@@ -4,6 +4,9 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.vm.Teleported
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.util.UUID
 
 /**
  * Sub-VM module legos: tika / corenlp / camel / graalce hosted as [LcncNodeRunner]s
@@ -35,6 +38,7 @@ object SubVmLegos {
      */
     fun register(ctx: borg.trikeshed.module.ModuleContext) {
         val host = borg.trikeshed.vm.VmSupervisor.current
+        ctx.lcncRunners.putAll(VmRuntimeNodes.runners(host))
         ctx.lcncRunners[TIKA] = tika(host)
         ctx.lcncRunners[CORENLP] = corenlp(host)
         ctx.lcncRunners[CAMEL] = camel(host)
@@ -162,7 +166,7 @@ object SubVmLegos {
 
     // ── tika: extract text + metadata from world-seeded files ─────────
 
-    fun tika(host: borg.trikeshed.vm.VmHost) = LcncNodeRunner { node, inputs ->
+    fun tika(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val facet = facetOf(node, default = "JVM")
         val files = inputStrings(node, inputs, key = "files")
             .ifEmpty { inputStrings(node, inputs, key = "text").let { if (it.isEmpty()) emptyList() else listOf("<text>") } }
@@ -170,12 +174,12 @@ object SubVmLegos {
             appendLine("tika = Java.type('org.apache.tika.Tika')")
             for (f in files) appendLine("print(tika.parseToString(java.nio.file.Paths.get('/workspace/$f')))")
         }
-        evalInVm(host, node, facet, script, inputs)
+        evalInVm(service.value, node, facet, script, inputs)
     }
 
     // ── corenlp: Stanford pipeline over a text lane ────────────────────
 
-    fun corenlp(host: borg.trikeshed.vm.VmHost) = LcncNodeRunner { node, inputs ->
+    fun corenlp(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val facet = facetOf(node, default = "JVM")
         val text = inputStrings(node, inputs, key = "text").joinToString("\n")
             .ifEmpty { node.params["text"] ?: "" }
@@ -202,7 +206,7 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(host, node, facet, script, text, inputs, defaultModule = "corenlp")
+        evalInVmText(service.value, node, facet, script, text, inputs, defaultModule = "corenlp")
     }
 
     // ── corenlp.extract: NER + dependency + sentiment per sentence ───
@@ -210,7 +214,7 @@ object SubVmLegos {
     // JSON instead of flat token/tag/lemma lines.  The annotators string
     // defaults to include ner; sentiment is opt-in (param "sentiment"=true).
 
-    fun corenlpExtract(host: borg.trikeshed.vm.VmHost) = LcncNodeRunner { node, inputs ->
+    fun corenlpExtract(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val facet = facetOf(node, default = "JVM")
         val text = inputStrings(node, inputs, key = "text").joinToString("\n")
             .ifEmpty { node.params["text"] ?: "" }
@@ -282,12 +286,12 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(host, node, facet, script, text, inputs, defaultModule = "corenlp")
+        evalInVmText(service.value, node, facet, script, text, inputs, defaultModule = "corenlp")
     }
 
     // ── camel: route DSL over the lego's params ─────────────────────────
 
-    fun camel(host: borg.trikeshed.vm.VmHost) = LcncNodeRunner { node, inputs ->
+    fun camel(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val facet = facetOf(node, default = "JVM")
         val from = node.params["from"] ?: "direct:lcnc"
         val to = node.params["to"] ?: "log:lcnc"
@@ -320,7 +324,7 @@ object SubVmLegos {
         val gateApplies = borg.trikeshed.graal.subvm.GuestModules.isInstalled(moduleName)
         for ((port, uri) in if (gateApplies) listOf("from" to from, "to" to to) else emptyList()) {
             borg.trikeshed.lcnc.CamelLinkage.refusal(uri, reach, mountedChain)?.let { why ->
-                return@LcncNodeRunner mapOf(
+                return@boundLcnc mapOf(
                     "routed" to "",
                     "ok" to false,
                     "error" to "vm.camel refuses $port='$uri': $why",
@@ -362,15 +366,15 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(host, node, facet, script, body, inputs, defaultModule = "camel")
+        evalInVmText(service.value, node, facet, script, body, inputs, defaultModule = "camel")
     }
 
     // ── graalce: any Graal language, source spelled inline ──────────────
 
-    fun graalce(host: borg.trikeshed.vm.VmHost) = LcncNodeRunner { node, inputs ->
+    fun graalce(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val facet = facetOf(node, default = "GRAAL_JS")
-        val source = node.params["source"] ?: ""
-        evalInVm(host, node, facet, source, inputs)
+        val source = VmRuntimeNodes.string(node, inputs, "source", allowBlank = true)
+        evalInVm(service.value, node, facet, source, inputs)
     }
 
     // ── shared eval path ────────────────────────────────────────────────
@@ -408,7 +412,7 @@ object SubVmLegos {
     ): Map<String, Any?> {
         val facet = borg.trikeshed.vm.vmFacetOf(facetName)
             ?: throw IllegalArgumentException("vm lego '${node.id}': unknown facet '$facetName' (use JVM, GRAAL_JS, …)")
-        val world = inputStrings(node, inputs, key = "world")
+        val world = VmRuntimeNodes.strings(node, inputs, "world")
         // `module` names the guest classpath this lego needs (utils/subvm/<module>). An explicit
         // param wins so a canvas can point a lego at a different build of the same library.
         val module = node.params["module"] ?: defaultModule
@@ -422,16 +426,33 @@ object SubVmLegos {
                         ?: " (no utils/subvm directory found from ${System.getProperty("user.dir")})"),
             )
         }
+        val keep = node.params["keep"]?.let {
+            requireNotNull(it.toBooleanStrictOrNull()) { "keep must be true or false" }
+        } ?: false
+        val id = VmRuntimeNodes.value(node, inputs, "vmId")?.let {
+            VmRuntimeNodes.id(VmRuntimeNodes.string(node, inputs, "vmId"))
+        } ?: if (keep) VmRuntimeNodes.id("lcnc:${node.id}") else "lcnc:${UUID.randomUUID()}"
+        val trust = VmRuntimeNodes.trust(node, inputs)
+        require(world.isEmpty() || trust == borg.trikeshed.vm.VmTrust.OWN) { "VM world requires OWN trust" }
+        require(module == null || trust == borg.trikeshed.vm.VmTrust.OWN) { "VM module requires OWN trust" }
         val spec = borg.trikeshed.vm.VmSpec(
-            id = "lcnc:${node.id}",
+            id = id,
             facet = facet,
-            trust = if (node.params["trust"] == "UNTRUSTED") borg.trikeshed.vm.VmTrust.UNTRUSTED else borg.trikeshed.vm.VmTrust.OWN,
+            trust = trust,
+            budget = VmRuntimeNodes.budget(node, inputs),
             world = world,
             module = module,
         )
-        val handle = host.get(spec.id) ?: host.spawn(spec)
+        currentCoroutineContext().ensureActive()
+        val existing = host.get(spec.id)
+        require(existing == null || existing.facet == facet) { "VM '${spec.id}' has a different facet" }
+        check(existing == null || existing.isAlive) { "VM '${spec.id}' is not alive" }
+        val handle = existing ?: host.spawn(spec)
+        var failure: Throwable? = null
+        var succeeded = false
         return try {
             val tele = handle.eval(source, node.id)
+            currentCoroutineContext().ensureActive()
             // The eval VALUE is the lego's structured result — the scripts end
             // with the payload expression (print() is only a human trace on the
             // VM's xterm, lossy past 28 rows). Terminal text is the FALLBACK for
@@ -449,7 +470,7 @@ object SubVmLegos {
                 }
                 sb + "\n" + term.plainText()
             }.getOrNull()
-            mapOf(
+            val output = mapOf(
                 "facet" to facet.id,
                 "vmId" to spec.id,
                 "cid" to tele.cid.value,
@@ -460,8 +481,21 @@ object SubVmLegos {
                 },
                 "inputs" to inputs.keys.toList(),
             )
+            succeeded = true
+            output
+        } catch (t: Throwable) {
+            failure = t
+            throw t
         } finally {
-            if (node.params["keep"] != "true") runCatching { handle.close() }
+            if (existing == null && (!keep || !succeeded)) {
+                try {
+                    host.revoke(spec.id, "lcnc invocation closed")
+                } catch (cleanup: Throwable) {
+                    val original = failure
+                    if (original == null) throw cleanup
+                    if (cleanup !== original) original.addSuppressed(cleanup)
+                }
+            }
         }
     }
 
@@ -497,9 +531,11 @@ object SubVmLegos {
 
     /** Input lane: wire-carried values win; the `in:`-prefixed param is the fallback spelling. */
     private fun inputStrings(node: LcncNode, inputs: Map<String, Any?>, key: String): List<String> {
-        val wired = inputs[key]
-        if (wired != null) return listOf(wired.toString())
-        val param = node.params["in:$key"] ?: return emptyList()
-        return param.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        return when (val value = VmRuntimeNodes.value(node, inputs, key)) {
+            null -> emptyList()
+            is String -> listOf(value)
+            is List<*> -> value.map { require(it is String) { "$key must contain text" }; it }
+            else -> throw IllegalArgumentException("$key must be text or a list of text")
+        }
     }
 }

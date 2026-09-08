@@ -32,11 +32,7 @@ object NalNodes {
         bag: BeliefBagElement,
         rete: ReteNetwork,
         kifSink: (String) -> Unit = {},
-    ): LcncNodeRunner = boundLcnc(bag) { bag, node, inputs ->
-        // Delegate to ConstructionBotNode.runner — the only model-spend seam.
-        val delegate = ConstructionBotNode.runner(brain, muxContext, cas, bag, rete, kifSink)
-        delegate.execute(node, inputs)
-    }
+    ): LcncNodeRunner = ConstructionBotNode.runner(brain, muxContext, cas, bag, rete, kifSink)
 
     /**
      * `nal.decay` — a thin pulse that sends [BeliefIntake.DecayTick] into the

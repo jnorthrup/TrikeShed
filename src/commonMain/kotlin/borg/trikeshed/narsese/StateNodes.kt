@@ -5,7 +5,10 @@ import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lcnc.CasStoreKey
+import borg.trikeshed.lcnc.KifKnowledgeBaseKey
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.RdfGraphProviderKey
 import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.TurtleRdf
@@ -34,7 +37,12 @@ object StateNodes {
         kif: KifKnowledgeBase,
         graph: () -> RdfGraph,  // lazy: graph may be mutated between ticks
         cas: CasStore,
-    ): LcncNodeRunner = boundLcnc(bag) { bag, _, _ ->
+    ): LcncNodeRunner = boundLcnc(CasStoreKey(cas),
+        boundLcnc(KifKnowledgeBaseKey(kif),
+            boundLcnc(RdfGraphProviderKey(graph), boundLcnc(bag) { bag, _, _ ->
+        val cas = CasStoreKey.require()
+        val kif = KifKnowledgeBaseKey.require()
+        val graph = RdfGraphProviderKey.require()
         // 1. Bag snapshot: COW map of angular → signal
         val bagSnap = bag.snapshot()
         val bagJson = buildString {
@@ -79,7 +87,7 @@ object StateNodes {
             "rdfCid" to (rdfCid?.value ?: ""),
             "bagSize" to bagSnap.size,
         ))
-    }
+    })))
 
     /**
      * `state.thaw` — load a freeze receipt from CAS, restore KIF assertions,
@@ -91,7 +99,10 @@ object StateNodes {
         bag: BeliefBagElement,
         cas: CasStore,
         kif: KifKnowledgeBase,
-    ): LcncNodeRunner = boundLcnc(bag) { bag, node, _ ->
+    ): LcncNodeRunner = boundLcnc(CasStoreKey(cas),
+        boundLcnc(KifKnowledgeBaseKey(kif), boundLcnc(bag) { bag, node, _ ->
+        val cas = CasStoreKey.require()
+        val kif = KifKnowledgeBaseKey.require()
         val cidStr = (node.params["cid"]
             ?: (node.params["snapshotCid"] ?: ""))
         require(cidStr.isNotEmpty()) { "state.thaw requires a cid param" }
@@ -137,7 +148,7 @@ object StateNodes {
             "bagRestored" to bagRestored,
             "kifAssertionsRestored" to kifRestored,
         ))
-    }
+    }))
 
     /** Compile-compat shim for the pre-bag registration; the daemon migrates off it. */
     @Deprecated(
@@ -147,12 +158,13 @@ object StateNodes {
     fun thawRunner(
         cas: CasStore,
         kif: KifKnowledgeBase,
-    ): LcncNodeRunner = LcncNodeRunner { node, _ ->
+    ): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(KifKnowledgeBaseKey(kif)) { kif, node, _ ->
+        val cas = CasStoreKey.require()
         val cidStr = (node.params["cid"]
             ?: (node.params["snapshotCid"] ?: ""))
         require(cidStr.isNotEmpty()) { "state.thaw requires a cid param" }
         val receiptBytes = cas.get(ContentId(cidStr))
-            ?: return@LcncNodeRunner mapOf("restored" to mapOf("error" to "CID not found in CAS"))
+            ?: return@boundLcnc mapOf("restored" to mapOf("error" to "CID not found in CAS"))
         val receipt = receiptBytes.decodeToString()
         val bagCid = extractJsonField(receipt, "bagCid")
         val kifCid = extractJsonField(receipt, "kifCid")
@@ -161,9 +173,9 @@ object StateNodes {
             "bagCid" to bagCid,
             "kifCid" to kifCid,
             "bagRestored" to 0,
-            "kifAssertionsRestored" to restoreKif(cas, kif, kifCid),
+            "kifAssertionsRestored" to restoreKif(cas, kif.value, kifCid),
         ))
-    }
+    })
 
     private fun restoreKif(cas: CasStore, kif: KifKnowledgeBase, kifCid: String): Int {
         if (kifCid.isEmpty()) return 0

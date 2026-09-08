@@ -5,12 +5,16 @@ import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lcnc.CasStoreKey
+import borg.trikeshed.lcnc.KifKnowledgeBaseKey
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncServiceBinding
+import borg.trikeshed.lcnc.RdfGraphProviderKey
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.rdf.RdfGraph
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -21,6 +25,7 @@ import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -40,12 +45,12 @@ class StatefulNarsContextTest {
         await { bag.budgetOf(angular) != null }
     }
 
-    private fun required(runner: LcncNodeRunner, key: CoroutineContext.Key<*>) {
+    private fun required(runner: LcncNodeRunner, vararg keys: CoroutineContext.Key<*>) {
         val binding = runner as LcncServiceBinding
-        assertEquals(1, binding.requiredKeys.size)
-        assertSame(key, binding.requiredKeys[0])
-        assertEquals(1, binding.providedKeys.size)
-        assertSame(key, binding.providedKeys[0])
+        assertEquals(keys.size, binding.requiredKeys.size)
+        assertEquals(keys.toSet(), binding.requiredKeys.view.toSet())
+        assertEquals(keys.size, binding.providedKeys.size)
+        assertEquals(keys.toSet(), binding.providedKeys.view.toSet())
     }
 
     @Test
@@ -174,7 +179,7 @@ class StatefulNarsContextTest {
     }
 
     @Test
-    fun freezeAndThawUseSelectedBagsWithTheSuppliedCasAndKnowledgeBase() = runTest {
+    fun freezeAndThawResolveBagCasKnowledgeBaseAndGraphProviders() = runTest {
         val original = BeliefBagElement(capacity = 32)
         val source = BeliefBagElement(capacity = 32)
         val target = BeliefBagElement(capacity = 32)
@@ -185,26 +190,35 @@ class StatefulNarsContextTest {
             mint(original, 33L)
             mint(source, 11L)
             mint(source, 22L)
+            val originalCas = CasStore.inMemory()
+            val originalKif = KifKnowledgeBase().apply { assertKif("(instance Original Knowledge)") }
             val cas = CasStore.inMemory()
             val kif = KifKnowledgeBase().apply { assertKif("(instance Freeze RoundTrip)") }
+            var defaultProjections = 0
             var projections = 0
-            val freeze = StateNodes.freezeRunner(original, kif, {
+            val freeze = StateNodes.freezeRunner(original, originalKif, {
+                defaultProjections++
+                RdfGraph(emptyList())
+            }, originalCas)
+            val restoredKif = KifKnowledgeBase()
+            val thaw = StateNodes.thawRunner(original, originalCas, originalKif)
+            required(freeze, CasStoreKey, KifKnowledgeBaseKey, RdfGraphProviderKey, BeliefBagElement.Key)
+            required(thaw, CasStoreKey, KifKnowledgeBaseKey, BeliefBagElement.Key)
+            val frozen = withContext(source + CasStoreKey(cas) + KifKnowledgeBaseKey(kif) + RdfGraphProviderKey {
                 projections++
                 RdfGraph(emptyList())
-            }, cas)
-            val restoredKif = KifKnowledgeBase()
-            val thaw = StateNodes.thawRunner(original, cas, restoredKif)
-            required(freeze, BeliefBagElement.Key)
-            required(thaw, BeliefBagElement.Key)
-            val frozen = withContext(source) { freeze.run(node("state.freeze"), emptyMap()) }
+            }) { freeze.run(node("state.freeze"), emptyMap()) }
             val snapshot = frozen["snapshot"] as Map<*, *>
             assertEquals(2, snapshot["bagSize"])
             assertEquals(1, projections)
+            assertEquals(0, defaultProjections)
             assertNotNull(cas.get(ContentId(snapshot["cid"] as String)))
+            assertNull(originalCas.get(ContentId(snapshot["cid"] as String)))
+            assertTrue("(instance Freeze RoundTrip)" in cas.get(ContentId(snapshot["kifCid"] as String))!!.decodeToString())
             val bagBytes = assertNotNull(cas.get(ContentId(snapshot["bagCid"] as String))).decodeToString()
             assertTrue("\"angular\":11," in bagBytes && "\"angular\":22," in bagBytes)
             assertTrue("\"angular\":33," !in bagBytes)
-            val restored = withContext(target) {
+            val restored = withContext(target + CasStoreKey(cas) + KifKnowledgeBaseKey(restoredKif)) {
                 thaw.run(node("state.thaw", mapOf("cid" to snapshot["cid"] as String)), emptyMap())
             }["restored"] as Map<*, *>
             await { target.size == 2 }
@@ -212,9 +226,26 @@ class StatefulNarsContextTest {
             assertEquals(2, restored["bagRestored"])
             assertEquals(1, restored["kifAssertionsRestored"])
             assertTrue("(instance Freeze RoundTrip)" in restoredKif.toKifFile())
+            assertTrue("Freeze" !in originalKif.toKifFile())
             assertEquals(1, original.size)
             assertEquals(ElementState.ACTIVE, source.state)
             assertEquals(ElementState.ACTIVE, target.state)
+
+            val defaultSnapshot = freeze.run(node("state.freeze"), emptyMap())["snapshot"] as Map<*, *>
+            assertEquals(1, defaultSnapshot["bagSize"])
+            assertEquals(1, defaultProjections)
+            assertNotNull(originalCas.get(ContentId(defaultSnapshot["cid"] as String)))
+
+            @Suppress("DEPRECATION")
+            val legacy = StateNodes.thawRunner(originalCas, originalKif)
+            required(legacy, CasStoreKey, KifKnowledgeBaseKey)
+            val legacyKif = KifKnowledgeBase()
+            val legacyResult = withContext(CasStoreKey(cas) + KifKnowledgeBaseKey(legacyKif)) {
+                legacy.run(node("state.thaw", mapOf("cid" to snapshot["cid"] as String)), emptyMap())
+            }["restored"] as Map<*, *>
+            assertEquals(0, legacyResult["bagRestored"])
+            assertEquals(1, legacyResult["kifAssertionsRestored"])
+            assertTrue("(instance Freeze RoundTrip)" in legacyKif.toKifFile())
         } finally {
             target.drain()
             source.drain()

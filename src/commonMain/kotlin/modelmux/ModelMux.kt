@@ -125,6 +125,8 @@ class ModelMux internal constructor(
      * rate and that trade belongs to whoever owns the traffic.
      */
     private val cacheCascade: CacheCascade = CacheCascade.EXACT_ONLY,
+    /** Configured selection, independent of catalog order and previous responses. */
+    val defaultModel: String? = null,
 ) {
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
@@ -680,6 +682,9 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
     private val models = mutableListOf<ModelEntry>()
     private var quotaLegion: QuotaLegion? = null
     private var cascade: CacheCascade = CacheCascade.EXACT_ONLY
+    private var defaultModel: String? = null
+
+    fun defaultModel(id: String): ModelMuxBuilder = apply { defaultModel = id }
 
     init {
         // The legion is constructed by default: receipts metered into it on every
@@ -752,8 +757,9 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
     private val pendingUrls = mutableMapOf<String, String>()
 
     internal fun build(): ModelMux {
+        require(defaultModel == null || models.any { it.a == defaultModel }) { "Default model is not in the catalog" }
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion, cascade)
+        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion, cascade, defaultModel)
     }
 }
 

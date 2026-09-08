@@ -387,9 +387,12 @@ def palette(index):
                     value = index.string(source, *span) if span else None
                     metadata = {key: source.raw(*value) for key, value in args.items()
                                 if isinstance(key, str) and re.search(r"construction|binding|context|key|exception", key, re.I)}
+                    ports = [args.get(name, args.get(position)) for name, position in (("inputs", 2), ("outputs", 3))]
+                    empty_ports = all(span and source.v[span[0]:span[1]] in (["emptyList", "(", ")"], ["listOf", "(", ")"]) for span in ports)
                     entries.append({**source.site(a), "type": value,
                                     "type_expression": source.raw(*span) if span else None,
-                                    "type_resolved": value is not None, "metadata": metadata})
+                                    "type_resolved": value is not None, "metadata": metadata,
+                                    "empty_ports_declared": empty_ports})
                 # A mapping/copy after the literal list is evidence, not per-type coverage.
                 if source.v[end + 1:end + 2] == ["."]:
                     issues.append({**source.site(end + 1), "reason": "postprocessed-palette-metadata",
@@ -428,10 +431,11 @@ def key_declarations(index):
                         continue
                     args = source.args(left + 1)
                     span = args.get("type", args.get(0))
+                    typed = _match(source, declaration["header"], declaration["header_end"], r"val type : String\b") is not None
                     keys.append({**row, **source.site(left),
                                  "qualified": declaration["qualified"] + "." + source.v[left],
                                  "kind": "enum-entry", "singleton": True, "aliases": [],
-                                 "palette_type": index.string(source, *span) if span else None,
+                                 "palette_type": index.string(source, *span) if span and typed else None,
                                  "type_expression": source.raw(*span) if span else None})
     return keys
 
@@ -484,7 +488,8 @@ def source_sites(index, keys):
             if stop != close or (key not in key_symbols and not context_syntax):
                 continue
             tail = source.v[close + 1:close + 4]
-            severity = "throws" if tail[:1] == ["!!"] or (tail[:1] == ["?:"] and tail[1:2] in (["error"], ["throw"])) else "optional"
+            checked = source.v[max(0, i - 2):i] in (["checkNotNull", "("], ["requireNotNull", "("])
+            severity = "throws" if checked or tail[:1] == ["!!"] or (tail[:1] == ["?:"] and tail[1:2] in (["error"], ["throw"])) else "optional"
             if severity != "throws" and tail[:1] == ["?:"]:
                 severity = "fallback"
             demands.append({**source.site(i), "source_offset": source.tokens[i].start,
@@ -603,6 +608,9 @@ def executor_evidence(index):
     def check(name, owner, method_name, pattern):
         method = index.method(_LCNC + owner, method_name)
         match = _match(method[0], method[2], method[3], pattern) if method else None
+        reference = {"factory-owns-key": "LcncNodeElement", "sam-selects-key": "LcncNodeKey"}.get(name)
+        if match is not None and reference and index.resolve(method[0], reference, match) != _LCNC + reference:
+            match = None
         row = {"check": name, "status": "observed" if match is not None else "unresolved"}
         if match is not None:
             row.update(method[0].site(match))
@@ -624,7 +632,7 @@ def executor_evidence(index):
     if len(declarations) == 1:
         source, d = declarations[0]
         if index.inherits(d["qualified"], ELEMENT):
-            found = _match(source, d["header"], d["header_end"], r"override val key : LcncNodeKey")
+            found = _match(source, d["header"], d["header_end"], r"override val key : LcncNodeKey\b")
     checks.append({"check": "element-owns-key", "status": "observed" if found is not None else "unresolved",
                    **(source.site(found) if found is not None else {})})
     check("sam-selects-key", "LcncNodeRunner", "run", r"val key = LcncNodeKey \. of \( node \. type \)")
@@ -771,10 +779,15 @@ def audit(texts):
         structural = branch if expected_role and branch and branch["role"] == expected_role else None
         if structural:
             valid_key = structural["key"] == _LCNC + "LcncScopeFrame.Key" if expected_role != "PRESENTATION" else structural["key_expression"] == "null"
-            status = "structural" if valid_key and not declared else "ambiguous"
+            if expected_role != "PRESENTATION":
+                valid_key = valid_key and any(b["element"] == _LCNC + "LcncScopeFrame" and b["key"] == structural["key"] for b in sites["element_bindings"])
+            valid_reason = expected_role == "SCOPE" or bool(structural["exception"])
+            status = "structural" if valid_key and valid_reason and not declared else "ambiguous"
         if not entry["type_resolved"]:
             status = "unresolved-type"
         structural_path = structural_paths.get(entry["type"])
+        if expected_role == "PRESENTATION" and not entry["empty_ports_declared"]:
+            structural_path = None
         dispatch = executor["status"] if status == "declared" else structural_path["status"] if status == "structural" and structural_path else "unresolved"
         metadata_status = "declared" if metadata["contract_property"] and (structural or (declared and metadata["invocation_lookup"])) else "unresolved"
         gap = status not in ("declared", "structural") or dispatch == "unresolved" or metadata_status == "unresolved"

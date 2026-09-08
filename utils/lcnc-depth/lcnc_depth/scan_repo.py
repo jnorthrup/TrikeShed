@@ -300,6 +300,9 @@ def _palette_report(a: dict) -> None:
     w(f"    All-package inventory: {sum(k['singleton'] for k in a['keys'])} singleton keys, "
       f"{len(a['construction_sites'])} construction sites, {len(a['installation_sites'])} context-call candidates, "
       f"{len(a['demand_sites'])} read sites\n")
+    bindings = a["service_metadata"]["binding_sites"]
+    unresolved = sum(d["status"] == "unresolved-element-key" for b in bindings for d in b["defaults"])
+    w(f"    Service metadata: {len(bindings)} registry binding sites, {unresolved} unresolved default-element keys\n")
     for row in a["rows"]:
         structural = row["structural_exception"] or row["scope_construction"]
         if structural:
@@ -311,7 +314,7 @@ def _palette_report(a: dict) -> None:
             w(f"    GAP {row['type'] or row['type_expression']}: mapping={row['invocation_mapping']}, "
               f"executor={row['executor_construction']}, metadata={row['context_metadata']} "
               f"({row['path']}:{row['line']})\n")
-    for issue in palette["issues"] + a["scope"].get("source_errors", []):
+    for issue in palette["issues"] + a["context_metadata"]["unresolved"] + a["scope"].get("source_errors", []):
         w(f"    UNRESOLVED {issue}\n")
     for key in a["extra_invocation_keys"] + a["unresolved_invocation_keys"]:
         w(f"    UNRESOLVED KEY {key['qualified']} ({key['path']}:{key['line']})\n")

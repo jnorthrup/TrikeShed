@@ -39,6 +39,7 @@ canvas.spark{display:block;margin-top:3px}
 #river{position:absolute;top:78px;right:10px;width:300px;bottom:150px;overflow:hidden;display:flex;flex-direction:column;gap:3px;pointer-events:none;z-index:4}
 .evt{background:rgba(17,21,30,.92);border-left:3px solid var(--dim);border-radius:3px;padding:3px 8px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:drop .25s ease-out}
 .evt small{color:var(--dim)}
+.evt[data-kind="build"]{order:-1;flex-shrink:0}
 @keyframes drop{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
 /* ── panels ──────────────────────────────────────────────── */
 .panel{position:absolute;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:6;display:none;flex-direction:column}
@@ -1497,11 +1498,15 @@ const COLORS={build:'#68c8c1',compile:'var(--compile)',deopt:'var(--deopt)',gc:'
 const PING={build:'#68c8c1',compile:'#3ddc84',deopt:'#ff4f58',gc:'#ffb02e',commit:'#3fd0ff'};
 function river(kind,text){
   const d=document.createElement('div');d.className='evt';d.style.borderLeftColor=COLORS[kind]||'var(--dim)';
+  d.dataset.kind=kind;
   const time=document.createElement('small');time.textContent=new Date().toTimeString().slice(0,8);
   const tag=document.createElement('b');tag.style.color=COLORS[kind]||'#fff';tag.textContent=kind;
   d.append(time,' ',tag,' ',String(text));
-  const r=$('river');r.prepend(d);while(r.children.length>34)r.lastChild.remove();
+  const r=$('river');r.prepend(d);
+  const rows=r.querySelectorAll(kind==='build'?'.evt[data-kind="build"]':'.evt:not([data-kind="build"])');
+  for(let i=kind==='build'?8:26;i<rows.length;i++)rows[i].remove();
 }
+new ResizeObserver(()=>{$('river').style.top=Math.ceil($('hud').getBoundingClientRect().bottom+4)+'px';}).observe($('hud'));
 function flash(chip,cls){if(reduced)return;chip.classList.add(cls);setTimeout(()=>chip.classList.remove(cls),450);}
 function pingAt(n,color,label){
   if(!n||!n.rect)n=root;if(!n||!n.rect)return;
@@ -1522,8 +1527,8 @@ function topOf(n){let t=n;while(t&&t.parent&&t.parent!==root)t=t.parent;return t
 function quake(e,n,kind='commit'){
   recentCommits++;
   const color=PING[kind];
-  const label=e.phase||kind;
-  if(recentCommits<=12){river(kind,(e.phase?e.phase+' ':'')+(e.deleted?'✕ ':'')+e.id);pingAt(n,color);return;}
+  const label=(e.deleted?'deleted ':'')+(e.phase==='compiled'?'compiler output':e.phase==='staged'?'staged output':kind);
+  if(recentCommits<=12){river(kind,label+' '+e.id);pingAt(n,color);return;}
   const t=kind==='commit'?topOf(n||root):(n?.leaf?n.parent:n)||root;
   const territory=t===root?'/':pathOf(t),k=label+':'+territory;
   const q=quakeBuf.get(k)||{n:t,count:0,kind,color,label,territory};q.count++;quakeBuf.set(k,q);

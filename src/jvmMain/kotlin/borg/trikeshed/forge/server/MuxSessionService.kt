@@ -60,7 +60,7 @@ class MuxSessionService(
                         "base" to mux.configuredBaseUrl(card.a).orEmpty(), "keyPresent" to (keyId != null),
                         "envVar" to (keyId ?: "llm.${card.providerTag ?: card.a}.key"), "discovered" to true)
                 } }
-                return response(mapOf("models" to catalog, "roster" to catalog, "defaultModel" to brain.lastModel()))
+                return response(mapOf("models" to catalog, "roster" to catalog, "defaultModel" to (mux.defaultModel ?: brain.lastModel())))
             }
             if (method == "GET" && route == Route.ACTIVITY) {
                 val external = brain.modelMux()

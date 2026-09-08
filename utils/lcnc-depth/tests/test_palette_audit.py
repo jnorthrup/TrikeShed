@@ -19,7 +19,8 @@ object LcncContracts {
     const val SCOPE_OUT = "scope.out"
     fun all(): List<LcncPortContract> = listOf(
         LcncPortContract(SCOPE), LcncPortContract(SCOPE_IN), LcncPortContract(SCOPE_OUT),
-        LcncPortContract("note"), LcncPortContract("program.ref"),
+        LcncPortContract("note", inputs = emptyList(), outputs = emptyList()),
+        LcncPortContract("program.ref", inputs = emptyList(), outputs = emptyList()),
         LcncPortContract("http.get"), LcncPortContract(ProjectNodes.READ),
         LcncPortContract(PromptNodes.GET), LcncPortContract(SubVm.LEGO_PREFIX + "tika"),
     )
@@ -181,6 +182,11 @@ def test_computed_all_and_copy_fallback_remain_unresolved():
     result = audit(sources)
     assert result["palette"]["issues"][0]["reason"] == "unsupported-all-expression"
     assert result["summary"]["gaps"] > 0
+    sources = changed("lcnc/Contracts.kt", "    )\n}\nobject ProjectNodes",
+                      "    ).map { it.copy(context = fallback()) }\n}\nobject ProjectNodes")
+    result = audit(sources)
+    assert result["palette"]["issues"][0]["reason"] == "postprocessed-palette-metadata"
+    assert result["summary"]["gaps"] > 0
 
 
 def test_all_packages_key_inheritance_aliases_and_source_evidence():
@@ -253,6 +259,54 @@ fun get() = currentCoroutineContext()[LcncScopeFrame]
     assert row["key"] == "borg.trikeshed.lcnc.LcncScopeFrame.Key"
     binding = next(b for b in result["element_bindings"] if b["element"].endswith("LcncScopeFrame"))
     assert binding["key"] == row["key"]
+
+
+def test_structural_metadata_alone_does_not_prove_executor_handling():
+    result = audit(changed("lcnc/Runner.kt", "withContext(childFrame)", "withContext(otherFrame)"))
+    scope = next(r for r in result["rows"] if r["type"] == "scope")
+    assert scope["invocation_mapping"] == "structural" and scope["gap"]
+    result = audit(changed("lcnc/Contracts.kt", '"note", inputs = emptyList()', '"note", inputs = listOf("value")'))
+    note = next(r for r in result["rows"] if r["type"] == "note")
+    assert note["executor_construction"] == "unresolved" and note["gap"]
+    result = audit(changed("lcnc/Frame.kt", "AbstractCoroutineContextElement(Key)", "AbstractCoroutineContextElement(OtherKey)"))
+    assert all(r["gap"] for r in result["rows"] if r["type"] in ("scope", "scope.in", "scope.out"))
+
+
+def test_service_binding_metadata_keeps_generic_element_and_fulfillment_distinct():
+    sources = deepcopy(SOURCES)
+    sources["lcnc/Services.kt"] = '''package borg.trikeshed.lcnc
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.AbstractCoroutineContextElement
+class LcncService<T>(key: LcncServiceKey<T>, val value: T) : AbstractCoroutineContextElement(key)
+abstract class LcncServiceKey<T> : CoroutineContext.Key<LcncService<T>> {
+    suspend fun require(): T = checkNotNull(currentCoroutineContext()[this]).value
+}
+interface LcncServiceBinding {
+    val requiredKeys: Keys
+    val providedKeys: Keys
+}
+class ProjectCorpus
+object ProjectCorpusKey : LcncServiceKey<ProjectCorpus>()
+object OtherServiceKey : LcncServiceKey<ProjectCorpus>()
+fun registry() = mapOf(
+    "project.read" to boundLcnc(ProjectCorpusKey(corpus), boundLcnc(OtherServiceKey(other)) { _, node, inputs ->
+        ProjectCorpusKey.require().read()
+    }),
+    "http.get" to boundLcnc(unknownProvider) { _, _, _ -> emptyMap() },
+)
+'''
+    result = audit(sources)
+    key = next(k for k in result["keys"] if k["qualified"].endswith(".ProjectCorpusKey"))
+    assert key["element"] == "borg.trikeshed.lcnc.LcncService"
+    read = next(r for r in result["rows"] if r["type"] == "project.read")
+    binding = read["service_bindings"][0]
+    assert [d["key"] for d in binding["defaults"]] == [
+        "borg.trikeshed.lcnc.ProjectCorpusKey", "borg.trikeshed.lcnc.OtherServiceKey"]
+    assert binding["direct_demands"][0]["severity"] == "throws"
+    assert binding["runtime_fulfillment"] == "unresolved"
+    http = next(r for r in result["rows"] if r["type"] == "http.get")
+    assert http["service_bindings"][0]["defaults"][0]["status"] == "unresolved-element-key"
+    assert read["service_requirements"] == "unresolved-transitive-reachability"
 
 
 def test_cli_gate_is_independent_of_historical_ccek_reachability(tmp_path, capsys):

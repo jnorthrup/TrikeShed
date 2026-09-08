@@ -4,9 +4,17 @@ import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lcnc.BrainClientKey
+import borg.trikeshed.lcnc.CasStoreKey
+import borg.trikeshed.lcnc.KifKnowledgeBaseKey
+import borg.trikeshed.lcnc.KifSinkKey
+import borg.trikeshed.lcnc.LegalCitationsKey
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncScopeFrame
+import borg.trikeshed.lcnc.MuxContextKey
+import borg.trikeshed.lcnc.boundLcnc
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -56,7 +64,14 @@ object LegalNodes {
         muxContext: CoroutineContext,
         cas: CasStore,
         kifSink: (String) -> Unit = {},
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(BrainClientKey(brain),
+        boundLcnc(MuxContextKey(muxContext),
+            boundLcnc(CasStoreKey(cas),
+                boundLcnc(KifSinkKey(kifSink), boundLcnc(LegalCitationsKey(::runEyecite)) { citations, node, inputs ->
+        val brain = BrainClientKey.require()
+        val muxContext = MuxContextKey.require()
+        val cas = CasStoreKey.require()
+        val kifSink = KifSinkKey.require()
         // Inputs are keyed by the wire's literal toPort (LcncRunner.gather()
         // does not strip the `?`), and — same as mux.chat's prompt — a
         // human-oversight brief can arrive as a root frame binding instead
@@ -77,7 +92,7 @@ object LegalNodes {
 
         // Step 1: real citation extraction — eyecite, run as a subprocess
         // (see class doc for why it's a subprocess and not a vm.* guest).
-        val eyeciteCitations = runEyecite(text)
+        val eyeciteCitations = citations.value(text)
         val citationsHint = if (eyeciteCitations.isEmpty()) "(none found)"
             else eyeciteCitations.joinToString("\n") { c ->
                 val case = (c["case"] as? String).orEmpty()
@@ -107,7 +122,7 @@ object LegalNodes {
             appendLine("Never invent a CID or a party absent from the cited text.")
         }
 
-        val raw = withContext(muxContext) {
+        val raw = withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
             brain.chat(
                 messages = listOf(
                     "system" to "You are a legal document analyst. Extract structured legal data from the document. Never fabricate citations, holdings, or parties not present in the source text.",
@@ -158,7 +173,7 @@ object LegalNodes {
             // reads a brief, not a raw structured map.
             "brief" to renderBrief(groundedCitations, groundedHoldings, groundedParties),
         )
-    }
+    }))))
 
     /**
      * Assert the grounded (never the refused) extraction into the KIF bank,
@@ -260,7 +275,8 @@ object LegalNodes {
      *   each line attributed to its document atom, capped at `maxFacts`
      *   (param, default 64) with a loud truncation marker.
      */
-    fun evidenceRunner(kif: KifKnowledgeBase): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    fun evidenceRunner(kif: KifKnowledgeBase): LcncNodeRunner = boundLcnc(KifKnowledgeBaseKey(kif)) { service, node, inputs ->
+        val kif = service.value
         val documentCid = ((inputs["documentCid"] ?: inputs["documentCid?"]) as? String)
             ?: node.params["documentCid"].orEmpty()
         val brief = ((inputs["brief"] ?: inputs["brief?"]) as? String)

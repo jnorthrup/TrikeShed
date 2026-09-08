@@ -1611,6 +1611,25 @@ object OroborosDaemon {
         // LIVE: cards are rebuilt on the first mux call after Hermes' files
         // change, so the picklist shows a `/model` switch on its next open.
         suspend fun buildLcncMux(): modelmux.ModelMux {
+            val liveBrain = brainClient.live()
+            val pin = brainClient.pin["pin"] as? Map<*, *>
+            val pinnedModel = pin?.get("model") as? String
+            val pinnedProvider = pin?.get("provider") as? String
+            val pinnedBase = pin?.get("baseUrl") as? String
+            var catalogKeys = keyMux
+            val pinnedSpec = if (pinnedModel != null && pinnedProvider != null && pinnedBase != null) {
+                // Reuse the resolved launch's credential; custom profiles do not have a HarnessRegistry row.
+                val pinMux = liveBrain.modelMux()
+                val pinKeyId = requireNotNull(pinMux.modelKeyId(pinnedModel)) { "Configured model has no key binding" }
+                val pinKey = requireNotNull(pinMux.keyMux.get(pinKeyId)) { "Configured model key is unavailable" }
+                catalogKeys = catalogKeys
+                    .withBinding("llm.$pinnedProvider.key", keymux.FixedKeySource(pinKey, "hermes-pin"))
+                    .withBinding("llm.$pinnedProvider.base_url", keymux.FixedKeySource(pinnedBase, "hermes-pin"))
+                borg.trikeshed.jules.BrainClient.EndpointSpec(
+                    name = "hermes:$pinnedProvider", envVar = "", base = pinnedBase,
+                    model = pinnedModel, provider = pinnedProvider,
+                )
+            } else null
             // Cards come from Hermes FIRST — the model instances it has run on and
             // been answered by ($HERMES_HOME/state.db: sessions + session_model_usage,
             // HermesInstances) — then the static roster for whatever Hermes has not
@@ -1628,7 +1647,10 @@ object OroborosDaemon {
             val hermesInstances = hermesKnown.filter { hermesKeyed[it.provider] == true }
             val hermesSpecs = borg.trikeshed.jules.HermesInstances.specs(hermesInstances)
             val hermesClaimed = hermesSpecs.mapTo(HashSet()) { it.provider to it.model }
-            val lcncRoster = hermesSpecs + brainClient.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
+            val discovered = hermesSpecs + liveBrain.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
+            val lcncRoster = if (pinnedSpec == null) discovered else listOf(pinnedSpec) + discovered.filterNot {
+                (it.provider ?: it.name) == pinnedSpec.provider && it.model == pinnedSpec.model
+            }
             System.err.println(
                 "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.jules.HermesModelUsage.stateDb()}), " +
                     "${lcncRoster.size - hermesSpecs.size} from the static roster" +
@@ -1650,8 +1672,9 @@ object OroborosDaemon {
             // most it ever bore in one day, and what Hermes burned today is already charged —
             // the key is shared, so the pool is. Rebuilt with the mux on every ledger change.
             refreshQuotaLegion()
-            return modelmux.ModelMux(keyMux) {
+            return modelmux.ModelMux(catalogKeys) {
                 quota(quotaLegion)
+                if (pinnedSpec != null) defaultModel(lcncCardIds.first())
                 lcncRoster.forEachIndexed { i, ep ->
                     model(
                         id = lcncCardIds[i],

@@ -2,12 +2,20 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.lcnc.BrainClientKey
+import borg.trikeshed.lcnc.CasStoreKey
+import borg.trikeshed.lcnc.KifSinkKey
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lcnc.MuxContextKey
+import borg.trikeshed.lcnc.ReteNetworkKey
+import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.dag.ReteNetwork
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -25,12 +33,21 @@ object ConstructionBotNode {
         bag: BeliefBagElement,
         rete: ReteNetwork,
         kifSink: (String) -> Unit = {},
-    ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
+    ): LcncNodeRunner = boundLcnc(BrainClientKey(brain),
+        boundLcnc(MuxContextKey(muxContext),
+            boundLcnc(CasStoreKey(cas),
+                boundLcnc(ReteNetworkKey(rete),
+                    boundLcnc(KifSinkKey(kifSink), boundLcnc(bag) { bag, node, inputs ->
+        val brain = BrainClientKey.require()
+        val muxContext = MuxContextKey.require()
+        val cas = CasStoreKey.require()
+        val rete = ReteNetworkKey.require()
+        val kifSink = KifSinkKey.require()
         val lines = parseLines(inputs["lines"], cas)
         require(lines.isNotEmpty()) { "read.construct requires lines" }
         val bot = ConstructionBot {
             val prompt = buildPrompt(lines)
-            val raw = withContext(muxContext) {
+            val raw = withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
                 brain.chat(
                     messages = listOf(
                         "system" to "Extract only explicit causal constructions. Return JSON: {\"constructions\":[{\"subject\":string,\"relation\":\"causes|results_in|leads_to|because|therefore|if_then\",\"object\":string,\"polarity\":boolean,\"evidenceCid\":\"sha256:...\",\"dependency\":\"nsubj|dobj|nmod|acl|advcl:because|mark:if|advcl:if|cc:therefore|neg\"}]}. Never invent a CID or a relation absent from the cited line.",
@@ -63,7 +80,7 @@ object ConstructionBotNode {
                 "cid" to receipt.aggregates[i].identity.value,
             ) },
         )
-    }
+    })))))
 
     private fun parseLines(value: Any?, cas: CasStore): List<ConstructionSourceLine> {
         val raw = value as? List<*> ?: listOfNotNull(value)

@@ -64,7 +64,7 @@ class LiveBrainClient(
 
     val pin: Map<String, Any?> get() = account
 
-    private suspend fun live(): BrainClient = holder.current().also { last = it }
+    internal suspend fun live(): BrainClient = holder.current().also { last = it }
 
     override fun hasEndpoints(): Boolean = last.hasEndpoints()
     override fun endpointSummaries(): List<EndpointSpec> = last.endpointSummaries()

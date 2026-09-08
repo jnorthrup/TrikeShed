@@ -231,7 +231,7 @@ object BrainMuxNodes {
                 ?: node.params["prompt"]?.takeIf { it.isNotBlank() }
                 ?: ""
 
-            var model = node.params["model"] ?: ""
+            var model = node.params["model"]?.takeIf { it.isNotBlank() } ?: modelMux?.defaultModel.orEmpty()
             if (model.isBlank()) {
                 // The live router owns the default; a previous explicit call does not.
                 val candidates = modelMux?.route("chat", "chat")?.a

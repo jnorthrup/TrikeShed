@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.kanban.InvokeLowering
 import borg.trikeshed.lib.toList
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.RelaxTransport
@@ -176,7 +177,7 @@ class LcncServiceBindingTest {
         override suspend fun exchange(envelopeJson: String): String {
             assertSame(proxy, RequestFactoryProxyKey.require())
             val envelope = JsonSupport.parseMap(envelopeJson)
-            val ops = (envelope["operations"] as List<*>).map { it as Map<*, *> }
+            val ops = checkNotNull(InvokeLowering.listishOf(envelope["operations"])).map { it as Map<*, *> }
             operations.addAll(ops)
             return JsonSupport.stringify(mapOf(
                 "ok" to true,
@@ -218,6 +219,12 @@ class LcncServiceBindingTest {
                 val invocations = context.fold(0) { count, e -> count + if (e is LcncNodeElement) 1 else 0 }
                 assertEquals(1, invocations)
                 requests.add(Triple(method, path, body))
+                if (path == "/api/invoke") {
+                    val commands = (body as Map<*, *>)["commands"] as List<*>
+                    return mapOf("results" to commands.map { mapOf("verdict" to "committed", "provider" to label) })
+                }
+                if (path == "/api/projects") return mapOf("verdict" to "ok", "name" to label)
+                if (method == "DELETE") return mapOf("verdict" to "unmounted", "name" to label)
                 return mapOf("provider" to label, "rows" to listOf(label), "routes" to listOf(label),
                     "panels" to listOf(label), "standings" to listOf(label))
             }
@@ -226,8 +233,13 @@ class LcncServiceBindingTest {
         val replacement = Calls("replacement")
         val registry = SurfaceNodes.registry(default)
         for ((type, runner) in registry) {
-            val node = LcncNode(type, type)
-            val inputs = mapOf("body" to mapOf("text" to "payload"))
+            val node = LcncNode(type, type, params = mapOf("name" to "mounted"))
+            val inputs = when (type) {
+                "job.command" -> mapOf("verb" to "cancel", "jobId" to "card", "expectedRevision" to 1L)
+                "job.batch" -> mapOf("commands" to listOf(mapOf("type" to "cancel", "jobId" to "card")))
+                "project.mount" -> mapOf("path" to "/mounted")
+                else -> mapOf("body" to mapOf("text" to "payload"))
+            }
             val ordinary = runner.run(node, inputs)
             val redirected = withContext(SurfaceCallKey(replacement)) { runner.run(node, inputs) }
             assertNotEquals(ordinary, redirected, type)

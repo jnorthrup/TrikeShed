@@ -453,6 +453,13 @@ class KeyMux constructor(
 
     suspend fun getWithSource(key: String): KeyResult = resolver.resolve(bindings, key.toKeyPath())
 
+    /** Prepend one binding without copying or mutating the inherited source chain. */
+    fun withBinding(path: String, source: KeySource): KeyMux {
+        val binding = path.toKeyPath() j source
+        val inherited = bindings
+        return KeyMux(((inherited.size + 1) j { i -> if (i == 0) binding else inherited[i - 1] }) j resolver)
+    }
+
     suspend fun set(key: String, value: String) {
         val path = key.toKeyPath()
         for ((p, src) in bindings.view) {

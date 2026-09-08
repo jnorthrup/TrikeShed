@@ -169,6 +169,19 @@ def test_contracts_skip_the_data_class_declaration():
     assert kotlin_scan.contracts(src, "LcncContracts.kt") == []
 
 
+def test_contracts_keep_dynamic_type_and_skip_non_code_calls():
+    src = '''
+data
+class LcncPortContract(val type: String)
+val example = """LcncPortContract("not.a.contract")"""
+fun actual() = LcncPortContract(type = type, inputs = emptyList(), isEffect = has("effect", type))
+LcncPortContract("literal" + suffix, "unbalanced ) title", emptyList(), emptyList())
+'''
+    rows = kotlin_scan.contracts(src)
+    assert [r["type"] for r in rows] == ["type", '"literal" + suffix']
+    assert all(not r["type_resolved"] for r in rows)
+
+
 def test_contracts_survive_inline_comments():
     src = '''
         LcncPortContract("note", "note", // a trailing comment with ( and "
