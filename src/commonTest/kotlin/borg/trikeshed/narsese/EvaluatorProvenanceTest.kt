@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.job.ContentId
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,6 +13,8 @@ import kotlin.test.assertTrue
  * the belief IS. These assert that the identity actually discriminates — before this, every
  * derivation in the tree was attributed to a hardcoded code-path name.
  */
+private fun runTestCompat(body: suspend () -> Unit) = runTest { body() }
+
 class EvaluatorProvenanceTest {
 
     private val p1 = PremiseReceipt(
@@ -66,5 +69,45 @@ class EvaluatorProvenanceTest {
             ContentId.of("pure:turn-review".encodeToByteArray()).value,
             Evaluator.pure("turn-review").cid.value,
         )
+    }
+}
+
+/**
+ * The induction lego resolves its guide the way every other lego resolves a model: the card's
+ * `model` param, then the live mux. Nothing here picks a vendor.
+ */
+class ReviewRunnerEvaluatorTest {
+
+    private val facts = listOf(
+        mapOf("verb" to "opened", "ok" to true, "context" to "ctx", "object" to "a"),
+        mapOf("verb" to "closed", "ok" to true, "context" to "ctx", "object" to "b"),
+    )
+
+    private suspend fun run(model: String?): Map<String, Any?> {
+        val bag = BeliefBagElement()
+        bag.open()
+        val review = TurnReviewElement(bag)
+        review.open()
+        val runner = BeliefsNodes.reviewRunner(review)
+        val params = if (model == null) emptyMap() else mapOf("model" to model)
+        @Suppress("UNCHECKED_CAST")
+        return runner.run(
+            borg.trikeshed.lcnc.LcncNode("r", "beliefs.review", params = params),
+            mapOf("facts" to facts),
+        ) as Map<String, Any?>
+    }
+
+    @Test
+    fun aNamedModelBecomesTheEvaluatorAndThePassIsNotReproducible() = runTestCompat {
+        val out = run("zai/glm-5")
+        assertEquals("model:zai/glm-5", out["evaluator"])
+        assertEquals(false, out["reproducible"], "an LLM-guided induction cannot be replayed from premises")
+    }
+
+    @Test
+    fun noModelLeavesThePassPureAndReproducible() = runTestCompat {
+        val out = run(null)
+        assertEquals("pure:turn-review", out["evaluator"])
+        assertEquals(true, out["reproducible"])
     }
 }

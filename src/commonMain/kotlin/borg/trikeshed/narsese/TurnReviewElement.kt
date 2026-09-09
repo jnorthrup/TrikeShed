@@ -52,8 +52,6 @@ class TurnReviewElement(
      */
     var evaluatorIdentity: Evaluator = Evaluator.pure("turn-review")
 
-    private val evaluator: ContentId get() = evaluatorIdentity.cid
-
     override suspend fun open() {
         super.open()
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
@@ -64,7 +62,13 @@ class TurnReviewElement(
      * (≤ [intakeCap]) so a render layer can caption the minted beliefs.
      * Quota-free: no model call anywhere on this path.
      */
-    suspend fun reviewTurn(facts: List<TurnFact>, turnSucceeded: Boolean): List<Pair<Long, String>> {
+    suspend fun reviewTurn(
+        facts: List<TurnFact>,
+        turnSucceeded: Boolean,
+        /** Who is deriving this pass. Per call, not per element: one element serves many turns. */
+        identity: Evaluator = evaluatorIdentity,
+    ): List<Pair<Long, String>> {
+        val evaluator = identity.cid
         if (state != ElementState.ACTIVE) return emptyList()
         val landed = ArrayList<Pair<Long, String>>()
 

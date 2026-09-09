@@ -4,6 +4,8 @@ import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.userspace.reactor.MuxReactorElement
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.math.abs
 
 /**
@@ -154,7 +156,16 @@ object BeliefsNodes {
                 objectTerm = m["object"]?.toString(),
             )
         }
-        val landed = review.reviewTurn(facts, turnSucceeded)
+        // Who guided this induction, resolved the way every other lego resolves a model
+        // (BrainMuxNodes:51): the card's own `model` param first, then the LIVE mux from the
+        // reactor context -- the one the daemon rebuilds when Hermes' state.db changes, so a
+        // /model switch in the Hermes CLI is reflected here on the next call. Blank means
+        // nothing guided it and the pass stays pure, which is the reproducible kind.
+        val guiding = node.params["model"]?.takeIf { it.isNotBlank() }
+            ?: currentCoroutineContext()[MuxReactorElement]?.modelMux()?.defaultModel
+        val identity = guiding?.takeIf { it.isNotBlank() }
+            ?.let { Evaluator.model(it) } ?: review.evaluatorIdentity
+        val landed = review.reviewTurn(facts, turnSucceeded, identity)
         for ((angular, gloss) in landed) glossSink(angular, gloss)
         mapOf(
             "landed" to landed.map { (angular, gloss) ->
@@ -162,6 +173,8 @@ object BeliefsNodes {
             },
             "glosses" to landed.map { it.second },
             "factsParsed" to facts.size,
+            "evaluator" to identity.toString(),
+            "reproducible" to identity.reproducible,
         )
     }
 
