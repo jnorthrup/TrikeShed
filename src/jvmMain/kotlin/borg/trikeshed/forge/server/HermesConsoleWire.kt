@@ -15,7 +15,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
-/** HTTP/SSE control surface for the real supervised Hermes VM VT220 panel. */
+/** HTTP/SSE control surface for the real supervised Hermes VM xterm-256color panel. */
 class HermesConsoleWire(
     private val console: HermesVmConsole,
     private val scope: CoroutineScope,
@@ -24,7 +24,12 @@ class HermesConsoleWire(
 
     init {
         scope.launch(Dispatchers.IO) {
-            for (command in commands) console.execute(command)
+            // A typed line has already echoed itself through the panel, so the turn must not echo again.
+            for (command in commands) console.execute(command, echo = false)
+        }
+        // The server-side line editor submits here, so a keystroke POST returns before the turn runs.
+        console.commandSink = { accepted ->
+            if (commands.trySend(accepted).isFailure) console.reject(accepted, "console command queue full or closed")
         }
     }
 

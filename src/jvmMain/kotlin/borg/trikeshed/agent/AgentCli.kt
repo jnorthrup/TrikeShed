@@ -12,14 +12,14 @@ import java.util.concurrent.TimeUnit
  * bounded `--version`; `which` is never trusted here because on the owner's Mac it
  * resolves to cmux shims, so the probe walks real directories and skips shim dirs.
  *
- * Enabled by default: codex and opencode. claude is installed but stays disabled
- * unless the operator says `--agents codex,opencode,claude` (RFC 0001 section 7's
- * quota spirit; its keychain reads misbehave under launchd).
+ * The roster is codex and opencode, both enabled by default. It is the owner's board
+ * and the owner's product surface: a vendor does not get a lane in it, or a name
+ * rendered on a card, for free.
  */
 class AgentCli(
     val id: String,
     val binary: String,
-    /** How the brief reaches the CLI: on stdin (codex, claude) or as the last argument (opencode). */
+    /** How the brief reaches the CLI: on stdin (codex) or as the last argument (opencode). */
     val briefOnStdin: Boolean,
     private val argv: (scratch: File, model: String, lastMessage: File, brief: String) -> List<String>,
 ) {
@@ -28,9 +28,8 @@ class AgentCli(
     companion object {
         const val CODEX = "codex"
         const val OPENCODE = "opencode"
-        const val CLAUDE = "claude"
         val DEFAULT_ENABLED: Set<String> = setOf(CODEX, OPENCODE)
-        val KNOWN: List<String> = listOf(CODEX, OPENCODE, CLAUDE)
+        val KNOWN: List<String> = listOf(CODEX, OPENCODE)
 
         /** Directories a real install lands in, in order; then the PATH walk minus shim and temp dirs. */
         fun candidateDirs(home: String = System.getProperty("user.home") ?: "", path: String = System.getenv("PATH") ?: "", tmp: String = System.getenv("TMPDIR") ?: ""): List<String> {
@@ -55,12 +54,6 @@ class AgentCli(
                     add(binary); add("run"); add("--format"); add("json"); add("--dir"); add(scratch.absolutePath); add("--auto")
                     if (model.isNotBlank()) { add("-m"); add(model) }
                     add(brief)
-                }
-            }
-            CLAUDE -> AgentCli(id, binary, briefOnStdin = true) { _, model, _, _ ->
-                buildList {
-                    add(binary); add("-p"); add("--output-format"); add("json"); add("--permission-mode"); add("acceptEdits"); add("--no-session-persistence")
-                    if (model.isNotBlank()) { add("--model"); add(model) }
                 }
             }
             else -> throw IllegalArgumentException("unknown agent id '$id'")

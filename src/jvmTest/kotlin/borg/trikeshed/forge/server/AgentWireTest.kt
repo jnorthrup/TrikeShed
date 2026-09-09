@@ -20,7 +20,7 @@ class AgentWireTest {
     @Test
     fun rosterAndRunsAreServedNewestFirstAndFiltered(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
-        val runs = InMemoryAgentRuns(listOf(AgentCliInfo("codex", "/opt/homebrew/bin/codex", "codex-cli 0.145.0", true), AgentCliInfo("claude", "/x/claude", "2.1", false, why = "installed; enable with --agents"))) { req ->
+        val runs = InMemoryAgentRuns(listOf(AgentCliInfo("codex", "/opt/homebrew/bin/codex", "codex-cli 0.145.0", true), AgentCliInfo("opencode", "/x/opencode", "2.1", false, why = "installed; enable with --agents"))) { req ->
             AgentRunResult(runId = req.runId, agent = req.agent)
         }
         for ((i, job) in listOf("j1", "j2", "j1").withIndex()) {
@@ -31,7 +31,7 @@ class AgentWireTest {
         val roster = json(wire.route("GET", "/api/agents", "", null)!!.body)
         assertEquals(42L, (roster["probedAtMs"] as Number).toLong()); assertEquals("default", roster["enabledBy"])
         val agents = roster["agents"] as List<Map<*, *>>
-        assertEquals(listOf("codex", "claude"), agents.map { it["id"] })
+        assertEquals(listOf("codex", "opencode"), agents.map { it["id"] })
         assertEquals(false, agents[1]["enabled"]); assertEquals("installed; enable with --agents", agents[1]["why"])
 
         val all = json(wire.route("GET", "/api/agents/runs", "", null)!!.body)

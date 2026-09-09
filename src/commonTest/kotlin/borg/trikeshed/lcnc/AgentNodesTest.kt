@@ -11,7 +11,7 @@ class AgentNodesTest {
 
     private val roster = listOf(
         AgentCliInfo("stub", "/usr/bin/stub", "0.1", enabled = true),
-        AgentCliInfo("claude", "/x/claude", "2.1", enabled = false, why = "not in the default set"),
+        AgentCliInfo("offlane", "/x/offlane", "2.1", enabled = false, why = "not in the default set"),
     )
 
     private fun runs(exit: Int = 0, killed: Boolean = false) = InMemoryAgentRuns(roster) { req ->
@@ -48,7 +48,7 @@ class AgentNodesTest {
         val registry = AgentNodes.registry(seam) { "run-7" }
         val listed = registry.getValue(AgentNodes.LIST).run(LcncNode("l", AgentNodes.LIST), emptyMap())
         assertEquals(2, listed["count"])
-        assertEquals(listOf("stub", "claude"), (listed["agents"] as List<*>).map { (it as Map<*, *>)["id"] })
+        assertEquals(listOf("stub", "offlane"), (listed["agents"] as List<*>).map { (it as Map<*, *>)["id"] })
         val out = registry.getValue(AgentNodes.RUN).run(LcncNode("a", AgentNodes.RUN, params = mapOf("agent" to "stub")), mapOf("brief?" to "add hello.txt"))
         assertEquals("run-7", out["runId"]); assertEquals(true, out["ok"]); assertEquals("sha256:p", out["patchCid"]); assertEquals(0, out["exit"])
         assertEquals("add hello.txt", seam.requests.single().brief)

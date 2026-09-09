@@ -78,7 +78,9 @@ class HermesVmConsoleTest {
                 val wire = HermesConsoleWire(console, scope)
                 val page = wire.route("GET", "/hermes", "", null)
                 assertEquals(200, page?.status)
-                assertTrue(page?.bytes?.decodeToString()?.contains("HERMES · VT220") == true)
+                assertTrue(page?.bytes?.decodeToString()?.contains("HERMES · XTERM-256COLOR") == true)
+                // The bottom command dialog is gone: the terminal itself takes keystrokes.
+                assertTrue(page?.bytes?.decodeToString()?.contains("id=\"command\"") == false)
                 val snapshot = wire.route("GET", "/api/hermes/terminal", "", null)
                 assertTrue(snapshot?.body?.contains("\"kind\":\"xterm-256color\"") == true)
                 val resized = wire.route(

@@ -17,13 +17,7 @@ actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val channelOperations = JsChannelOperations()
     val tlsBackend = StubTlsCodecBackend()
     return listOf(
-    NioCapabilityReport(
-        backendName = "js_fetch",
-        ioUringAvailable = false,
-        capabilities = listOf("net", "read", "write"),
-        kernelHint = "",
-        checkedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
-    ),
+    currentNioCapabilityReport(),
     JsFileOperations(),
     JsSystemOperations(),
     channelOperations,

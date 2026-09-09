@@ -58,7 +58,7 @@ import sun.misc.SignalHandler
  *   --max-slots <N>         live session cap (default = 15)
  *   --hermes-root <path>    Hermes Python source checkout
  *   --hermes-sleeve <path>  GraalPy-safe overlay root
- *   --hermes-console        eagerly boot the VT220 Hermes VM panel
+ *   --hermes-console        eagerly boot the xterm-256color Hermes VM panel
  * Positional args (must come last):
  *   forgeHome               default = ~/.local/forge (ForgeHome.defaultHome)
  *   repoDir                 default = cwd
@@ -166,7 +166,7 @@ object OroborosDaemon {
         val projects: List<String> = emptyList(),
         /** Dynamic modules attached at boot: --module <fqcn> (repeatable). Proxy-ctor loaded (app CP, then build/live). */
         val modules: List<String> = emptyList(),
-        /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode[,claude] or TRIKESHED_AGENTS; default codex,opencode. */
+        /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode or TRIKESHED_AGENTS; default codex,opencode. */
         val agents: Set<String> = borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED,
     )
 
@@ -1951,6 +1951,8 @@ object OroborosDaemon {
         )
         // The fact plane itself, read-only: /api/rete/facts, /api/facts/rdf, /api/rete/productions.
         val reteWire = borg.trikeshed.forge.server.ReteWire(rete, kifTee, causalityRete, borg.trikeshed.ontology.SumoCorpus.pinned)
+        // The polyglot agent sleeves and the red cards their unresolved traps generate (/api/sleeves).
+        val sleeveWire = borg.trikeshed.forge.server.SleeveWire()
         // The hover blip: one LCNC node read across panels + KIF + productions + graal (/api/lcnc/blip).
         val blipWire = borg.trikeshed.forge.server.LcncBlipWire(
             network = rete,
@@ -1960,7 +1962,7 @@ object OroborosDaemon {
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
-            reteWire::route, blipWire::route, agentWire::route,
+            reteWire::route, blipWire::route, agentWire::route, sleeveWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
         // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
