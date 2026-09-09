@@ -35,6 +35,47 @@ interface LiburingFacade {
     fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit>
     fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
     fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit>
+
+    // ── The syscalls ────────────────────────────────────────────────────────────────────────
+    // Every one of these was previously reached by calling java.nio (or the platform equivalent)
+    // directly from whatever needed it. That is the creep: each call site grows its own platform
+    // assumptions and the submission vocabulary stops being the only way in.
+    //
+    // Signatures follow liburing's io_uring_prep_* exactly -- dirfd before path, mode before
+    // offset on fallocate, madvise by address rather than fd -- so that a reader who knows
+    // liburing already knows this, and a native binding is a straight pass-through with no
+    // argument shuffling to get wrong. AT_FDCWD is -100, as Submissions.openat already uses.
+    // A default of "unsupported" keeps every existing actual compiling untouched.
+
+    /** io_uring_prep_openat(sqe, dfd, path, flags, mode). The new fd arrives on the completion. */
+    fun prepOpenat(dfd: Int, path: String, flags: Int, mode: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_statx(sqe, dfd, path, flags, mask, statxbuf). */
+    fun prepStatx(dfd: Int, path: String, flags: Int, mask: Int, bufAddress: Long, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_fallocate(sqe, fd, mode, offset, len) -- mode first, as liburing has it. */
+    fun prepFallocate(fd: Int, mode: Int, offset: Long, len: Long, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_fadvise(sqe, fd, offset, len, advice). POSIX_FADV_WILLNEED is 3. */
+    fun prepFadvise(fd: Int, offset: Long, len: Int, advice: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_madvise(sqe, addr, length, advice) -- by address, not fd. MADV_WILLNEED is 3. */
+    fun prepMadvise(addr: Long, length: Int, advice: Int, userData: Long): Result<Unit> = unsupported()
+
+    /**
+     * msync. liburing has no lead here -- Linux never made it a ring op, so this is the waist's
+     * own, shaped like madvise for consistency with its neighbour rather than invented afresh.
+     */
+    fun prepMsync(addr: Long, length: Int, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_renameat(sqe, olddfd, oldpath, newdfd, newpath, flags). */
+    fun prepRenameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_unlinkat(sqe, dfd, path, flags). */
+    fun prepUnlinkat(dfd: Int, path: String, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_mkdirat(sqe, dfd, path, mode). */
+    fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> = unsupported()
     fun submit(): Result<Int>
 
     /**
@@ -157,6 +198,33 @@ object Liburing : LiburingFacade by LiburingImpl {
 
     override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
         if (admit(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0L, flags, userData))) LiburingImpl.prepRecvmsg(fd, msgHdrPtr, flags, userData) else vetoed()
+
+    override fun prepOpenat(dfd: Int, path: String, flags: Int, mode: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.OPENAT, dfd, 0L, path.length, flags.toLong(), mode, userData))) LiburingImpl.prepOpenat(dfd, path, flags, mode, userData) else vetoed()
+
+    override fun prepStatx(dfd: Int, path: String, flags: Int, mask: Int, bufAddress: Long, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.STATX, dfd, bufAddress, path.length, mask.toLong(), flags, userData))) LiburingImpl.prepStatx(dfd, path, flags, mask, bufAddress, userData) else vetoed()
+
+    override fun prepFallocate(fd: Int, mode: Int, offset: Long, len: Long, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.FALLOCATE, fd, 0L, len.toInt(), offset, mode, userData))) LiburingImpl.prepFallocate(fd, mode, offset, len, userData) else vetoed()
+
+    override fun prepFadvise(fd: Int, offset: Long, len: Int, advice: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.FADVISE, fd, 0L, len, offset, advice, userData))) LiburingImpl.prepFadvise(fd, offset, len, advice, userData) else vetoed()
+
+    override fun prepMadvise(addr: Long, length: Int, advice: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.MADVISE, -1, addr, length, 0L, advice, userData))) LiburingImpl.prepMadvise(addr, length, advice, userData) else vetoed()
+
+    override fun prepMsync(addr: Long, length: Int, flags: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.MSYNC, -1, addr, length, 0L, flags, userData))) LiburingImpl.prepMsync(addr, length, flags, userData) else vetoed()
+
+    override fun prepRenameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String, flags: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.RENAMEAT, oldDfd, 0L, oldPath.length, newDfd.toLong(), flags, userData))) LiburingImpl.prepRenameat(oldDfd, oldPath, newDfd, newPath, flags, userData) else vetoed()
+
+    override fun prepUnlinkat(dfd: Int, path: String, flags: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.UNLINKAT, dfd, 0L, path.length, 0L, flags, userData))) LiburingImpl.prepUnlinkat(dfd, path, flags, userData) else vetoed()
+
+    override fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.MKDIRAT, dfd, 0L, path.length, 0L, mode, userData))) LiburingImpl.prepMkdirat(dfd, path, mode, userData) else vetoed()
 
     override fun waitCqe(): Result<UringCompletion?> = LiburingImpl.waitCqe().map { observe(it) }
 
