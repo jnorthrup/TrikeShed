@@ -446,6 +446,33 @@ tasks.withType<Test>().configureEach {
     )
 }
 
+tasks.register<Test>("btrfsStorageCheck") {
+    group = "verification"
+    description = "Verify userspace Btrfs storage, world replication, ISAM, and fresh-process crash recovery."
+    val jvmTests = tasks.named<Test>("jvmTest")
+    dependsOn("jvmTestClasses")
+    testClassesDirs = jvmTests.get().testClassesDirs
+    classpath = jvmTests.get().classpath
+    filter {
+        includeTestsMatching("borg.trikeshed.btrfs.*")
+        includeTestsMatching("borg.trikeshed.graal.subvm.BtrfsHostedVmWorldTest")
+        includeTestsMatching("borg.trikeshed.graal.subvm.TrikeShedGraalVfs*Test")
+        includeTestsMatching("borg.trikeshed.isam.*")
+        includeTestsMatching("borg.trikeshed.job.CanonicalCborTest")
+        includeTestsMatching("borg.trikeshed.job.ContentIdTest")
+        includeTestsMatching("borg.trikeshed.util.oroboros.Sha2CasBusTest")
+        includeTestsMatching("borg.trikeshed.userspace.nio.file.spi.DurableStoragePrimitivesTest")
+        includeTestsMatching("borg.trikeshed.couch.replicate.*")
+        includeTestsMatching("borg.trikeshed.couch.CouchReplicationTest")
+        includeTestsMatching("borg.trikeshed.couch.CouchWireRouterAttachmentTest")
+    }
+    timeout.set(Duration.ofSeconds(120))
+    outputs.upToDateWhen { false }
+    doFirst {
+        systemProperty("trikeshed.storage.classpath", classpath.asPath)
+    }
+}
+
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(
         listOf(

@@ -1,392 +1,400 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.cas.FileExtent
+import borg.trikeshed.cas.FileTreeManifest
 import borg.trikeshed.cas.CasPaths
+import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.job.CanonicalCbor
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.util.oroboros.FileCasStore
 
 /**
- * MiniBtrfs — a userspace filesystem matching btrfs's three defining properties, not its on-disk
- * B-tree format:
+ * File trees over an existing CAS and a filesystem publication boundary.
+ * Canonical tree identity excludes the mount, subvolume name, and read-only flag.
+ * Snapshots share immutable indexes and CAS extents; mutations publish a new
+ * canonical tree before changing the live index. This is not the Btrfs disk format.
  *
- *  - **Copy-on-write extents.** Content lands in an append-only, content-addressed extent store
- *    (SHA-256 via [ContentId], the same convention as the rest of TrikeShed's CAS). An extent is
- *    written once, under its own hash, and never mutated; writing back unchanged content is a
- *    dedup no-op, exactly as btrfs's own CoW never overwrites a live extent in place.
- *  - **Snapshots cheap in DATA, not files.** A subvolume's tree is a `path -> Entry` index; a
- *    snapshot copies that index (one small structure, sized by file COUNT), never the bytes behind
- *    it. Two subvolumes sharing every byte of a 2 GB tree cost the same to snapshot as two sharing
- *    nothing. This is the actual guarantee btrfs snapshots give — btrfs's own cost is O(tree nodes
- *    touched), not literally O(1) either — and nothing here claims more.
- *  - **Checksummed reads and a send/receive that fails closed.** Every extent fetch is verified
- *    against the hash it was stored under; [send] emits a manifest plus the extents it references,
- *    and [receive] verifies every extent against its declared hash BEFORE committing anything — a
- *    truncated or corrupted stream lands no partial subvolume, matching btrfs send/receive's own
- *    guarantee against a torn transfer.
- *
- * Unreferenced extents are reclaimed (mark-and-sweep across all live subvolumes) when a subvolume
- * is deleted — real btrfs defers this to a background cleaner; doing it eagerly here is the
- * honest choice for a toy with no cleaner thread, not a shortcut.
- *
- * One live [UserspaceBtrfs] instance is one mount: its index is loaded from [fileOps] once at
- * construction and kept in memory thereafter, exactly the assumption a live mounted filesystem
- * makes about the block device under it. Extent bytes and subvolume manifests are the only things
- * durable in [fileOps] — a second instance pointed at the same [rootDir] on the same backing store
- * sees prior state (manifests replay), never a *live* peer's uncommitted writes.
+ * A mount owns its live index. Separate mounts observe changes on reopen, not
+ * through cache coherence. An injected CAS is shared and is never reclaimed here.
+ * The default file CAS retains the earlier extent paths and local reclamation.
  */
-class UserspaceBtrfs(val rootDir: String, val fileOps: FileOperations) {
-
-    private data class Entry(val isDir: Boolean, val extentId: String?, val length: Long)
-
-    private class Subvolume(var readOnly: Boolean) {
-        var entries: Map<String, Entry> = emptyMap()
+class UserspaceBtrfs(
+    val rootDir: String,
+    val fileOps: FileOperations,
+    cas: CasStore? = null,
+) {
+    private data class Entry(val extent: FileExtent?) {
+        val isDir: Boolean get() = extent == null
     }
+    private class Subvolume(val readOnly: Boolean, val entries: LinearHashMap<String, Entry>)
 
-    private val subvolumes = LinkedHashMap<String, Subvolume>()
+    val cas: CasStore = cas ?: FileCasStore(fileOps, fileOps.resolvePath(rootDir, "extents"))
+    private val ownsCas = cas == null
+    private val subvolumes = LinearHashMap<String, Subvolume>()
     private val extentsDir get() = fileOps.resolvePath(rootDir, "extents")
     private val subvolDir get() = fileOps.resolvePath(rootDir, "subvolumes")
+    private var publicationFailure: Throwable? = null
 
     init {
         if (!fileOps.exists(rootDir)) fileOps.mkdirs(rootDir)
-        if (!fileOps.exists(extentsDir)) fileOps.mkdirs(extentsDir)
+        if (ownsCas && !fileOps.exists(extentsDir)) fileOps.mkdirs(extentsDir)
         if (!fileOps.exists(subvolDir)) fileOps.mkdirs(subvolDir)
-        for (fileName in fileOps.listDir(subvolDir).map { it.substringBefore('/') }.distinct()) {
+        for (fileName in fileOps.listDir(subvolDir).sorted()) {
+            if (!fileName.endsWith(".manifest")) continue
             val name = fileName.removeSuffix(".manifest")
-            if (name == fileName || !isValidName(name)) continue // not a manifest file, or an invalid name
-            runCatching { loadManifest(name) }
+            require(isValidName(name)) { "Invalid subvolume manifest name" }
+            readManifest(fileOps.readAllBytes(manifestPathOf(name)))?.let { subvolumes[name] = it }
         }
     }
 
-    // ── subvolumes ────────────────────────────────────────────────
-
     fun createSubvolume(name: String): Boolean {
-        if (!isValidName(name) || subvolumes.containsKey(name)) return false
-        subvolumes[name] = Subvolume(readOnly = false)
-        persistManifest(name)
+        operational()
+        if (!isValidName(name) || name in subvolumes) return false
+        publish(name, Subvolume(false, LinearHashMap()))
         return true
     }
 
     fun deleteSubvolume(name: String): Boolean {
-        if (!isValidName(name)) return false
-        subvolumes.remove(name) ?: return false
-        runCatching { fileOps.deleteRecursively(manifestPathOf(name)) }
-        sweepUnreferencedExtents()
+        operational()
+        if (!isValidName(name) || name !in subvolumes) return false
+        // A durable tombstone gives deletion the same publication boundary as updates.
+        publishBytes(name, CanonicalCbor.encodeMap(mapOf("format" to LOCAL_FORMAT, "deleted" to true)))
+        subvolumes.remove(name)
+        if (ownsCas) runCatching { sweepUnreferencedExtents() }
         return true
     }
 
-    fun hasSubvolume(name: String): Boolean = subvolumes.containsKey(name)
+    fun hasSubvolume(name: String): Boolean { operational(); return name in subvolumes }
 
-    fun listSubvolumes(): List<String> = subvolumes.keys.sorted()
+    fun listSubvolumes(): List<String> {
+        operational()
+        return subvolumes.entries().view.map { it.a }.sorted()
+    }
 
-    /** O(entries), never O(bytes): the index is copied, the extent store is shared by reference. */
+    /** The index and extents are immutable after publication, so snapshots share both. */
     fun snapshot(sourceName: String, destName: String): Boolean {
-        val src = subvolumes[sourceName] ?: return false
-        if (!isValidName(destName) || subvolumes.containsKey(destName)) return false
-        val dst = Subvolume(readOnly = true)
-        dst.entries = src.entries // structural sharing: the NEXT write on either side copies, not this call
-        subvolumes[destName] = dst
-        persistManifest(destName)
+        operational()
+        val source = subvolumes[sourceName] ?: return false
+        if (!isValidName(destName) || destName in subvolumes) return false
+        publish(destName, Subvolume(true, source.entries))
         return true
     }
-
-    // ── files ─────────────────────────────────────────────────────
 
     fun writeFile(subvol: String, file: String, content: ByteArray): Boolean {
-        val sv = subvolumes[subvol] ?: return false
-        if (sv.readOnly || !isValidFilePath(file)) return false
-        val extentId = putExtent(content)
-        val next = LinkedHashMap(sv.entries)
-        ensureAncestors(next, file)
-        next[file] = Entry(isDir = false, extentId = extentId, length = content.size.toLong())
-        sv.entries = next // the copy-on-write: this subvolume's index moves forward; any snapshot's does not
-        persistManifest(subvol)
+        operational()
+        val current = subvolumes[subvol] ?: return false
+        if (current.readOnly || !isValidPath(file) || current.entries[file]?.isDir == true) return false
+        val entries = copyEntries(current.entries)
+        if (!ensureAncestors(entries, file)) return false
+        val bytes = content.copyOf()
+        entries[file] = Entry(putVerified(bytes) j bytes.size.toLong())
+        publish(subvol, Subvolume(false, entries))
         return true
     }
 
     fun fetchFile(subvol: String, file: String): ByteArray? {
-        val sv = subvolumes[subvol] ?: return null
-        val entry = sv.entries[file] ?: return null
-        if (entry.isDir || entry.extentId == null) return null
-        return getExtent(entry.extentId)
+        operational()
+        val extent = subvolumes[subvol]?.entries?.get(file)?.extent ?: return null
+        return extentBytes(extent)
     }
 
     fun deleteFile(subvol: String, file: String): Boolean {
-        val sv = subvolumes[subvol] ?: return false
-        if (sv.readOnly || !isValidFilePath(file)) return false
-        if (sv.entries[file]?.isDir != false) return false
-        val next = LinkedHashMap(sv.entries)
-        next.remove(file)
-        sv.entries = next
-        persistManifest(subvol)
+        operational()
+        val current = subvolumes[subvol] ?: return false
+        if (current.readOnly || !isValidPath(file) || current.entries[file]?.isDir != false) return false
+        val entries = copyEntries(current.entries)
+        entries.remove(file)
+        publish(subvol, Subvolume(false, entries))
         return true
     }
 
-    // ── directories ───────────────────────────────────────────────
-
     fun createDirectory(subvol: String, directory: String): Boolean {
-        val sv = subvolumes[subvol] ?: return false
-        if (sv.readOnly) return false
-        if (directory.isEmpty()) return true // root always exists
-        if (!isValidFilePath(directory)) return false
-        if (sv.entries[directory]?.isDir == true) return false // already exists
-        val next = LinkedHashMap(sv.entries)
-        ensureAncestors(next, "$directory/.")
-        next[directory] = Entry(isDir = true, extentId = null, length = 0)
-        sv.entries = next
-        persistManifest(subvol)
+        operational()
+        val current = subvolumes[subvol] ?: return false
+        if (current.readOnly) return false
+        if (directory.isEmpty()) return true
+        if (!isValidPath(directory) || directory in current.entries) return false
+        val entries = copyEntries(current.entries)
+        if (!ensureAncestors(entries, directory)) return false
+        entries[directory] = Entry(null)
+        publish(subvol, Subvolume(false, entries))
         return true
     }
 
     fun listDirectory(subvol: String, directory: String = ""): List<String>? {
-        val sv = subvolumes[subvol] ?: return null
-        if (directory.isNotEmpty()) {
-            if (!isValidFilePath(directory)) return null
-            if (sv.entries[directory]?.isDir != true) return null
-        }
+        operational()
+        val current = subvolumes[subvol] ?: return null
+        if (directory.isNotEmpty() && current.entries[directory]?.isDir != true) return null
         val prefix = if (directory.isEmpty()) "" else "$directory/"
-        // ⚡ Bolt: Avoid intermediate sequence, filter, and map allocations.
-        // Use a direct loop with LinkedHashSet to preserve distinctness before sorting, reducing GC pressure.
-        val result = LinkedHashSet<String>()
-        for (key in sv.entries.keys) {
-            if (key.startsWith(prefix) && key != directory) {
-                val name = key.removePrefix(prefix).substringBefore('/')
-                if (name.isNotEmpty()) {
-                    result.add(name)
-                }
-            }
+        val names = mutableSetOf<String>()
+        for ((path, _) in current.entries.entries().view) {
+            if (path.startsWith(prefix) && path != directory) names.add(path.removePrefix(prefix).substringBefore('/'))
         }
-        val list = result.toMutableList()
-        list.sort()
-        return list
+        return names.sorted()
     }
 
     fun isDirectory(subvol: String, path: String = ""): Boolean {
-        if (path.isEmpty()) return subvolumes.containsKey(subvol)
-        return subvolumes[subvol]?.entries?.get(path)?.isDir == true
+        operational()
+        return if (path.isEmpty()) subvol in subvolumes else subvolumes[subvol]?.entries?.get(path)?.isDir == true
     }
 
-    fun isFile(subvol: String, path: String): Boolean =
-        subvolumes[subvol]?.entries?.get(path)?.isDir == false
-
-    // ── send / receive ────────────────────────────────────────────
-
-    /** Deterministic, checksummed wire form: manifest lines, then each referenced extent once. */
-    fun send(sourceName: String): ByteArray? {
-        val sv = subvolumes[sourceName] ?: return null
-        val lines = StringBuilder(MAGIC).append('\n')
-        val hashes = LinkedHashSet<String>()
-        for ((path, entry) in sv.entries.entries.sortedBy { it.key }) {
-            if (entry.isDir) {
-                lines.append("D\t").append(path).append('\n')
-            } else {
-                lines.append("F\t").append(path).append('\t').append(entry.extentId).append('\t').append(entry.length).append('\n')
-                entry.extentId?.let(hashes::add)
-            }
-        }
-        lines.append("END\n")
-        val header = lines.toString().encodeToByteArray()
-        val extentBlocks = ArrayList<ByteArray>(hashes.size * 2)
-        var total = header.size
-        for (hash in hashes) {
-            val bytes = getExtent(hash) ?: return null // internal inconsistency: refuse to emit a lie
-            val head = "EXT\t$hash\t${bytes.size}\n".encodeToByteArray()
-            extentBlocks += head; extentBlocks += bytes
-            total += head.size + bytes.size + 1 // +1 for the trailing newline
-        }
-        // A single pre-sized buffer, not a boxed ArrayList<Byte>: extent bytes can be large and
-        // per-byte boxing would be exactly the naive-copy inefficiency this rewrite exists to avoid.
-        val out = ByteArray(total)
-        var pos = 0
-        header.copyInto(out, pos); pos += header.size
-        // extentBlocks alternates head/body; a trailing newline follows each body block only.
-        var idx = 0
-        while (idx < extentBlocks.size) {
-            val head = extentBlocks[idx]; val body = extentBlocks[idx + 1]
-            head.copyInto(out, pos); pos += head.size
-            body.copyInto(out, pos); pos += body.size
-            out[pos] = '\n'.code.toByte(); pos++
-            idx += 2
-        }
-        return out
+    fun isFile(subvol: String, path: String): Boolean {
+        operational()
+        return subvolumes[subvol]?.entries?.get(path)?.isDir == false
     }
 
-    fun receive(destName: String, stream: ByteArray): Boolean {
-        if (!isValidName(destName) || subvolumes.containsKey(destName)) return false
+    /** Canonical CAS/Confix tree, independent of physical storage and local metadata. */
+    fun manifest(name: String): FileTreeManifest? {
+        operational()
+        return subvolumes[name]?.let(::tree)
+    }
+
+    fun manifestId(name: String): ContentId? = manifest(name)?.let { putVerified(it.encode()) }
+
+    /** All referenced blobs must already be present and valid in this mount's CAS. */
+    fun receiveManifest(destName: String, manifest: FileTreeManifest, readOnly: Boolean = true): Boolean {
+        operational()
+        if (!isValidName(destName) || destName in subvolumes) return false
         return runCatching {
-            val text = stream.decodeToString()
-            if (!text.startsWith("$MAGIC\n")) return false
-            val lines = text.split('\n')
-            var i = 1
-            data class Pending(val isDir: Boolean, val extentId: String?, val length: Long)
-            val staged = LinkedHashMap<String, Pending>()
-            while (i < lines.size && lines[i] != "END") {
-                val cols = lines[i].split('\t')
-                when (cols[0]) {
-                    "D" -> staged[cols[1]] = Pending(true, null, 0)
-                    "F" -> staged[cols[1]] = Pending(false, cols[2], cols[3].toLong())
-                    else -> return false
-                }
-                i++
+            require(manifest.entries.view.all { isValidPath(it.a) }) { "Invalid file-tree path" }
+            // Capture a canonical value before validating references or publishing it.
+            val captured = FileTreeManifest.decode(manifest.encode())
+            for ((_, extent) in captured.entries.view) if (extent != null) {
+                requireNotNull(extentBytes(extent)) { "Missing or corrupt file-tree extent" }
             }
-            if (i >= lines.size) return false // no END: truncated
-            i++ // past END
-            // Extent blocks come as raw bytes with a text header; re-scan the ORIGINAL byte array
-            // from the header's byte offset onward — text.split() already lost byte-exactness.
-            var offset = indexOfLine(stream, "END\n") ?: return false
-            offset += "END\n".encodeToByteArray() .size
-            val stagedExtents = HashMap<String, ByteArray>()
-            while (offset < stream.size) {
-                val headerEnd = indexOfByte(stream, '\n'.code.toByte(), offset) ?: return false
-                val header = stream.decodeToString(offset, headerEnd)
-                val cols = header.split('\t')
-                if (cols.size != 3 || cols[0] != "EXT") return false
-                val hash = cols[1]
-                val length = cols[2].toIntOrNull() ?: return false
-                val bodyStart = headerEnd + 1
-                val bodyEnd = bodyStart + length
-                if (bodyEnd > stream.size) return false // truncated body: fail closed
-                val bytes = stream.copyOfRange(bodyStart, bodyEnd)
-                if (ContentId.of(bytes).value != hash) return false // corrupted: fail closed
-                stagedExtents[hash] = bytes
-                offset = bodyEnd + 1 // skip the trailing newline
-            }
-            // Every referenced hash must have arrived as a verified extent — no dangling references.
-            for (p in staged.values) if (!p.isDir && (p.extentId == null || p.extentId !in stagedExtents)) return false
-            // All-or-nothing: only now do we touch real state.
-            for ((hash, bytes) in stagedExtents) putExtentVerified(hash, bytes)
-            val sv = Subvolume(readOnly = true)
-            sv.entries = staged.mapValues { (_, p) -> Entry(p.isDir, p.extentId, p.length) }
-            subvolumes[destName] = sv
-            persistManifest(destName)
+            publish(destName, Subvolume(readOnly, entries(captured)))
             true
         }.getOrDefault(false)
     }
 
-    // ── extent store (content-addressed, CoW) ───────────────────────
-
-    private fun putExtent(bytes: ByteArray): String {
-        val id = ContentId.of(bytes).value
-        putExtentVerified(id, bytes)
-        return id
+    /** Legacy transfer writer retained for older peers. New replication uses [manifest]. */
+    fun send(sourceName: String): ByteArray? {
+        val manifest = manifest(sourceName) ?: return null
+        val header = StringBuilder(MAGIC).append('\n')
+        for ((path, extent) in manifest.entries.view) {
+            if (extent == null) header.append("D\t$path\n")
+            else header.append("F\t$path\t${extent.a.value}\t${extent.b}\n")
+        }
+        header.append("END\n")
+        val blocks = mutableListOf<ByteArray>(header.toString().encodeToByteArray())
+        var total = blocks[0].size.toLong()
+        for (cid in manifest.references().view) {
+            val bytes = blob(cid) ?: return null
+            val line = "EXT\t${cid.value}\t${bytes.size}\n".encodeToByteArray()
+            blocks.add(line); blocks.add(bytes); blocks.add(byteArrayOf(10))
+            total += line.size.toLong() + bytes.size + 1
+            require(total <= Int.MAX_VALUE) { "Legacy send stream exceeds byte-array capacity" }
+        }
+        // Length metadata is checked independently of the content hash.
+        for ((_, extent) in manifest.entries.view) if (extent != null && extentBytes(extent) == null) return null
+        val result = ByteArray(total.toInt())
+        var offset = 0
+        for (block in blocks) { block.copyInto(result, offset); offset += block.size }
+        return result
     }
 
-    private fun putExtentVerified(id: String, bytes: ByteArray) {
-        val path = extentPathOf(id)
-        if (!fileOps.exists(path)) {
-            fileOps.mkdirs(fileOps.resolvePath(extentsDir, CasPaths.shard(ContentId(id))))
-            fileOps.writeAtomically(path, bytes.copyOf())
+    /** Strict reader for earlier BTRFS_SEND_V2 streams, including raw binary extents. */
+    fun receive(destName: String, stream: ByteArray): Boolean {
+        operational()
+        if (!isValidName(destName) || destName in subvolumes) return false
+        return runCatching {
+            var offset = 0
+            fun line(): String {
+                val end = (offset until stream.size).firstOrNull { stream[it] == 10.toByte() }
+                    ?: error("Truncated transfer line")
+                return stream.decodeToString(offset, end, throwOnInvalidSequence = true).also { offset = end + 1 }
+            }
+            require(line() == MAGIC)
+            val staged = LinearHashMap<String, Entry>()
+            while (true) {
+                val row = line()
+                if (row == "END") break
+                parseEntry(staged, row)
+            }
+            val manifest = tree(Subvolume(true, staged))
+            val received = LinearHashMap<ContentId, ByteArray>()
+            while (offset < stream.size) {
+                val fields = line().split('\t')
+                require(fields.size == 3 && fields[0] == "EXT")
+                val cid = ContentId(fields[1])
+                val length = fields[2].toInt()
+                require(length >= 0 && length < stream.size - offset && cid !in received)
+                val bytes = stream.copyOfRange(offset, offset + length)
+                require(stream[offset + length] == 10.toByte() && ContentId.of(bytes) == cid)
+                received[cid] = bytes
+                offset += length + 1
+            }
+            require(received.count == manifest.references().size) { "Unexpected or missing transfer extents" }
+            for ((_, extent) in manifest.entries.view) if (extent != null) {
+                require(received[extent.a]?.size?.toLong() == extent.b) { "Transfer extent length mismatch" }
+            }
+            for ((cid, bytes) in received.entries().view) require(putVerified(bytes) == cid)
+            receiveManifest(destName, manifest)
+        }.getOrDefault(false)
+    }
+
+    private fun tree(subvolume: Subvolume): FileTreeManifest =
+        FileTreeManifest.of(subvolume.entries.entries() α { it.a j it.b.extent })
+
+    private fun entries(manifest: FileTreeManifest): LinearHashMap<String, Entry> =
+        LinearHashMap<String, Entry>().also { index ->
+            for ((path, extent) in manifest.entries.view) index[path] = Entry(extent)
+        }
+
+    private fun copyEntries(source: LinearHashMap<String, Entry>): LinearHashMap<String, Entry> =
+        LinearHashMap<String, Entry>().also { target ->
+            for ((path, entry) in source.entries().view) target[path] = entry
+        }
+
+    private fun ensureAncestors(index: LinearHashMap<String, Entry>, path: String): Boolean {
+        var slash = path.indexOf('/')
+        while (slash >= 0) {
+            val ancestor = path.substring(0, slash)
+            val entry = index[ancestor]
+            if (entry != null && !entry.isDir) return false
+            if (entry == null) index[ancestor] = Entry(null)
+            slash = path.indexOf('/', slash + 1)
+        }
+        return true
+    }
+
+    private fun putVerified(bytes: ByteArray): ContentId {
+        val expected = ContentId.of(bytes)
+        if (blob(expected)?.contentEquals(bytes) == true) return expected
+        require(cas.put(bytes) == expected) { "CAS returned an incorrect content identity" }
+        require(blob(expected)?.contentEquals(bytes) == true) { "CAS publication verification failed" }
+        return expected
+    }
+
+    private fun blob(cid: ContentId): ByteArray? = runCatching {
+        // An error or wrong digest in the authoritative CAS is corruption, not
+        // permission to fall back to another copy. Only absence permits migration.
+        val present = cas.get(cid)
+        if (present != null) return@runCatching present.takeIf { ContentId.of(it) == cid }?.copyOf()
+        val paths = s_[CasPaths.blob(cid), CasPaths.legacyBlob(cid), cid.value.replace(':', '_')]
+        for (relative in paths.view) {
+            val path = fileOps.resolvePath(extentsDir, relative)
+            if (!fileOps.isFile(path)) continue
+            val bytes = fileOps.readAllBytes(path)
+            if (ContentId.of(bytes) != cid) return@runCatching null
+            if (!ownsCas) {
+                require(cas.put(bytes) == cid) { "CAS migration identity mismatch" }
+                require(cas.get(cid)?.contentEquals(bytes) == true) { "CAS migration verification failed" }
+            }
+            return@runCatching bytes.copyOf()
+        }
+        null
+    }.getOrNull()
+
+    private fun extentBytes(extent: FileExtent): ByteArray? = blob(extent.a)?.takeIf { it.size.toLong() == extent.b }
+
+    private fun manifestPathOf(name: String) = fileOps.resolvePath(subvolDir, "$name.manifest")
+
+    private fun publish(name: String, next: Subvolume) {
+        val cid = putVerified(tree(next).encode())
+        publishBytes(name, CanonicalCbor.encodeMap(mapOf(
+            "format" to LOCAL_FORMAT, "readOnly" to next.readOnly, "manifest" to cid.value,
+        )))
+        subvolumes[name] = next
+    }
+
+    private fun publishBytes(name: String, bytes: ByteArray) {
+        val path = manifestPathOf(name)
+        val before = if (fileOps.exists(path)) fileOps.readAllBytes(path).copyOf() else null
+        try {
+            fileOps.writeAtomically(path, bytes)
+            check(fileOps.readAllBytes(path).contentEquals(bytes)) { "Manifest publication verification failed" }
+        } catch (failure: Throwable) {
+            val unchanged = runCatching {
+                if (before == null) !fileOps.exists(path)
+                else fileOps.exists(path) && fileOps.readAllBytes(path).contentEquals(before)
+            }.getOrDefault(false)
+            // A provider can fail after rename (for example on directory fsync).
+            // Its mount must reopen rather than expose an index older than disk.
+            if (!unchanged) publicationFailure = failure
+            throw failure
         }
     }
 
-    private fun getExtent(id: String): ByteArray? {
-        val current = extentPathOf(id)
-        val path = if (fileOps.exists(current)) current else legacyExtentPathOf(id)
-        if (!fileOps.exists(path)) return null
-        val bytes = fileOps.readAllBytes(path)
-        return if (ContentId.of(bytes).value == id) bytes else null // silent corruption caught, not served
+    private fun readManifest(bytes: ByteArray): Subvolume? {
+        if (bytes.size >= MAGIC.length && bytes.decodeToString(0, MAGIC.length) == MAGIC) {
+            val lines = bytes.decodeToString(throwOnInvalidSequence = true).split('\n')
+            require(lines.size >= 3 && lines[0] == MAGIC && lines.last().isEmpty()) { "Invalid legacy manifest" }
+            require(lines[1] == "RO\t0" || lines[1] == "RO\t1")
+            val index = LinearHashMap<String, Entry>()
+            for (row in lines.subList(2, lines.lastIndex)) parseEntry(index, row)
+            return Subvolume(lines[1] == "RO\t1", entries(tree(Subvolume(false, index))))
+        }
+        val fields = CanonicalCbor.decodeMap(bytes)
+        require(CanonicalCbor.encodeMap(fields).contentEquals(bytes) && fields["format"] == LOCAL_FORMAT) { "Invalid subvolume manifest" }
+        if (fields["deleted"] == true) {
+            require(fields.size == 2)
+            return null
+        }
+        require(fields.size == 3 && fields["readOnly"] is Boolean && fields["manifest"] is String)
+        val cid = ContentId(fields["manifest"] as String)
+        val manifest = FileTreeManifest.decode(requireNotNull(blob(cid)) { "Missing or corrupt canonical manifest" })
+        return Subvolume(fields["readOnly"] as Boolean, entries(manifest))
+    }
+
+    private fun parseEntry(index: LinearHashMap<String, Entry>, row: String) {
+        val fields = row.split('\t')
+        require(fields.size >= 2 && isValidPath(fields[1]) && fields[1] !in index)
+        val extent: FileExtent? = when (fields[0]) {
+            "D" -> { require(fields.size == 2); null }
+            "F" -> {
+                require(fields.size == 4)
+                ContentId(fields[2]) j fields[3].toLong().also { require(it in 0..Int.MAX_VALUE.toLong()) }
+            }
+            else -> error("Unknown legacy manifest entry")
+        }
+        index[fields[1]] = Entry(extent)
     }
 
     private fun sweepUnreferencedExtents() {
-        val live = HashSet<String>()
-        for (sv in subvolumes.values) for (e in sv.entries.values) e.extentId?.let(live::add)
-        val sharded = Regex("sha256/(?:[0-9a-f]/){4}[0-9a-f]{60}")
-        val legacy = Regex("sha256_[0-9a-f]{64}")
+        // Read all durable roots, including roots published by another mount.
+        val live = mutableSetOf<ContentId>()
+        for (fileName in fileOps.listDir(subvolDir)) if (fileName.endsWith(".manifest")) {
+            val subvolume = readManifest(fileOps.readAllBytes(fileOps.resolvePath(subvolDir, fileName))) ?: continue
+            val manifest = tree(subvolume)
+            live.add(ContentId.of(manifest.encode()))
+            for (cid in manifest.references().view) live.add(cid)
+        }
         fun sweep(directory: String, prefix: String) {
-            for (name in fileOps.listDir(directory).map { it.substringBefore('/') }.distinct()) {
+            for (name in fileOps.listDir(directory)) {
                 val path = fileOps.resolvePath(directory, name)
                 val relative = prefix + name
-                if (fileOps.isDir(path)) {
-                    sweep(path, "$relative/")
-                } else if (fileOps.isFile(path)) {
-                    val id = when {
-                        sharded.matches(relative) -> "sha256:" + relative.removePrefix("sha256/").replace("/", "")
-                        legacy.matches(relative) -> relative.replace('_', ':')
+                if (fileOps.isDir(path)) sweep(path, "$relative/")
+                else if (fileOps.isFile(path)) {
+                    val text = when {
+                        SHARDED.matches(relative) || OLD_SHARDED.matches(relative) -> "sha256:" + relative.removePrefix("sha256/").replace("/", "")
+                        FLAT.matches(relative) -> relative.replace('_', ':')
                         else -> continue
                     }
-                    if (id !in live) runCatching { fileOps.deleteRecursively(path) }
+                    if (ContentId(text) !in live) fileOps.deleteRecursively(path)
                 }
             }
         }
         sweep(extentsDir, "")
     }
 
-    // ── manifest persistence ─────────────────────────────────────
-
-    private fun manifestPathOf(name: String) = fileOps.resolvePath(subvolDir, "$name.manifest")
-    private fun extentPathOf(id: String) = fileOps.resolvePath(extentsDir, CasPaths.blob(ContentId(id)))
-    private fun legacyExtentPathOf(id: String) = fileOps.resolvePath(extentsDir, id.replace(':', '_'))
-
-    private fun persistManifest(name: String) {
-        val sv = subvolumes[name] ?: return
-        val sb = StringBuilder(MAGIC).append('\n')
-        sb.append(if (sv.readOnly) "RO\t1\n" else "RO\t0\n")
-        for ((path, entry) in sv.entries.entries.sortedBy { it.key }) {
-            sb.append(if (entry.isDir) "D\t$path\n" else "F\t$path\t${entry.extentId}\t${entry.length}\n")
-        }
-        fileOps.write(manifestPathOf(name), sb.toString().encodeToByteArray())
+    private fun operational() {
+        check(publicationFailure == null) { "Manifest publication outcome is uncertain; reopen the mount" }
     }
 
-    private fun loadManifest(name: String) {
-        val text = fileOps.readAllBytes(manifestPathOf(name)).decodeToString()
-        val lines = text.split('\n')
-        if (lines.isEmpty() || lines[0] != MAGIC) return
-        var readOnly = false
-        val entries = LinkedHashMap<String, Entry>()
-        for (i in 1 until lines.size) {
-            val line = lines[i]
-            if (line.isEmpty()) continue
-            val cols = line.split('\t')
-            when (cols[0]) {
-                "RO" -> readOnly = cols.getOrNull(1) == "1"
-                "D" -> entries[cols[1]] = Entry(true, null, 0)
-                "F" -> entries[cols[1]] = Entry(false, cols.getOrNull(2), cols.getOrNull(3)?.toLongOrNull() ?: 0)
-            }
-        }
-        val sv = Subvolume(readOnly)
-        sv.entries = entries
-        subvolumes[name] = sv
-    }
+    private fun isValidName(name: String): Boolean = isValidPath(name) && '/' !in name
 
-    // ── path bookkeeping ──────────────────────────────────────────
-
-    /** Every ancestor directory of [path] gets an explicit `D` entry — matches directories that
-     *  actually contain files always being listable, without a separate "implicit dir" pass. */
-    private fun ensureAncestors(entries: MutableMap<String, Entry>, path: String) {
-        val parts = path.split('/').dropLast(1)
-        var acc = ""
-        for (p in parts) {
-            acc = if (acc.isEmpty()) p else "$acc/$p"
-            if (acc !in entries) entries[acc] = Entry(isDir = true, extentId = null, length = 0)
-        }
-    }
-
-    private fun isValidName(name: String): Boolean {
-        if (name.isEmpty() || name == "." || name == "..") return false
-        if (name.contains("/") || name.contains("\\")) return false
-        return true
-    }
-
-    private fun isValidFilePath(file: String): Boolean {
-        if (file.isEmpty() || file == "." || file == "..") return false
-        if (file.contains("..")) return false
-        if (file.startsWith("/")) return false
-        return true
-    }
-
-    private fun indexOfLine(haystack: ByteArray, needle: String): Int? {
-        val n = needle.encodeToByteArray()
-        outer@ for (i in 0..haystack.size - n.size) {
-            for (j in n.indices) if (haystack[i + j] != n[j]) continue@outer
-            return i
-        }
-        return null
-    }
-
-    private fun indexOfByte(haystack: ByteArray, byte: Byte, from: Int): Int? {
-        for (i in from until haystack.size) if (haystack[i] == byte) return i
-        return null
-    }
+    private fun isValidPath(path: String): Boolean = FileTreeManifest.validPath(path) &&
+        path.encodeToByteArray().decodeToString() == path
 
     companion object {
         private const val MAGIC = "BTRFS_SEND_V2"
+        private const val LOCAL_FORMAT = "userspace-subvolume-v1"
+        private val SHARDED = Regex("sha256/(?:[0-9a-f]/){4}[0-9a-f]{60}")
+        private val OLD_SHARDED = Regex("sha256/[0-9a-f]{2}/[0-9a-f]{62}")
+        private val FLAT = Regex("sha256_[0-9a-f]{64}")
     }
 }

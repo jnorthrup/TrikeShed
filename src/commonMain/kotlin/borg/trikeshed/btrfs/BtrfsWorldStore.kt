@@ -2,6 +2,9 @@ package borg.trikeshed.btrfs
 
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
+import borg.trikeshed.collections.associative.LinearHashMap
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.util.oroboros.FileCasStore
 
 /**
  * Where a guest VM's btrfs world lives.
@@ -18,10 +21,10 @@ import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
  * because extents are keyed by content hash. Isolation is by subvolume, which
  * `TrikeShedGraalVfs` never leaves.
  *
- * [ofMemory] keeps the previous behaviour exactly, including its isolation model: a **fresh**
- * backing store per guest, so a memory world is collected with the guest that owned it rather than
- * accumulating on the host for as long as the hypervisor lives. Only the file-based store shares a
- * backing filesystem between guests, because only there is the sharing the point.
+ * [cas] is shared across guests and may be the same CAS the host exposes through
+ * Couch. Manifests and file bytes keep one content identity across guest mounts,
+ * snapshots, and publication. [ofMemory] keeps a stable private metadata backing
+ * per guest for this world's lifetime; a newly constructed memory world is empty.
  *
  * ## Why several live mounts on one file root are safe, and what would break it
  * [UserspaceBtrfs] documents itself as "one live instance is one mount", and [ofFiles] hands each
@@ -29,17 +32,16 @@ import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
  * each writes only its own `<id>.manifest`, and extents are content-addressed and append-only, so
  * concurrent writers either write different files or write identical bytes to the same name.
  *
- * The one operation that would break it is [UserspaceBtrfs.deleteSubvolume], whose mark-and-sweep
- * only sees the subvolumes *its own* instance loaded — a sweep from one guest's mount would reclaim
- * extents another guest's mount still references. Nothing on the VM path calls it (the guest VFS
- * creates and snapshots, never deletes), and reaping a guest world must therefore go through a
- * single owning mount rather than the guest's own.
+ * Guest mounts borrow [cas], so deleting a subvolume never sweeps shared CAS
+ * objects using only that guest's references. Shared-object reclamation belongs
+ * to the owning store, with the complete set of roots.
  */
 class BtrfsWorldStore private constructor(
     private val backingFor: (guestId: String) -> FileOperations,
     val root: String,
     /** False for [ofMemory]: callers that want durability can assert on it rather than assume. */
     val durable: Boolean,
+    val cas: CasStore,
 ) {
     /** The backing store for one guest — shared for [ofFiles], private for [ofMemory]. */
     fun fileOpsFor(guestId: String): FileOperations = backingFor(guestId)
@@ -47,16 +49,24 @@ class BtrfsWorldStore private constructor(
     /** The subvolume a guest owns. Guest ids carry no path separators, so they are valid names. */
     fun subvolumeFor(guestId: String): String = guestId
 
+    /** A fresh view of committed guest metadata using this world's shared CAS. */
+    fun mount(guestId: String): UserspaceBtrfs = UserspaceBtrfs(root, fileOpsFor(guestId), cas)
+
     override fun toString(): String = "BtrfsWorldStore(root=$root, durable=$durable)"
 
     companion object {
-        /** The historical behaviour, named: a world that lives and dies with its guest. */
-        fun ofMemory(): BtrfsWorldStore =
-            BtrfsWorldStore({ InMemoryFileOperations(cwd = "/") }, MEMORY_ROOT, durable = false)
+        /** Stable per-guest metadata and shared blobs, all owned by this memory world. */
+        fun ofMemory(cas: CasStore = CasStore.inMemory()): BtrfsWorldStore {
+            val guests = LinearHashMap<String, FileOperations>()
+            return BtrfsWorldStore({ guest ->
+                guests[guest] ?: InMemoryFileOperations(cwd = "/").also { guests[guest] = it }
+            }, MEMORY_ROOT, durable = false, cas = cas)
+        }
 
         /** File-based: guest worlds survive the daemon that spawned them, on one shared filesystem. */
-        fun ofFiles(fileOps: FileOperations, root: String): BtrfsWorldStore =
-            BtrfsWorldStore({ fileOps }, root, durable = true)
+        fun ofFiles(fileOps: FileOperations, root: String, cas: CasStore? = null): BtrfsWorldStore =
+            BtrfsWorldStore({ fileOps }, root, durable = true,
+                cas = cas ?: FileCasStore(fileOps, fileOps.resolvePath(root, "extents")))
 
         const val MEMORY_ROOT = "/trikeshed-graal-btrfs"
 

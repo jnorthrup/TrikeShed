@@ -1,9 +1,11 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.cas.FileTreeManifest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.channels.Channel
 
@@ -180,6 +182,10 @@ class Couch(
         if (!newEdits) {
             val rev = body["_rev"] as? String ?: return@map mapOf("id" to id, "error" to "bad_request", "reason" to "new_edits=false requires _rev")
             val doc = if (deleted) null else toDocument(id, body)
+            if (doc != null && field(doc, "contentType") == FileTreeManifest.CONTENT_TYPE) {
+                val failure = runCatching { referencedCids(doc, requirePresent = true) }.exceptionOrNull()
+                if (failure != null) return@map mapOf("id" to id, "error" to "invalid_attachment", "reason" to failure.message)
+            }
             val ok = store.putReplicated(doc, id, rev, deleted)
             // The landed revision must also exist as a blob here, whoever minted the rev.
             if (ok && doc != null && (revToCid(rev)?.let { cas.get(it) } == null)) cas.put(CouchStoreFactory.canonicalBody(doc))
@@ -228,13 +234,44 @@ class Couch(
     fun blockGet(cid: String): ByteArray? = runCatching { ContentId(cid) }.getOrNull()?.let { cas.get(it) }
     fun blockPut(bytes: ByteArray): ContentId = cas.put(bytes)
 
-    /** CIDs a document's replication needs beyond its body: today, its attachment blob. */
-    fun referencedCids(body: Map<String, Any?>): List<String> =
-        listOfNotNull((body["contentId"] as? String)?.takeIf { it.startsWith("sha256:") })
+    /** Attachment root and its file-tree extents; [requirePresent] validates publication readiness. */
+    fun referencedCids(body: Map<String, Any?>, requirePresent: Boolean = false): List<String> =
+        referencedCids(body["contentId"] as? String, body["contentType"] as? String, body["length"], requirePresent)
 
     /** Same, from a decoded [Document]. */
-    fun referencedCids(doc: Document): List<String> =
-        listOfNotNull((doc.fields.firstOrNull { it.name == "contentId" }?.value as? String)?.takeIf { it.startsWith("sha256:") })
+    fun referencedCids(doc: Document, requirePresent: Boolean = false): List<String> =
+        referencedCids(field(doc, "contentId") as? String, field(doc, "contentType") as? String, field(doc, "length"), requirePresent)
+
+    private fun referencedCids(contentId: String?, contentType: String?, length: Any?, requirePresent: Boolean): List<String> {
+        val fileTree = contentType == FileTreeManifest.CONTENT_TYPE
+        val root = contentId?.takeIf { it.startsWith("sha256:") }
+        if (root == null) {
+            require(!fileTree) { "File-tree publication has no content identity" }
+            return emptyList()
+        }
+        if (!fileTree && !requirePresent) return listOf(root)
+        val cid = ContentId(root)
+        // Pull first acquires the root, then resolves this graph again before publishing the revision.
+        val bytes = cas.get(cid)
+        if (bytes == null) {
+            check(!requirePresent) { "Missing attachment root: $root" }
+            return listOf(root)
+        }
+        check(ContentId.of(bytes) == cid) { "Attachment root does not match its content identity" }
+        if (!fileTree) return listOf(root)
+        require(length is Number && length.toLong() == bytes.size.toLong() && length.toDouble() == bytes.size.toDouble()) {
+            "File-tree root length mismatch"
+        }
+        val manifest = FileTreeManifest.decode(bytes)
+        if (requirePresent) for ((_, extent) in manifest.entries.view) {
+            if (extent == null) continue
+            val child = cas.get(extent.a)
+            check(child != null && child.size.toLong() == extent.b && ContentId.of(child) == extent.a) {
+                "Missing or corrupt file-tree extent: ${extent.a.value}"
+            }
+        }
+        return listOf(root) + manifest.references().view.map { it.value }
+    }
 
     // ── rewrites (CouchApp) ───────────────────────────────────────
 

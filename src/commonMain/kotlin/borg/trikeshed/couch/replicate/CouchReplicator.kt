@@ -5,6 +5,7 @@ import borg.trikeshed.couch.revWins
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
+import kotlinx.coroutines.CancellationException
 
 /** One HTTP round trip. The daemon binds this to HtxElement; tests bind it to another [Couch] in-process. */
 fun interface HttpExchange {
@@ -41,7 +42,8 @@ data class ReplicationReport(
  * The protocol is the classic one — `_changes` → `_revs_diff` → `_bulk_docs(new_edits=false)` with
  * `_local/<id>` checkpoints — but the payload moves as blocks: a revision names its canonical CBOR
  * body blob in the peer's CAS (`GET {db}/_cas/{cid}`), and attachment documents reference their
- * bytes by `contentId`. The replicator pulls every blob it lacks, verifies each against its
+ * bytes by `contentId`. Canonical file-tree roots name their separate extent blobs. The
+ * replicator pulls every blob it lacks, verifies each against its
  * ContentId, lands it in the local CAS, and only then commits the revision. Nothing is copied that
  * is not a blob; nothing is trusted that does not hash.
  *
@@ -113,17 +115,22 @@ class CouchReplicator(
             // Stage 1: body blobs (the rev names them). Stage 2: whatever the bodies reference.
             blobs += fetchBlobs(src, wantedRows.filter { !it.deleted }
                 .mapNotNull { Couch.revToCid(it.rev)?.value }
-                .filter { local.cas.get(ContentId(it)) == null })
+                .filter { localBlob(ContentId(it)) == null })
             val decoded = HashMap<Row, borg.trikeshed.couch.Document?>()
             for (row in wantedRows) {
                 if (row.deleted) continue
                 decoded[row] = Couch.revToCid(row.rev)
-                    ?.let { local.cas.get(it) ?: fetchBlob(src, it)?.also { _ -> blobs++ } }
+                    ?.let { localBlob(it) ?: fetchBlob(src, it)?.also { _ -> blobs++ } }
                     ?.let { CouchStoreFactory.documentFromBody(it) }
             }
             blobs += fetchBlobs(src, decoded.values.filterNotNull()
                 .flatMap { local.referencedCids(it) }
-                .filter { local.cas.get(ContentId(it)) == null }.distinct())
+                .filter { localBlob(ContentId(it)) == null }.distinct())
+            // Roots acquired above now expose their canonical file-tree references.
+            // Keep extent transfer on the bulk lane instead of one exchange per file.
+            blobs += fetchBlobs(src, decoded.values.filterNotNull()
+                .flatMap { local.referencedCids(it) }
+                .filter { localBlob(ContentId(it)) == null }.distinct())
             for (row in wantedRows) {
                 if (row.deleted) {
                     if (local.store.putReplicated(null, row.id, row.rev, true)) written++ else conflicts++
@@ -134,13 +141,18 @@ class CouchReplicator(
                 check(doc.id == row.id) { "Replication body does not belong to the offered document" }
                 // Every referenced blob must be local before the revision becomes visible.
                 var complete = true
-                for (cidText in local.referencedCids(doc)) {
-                    val cid = ContentId(cidText)
-                    if (local.cas.get(cid) != null) continue
-                    if (fetchBlob(src, cid) == null) { complete = false; break }
-                    blobs++
+                // The single-block fallback may acquire a root omitted by the bulk lane.
+                // Resolve again after that acquisition so its children cannot be skipped.
+                repeat(2) {
+                    if (complete) for (cidText in local.referencedCids(doc)) {
+                        val cid = ContentId(cidText)
+                        if (localBlob(cid) != null) continue
+                        if (fetchBlob(src, cid) == null) { complete = false; break }
+                        blobs++
+                    }
                 }
                 if (!complete) { undelivered++; continue }
+                local.referencedCids(doc, requirePresent = true)
                 // Declined = our head wins (revWins); the document is complete on both sides.
                 if (local.store.putReplicated(doc, row.id, row.rev, false)) written++ else conflicts++
             }
@@ -159,6 +171,7 @@ class CouchReplicator(
     // ── push: local → remote ───────────────────────────────────────
 
     suspend fun push(target: String, sinceOverride: Long? = null): ReplicationReport {
+        firstUndelivered = null
         val dst = target.trimEnd('/')
         val replId = replicationId("push", local.name, dst)
         val start = sinceOverride ?: checkpoint(replId)
@@ -179,13 +192,15 @@ class CouchReplicator(
                 if (f.deleted) { docs += mapOf("_id" to f.docId, "_rev" to f.rev, "_deleted" to true); continue }
                 val doc = f.doc ?: error("Replication source revision has no document: ${f.docId}")
                 val rendered = local.render(doc, f.rev)
+                val references = local.referencedCids(doc, requirePresent = true)
                 // Ship blobs first: the body the rev names, then anything the body references.
                 var complete = true
                 val bodyCid = Couch.revToCid(f.rev)
-                val bodyBytes = bodyCid?.let { local.cas.get(it) } ?: CouchStoreFactory.canonicalBody(doc)
+                val bodyBytes = bodyCid?.let { localBlob(it) } ?: CouchStoreFactory.canonicalBody(doc)
+                check(bodyCid != null && ContentId.of(bodyBytes) == bodyCid) { "Replication source body does not match its revision" }
                 if (!putBlob(dst, bodyBytes, f.docId)) complete = false else blobs++
-                if (complete) for (cidText in local.referencedCids(rendered)) {
-                    val bytes = local.cas.get(ContentId(cidText)) ?: error("Replication source blob missing: $cidText")
+                if (complete) for (cidText in references) {
+                    val bytes = localBlob(ContentId(cidText)) ?: error("Replication source blob missing: $cidText")
                     if (!putBlob(dst, bytes, f.docId)) { complete = false; break }
                     blobs++
                 }
@@ -198,9 +213,11 @@ class CouchReplicator(
                 check(list.size == docs.size) { "Replication bulk response omitted acknowledgements" }
                 for ((index, r) in list.withIndex()) {
                     val ack = r as? Map<*, *>
-                    // `new_edits=false` on a head-only peer: ok=false means its head won (revWins), the
-                    // same declined-loser outcome pull sees from putReplicated — complete, not a hole.
-                    if (ack?.get("ok") == true && ack["id"] == docs[index]["_id"] && ack["rev"] == docs[index]["_rev"]) written++ else conflicts++
+                    when {
+                        ack?.get("ok") == true && ack["id"] == docs[index]["_id"] && ack["rev"] == docs[index]["_rev"] -> written++
+                        ack?.get("error") == "conflict" && ack["id"] == docs[index]["_id"] -> conflicts++
+                        else -> undelivered++
+                    }
                 }
             }
             check(undelivered == 0) {
@@ -228,16 +245,21 @@ class CouchReplicator(
         while (want.isNotEmpty()) {
             var progressed = 0
             for (chunk in want.chunked(bulkChunk)) {
+                val requested = chunk.toSet()
                 val r = http.call("POST", "$peer/_cas/_bulk", JsonSupport.stringify(mapOf("cids" to chunk)).encodeToByteArray(), "application/json")
                 if (!r.ok) continue
                 for ((cid, bytes) in borg.trikeshed.couch.CasBulkCodec.decode(r.body)) {
+                    if (cid !in requested) continue
                     val expect = runCatching { ContentId(cid) }.getOrNull() ?: continue
-                    if (ContentId.of(bytes) != expect) continue
-                    local.cas.put(bytes); landed++; progressed++
+                    if (ContentId.of(bytes) != expect || localBlob(expect) != null) continue
+                    check(local.cas.put(bytes) == expect && localBlob(expect)?.contentEquals(bytes) == true) {
+                        "Replication CAS did not persist blob: $cid"
+                    }
+                    landed++; progressed++
                 }
             }
             if (progressed == 0) break
-            want = want.filter { local.cas.get(ContentId(it)) == null }
+            want = want.filter { localBlob(ContentId(it)) == null }
         }
         return landed
     }
@@ -246,8 +268,12 @@ class CouchReplicator(
         val r = http.call("GET", "$peer/_cas/${cid.value}", null, null)
         if (!r.ok) return null
         if (ContentId.of(r.body) != cid) return null // peer lied or link corrupted: never land it
-        local.cas.put(r.body)
-        return r.body
+        check(local.cas.put(r.body) == cid) { "Replication CAS returned a different content identity" }
+        return localBlob(cid)?.also { check(it.contentEquals(r.body)) } ?: error("Replication CAS did not persist blob: ${cid.value}")
+    }
+
+    private fun localBlob(cid: ContentId): ByteArray? = local.cas.get(cid)?.also {
+        check(ContentId.of(it) == cid) { "Replication blob does not match its content identity: ${cid.value}" }
     }
 
     /** Why the first undelivered push revision could not land, for the failure message. */
@@ -262,9 +288,16 @@ class CouchReplicator(
         // A peer that closes mid-request (413 and close) breaks the pipe under the HTX write; that is
         // this document's failure, not the pass's — name it and count it, do not throw out of the loop.
         val reply = runCatching { http.call("POST", "$peer/_cas", bytes, "application/octet-stream") }
-            .getOrElse { e -> if (firstUndelivered == null) firstUndelivered = "$docId: ${e.message ?: e::class.simpleName}"; return false }
-        if (!reply.ok && firstUndelivered == null) firstUndelivered = "$docId: peer answered ${reply.status} to a ${bytes.size}-byte blob"
-        return reply.ok
+            .getOrElse { e ->
+                if (e is CancellationException) throw e
+                if (firstUndelivered == null) firstUndelivered = "$docId: ${e.message ?: e::class.simpleName}"
+                return false
+            }
+        val acknowledged = reply.ok && (runCatching { JsonSupport.parse(reply.text) }.getOrNull() as? Map<*, *>)
+            ?.get("cid") == ContentId.of(bytes).value
+        if (!acknowledged && firstUndelivered == null) firstUndelivered =
+            "$docId: peer did not acknowledge the requested blob (HTTP ${reply.status})"
+        return acknowledged
     }
 
     // ── checkpoints ───────────────────────────────────────────────

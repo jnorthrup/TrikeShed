@@ -682,6 +682,7 @@ object OroborosDaemon {
         val vmWorldStore = borg.trikeshed.btrfs.BtrfsWorldStore.ofFiles(
             fileOps,
             borg.trikeshed.btrfs.BtrfsWorldStore.homeUnder(forgeHome.absolutePath),
+            cas = couchDb.cas,
         )
         // ONE pointcut adapter over the daemon blackboard. Built here, before the Hypervisor, so
         // the Hypervisor's landings, the couch projection (installed below, in the pointcut

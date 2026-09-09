@@ -59,6 +59,9 @@ enum class BtrfsCapability {
     DEFRAG,
     BALANCE,
     RAID_PROFILE_LAYOUT,
+    RAID_VOLUME,
+    SPANNED_VOLUME,
+    RAID_RECOVERY,
 }
 
 data class BtrfsCapabilityStatus(
@@ -87,6 +90,24 @@ object BtrfsImplementationStatus {
             BtrfsSupportStatus.IMPLEMENTED,
             BtrfsOracleKind.LOCAL_INVARIANT,
             "BtrfsBlockGroupProfile validates supported block-group profile bits and stripe counts.",
+        ),
+        BtrfsCapabilityStatus(
+            BtrfsCapability.RAID_VOLUME,
+            BtrfsSupportStatus.IMPLEMENTED,
+            BtrfsOracleKind.LOCAL_INVARIANT,
+            "BtrfsRaidVolume composes SINGLE, DUP, RAID0/1/10/5/6 block IO through bounded member channels; BtrfsRaidImage owns uring image members. This is userspace block storage, not canonical Btrfs filesystem serialization. Same-host files do not establish physical failure isolation.",
+        ),
+        BtrfsCapabilityStatus(
+            BtrfsCapability.SPANNED_VOLUME,
+            BtrfsSupportStatus.IMPLEMENTED,
+            BtrfsOracleKind.LOCAL_INVARIANT,
+            "SPAN concatenates unequal member data capacities, including reads and writes across member boundaries. BtrfsRaidImage persists geometry and ordered member identities; SPAN cannot recover an erased member.",
+        ),
+        BtrfsCapabilityStatus(
+            BtrfsCapability.RAID_RECOVERY,
+            BtrfsSupportStatus.IMPLEMENTED,
+            BtrfsOracleKind.LOCAL_INVARIANT,
+            "Mirrors and P/Q parity recover known erasures within layout redundancy. Replacement is unavailable until rebuild and sync complete. Checksummed dual slots retain ordered identities, unavailable state and complete block after-images for redo. Atomicity covers one physical stripe block or replicated logical block, not an entire multi-block write. Bare BtrfsRaidVolume requires caller-supplied persistence. Parity cannot identify arbitrary silent corruption; power-loss durability requires the backend's write and fsync guarantees.",
         ),
         BtrfsCapabilityStatus(
             BtrfsCapability.MKFS_IMAGE,

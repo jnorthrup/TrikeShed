@@ -1,7 +1,9 @@
 package borg.trikeshed.btrfs
 
 import borg.trikeshed.lib.Closeable
+import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.SelectionResult
@@ -19,9 +21,12 @@ import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlin.concurrent.Volatile
 
 data class BtrfsVolumeIoCompletion(
     val opcode: UringOp,
@@ -53,6 +58,8 @@ class BtrfsImageIoException(
  * The supplied channel is dedicated to this volume's request identities;
  * its caller drains the channel after the volume. Compatibility instances
  * own and close their internally created channel.
+ * Admission occurs under the volume lock. Drain stops admission before waiting;
+ * admitted operations retain their buffers until every partial I/O settles.
  */
 class BtrfsUringFileVolume private constructor(
     val imagePath: String,
@@ -63,7 +70,16 @@ class BtrfsUringFileVolume private constructor(
     private var fd: Int,
     val backendReport: NioCapabilityReport,
     val channelReport: BtrfsUringChannelReport?,
+    val readOnly: Boolean = false,
 ) : Volume, Closeable {
+    private constructor(
+        imagePath: String,
+        blockSize: Int,
+        capacity: Long,
+        backendReport: NioCapabilityReport,
+        resources: Join<File, UringChannel>,
+    ) : this(imagePath, blockSize, capacity, resources.b, resources.a, -1, backendReport, null)
+
     constructor(
         imagePath: String,
         blockSize: Int = NioBtrfsGraalBlobStore.SECTOR_MIN.toInt(),
@@ -74,27 +90,34 @@ class BtrfsUringFileVolume private constructor(
         imagePath = imagePath,
         blockSize = blockSize,
         capacity = capacity,
-        file = openPreSizedFile(imagePath, blockSize, capacity),
-        channel = UringChannels.open(entries, ebpfPrograms),
-        fd = -1,
         backendReport = currentNioCapabilityReport(),
-        channelReport = null,
+        resources = openCompatibility(imagePath, blockSize, capacity, entries, ebpfPrograms),
     )
 
     companion object {
         private const val O_RDWR: Int = 2
         private const val O_CREAT: Int = 64
+        private const val O_EXCL: Int = 128
 
+        /**
+         * Reopen with create=false; resizing an existing image requires resize=true.
+         * Create-and-size is exclusive by default, so failure cannot truncate an
+         * existing image. readOnly requires create=false and resize=false.
+         */
         suspend fun open(
             channel: UringChannel,
             imagePath: String,
             blockSize: Int = NioBtrfsGraalBlobStore.SECTOR_MIN.toInt(),
             capacity: Long,
             create: Boolean = true,
-            resize: Boolean = true,
+            resize: Boolean = create,
             backendReport: NioCapabilityReport,
             channelReport: BtrfsUringChannelReport? = null,
+            exclusive: Boolean = create && resize,
+            readOnly: Boolean = false,
         ): BtrfsUringFileVolume {
+            require(!exclusive || create) { "exclusive open requires create" }
+            require(!readOnly || (!create && !resize)) { "read-only open cannot create or resize an image" }
             val volume = BtrfsUringFileVolume(
                 imagePath = imagePath,
                 blockSize = blockSize,
@@ -104,29 +127,41 @@ class BtrfsUringFileVolume private constructor(
                 fd = -1,
                 backendReport = backendReport,
                 channelReport = channelReport,
+                readOnly = readOnly,
             )
             try {
-                val flags = O_RDWR or if (create) O_CREAT else 0
-                val opened = volume.submitOneAwait(
-                    opcode = UringOp.OPENAT,
-                    byteOffset = 0L,
-                    byteLength = imagePath.encodeToByteArray().size,
-                ) { token -> Submissions.openat(imagePath, flags, token) }
-                if (opened < 0) {
-                    throw BtrfsImageIoException("OPENAT failed for $imagePath: res=$opened", volume.ioReceipts())
+                val flags = (if (readOnly) 0 else O_RDWR) or
+                    (if (create) O_CREAT else 0) or (if (exclusive) O_EXCL else 0)
+                currentCoroutineContext().ensureActive()
+                // Retain the descriptor before cancellation can discard its OPENAT completion.
+                withContext(NonCancellable) {
+                    val opened = volume.submitOneAwait(
+                        opcode = UringOp.OPENAT,
+                        byteOffset = 0L,
+                        byteLength = imagePath.encodeToByteArray().size,
+                    ) { token -> Submissions.openat(imagePath, flags, token) }
+                    if (opened < 0) {
+                        throw BtrfsImageIoException("OPENAT failed for $imagePath: res=$opened", volume.ioReceipts())
+                    }
+                    volume.fd = opened
                 }
-                volume.fd = opened
+                currentCoroutineContext().ensureActive()
                 if (resize) {
-                    val truncated = volume.submitOneAwait(UringOp.FTRUNCATE, 0L, 0) { token ->
-                        UringSubmission(UringOp.FTRUNCATE, opened, 0, 0, volume.capacityBytes, userData = token)
-                    }
-                    if (truncated != 0) {
-                        throw BtrfsImageIoException("FTRUNCATE failed for $imagePath: res=$truncated", volume.ioReceipts())
+                    withContext(NonCancellable) {
+                        val truncated = volume.submitOneAwait(UringOp.FTRUNCATE, 0L, 0) { token ->
+                            UringSubmission(UringOp.FTRUNCATE, volume.fd, 0, 0, volume.capacityBytes, userData = token)
+                        }
+                        if (truncated != 0) {
+                            throw BtrfsImageIoException("FTRUNCATE failed for $imagePath: res=$truncated", volume.ioReceipts())
+                        }
                     }
                 }
+                currentCoroutineContext().ensureActive()
                 return volume
             } catch (failure: Throwable) {
-                runCatching { volume.drain() }
+                runCatching { volume.drain() }.exceptionOrNull()?.let {
+                    if (it !== failure) failure.addSuppressed(it)
+                }
                 throw failure
             }
         }
@@ -148,7 +183,24 @@ class BtrfsUringFileVolume private constructor(
                 }
                 return opened
             } catch (failure: Throwable) {
-                runCatching { opened.close() }
+                runCatching { opened.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                throw failure
+            }
+        }
+
+        private fun openCompatibility(
+            imagePath: String,
+            blockSize: Int,
+            capacity: Long,
+            entries: Int,
+            ebpfPrograms: List<UringEbpfProgram>,
+        ): Join<File, UringChannel> {
+            require(entries > 0) { "entries must be positive" }
+            val file = openPreSizedFile(imagePath, blockSize, capacity)
+            try {
+                return file j UringChannels.open(entries, ebpfPrograms)
+            } catch (failure: Throwable) {
+                runCatching { file.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
                 throw failure
             }
         }
@@ -157,13 +209,14 @@ class BtrfsUringFileVolume private constructor(
     private val lock = Mutex()
     private val completions = ArrayList<BtrfsVolumeIoCompletion>()
     private val capacityBytes: Long = checkedCapacityBytes(capacity, blockSize)
+    @Volatile private var draining = false
     private var closed = false
+    private var closeFailure: Throwable? = null
     private var nextUserData = 1L
 
     fun ioReceipts(): List<BtrfsVolumeIoCompletion> = completions.toList()
 
-    override suspend fun read(lba: Long, count: Int): ByteBuffer = lock.withLock {
-        requireOpen()
+    override suspend fun read(lba: Long, count: Int): ByteBuffer = withIo {
         require(count >= 0) { "count must be non-negative" }
         val byteLength = byteCount(count)
         val byteOffset = checkedByteOffset(lba, byteLength)
@@ -187,19 +240,25 @@ class BtrfsUringFileVolume private constructor(
                     ioReceipts(),
                 )
             }
+            if (res > byteLength - copied) {
+                throw BtrfsImageIoException(
+                    "oversized READ completion at $offset: res=$res remaining=${byteLength - copied}",
+                    ioReceipts(),
+                )
+            }
             copied += res
         }
         ByteBuffer.wrap(target)
     }
 
-    override suspend fun write(lba: Long, data: ByteBuffer): Unit = lock.withLock {
-        requireOpen()
+    override suspend fun write(lba: Long, data: ByteBuffer): Unit = withIo {
+        check(!readOnly) { "BtrfsUringFileVolume is read-only" }
         val startPosition = data.position()
         val total = data.remaining()
         val byteOffset = checkedByteOffset(lba, total)
         var written = 0
         while (written < total) {
-            val source = ByteBuffer.wrap(data.array(), data.arrayOffset() + data.position(), data.remaining())
+            val source = data.slice()
             val offset = byteOffset + written
             val res = if (fd >= 0) {
                 submitOneAwait(UringOp.WRITE, offset, data.remaining()) { token ->
@@ -229,8 +288,7 @@ class BtrfsUringFileVolume private constructor(
         }
     }
 
-    override suspend fun sync(): Unit = lock.withLock {
-        requireOpen()
+    override suspend fun sync(): Unit = withIo {
         val res = if (fd >= 0) {
             submitOneAwait(UringOp.FSYNC, 0L, 0) { token ->
                 Submissions.fsync(fd, token)
@@ -245,40 +303,73 @@ class BtrfsUringFileVolume private constructor(
         }
     }
 
-    suspend fun drain(): Unit = withContext(NonCancellable) { lock.withLock {
-        if (!closed) {
-            val res = when {
-                fd >= 0 -> submitOneAwait(UringOp.CLOSE, 0L, 0) { token -> Submissions.close(fd, token) }
-                file != null -> submitOne(UringOp.CLOSE, 0L, 0) { token ->
-                    channel.close(requireNotNull(file), token)
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        draining = true
+        lock.withLock {
+            closeResource {
+                when {
+                    fd >= 0 -> submitOneAwait(UringOp.CLOSE, 0L, 0) { token -> Submissions.close(fd, token) }
+                    file != null -> submitOne(UringOp.CLOSE, 0L, 0) { token -> channel.close(file, token) }
+                    else -> 0
                 }
-                else -> 0
             }
-            if (res != 0) {
-                throw BtrfsImageIoException("CLOSE failed for $imagePath: res=$res", ioReceipts())
-            }
-            fd = -1
-            closed = true
         }
-        if (file != null) channel.closeNow()
-    } }
+    }
 
     override fun close() {
-        if (closed) {
-            if (file != null) channel.closeNow()
-            return
+        check(lock.tryLock()) { "suspend drain() is required while volume I/O is active" }
+        try {
+            check(closed || fd < 0) { "suspend drain() is required for fd-backed BtrfsUringFileVolume" }
+            draining = true
+            closeResource {
+                submitOne(UringOp.CLOSE, 0L, 0) { token -> channel.close(requireNotNull(file), token) }
+            }
+        } finally {
+            lock.unlock()
         }
-        if (fd >= 0) {
-            throw IllegalStateException("suspend drain() is required for fd-backed BtrfsUringFileVolume")
+    }
+
+    private inline fun closeResource(closeDescriptor: () -> Int) {
+        if (!closed) {
+            try {
+                val res = closeDescriptor()
+                if (res != 0) {
+                    val failure = BtrfsImageIoException("CLOSE failed for $imagePath: res=$res", ioReceipts())
+                    // A rejected SQE never reached the backend; the owned File still needs closing.
+                    if (file != null && completions.lastOrNull()?.submitted == 0) {
+                        runCatching { file.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                    }
+                    throw failure
+                }
+            } catch (failure: Throwable) {
+                closeFailure = failure
+            } finally {
+                // A failing CLOSE may already have released the fd. Never retry that identity.
+                fd = -1
+                closed = true
+            }
         }
-        val res = submitOne(UringOp.CLOSE, 0L, 0) { token ->
-            channel.close(requireNotNull(file), token)
+        if (file != null) {
+            try {
+                channel.closeNow()
+            } catch (failure: Throwable) {
+                val first = closeFailure
+                if (first == null) closeFailure = failure else if (first !== failure) first.addSuppressed(failure)
+            }
         }
-        if (res != 0) {
-            throw BtrfsImageIoException("CLOSE failed for $imagePath: res=$res", ioReceipts())
+        closeFailure?.let { throw it }
+    }
+
+    private suspend fun <T> withIo(operation: suspend () -> T): T {
+        currentCoroutineContext().ensureActive()
+        check(!draining) { "BtrfsUringFileVolume is draining" }
+        return lock.withLock {
+            requireOpen()
+            currentCoroutineContext().ensureActive()
+            val result = withContext(NonCancellable) { operation() }
+            currentCoroutineContext().ensureActive()
+            result
         }
-        closed = true
-        channel.closeNow()
     }
 
     private fun byteCount(count: Int): Int {
@@ -298,7 +389,7 @@ class BtrfsUringFileVolume private constructor(
     }
 
     private fun requireOpen() {
-        check(!closed && (fd >= 0 || file?.isOpen() == true)) { "BtrfsUringFileVolume is closed" }
+        check(!draining && !closed && (fd >= 0 || file?.isOpen() == true)) { "BtrfsUringFileVolume is closed or draining" }
     }
 
     private inline fun submitOne(

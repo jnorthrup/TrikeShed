@@ -5,15 +5,82 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.DocumentExtent
 import borg.trikeshed.userspace.nio.DocumentInputElement
 import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.nio.channels.UringChannels
+import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.test.runTest
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BtrfsUringFileVolumeTest {
+
+    @Test
+    fun invalid_entries_fail_before_creating_a_compatibility_file() {
+        val directory = Files.createTempDirectory("trikeshed-btrfs-construction-")
+        val path = directory.resolve("missing.img")
+        try {
+            assertFailsWith<IllegalArgumentException> {
+                BtrfsUringFileVolume(path.toString(), blockSize = 512, capacity = 1, entries = 0)
+            }
+            assertFalse(Files.exists(path))
+        } finally {
+            Files.deleteIfExists(path)
+            Files.deleteIfExists(directory)
+        }
+    }
+
+    @Test
+    fun connected_reopen_preserves_capacity_and_read_only_data_until_explicit_resize() = runTest {
+        val directory = Files.createTempDirectory("trikeshed-btrfs-reopen-")
+        val path = directory.resolve("volume.img")
+        val channel = UringChannels.open(entries = 8)
+        val payload = byteArrayOf(1, 2, 3, 4)
+        try {
+            val created = BtrfsUringFileVolume.open(channel, path.toString(), blockSize = 512, capacity = 16,
+                backendReport = currentNioCapabilityReport())
+            try {
+                created.write(3, ByteBuffer.wrap(payload))
+                created.sync()
+            } finally {
+                created.drain()
+            }
+            assertEquals(8192L, Files.size(path))
+            val reopened = BtrfsUringFileVolume.open(channel, path.toString(), blockSize = 512, capacity = 8,
+                create = false, backendReport = currentNioCapabilityReport(), readOnly = true)
+            try {
+                assertEquals(8192L, Files.size(path))
+                val bytes = ByteArray(payload.size)
+                reopened.read(3, 1).get(bytes)
+                assertContentEquals(payload, bytes)
+                assertFailsWith<IllegalStateException> { reopened.write(3, ByteBuffer.wrap(payload)) }
+                assertFalse(reopened.ioReceipts().any { it.opcode == UringOp.FTRUNCATE })
+            } finally {
+                reopened.drain()
+            }
+            val resized = BtrfsUringFileVolume.open(channel, path.toString(), blockSize = 512, capacity = 32,
+                create = false, resize = true, backendReport = currentNioCapabilityReport())
+            try {
+                assertEquals(16384L, Files.size(path))
+                val bytes = ByteArray(payload.size)
+                resized.read(3, 1).get(bytes)
+                assertContentEquals(payload, bytes)
+                val padding = ByteArray(512)
+                resized.read(31, 1).get(padding)
+                assertContentEquals(ByteArray(512), padding)
+            } finally {
+                resized.drain()
+            }
+        } finally {
+            channel.drain()
+            Files.deleteIfExists(path)
+            Files.deleteIfExists(directory)
+        }
+    }
 
     @Test
     fun file_backed_volume_survives_reopen_through_common_uring_channel() = runTest {
@@ -26,7 +93,7 @@ class BtrfsUringFileVolumeTest {
                 val volume = writeVolume
                 volume.write(3, ByteBuffer.wrap(payload))
                 volume.sync()
-                assertEquals("jvm_nio", volume.backendReport.backendName)
+                assertEquals(currentNioCapabilityReport(), volume.backendReport)
                 assertTrue(volume.ioReceipts().any { it.opcode == UringOp.WRITE && it.res == payload.size })
                 assertTrue(volume.ioReceipts().any { it.opcode == UringOp.FSYNC && it.res == 0 })
             } finally {

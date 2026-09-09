@@ -1,20 +1,42 @@
 package borg.trikeshed.btrfs
 
 import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfContextLayout
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfInsn
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
+import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.test.runTest
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BtrfsImageIoTest {
+
+    @Test
+    fun connected_seed_creation_failure_preserves_existing_image_bytes_and_length() = runTest {
+        val path = Files.createTempFile("trikeshed-btrfs-existing-", ".img")
+        val original = ByteArray(2 * 1024 * 1024) { (it % 251).toByte() }
+        val channel = UringChannels.open(entries = 8)
+        try {
+            Files.write(path, original)
+            val failure = assertFailsWith<BtrfsImageIoException> {
+                NioBtrfsGraalBlobStore.writeImageViaUring(channel, path.toString(), 1024uL * 1024uL,
+                    currentNioCapabilityReport())
+            }
+            assertEquals(listOf(UringOp.OPENAT), failure.completions.map { it.opcode })
+            assertEquals(original.size.toLong(), Files.size(path))
+            assertContentEquals(original, Files.readAllBytes(path))
+        } finally {
+            channel.drain()
+            Files.deleteIfExists(path)
+        }
+    }
 
     @Test
     fun seed_image_superblocks_move_through_common_uring_volume() = runTest {
@@ -24,8 +46,7 @@ class BtrfsImageIoTest {
             RandomAccessFile(path.toFile(), "rw").use { it.setLength(total.toLong()) }
             val receipt = BtrfsImageIo.writeSeedImage(path.toString(), total)
 
-            assertEquals("jvm_nio", receipt.backend.backendName)
-            assertFalse(receipt.backend.ioUringAvailable)
+            assertEquals(currentNioCapabilityReport(), receipt.backend)
             assertTrue(receipt.wroteMirror)
             assertEquals(2, receipt.superblocks.size)
             assertEquals(BtrfsSeedImageLayout.requiredBytes(total), receipt.requiredBytes)

@@ -3,7 +3,6 @@ package borg.trikeshed.isam.meta
 import borg.trikeshed.common.Files
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
-import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -44,51 +43,56 @@ class IsamMetaFileReader(
     private val fileOps: FileOperations? = null
 ) : Usable {
 
-    val recordlen: Int by lazy {
-        constraints.last().end
-    }
-    val constraints: Series<RecordMeta> by lazy {
-        open()
-        constraints1.toSeries()
+    val recordlen: Int get() = constraints.last().end
+    val constraints: Series<RecordMeta> get() {
+        if (constraints1 == null) open()
+        return requireNotNull(constraints1)
     }
 
-    private lateinit var constraints1: List<RecordMeta>
+    private var constraints1: Series<RecordMeta>? = null
 
     override fun open() {
+        constraints1 = null
         val lines = if (fileOps != null) {
             fileOps.readAllLines(metafileFilename)
         } else {
             Files.readAllLines(metafileFilename)
-        }.filterNot { it.trim().startsWith('#') }
+        }.filterNot { it.isBlank() || it.trim().startsWith('#') }
+        require(lines.size in 3..4) { "ISAM metadata requires coordinates, names, types and optional groups" }
 
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
         val types: Series<String> = CharSeries(lines[2]).trim.splitWs() α CharSeries::asString
 
-        val namesList = names.toList()
+        require(names.size > 0 && types.size == names.size && coords.size.toLong() == names.size.toLong() * 2) {
+            "ISAM metadata column counts disagree"
+        }
         val groupsLine = if (lines.size > 3) lines[3].trim() else ""
         val groupSeries: Series<Join<Int, String>> = if (groupsLine.isNotEmpty()) {
-            parseGroupsLine(groupsLine, namesList.size)
+            parseGroupsLine(groupsLine, names.size)
         } else {
-            namesList.size j { idx: Int -> idx j "0" }
+            names.size j { _: Int -> 0 j "0" }
         }
 
-        this@IsamMetaFileReader.constraints1 = namesList.zip(types.toList()).mapIndexed { index, (name, type) ->
+        val parsed = Array(names.size) { index ->
             val begin = coords[2 * index].toInt()
             val end = coords[2 * index + 1].toInt()
+            require(begin >= 0 && end > begin) { "ISAM columns require positive fixed widths" }
             val (groupId, groupName) = groupSeries[index]
-            val ioMemento: IOMemento = IOMemento.valueOf(type)
+            val ioMemento: IOMemento = IOMemento.valueOf(types[index])
             val decoder = ioMemento.createDecoder(end - begin)
             val encoder = ioMemento.createEncoder(end - begin)
-            val recordMeta = RecordMeta(name, ioMemento, begin, end, decoder, encoder)
+            val recordMeta = RecordMeta(names[index], ioMemento, begin, end, decoder, encoder)
             recordMeta.groupId = groupId
             recordMeta.groupName = groupName
             recordMeta
-        }
+        }.toSeries()
+        validate(parsed)
+        constraints1 = parsed
     }
 
     override fun close() {
-         logDebug { "noOp:closing metafile ${this.metafileFilename}" }
+        constraints1 = null
     }
 
     //toString
@@ -103,6 +107,7 @@ class IsamMetaFileReader(
      */
     companion object {
         fun parseGroupsLine(line: String, colCount: Int): Series<Join<Int, String>> {
+            require(colCount > 0) { "ISAM requires columns" }
             val colToGroupName = mutableMapOf<Int, String>()
             val mentionedGroups = mutableListOf<String>()
 
@@ -110,9 +115,10 @@ class IsamMetaFileReader(
             val tokens: Series<CharSeries> = cs.splitWs()
             for (token in tokens) {
                 val colonIdx = token.asString().lastIndexOf(':')
-                if (colonIdx < 0) continue
+                require(colonIdx > 0 && colonIdx == token.asString().indexOf(':')) { "Invalid ISAM group token" }
                 val colListCs  = token.clone().lim(token.pos + colonIdx)
                 val groupName  = token.clone().pos(token.pos + colonIdx + 1).asString()
+                validateGroupName(groupName)
                 if (groupName !in mentionedGroups) mentionedGroups.add(groupName)
                 val colSpecs: Series<CharSeries> = (CharSeries(colListCs.asString()) / ',') α { CharSeries(it) }
                 for (spec in colSpecs) {
@@ -121,14 +127,20 @@ class IsamMetaFileReader(
                     if (dashIdx > 0) {
                         val lo = specs.clone().lim(specs.pos + dashIdx).asString().toInt()
                         val hi = specs.clone().pos(specs.pos + dashIdx + 1).asString().toInt()
-                        for (k in lo..hi) colToGroupName[k] = groupName
+                        require(lo in 0 until colCount && hi in lo until colCount) { "ISAM group range is outside the columns" }
+                        for (k in lo..hi) {
+                            require(colToGroupName.put(k, groupName) == null) { "ISAM column belongs to multiple groups" }
+                        }
                     } else {
-                        colToGroupName[specs.asString().toInt()] = groupName
+                        val index = specs.asString().toInt()
+                        require(index in 0 until colCount) { "ISAM group index is outside the columns" }
+                        require(colToGroupName.put(index, groupName) == null) { "ISAM column belongs to multiple groups" }
                     }
                 }
             }
 
-            val implicitName = mentionedGroups.size.toString()
+            var implicitName = mentionedGroups.size.toString()
+            while (implicitName in mentionedGroups) implicitName = "_$implicitName"
             val implicitGroupId = mentionedGroups.size
 
             return colCount j { idx: Int ->
@@ -206,12 +218,14 @@ class IsamMetaFileReader(
             varchars: Map<String, Int>,
             useMonocursorGroupings: Boolean = true
         ): Series<RecordMeta> {
+            require(recordMetas.size > 0) { "ISAM requires column metadata" }
             val result = if (recordMetas.view.any { it !is RecordMeta || (min(it.begin, it.end) < 0 && it.child == null) } || useMonocursorGroupings) {
                 var offset = 0
                 recordMetas.view.map { columnMeta: ColumnMeta ->
                     val name = columnMeta.name.toString()
-                    val type = columnMeta.type as IOMemento
-                    val len = type.networkSize ?: varchars[name] ?: throw Exception("no network size for $name")
+                    val type = columnMeta.type as? IOMemento ?: throw IllegalArgumentException("No ISAM codec for $name")
+                    val len = type.networkSize ?: varchars[name] ?: throw IllegalArgumentException("No fixed width for $name")
+                    require(len > 0 && offset <= Int.MAX_VALUE - len) { "ISAM row length exceeds buffer capacity or has a nonpositive width" }
                     val existingGroupId = (columnMeta as? RecordMeta)?.groupId ?: 0
                     val existingGroupName = (columnMeta as? RecordMeta)?.groupName ?: "0"
 
@@ -223,19 +237,46 @@ class IsamMetaFileReader(
 
                     val recordMeta = RecordMeta(
                         name = name,
-                        type = type as IOMemento,
+                        type = type,
                         begin = offset,
                         end = offset + len,
                         decoder = type.createDecoder(len),
                         encoder = type.createEncoder(len),
-                        groupId = groupId,
-                        groupName = groupName,
-                    )
+                    ).also {
+                        it.groupId = groupId
+                        it.groupName = groupName
+                    }
                     offset += len
                     recordMeta
                 }.toSeries()
             } else recordMetas as Series<RecordMeta>
+            validate(result)
             return result
+        }
+
+        private fun validateGroupName(name: String) {
+            require(name.isNotEmpty() && name.none { it.isWhitespace() || it <= ' ' || it in ":/\\" }) {
+                "Invalid ISAM group name"
+            }
+        }
+
+        private fun validate(metadata: Series<RecordMeta>) {
+            require(metadata.size > 0) { "ISAM requires column metadata" }
+            val groupIds = mutableMapOf<String, Int>()
+            val groupNames = mutableMapOf<Int, String>()
+            var offset = 0
+            for (column in metadata.view) {
+                require(column.name.isNotEmpty() && !column.name.startsWith('#') && column.name.none { it.isWhitespace() || it <= ' ' }) {
+                    "Invalid ISAM column name"
+                }
+                require(column.begin == offset && column.end > column.begin) { "ISAM column offsets must be contiguous and positive" }
+                val width = column.end - column.begin
+                require(column.type.networkSize == null || column.type.networkSize == width) { "ISAM codec width differs from metadata for ${column.name}" }
+                validateGroupName(column.groupName)
+                require(column.groupId >= 0 && groupIds.getOrPut(column.groupName) { column.groupId } == column.groupId &&
+                    groupNames.getOrPut(column.groupId) { column.groupName } == column.groupName) { "ISAM group names and identifiers disagree" }
+                offset = column.end
+            }
         }
     }
 }

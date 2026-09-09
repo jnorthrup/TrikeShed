@@ -4,6 +4,7 @@ import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createTempDirectory
@@ -120,20 +121,28 @@ class BtrfsHostedVmWorldTest {
     @Test
     fun identicalBytesAcrossGuestsCostOneExtent() {
         val root = tempRoot()
-        val store = fileStore(root)
         val shared = ByteArray(4096) { (it % 251).toByte() }
+        val backing = JvmFileOperations()
+        var payloadWrites = 0
+        val files = object : FileOperations by backing {
+            override fun writeAtomically(filename: String, bytes: ByteArray) {
+                if (bytes.contentEquals(shared)) payloadWrites++
+                backing.writeAtomically(filename, bytes)
+            }
+        }
+        val store = BtrfsWorldStore.ofFiles(files, root)
 
-        val a = TrikeShedGraalVfs(store.fileOpsFor("vm.a"), store.root, store.subvolumeFor("vm.a"), "vm.a")
-        val extentsAfterA = extentCount(root)
+        val a = TrikeShedGraalVfs(store.fileOpsFor("vm.a"), store.root, store.subvolumeFor("vm.a"), "vm.a", store.cas)
         a.put("/workspace/lib.bin", shared)
-        val withOneCopy = extentCount(root)
-        assertTrue(withOneCopy > extentsAfterA, "the write landed no extent")
+        assertEquals(1, payloadWrites, "the write landed no verified file object")
 
         // A second guest storing the same bytes adds no extent: they are content-addressed, which
         // is the reason to put many guest worlds on one filesystem rather than one root each.
-        val b = TrikeShedGraalVfs(store.fileOpsFor("vm.b"), store.root, store.subvolumeFor("vm.b"), "vm.b")
+        val b = TrikeShedGraalVfs(store.fileOpsFor("vm.b"), store.root, store.subvolumeFor("vm.b"), "vm.b", store.cas)
         b.put("/workspace/vendored/lib.bin", shared)
-        assertEquals(withOneCopy, extentCount(root), "identical content across guests was stored twice")
+        // Canonical manifests are also CAS objects, so counting every CAS file
+        // would confuse distinct directory metadata with duplicated payloads.
+        assertEquals(1, payloadWrites, "identical file content across guests was stored twice")
 
         assertContentEquals(shared, a.fetch("/workspace/lib.bin"))
         assertContentEquals(shared, b.fetch("/workspace/vendored/lib.bin"))
@@ -166,9 +175,4 @@ class BtrfsHostedVmWorldTest {
         assertEquals("/x/forge/vm-worlds", BtrfsWorldStore.homeUnder("/x/forge"))
     }
 
-    private fun extentCount(root: String): Int {
-        val dir = Path.of(root, "extents")
-        if (!Files.isDirectory(dir)) return 0
-        Files.walk(dir).use { return it.filter(Files::isRegularFile).count().toInt() }
-    }
 }

@@ -4,16 +4,14 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
+import kotlinx.coroutines.CoroutineScope
 
 /**
- * Nio ↔ Btrfs ↔ Graal blob wiring — all commonMain, per-target chokepoints as TODO.
+ * Common userspace block-volume, Btrfs seed-image, and Graal blob entry points.
  *
- * One mount = local-exclusive GraalVM-access filesystem blobs:
- *  - growable, linkable (per span mount), raidable (per c userspace btrfs RAID)
- *  - on-disk layout must pass `btrfs check` before any mountable claim
- *
- * Every platform-specific seam is a TODO chokepoint so the whole object lives in commonMain.
- * Targets fill their actuals; jvmMainClasses stays green via TODO stubs.
+ * [openRaidImage] and the configuration-based [spanMount] expose persistent
+ * userspace block I/O. Canonical Btrfs filesystem serialization, exclusive
+ * filesystem locking, ioctl reflinks, and Graal mounting remain incomplete.
  */
 object NioBtrfsGraalBlobStore {
 
@@ -110,7 +108,7 @@ object NioBtrfsGraalBlobStore {
     ): BtrfsImageWriteReceipt =
         BtrfsImageIo.writeSeedImage(imagePath, totalBytes, entries, ebpfPrograms)
 
-    /** Connected uring path: caller supplies the selected channel; image OPENAT/FTRUNCATE go through SQE/CQE. */
+    /** Creates a new seed image exclusively through the selected channel; existing images are preserved. */
     suspend fun writeImageViaUring(
         channel: UringChannel,
         imagePath: String,
@@ -123,7 +121,27 @@ object NioBtrfsGraalBlobStore {
     fun verifyWithCBtrfs(imagePath: String): Boolean =
         TODO("posixMain: pinned btrfs-progs ProcessOperations.exec(\"btrfs\", \"check\", imagePath) == 0; jvmMain: local superblock parse is not a mountability oracle")
 
-    /** Span mount: multiple devices in one volume (device tree). */
+    /** Persistent userspace block volume over owned image members and uring channels. */
+    suspend fun openRaidImage(
+        scope: CoroutineScope,
+        config: BtrfsRaidImageConfig,
+        create: Boolean = false,
+        resize: Boolean = false,
+        unavailable: Set<Int> = emptySet(),
+    ): BtrfsRaidImage = BtrfsRaidImage.open(scope, config, create, resize, unavailable = unavailable)
+
+    /** Concatenates member data regions; this entry does not mount a kernel filesystem. */
+    suspend fun spanMount(
+        scope: CoroutineScope,
+        config: BtrfsRaidImageConfig,
+        create: Boolean = false,
+        resize: Boolean = false,
+    ): BtrfsRaidImage {
+        require(config.layout == BtrfsVolumeLayout.SPAN) { "spanMount requires SPAN layout" }
+        return openRaidImage(scope, config, create, resize)
+    }
+
+    /** Legacy device-tree entry retained for source compatibility; filesystem mounting remains incomplete. */
     fun spanMount(devices: List<String>, fileOps: FileOperations): BtrfsDeviceTree =
         TODO("BtrfsDeviceTree(devItems) + BtrfsChunkTree with stripes spanning devids; linkable reflink only within same span")
 
@@ -134,26 +152,18 @@ object NioBtrfsGraalBlobStore {
     // ── Wiring (commonMain composition, no platform import) ───────────────────
 
     /**
-     * Wire sequence — all in commonMain, each step hits a chokepoint above:
-     *
-     *  fileOps (userspace nio) ──► UserspaceBtrfs(rootDir, fileOps)  // CoW extents + manifests
-     *       │                         ▲ reflink (span mount)  ▲ raid (chunk tree)
-     *       │                         │ BtrfsReflinkStore       │ BtrfsChunkItem
-     *       ▼                         │                         │
-     *  btrfs.img (superblock seed; btrfs-progs gated) ◄──── writeMountableImage
-     *       │
-     *       └─► acquireExclusive ──► TrikeShedGraalVfs / GraalBtrfsSupervisor  // local-exclusive
-     *                              blobs are growable (CoW) + linkable + raidable
-     *
-     * Test: writeMountableImage(...) then verifyWithCBtrfs(...) before any blob grow/link/raid.
+     * RAID/SPAN block volumes, directory-backed blobs, and seed-image fixtures
+     * are distinct consumers. A mountable filesystem still requires complete
+     * canonical trees and an offline Btrfs oracle.
      */
     fun wireInfo(): String = buildString {
-        appendLine("NioBtrfsGraalBlobStore wiring (all commonMain, chokepoints=TODO):")
+        appendLine("NioBtrfsGraalBlobStore userspace wiring:")
+        appendLine(" - openRaidImage / spanMount -> BtrfsRaidImage -> BtrfsRaidVolume -> owned uring image members")
         appendLine(" - userspace nio FileOperations (InMemoryFileOperations | PosixFileOperations | JvmFileOperations)")
         appendLine(" - UserspaceBtrfs CoW extents + snapshot (O(entries) not bytes)")
-        appendLine(" - BtrfsReflinkStore reflink (span mount linkable)")
-        appendLine(" - BtrfsChunkTree/BtrfsStripe RAID (c userspace btrfs type bits)")
-        appendLine(" - TrikeShedGraalVfs local-exclusive (file lock)")
+        appendLine(" - BtrfsReflinkStore models shared blobs; filesystem reflink ioctl wiring remains incomplete")
+        appendLine(" - BtrfsChunkTree/BtrfsStripe retain local profile metadata fixtures")
+        appendLine(" - exclusive filesystem locking and Graal mount entry points remain incomplete")
         appendLine(" - BtrfsUringFileVolume: nonvolatile userspace.nio.Volume over selected uring channel")
         appendLine(" - on-disk seed: superblock BTRFS_MAGIC=0x4D5F53665248425F at 64K; btrfs-progs oracle still required")
     }

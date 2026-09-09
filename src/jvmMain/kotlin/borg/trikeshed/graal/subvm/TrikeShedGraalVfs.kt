@@ -2,6 +2,7 @@ package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
@@ -41,8 +42,9 @@ class TrikeShedGraalVfs(
     private val btrfsRoot: String = "/trikeshed-graal-btrfs",
     private val liveSubvolume: String = "live",
     private val instanceId: String = "global",
+    cas: CasStore? = null,
 ) : GraalFileSystem {
-    private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps)
+    private val btrfs = UserspaceBtrfs(btrfsRoot, fileOps, cas)
     private val generation = AtomicLong()
     private val inodeSalt = kotlin.random.Random.Default.nextLong()
     @Volatile private var workingDirectory: Path = Path.of(WORKSPACE)
@@ -116,12 +118,16 @@ class TrikeShedGraalVfs(
         if (relative.isEmpty() || isDirectory(relative)) throw FileSystemException(path.toString(), null, "is a directory")
         val write = StandardOpenOption.WRITE in options || StandardOpenOption.APPEND in options
         val read = StandardOpenOption.READ in options || !write
-        val create = StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options
+        require(StandardOpenOption.APPEND !in options || (!read && StandardOpenOption.TRUNCATE_EXISTING !in options)) {
+            "APPEND cannot be combined with READ or TRUNCATE_EXISTING"
+        }
+        val create = write && (StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options)
         val exists = btrfs.isFile(liveSubvolume, relative)
-        if (StandardOpenOption.CREATE_NEW in options && exists) throw FileAlreadyExistsException(path.toString())
+        if (write && StandardOpenOption.CREATE_NEW in options && exists) throw FileAlreadyExistsException(path.toString())
         if (!exists && !create) throw NoSuchFileException(path.toString())
         val truncate = write && StandardOpenOption.TRUNCATE_EXISTING in options
-        val initial = if (exists && !truncate) btrfs.fetchFile(liveSubvolume, relative) ?: ByteArray(0) else ByteArray(0)
+        val initial = if (exists && !truncate) btrfs.fetchFile(liveSubvolume, relative)
+            ?: throw IOException("missing or corrupt VFS file: $path") else ByteArray(0)
         val commit: (ByteArray) -> Unit = { bytes ->
             if (!btrfs.writeFile(liveSubvolume, relative, bytes)) throw IOException("VFS commit rejected: $path")
             generation.incrementAndGet()
@@ -185,7 +191,8 @@ class TrikeShedGraalVfs(
         val relative = relativeOf(path)
         if (!exists(relative)) throw NoSuchFileException(path.toString())
         val directory = isDirectory(relative)
-        val size = if (directory) 0L else (btrfs.fetchFile(liveSubvolume, relative)?.size?.toLong() ?: 0L)
+        val size = if (directory) 0L else btrfs.fetchFile(liveSubvolume, relative)?.size?.toLong()
+            ?: throw IOException("missing or corrupt VFS file: $path")
         val zeroTime = FileTime.fromMillis(0)
         val inode = inodeOf(relative)
         val all = linkedMapOf<String, Any>(
@@ -301,6 +308,7 @@ private class VfsByteChannel(
     override fun read(dst: ByteBuffer): Int {
         ensureOpen()
         if (!readable) throw NonReadableChannelException()
+        if (!dst.hasRemaining()) return 0
         if (cursor >= length) return -1
         val count = minOf(dst.remaining(), length - cursor)
         dst.put(data, cursor, count)
@@ -311,13 +319,20 @@ private class VfsByteChannel(
     override fun write(src: ByteBuffer): Int {
         ensureOpen()
         if (!writable) throw NonWritableChannelException()
-        if (append) cursor = length
         val count = src.remaining()
-        ensureCapacity(cursor + count)
-        src.get(data, cursor, count)
-        cursor += count
-        if (cursor > length) length = cursor
-        commit(data.copyOf(length))
+        if (count == 0) return 0
+        val offset = if (append) length else cursor
+        require(count <= Int.MAX_VALUE - offset) { "VFS file exceeds byte-array capacity" }
+        val end = offset + count
+        val nextLength = maxOf(length, end)
+        val candidate = data.copyOf(maxOf(nextLength, 32))
+        if (offset > length) candidate.fill(0, length, offset)
+        src.duplicate().get(candidate, offset, count)
+        commit(candidate.copyOf(nextLength))
+        data = candidate
+        length = nextLength
+        cursor = end
+        src.position(src.position() + count)
         return count
     }
 
@@ -336,19 +351,18 @@ private class VfsByteChannel(
         ensureOpen()
         if (!writable) throw NonWritableChannelException()
         require(size in 0..Int.MAX_VALUE.toLong()) { "invalid size: $size" }
-        if (size < length) { length = size.toInt(); commit(data.copyOf(length)) }
-        if (cursor > length) cursor = length
+        if (size < length) {
+            val candidate = data.copyOf(size.toInt())
+            commit(candidate)
+            data = candidate.copyOf(maxOf(candidate.size, 32))
+            length = candidate.size
+        }
+        if (cursor > size) cursor = size.toInt()
         return this
     }
 
     private fun ensureOpen() { if (!open) throw ClosedChannelException() }
 
-    private fun ensureCapacity(required: Int) {
-        if (required <= data.size) return
-        var capacity = data.size
-        while (capacity < required) capacity = maxOf(capacity * 2, required)
-        data = data.copyOf(capacity)
-    }
 }
 
 /**
@@ -377,6 +391,7 @@ class GraalBtrfsSupervisor(
         // and see each other's files. The isolation this class advertises is the subvolume.
         liveSubvolume = world.subvolumeFor(id),
         instanceId = id,
+        cas = world.cas,
     )
     /** Exposed so the Hypervisor's LeafTrainer can observe the same in-process guest it trains. */
     val guest = InProcessIsolate(
