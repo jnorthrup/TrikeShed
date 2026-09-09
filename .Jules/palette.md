@@ -126,3 +126,6 @@
 ## 2024-05-27 - Context-Specific ARIA Labels for generic buttons
 **Learning:** Adding ARIA labels to generic icon-only or poorly labeled buttons (like 'Fit') provides essential context for screen reader users, but adding ARIA labels that duplicate visible text (like 'Add a page') is redundant and violates WCAG 2.5.3 (Label in Name) best practices unless it provides significant extra context.
 **Action:** Before adding an ARIA label, verify the element's existing text content. Only add `aria-label` if the visible text is insufficient or absent (e.g., icon-only buttons), or if it adds crucial missing context.
+## $(date +%Y-%m-%d) - Synchronizing active states for duplicate navigation items
+**Learning:** When managing view state in a single-page application, ensure that all duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) consistently receive the `aria-current="page"` attribute and visual active state updates to prevent ambiguous states for screen reader users.
+**Action:** Use `document.querySelectorAll` instead of `document.querySelector` to apply state changes to all instances of a duplicated control simultaneously, rather than just the primary one.
