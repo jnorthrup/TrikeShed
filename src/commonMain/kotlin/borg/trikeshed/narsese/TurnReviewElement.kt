@@ -45,7 +45,14 @@ class TurnReviewElement(
         val objectTerm: String? = null,
     )
 
-    private val evaluator = ContentId.of("turn-review".encodeToByteArray())
+    /**
+     * Who is deriving. Defaults to the pure pass this element has always been, so an existing
+     * caller mints exactly the receipts it did before; a caller whose induction is frontended by
+     * an LLM passes [Evaluator.model] and the receipt then names the guide, not the code path.
+     */
+    var evaluatorIdentity: Evaluator = Evaluator.pure("turn-review")
+
+    private val evaluator: ContentId get() = evaluatorIdentity.cid
 
     override suspend fun open() {
         super.open()
