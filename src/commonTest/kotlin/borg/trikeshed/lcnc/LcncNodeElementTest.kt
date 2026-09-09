@@ -114,6 +114,7 @@ class LcncNodeElementTest {
             assertEquals(ElementState.CLOSED, element.lifecycleState)
             element.close()
             assertFailsWith<IllegalStateException> { element.open() }
+            Unit
         }
     }
 

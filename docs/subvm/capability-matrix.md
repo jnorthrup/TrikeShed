@@ -35,17 +35,17 @@ Measured, not declared: every cell is a probe result on a real host. `✓` OK ·
 | `host.native-image-tool` | OK | 0 | /Users/jim/.sdkman/candidates/java/25.0.4.1-graal/bin/native-image |
 | `host.graaljs-node` | ABSENT | 0 | no GraalJS node launcher (PATH node is stock Node.js, no Truffle); Node APIs cell = absent |
 | `host.llvm-language` | OK | 0 | llvm (Sulong) available |
-| `js.eval` | OK | 4 | fib(15)=Num(v=610) |
+| `js.eval` | OK | 3 | fib(15)=Num(v=610) |
 | `js.host-delegate` | OK | 2 | host.call('double',21)=Num(v=42) |
 | `js.statement-limit` | OK | 3 | EXHAUSTED after 20k statements; alive=false |
-| `js.wall-interrupt` | OK | 403 | INTERRUPTED after 400ms; alive=true |
-| `js.root-observation` | OK | 4 | 177 fib frames via listener, 177 self-contained |
+| `js.wall-interrupt` | OK | 403 | INTERRUPTED after 401ms; alive=true |
+| `js.root-observation` | OK | 3 | 177 fib frames via listener, 177 self-contained |
 | `js.leaf-delegation` | OK | 13 | phase=DELEGATED served={GUEST=12, SHADOW=2, MEMO=9} fires=1 |
-| `js.process-wall` | OK | 756 | child pid alive=true; fib(10)=Num(v=55); host.call across wall=Num(v=8) |
-| `python.eval` | OK | 82 | fib(15)=Num(v=610) |
-| `python.host-delegate` | OK | 71 | host.call('double',21)=Num(v=42) |
-| `python.statement-limit` | BOUNDED | 1 | statementLimit unsafe on PYTHON (GIL assert) → stop=INTERRUPT |
-| `python.wall-interrupt` | OK | 478 | INTERRUPTED after 401ms; alive=true |
-| `python.root-observation` | OK | 115 | 177 fib frames via binding pointcuts, 177 self-contained |
-| `python.leaf-delegation` | OK | 178 | phase=DELEGATED served={GUEST=12, SHADOW=2, MEMO=9} fires=1 |
-| `python.process-wall` | OK | 2577 | child pid alive=true; fib(10)=Num(v=55); host.call across wall=Num(v=8) |
+| `js.process-wall` | OK | 697 | child pid alive=true; fib(10)=Num(v=55); host.call across wall=Num(v=8) |
+| `python.eval` | OK | 72 | fib(15)=Num(v=610) |
+| `python.host-delegate` | OK | 53 | host.call('double',21)=Num(v=42) |
+| `python.statement-limit` | BOUNDED | 0 | statementLimit unsafe on PYTHON (GIL assert) → stop=INTERRUPT |
+| `python.wall-interrupt` | OK | 448 | INTERRUPTED after 400ms; alive=true |
+| `python.root-observation` | OK | 48 | 177 fib frames via binding pointcuts, 177 self-contained |
+| `python.leaf-delegation` | OK | 108 | phase=DELEGATED served={GUEST=12, SHADOW=2, MEMO=9} fires=1 |
+| `python.process-wall` | OK | 1962 | child pid alive=true; fib(10)=Num(v=55); host.call across wall=Num(v=8) |

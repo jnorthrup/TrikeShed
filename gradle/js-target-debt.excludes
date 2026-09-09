@@ -5,8 +5,19 @@
 **/taxonomy/CryptoAndFormatTaxonomy.kt
 **/parse/json/Codec.kt
 **/ui/palette/**
-# expect declarations with no JS actual (eBPF/JIT, process workers, oroboros daemon) and their commonMain consumers
-**/userspace/nio/ebpf/**
+# expect declarations with no JS actual (eBPF/JIT/probes, process workers, oroboros daemon) and their commonMain consumers
+**/userspace/nio/ebpf/ExpectRunNative.kt
+**/userspace/nio/ebpf/Probe.kt
+**/userspace/nio/ebpf/codec/**
+**/userspace/nio/ebpf/engine/**
+**/userspace/nio/ebpf/io/**
+**/userspace/nio/ebpf/probe/**
+**/userspace/nio/ebpf/types/**
+**/userspace/nio/ebpf/verifier/**
+**/btrfs/BtrfsImageIo.kt
+**/btrfs/BtrfsUringFileVolume.kt
+**/btrfs/NioBtrfsGraalBlobStore.kt
+**/btrfs/NioBtrfsGraalBlobStoreTest.kt
 **/userspace/nio/process/ProcessWorkerFactory.kt
 **/org/trikeshed/oroboros/OroborosDaemon.kt
 **/pointcut/polyglot/PointcutPolyglotBlackboardTaxonomy.kt

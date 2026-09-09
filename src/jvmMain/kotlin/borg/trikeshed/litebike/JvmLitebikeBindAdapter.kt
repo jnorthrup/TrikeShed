@@ -4,10 +4,13 @@ package borg.trikeshed.litebike
 
 import borg.trikeshed.litebike.taxonomy.Protocol
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import java.net.InetSocketAddress
@@ -18,6 +21,7 @@ import java.nio.channels.AsynchronousServerSocketChannel
 import java.nio.channels.AsynchronousSocketChannel
 import java.nio.channels.CompletionHandler
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * JvmLitebikeBindAdapter — the only place native bind lives for the
@@ -87,7 +91,7 @@ object JvmLitebikeBindAdapter {
         host: String = "0.0.0.0",
         connections: ConnectionRegistry = ConnectionRegistry(),
     ) {
-        // JVM NIO executor — one thread per CPU, daemon.
+        // JVM NIO executor — one thread per CPU, owned by this bind scope.
         val group: AsynchronousChannelGroup =
             AsynchronousChannelGroup.withFixedThreadPool(
                 Runtime.getRuntime().availableProcessors(),
@@ -107,12 +111,21 @@ object JvmLitebikeBindAdapter {
         // owns the bind and accepted-channel read loop; starting a second
         // fanout here would race the daemon's consumers and consume messages
         // before the HTTP worker can dispatch them through NUID.
-        acceptLoop(server, element, connections)
-
-        // Best-effort cleanup if scope exits unexpectedly.
-        runCatching { connections.closeAll() }
-        runCatching { server.close() }
-        runCatching { group.shutdown() }
+        try {
+            acceptLoop(server, element, connections)
+        } finally {
+            withContext(NonCancellable + Dispatchers.IO) {
+                runCatching { connections.closeAll() }
+                runCatching { server.close() }
+                group.shutdown()
+                val terminated = runCatching { group.awaitTermination(2, TimeUnit.SECONDS) }
+                    .getOrDefault(false)
+                if (!terminated) {
+                    runCatching { group.shutdownNow() }
+                    runCatching { group.awaitTermination(2, TimeUnit.SECONDS) }
+                }
+            }
+        }
     }
 
     private suspend fun acceptLoop(

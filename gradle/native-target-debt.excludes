@@ -4,8 +4,19 @@
 **/parse/json/Codec.kt
 # androidx Compose UI in commonMain; Compose is not a dependency of any target here
 **/ui/palette/**
-# expect declarations with jvm-only actuals (mirrors the js ratchet's reasoning)
-**/userspace/nio/ebpf/**
+# expect declarations with jvm/linux-only actuals (mirrors the js ratchet's reasoning)
+**/userspace/nio/ebpf/ExpectRunNative.kt
+**/userspace/nio/ebpf/Probe.kt
+**/userspace/nio/ebpf/codec/**
+**/userspace/nio/ebpf/engine/**
+**/userspace/nio/ebpf/io/**
+**/userspace/nio/ebpf/probe/**
+**/userspace/nio/ebpf/types/**
+**/userspace/nio/ebpf/verifier/**
+**/btrfs/BtrfsImageIo.kt
+**/btrfs/BtrfsUringFileVolume.kt
+**/btrfs/NioBtrfsGraalBlobStore.kt
+**/btrfs/NioBtrfsGraalBlobStoreTest.kt
 **/org/trikeshed/oroboros/OroborosDaemon.kt
 # java.util.concurrent.ConcurrentHashMap; needs a real Mutex/atomic-map rewrite
 # (lookup() must stay a synchronous "pure map read" per its own doc comment,

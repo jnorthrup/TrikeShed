@@ -2508,6 +2508,7 @@ object OroborosDaemon {
                 // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
                 runCatching { blackboardFacts.close() }
                 runCatching { graalFacts.close() }
+                runCatching { jvmVitals.stop() }
                 runCatching { kifTeeDisposer.close() }
                 runCatching { kanbanJob.cancel() }
                 runCatching { moduleSupervisor.drainAll() }

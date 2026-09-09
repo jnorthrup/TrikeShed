@@ -6,11 +6,11 @@ import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 
 plugins {
-    kotlin("multiplatform") version "2.4.10"
+    kotlin("multiplatform") version "2.4.20"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
-    kotlin("plugin.serialization") version "2.4.10"
-    kotlin("plugin.compose") version "2.4.10"
+    kotlin("plugin.serialization") version "2.4.20"
+    kotlin("plugin.compose") version "2.4.20"
     id("org.jetbrains.compose") version "1.11.1"
 }
 

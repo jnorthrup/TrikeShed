@@ -154,12 +154,12 @@ class DocumentCuratorElement private constructor(
                     var nlp: Outcome<NlpDocument>? = null
                     var model: Outcome<ModelResponse>? = null
                     channelFlow<Branch> {
-                        launch {
+                        launch(Dispatchers.Default) {
                             val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
                             val result = attempt { owner.nlp.read(work.source.text) }
                             send(Branch.Nlp(Outcome(result, owner.observe("curator.nlp", work.source))))
                         }
-                        launch {
+                        launch(Dispatchers.Default) {
                             val owner = currentCoroutineContext()[Key] ?: error("missing curator owner")
                             val result = attempt {
                                 owner.model(

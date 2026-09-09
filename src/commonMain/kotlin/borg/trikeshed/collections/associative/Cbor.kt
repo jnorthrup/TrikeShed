@@ -41,10 +41,16 @@ object Cbor {
                 for (i in 0 until items.a) items.b(i).encode(buf)
             }
             is Item.Map -> {
-                encodeHead(buf, 5, entries.a.toLong())
+                val sorted = ArrayList<EncodedMapEntry>(entries.a)
                 for (i in 0 until entries.a) {
-                    Item.Str(entries.b(i).a).encode(buf)
-                    entries.b(i).b.encode(buf)
+                    val entry = entries.b(i)
+                    sorted.add(EncodedMapEntry(encodeMapKey(entry.a), entry.b))
+                }
+                sorted.sortWith { left, right -> compareUnsigned(left.keyBytes, right.keyBytes) }
+                encodeHead(buf, 5, sorted.size.toLong())
+                for (entry in sorted) {
+                    buf.write(entry.keyBytes)
+                    entry.value.encode(buf)
                 }
             }
             is Item.Bool -> buf.write(if (value) 0xF5 else 0xF4)
@@ -60,7 +66,7 @@ object Cbor {
         }
     }
 
-   fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
+	   fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
         val mt = major shl 5
         when {
             value < 24 -> buf.write(mt or value.toInt())
@@ -68,8 +74,26 @@ object Cbor {
             value <= 0xFFFF -> { buf.write(mt or 25); buf.writeShort(value.toInt()) }
             value <= 0xFFFFFFFFL -> { buf.write(mt or 26); buf.writeInt(value.toInt()) }
             else -> { buf.write(mt or 27); buf.writeLong(value) }
+	        }
+	    }
+
+        private data class EncodedMapEntry(val keyBytes: ByteArray, val value: Item)
+
+        private fun encodeMapKey(key: String): ByteArray {
+            val buf = ByteBuf()
+            Item.Str(key).encode(buf)
+            return buf.toByteArray()
         }
-    }
+
+        private fun compareUnsigned(left: ByteArray, right: ByteArray): Int {
+            val limit = minOf(left.size, right.size)
+            for (i in 0 until limit) {
+                val l = left[i].toInt() and 0xff
+                val r = right[i].toInt() and 0xff
+                if (l != r) return l - r
+            }
+            return left.size - right.size
+        }
 
     fun decode(bytes: ByteArray): Item = Reader(bytes, 0).readItem()
 

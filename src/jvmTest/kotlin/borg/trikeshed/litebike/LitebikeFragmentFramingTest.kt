@@ -119,11 +119,55 @@ class LitebikeFragmentFramingTest {
         }
     }
 
+    @Test
+    fun cancellingBindTerminatesAsyncChannelGroupThreads() = runBlocking {
+        val before = asyncChannelGroupThreads().size
+        val port = ServerSocket(0).use { it.localPort }
+        val listener = LitebikeListenerElement().also { it.open() }
+        val connections = ConnectionRegistry()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val bind = scope.launch {
+            JvmLitebikeBindAdapter.bindAndServe(listener, port = port, host = "127.0.0.1", connections = connections)
+        }
+        try {
+            awaitPort(port)
+        } finally {
+            bind.cancelAndJoin()
+            scope.cancel()
+            listener.close()
+            connections.closeAll()
+        }
+        assertEventually("async channel group threads stopped: ${asyncChannelGroupThreads()}") {
+            asyncChannelGroupThreads().size <= before
+        }
+    }
+
     private fun awaitPort(port: Int) {
         val deadline = System.nanoTime() + 5_000_000_000L
         while (System.nanoTime() < deadline) {
             try { Socket("127.0.0.1", port).close(); return } catch (_: Exception) { Thread.sleep(20) }
         }
         error("litebike never bound :$port")
+    }
+
+    private fun asyncChannelGroupThreads(): List<String> =
+        Thread.getAllStackTraces().entries
+            .filter { (thread, frames) ->
+                !thread.isDaemon && frames.any { frame ->
+                    frame.className.contains("AsynchronousChannelGroupImpl") ||
+                        frame.className.contains("KQueuePort") ||
+                        frame.className.contains("EPollPort")
+                }
+            }
+            .map { (thread, _) -> thread.name }
+            .sorted()
+
+    private fun assertEventually(message: String, timeoutMs: Long = 4_000, predicate: () -> Boolean) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            if (predicate()) return
+            Thread.sleep(50)
+        }
+        assertTrue(predicate(), message)
     }
 }

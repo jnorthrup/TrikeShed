@@ -3,7 +3,6 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.InvokeLowering
 import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.torrent.percentEncode
 
 /**
  * The daemon half of the node types the canvas could only reach by `fetch`.
@@ -124,7 +123,7 @@ object SurfaceNodes {
         "project.kill" to boundLcnc(SurfaceCallKey(call)) { service, node, _ ->
             val name = node.params["name"]?.takeIf { it.isNotBlank() }
                 ?: error("project.kill: name required")
-            val result = response(service.value("DELETE", "/api/projects/${percentEncode(name)}", null), node.type)
+            val result = response(service.value("DELETE", "/api/projects/${percentEncodePathSegment(name)}", null), node.type)
             check(result["verdict"] == "unmounted") {
                 "project.kill: ${result["detail"] ?: result["verdict"] ?: "unmount refused"}"
             }
@@ -157,4 +156,23 @@ object SurfaceNodes {
         "panels.list", "mux.standings",
         "job.command", "job.batch", "project.mount", "project.kill",
     )
+
+    private fun percentEncodePathSegment(text: String): String =
+        buildString(text.length * 2) {
+            for (byte in text.encodeToByteArray()) {
+                val value = byte.toInt() and 0xff
+                if (value < 128 && isUnreserved(value.toChar())) {
+                    append(value.toChar())
+                } else {
+                    append('%')
+                    append(HEX_UPPER[value shr 4])
+                    append(HEX_UPPER[value and 0x0f])
+                }
+            }
+        }
+
+    private fun isUnreserved(char: Char): Boolean =
+        char in 'A'..'Z' || char in 'a'..'z' || char in '0'..'9' || char == '-' || char == '.' || char == '_' || char == '~'
+
+    private val HEX_UPPER = "0123456789ABCDEF".toCharArray()
 }

@@ -207,6 +207,28 @@ paths:
       responses:
         "200":
           description: ok
+  /blackboard/sheet:
+    get:
+      operationId: blackboardSheet
+      summary: one fact or one territory as a grid-in-cell sheet family
+      parameters:
+        - name: key
+          in: query
+          schema:
+            type: string
+        - name: prefix
+          in: query
+          schema:
+            type: string
+        - name: max
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: sheet family JSON
+        "400":
+          description: key or prefix required
   /blackboard:
     get:
       operationId: blackboardPage

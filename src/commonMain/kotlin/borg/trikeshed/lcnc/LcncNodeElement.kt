@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,18 +74,38 @@ class LcncNodeElement internal constructor(
         }
         try {
             currentCoroutineContext().ensureActive()
-            val value = withContext(supervisor + this + LcncOwnerJob(parentJob)) {
+            val outcome = withContext(supervisor + this + LcncOwnerJob(parentJob)) {
                 check(currentCoroutineContext()[key] === this@LcncNodeElement)
-                runner.execute(node, inputs)
+                try {
+                    LcncNodeOutcome.Returned(runner.execute(node, inputs))
+                } catch (failure: Throwable) {
+                    val cancellation = cancellationFor(failure)
+                    currentCoroutineContext()[Job]?.children?.forEach { it.cancel(cancellation) }
+                    if (failure is CancellationException) LcncNodeOutcome.Cancelled(failure)
+                    else LcncNodeOutcome.Failed(failure)
+                }
             }
-            completion.value = LcncNodeOutcome.Returned(value)
-            return value
+            return when (outcome) {
+                is LcncNodeOutcome.Returned -> {
+                    completion.value = outcome
+                    outcome.outputs
+                }
+                is LcncNodeOutcome.Cancelled -> {
+                    completion.value = outcome
+                    supervisor.cancel(outcome.cause)
+                    throw outcome.cause
+                }
+                is LcncNodeOutcome.Failed -> {
+                    completion.value = outcome
+                    val cancellation = cancellationFor(outcome.cause)
+                    supervisor.cancel(cancellation)
+                    throw outcome.cause
+                }
+            }
         } catch (failure: Throwable) {
             completion.value = if (failure is CancellationException) LcncNodeOutcome.Cancelled(failure)
                 else LcncNodeOutcome.Failed(failure)
-            val cancellation = failure as? CancellationException
-                ?: CancellationException("${node.id}: invocation failed").apply { initCause(failure) }
-            supervisor.cancel(cancellation)
+            supervisor.cancel(cancellationFor(failure))
             throw failure
         } finally {
             withContext(NonCancellable) { drain() }
@@ -100,4 +121,7 @@ class LcncNodeElement internal constructor(
     }
 
     suspend fun close() = drain()
+
+    private fun cancellationFor(failure: Throwable): CancellationException =
+        failure as? CancellationException ?: CancellationException("${node.id}: invocation failed", failure)
 }

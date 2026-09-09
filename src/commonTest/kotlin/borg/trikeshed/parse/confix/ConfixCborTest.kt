@@ -45,6 +45,18 @@ class ConfixCborTest {
         assertContentEquals(expected, Cbor.encode(second))
     }
 
+    @Test
+    fun objectKeysUseUnsignedEncodedByteOrdering() {
+        val item = itemMapOf("a\u0080" to Item.Num(2), "aa\u0000" to Item.Num(1))
+        val expected = bytes(
+            0xa2,
+            0x63, 0x61, 0x61, 0x00, 0x01,
+            0x63, 0x61, 0xc2, 0x80, 0x02,
+        )
+
+        assertContentEquals(expected, Cbor.encode(item))
+    }
+
     private fun emit(item: Item): ByteArray = Cbor.encode(item)
 
     private fun bytes(vararg values: Int): ByteArray = ByteArray(values.size) { values[it].toByte() }

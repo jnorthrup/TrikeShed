@@ -9,6 +9,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.α
+import kotlin.jvm.JvmInline
 
 enum class SumoMask { ANCESTORS, DESCENDANTS, INSTANCES, DISJOINT }
 

@@ -80,6 +80,28 @@ class SurfaceCommandNodesTest {
     }
 
     @Test
+    fun projectKillEncodesNameAsOnePathSegment() = runTest {
+        val requests = ArrayList<Triple<String, String, Any?>>()
+        val runner = SurfaceNodes.registry { method, path, body ->
+            requests.add(Triple(method, path, body))
+            mapOf("verdict" to "unmounted")
+        }.getValue("project.kill")
+
+        val out = runner.run(
+            LcncNode("kill", "project.kill", params = mapOf("name" to "space / percent % \u6c34")),
+            emptyMap<String, Any?>(),
+        )
+
+        assertEquals(mapOf("verdict" to "unmounted"), out["verdict"])
+        assertEquals(
+            listOf<Triple<String, String, Any?>>(
+                Triple("DELETE", "/api/projects/space%20%2F%20percent%20%25%20%E6%B0%B4", null),
+            ),
+            requests,
+        )
+    }
+
+    @Test
     fun missingMalformedAndRefusedResponsesCannotReportSuccess() = runTest {
         val command = LcncNode("command", "job.command")
         val inputs = mapOf("verb" to "cancel", "jobId" to "card")

@@ -36,6 +36,7 @@ class ViewNodesTest {
         assertFailsWith<IllegalStateException> {
             registry.getValue("view.reduce").run(LcncNode("r", "view.reduce", mapOf("reducer" to "eval")), mapOf("rows" to rows))
         }
+        Unit
     }
 
     @Test

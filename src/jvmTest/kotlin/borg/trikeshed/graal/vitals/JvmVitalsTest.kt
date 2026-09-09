@@ -40,4 +40,38 @@ class JvmVitalsTest {
         v.start(); v.stop(); v.stop()
         assertEquals(false, v.jfrLive)
     }
+
+    @Test
+    fun stopTerminatesRecordingStreamThread() {
+        val before = recordingStreamThreads().size
+        val v = JvmVitals()
+        v.start()
+        try {
+            if (v.jfrLive) {
+                assertEventually("JFR stream thread started") {
+                    recordingStreamThreads().size > before
+                }
+            }
+        } finally {
+            v.stop()
+        }
+        assertEventually("JFR stream thread stopped: ${recordingStreamThreads()}") {
+            recordingStreamThreads().size <= before
+        }
+    }
+
+    private fun recordingStreamThreads(): List<String> =
+        Thread.getAllStackTraces().keys
+            .filter { !it.isDaemon && it.name.startsWith("JFR Event Stream") }
+            .map { it.name }
+            .sorted()
+
+    private fun assertEventually(message: String, timeoutMs: Long = 4_000, predicate: () -> Boolean) {
+        val deadline = System.nanoTime() + timeoutMs * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            if (predicate()) return
+            Thread.sleep(50)
+        }
+        assertTrue(predicate(), message)
+    }
 }
