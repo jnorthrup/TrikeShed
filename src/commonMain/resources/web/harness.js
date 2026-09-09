@@ -1,9 +1,11 @@
 "use strict";
 
+const HarnessInitialHash = typeof location==="undefined"?"":location.hash;
+
 // View state only. Documents, vocabulary, run receipts and provenance come from the board.
 const Harness = {
   surface: typeof location==="undefined"?"board":/^\/panels(?:\.html)?\/?$/.test(location.pathname)?"panels":/^\/graal\/?$/.test(location.pathname)?"graal":"board",
-  epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null,
+  epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null, terrainBookmark: null,
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
   mounts: new Map(), baselines: new Map(), loadedCids: new Map(), nextY: 0, nextX:0, rowHeight:0,
@@ -535,6 +537,27 @@ const Harness = {
     const r=viewport.getBoundingClientRect(),anchor={x:r.width/2,y:r.height/2};
     Object.assign(view,LandscapeNavigation.zoomAt(camera,camera.z,anchor,this.zoomCeiling(anchor.x,anchor.y,camera)));
   },
+  objectFocusBox(id) {
+    if(id)return Landscape.terrain?.boxFor?.(id)||Landscape.terrain?.nodeFor(id)?.rect||null;
+    return Landscape.objectBox;
+  },
+  applyTerrainBookmark() {
+    const target=this.terrainBookmark;if(!target)return false;
+    const box=this.objectFocusBox(target.id);if(!box)return false;
+    this.focus(box,LandscapeNavigation.object(target.id),false);
+    if(Landscape.heapLoaded)this.terrainBookmark=null;
+    return true;
+  },
+  restoreBookmark(bookmark) {
+    if(!bookmark)return false;
+    const focus=bookmark.focus||"";
+    if(focus.startsWith("object:")){
+      this.terrainBookmark={id:focus.slice(7)};
+      if(this.applyTerrainBookmark())return true;
+    }
+    this.restoreCamera(bookmark.camera);this.focusKey=focus;applyView();redraw();
+    return true;
+  },
   focus(box, identity="", remember=true, scale=1) {
     if(remember){this.viewHistory.push({camera:{...view},focus:this.focusKey,node:this.viewNode});if(this.viewHistory.length>64)this.viewHistory.shift();}
     this.focusKey=identity;this.viewNode=null;$("#viewBack").disabled=!this.viewHistory.length;
@@ -761,7 +784,7 @@ const Harness = {
     this.live=false;
     this.stream?.close();clearTimeout(this.reconnectTimer);
     const generation=++this.connectionGeneration,initial=!this.ready;
-    const bookmark=initial?LandscapeNavigation.decode(location.hash):null;
+    const bookmark=initial?LandscapeNavigation.decode(HarnessInitialHash||location.hash):null;
     let buffer=[],hydrating=true,chain=Promise.resolve();
     this.connectionStatus("Syncing");
     try {
@@ -799,7 +822,7 @@ const Harness = {
       buffer=[];hydrating=false;this.render();buildPalette();
       await Landscape.refresh();
       if(generation!==this.connectionGeneration)return;
-      if(bookmark){this.restoreCamera(bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
+      if(bookmark)this.restoreBookmark(bookmark);
       else if(initial&&this.surface==="graal")this.focus(Landscape.objectBox,LandscapeNavigation.object(""));
       else if(initial&&!requested)this.fit(this.surface!=="panels");
       this.connectionStatus("Live");$("#connection").classList.add("live");

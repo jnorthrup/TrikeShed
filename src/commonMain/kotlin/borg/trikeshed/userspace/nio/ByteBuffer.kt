@@ -81,6 +81,8 @@ public open class ByteBuffer protected constructor(
 
     public override fun hasArray(): Boolean = true
 
+    public override fun isReadOnly(): Boolean = readOnly
+
     public override fun array(): ByteArray = backing
 
     public override fun arrayOffset(): Int = base

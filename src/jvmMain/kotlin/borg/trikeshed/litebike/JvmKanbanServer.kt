@@ -549,6 +549,8 @@ class JvmKanbanServer(
     private fun staticAsset(path: String): HttpResponse? {
         // Method dispatch lets new presentation assets land without recreating the reactor hub.
         val (resource, contentType) = when (val assetPath = path.substringBefore('?')) {
+            "/application-nav.js" -> "web/application-nav.js" to "application/javascript; charset=utf-8"
+            "/application-nav.css" -> "web/application-nav.css" to "text/css; charset=utf-8"
             "/spacegraph-shadow.js" -> "web/spacegraph-shadow.js" to "application/javascript; charset=utf-8"
             "/spacegraph-shadow.css" -> "web/spacegraph-shadow.css" to "text/css; charset=utf-8"
             else -> staticAssets[assetPath]

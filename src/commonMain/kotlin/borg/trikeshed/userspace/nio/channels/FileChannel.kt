@@ -3,17 +3,19 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.IOException
+import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
 import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
-import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.file.File
 
 /**
  * FileChannel wired behind UringFacade.
  *
- * Every read/write routes through Channel → ChannelImpl → FunctionalUringFacade.
+ * Open, read, write, sync and close route through FunctionalUringFacade.
  */
 public abstract class FileChannel protected constructor() : AbstractInterruptibleChannel(), SeekableByteChannel, GatheringByteChannel, ScatteringByteChannel {
     public abstract override fun close()
@@ -40,13 +42,49 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     public abstract fun tryLock(): FileLock?
 
     companion object {
-        fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
-            val readOnly = !options.any { it is StandardOpenOption && it == StandardOpenOption.WRITE }
-            val file = Files.open(path.toString(), readOnly)
-            val channel = UringChannels.open()
-            return UringFileChannel(file, channel)
+        fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel =
+            open(path.toString(), options, *attrs)
+
+        fun open(path: String, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
+            require(attrs.isEmpty()) { "File attributes are not supported" }
+            return open(path, options) { UringChannels.open() }
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())
+        fun open(path: String, vararg options: OpenOption): FileChannel = open(path, options.toSet())
+
+        internal fun open(
+            path: String,
+            options: Set<OpenOption>,
+            channelFactory: () -> UringChannel,
+        ): FileChannel {
+            val supported = setOf(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING)
+            require(options.all { it in supported }) { "Unsupported file open option" }
+            val write = StandardOpenOption.WRITE in options
+            require(write || options.none {
+                it == StandardOpenOption.CREATE || it == StandardOpenOption.CREATE_NEW || it == StandardOpenOption.TRUNCATE_EXISTING
+            }) { "Creation and truncation require WRITE" }
+
+            var flags = if (write) { if (StandardOpenOption.READ in options) 2 else 1 } else 0
+            if (StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options) flags = flags or 64
+            if (StandardOpenOption.CREATE_NEW in options) flags = flags or 128
+            if (StandardOpenOption.TRUNCATE_EXISTING in options) flags = flags or 512
+            val submission = Submissions.openat(path, flags, 0)
+            val channel = channelFactory()
+            try {
+                channel.enqueue(submission)
+                channel.submit()
+                val completion = channel.wait(1).singleOrNull()
+                if (completion == null || completion.userData != submission.userData) throw IOException("Invalid OPENAT completion: $path")
+                if (completion.res < 0) throw IOException("OPENAT failed: ${completion.res}: $path")
+                val file = File.fromFd(completion.res)
+                if (!file.isOpen()) throw IOException("OPENAT returned a closed descriptor: ${completion.res}")
+                return UringFileChannel(file, channel, readable = !write || StandardOpenOption.READ in options, writable = write)
+            } catch (failure: Throwable) {
+                runCatching { channel.closeNow() }.exceptionOrNull()?.let { if (it !== failure) failure.addSuppressed(it) }
+                throw failure
+            }
+        }
     }
 
     public open class MapMode {

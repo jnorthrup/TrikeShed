@@ -274,6 +274,42 @@ paths:
           description: no_spine
         "503":
           description: store_not_mounted
+  /api/graal/doc:
+    get:
+      operationId: graalDoc
+      summary: selected document detail sanitized for the Graal inspector
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: id_required
+        "404":
+          description: document_missing
+        "410":
+          description: document_deleted
+        "503":
+          description: cas_database_unavailable
+  /api/graal/content:
+    get:
+      operationId: graalContent
+      summary: selected attachment bytes through the Graal project-db resolver
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: ok
+        "400":
+          description: id_required
+        "403":
+          description: content_preview_blocked
+        "404":
+          description: content_missing
+        "410":
+          description: document_deleted
+        "503":
+          description: cas_database_unavailable
   /api/graal/classfile:
     get:
       operationId: graalClassfile

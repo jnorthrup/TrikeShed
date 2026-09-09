@@ -61,7 +61,7 @@ class BtrfsRaidVolume private constructor(
             requireNotNull(scope.coroutineContext[Job]) { "RAID requires an owning Job" }.ensureActive()
             require(members.size > 0 && queueCapacity > 0)
             val values = Array(members.size) { members[it] }
-            val members = values.size j { values[it] }
+            val members = values.size j { index: Int -> values[index] }
             val blockSize = members[0].blockSize
             require(blockSize > 0 && (0 until members.size).all { members[it].blockSize == blockSize })
             require((0 until members.size).all { i -> (0 until i).none { members[it] === members[i] } }) {

@@ -3,6 +3,7 @@ package borg.trikeshed.userspace.nio.channels
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.SelectionResult
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
@@ -18,6 +19,8 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 class UringChannel(
     private val facade: FunctionalUringFacade,
 ) {
+    fun enqueue(submission: UringSubmission) = facade.enqueue(submission)
+
     fun read(file: File, buffer: ByteBuffer, offset: Long, userData: Long) =
         facade.read(file.impl, buffer, offset, userData)
 

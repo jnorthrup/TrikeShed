@@ -462,6 +462,8 @@ tasks.register<Test>("btrfsStorageCheck") {
         includeTestsMatching("borg.trikeshed.job.ContentIdTest")
         includeTestsMatching("borg.trikeshed.util.oroboros.Sha2CasBusTest")
         includeTestsMatching("borg.trikeshed.userspace.nio.file.spi.DurableStoragePrimitivesTest")
+        includeTestsMatching("borg.trikeshed.userspace.JvmUserspaceChannelBackendTest")
+        includeTestsMatching("borg.trikeshed.userspace.FunctionalUringFacadeLifecycleTest")
         includeTestsMatching("borg.trikeshed.couch.replicate.*")
         includeTestsMatching("borg.trikeshed.couch.CouchReplicationTest")
         includeTestsMatching("borg.trikeshed.couch.CouchWireRouterAttachmentTest")
@@ -719,18 +721,11 @@ tasks.register<JavaExec>("portHermesPython") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
-// Daemon — flywheel loop. HotSwapAgent watches CycleBody.class for live edits.
+// Normal launch uses the same required AOT path as the retained AOT task name.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"
-    description = "Launch OroborosDaemon with the live feed and HotSwapAgent. -Pjdwp=5005[,suspend]; --args='--watch [flags] forgeHome repoDir'."
-    mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
-    useStagedJvmClasspath()
-    dependsOn("hotswapFeed", "hotswapAgentJar")
-    doFirst {
-        jvmArgs("-javaagent:${layout.buildDirectory.file("libs/hotswap-agent.jar").get().asFile}=${layout.buildDirectory.dir("live").get().asFile}")
-    }
-    // Forward stdio; HotswapAgent prints to stdout.
-    standardInput = System.`in`
+    description = "Automatically stage a compatible HotSpot AOT cache and launch OroborosDaemon with AOT required. --args preserves daemon home/repo arguments."
+    useDaemonAot()
 }
 
 // ── AOT cache (JEP 483 / Leyden, JDK 25) ────────────────────────────────────
@@ -741,10 +736,101 @@ tasks.register<JavaExec>("runOroborosDaemon") {
 //   2. The archive is bound to the EXACT classpath string. stageDaemonAot writes the -cp it used
 //      to a sidecar (oroboros.aot.cp); runOroborosDaemonAot reads that same string back, so create
 //      and consume use the same ordered entries. AOTMode=on requires an applicable cache.
+// Content fingerprints additionally bind runtime binaries, ordered JAR paths, sizes, mtimes and bytes.
 // The archive lands at build/staging/oroboros.aot — beside the jars it is bound to, and where the
 // build-plane absorber can pick it up so the AOT cache teleports with the install (gap-analysis §7).
 val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
 val daemonAotCpFile = layout.buildDirectory.file("staging/oroboros.aot.cp")
+val daemonAotFingerprintFile = layout.buildDirectory.file("staging/oroboros.aot.fingerprint")
+
+fun daemonAotJava(): File = File(System.getProperty("java.home"), "bin/java").canonicalFile
+
+fun daemonAotHash(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().buffered().use { input ->
+        val buffer = ByteArray(128 * 1024)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+        }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+}
+
+fun daemonAotFingerprint(): String {
+    val java = daemonAotJava()
+    val runtime = java.parentFile.parentFile
+    val runtimeFiles = listOf(java, File(runtime, "release"), File(runtime, "lib/modules")) +
+        listOf("lib/server/libjvm.dylib", "lib/server/libjvm.so", "bin/server/jvm.dll")
+            .map { File(runtime, it) }.filter { it.isFile }
+    val inputs = runtimeFiles + daemonAotClasspath().split(File.pathSeparator).map(::File)
+    val fingerprint = buildString {
+        appendLine("hotspot-aot-v2")
+        appendLine("--add-modules=jdk.internal.vm.ci")
+        appendLine(System.getProperty("os.arch"))
+        for (name in listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) appendLine("$name=${System.getenv(name).orEmpty()}")
+        for (input in inputs) {
+            check(input.isFile) { "Missing AOT input: $input" }
+            appendLine("${input.canonicalPath}\t${input.length()}\t${input.lastModified()}\t${daemonAotHash(input)}")
+        }
+    }
+    return MessageDigest.getInstance("SHA-256").digest(fingerprint.toByteArray()).joinToString("") { "%02x".format(it) }
+}
+
+fun daemonAotMatches(fingerprint: String): Boolean {
+    val aot = daemonAotCache.get().asFile
+    return aot.isFile && aot.length() > 0 && runCatching {
+        daemonAotCpFile.get().asFile.readText() == daemonAotClasspath() &&
+            daemonAotFingerprintFile.get().asFile.readText() == "$fingerprint\n${daemonAotHash(aot)}\n"
+    }.getOrDefault(false)
+}
+
+fun writeDaemonAotReceipt(target: File, text: String) {
+    val temporary = Files.createTempFile(target.parentFile.toPath(), ".aot-", ".tmp")
+    try {
+        Files.writeString(temporary, text)
+        Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    } finally { Files.deleteIfExists(temporary) }
+}
+
+fun adoptDaemonAot(fingerprint: String): Boolean {
+    val aot = daemonAotCache.get().asFile
+    val cp = daemonAotClasspath()
+    if (!aot.isFile || aot.length() == 0L || daemonAotFingerprintFile.get().asFile.exists() ||
+        !daemonAotCpFile.get().asFile.isFile || daemonAotCpFile.get().asFile.readText() != cp) return false
+    val archiveHash = daemonAotHash(aot)
+    val log = layout.buildDirectory.file("reports/aot/adopt.log").get().asFile
+    log.parentFile.mkdirs()
+    val process = ProcessBuilder(listOf(daemonAotJava().path, "--add-modules=jdk.internal.vm.ci",
+        "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info", "-cp", cp, "-version"))
+        .redirectErrorStream(true).redirectOutput(log).start()
+    try {
+        if (!process.waitFor(20, TimeUnit.SECONDS) || process.exitValue() != 0) {
+            logger.lifecycle("[aot] existing cache rejected or acceptance timed out; see $log")
+            return false
+        }
+        val evidence = log.readText()
+        if (!evidence.contains("Opened AOT cache ${aot.path}.") ||
+            !evidence.contains("Mapped static  region #0") || !evidence.contains("Using AOT-linked classes: true")) {
+            logger.lifecycle("[aot] existing cache lacks JVM acceptance evidence; see $log")
+            return false
+        }
+        check(daemonAotFingerprint() == fingerprint && daemonAotHash(aot) == archiveHash) {
+            "AOT inputs or archive changed during acceptance; refusing legacy receipt"
+        }
+        writeDaemonAotReceipt(daemonAotFingerprintFile.get().asFile, "$fingerprint\n$archiveHash\n")
+        logger.lifecycle("[aot] adopted JVM-verified existing cache without retraining: $aot")
+        return true
+    } finally {
+        if (process.isAlive) {
+            process.destroyForcibly()
+            check(process.waitFor(5, TimeUnit.SECONDS)) { "AOT acceptance JVM did not stop; see $log" }
+        }
+    }
+}
+
+// AOT preparation and verification never publish watched live classes.
 // Identical classpath construction for both tasks: app jar, then staged dependency jars in a stable
 // sorted order (glob expansion order is not guaranteed; sorting makes create == consume).
 fun daemonAotClasspath(): String {
@@ -759,7 +845,7 @@ fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
     // macOS's default temp path exceeds the daemon Unix-domain socket limit.
     val tempRoot = File("/tmp").takeIf { it.isDirectory } ?: File(System.getProperty("java.io.tmpdir"))
     val home = Files.createTempDirectory(tempRoot.toPath(), "ts-aot-").toFile()
-    val javaBin = File(System.getProperty("java.home"), "bin/java")
+    val javaBin = daemonAotJava()
     val command = listOf(javaBin.path, "--add-modules=jdk.internal.vm.ci") + flags + listOf("-Xlog:aot=info", "-cp", daemonAotClasspath(),
         "borg.trikeshed.daemon.OroborosDaemon", "--watch", "--kanban-port", port.toString(),
         "--interval-ms", "86400000", "--agents", "none", home.resolve("forge").path, projectDir.path)
@@ -786,32 +872,28 @@ fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
         check(response.statusCode() == 200) { "AOT status unavailable: ${response.statusCode()}" }
         logger.lifecycle("[aot] live switches: ${response.body()}")
         if (flags.any { it.startsWith("-XX:AOTCache=") }) {
-            val id = "projects/${projectDir.name.lowercase()}/build/live/classes/borg/trikeshed/daemon/HotSwapAgent.class"
-            val sheetRequest = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/graal/sheet?id=$id"))
-                .timeout(Duration.ofSeconds(5)).GET().build()
-            var visible = false
-            while (process.isAlive && System.nanoTime() < deadline) {
-                visible = runCatching {
-                    val sheetResponse = client.send(sheetRequest, HttpResponse.BodyHandlers.ofString())
-                    if (sheetResponse.statusCode() != 200) false else {
-                        val family = JsonSlurper().parseText(sheetResponse.body()) as List<*>
-                        val root = family.first() as Map<*, *>
-                        val rows = root["rows"] as List<*>
-                        rows.any { it == listOf("exactRuntimeBlob", true) } &&
-                            family.any { sheet ->
-                                sheet is Map<*, *> && sheet["id"] == "$id/methods" &&
-                                    (sheet["rows"] as? List<*>)?.isNotEmpty() == true
-                            }
-                    }
-                }.getOrDefault(false)
-                if (visible) break
-                Thread.sleep(500)
+            val status = JsonSlurper().parseText(response.body()) as Map<*, *>
+            val expectedCache = flags.single { it.startsWith("-XX:AOTCache=") }.substringAfter('=')
+            check(status["mode"] == "on" && status["cacheInput"] == expectedCache && status["exists"] == true) {
+                "AOT daemon did not require the selected cache; see $log"
             }
-            check(visible) { "AOT daemon did not expose runtime-matching classfile sheets; see $log" }
-            logger.lifecycle("[aot] live classfile TreeSheets verified: $id (exactRuntimeBlob=true)")
         }
         Thread.sleep(seconds * 1000)
         check(process.isAlive) { "AOT daemon exited before probe completed; see $log" }
+        if (flags.any { it.startsWith("-XX:AOTCacheOutput=") }) {
+            val status = JsonSlurper().parseText(response.body()) as Map<*, *>
+            if (status["mxBeanRegistered"] == true) {
+                val vm = com.sun.tools.attach.VirtualMachine.attach(process.pid().toString())
+                val address = try { vm.startLocalManagementAgent() } finally { vm.detach() }
+                javax.management.remote.JMXConnectorFactory.connect(javax.management.remote.JMXServiceURL(address)).use { connector ->
+                    val ended = connector.mBeanServerConnection.invoke(
+                        javax.management.ObjectName("jdk.management:type=HotSpotAOTCache"),
+                        "endRecording", emptyArray<Any>(), emptyArray<String>())
+                    check(ended == true) { "HotSpot AOT recording did not finalize; see $log" }
+                }
+                logger.lifecycle("[aot] HotSpotAOTCacheMXBean.endRecording completed")
+            } else logger.lifecycle("[aot] AOT MXBean unavailable on this runtime; finalizing at JVM shutdown")
+        }
         process.destroy()
         check(process.waitFor(60, TimeUnit.SECONDS)) { "AOT daemon did not finish cache shutdown; see $log" }
         return response.body()
@@ -826,10 +908,16 @@ fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
 
 tasks.register("stageDaemonAot") {
     group = "oroboros"
-    description = "Train and validate the JDK 25 AOT cache without shell scripts. -PaotWarmSeconds=30 -PaotTrainPort=8971."
-    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources", "hotswapFeed")
+    description = "Reuse a fingerprint-matched HotSpot AOT cache or train and finalize one automatically. -PaotWarmSeconds=30 -PaotTrainPort=8971."
+    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources")
     timeout.set(Duration.ofSeconds(180))
     doLast {
+        val fingerprint = daemonAotFingerprint()
+        if (daemonAotMatches(fingerprint) || adoptDaemonAot(fingerprint)) {
+            logger.lifecycle("[aot] reusing compatible cache: ${daemonAotCache.get().asFile} ($fingerprint)")
+            return@doLast
+        }
+        logger.lifecycle("[aot] cache missing or incompatible; training current JAR and runtime ($fingerprint)")
         val warm = providers.gradleProperty("aotWarmSeconds").orElse("30").get().toLong()
         require(warm in 0..30) { "aotWarmSeconds must be 0..30 to retain the three-minute bound" }
         val port = providers.gradleProperty("aotTrainPort").orElse("8971").get().toInt()
@@ -844,31 +932,49 @@ tasks.register("stageDaemonAot") {
         check(pending.isFile && pending.length() > 0 && entries >= 30000) {
             "No validated daemon AOT archive ($entries class CP entries); see $log"
         }
+        check(daemonAotFingerprint() == fingerprint) { "AOT inputs changed during training; refusing cache promotion" }
+        val archiveHash = daemonAotHash(pending)
         Files.move(pending.toPath(), aot.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        daemonAotCpFile.get().asFile.writeText(daemonAotClasspath())
+        writeDaemonAotReceipt(daemonAotCpFile.get().asFile, daemonAotClasspath())
+        writeDaemonAotReceipt(daemonAotFingerprintFile.get().asFile, "$fingerprint\n$archiveHash\n")
         logger.lifecycle("[aot] validated ${aot.length()} bytes, $entries class CP entries: $aot")
     }
 }
 
+tasks.register("prepareDaemonAot") {
+    group = "oroboros"
+    description = "Prepare a compatible required-AOT daemon cache after the current application and runtime jars are staged."
+    dependsOn("stageDaemonAot")
+}
+
 fun requireDaemonAot(): File {
     val aot = daemonAotCache.get().asFile
-    check(aot.isFile && aot.length() > 0 && daemonAotCpFile.get().asFile.isFile &&
-        daemonAotCpFile.get().asFile.readText() == daemonAotClasspath()) {
-        "Missing or mismatched AOT cache; run ./gradlew stageDaemonAot"
+    check(daemonAotMatches(daemonAotFingerprint())) {
+        "AOT inputs or cache changed after staging; refusing launch without a compatible AOT cache"
     }
     return aot
 }
 
 tasks.register<JavaExec>("runOroborosDaemonAot") {
     group = "oroboros"
-    description = "Require the trained AOT cache and expose JVM AOT logs. --args forwards daemon flags and positional home/repo."
-    dependsOn("jvmJar", "stageDaemonLib", "hotswapFeed")
+    description = "Alias launch configuration for the normal required-AOT daemon chain."
+    useDaemonAot()
+}
+
+fun org.gradle.api.tasks.JavaExec.useDaemonAot() {
+    dependsOn("prepareDaemonAot")
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     standardInput = System.`in`
     environment("TRIKESHED_AOT_DEFAULT", "1")
     providers.gradleProperty("daemonArgs").orNull?.let { setArgsString(it) }
+    jdwpSpec?.let { spec ->
+        val port = spec.substringBefore(',').trim()
+        val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
+        jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
+    }
     doFirst {
         val aot = requireDaemonAot()
+        setExecutable(daemonAotJava().path)
         classpath = files(daemonAotClasspath().split(File.pathSeparator))
         jvmArgs("--add-modules=jdk.internal.vm.ci", "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info")
         logger.lifecycle("[aot] required cache: $aot; TRIKESHED_AOT_DEFAULT=1")
@@ -878,7 +984,7 @@ tasks.register<JavaExec>("runOroborosDaemonAot") {
 tasks.register("verifyDaemonAot") {
     group = "verification"
     description = "Boot with required AOT cache, query live AOT switches, and stop the isolated daemon."
-    dependsOn("jvmJar", "stageDaemonLib", "hotswapFeed")
+    dependsOn("stageDaemonAot")
     timeout.set(Duration.ofSeconds(180))
     doLast {
         val aot = requireDaemonAot()

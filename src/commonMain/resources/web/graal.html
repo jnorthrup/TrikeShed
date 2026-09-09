@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/application-nav.css">
+<script src="/application-nav.js" defer></script>
 <link rel="stylesheet" href="/allocation-inspector.css">
 <script src="/vendor/lucide-mux.js" defer></script>
 <script src="/allocation-inspector.js" defer></script>
@@ -195,7 +197,7 @@ html[data-skin="marker"] #hud{background:linear-gradient(180deg,rgba(246,245,240
 html[data-skin="marker"] #crumb{text-shadow:none}
 </style>
 </head>
-<body>
+<body data-app-page="graal">
 <canvas id="map"></canvas>
 <div id="hud">
   <div id="ident"><b>GraalVM</b><span id="identSub">connecting…</span></div>
@@ -240,6 +242,14 @@ function dbUrl(id){
   if(PROJECT_DBS.has(seg)){const rest=id.split('/').slice(1);return '/'+seg+'/'+rest.map(encodeURIComponent).join('/');}
   return '/'+DB+'/'+id.split('/').map(encodeURIComponent).join('/');
 }
+function graalDocUrl(id){return '/api/graal/doc?id='+encodeURIComponent(id);}
+function graalContentUrl(id){return '/api/graal/content?id='+encodeURIComponent(id);}
+const SECRET_ID_RE=/(^|[/:._-])(credential|credentials|secret|secrets|token|tokens|apikey|api[-_]?key|keymux)([/:._-]|$)/i;
+const SECRET_TEXT_RE=/\b(Bearer\s+[A-Za-z0-9._+/=-]{16,}|(?:sk|rk|pk|ghp|github_pat|xox[baprs]|ya29|AIza)[A-Za-z0-9._-]{12,})\b/i;
+function sensitiveDocId(id){const s=String(id||'').replace(/\\/g,'/'),f=s.split('/').pop().toLowerCase();return f==='.env'||f.startsWith('.env.')||f.endsWith('.env')||SECRET_ID_RE.test(s);}
+function sensitiveFieldName(name){const k=String(name||'').replace(/[^A-Za-z0-9]/g,'').toLowerCase();
+  return /apikey|token|password|secret|credential|authorization/.test(k)||/^(accesskey|accesskeyid|secretkey|clientsecret|privatekey|providerkey|bearertoken|key)$/.test(k);}
+function displaySafe(k,v){const s=(v??'').toString();return sensitiveFieldName(k)||SECRET_TEXT_RE.test(s)?'[redacted]':s.replace(SECRET_TEXT_RE,'[redacted]');}
 /* ── world & camera ─────────────────────────────────────── */
 const W=1600,H=1000;
 let cam={s:1,ox:0,oy:0};                 // screen = (world - o) * s
@@ -510,9 +520,10 @@ let layer=1;
 const kCache=new Map();      // id → gzip ratio 0..1 (the practical K estimate)
 let kInFlight=0;
 function wantK(n){
+  if(sensitiveDocId(n.id)){kCache.set(n.id,-2);return;}
   if(kCache.has(n.id)||kInFlight>=3||n.bytes>1500000||typeof CompressionStream==='undefined')return;
   kCache.set(n.id,-1);kInFlight++;
-  fetch('/'+DB+'/'+n.id.split('/').map(encodeURIComponent).join('/')+'/content')
+  fetch(graalContentUrl(n.id))
     .then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status))
     .then(async buf=>{
       const c=await new Response(new Blob([buf]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
@@ -524,9 +535,10 @@ let pInFlight=0;
 const TEXTY=/\.(kt|kts|java|py|js|ts|md|json|yaml|yml|css|sh|gradle|xml|txt|html|toml|properties|sql|rs|c|h|cpp|go|wal|jsonl)$/i;
 function wantPreview(n){
   if(previewCache.has(n.id)||pInFlight>=3)return;
+  if(sensitiveDocId(n.id)){previewCache.set(n.id,null);return;}
   if(!TEXTY.test(n.id)||n.bytes>400000){previewCache.set(n.id,null);return;}
   previewCache.set(n.id,[]);pInFlight++;
-  fetch('/'+DB+'/'+n.id.split('/').map(encodeURIComponent).join('/')+'/content')
+  fetch(graalContentUrl(n.id))
     .then(r=>r.ok?r.text():Promise.reject(r.status))
     .then(t=>previewCache.set(n.id,t.split('\n').slice(0,16)))
     .catch(()=>previewCache.set(n.id,null)).finally(()=>pInFlight--);
@@ -1014,17 +1026,22 @@ async function openDoc(id){
     } else {
       $('docBody').innerHTML='<div class="docmeta"><b>'+esc(pd.title)+'</b></div><table class="kv">'+
         Object.entries(pd.session).filter(([k,v])=>typeof v!=='object').slice(0,14)
-          .map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc((v??'').toString().slice(0,120))+'</td></tr>').join('')+'</table>';
+          .map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc(displaySafe(k,v).slice(0,120))+'</td></tr>').join('')+'</table>';
     }
     return;
   }
   let doc=null;
-  try{doc=await (await fetch(dbUrl(id))).json();}
+  try{
+    const response=await fetch(graalDocUrl(id));
+    doc=await response.json();
+    if(!response.ok){$('docBody').textContent=(doc.error||'document fetch failed')+' ('+response.status+')';return;}
+  }
   catch(e){$('docBody').textContent='fetch failed: '+e;return;}
   const att=doc._attachments&&doc._attachments.content;
+  const previewBlocked=!!(doc._graal&&doc._graal.previewBlocked)||!!(att&&att.previewBlocked)||sensitiveDocId(id);
   // ── header: path, rev/cid as chips, bytes, kolmogorov gauge ──
   let html='<div class="docmeta"><span style="color:var(--dim)">'+esc(id)+'</span></div>'+
-    '<div class="docmeta">'+chip(doc._rev,'rev')+(att?chip(att.cid,'cid'):'')+
+    '<div class="docmeta">'+chip(doc._rev,'rev')+(att&&att.cid?chip(att.cid,'cid'):'')+
     (att?'<span>'+fmtBytes(att.length||0)+'</span><span class="kgauge" id="kg"><i></i></span><span style="color:var(--dim)">…K</span>':'')+'</div>';
   // ── field sheet (no underscore noise, hashes as chips) ──
   const fields=Object.entries(doc).filter(([k])=>!k.startsWith('_')&&k!=='contentId'&&k!=='length'&&k!=='contentType');
@@ -1035,12 +1052,14 @@ async function openDoc(id){
   }
   $('docBody').innerHTML=html+'<div id="proj" style="margin-top:8px;color:var(--dim)">projecting…</div>';
   // ── content projection by type ──
-  if(att){
+  if(att&&previewBlocked){
+    document.getElementById('proj').textContent='content preview blocked for credential-bearing document';
+  } else if(att){
     const ct=(att.content_type||'').toLowerCase(),ext=extOf(id),big=(att.length||0)>1500000;
     const proj=document.getElementById('proj');
     if(big){proj.innerHTML='<a style="cursor:pointer;color:var(--commit)" onclick="this.parentElement.textContent=\'…\';projectBytes(\''+id.replace(/'/g,"\\'")+'\')">'+fmtBytes(att.length)+' — project anyway</a>';}
     else await projectBytes(id,ct,ext);
-  } else document.getElementById('proj').textContent='';
+  } else document.getElementById('proj').textContent=previewBlocked?'content preview blocked for credential-bearing document':'';
   // ── dag edges ──
   try{const d=await (await fetch('/api/graal/dag?id='+encodeURIComponent(id))).json();
     selEdges=(d.edges||[]).map(e=>({to:nodeFor(e.to),kind:e.kind,id:e.to}));
@@ -1095,8 +1114,9 @@ function renderSheetFamily(){
 async function projectBytes(id,ct,ext){
   const proj=document.getElementById('proj');if(!proj)return;
   ct=ct||'';ext=ext||extOf(id);
+  if(sensitiveDocId(id)){proj.textContent='content preview blocked for credential-bearing document';return;}
   try{
-    const r=await fetch(dbUrl(id)+'/content');
+    const r=await fetch(graalContentUrl(id));
     if(!r.ok){proj.textContent='no content ('+r.status+')';return;}
     const buf=await r.arrayBuffer();
     kolmogorov(buf,'kg');

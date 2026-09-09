@@ -44,9 +44,12 @@ class BtrfsImageIoTest {
         val total = 128uL * 1024uL * 1024uL
         try {
             RandomAccessFile(path.toFile(), "rw").use { it.setLength(total.toLong()) }
+            val before = currentNioCapabilityReport()
             val receipt = BtrfsImageIo.writeSeedImage(path.toString(), total)
 
-            assertEquals(currentNioCapabilityReport(), receipt.backend)
+            val after = currentNioCapabilityReport()
+            assertEquals(after.copy(checkedAt = receipt.backend.checkedAt), receipt.backend)
+            assertTrue(receipt.backend.checkedAt in before.checkedAt..after.checkedAt)
             assertTrue(receipt.wroteMirror)
             assertEquals(2, receipt.superblocks.size)
             assertEquals(BtrfsSeedImageLayout.requiredBytes(total), receipt.requiredBytes)

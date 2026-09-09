@@ -45,6 +45,9 @@ let cam={s:1,ox:0,oy:0},innerWidth=1,innerHeight=1,PROJECT_DBS=new Set(),layer=1
 let hover=null,fog=false,skin="ops",mask=GraalTopology.all;
 const heatOf=()=>0;
 function dbUrl(id){const parts=id.split("/");return PROJECT_DBS.has(parts[0])?"/"+parts.map(encodeURIComponent).join("/"):"/"+DB+"/"+parts.map(encodeURIComponent).join("/");}
+function contentUrl(id){return "/api/graal/content?id="+encodeURIComponent(id);}
+const SECRET_ID_RE=/(^|[/:._-])(credential|credentials|secret|secrets|token|tokens|apikey|api[-_]?key|keymux)([/:._-]|$)/i;
+function sensitiveDocId(id){const s=String(id||"").replace(/\\/g,"/"),f=s.split("/").pop().toLowerCase();return f===".env"||f.startsWith(".env.")||f.endsWith(".env")||SECRET_ID_RE.test(s);}
 let root=null,byId=new Map();
 const HUES={'forge':300,'projects':172,'.git':262,'pointcut':8,'_design':318,'memories':210,'lost-found':48,'jules':132,'vms':282};
 function hueOf(name){if(name in HUES)return HUES[name];let h=0;for(const c of name)h=(h*31+c.charCodeAt(0))>>>0;return h%360;}
@@ -137,9 +140,10 @@ const kCache=new Map();      // id → gzip ratio 0..1 (the practical K estimate
 let kInFlight=0;
 function wantK(n){
   if(n.detail?.runtime)return;
+  if(sensitiveDocId(n.id)){kCache.set(n.id,-2);return;}
   if(kCache.has(n.id)||kInFlight>=3||n.bytes>1500000||typeof CompressionStream==='undefined')return;
   kCache.set(n.id,-1);kInFlight++;
-  fetch(dbUrl(n.id)+'/content')
+  fetch(contentUrl(n.id))
     .then(r=>r.ok?r.arrayBuffer():Promise.reject(r.status))
     .then(async buf=>{
       const c=await new Response(new Blob([buf]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
@@ -152,9 +156,10 @@ const TEXTY=/\.(kt|kts|java|py|js|ts|md|json|yaml|yml|css|sh|gradle|xml|txt|html
 function wantPreview(n){
   if(n.detail?.runtime)return;
   if(previewCache.has(n.id)||pInFlight>=3)return;
+  if(sensitiveDocId(n.id)){previewCache.set(n.id,null);return;}
   if(!TEXTY.test(n.id)||n.bytes>400000){previewCache.set(n.id,null);return;}
   previewCache.set(n.id,[]);pInFlight++;
-  fetch(dbUrl(n.id)+'/content')
+  fetch(contentUrl(n.id))
     .then(r=>r.ok?r.text():Promise.reject(r.status))
     .then(t=>previewCache.set(n.id,t.split('\n').slice(0,16)))
     .catch(()=>previewCache.set(n.id,null)).finally(()=>{pInFlight--; options.invalidate();});
@@ -245,13 +250,19 @@ draw(camera,width,height) {cam=camera;innerWidth=width;innerHeight=height;if(roo
 setLayer(value){layer=value;},
 setMask(value){mask=value&GraalTopology.all;options.invalidate();},
 visible(n){return !!(n?.categories&mask);},
-hit(x,y) {
- if(!root)return null;let found=null;
- function visit(n){const r=n.rect;if(!r||x<r.x||y<r.y||x>r.x+r.w||y>r.y+r.h)return;
- if(!(n.categories&mask)){found=null;return;}found=n;
- if(n.children.size&&r.w*cam.s>26&&r.h*cam.s>18){layout(n);for(const c of n.children.values())visit(c);}}
- visit(root);return found===root?null:found;
-},
-nodeFor(id){return byId.get(id);},url:dbUrl,hueOf,
-};
-}
+	hit(x,y) {
+	 if(!root)return null;let found=null;
+	 function visit(n){const r=n.rect;if(!r||x<r.x||y<r.y||x>r.x+r.w||y>r.y+r.h)return;
+	 if(!(n.categories&mask)){found=null;return;}found=n;
+	 if(n.children.size&&r.w*cam.s>26&&r.h*cam.s>18){layout(n);for(const c of n.children.values())visit(c);}}
+	 visit(root);return found===root?null:found;
+	},
+	boxFor(id){
+	 const n=byId.get(id);if(!n)return null;
+	 const path=[];for(let a=n;a;a=a.parent)path.unshift(a);
+	 for(let i=1;i<path.length;i++){if(!path[i-1].rect)return null;layout(path[i-1]);}
+	 return n.rect||null;
+	},
+	nodeFor(id){return byId.get(id);},url:dbUrl,hueOf,
+	};
+	}

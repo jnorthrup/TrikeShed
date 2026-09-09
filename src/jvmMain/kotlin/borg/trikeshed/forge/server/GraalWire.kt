@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.Couch
+import borg.trikeshed.couch.Document
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.graal.subvm.HermesCapsule
 import borg.trikeshed.graal.vitals.JvmVitals
@@ -36,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET /api/graal/vitals         [JvmVitals.snapshot] + pointcut route summary
  *   GET /api/graal/pointcuts      every `pointcut/…` document as a route row
  *   GET /api/graal/map            the whole store as compact `[id, bytes]` rows — the RTS terrain
+ *   GET /api/graal/doc?id=…       selected document detail sanitized for the Graal inspector
+ *   GET /api/graal/content?id=…   selected attachment bytes through the same project-db resolver
  *   GET /api/graal/dag[?id=…]     the DAG arcs the tree cannot show: shared-blob cross-links and
  *                                 pointcut→class edges for one node, or the high-degree hubs
  *   GET /api/graal/classfile?id=… selected class attachment projection, parsed by JDK 25
@@ -89,6 +92,21 @@ class GraalWire(
     companion object {
         const val EVENTS_PATH = "/api/graal/events"
         val STREAMING: Set<String> = setOf(EVENTS_PATH)
+        private const val REDACTED = "[redacted]"
+        private val SENSITIVE_ID = Regex("""(^|[/:._-])(credential|credentials|secret|secrets|token|tokens|apikey|api-key|api_key|keymux)([/:._-]|$)""", RegexOption.IGNORE_CASE)
+        private val SAFE_FIELD_NAMES = setOf(
+            "id", "rev", "type", "kind", "name", "label", "provider", "model", "contenttype",
+            "length", "agentid", "revision", "sequence", "code", "codering8",
+        )
+        private val SENSITIVE_FIELD_NAMES = setOf(
+            "apikey", "apitoken", "accesskey", "accesskeyid", "secretkey", "clientsecret",
+            "token", "refreshtoken", "accesstoken", "password", "authorization", "bearertoken",
+            "privatekey", "providerkey", "credential", "credentials", "secret",
+        )
+        private val SECRET_TEXT_PATTERNS = listOf(
+            Regex("""(?i)\bBearer\s+[A-Za-z0-9._+/=-]{16,}"""),
+            Regex("""(?i)\b(sk|rk|pk|ghp|github_pat|xox[baprs]|ya29|AIza)[A-Za-z0-9._-]{12,}"""),
+        )
     }
 
     suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
@@ -121,6 +139,8 @@ class GraalWire(
             }
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
+            method == "GET" && p == "/api/graal/doc" -> withContext(Dispatchers.IO) { docRoute(path) }
+            method == "GET" && p == "/api/graal/content" -> withContext(Dispatchers.IO) { contentRoute(path) }
             method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)
             method == "GET" && p == "/api/graal/strength" -> strengthRoute(path)
             method == "GET" && p == "/api/graal/density" -> densityRoute(path)
@@ -133,7 +153,7 @@ class GraalWire(
                 val id = borg.trikeshed.relaxfactory.CouchHttpSurface
                     .parseQuery(path.substringAfter('?', ""))["id"]
                     ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"class_id_required"}""")
-                val projection = ClassfileBlobProjection(couch, vitals).project(id)
+                val projection = classfileProjection(id)
                 JvmKanbanServer.HttpResponse(
                     (projection["status"] as? Number)?.toInt() ?: if (projection["error"] == null) 200 else 404,
                     JsonSupport.stringify(projection),
@@ -143,9 +163,9 @@ class GraalWire(
                 val source = borg.trikeshed.relaxfactory.CouchHttpSurface
                     .parseQuery(path.substringAfter('?', ""))["source"]
                     ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"source_required"}""")
-                val db = couch
+                val target = graalDocTarget(source)
                     ?: return@withContext JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
-                val projection = ClasspathSourceProjection(db).project(source)
+                val projection = ClasspathSourceProjection(target.db).project(target.docId)
                 JvmKanbanServer.HttpResponse(
                     if (projection["error"] == null) 200 else 404,
                     JsonSupport.stringify(projection),
@@ -181,6 +201,190 @@ class GraalWire(
         return JvmKanbanServer.HttpResponse(200, "", contentType, bytes)
     }
 
+    private data class GraalDocTarget(
+        val displayId: String,
+        val dbName: String,
+        val docId: String,
+        val db: Couch,
+        val store: CouchStore,
+    )
+
+    private fun graalDocTarget(id: String): GraalDocTarget? {
+        if (id.isBlank()) return null
+        val slash = id.indexOf('/')
+        if (slash > 0) {
+            val dbName = id.substring(0, slash)
+            val rest = id.substring(slash + 1)
+            val pdb = projectDbs?.get(dbName)
+            if (pdb != null) return GraalDocTarget(id, pdb.name, rest, pdb.db, pdb.store)
+        }
+        val db = couch ?: return null
+        return GraalDocTarget(id, db.name, id, db, couchStore ?: db.store)
+    }
+
+    private fun docRoute(path: String): JvmKanbanServer.HttpResponse {
+        val id = borg.trikeshed.relaxfactory.CouchHttpSurface
+            .parseQuery(path.substringAfter('?', ""))["id"]
+            ?: return json(400, mapOf("error" to "id_required"))
+        val target = graalDocTarget(id)
+            ?: return json(503, mapOf("error" to "cas_database_unavailable", "id" to id))
+        val doc = target.store.get(target.docId)
+            ?: return json(404, mapOf("error" to "document_missing", "id" to id))
+        if (isGraalDeleted(doc)) return json(410, mapOf("error" to "document_deleted", "id" to id))
+        val rendered = target.db.render(doc, target.store.head.getRev(target.docId))
+        return json(200, sanitizeGraalDocument(target.displayId, rendered))
+    }
+
+    private fun contentRoute(path: String): JvmKanbanServer.HttpResponse {
+        val id = borg.trikeshed.relaxfactory.CouchHttpSurface
+            .parseQuery(path.substringAfter('?', ""))["id"]
+            ?: return json(400, mapOf("error" to "id_required"))
+        val target = graalDocTarget(id)
+            ?: return json(503, mapOf("error" to "cas_database_unavailable", "id" to id))
+        val doc = target.store.get(target.docId)
+            ?: return json(404, mapOf("error" to "document_missing", "id" to id))
+        if (isGraalDeleted(doc)) return json(410, mapOf("error" to "document_deleted", "id" to id))
+        val rendered = target.db.render(doc, target.store.head.getRev(target.docId))
+        val safeDocument = sanitizeGraalDocument(target.displayId, rendered)
+        if ((safeDocument["_graal"] as? Map<*, *>)?.get("previewBlocked") == true) {
+            return json(403, mapOf("error" to "content_preview_blocked", "id" to id))
+        }
+        val (contentType, bytes) = target.db.attachment(target.docId)
+            ?: return json(404, mapOf("error" to "content_missing", "id" to id))
+        return JvmKanbanServer.HttpResponse(200, "", contentType, bytes)
+    }
+
+    private fun classfileProjection(id: String): Map<String, Any?> {
+        val target = graalDocTarget(id)
+            ?: return linkedMapOf("error" to "cas_database_unavailable", "status" to 503, "id" to id)
+        val doc = target.store.get(target.docId)
+            ?: return ClassfileBlobProjection(target.db, vitals).project(target.docId).withGraalId(id, target)
+        if (isGraalDeleted(doc)) return linkedMapOf("error" to "class_blob_deleted", "status" to 410, "id" to id)
+        return ClassfileBlobProjection(target.db, vitals).project(target.docId).withGraalId(id, target)
+    }
+
+    private fun Map<String, Any?>.withGraalId(id: String, target: GraalDocTarget): Map<String, Any?> {
+        if (target.docId == id) return this
+        val out = LinkedHashMap<String, Any?>()
+        out.putAll(this)
+        out["id"] = id
+        out["docId"] = target.docId
+        out["database"] = target.dbName
+        return out
+    }
+
+    private fun isGraalDeleted(doc: Document): Boolean = doc.fields.any { field ->
+        when (field.name) {
+            "_deleted" -> field.value == true
+            "deleted" -> field.value == true || field.value?.toString()?.equals("true", ignoreCase = true) == true
+            else -> false
+        }
+    }
+
+    private data class Sanitized(val value: Any?, val redacted: Boolean)
+
+    private fun sanitizeGraalDocument(id: String, raw: Map<String, Any?>): Map<String, Any?> {
+        val sensitive = sensitiveDocId(id) ||
+            raw.keys.any { sensitiveFieldName(it, true) } ||
+            raw.values.any { containsSecretText(it) }
+        var redacted = false
+        val out = LinkedHashMap<String, Any?>()
+        for ((key, value) in raw) {
+            when {
+                key == "_rev" && sensitive -> {
+                    out[key] = REDACTED
+                    redacted = true
+                }
+                key == "contentId" && sensitive -> {
+                    out[key] = REDACTED
+                    redacted = true
+                }
+                key == "_attachments" && sensitive -> {
+                    out[key] = blockedAttachmentStub(value)
+                    redacted = true
+                }
+                else -> {
+                    val item = sanitizeGraalValue(key, value, sensitiveFieldName(key, sensitive), sensitive)
+                    out[key] = item.value
+                    redacted = redacted || item.redacted
+                }
+            }
+        }
+        out["_graal"] = mapOf(
+            "redacted" to redacted,
+            "previewBlocked" to sensitive,
+            "documentId" to id,
+        )
+        return out
+    }
+
+    private fun sanitizeGraalValue(key: String, value: Any?, keySensitive: Boolean, documentSensitive: Boolean): Sanitized =
+        when (value) {
+            is Map<*, *> -> {
+                var redacted = false
+                val out = LinkedHashMap<String, Any?>()
+                for ((rawKey, rawValue) in value) {
+                    val childKey = rawKey?.toString().orEmpty()
+                    val item = sanitizeGraalValue(childKey, rawValue, keySensitive || sensitiveFieldName(childKey, documentSensitive), documentSensitive)
+                    out[childKey] = item.value
+                    redacted = redacted || item.redacted
+                }
+                Sanitized(out, redacted)
+            }
+            is List<*> -> {
+                var redacted = false
+                val out = value.map { item ->
+                    val sanitized = sanitizeGraalValue(key, item, keySensitive, documentSensitive)
+                    redacted = redacted || sanitized.redacted
+                    sanitized.value
+                }
+                Sanitized(out, redacted)
+            }
+            is String -> if (keySensitive || looksSecretText(value)) Sanitized(REDACTED, true) else Sanitized(value, false)
+            null -> Sanitized(null, false)
+            else -> if (keySensitive) Sanitized(REDACTED, true) else Sanitized(value, false)
+        }
+
+    private fun containsSecretText(value: Any?): Boolean = when (value) {
+        is String -> looksSecretText(value)
+        is Map<*, *> -> value.values.any { containsSecretText(it) }
+        is List<*> -> value.any { containsSecretText(it) }
+        else -> false
+    }
+
+    private fun blockedAttachmentStub(value: Any?): Map<String, Any?> {
+        val content = ((value as? Map<*, *>)?.get("content") as? Map<*, *>).orEmpty()
+        val stub = LinkedHashMap<String, Any?>()
+        stub["stub"] = true
+        stub["previewBlocked"] = true
+        content["content_type"]?.let { stub["content_type"] = it }
+        content["length"]?.let { stub["length"] = it }
+        return mapOf("content" to stub)
+    }
+
+    private fun sensitiveDocId(id: String): Boolean {
+        val normalized = id.replace('\\', '/').lowercase()
+        val file = normalized.substringAfterLast('/')
+        if (file == ".env" || file.startsWith(".env.") || file.endsWith(".env")) return true
+        return SENSITIVE_ID.containsMatchIn(normalized)
+    }
+
+    private fun sensitiveFieldName(name: String, documentSensitive: Boolean): Boolean {
+        val compact = name.filter { it.isLetterOrDigit() }.lowercase()
+        if (compact in SAFE_FIELD_NAMES) return false
+        if (compact in SENSITIVE_FIELD_NAMES) return true
+        if (compact.contains("apikey") || compact.contains("token") || compact.contains("password")) return true
+        if (compact.contains("secret") || compact.contains("credential") || compact.contains("authorization")) return true
+        if (compact.endsWith("privatekey") || compact.endsWith("providerkey")) return true
+        return documentSensitive && compact == "key"
+    }
+
+    private fun looksSecretText(value: String): Boolean {
+        val text = value.trim()
+        if (text.length < 16) return false
+        return SECRET_TEXT_PATTERNS.any { it.containsMatchIn(text) }
+    }
+
     /**
      * The 30k-foot terrain: every live document as `[id, bytes]`. The console builds the
      * prefix-tree territories client-side and lays them out as a zoomable treemap; bytes come
@@ -206,7 +410,7 @@ class GraalWire(
             return s
         }
         val rows = store?.all().orEmpty()
-            .filter { d -> d.fields.none { it.name == "_deleted" && it.value == true } }
+            .filter { d -> !isGraalDeleted(d) }
             .map { d ->
                 val len = (d.fields.firstOrNull { it.name == "length" }?.value as? String)?.toLongOrNull()
                 val gen = store?.head?.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
@@ -217,7 +421,7 @@ class GraalWire(
         // the client resolves `<db>/<docid>` rows back to `/<db>/<docid>` fetches.
         val projectRows = projectDbs?.all().orEmpty().flatMap { pdb ->
             pdb.store.all()
-                .filter { d -> d.fields.none { it.name == "_deleted" && it.value == true } }
+                .filter { d -> !isGraalDeleted(d) }
                 .map { d ->
                     val len = (d.fields.firstOrNull { it.name == "length" }?.value as? String)?.toLongOrNull()
                     val gen = pdb.store.head.getRev(d.id)?.substringBefore('-')?.toIntOrNull() ?: 1
@@ -253,12 +457,22 @@ class GraalWire(
             return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(listOf(sheet.toMap())))
         }
 
-        val store = couchStore ?: return JvmKanbanServer.HttpResponse(503, """{"error":"store not wired"}""")
-        val doc = store.get(id) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"no such document","id":"$id"}""")
+        val target = graalDocTarget(id) ?: return JvmKanbanServer.HttpResponse(503, """{"error":"store not wired"}""")
+        val doc = target.store.get(target.docId) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"no such document","id":"$id"}""")
+        if (isGraalDeleted(doc)) return JvmKanbanServer.HttpResponse(410, """{"error":"document_deleted","id":"$id"}""")
+        val rendered = target.db.render(doc, target.store.head.getRev(target.docId))
+        val safeDocument = sanitizeGraalDocument(id, rendered)
+        if ((safeDocument["_graal"] as? Map<*, *>)?.get("previewBlocked") == true) {
+            val projection = safeDocument.filterKeys { !it.startsWith("_") || it == "_graal" }
+            return JvmKanbanServer.HttpResponse(
+                200,
+                JsonSupport.stringify(projectionSheets(id, projection).map { it.toMap() }),
+            )
+        }
         val fields = linkedMapOf<String, Any?>()
         for (f in doc.fields) if (!f.name.startsWith("_")) fields[f.name] = f.value
         val projection = when {
-            id.endsWith(".class") -> ClassfileBlobProjection(couch, vitals).project(id).let { structure ->
+            id.endsWith(".class") -> classfileProjection(id).let { structure ->
                 if (structure["error"] != null) structure else linkedMapOf<String, Any?>().apply {
                     // Keep small facets ahead of instruction/pointcut collections in the shared sheet budget.
                     for (key in listOf("id", "className", "superClass", "interfaces", "sourceFile", "classFile",
@@ -269,8 +483,7 @@ class GraalWire(
                 }
             }
             id.endsWith(".kt") || id.endsWith(".java") -> {
-                val database = couch ?: return JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
-                ClasspathSourceProjection(database).project(id)
+                ClasspathSourceProjection(target.db).project(target.docId)
             }
             else -> fields
         }
@@ -425,6 +638,7 @@ class GraalWire(
     // ── capsule: the hermes sleeve's captured VT shell ────────────
 
     private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(v))
+
 
     private fun capsuleRoute(method: String, p: String, payload: ByteArray): JvmKanbanServer.HttpResponse {
         val tail = p.removePrefix("/api/graal/capsule/")

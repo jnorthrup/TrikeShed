@@ -10,18 +10,16 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
 import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.JvmDescriptor
-import borg.trikeshed.userspace.JvmFileTable
 import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.UserspaceChannelBackend
-import borg.trikeshed.userspace.openJvmEmulatedChannelBackend
+import borg.trikeshed.userspace.openUserspaceChannelBackend
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.channels.UringChannel
-import borg.trikeshed.userspace.nio.channels.UringFileChannel
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
@@ -37,7 +35,7 @@ import kotlin.test.assertTrue
 
 class JvmIsamOperationsTest {
     /** Real files, with faults confined to SQE/CQE handling beneath the existing facade. */
-    private class Backend(private val io: UserspaceChannelBackend = openJvmEmulatedChannelBackend()) : UserspaceChannelBackend by io {
+    private class Backend(private val io: UserspaceChannelBackend = openUserspaceChannelBackend(32)) : UserspaceChannelBackend by io {
         override val capabilities get() = io.capabilities
         override val nativeCapabilities get() = io.nativeCapabilities
         var maximumTransfer = 2
@@ -45,57 +43,62 @@ class JvmIsamOperationsTest {
         var invalidResult: Int? = null
         var writesBeforeFailure = Int.MAX_VALUE
         var rejectClose = false
+        var corruptToken: UringOp? = null
         var closes = 0
         val operations = mutableListOf<UringOp>()
-        val descriptors = mutableListOf<JvmDescriptor>()
+        val completions = mutableListOf<SelectionResult>()
+        val files = mutableListOf<File>()
 
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = submissions.map { submission ->
             operations += submission.opcode
-            if (submission.opcode == failure || (submission.opcode == UringOp.WRITE && writesBeforeFailure-- <= 0) ||
+            val result = if (submission.opcode == failure || (submission.opcode == UringOp.WRITE && writesBeforeFailure-- <= 0) ||
                 (submission.opcode == UringOp.CLOSE && rejectClose)) {
                 SelectionResult(invalidResult ?: -5, submission.userData)
             } else {
-                val limited = if (submission.opcode == UringOp.READ || submission.opcode == UringOp.WRITE)
-                    submission.copy(len = minOf(maximumTransfer, submission.len)) else submission
-                val result = io.submitBatch(listOf(limited)).single()
-                if (submission.opcode == UringOp.OPENAT && result.res >= 0) {
-                    descriptors += requireNotNull(JvmFileTable.descriptor(result.res))
+                val transfer = submission.opcode == UringOp.READ || submission.opcode == UringOp.WRITE
+                val limited = if (transfer) submission.copy(len = minOf(maximumTransfer, submission.len)) else submission
+                io.submitBatch(listOf(limited)).single().also {
+                    if (submission.opcode == UringOp.OPENAT && it.res >= 0) files += File.fromFd(it.res)
                 }
-                result
             }
+            (if (submission.opcode == corruptToken) result.copy(userData = result.userData + 1) else result)
+                .also { completions += it }
         }
 
         override fun close() { closes++; io.close() }
+
+        fun assertClosed() {
+            assertEquals(1, closes, "Facade backend closes exactly once")
+            assertFailsWith<IllegalStateException> { io.submitBatch(emptyList()) }
+            val observer = openUserspaceChannelBackend(4)
+            try {
+                files.forEach { file ->
+                    assertFalse(file.isOpen(), "Actual file handle must be closed")
+                    val buffer = ByteBuffer.allocate(1)
+                    val token = Long.MIN_VALUE
+                    val result = observer.submitBatch(listOf(Submissions.read(file.id, 0, 1, 0, token).copy(buffer = buffer))).single()
+                    assertEquals(SelectionResult(-9, token), result, "Closed descriptor must report EBADF, not EOF")
+                    assertEquals(0, buffer.position())
+                }
+            } finally { observer.close() }
+        }
     }
 
     private class Channels(val configure: (Backend, Int) -> Unit = { _, _ -> }) {
         val backends = mutableListOf<Backend>()
 
-        fun open(path: String, options: Set<OpenOption>): FileChannel {
-            val backend = Backend().also { configure(it, backends.size); backends += it }
-            val channel = UringChannel(FunctionalUringFacade(32, backend))
+        fun open(path: String, options: Set<OpenOption>): FileChannel = FileChannel.open(path, options) {
+            val backend = Backend().also { backends += it }
             try {
-                val write = StandardOpenOption.WRITE in options
-                var flags = if (write) { if (StandardOpenOption.READ in options) 2 else 1 } else 0
-                if (StandardOpenOption.CREATE in options) flags = flags or 64
-                if (StandardOpenOption.TRUNCATE_EXISTING in options) flags = flags or 512
-                channel.enqueue(Submissions.openat(path, flags, 0))
-                channel.submit()
-                val completion = channel.wait(1).single()
-                if (completion.res < 0) throw IOException("ISAM test OPENAT failed: ${completion.res}")
-                return UringFileChannel(File.fromFd(completion.res), channel)
+                configure(backend, backends.lastIndex)
+                UringChannel(FunctionalUringFacade(32, backend))
             } catch (failure: Throwable) {
-                channel.closeNow()
+                backend.close()
                 throw failure
             }
         }
 
-        fun assertClosed() {
-            backends.forEach { backend ->
-                assertEquals(1, backend.closes, "Facade backend closes exactly once")
-                assertTrue(backend.descriptors.all { !it.isOpen() }, "Actual file descriptors must be closed")
-            }
-        }
+        fun assertClosed() = backends.forEach { it.assertClosed() }
     }
 
     private fun cursor(vararg values: Pair<Int, Byte>): Cursor {
@@ -224,6 +227,9 @@ class JvmIsamOperationsTest {
         val failedOpen = Channels { backend, index -> if (index == 1) backend.failure = UringOp.OPENAT }
         assertFailsWith<IOException> { reader(JvmIsamOperations(failedOpen::open), path).open() }
         failedOpen.assertClosed()
+        val malformedOpen = Channels { backend, _ -> backend.corruptToken = UringOp.OPENAT }
+        assertFailsWith<IOException> { reader(JvmIsamOperations(malformedOpen::open), path).open() }
+        malformedOpen.assertClosed()
         for (result in arrayOf(0, 99, 1)) {
             val channels = Channels { backend, _ -> backend.failure = UringOp.READ; backend.invalidResult = result }
             val source = reader(JvmIsamOperations(channels::open), path)

@@ -88,12 +88,15 @@ class BtrfsUringFileVolumeTest {
         try {
             RandomAccessFile(path.toFile(), "rw").use { it.setLength(16L * 512L) }
             val payload = "nonvolatile document bytes".encodeToByteArray()
+            val before = currentNioCapabilityReport()
             val writeVolume = BtrfsUringFileVolume(path.toString(), blockSize = 512, capacity = 16)
             try {
                 val volume = writeVolume
                 volume.write(3, ByteBuffer.wrap(payload))
                 volume.sync()
-                assertEquals(currentNioCapabilityReport(), volume.backendReport)
+                val after = currentNioCapabilityReport()
+                assertEquals(after.copy(checkedAt = volume.backendReport.checkedAt), volume.backendReport)
+                assertTrue(volume.backendReport.checkedAt in before.checkedAt..after.checkedAt)
                 assertTrue(volume.ioReceipts().any { it.opcode == UringOp.WRITE && it.res == payload.size })
                 assertTrue(volume.ioReceipts().any { it.opcode == UringOp.FSYNC && it.res == 0 })
             } finally {

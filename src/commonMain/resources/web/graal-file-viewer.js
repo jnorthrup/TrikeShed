@@ -136,6 +136,41 @@ async function sourceMates(id,mount,state){
     bindRefs(region);
   }catch(error){if(!state.controller.signal.aborted)region.textContent="Class projection unavailable: "+error.message;}
 }
+function projectionTable(rows){
+  return '<table>'+rows.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc(v??'')+'</td></tr>').join('')+'</table>';
+}
+async function classProjection(id,mount,state){
+  const region=element("section","classdetail");region.append(element("p","file-note","Loading class projection"));mount.append(region);
+  try{
+    const response=await fetch("/api/graal/classfile?id="+encodeURIComponent(id),{signal:state.controller.signal});
+    const data=JSON.parse(new TextDecoder().decode(await readBytes(response,2097152)));if(state.controller.signal.aborted)return;
+    if(!response.ok||data.error){region.replaceChildren(element("p","file-error","Class projection unavailable: "+(data.error||response.status)));return;}
+    const methods=Array.isArray(data.methods)?data.methods.slice(0,80):[];
+    const fields=Array.isArray(data.fields)?data.fields.slice(0,40):[];
+    const interfaces=Array.isArray(data.interfaces)?data.interfaces.join(", "):"";
+    region.innerHTML='<h3>'+esc(data.className||data.id||id)+'</h3>'+
+      projectionTable([
+        ["super",data.superClass||""],
+        ["interfaces",interfaces],
+        ["source",data.sourceFile||""],
+        ["classpath",data.onClasspath===true?"present":data.onClasspath===false?"absent":"unknown"],
+        ["exact runtime blob",data.exactRuntimeBlob===true?"true":data.exactRuntimeBlob===false?"false":"unknown"],
+        ["api",data.classfileApi||"java.lang.classfile"],
+      ]);
+    if(fields.length){
+      const table=element("table","class-members");
+      table.innerHTML='<tr><th>field</th><th>descriptor</th></tr>'+
+        fields.map(f=>'<tr><td>'+esc(f.name||'')+'</td><td>'+esc(f.descriptor||'')+'</td></tr>').join('');
+      region.append(table);
+    }
+    if(methods.length){
+      const table=element("table","class-members");
+      table.innerHTML='<tr><th>method</th><th>descriptor</th><th>instructions</th></tr>'+
+        methods.map(m=>'<tr><td>'+esc(m.name||'')+'</td><td>'+esc(m.descriptor||'')+'</td><td>'+esc(Array.isArray(m.instructions)?m.instructions.length:(m.instructionCount||''))+'</td></tr>').join('');
+      region.append(table);
+    }
+  }catch(error){if(!state.controller.signal.aborted)region.replaceChildren(element("p","file-error","Class projection unavailable: "+error.message));}
+}
 async function render(mount,options){
   dispose(mount);mount.replaceChildren();mount.classList.add("graal-file");
   const state={controller:new AbortController(),urls:[]};states.set(mount,state);
@@ -182,7 +217,7 @@ async function render(mount,options){
     }else if(mode==="html"){
       const frame=element("iframe","htmlview");frame.title=options.id||"HTML blob";frame.setAttribute("sandbox","");
       frame.srcdoc='<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data: blob:; style-src &#39;unsafe-inline&#39;">'+text();body.append(frame);
-    }else if(mode==="class")body.innerHTML=classCard(bytes)||hexHead(bytes);
+    }else if(mode==="class"){body.innerHTML=classCard(bytes)||hexHead(bytes);if(options.id)await classProjection(options.id,body,state);}
     else if(mode==="binary")body.innerHTML=hexHead(bytes);
     else{
       const value=text(),source=element("div");
@@ -211,4 +246,5 @@ const api={isCid,kind,readBytes,measure,codeView,mdView,classCard,hexHead,shapeR
 };
 return api;
 })();
+if(typeof window!=="undefined")window.GraalFileViewer=GraalFileViewer;
 if(typeof module!=="undefined")module.exports=GraalFileViewer;

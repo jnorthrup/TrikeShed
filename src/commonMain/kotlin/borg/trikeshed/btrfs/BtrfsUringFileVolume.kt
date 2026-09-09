@@ -337,7 +337,7 @@ class BtrfsUringFileVolume private constructor(
                     val failure = BtrfsImageIoException("CLOSE failed for $imagePath: res=$res", ioReceipts())
                     // A rejected SQE never reached the backend; the owned File still needs closing.
                     if (file != null && completions.lastOrNull()?.submitted == 0) {
-                        runCatching { file.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                        runCatching { requireNotNull(file).close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
                     }
                     throw failure
                 }

@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/application-nav.css">
+<script src="/application-nav.js" defer></script>
 <link rel="stylesheet" href="/allocation-inspector.css">
 <script src="/vendor/lucide-mux.js" defer></script>
 <script src="/allocation-inspector.js" defer></script>
@@ -12,9 +14,9 @@
 <link rel="stylesheet" href="/patch-camera.css">
 <link rel="stylesheet" href="/archive.css">
 </head>
-<body>
+<body data-app-page="board">
 <div id="bar">
-  <b>BLACKBOARD</b><a href="/harness" target="_blank" rel="noopener" title="Open full blackboard">Board ↗</a><a href="/graal" target="_blank" rel="noopener" title="Open Graal console in its own window">Graal ↗</a><a id="panelsBreakout" href="/panels" target="_blank" rel="noopener" title="Open selected program in a panel window">Panels ↗</a><span id="connection">Connecting</span>
+  <b>BLACKBOARD</b><span id="connection">Connecting</span>
   <button id="boardHome" title="Fit the blackboard" aria-label="Fit blackboard">⊞</button>
   <button id="viewBack" title="Previous view" aria-label="Previous view" disabled>←</button>
   <button id="viewUp" title="Enclosing scope" aria-label="Enclosing scope">↑</button>
@@ -22,6 +24,7 @@
   <button id="archiveBtn" title="Archive import and restore" aria-label="Archives">▣</button>
   <select id="terrainLayer" aria-label="Terrain layer"><option value="1">Objects</option><option value="2">Entropy</option><option value="3">Recency</option></select>
   <select id="programSelect" aria-label="Program"><option>Loading programs</option></select>
+  <a id="panelsBreakout" href="/panels" target="_blank" rel="noopener" title="Open selected program in a separate Panels tab" aria-label="Open selected program in a separate Panels tab">↗</a>
   <div id="parentTools" role="group" aria-label="Selected parent controls">
     <button id="parentHandle" title="Selected parent" aria-label="Selected parent">⠿</button>
     <button id="fdBtn" title="Layout selected parent">↦ fd</button><button id="shakeBtn" title="Shake selected parent">shake</button><button id="fitBtn" title="Fit selected parent">⤢ fit</button>
@@ -39,7 +42,6 @@
   <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
   <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
   <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
-  <a href="/keymux" title="KeyMux">KeyMux</a><a href="/modelmux" title="ModelMux">ModelMux</a>
   <button id="sheetsBtn" title="every territory as grid-in-cell sheets (CursorSheet) — a container cell drills in, the crumb climbs out">▤ sheets</button>
   <button id="exportBtn">export</button>
   <button id="importBtn">import</button>
@@ -53,6 +55,10 @@
 <nav id="boardnav" aria-label="Blackboard territories"></nav>
 <details id="topologyLegend" open>
   <summary>Topology <span id="topologyCount"></span></summary>
+  <div id="detailControl">
+    <label for="detailLevel">Detail</label><output id="detailValue" for="detailLevel">50%</output>
+    <input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="Left: overview. Right: more detail. Camera zoom stays unchanged.">
+  </div>
   <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
   <details class="legend-section"><summary>Blobs and heap</summary>
   <div id="topologyCategories" role="group" aria-label="Topology masks"></div>

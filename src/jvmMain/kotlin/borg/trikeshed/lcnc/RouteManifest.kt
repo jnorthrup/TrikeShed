@@ -121,6 +121,8 @@ object RouteManifest {
             RouteEntry("GET", "/api/graal/allocation-frame", "sampled frame classpath and bytecode projection"),
             RouteEntry("GET", "/api/graal/pointcuts", "pointcut route table"),
             RouteEntry("GET", "/api/graal/map", "full store as compact [id, bytes] rows"),
+            RouteEntry("GET", "/api/graal/doc", "selected document detail sanitized for the Graal inspector"),
+            RouteEntry("GET", "/api/graal/content", "selected attachment bytes through the Graal project-db resolver"),
             RouteEntry("GET", "/api/graal/zoom", "mid-zoom ring representatives per code ring"),
             RouteEntry("GET", "/api/graal/strength", "CAS-granting-strength proof between two cids"),
             RouteEntry("GET", "/api/graal/density", "per-region residual density at a zoom band"),

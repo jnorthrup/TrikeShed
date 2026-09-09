@@ -9,50 +9,119 @@ import borg.trikeshed.lib.toList
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import platform.posix.EBADF
+import platform.posix.EINVAL
+import platform.posix.EIO
+import platform.posix.ENAMETOOLONG
+import platform.posix.EOPNOTSUPP
 import platform.posix.O_CREAT
+import platform.posix.O_EXCL
 import platform.posix.O_RDONLY
 import platform.posix.O_RDWR
+import platform.posix.O_TRUNC
+import platform.posix.O_WRONLY
+import platform.posix.PATH_MAX
+import platform.posix.errno
 import platform.posix.open
 
 private class PosixUserspaceChannelBackend(
     private val entries: Int,
 ) : UserspaceChannelBackend {
+    override val capabilities: Long = UringOp.caps(UringOp.OPENAT, UringOp.READ, UringOp.READV,
+        UringOp.WRITE, UringOp.WRITEV, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE)
+    private val ownedFds = mutableSetOf<Int>()
+    private var closed = false
 
-    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
-        if (submissions.isEmpty()) return emptyList()
-        val results = mutableListOf<SelectionResult>()
-        submissions.forEach { sub ->
-            when (sub.opcode) {
-                UringOp.READ, UringOp.READV -> {
-                    val bytes = sub.buffer?.array() ?: return@forEach
-                    val start = (sub.buffer?.arrayOffset() ?: 0) + (sub.buffer?.position() ?: 0)
-                    val len = sub.buffer?.remaining() ?: 0
-                    val n = PosixUringIO.readAt(sub.fd, bytes, start, len, sub.offset, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                UringOp.WRITE, UringOp.WRITEV -> {
-                    val bytes = sub.buffer?.array() ?: return@forEach
-                    val start = (sub.buffer?.arrayOffset() ?: 0) + (sub.buffer?.position() ?: 0)
-                    val len = sub.buffer?.remaining() ?: 0
-                    val n = PosixUringIO.writeAt(sub.fd, bytes, start, len, sub.offset, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                UringOp.FSYNC -> {
-                    val n = PosixUringIO.fsync(sub.fd, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                UringOp.FTRUNCATE -> {
-                    val n = PosixUringIO.ftruncate(sub.fd, sub.offset, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                UringOp.CLOSE -> {
-                    val n = PosixUringIO.closeFd(sub.fd, entries)
-                    results.add(SelectionResult(n, sub.userData))
-                }
-                else -> results.add(SelectionResult(-1, sub.userData))
+    init {
+        require(entries > 0) { "entries must be positive" }
+    }
+
+    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = submissions.map { sub ->
+        val result = if (closed) -EBADF else try {
+            execute(sub)
+        } catch (_: IllegalArgumentException) {
+            -EINVAL
+        } catch (_: Exception) {
+            -EIO
+        }
+        SelectionResult(result, sub.userData)
+    }
+
+    private fun execute(sub: UringSubmission): Int = when (sub.opcode) {
+        UringOp.OPENAT -> open(sub)
+        UringOp.READ, UringOp.READV -> transfer(sub, write = false)
+        UringOp.WRITE, UringOp.WRITEV -> transfer(sub, write = true)
+        UringOp.FSYNC -> if (sub.fd < 0) -EBADF else PosixUringIO.fsync(sub.fd, entries)
+        UringOp.FTRUNCATE -> when {
+            sub.fd < 0 -> -EBADF
+            sub.offset < 0 -> -EINVAL
+            else -> PosixUringIO.ftruncate(sub.fd, sub.offset, entries)
+        }
+        UringOp.CLOSE -> {
+            // A failed close may have released the identity; drain must not retry it.
+            ownedFds.remove(sub.fd)
+            if (sub.fd < 0) -EBADF else PosixUringIO.closeFd(sub.fd, entries)
+        }
+        else -> -EOPNOTSUPP
+    }
+
+    private fun open(sub: UringSubmission): Int {
+        require(sub.fd == -100 && sub.addr == 0L && sub.flags == 0)
+        require(sub.offset in 0..Int.MAX_VALUE.toLong())
+        val flags = sub.offset.toInt()
+        require(flags and (3 or 64 or 128 or 512).inv() == 0)
+        val access = flags and 3
+        require(access != 3 && (flags and (64 or 128 or 512) == 0 || access != 0))
+        require(flags and 128 == 0 || flags and 64 != 0)
+        val buffer = requireNotNull(sub.buffer).duplicate()
+        require(sub.len > 0 && sub.len <= buffer.remaining())
+        if (sub.len >= PATH_MAX) return -ENAMETOOLONG
+        val bytes = ByteArray(sub.len).also { buffer.get(it) }
+        val path = try { bytes.decodeToString(throwOnInvalidSequence = true) } catch (_: Exception) { return -EINVAL }
+        require('\u0000' !in path)
+
+        // SQEs carry Linux flag values; Darwin's O_CREAT/O_EXCL/O_TRUNC differ.
+        var nativeFlags = when (access) { 0 -> O_RDONLY; 1 -> O_WRONLY; else -> O_RDWR }
+        if (flags and 64 != 0) nativeFlags = nativeFlags or O_CREAT
+        if (flags and 128 != 0) nativeFlags = nativeFlags or O_EXCL
+        if (flags and 512 != 0) nativeFlags = nativeFlags or O_TRUNC
+        val fd = platform.posix.open(path, nativeFlags, 438u)
+        if (fd < 0) return -errno
+        ownedFds.add(fd)
+        return fd
+    }
+
+    private fun transfer(sub: UringSubmission, write: Boolean): Int {
+        val buffer = sub.buffer ?: return -EINVAL
+        if (sub.fd < 0) return -EBADF
+        require(sub.len in 0..buffer.remaining() && sub.offset >= 0)
+        require(write || !buffer.isReadOnly())
+        val position = buffer.position()
+        val start = buffer.arrayOffset() + position
+        val result = if (write) {
+            PosixUringIO.writeAt(sub.fd, buffer.array(), start, sub.len, sub.offset, entries)
+        } else {
+            PosixUringIO.readAt(sub.fd, buffer.array(), start, sub.len, sub.offset, entries)
+        }
+        if (result > sub.len) return -EIO
+        if (result > 0) buffer.position(position + result)
+        return result
+    }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        var failure: Throwable? = null
+        for (fd in ownedFds) {
+            try {
+                val result = PosixUringIO.closeFd(fd, entries)
+                check(result == 0) { "CLOSE failed for owned descriptor $fd: $result" }
+            } catch (caught: Throwable) {
+                if (failure == null) failure = caught else failure.addSuppressed(caught)
             }
         }
-        return results
+        ownedFds.clear()
+        failure?.let { throw it }
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {

@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/application-nav.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/application-nav.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Hermes VT220 · TrikeShed</title>
@@ -24,7 +27,7 @@ footer{display:flex;gap:8px;padding:8px 10px;background:var(--panel);border-top:
 @media(prefers-reduced-motion:reduce){.blink{animation:none}}
 </style>
 </head>
-<body>
+<body data-app-page="hermes">
 <header><b>HERMES · VT220</b><span id="state" class="badge">closed</span><span id="geometry" class="badge">–</span><span id="revision" class="badge">rev 0</span><button id="open">boot GraalPy sleeve</button><a href="/graal" style="color:var(--dim);margin-left:auto">Graal console ↗</a></header>
 <main>
   <section id="terminalPanel"><div id="screenWrap"><div id="screen" tabindex="0" role="application" aria-label="Hermes VT220 terminal"></div></div></section>

@@ -1,6 +1,9 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/application-nav.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/application-nav.js" defer></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Futon · trikeshed</title>
@@ -42,7 +45,7 @@ td.rev{color:var(--dim);max-width:130px}
 @media (max-width:900px){#wrap{flex-direction:column}#list{border-right:0;border-bottom:1px solid var(--line)}}
 </style>
 </head>
-<body>
+<body data-app-page="futon">
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">

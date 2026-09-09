@@ -10,6 +10,22 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfContext
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.channels.Channel as Queue
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Interface abstracting the underlying polling/completion logic.
@@ -41,8 +57,8 @@ public interface UserspaceChannelBackend {
  * Core dispatch layer for userspace channels.
  * Maintains an internal [entries] queue similar to a `ring`.
  *
- * Callers enqueue operations using `facade.enqueue(submission)`
- * or legacy typed methods, then call `submit()` to drain the queue.
+ * Compatibility callers enqueue operations, then call `submit()`.
+ * [Key.create] owns bounded suspend batches; callers close it with [drain].
  */
 public class FunctionalUringFacade(
     private val entries: Int,
@@ -50,20 +66,50 @@ public class FunctionalUringFacade(
     private val containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy =
         borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
     ebpfPrograms: List<UringEbpfProgram> = emptyList(),
-) {
+    scope: CoroutineScope? = null,
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<FunctionalUringFacade> {
+        fun create(
+            scope: CoroutineScope,
+            entries: Int,
+            backend: UserspaceChannelBackend,
+            ebpfPrograms: List<UringEbpfProgram> = emptyList(),
+            containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy =
+                borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
+        ) = FunctionalUringFacade(entries, backend, containmentPolicy, ebpfPrograms, scope)
+    }
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    init {
+        require(entries > 0) { "entries must be positive" }
+        scope?.let { requireNotNull(it.coroutineContext[Job]) { "Uring requires an owning Job" }.ensureActive() }
+    }
+
+    private class Batch(val submissions: Series<UringSubmission>) {
+        val result = Queue<Result<Series<UringCompletion>>>(1)
+    }
+
     private val pending = ArrayDeque<UringSubmission>()
     private val completions = ArrayDeque<SelectionResult>()
     private val submitPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.SUBMIT }
     private val completionPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.COMPLETE }
     private var closed = false
+    private var closing = false
+    private var closeFailure: Throwable? = null
+    private val admission = Mutex()
+    private val execution = Mutex()
+    // At most entries batches are admitted, each containing at most entries SQEs.
+    private val input = Queue<Batch>(entries)
+    private val capacity = Semaphore(entries)
+    private var active = 0
+    private val drained = CompletableDeferred<Unit>()
+    private val termination = CompletableDeferred<Unit>()
+    private val supervisor = scope?.let { SupervisorJob(it.coroutineContext[Job]) }
 
     val capabilities: Long get() = backend.capabilities
     val nativeCapabilities: Long get() = backend.nativeCapabilities
     val availability: String get() = backend.availability
-
-    init {
-        require(entries > 0) { "entries must be positive" }
-    }
 
     // -- Unified UringSubmission API --
 
@@ -117,11 +163,52 @@ public class FunctionalUringFacade(
     private val syntheticEpoch: Long =
         containmentPolicy.layer2Metadata.syntheticEpoch
 
+    private val consumer = scope?.let {
+        val ownedScope = CoroutineScope(it.coroutineContext + this + requireNotNull(supervisor))
+        val cancellation = ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                awaitCancellation()
+            } finally {
+                withContext(NonCancellable) { stopAdmission() }
+            }
+        }
+        ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            val facade = requireNotNull(currentCoroutineContext()[Key])
+            // Cancellation closes admission; the consumer retains every admitted buffer.
+            withContext(NonCancellable) {
+                try {
+                    for (batch in input) {
+                        try {
+                            val result = runCatching { execution.withLock { facade.executeBatch(batch.submissions) } }
+                            batch.result.trySend(result).getOrThrow()
+                        } finally {
+                            batch.result.close()
+                            capacity.release()
+                        }
+                    }
+                } finally {
+                    stopAdmission()
+                    try {
+                        execution.withLock { closeBackend() }
+                        termination.complete(Unit)
+                    } catch (failure: Throwable) {
+                        termination.completeExceptionally(failure)
+                    } finally {
+                        cancellation.cancel()
+                        requireNotNull(supervisor).complete()
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * Enqueue a raw io_uring submission.
      * Throws if the queue is full or if the op is a rejected xattr channel.
      */
-    fun enqueue(submission: UringSubmission) {
+    fun enqueue(submission: UringSubmission) = synchronous {
+        check(!closing) { "Uring is draining or closed" }
+        check(supervisor == null) { "Use batchEnqueue on a scoped uring" }
         require(submission.opcode !in REJECTED_OPS) {
             "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
         }
@@ -129,7 +216,7 @@ public class FunctionalUringFacade(
         val rejected = runSubmitPrograms(submission)
         if (rejected != null) {
             completions.addLast(SelectionResult(rejected, submission.userData))
-            return
+            return@synchronous
         }
         pending.addLast(submission)
     }
@@ -184,7 +271,52 @@ public class FunctionalUringFacade(
 
     /** Suspend through the backend; never invoke the synchronous compatibility path. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        require(submissions.size <= entries) { "submission queue full" }
+        require(submissions.size in 0..entries) { "submission queue full" }
+        currentCoroutineContext().ensureActive()
+        if (supervisor == null) {
+            admission.withLock {
+                currentCoroutineContext().ensureActive()
+                check(!closing) { "Uring is draining or closed" }
+                active++
+            }
+            try {
+                val result = withContext(NonCancellable) {
+                    runCatching { execution.withLock { executeBatch(submissions) } }
+                }
+                currentCoroutineContext().ensureActive()
+                return result.getOrThrow()
+            } finally {
+                withContext(NonCancellable) {
+                    admission.withLock {
+                        active--
+                        if (closing && active == 0) drained.complete(Unit)
+                    }
+                }
+            }
+        }
+
+        admission.withLock { check(!closing && supervisor.isActive) { "Uring is draining or closed" } }
+        capacity.acquire()
+        var admitted = false
+        try {
+            val batch = admission.withLock {
+                currentCoroutineContext().ensureActive()
+                check(!closing && supervisor.isActive) { "Uring is draining or closed" }
+                val batch = Batch(Array(submissions.size) { submissions[it] }.toSeries())
+                input.trySend(batch).getOrThrow()
+                admitted = true
+                batch
+            }
+            // A cancelled caller may release its buffers only after its effects settle.
+            val result = withContext(NonCancellable) { batch.result.receive() }
+            currentCoroutineContext().ensureActive()
+            return result.getOrThrow()
+        } finally {
+            if (!admitted) capacity.release()
+        }
+    }
+
+    private suspend fun executeBatch(submissions: Series<UringSubmission>): Series<UringCompletion> {
         val ordered = arrayOfNulls<UringCompletion>(submissions.size)
         val admitted = mutableListOf<UringSubmission>()
         val admittedIndexes = mutableListOf<Int>()
@@ -215,12 +347,19 @@ public class FunctionalUringFacade(
 
     /** Submit the prepared queue and suspend until every entry has completed. */
     suspend fun submitAwait(): Series<UringCompletion> {
-        val batch = pending.toList().toSeries()
-        pending.clear()
+        val batch = synchronous {
+            check(!closing) { "Uring is draining or closed" }
+            pending.toList().toSeries().also { pending.clear() }
+        }
         return batchEnqueue(batch)
     }
 
-    fun submit(): Int {
+    fun submit(): Int = synchronous {
+        check(!closing) { "Uring is draining or closed" }
+        submitPending()
+    }
+
+    private fun submitPending(): Int {
         val submitted = pending.size
         if (submitted == 0) return 0
 
@@ -238,37 +377,88 @@ public class FunctionalUringFacade(
         return submitted
     }
 
-    fun wait(minComplete: Int = 1): List<SelectionResult> {
+    fun wait(minComplete: Int = 1): List<SelectionResult> = synchronous {
         require(minComplete >= 0) { "minComplete must be non-negative" }
-        if (completions.size < minComplete && pending.isNotEmpty()) submit()
+        if (completions.size < minComplete && pending.isNotEmpty()) submitPending()
 
-        return buildList {
+        buildList {
             while (completions.isNotEmpty()) {
                 add(completions.removeFirst())
             }
         }
     }
 
-    fun peek(): List<SelectionResult> = buildList {
-        while (completions.isNotEmpty()) {
-            add(completions.removeFirst())
+    fun peek(): List<SelectionResult> = synchronous {
+        buildList {
+            while (completions.isNotEmpty()) {
+                add(completions.removeFirst())
+            }
         }
     }
 
-    fun closeNow() {
+    fun closeNow() = synchronous {
+        check(supervisor == null && active == 0) { "suspend drain() is required for active or scoped uring" }
+        closing = true
+        input.close()
+        try {
+            if (pending.isNotEmpty()) submitPending()
+        } finally {
+            closeBackend()
+        }
+    }
+
+    private fun closeBackend() {
         if (!closed) {
-            if (pending.isNotEmpty()) submit()
-            backend.close()
             closed = true
+            try {
+                backend.close()
+            } catch (failure: Throwable) {
+                closeFailure = failure
+            }
         }
+        closeFailure?.let { throw it }
     }
 
-    suspend fun drain() {
-        closeNow()
+    private suspend fun stopAdmission() = admission.withLock {
+        closing = true
+        input.close()
+        if (active == 0) drained.complete(Unit)
+    }
+
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        stopAdmission()
+        if (consumer != null) {
+            consumer.join()
+            requireNotNull(supervisor).join()
+            termination.await()
+        } else {
+            drained.await()
+            execution.withLock {
+                try {
+                    if (pending.isNotEmpty()) submitPending()
+                } finally {
+                    closeBackend()
+                }
+            }
+        }
     }
 
     suspend fun close() {
         drain()
+    }
+
+    private inline fun <T> synchronous(block: () -> T): T {
+        check(admission.tryLock()) { "Concurrent use requires the suspend uring API" }
+        try {
+            check(execution.tryLock()) { "Concurrent use requires the suspend uring API" }
+            try {
+                return block()
+            } finally {
+                execution.unlock()
+            }
+        } finally {
+            admission.unlock()
+        }
     }
 
     private fun runSubmitPrograms(submission: UringSubmission): Int? {

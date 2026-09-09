@@ -96,6 +96,7 @@ function visibleClosure(node) {
 
 const Landscape = {
   detailOwner:null, details:new Set(),
+  labelBudget:48, labels:new Map(),
   canvas:document.getElementById("landscape"), pending:0, terrain:null, rows:[], dbs:[], edges:[], hits:[],
   storeRows:[], runtimeRows:[], mask:127, heapBusy:false, heapStatus:"Not loaded", poolStatus:"Not loaded",
   activityMask:new Set(LandscapeActivity.states.map(s=>s.id)), activityNodes:new Map(), activityPrograms:new Map(), activityFacts:new Map(), activityLinks:[],
@@ -157,43 +158,86 @@ const Landscape = {
     this.terrain?.setRows(this.rows,this.objectBox,this.dbs);
   },
   schedule() {if(this.pending)return;this.pending=requestAnimationFrame(()=>{this.pending=0;this.draw();});},
-  // A hard ceiling on how many nodes may hold DOM detail at once. Readability already
-  // bounds this — a 1310x889 viewport holds ~260 boxes of 115x38 — so the cap only
-  // exists so a pathological layout cannot hand the document thousands of live nodes.
+  // Unselected detail is budgeted; the selected program retains priority.
   detailBudget: 400,
-  // Detail is acquired at a box an operator can read and held down to a slightly smaller
-  // one, so a node resting on the boundary does not flip between panel and fill each frame.
-  detailRelease: {w:100,h:33},
+  // Resolve structure before close-up editing: a standard 190-unit node crosses
+  // this boundary at z=.48. Hysteresis avoids flicker while backing out.
+  detailAcquire: {w:90,h:30}, detailRelease: {w:80,h:26}, detailLevel:50, detailFactor:1,
+  setDetail(value, persist=true) {
+    if(value===null||value===""||!Number.isFinite(Number(value)))return;
+    this.detailLevel=Math.max(0,Math.min(100,Math.round(Number(value))));
+    this.detailFactor=2**((this.detailLevel-50)/25);
+    const slider=document.getElementById("detailLevel"),output=document.getElementById("detailValue");
+    if(slider){slider.value=String(this.detailLevel);slider.setAttribute("aria-valuetext",this.detailLevel+"% detail; higher reveals more without zooming");}
+    if(output)output.textContent=this.detailLevel+"%";
+    if(persist)try{localStorage.setItem("blackboard.detail",String(this.detailLevel));}catch(_){}
+    this.schedule();
+  },
   detailFor(node, box, absorbed) {
     if(this.detailOwner!==Harness.selected){this.detailOwner=Harness.selected;this.details.clear();}
     const held=this.details.has(node.id);
-    const floor=held?this.detailRelease:{w:115,h:38};
-    const readable=!absorbed&&box.w>=floor.w&&box.h>=floor.h;
-    // Detail used to be reserved for the SELECTED program, so every other territory
-    // stayed the flat canvas fill however far you dove into it. Measured on this board
-    // at z=0.83: 820 nodes were large enough on screen to read and not one resolved —
-    // the reported "does not reach the lower layer, it stays one colour". Being readable
-    // is itself the budget: a node only qualifies once an operator has zoomed in far
-    // enough to ask for it, and the viewport bounds how many can qualify at once. The
-    // selected program keeps priority, so it is never crowded out of its own interior.
-    // Readable is also how detail LEAVES. It was only ever granted, so a dive that resolved
-    // a ring's interior left those panels in the document all the way back out, painting a
-    // 200px panel of 11px type into 3px of screen: the smear the whole board wore after one
-    // dive, where the flat fill it replaced is crisp at any size. What must survive a
-    // zoom-out is an edit in progress, not the pixels — a node holding the caret keeps its
-    // DOM however small it is drawn.
+    const floor=held?this.detailRelease:this.detailAcquire;
+    const resolved=!absorbed&&box.w>=Math.max(held?32:40,floor.w/this.detailFactor)&&
+      box.h>=Math.max(held?17:20,floor.h/this.detailFactor);
+    // Other programs may resolve too; selection governs mutation, not visibility.
+    // A live edit keeps its original element when zooming back into the overview.
     const editing=held&&node.el&&typeof document.activeElement!=="undefined"&&document.activeElement&&node.el.contains?.(document.activeElement);
-    if((readable||editing)&&(held||node._program===this.detailOwner||this.details.size<this.detailBudget))this.details.add(node.id);
+    if((resolved||editing)&&(held||node._program===this.detailOwner||this.details.size<this.detailBudget))this.details.add(node.id);
     else this.details.delete(node.id);
     return this.details.has(node.id);
+  },
+  labelLayout(candidates, measure) {
+    const placed=[];
+    candidates.sort((a,b)=>Number(b.node._program===Harness.selected)-Number(a.node._program===Harness.selected)||
+      Number(this.labels.has(b.node.id))-Number(this.labels.has(a.node.id))||b.box.w*b.box.h-a.box.w*a.box.h);
+    for(const {node,box,clip} of candidates){
+      if(placed.length>=this.labelBudget)break;
+      const text=node.params?.archiveCid?(node.params.archivePath?.replace(/\/$/,"").split("/").pop()||"Archive"):
+        node.type==="scope.in"?"in: "+(node.params?.name||"?"):node.type==="scope.out"?"yield: "+(node.params?.name||"?"):node.type;
+      const w=Math.min(208,measure(text)+8,clip.right-clip.left),h=18;
+      if(w<32||clip.bottom-clip.top<h)continue;
+      const x=Math.max(clip.left,Math.min(box.x,clip.right-w));
+      for(const top of [box.y-h,box.y+box.h+2]){
+        const y=Math.max(clip.top,Math.min(top,clip.bottom-h));
+        if(placed.some(p=>x<p.x+p.w+4&&x+w+4>p.x&&y<p.y+p.h+3&&y+h+3>p.y))continue;
+        placed.push({id:node.id,text,x,y,w,h});break;
+      }
+    }
+    return placed;
+  },
+  labelFor(box, detail, absorbed, onScreen) {
+    // Territory names orient the distant overview. Node labels bridge only
+    // unresolved boxes with room for text, never duplicate resolved headers.
+    return onScreen&&!absorbed&&!detail&&box.w>=48&&box.h>=20;
+  },
+  drawLabels(candidates, ctx) {
+    ctx.save();ctx.font="12px system-ui";
+    const placed=this.labelLayout(candidates,text=>ctx.measureText(text).width);
+    ctx.restore();
+    if(!placed.length&&!this.labels.size)return;
+    if(!this.labelLayer){
+      this.labelLayer=document.createElement("div");this.labelLayer.id="landscape-labels";
+      this.labelLayer.setAttribute("aria-hidden","true");viewport.appendChild(this.labelLayer);
+    }
+    const next=new Map();
+    for(const p of placed){
+      let el=this.labels.get(p.id);
+      if(!el){el=document.createElement("span");el.dataset.nodeId=p.id;this.labelLayer.appendChild(el);}
+      if(el.textContent!==p.text)el.textContent=p.text;
+      el.style.transform=`translate(${p.x}px,${p.y}px)`;el.style.width=p.w+"px";
+      next.set(p.id,el);
+    }
+    for(const [id,el] of this.labels)if(!next.has(id))el.remove();
+    this.labels=next;
   },
   measure(vr) {
     // Read all layout before changing visibility/inert. Interleaving these
     // forced a style flush for every node, multiplied by nesting depth.
     const geometry=new Map();
-    for(const n of G.nodes)if(n.el)geometry.set(n,{
-      rect:n.el.getBoundingClientRect(),host:n._childHost?.getBoundingClientRect(),
-    });
+    for(const n of G.nodes)if(n.el){
+      const rect=n.el.getBoundingClientRect();
+      geometry.set(n,{rect,host:n._childHost?.getBoundingClientRect()});
+    }
     const intersect=(a,b)=>({left:Math.max(a.left,b.left),top:Math.max(a.top,b.top),right:Math.min(a.right,b.right),bottom:Math.min(a.bottom,b.bottom)});
     const clip=n=>{
       const g=geometry.get(n);if(!g)return vr;
@@ -227,7 +271,7 @@ const Landscape = {
     }
     if(this.terrain)this.terrain.draw({s:view.z,ox:-view.x/view.z,oy:-view.y/view.z},width,height);
     const byId=new Map(G.nodes.map(n=>[n.id,n])),vr=viewport.getBoundingClientRect();
-    const geometry=this.measure(vr),visibility=[];
+    const geometry=this.measure(vr),visibility=[],labels=[];
     this.drawingGeometry=geometry;
     try {
     ctx.strokeStyle="#81aaa8";ctx.lineWidth=.7;
@@ -250,6 +294,10 @@ const Landscape = {
       // Off screen is not eligible either, so panning releases what leaves the view.
       const detail=this.detailFor(n,b,absorbed||!onScreen);
       visibility.push([n,detail]);
+      if(this.labelFor(b,detail,absorbed,onScreen))labels.push({node:n,box:b,clip:{
+        left:Math.max(0,clip.left-vr.left),top:Math.max(0,clip.top-vr.top),
+        right:Math.min(width,clip.right-vr.left),bottom:Math.min(height,clip.bottom-vr.top),
+      }});
       if(detail||!onScreen)continue;
       const size=Math.min(b.w,b.h);
       // The same interior survives at every depth, down to a pixel. Collapsing
@@ -264,10 +312,6 @@ const Landscape = {
       else {ctx.fillRect(b.x,b.y,b.w,b.h);ctx.strokeStyle=scope?"#8ac5bb":"#28383b";ctx.strokeRect(b.x,b.y,b.w,b.h);}
       const activity=this.activityNodes.get(n.id);
       if(activity&&size>=4){ctx.fillStyle=LandscapeActivity.states.find(s=>s.id===activity.state).color;ctx.fillRect(b.x,b.y,Math.min(4,b.w),Math.min(8,b.h));}
-      if(b.w>85&&b.h>20){
-        const label=n.params?.archiveCid?(n.params.archivePath?.replace(/\/$/,"").split("/").pop()||"Archive"):n.type==="scope.in"?"in: "+(n.params?.name||"?"):n.type==="scope.out"?"yield: "+(n.params?.name||"?"):n.type;
-        ctx.fillStyle=scope?"#d7ebe5":"#101c1d";ctx.font="10px system-ui";ctx.fillText(label.slice(0,Math.floor(b.w/6)),b.x+4,b.y+13);
-      }
       ctx.restore();
       this.hits.push({box,node:n});
     }
@@ -299,6 +343,7 @@ const Landscape = {
       if(n.el.style.visibility!==value)n.el.style.visibility=value;
       if(n.el.inert!==inert)n.el.inert=inert;
     }
+    this.drawLabels(labels,ctx);
     }finally{this.drawingGeometry=null;}
   },
   async refresh() {
@@ -317,11 +362,18 @@ const Landscape = {
     this.rows=this.storeRows.concat(this.runtimeRows);
     this.terrain?.setRows(this.rows,this.objectBox,this.dbs);
     this.terrain?.setMask(this.mask);
+    if(typeof Harness!=="undefined"&&typeof Harness.applyTerrainBookmark==="function")Harness.applyTerrainBookmark();
     this.updateLegend();Harness.schedule();this.schedule();
   },
   initLegend() {
     if(this.legend)return;
     this.legend=document.getElementById("topologyLegend");if(!this.legend)return;
+    let detail=this.detailLevel;
+    try{detail=localStorage.getItem("blackboard.detail")??detail;}catch(_){}
+    this.setDetail(detail,false);
+    const detailSlider=document.getElementById("detailLevel");
+    detailSlider?.addEventListener("input",()=>this.setDetail(detailSlider.value,false));
+    detailSlider?.addEventListener("change",()=>this.setDetail(detailSlider.value));
     try{const saved=JSON.parse(localStorage.getItem("graal.topology.mask"));
       if(Number.isInteger(saved)&&saved>=0&&saved<=GraalTopology.all)this.mask=saved;
     }catch(_){}
@@ -413,23 +465,32 @@ const Landscape = {
     }
     const signal=Harness.beginInspection(id,"Object","Loading");
     const dialog=document.getElementById("factInspector"),body=document.getElementById("factValue");
+    dialog.querySelector("#factFilePreview")?.remove();
     try {
-      const response=await fetch(this.terrain.url(id),{signal});if(!response.ok)throw Error(response.status);
+      const response=await fetch("/api/graal/doc?id="+encodeURIComponent(id),{signal});if(!response.ok)throw Error(response.status);
       const doc=JSON.parse(await this.readText(response));if(signal.aborted)return;
       body.textContent=JSON.stringify(doc,null,2);
       Harness.loadSheets([{url:"/api/graal/sheet?id="+encodeURIComponent(id)}],id);
       const attachment=doc._attachments?.content;
       if(attachment){
-        try {
-          const content=await fetch(this.terrain.url(id)+"/content",{signal});
+        const preview=document.createElement("div");preview.id="factFilePreview";body.after(preview);
+        if(doc._graal?.previewBlocked||attachment.previewBlocked){
+          preview.textContent="Content preview blocked for credential-bearing document";
+        }else if(window.GraalFileViewer){
+          await GraalFileViewer.render(preview,{id,cid:attachment.cid,type:attachment.content_type,url:"/api/graal/content?id="+encodeURIComponent(id),signal});
+        }else try {
+          const content=await fetch("/api/graal/content?id="+encodeURIComponent(id),{signal});
           if(content.ok){
             const type=content.headers.get("content-type")||"";
             const texty=type.startsWith("text/")||/json|javascript|xml/.test(type)||/\.(kt|kts|py|md|txt|java|rs|sh|js|html|css)$/.test(id);
             const bytes=await this.readBytes(content,texty?131072:2048);
             if(signal.aborted)return;
-            body.textContent=texty?new TextDecoder().decode(bytes):JSON.stringify(doc,null,2)+"\n\n"+Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join(" ");
+            preview.textContent=texty?new TextDecoder().decode(bytes):Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join(" ");
           }
-        }catch(e){if(signal.aborted)return;body.textContent+="\n\nContent preview unavailable: "+e.message;}
+        }catch(e){if(signal.aborted)return;preview.textContent="Content preview unavailable: "+e.message;}
+      }else if(doc._graal?.previewBlocked){
+        const preview=document.createElement("div");preview.id="factFilePreview";body.after(preview);
+        preview.textContent="Content preview blocked for credential-bearing document";
       }
       const dagResponse=await fetch("/api/graal/dag?id="+encodeURIComponent(id),{signal});
       if(dagResponse.ok){const dag=JSON.parse(await this.readText(dagResponse));if(signal.aborted)return;

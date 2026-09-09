@@ -12,12 +12,19 @@ import borg.trikeshed.userspace.reactor.Interest
 import java.nio.channels.FileChannel
 import java.nio.channels.Selector
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 
 private object JvmFileTable {
     private val files = ConcurrentHashMap<Int, FileChannel>()
+    private val nextId = AtomicInteger(1)
 
-    fun register(fd: Int, channel: FileChannel) {
+    fun register(channel: FileChannel): Int {
+        val fd = nextId.getAndIncrement()
+        check(fd > 0) { "Userspace descriptor identities exhausted" }
         files[fd] = channel
+        return fd
     }
 
     fun channel(fd: Int): FileChannel? = files[fd]?.takeIf { it.isOpen }
@@ -34,19 +41,28 @@ private object JvmFileTable {
  * File I/O: direct FileChannel (blocking, but in real impl offloaded to thread pool).
  * Socket I/O: registered with [JvmReactorOperations] for async select.
  */
-private class JvmUserspaceChannelBackend(
-    private val reactor: JvmReactorOperations = JvmReactorOperations(),
-) : UserspaceChannelBackend {
+private class JvmUserspaceChannelBackend : UserspaceChannelBackend {
+    private val socketSelector = lazy { Selector.open() }
+    private val reactor by lazy { JvmReactorOperations(socketSelector.value) }
+    override val capabilities: Long = UringOp.caps(UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
+        UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE)
+    private val ownedFiles = ConcurrentHashMap<Int, FileChannel>()
+    @Volatile private var closed = false
 
     // fd -> ChannelWrapper
     private val channels = ConcurrentHashMap<Int, ChannelWrapper>()
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+        check(!closed) { "Userspace backend is closed" }
         if (submissions.isEmpty()) return emptyList()
 
         val results = mutableListOf<SelectionResult>()
 
         for (sub in submissions) {
+            if (sub.opcode == UringOp.OPENAT) {
+                results.add(SelectionResult(open(sub), sub.userData))
+                continue
+            }
             var wrapper = channels[sub.fd]
             if (wrapper == null) {
                 // Auto-register if not present (for files opened via FilesImpl)
@@ -54,7 +70,7 @@ private class JvmUserspaceChannelBackend(
                     val fc = JvmFileTable.channel(sub.fd)
                     wrapper = if (fc == null) null else registerChannel(fc, sub.fd)
                 } else {
-                    results.add(SelectionResult(-1, sub.userData))
+                    results.add(SelectionResult(-95, sub.userData))
                     continue
                 }
             }
@@ -68,20 +84,71 @@ private class JvmUserspaceChannelBackend(
                     UringOp.CLOSE -> {
                         val closed = wrapper.executeClose()
                         channels.remove(sub.fd)
+                        ownedFiles.remove(sub.fd)
                         JvmFileTable.unregister(sub.fd)
                         closed
                     }
                     else -> {
-                        results.add(SelectionResult(-1, sub.userData))
+                        results.add(SelectionResult(-95, sub.userData))
                         continue
                     }
                 }
             } else {
-                -1
+                -9
             }
             results.add(SelectionResult(res, sub.userData))
         }
         return results
+    }
+
+    private fun open(sub: UringSubmission): Int = try {
+        require(sub.fd == -100 && sub.addr == 0L && sub.flags == 0)
+        require(sub.offset in 0..Int.MAX_VALUE.toLong())
+        val flags = sub.offset.toInt()
+        require(flags and (3 or 64 or 128 or 512).inv() == 0)
+        val access = flags and 3
+        require(access != 3 && (flags and (64 or 128 or 512) == 0 || access != 0))
+        require(flags and 128 == 0 || flags and 64 != 0)
+        val buffer = requireNotNull(sub.buffer).duplicate()
+        require(sub.len > 0 && sub.len <= buffer.remaining())
+        val path = ByteArray(sub.len).also { buffer.get(it) }.decodeToString(throwOnInvalidSequence = true)
+        require('\u0000' !in path)
+        val options = mutableSetOf<StandardOpenOption>()
+        if (access != 1) options += StandardOpenOption.READ
+        if (access != 0) options += StandardOpenOption.WRITE
+        if (flags and 128 != 0) options += StandardOpenOption.CREATE_NEW
+        else if (flags and 64 != 0) options += StandardOpenOption.CREATE
+        if (flags and 512 != 0) options += StandardOpenOption.TRUNCATE_EXISTING
+        val file = FileChannel.open(Path.of(path), options)
+        try {
+            val fd = JvmFileTable.register(file)
+            ownedFiles[fd] = file
+            registerChannel(file, fd)
+            fd
+        } catch (failure: Throwable) {
+            file.close()
+            throw failure
+        }
+    } catch (failure: Exception) { ioResult(failure) }
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        var failure: Exception? = null
+        for ((fd, file) in ownedFiles) {
+            JvmFileTable.unregister(fd, file)
+            try { file.close() } catch (caught: Exception) {
+                if (failure == null) failure = caught else failure.addSuppressed(caught)
+            }
+        }
+        ownedFiles.clear()
+        channels.clear()
+        if (socketSelector.isInitialized()) {
+            try { socketSelector.value.close() } catch (caught: Exception) {
+                if (failure == null) failure = caught else failure.addSuppressed(caught)
+            }
+        }
+        failure?.let { throw it }
     }
 
     @Suppress("UNUSED_PARAMETER")
@@ -136,30 +203,40 @@ private class JvmUserspaceChannelBackend(
         } catch (_: Exception) { -1 }
 
         override fun executeRead(sub: UringSubmission): Int {
-            val buf = sub.buffer ?: return -1
-            val nioBuf = buf.toNioByteBuffer()
+            val buf = sub.buffer ?: return -22
+            if (buf.isReadOnly()) return -22
             return try {
+                require(sub.len in 0..buf.remaining())
+                val nioBuf = buf.toNioByteBuffer().limit(buf.position() + sub.len)
                 val n = fc.read(nioBuf, sub.offset)
                 if (n > 0) buf.position(buf.position() + n)
                 n
-            } catch (_: Exception) { -1 }
+            } catch (failure: Exception) { ioResult(failure) }
         }
 
         override fun executeWrite(sub: UringSubmission): Int {
-            val buf = sub.buffer ?: return -1
-            val nioBuf = buf.toNioByteBuffer()
+            val buf = sub.buffer ?: return -22
             return try {
+                require(sub.len in 0..buf.remaining())
+                val nioBuf = buf.toNioByteBuffer().limit(buf.position() + sub.len)
                 val n = fc.write(nioBuf, sub.offset)
                 if (n > 0) buf.position(buf.position() + n)
                 n
-            } catch (_: Exception) { -1 }
+            } catch (failure: Exception) { ioResult(failure) }
         }
 
-        override fun executeSync(): Int = try { fc.force(false); 0 } catch (_: Exception) { -1 }
+        override fun executeSync(): Int = try { fc.force(true); 0 } catch (failure: Exception) { ioResult(failure) }
 
-        override fun executeTruncate(size: Long): Int = try { fc.truncate(size); 0 } catch (_: Exception) { -1 }
+        override fun executeTruncate(size: Long): Int = try {
+            require(size >= 0)
+            if (size > fc.size()) {
+                // NIO truncate only shrinks; a positional zero byte provides ftruncate growth.
+                check(fc.write(java.nio.ByteBuffer.wrap(byteArrayOf(0)), size - 1) == 1)
+            } else fc.truncate(size)
+            0
+        } catch (failure: Exception) { ioResult(failure) }
 
-        override fun executeClose(): Int = try { fc.close(); 0 } catch (_: Exception) { -1 }
+        override fun executeClose(): Int = try { fc.close(); 0 } catch (failure: Exception) { ioResult(failure) }
     }
 
     private data class SocketWrapper(
@@ -243,7 +320,7 @@ private fun ByteBuffer.arrayAddress(): Long = java.nio.ByteBuffer.wrap(array(), 
 // ^ Note: In real impl, use JNR/Unsafe/foreign.MemorySegment to get native address
 
 private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
-    val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
+    val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity()).slice()
     nio.position(position())
     nio.limit(limit())
     return nio
@@ -251,7 +328,7 @@ private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
 
 actual class FileImpl actual constructor(actual val id: Int) {
     @PublishedApi internal var path: String = ""
-    @PublishedApi internal var jvmChannel: java.nio.channels.FileChannel? = null
+    @PublishedApi internal var jvmChannel: java.nio.channels.FileChannel? = JvmFileTable.channel(id)
     actual fun isOpen(): Boolean = jvmChannel?.isOpen ?: false
     actual fun close() {
         val channel = jvmChannel
@@ -270,17 +347,30 @@ actual class FileImpl actual constructor(actual val id: Int) {
 }
 
 internal actual object FilesImpl {
-    private var nextId = 1
-    actual fun open(path: String, readOnly: Boolean): FileImpl =
-        FileImpl(nextId++).also { fi ->
-            fi.path = path
-            fi.jvmChannel = java.nio.channels.FileChannel.open(
+    actual fun open(path: String, readOnly: Boolean): FileImpl {
+        val channel = java.nio.channels.FileChannel.open(
                 java.nio.file.Paths.get(path),
                 if (readOnly) java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ)
                 else java.util.EnumSet.of(java.nio.file.StandardOpenOption.READ, java.nio.file.StandardOpenOption.WRITE)
             )
-            fi.jvmChannel?.let { JvmFileTable.register(fi.id, it) }
+        try {
+            return FileImpl(JvmFileTable.register(channel)).also { it.path = path }
+        } catch (failure: Throwable) {
+            channel.close()
+            throw failure
         }
+    }
+}
+
+private fun ioResult(failure: Exception): Int = when (failure) {
+    is java.nio.file.NoSuchFileException -> -2
+    is java.nio.file.AccessDeniedException, is SecurityException -> -13
+    is java.nio.file.FileAlreadyExistsException -> -17
+    is java.nio.channels.ClosedChannelException,
+    is java.nio.channels.NonReadableChannelException,
+    is java.nio.channels.NonWritableChannelException -> -9
+    is IllegalArgumentException -> -22
+    else -> -5
 }
 
 internal actual object ChannelsImpl {

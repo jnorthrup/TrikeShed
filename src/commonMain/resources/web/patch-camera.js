@@ -152,6 +152,7 @@ function glide(){ if(!momFrame) momFrame=requestAnimationFrame(tickMomentum); }
 
 viewport.addEventListener("pointerdown",e=>{
   if(e.button!==0)return;
+  if(typeof Harness!=="undefined")Harness.terrainBookmark=null;
   killMomentum(); panning=true;
   viewport.classList.add("panning");
   const sx=e.clientX,sy=e.clientY,ox=view.x,oy=view.y;

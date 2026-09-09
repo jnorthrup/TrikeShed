@@ -303,15 +303,83 @@ test("detail resolves what can be read, holds through the boundary, and releases
   const {landscape,harness}=fixture();
   const node={id:"a::one",_program:"a"};
   harness.selected="a";
-  assert.equal(landscape.detailFor(node,{w:114,h:100},false),false,"a box too small to read stays the flat fill");
+  assert.equal(landscape.detailFor(node,{w:79,h:25},false),false,"distant nodes stay the flat fill");
   assert.equal(landscape.detailFor(node,{w:200,h:100},false),true,"a readable box resolves into the document");
-  assert.equal(landscape.detailFor(node,{w:104,h:34},false),true,"it holds just under the acquire floor, so the boundary cannot flicker");
+  assert.equal(landscape.detailFor(node,{w:84,h:28},false),true,"it holds just under the acquire floor, so the boundary cannot flicker");
   // Detail used to be granted and never taken back, so a dive that resolved a ring's
   // interior left those panels in the document all the way out: 200px of chrome and 11px
   // of type painted into 20px of screen, the smear the whole board wore after one dive.
   assert.equal(landscape.detailFor(node,{w:20,h:10},false),false,"a 20px smear returns to the fill it replaced");
   assert.equal(landscape.details.size,0);
   assert.equal(landscape.detailFor(node,{w:200,h:100},true),false,"an absorbed node never resolves");
+});
+
+test("strategy detail arrives at half scale and yields to sparse overview on zoom-out",()=>{
+  const {landscape,harness}=fixture();harness.selected="a";
+  const node={id:"a::one",_program:"a"};
+  for(const zoom of [.1,.48,.5,.48,1.7,.5,.48,.1]){
+    const box={w:190*zoom,h:135*zoom};
+    const detail=landscape.detailFor(node,box,false);
+    assert.equal(detail,zoom!==.1,"normal nodes need not wait for close-up editing");
+    assert.equal(landscape.labelFor(box,detail,false,true),false,"neither tiny overview nor resolved detail gets a duplicate label");
+  }
+  const bridge={w:70,h:32};
+  assert.equal(landscape.labelFor(bridge,false,false,true),true,"unresolved mid-distance boxes retain orientation");
+  assert.equal(landscape.labelFor(bridge,false,true,true),false,"absorbed children do not flood scope labels");
+  assert.equal(landscape.labelFor(bridge,false,false,false),false,"offscreen labels stay absent");
+  assert.equal(landscape.labelBudget,48);
+});
+
+test("overview label overlap and count are bounded without enabling node details",()=>{
+  const {landscape,harness}=fixture();harness.selected="a";
+  landscape.labelBudget=8;
+  const labels=landscape.labelLayout(Array.from({length:1000},(_,i)=>({
+    node:{id:"a::"+i,_program:"a",type:"node"},
+    box:{x:(i%10)*80,y:40+Math.floor(i/10)*30,w:20,h:10},
+    clip:{left:0,top:0,right:1000,bottom:800},
+  })),text=>text.length*7);
+  assert.equal(labels.length,8);assert.equal(landscape.details.size,0);
+  for(let i=0;i<labels.length;i++)for(let j=i+1;j<labels.length;j++){
+    const a=labels[i],b=labels[j];
+    assert.equal(a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y,false);
+  }
+});
+
+test("Detail preference changes resolution at fixed zoom without editing the graph",()=>{
+  const {context,landscape,harness,element}=fixture();harness.selected="a";
+  const node={id:"a::one",_program:"a"},box={w:95,h:67};
+  const camera={x:250,y:180,z:.5};context.view=camera;
+  context.G.nodes=[node];let frames=0;
+  landscape.schedule=()=>frames++;
+  context.save=()=>assert.fail("viewer preference must not save a program");
+  const preferences=new Map();context.localStorage={setItem:(key,value)=>preferences.set(key,value)};
+  landscape.setDetail(0);
+  assert.equal(landscape.detailFor(node,box,false),false);
+  landscape.setDetail(50,false);
+  assert.equal(landscape.detailFor(node,box,false),true);
+  assert.equal(preferences.get("blackboard.detail"),"0","drag updates defer preference writes until change");
+  landscape.setDetail(100);
+  assert.equal(landscape.detailFor(node,{w:50,h:30},false),true);
+  assert.equal(landscape.detailFor(node,{w:19,h:13.5},false),false,"even maximum detail leaves pixel-sized nodes in overview");
+  assert.equal(element("detailLevel").value,"100");
+  assert.equal(element("detailValue").textContent,"100%");
+  assert.equal(preferences.get("blackboard.detail"),"100");
+  assert.deepEqual(context.view,{x:250,y:180,z:.5});
+  assert.equal(context.G.nodes[0],node);assert.equal(frames,3);
+  for(const invalid of [null,"",NaN,Infinity,"no"]){landscape.setDetail(invalid);}
+  assert.equal(frames,3);
+  landscape.setDetail(500);assert.equal(landscape.detailLevel,100);
+  landscape.setDetail(-10);assert.equal(landscape.detailLevel,0);
+});
+
+test("label collisions preserve an existing label and stay inside scope clipping",()=>{
+  const {landscape,harness}=fixture();harness.selected="a";
+  landscape.labels.set("a::held",{});
+  const candidate=id=>({node:{id,_program:"a",type:"scope"},box:{x:80,y:20,w:20,h:10},clip:{left:0,top:0,right:100,bottom:18}});
+  const labels=landscape.labelLayout([candidate("a::new"),candidate("a::held")],text=>text.length*7);
+  assert.equal(labels.length,1);assert.equal(labels[0].id,"a::held");
+  assert.ok(labels[0].x>=0&&labels[0].x+labels[0].w<=100);
+  assert.equal(labels[0].y,0);
 });
 
 test("an edit in progress outlives the zoom-out that would release it",()=>{

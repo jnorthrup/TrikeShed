@@ -13,6 +13,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
@@ -93,7 +94,7 @@ class BtrfsUringLifecycleTest {
 
     private val report = NioCapabilityReport("controlled", false, emptyList(), "", 0)
 
-    private fun channel(backend: Backend) = UringChannel(FunctionalUringFacade(8, backend))
+    private fun CoroutineScope.channel(backend: Backend) = UringChannel(FunctionalUringFacade.create(this, 8, backend))
 
     private suspend fun open(channel: UringChannel, resize: Boolean = false) =
         BtrfsUringFileVolume.open(channel, "controlled.img", blockSize = 512, capacity = 16,

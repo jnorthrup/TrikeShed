@@ -55,7 +55,7 @@ internal class BtrfsRaidMetadata(
                 write.copy(bytes = write.bytes.copyOf())
             }
         }
-        val transaction = captured.size j { captured[it] }
+        val transaction = captured.size j { index: Int -> captured[index] }
         validateWrites(record.config, transaction)
         check(record.epoch < Long.MAX_VALUE) { "RAID transaction sequence exhausted" }
         record = record.copy(
@@ -266,7 +266,7 @@ internal class BtrfsRaidMetadata(
             }
             require(source.position == length) { "Unexpected RAID metadata fields" }
             require((epoch == 0L) == (writeCount == 0)) { "RAID transaction is missing its redo blocks" }
-            val transaction = writeCount j { writes[it] }
+            val transaction = writeCount j { index: Int -> writes[index] }
             if (writeCount > 0) validateWrites(config, transaction)
             return BtrfsRaidRecord(generation, epoch, baseEpoch, arrayId, config, failed, transaction)
         }
