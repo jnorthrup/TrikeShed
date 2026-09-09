@@ -101,7 +101,11 @@ class JvmAgentRunner(
             exec(listOf("git", "add", "-A"), repo, 60_000L, 65_536)
             val diff = exec(listOf("git", "diff", "--cached", "--binary", "--no-color", base), repo, 60_000L, 16 * 1024 * 1024)
             val patch = diff.bytes
-            val filesChanged = patch.decodeToString().lineSequence().count { it.startsWith("diff --git ") }
+            // `diff --git a/<path> b/<path>` — take the b-side, which is the path after the change.
+            val files = patch.decodeToString().lineSequence().filter { it.startsWith("diff --git ") }
+                .mapNotNull { line -> line.substringAfterLast(" b/", "").takeIf { it.isNotBlank() } }
+                .distinct().toList()
+            val filesChanged = files.size
 
             val transcript = capture.bytes() + (if (capture.dropped > 0) "\n[truncated: ${capture.dropped} bytes over the ${request.maxBytes} byte cap were dropped]\n".toByteArray() else ByteArray(0))
             val summary = lastMessage.takeIf { it.isFile && it.length() > 0 }?.readText()?.trim()?.ifEmpty { null }
@@ -109,7 +113,7 @@ class JvmAgentRunner(
             val transcriptCid = cas.put(transcript).value
             val patchCid = if (patch.isNotEmpty()) cas.put(patch).value else ""
             result = result.copy(finishedAtMs = clock(), exit = exit, killed = killed, bytes = capture.total, kept = capture.kept, truncated = capture.dropped > 0,
-                transcriptCid = transcriptCid, patchCid = patchCid, patchBytes = patch.size.toLong(), filesChanged = filesChanged, summary = summary,
+                transcriptCid = transcriptCid, patchCid = patchCid, patchBytes = patch.size.toLong(), filesChanged = filesChanged, files = files, summary = summary,
                 error = if (killed) "budget of ${request.budgetSeconds}s exceeded; the process tree was killed" else "")
             attachments?.let { att ->
                 fun put(name: String, type: String, bytes: ByteArray) {

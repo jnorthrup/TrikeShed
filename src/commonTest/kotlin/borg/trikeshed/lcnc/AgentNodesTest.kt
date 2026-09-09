@@ -63,7 +63,7 @@ class AgentNodesTest {
         assertEquals(AgentNodes.SUMMARY_CHARS, (good.receipt()["summary"] as String).length)
         assertEquals(
             listOf("runId", "jobId", "agent", "cli", "version", "model", "repo", "base", "scratch", "retained", "startedAtMs", "finishedAtMs",
-                "budgetSeconds", "exit", "ok", "killed", "bytes", "kept", "truncated", "transcriptCid", "patchCid", "patchBytes", "filesChanged", "summary", "error"),
+                "budgetSeconds", "exit", "ok", "killed", "bytes", "kept", "truncated", "transcriptCid", "patchCid", "patchBytes", "filesChanged", "files", "summary", "error"),
             good.receipt().keys.toList(),
         )
         assertTrue(!AgentRunResult(runId = "r", agent = "stub", exit = 0, killed = true).ok, "a budget kill is not ok")

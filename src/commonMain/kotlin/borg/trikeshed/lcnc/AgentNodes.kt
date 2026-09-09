@@ -52,6 +52,12 @@ data class AgentRunResult(
     val patchCid: String = "",
     val patchBytes: Long = 0L,
     val filesChanged: Int = 0,
+    /**
+     * The paths the diff touched, read off its `diff --git` headers. The count alone could not be
+     * checked against anything: a criterion naming a file needs the names to verify against, and the
+     * diff is the machine-recorded account rather than the agent's own prose summary.
+     */
+    val files: List<String> = emptyList(),
     val summary: String = "",
     val error: String = "",
 ) {
@@ -65,6 +71,7 @@ data class AgentRunResult(
         "startedAtMs" to startedAtMs, "finishedAtMs" to finishedAtMs, "budgetSeconds" to budgetSeconds,
         "exit" to exit, "ok" to ok, "killed" to killed, "bytes" to bytes, "kept" to kept, "truncated" to truncated,
         "transcriptCid" to transcriptCid, "patchCid" to patchCid, "patchBytes" to patchBytes, "filesChanged" to filesChanged,
+        "files" to files,
         "summary" to summary.take(AgentNodes.SUMMARY_CHARS), "error" to error,
     )
 }

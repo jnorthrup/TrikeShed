@@ -337,9 +337,23 @@ class BoardClaimWorker(
         for (c in children) planeIds.add(c.evidenceId)
         // A recorded diff is citable evidence; an empty one is not.
         if ((agentResult?.patchBytes ?: 0L) > 0L) planeIds.add(AgentNodes.evidenceId(agentRunId))
+        // The judge matches a citation against the criterion that cited it, so it needs the fact's
+        // text and not just its id: a fact whose body carries the path or symbol a MUST names is
+        // what makes that MUST answered rather than merely footnoted.
+        val planeText = HashMap<String, String>(planeRows.size * 2)
+        for (r in planeRows) planeText[PlaneBrief.evidenceId(r)] =
+            r.fields.entries.joinToString(" ") { (k, v) -> "$k ${v ?: ""}" }
+        for (c in children) planeText[c.evidenceId] = c.jobId + " " + c.model + " " + c.content
+        // The agent lane's evidence is its diff: the paths it touched, then its own summary. A
+        // criterion naming a file is answered by the file appearing in the patch, not by the agent
+        // saying it did the work.
+        agentResult?.let { r ->
+            planeText[AgentNodes.evidenceId(agentRunId)] =
+                r.files.joinToString(" ") + " " + r.patchCid + " " + r.summary
+        }
         val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
         val decision = if (agentResult?.killed == true) PlaneJudge.Decision(PlaneJudge.Outcome.REVIEW, "agent budget of ${agentBudget}s exceeded; a person decides", null)
-            else PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds)
+            else PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds, planeText)
         // The revision the card landed RUNNING on — NOT store.card().revision: a person who
         // moved the card during the brain call must win, and the CAS refusal records it.
         val current = landed.snapshot.revision
