@@ -1,0 +1,25 @@
+{
+  "name": "TrikeShed Forge",
+  "short_name": "Forge",
+  "description": "Local-first Forge workspace: page, kanban reactor core, and zoomable RTS/fractal board field backed by browser webcache.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090d13",
+  "theme_color": "#090d13",
+  "orientation": "landscape-primary",
+  "icons": [
+    {
+      "src": "./icons/forge-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/forge-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

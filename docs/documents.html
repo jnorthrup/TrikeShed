@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/application-nav.css">
+<script src="/vendor/lucide-mux.js" defer></script>
+<script src="/application-nav.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forge</title>
+<style>
+/* The muggle surface. Proportions are the workspace-and-page pattern a stranger already
+   knows: a quiet sidebar, a wide reading column with a large title, and a table when the
+   workspace is the data. The ink is Forge's, not theirs. */
+:root{
+  --bg:#191919;--side:#202020;--hover:#2c2c2c;--line:#333;--rule:#2a2a2a;
+  --ink:#e9e9e7;--dim:#9b9a97;--faint:#6f6e6b;--accent:#64ceca;
+  --page:720px;
+}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+#document-surface{display:grid;grid-template-columns:260px 1fr;height:100vh}
+
+/* sidebar */
+.ds-side{background:var(--side);border-right:1px solid var(--rule);overflow:auto;padding:10px 8px 24px}
+.ds-brand{font-weight:600;font-size:14px;padding:6px 8px 2px;letter-spacing:.01em}
+.ds-side-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);padding:12px 8px 4px}
+.ds-tree,.ds-pages{list-style:none;margin:0;padding:0}
+.ds-tree a{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;
+  color:var(--ink);text-decoration:none;font-size:14px;line-height:1.4}
+.ds-tree a:hover{background:var(--hover)}
+.ds-tree a.ds-selected{background:var(--hover);font-weight:500}
+.ds-caret{color:var(--faint);font-size:10px;width:10px;flex:none}
+.ds-ico{color:var(--faint);font-size:12px;width:14px;flex:none;text-align:center}
+.ds-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-count{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+.ds-pages{margin:1px 0 4px}
+.ds-pages a{padding-left:22px;color:var(--dim)}
+.ds-pages a.ds-selected,.ds-pages a:hover{color:var(--ink)}
+.ds-empty-pages{padding-left:24px;font-size:13px;margin:2px 0 6px}
+
+/* main column */
+.ds-main{display:flex;flex-direction:column;overflow:hidden}
+.ds-crumb{display:flex;align-items:center;gap:12px;height:45px;padding:0 16px;flex:none;
+  border-bottom:1px solid var(--rule)}
+.ds-crumbs{flex:1;font-size:14px;color:var(--dim);display:flex;align-items:center;gap:8px;min-width:0}
+.ds-crumbs a{color:var(--dim);text-decoration:none;padding:2px 6px;border-radius:4px}
+.ds-crumbs a:hover{background:var(--hover);color:var(--ink)}
+.ds-here{color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds-sep{color:var(--faint)}
+.ds-views{display:flex;gap:2px;flex:none}
+.ds-view{background:none;border:0;color:var(--dim);font:inherit;font-size:13px;
+  padding:4px 10px;border-radius:4px;cursor:pointer}
+.ds-view:hover{background:var(--hover);color:var(--ink)}
+.ds-view.ds-on{color:var(--ink);background:var(--hover);font-weight:500}
+.ds-content{overflow:auto;flex:1}
+.ds-page{max-width:var(--page);margin:0 auto;padding:56px 24px 30vh}
+.ds-page-wide{max-width:1180px}
+.ds-title{font-size:40px;line-height:1.2;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+.ds-sub{color:var(--faint);font-size:13px;margin:0 0 28px}
+.ds-sub a{color:var(--dim)}
+.ds-dim{color:var(--dim)}
+.ds-empty{color:var(--faint);padding:8px}
+
+/* the page body: blocks, at reading proportions */
+.ds-body h1,.ds-body h2,.ds-body h3{font-weight:600;letter-spacing:-.01em;margin:28px 0 6px;line-height:1.3}
+.ds-body h1{font-size:28px}.ds-body h2{font-size:22px}.ds-body h3{font-size:18px}
+.ds-body p{margin:0 0 12px}
+.ds-body ul,.ds-body ol{margin:0 0 12px;padding-left:26px}
+.ds-body li{margin:3px 0}
+.ds-body a{color:var(--accent)}
+.ds-body hr{border:0;border-top:1px solid var(--line);margin:24px 0}
+.ds-body blockquote{border-left:3px solid var(--line);margin:12px 0;padding:2px 14px;color:var(--dim)}
+.ds-body pre,.ds-extract pre{background:var(--side);border:1px solid var(--rule);border-radius:4px;
+  padding:12px 14px;overflow:auto;line-height:1.45}
+.ds-body code,.ds-extract code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13.5px}
+.ds-body :not(pre)>code{background:var(--side);padding:1px 5px;border-radius:3px;color:#e5a3a0}
+.ds-extract{margin-top:40px;padding-top:16px;border-top:1px solid var(--rule)}
+.ds-extract h2{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint)}
+.ds-cid{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+
+/* the table view */
+.ds-table{width:100%;border-collapse:collapse;font-size:14px}
+.ds-table{table-layout:fixed}
+.ds-table th,.ds-table td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--rule);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ds-table th:nth-child(1),.ds-table td:nth-child(1){width:36%}
+.ds-table th:nth-child(2),.ds-table td:nth-child(2){width:19%}
+.ds-table th:nth-child(3),.ds-table td:nth-child(3){width:11%}
+.ds-table th:nth-child(4),.ds-table td:nth-child(4){width:12%}
+.ds-table th:nth-child(5),.ds-table td:nth-child(5){width:22%}
+.ds-th{color:var(--dim);font-weight:400;font-size:13px;cursor:pointer;user-select:none;
+  border-top:1px solid var(--rule);white-space:nowrap}
+.ds-th:hover{background:var(--hover);color:var(--ink)}
+.ds-th-cid{cursor:default}
+.ds-th-cid:hover{background:none;color:var(--dim)}
+.ds-arrow{margin-left:5px;font-size:11px;color:var(--faint)}
+.ds-row{cursor:pointer}
+.ds-row:hover{background:var(--hover)}
+.ds-row.ds-selected{background:var(--hover)}
+/* NOT flex: a flex td stops taking the column's width and truncates at its content box. */
+.ds-cell-name .ds-name{display:inline}
+.ds-table td .ds-ico,.ds-table th .ds-ico{display:inline-block;margin-right:7px;vertical-align:baseline}
+.ds-num{font-variant-numeric:tabular-nums;color:var(--dim)}
+td.ds-cid{color:var(--faint)}
+.ds-loading{padding:24px;color:var(--faint)}
+
+/* A run block (AutoTools, Cut B): a build target written into the page. Lamp colours are
+   web/landscape.js's palette so the harness and the document surface say the same thing. */
+.ds-run{border:1px solid var(--line);border-radius:8px;background:var(--panel);margin:16px 0;padding:10px 12px}
+.ds-run-refused{border-style:dashed}
+.ds-run-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ds-run-lamp{border-radius:999px;padding:2px 10px;font-size:11.5px;font-weight:600;letter-spacing:.04em;color:#111315;background:#9da6ac}
+.ds-run-lamp-never-built{background:#9da6ac}
+.ds-run-lamp-running{background:#69cd92}
+.ds-run-lamp-completed{background:#7baedc}
+.ds-run-lamp-stale{background:#d9a066}
+.ds-run-lamp-failed{background:#ee8884}
+.ds-run-lamp-unread,.ds-run-lamp-refused{background:#3c4448;color:var(--dim)}
+.ds-run-program{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ds-run-button{margin-left:auto;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:4px 14px;font:inherit;font-size:12.5px;cursor:pointer}
+.ds-run-button:hover:enabled{border-color:var(--graal);color:var(--graal)}
+.ds-run-button:disabled{opacity:.5;cursor:default}
+.ds-run-reason{margin:8px 0 4px;color:var(--dim)}
+.ds-run-note{margin:8px 0 4px;color:var(--dim);font-style:italic}
+.ds-run-meta{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;margin:6px 0 0;font-size:12px;color:var(--dim)}
+.ds-run-meta dt,.ds-run-meta dd{margin:0}
+.ds-run-meta dd{color:var(--ink)}
+.ds-run-cid{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ds-run-output{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+.ds-run-output pre{background:var(--panel2)}
+</style>
+</head>
+<body data-app-page="documents">
+<div id="document-surface" class="ds"><p class="ds-loading">Loading the Kotlin/JS bundle (/kotlin/TrikeShed.js). If this line stays, run <code>./gradlew stageKotlinJs</code> and reload.</p></div>
+<script src="/kotlin/TrikeShed.js" defer></script>
+</body>
+</html>

@@ -1095,10 +1095,23 @@ tasks.register<Sync>("generateForgePages") {
     // `*.md` is TOP LEVEL ONLY — a Sync deletes whatever the spec does not produce, so every
     // hand-written subtree has to be named. docs/subvm/ was swept by this task on 2026-09-07
     // (capability-matrix.md and its capabilities json) because nothing here claimed it.
+    // A Sync DELETES whatever its spec does not produce, so every hand-written thing in docs/ has to
+    // be named here or publishing destroys it. This has already happened twice: docs/subvm/ on
+    // 2026-09-07, and before this list was widened the task would also have swept docs/demo/ (96
+    // files of guides), the rete/graph pages, the graph .mjs scripts, connections.json and the PNGs.
+    // Rule for adding to docs/: if this task does not produce it, add it here in the same commit.
     preserve {
-        include("index.html")
+        include("index.html")           // the ForgeApp bake
+        include("forge-app.html")       // …kept under its own name too, so index.html can be the shell
+        include("surfaces.html")        // the operator-surface index the bake writes
         include(".nojekyll")
-        include("*.md")
+        include("*.md")                 // top level only; subtrees below are named explicitly
+        include("*.mjs")                // build-graph, check-graph, render-rete-evidence, the model + its test
+        include("*.png")                // the rendered graphs
+        include("connections.json")
+        include("graph-template.html")
+        include("rete-*.html")
+        include("demo/**")
         include("dispatch/**")
         include("subvm/**")
     }
