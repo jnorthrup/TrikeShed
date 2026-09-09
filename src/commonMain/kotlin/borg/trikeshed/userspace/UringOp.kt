@@ -81,13 +81,16 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     // caller that has to leave the submission vocabulary to map a file is exactly the seam
     // where per-platform code starts to fray.
     MAP(-1, "mmap — map a descriptor range into the address space"),
-    MUNMAP(-1, "munmap — release a mapping"),
-    MSYNC(-1, "msync — flush a mapping to its backing store"),
+    // These share MAP's capability bit. The mask answers "can this backend map memory", not
+    // "which of the three is this" -- no backend supports mmap without munmap, and dispatch is by
+    // opcode identity regardless. Three bits for one capability was waste against a 64-op ceiling.
+    MUNMAP(-1, "munmap — release a mapping") { override val mask: Long get() = MAP.mask },
+    MSYNC(-1, "msync — flush a mapping to its backing store") { override val mask: Long get() = MAP.mask },
     ;
 
     /**
      * The enum IS the bitmask: `1L shl ordinal`. That caps the vocabulary at 64 operations and
-     * there are 61 now. Past 63 the shift wraps silently and two ops share a bit, so a capability
+     * there are 61 entries now, 59 distinct bits. Past 63 the shift wraps silently and two ops share a bit, so a capability
      * test starts answering for the wrong one. Adding the 65th means widening the mask type, not
      * appending another entry.
      */

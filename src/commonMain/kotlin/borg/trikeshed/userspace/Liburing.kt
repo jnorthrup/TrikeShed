@@ -99,9 +99,10 @@ object Liburing : LiburingFacade by LiburingImpl {
 
     private fun vetoed(): Result<Unit> = Result.failure(UringVetoed)
 
-    private fun observe(completion: UringCompletion?, submission: UringSubmission): UringCompletion? {
+    private fun observe(completion: UringCompletion?): UringCompletion? {
         val programs = completePrograms ?: return completion
         if (completion == null) return null
+        val submission = answering(completion)
         var res = completion.res.toLong()
         var index = 0
         while (index < programs.size) {
@@ -111,8 +112,18 @@ object Liburing : LiburingFacade by LiburingImpl {
         return if (res == completion.res.toLong()) completion else completion.copy(res = res.toInt())
     }
 
-    /** The submission a completion is answering is not tracked here; COMPLETE sees a NOP shape. */
-    private val completionShape = UringSubmission(UringOp.NOP, -1, 0L, 0, 0L)
+    /**
+     * The shape a COMPLETE program sees for the submission being answered.
+     *
+     * A shared NOP constant was wrong: it handed every program fd -1 and userData 0, so nothing
+     * could tell which submission a completion belonged to. userData is io_uring's own
+     * correlation key and the completion carries it, so it is threaded through here -- which is
+     * also what makes UringEbpfContextLayout.USER_DATA mean anything to a program reading the
+     * context. No correlation table: the key is already in hand, and a map on the completion path
+     * is the allocation this seam cannot afford.
+     */
+    private fun answering(completion: UringCompletion): UringSubmission =
+        UringSubmission(UringOp.NOP, -1, 0L, 0, 0L, completion.flags, completion.userData)
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         if (admit(UringSubmission(UringOp.READ, fd, bufAddress, len, offset, 0, userData))) LiburingImpl.prepRead(fd, bufAddress, len, offset, userData) else vetoed()
@@ -147,9 +158,9 @@ object Liburing : LiburingFacade by LiburingImpl {
     override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
         if (admit(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0L, flags, userData))) LiburingImpl.prepRecvmsg(fd, msgHdrPtr, flags, userData) else vetoed()
 
-    override fun waitCqe(): Result<UringCompletion?> = LiburingImpl.waitCqe().map { observe(it, completionShape) }
+    override fun waitCqe(): Result<UringCompletion?> = LiburingImpl.waitCqe().map { observe(it) }
 
-    override fun peekCqe(): Result<UringCompletion?> = LiburingImpl.peekCqe().map { observe(it, completionShape) }
+    override fun peekCqe(): Result<UringCompletion?> = LiburingImpl.peekCqe().map { observe(it) }
 }
 
 /** A SUBMIT program refused this submission. EPERM, surfaced rather than swallowed. */
