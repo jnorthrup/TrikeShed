@@ -48,7 +48,16 @@ object SleeveTddRedKanban {
      * every MUST is met with an evidence id, so each MUST here names something checkable rather than an
      * intention: a file that exists, a test that passes, a shape that was chosen.
      */
-    fun spec(manifest: AgentSleeveManifest, trap: PolyglotTrap): String = buildString {
+    /**
+     * @param agent the coding-agent id to name on the card, or blank to name none.
+     *
+     * Blank is the default on purpose. Writing `AGENT: codex` here would pick one vendor's CLI by
+     * fiat and route around the machinery that exists to make that choice — the KeyMux brain roster,
+     * ModelMux routing, and the spec's own `MODEL:` / `MODELS:` / `FANOUT:` grammar. A card that
+     * names no agent is claimed by the chat brain through ModelMux; a lane or an operator that
+     * wants a particular CLI says so on the card, where the choice is visible and revisable.
+     */
+    fun spec(manifest: AgentSleeveManifest, trap: PolyglotTrap, agent: String = ""): String = buildString {
         appendLine("GOAL: resolve the ${trap.symbol} trap so ${manifest.entryModule} survives it under ${manifest.facet.id}")
         appendLine("MUST: ${manifest.sleeveRoot}/${trap.forkPath} exists and shadows ${trap.donorModule} by module identity")
         appendLine("MUST: ${trap.redTest} fails against the unforked sleeve and passes against the fork")
@@ -61,7 +70,7 @@ object SleeveTddRedKanban {
         appendLine("OUT-OF-SCOPE: editing the donor checkout at ${manifest.donorRoot ?: "(unpinned)"}")
         appendLine("OUT-OF-SCOPE: loosening the isolate bounds to make the trap disappear")
         appendLine("REVIEW: human")
-        appendLine("AGENT: codex")
+        if (agent.isNotBlank()) appendLine("AGENT: $agent")
     }
 
     fun pinSpec(manifest: AgentSleeveManifest): String = buildString {
@@ -77,14 +86,14 @@ object SleeveTddRedKanban {
      * The `kanban.submit` payload shape, so these can go onto the live board without a second
      * translation. `priority` is the board's integer, not [CardPriority].
      */
-    fun submissions(): List<Map<String, Any?>> = AgentSleeveRegistry.ALL.flatMap { manifest ->
+    fun submissions(agent: String = ""): List<Map<String, Any?>> = AgentSleeveRegistry.ALL.flatMap { manifest ->
         cards(manifest).map { card ->
             val trapId = card.metadata["trap"]
             val trap = manifest.traps.firstOrNull { it.id == trapId }
             mapOf(
                 "jobId" to card.id.value,
                 "title" to card.title,
-                "spec" to if (trap == null) pinSpec(manifest) else spec(manifest, trap),
+                "spec" to if (trap == null) pinSpec(manifest) else spec(manifest, trap, agent),
                 "tags" to card.tags.toList(),
                 "dependencies" to card.dependencies.map { it.value },
                 "priority" to (card.metadata["boardPriority"]?.toInt() ?: PRIORITY_CATCHABLE),

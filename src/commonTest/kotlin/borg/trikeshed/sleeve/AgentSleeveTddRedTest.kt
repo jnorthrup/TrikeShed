@@ -150,3 +150,24 @@ class AgentSleeveTddRedTest {
         assertTrue((summary["uncatchable"] as Int) > 0, "pi and ohmypi both carry unreproduced thread/process bounds")
     }
 }
+
+/** The generator must not choose a vendor: that is what the roster and ModelMux are for. */
+class SleeveCardAgentSelectionTest {
+    @Test
+    fun noSpecNamesAnAgentUnlessOneIsAskedFor() {
+        for (s in SleeveTddRedKanban.submissions()) {
+            val spec = s["spec"] as String
+            assertTrue(
+                spec.lines().none { it.startsWith("AGENT:") },
+                "the card named an agent nobody chose — that routes around the brain roster: ${s["jobId"]}",
+            )
+        }
+    }
+
+    @Test
+    fun anAgentIsNamedOnlyWhenTheCallerNamesOne() {
+        val named = SleeveTddRedKanban.submissions(agent = "opencode")
+            .filter { (it["spec"] as String).contains("AGENT: opencode") }
+        assertTrue(named.isNotEmpty(), "an explicitly requested agent must reach the card")
+    }
+}
