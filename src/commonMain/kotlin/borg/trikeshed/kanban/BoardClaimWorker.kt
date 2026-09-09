@@ -353,7 +353,10 @@ class BoardClaimWorker(
         }
         val humanTag = card?.tags?.any { it.lowercase() in HUMAN_TAGS } == true
         val decision = if (agentResult?.killed == true) PlaneJudge.Decision(PlaneJudge.Outcome.REVIEW, "agent budget of ${agentBudget}s exceeded; a person decides", null)
-            else PlaneJudge.decide(spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds, planeText)
+            else PlaneJudge.decide(
+                spec, humanTag, ok, answer["content"]?.toString().orEmpty(), planeIds, planeText,
+                ownCriteria = card?.parent.isNullOrBlank(),
+            )
         // The revision the card landed RUNNING on — NOT store.card().revision: a person who
         // moved the card during the brain call must win, and the CAS refusal records it.
         val current = landed.snapshot.revision

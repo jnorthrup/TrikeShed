@@ -80,6 +80,7 @@ object PlaneJudge {
         replyText: String,
         planeIds: Set<String>,
         planeText: Map<String, String>,
+        ownCriteria: Boolean = true,
     ): Decision {
         if (!brainOk) return Decision(Outcome.RETRY, "brain call failed", null)
         val reply = parse(replyText) ?: return Decision(Outcome.RETRY, "no VERDICT line in the reply", null)
@@ -94,7 +95,12 @@ object PlaneJudge {
             if (!l.met) return Decision(Outcome.RETRY, "${c.label} NOT-MET", reply)
             if (l.evidence.isEmpty()) return Decision(Outcome.RETRY, "${c.label} MET without evidence", reply)
             if (!onPlane(l.evidence, planeIds)) return Decision(Outcome.RETRY, "${c.label} evidence '${l.evidence}' is not a fact on the plane", reply)
-            val anchors = anchors(c.text)
+            // A fan-out child answers the parent's criteria verbatim, and those are worded for the
+            // MERGE: "cite one blackboard/kanban/claim/ receipt id" names the receipts the children
+            // themselves produce, so no child can ever satisfy it. Holding a child to wording aimed
+            // at its parent blocks the whole fan-out, which is worse than the looseness it closes.
+            // The parent is still judged strictly, and the parent is what closes the work.
+            val anchors = if (ownCriteria) anchors(c.text) else emptySet()
             if (anchors.isEmpty()) { unanchored++; continue }
             val haystack = haystack(l.evidence, planeIds, planeText)
             val hit = anchors.any { haystack.contains(it) }
@@ -111,8 +117,11 @@ object PlaneJudge {
                 reply,
             )
         }
-        val reason = if (unanchored == 0) "every MUST met with evidence that answers it"
-            else "every MUST met with evidence on the plane; $unanchored named nothing concrete to match against"
+        val reason = when {
+            unanchored == 0 -> "every MUST met with evidence that answers it"
+            !ownCriteria -> "every MUST met with evidence on the plane; inherited criteria are judged at the merge"
+            else -> "every MUST met with evidence on the plane; $unanchored named nothing concrete to match against"
+        }
         return Decision(Outcome.DONE, reason, reply)
     }
 
