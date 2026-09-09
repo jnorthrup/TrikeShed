@@ -257,8 +257,31 @@ class GraalWire(
         val doc = store.get(id) ?: return JvmKanbanServer.HttpResponse(404, """{"error":"no such document","id":"$id"}""")
         val fields = linkedMapOf<String, Any?>()
         for (f in doc.fields) if (!f.name.startsWith("_")) fields[f.name] = f.value
+        val projection = when {
+            id.endsWith(".class") -> ClassfileBlobProjection(couch, vitals).project(id).let { structure ->
+                if (structure["error"] != null) structure else linkedMapOf<String, Any?>().apply {
+                    // Keep small facets ahead of instruction/pointcut collections in the shared sheet budget.
+                    for (key in listOf("id", "className", "superClass", "interfaces", "sourceFile", "classFile",
+                        "classfileApi", "blobCid", "runtimeCid", "exactRuntimeBlob", "onClasspath",
+                        "fields", "methods", "runtimeObservation", "pointcuts")) {
+                        if (structure.containsKey(key)) put(key, structure[key])
+                    }
+                }
+            }
+            id.endsWith(".kt") || id.endsWith(".java") -> {
+                val database = couch ?: return JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
+                ClasspathSourceProjection(database).project(id)
+            }
+            else -> fields
+        }
+        if (projection !== fields && projection["error"] != null) return JvmKanbanServer.HttpResponse(
+            (projection["status"] as? Number)?.toInt() ?: 404, JsonSupport.stringify(projection),
+        )
+        if (projection !== fields) return JvmKanbanServer.HttpResponse(
+            200, JsonSupport.stringify(projectionSheets(id, projection).map { it.toMap() }),
+        )
         val confix = runCatching {
-            borg.trikeshed.parse.confix.confixDoc(JsonSupport.stringify(fields))
+            borg.trikeshed.parse.confix.confixDoc(JsonSupport.stringify(projection))
         }.getOrElse {
             return JvmKanbanServer.HttpResponse(502, """{"error":"document did not parse as confix","detail":"${it.message}"}""")
         }

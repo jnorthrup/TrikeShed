@@ -1,4 +1,13 @@
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+import java.net.ServerSocket
+import java.util.concurrent.TimeUnit
+import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
@@ -661,7 +670,7 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
     }
     dependsOn("jvmProcessResources")
     doFirst {
-        val classes = file("build/classes/kotlin/jvm/main")
+        val classes = file(if (name == "runOroborosDaemon") "build/live/classes" else "build/classes/kotlin/jvm/main")
         val resources = file("build/processedResources/jvm/main")
         val lib = file(stagingLibDir)
         if (!classes.isDirectory) throw GradleException("missing $classes; run ./gradlew compileKotlinJvm")
@@ -686,9 +695,13 @@ tasks.register<JavaExec>("portHermesPython") {
 // Daemon — flywheel loop. HotSwapAgent watches CycleBody.class for live edits.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"
-    description = "Launch OroborosDaemon from naked classes + staged lib/. -Pjdwp=5005[,suspend] attaches a debugger; --args forwards daemon flags (--once/--watch/--interval-ms/--home/--repo)."
+    description = "Launch OroborosDaemon with the live feed and HotSwapAgent. -Pjdwp=5005[,suspend]; --args='--watch [flags] forgeHome repoDir'."
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     useStagedJvmClasspath()
+    dependsOn("hotswapFeed", "hotswapAgentJar")
+    doFirst {
+        jvmArgs("-javaagent:${layout.buildDirectory.file("libs/hotswap-agent.jar").get().asFile}=${layout.buildDirectory.dir("live").get().asFile}")
+    }
     // Forward stdio; HotswapAgent prints to stdout.
     standardInput = System.`in`
 }
@@ -700,8 +713,7 @@ tasks.register<JavaExec>("runOroborosDaemon") {
 //      staged runtime jars, NOT the hot-swappable build/live/classes the dev launchers use.
 //   2. The archive is bound to the EXACT classpath string. stageDaemonAot writes the -cp it used
 //      to a sidecar (oroboros.aot.cp); runOroborosDaemonAot reads that same string back, so create
-//      and consume can never drift (a mismatch is silently ignored under AOTMode=auto — never fatal,
-//      but also never applied, which is the failure this sidecar prevents).
+//      and consume use the same ordered entries. AOTMode=on requires an applicable cache.
 // The archive lands at build/staging/oroboros.aot — beside the jars it is bound to, and where the
 // build-plane absorber can pick it up so the AOT cache teleports with the install (gap-analysis §7).
 val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
@@ -714,99 +726,143 @@ fun daemonAotClasspath(): String {
     return (listOf(jar) + libs).joinToString(File.pathSeparator) { it.path }
 }
 
-// SUGGESTION 1 — expose the archive: AOTCacheOutput on a training run.
-tasks.register<Exec>("stageDaemonAot") {
-    group = "oroboros"
-    description = "Train + write the daemon AOT cache to build/staging/oroboros.aot (JEP 483). Boots from the jar classpath, warms -PaotWarmSeconds=N (default 30), then SIGTERM -> exitProcess(0) triggers the dump. Regenerate whenever the class set changes."
-    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources")
-    val warm = (project.findProperty("aotWarmSeconds") as String?)?.toIntOrNull() ?: 30
-    val port = (project.findProperty("aotTrainPort") as String?)?.toIntOrNull() ?: 8971
-    val aot = daemonAotCache.get().asFile
-    val cpFile = daemonAotCpFile.get().asFile
-    // OUTSIDE the worktree on purpose: the daemon refuses a forge home inside the repo
-    // ("daemon state never lands in source"), so a home under build/ made every training run die
-    // one second in — and because the dump happens on exit, that produced a cache of nothing but
-    // JDK classes which still passed `test -s` and reported success.
-    val trainHome = File(providers.systemProperty("java.io.tmpdir").get(), "trikeshed-aot-train")
-    val repo = projectDir.path
-    val javaBin = File(providers.systemProperty("java.home").get(), "bin/java").path
-    doFirst {
-        aot.parentFile.mkdirs(); aot.delete()
-        trainHome.deleteRecursively(); trainHome.mkdirs()
-        val cp = daemonAotClasspath()
-        cpFile.writeText(cp)
-        // HOME is redirected to a throwaway so the ~/.hermes absorber is skipped during training
-        // (we want to link the class graph fast, not replicate 600MB of agent home).
-        commandLine("bash", "-c", """
-            set -u
-            LOG='${trainHome.path}/train.log'
-            HOME='${trainHome.path}' \
-              '$javaBin' -XX:AOTCacheOutput='${aot.path}' -Xlog:aot=info \
-              -cp '$cp' borg.trikeshed.daemon.OroborosDaemon \
-              --watch --kanban-port $port --interval-ms 86400000 '${trainHome.path}/forge' '$repo' > "${'$'}LOG" 2>&1 &
-            PID=${'$'}!
-            # A training run is only worth dumping once the daemon is SERVING: the class graph a
-            # cache exists to link is the one boot walks. The old loop could not tell "healthy"
-            # from "died" — it broke on either and echoed success regardless, so a daemon that
-            # fell over in its first second still wrote a JDK-only archive and the task passed.
-            READY=0
-            for i in ${'$'}(seq 1 180); do
-              curl -sf -m 2 http://127.0.0.1:$port/api/health >/dev/null 2>&1 && { READY=1; break; }
-              kill -0 ${'$'}PID 2>/dev/null || break
-              sleep 1
-            done
-            if [ "${'$'}READY" != 1 ]; then
-              echo "[aot] FAILED: the training daemon never answered /api/health on port $port" >&2
-              tail -40 "${'$'}LOG" >&2
-              kill -9 ${'$'}PID 2>/dev/null || true
-              exit 1
-            fi
-            echo "[aot] daemon healthy; holding ${warm}s to link the hot path"
-            sleep $warm
-            kill -TERM ${'$'}PID 2>/dev/null || true
-            for i in ${'$'}(seq 1 120); do kill -0 ${'$'}PID 2>/dev/null || break; sleep 1; done
-            kill -9 ${'$'}PID 2>/dev/null || true
-            if [ ! -s '${aot.path}' ]; then
-              echo "[aot] FAILED: no cache was written" >&2; tail -40 "${'$'}LOG" >&2; exit 1
-            fi
-            # The symptom that made this lane worthless while reporting success: an archive of
-            # nothing but JDK classes. It is 17MB, passes every file test, and saves the daemon
-            # nothing because none of ITS classes are in it. Measured on this repo: a run that died
-            # at boot records 18,652 CP entries, a run that actually served records 73,671. Anything
-            # near the former means the daemon was not running when the graph was recorded.
-            # ("App loader initiated classes" is NOT the signal — it is a loader-constraint count
-            # and reads 0 for both.)
-            ENTRIES=${'$'}(grep -oE 'Class +CP entries += +[0-9]+' "${'$'}LOG" | tail -1 | grep -oE '[0-9]+${'$'}')
-            if [ -z "${'$'}ENTRIES" ] || [ "${'$'}ENTRIES" -lt 30000 ]; then
-              echo "[aot] FAILED: only ${'$'}{ENTRIES:-0} classes were recorded — that is a JDK-only archive, not the daemon's graph." >&2
-              grep -E 'Class +CP entries|AOTCache creation' "${'$'}LOG" >&2
-              exit 1
-            fi
-            grep -E 'Class +CP entries|AOTCache creation is complete' "${'$'}LOG" || true
-        """.trimIndent())
+// Bounded JVM lifecycle shared by training and cache-consumption verification.
+fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
+    ServerSocket(port).use { }
+    // macOS's default temp path exceeds the daemon Unix-domain socket limit.
+    val tempRoot = File("/tmp").takeIf { it.isDirectory } ?: File(System.getProperty("java.io.tmpdir"))
+    val home = Files.createTempDirectory(tempRoot.toPath(), "ts-aot-").toFile()
+    val javaBin = File(System.getProperty("java.home"), "bin/java")
+    val command = listOf(javaBin.path, "--add-modules=jdk.internal.vm.ci") + flags + listOf("-Xlog:aot=info", "-cp", daemonAotClasspath(),
+        "borg.trikeshed.daemon.OroborosDaemon", "--watch", "--kanban-port", port.toString(),
+        "--interval-ms", "86400000", "--agents", "none", home.resolve("forge").path, projectDir.path)
+    log.parentFile.mkdirs()
+    val builder = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log)
+    builder.environment()["HOME"] = home.path
+    builder.environment()["TRIKESHED_AOT_DEFAULT"] = "1"
+    val process = builder.start()
+    try {
+        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
+        val deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos()
+        var ready = false
+        while (process.isAlive && System.nanoTime() < deadline) {
+            ready = runCatching {
+                client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/health"))
+                    .timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode() == 200
+            }.getOrDefault(false)
+            if (ready) break
+            Thread.sleep(500)
+        }
+        check(ready && process.isAlive) { "AOT daemon did not become healthy; see $log" }
+        val response = client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/graal/aot"))
+            .timeout(Duration.ofSeconds(5)).GET().build(), HttpResponse.BodyHandlers.ofString())
+        check(response.statusCode() == 200) { "AOT status unavailable: ${response.statusCode()}" }
+        logger.lifecycle("[aot] live switches: ${response.body()}")
+        if (flags.any { it.startsWith("-XX:AOTCache=") }) {
+            val id = "projects/${projectDir.name.lowercase()}/build/live/classes/borg/trikeshed/daemon/HotSwapAgent.class"
+            val sheetRequest = HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/graal/sheet?id=$id"))
+                .timeout(Duration.ofSeconds(5)).GET().build()
+            var visible = false
+            while (process.isAlive && System.nanoTime() < deadline) {
+                visible = runCatching {
+                    val sheetResponse = client.send(sheetRequest, HttpResponse.BodyHandlers.ofString())
+                    if (sheetResponse.statusCode() != 200) false else {
+                        val family = JsonSlurper().parseText(sheetResponse.body()) as List<*>
+                        val root = family.first() as Map<*, *>
+                        val rows = root["rows"] as List<*>
+                        rows.any { it == listOf("exactRuntimeBlob", true) } &&
+                            family.any { sheet ->
+                                sheet is Map<*, *> && sheet["id"] == "$id/methods" &&
+                                    (sheet["rows"] as? List<*>)?.isNotEmpty() == true
+                            }
+                    }
+                }.getOrDefault(false)
+                if (visible) break
+                Thread.sleep(500)
+            }
+            check(visible) { "AOT daemon did not expose runtime-matching classfile sheets; see $log" }
+            logger.lifecycle("[aot] live classfile TreeSheets verified: $id (exactRuntimeBlob=true)")
+        }
+        Thread.sleep(seconds * 1000)
+        check(process.isAlive) { "AOT daemon exited before probe completed; see $log" }
+        process.destroy()
+        check(process.waitFor(60, TimeUnit.SECONDS)) { "AOT daemon did not finish cache shutdown; see $log" }
+        return response.body()
+    } finally {
+        if (process.isAlive) {
+            process.destroyForcibly()
+            process.waitFor(10, TimeUnit.SECONDS)
+        }
+        logger.lifecycle("[aot] log: $log; probe home: $home")
     }
-    doLast { println("[aot] wrote ${aot.path} (${if (aot.exists()) aot.length() else 0} bytes); classpath pinned in ${cpFile.name}") }
 }
 
-// SUGGESTION 2 — consume the archive: AOTCache + AOTMode=auto at launch, same pinned classpath.
-tasks.register<Exec>("runOroborosDaemonAot") {
+tasks.register("stageDaemonAot") {
     group = "oroboros"
-    description = "Launch OroborosDaemon consuming build/staging/oroboros.aot (AOTMode=auto: used if valid, ignored if stale/missing). JAR classpath pinned to the create run. -PdaemonArgs=\"--watch --kanban-port 8901\" forwards flags."
-    dependsOn("jvmJar", "stageDaemonLib")
+    description = "Train and validate the JDK 25 AOT cache without shell scripts. -PaotWarmSeconds=30 -PaotTrainPort=8971."
+    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources", "hotswapFeed")
+    timeout.set(Duration.ofSeconds(180))
+    doLast {
+        val warm = providers.gradleProperty("aotWarmSeconds").orElse("30").get().toLong()
+        require(warm in 0..30) { "aotWarmSeconds must be 0..30 to retain the three-minute bound" }
+        val port = providers.gradleProperty("aotTrainPort").orElse("8971").get().toInt()
+        val aot = daemonAotCache.get().asFile
+        val pending = File(aot.parentFile, "oroboros.pending.aot")
+        aot.parentFile.mkdirs()
+        Files.deleteIfExists(pending.toPath())
+        val log = layout.buildDirectory.file("reports/aot/train.log").get().asFile
+        aotProbe(listOf("-XX:AOTCacheOutput=${pending.path}"), port, warm, log)
+        val entries = Regex("Class +CP entries += +([0-9]+)").findAll(log.readText())
+            .lastOrNull()?.groupValues?.get(1)?.toLongOrNull() ?: 0
+        check(pending.isFile && pending.length() > 0 && entries >= 30000) {
+            "No validated daemon AOT archive ($entries class CP entries); see $log"
+        }
+        Files.move(pending.toPath(), aot.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        daemonAotCpFile.get().asFile.writeText(daemonAotClasspath())
+        logger.lifecycle("[aot] validated ${aot.length()} bytes, $entries class CP entries: $aot")
+    }
+}
+
+fun requireDaemonAot(): File {
     val aot = daemonAotCache.get().asFile
-    val cpFile = daemonAotCpFile.get().asFile
-    val extra = (project.findProperty("daemonArgs") as String?) ?: "--watch --kanban-port 8901"
-    val repo = projectDir.path
-    val javaBin = File(providers.systemProperty("java.home").get(), "bin/java").path
+    check(aot.isFile && aot.length() > 0 && daemonAotCpFile.get().asFile.isFile &&
+        daemonAotCpFile.get().asFile.readText() == daemonAotClasspath()) {
+        "Missing or mismatched AOT cache; run ./gradlew stageDaemonAot"
+    }
+    return aot
+}
+
+tasks.register<JavaExec>("runOroborosDaemonAot") {
+    group = "oroboros"
+    description = "Require the trained AOT cache and expose JVM AOT logs. --args forwards daemon flags and positional home/repo."
+    dependsOn("jvmJar", "stageDaemonLib", "hotswapFeed")
+    mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     standardInput = System.`in`
+    environment("TRIKESHED_AOT_DEFAULT", "1")
+    providers.gradleProperty("daemonArgs").orNull?.let { setArgsString(it) }
     doFirst {
-        // Reuse the create run's exact -cp when present so the AOT classpath matches; otherwise
-        // rebuild it identically. Both yield the same string by construction.
-        val cp = if (cpFile.exists()) cpFile.readText().trim() else daemonAotClasspath()
-        val aotFlags = if (aot.exists()) listOf("-XX:AOTCache=${aot.path}", "-XX:AOTMode=auto")
-                       else { logger.lifecycle("[aot] no cache at ${aot.path}; run ./gradlew stageDaemonAot first (booting without it)"); emptyList() }
-        if (aot.exists()) logger.lifecycle("[aot] consuming ${aot.path} (${aot.length()} bytes)")
-        commandLine(listOf(javaBin) + aotFlags + listOf("-cp", cp, "borg.trikeshed.daemon.OroborosDaemon") + extra.split(" ").filter { it.isNotBlank() } + listOf(repo))
+        val aot = requireDaemonAot()
+        classpath = files(daemonAotClasspath().split(File.pathSeparator))
+        jvmArgs("--add-modules=jdk.internal.vm.ci", "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info")
+        logger.lifecycle("[aot] required cache: $aot; TRIKESHED_AOT_DEFAULT=1")
+    }
+}
+
+tasks.register("verifyDaemonAot") {
+    group = "verification"
+    description = "Boot with required AOT cache, query live AOT switches, and stop the isolated daemon."
+    dependsOn("jvmJar", "stageDaemonLib", "hotswapFeed")
+    timeout.set(Duration.ofSeconds(180))
+    doLast {
+        val aot = requireDaemonAot()
+        val log = layout.buildDirectory.file("reports/aot/verify.log").get().asFile
+        aotProbe(listOf("-XX:AOTCache=${aot.path}", "-XX:AOTMode=on"),
+            providers.gradleProperty("aotTrainPort").orElse("8971").get().toInt(), 0, log)
+        val evidence = log.readText()
+        check(evidence.contains("Opened AOT cache ${aot.path}.") &&
+            evidence.contains("Mapped static  region #0") &&
+            evidence.contains("Using AOT-linked classes: true")) { "JVM did not enable AOT-linked classes; see $log" }
+        logger.lifecycle("[aot] AOT-linked classes active and daemon health verified")
     }
 }
 
@@ -1236,22 +1292,31 @@ tasks.register<JavaExec>("queueGraphWork") {
 // commonMain Purity Check — detect JVM-specific patterns
 // ─────────────────────────────────────────────────────────────────
 
-tasks.register<Exec>("commonMainPurity") {
+tasks.register("commonMainPurity") {
     group = "verification"
     description = "Check commonMain for JVM-specific imports and patterns"
-    commandLine("bash", "scripts/common-purity.sh")
-    isIgnoreExitValue = true
+    val sources = fileTree("src/commonMain") { include("**/*.kt") }
+    inputs.files(sources)
+    doLast {
+        val forbidden = Regex("^\\s*import\\s+(java\\.|javax\\.|sun\\.|com\\.sun\\.)")
+        val violations = sources.files.sorted().flatMap { source ->
+            source.readLines().mapIndexedNotNull { index, line ->
+                if (forbidden.containsMatchIn(line)) "${source.relativeTo(projectDir)}:${index + 1}: $line" else null
+            }
+        }
+        if (violations.isNotEmpty()) throw GradleException(violations.joinToString("\n"))
+    }
 }
 
 tasks.named("check") {
-    dependsOn("commonMainPurity")
+    dependsOn("commonMainPurity", "scriptPolicy")
 }
 
 
-tasks.register<Exec>("hotswapFeed") {
+tasks.register("hotswapFeed") {
     group = "build"
-    description = "Atomic compile feed for the live dir (replaces wrong 17; hot-swap stays)"
-    dependsOn("jvmMainClasses", "stageDaemonLib")
+    description = "Publish compiled JVM files atomically, prune stale files, then advance the live generation."
+    dependsOn("jvmMainClasses", "stageDaemonLib", "hotswapAgentJar")
 
     val buildDir = project.layout.buildDirectory.get().asFile
     val srcDir = File(buildDir, "classes/kotlin/jvm/main")
@@ -1259,20 +1324,82 @@ tasks.register<Exec>("hotswapFeed") {
     val liveDir = File(buildDir, "live")
     val destDir = File(liveDir, "classes")
 
-    doFirst {
-        destDir.mkdirs()
-    }
-    
-    commandLine("rsync", "-a", "--delay-updates", "--delete", "${srcDir.absolutePath}/", "${javaDir.absolutePath}/", "${destDir.absolutePath}/")
-
     doLast {
+        check(srcDir.isDirectory) { "Missing compiled Kotlin classes: $srcDir" }
+        destDir.mkdirs()
+        val retained = mutableSetOf<String>()
+        // Publish complete files before advancing the generation watched by HotSwapAgent.
+        listOf(srcDir, javaDir).filter { it.isDirectory }.forEach { root ->
+            root.walkTopDown().filter { it.isFile }.forEach { source ->
+                val relative = source.relativeTo(root).invariantSeparatorsPath
+                retained.add(relative)
+                val target = destDir.resolve(relative)
+                target.parentFile.mkdirs()
+                if (!target.isFile || Files.mismatch(source.toPath(), target.toPath()) != -1L) {
+                    val temporary = Files.createTempFile(target.parentFile.toPath(), ".feed-", ".tmp")
+                    try {
+                        Files.copy(source.toPath(), temporary, StandardCopyOption.REPLACE_EXISTING)
+                        Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                    } finally {
+                        Files.deleteIfExists(temporary)
+                    }
+                }
+            }
+        }
+        destDir.walkBottomUp().forEach { target ->
+            if (target.isFile && target.relativeTo(destDir).invariantSeparatorsPath !in retained) Files.delete(target.toPath())
+            else if (target.isDirectory && target != destDir && target.list()?.isEmpty() == true) target.delete()
+        }
         val genFile = File(liveDir, ".generation")
         val currentGen = if (genFile.exists()) {
             genFile.readText().trim().toLongOrNull() ?: 0L
         } else {
             0L
         }
-        genFile.writeText((currentGen + 1).toString() + "\n")
+        val next = Files.createTempFile(liveDir.toPath(), ".generation-", ".tmp")
+        try {
+            Files.writeString(next, (currentGen + 1).toString() + "\n")
+            Files.move(next, genFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(next)
+        }
+    }
+}
+
+tasks.register("oroborosDoctor") {
+    group = "verification"
+    description = "Check live daemon health and operator routes; -PdaemonUrl=http://127.0.0.1:8888."
+    val base = providers.gradleProperty("daemonUrl").orElse("http://127.0.0.1:8888")
+    doLast {
+        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
+        val failures = mutableListOf<String>()
+        listOf("/api/health", "/api/board", "/panels", "/graal").forEach { path ->
+            val url = base.get().trimEnd('/') + path
+            try {
+                val request = HttpRequest.newBuilder(URI(url)).timeout(Duration.ofSeconds(10)).GET().build()
+                val response = client.send(request, HttpResponse.BodyHandlers.discarding())
+                logger.lifecycle("${response.statusCode()} $url")
+                if (response.statusCode() != 200) failures.add(url)
+            } catch (failure: Exception) {
+                failures.add("$url: ${failure.javaClass.simpleName}: ${failure.message.orEmpty()}")
+            }
+        }
+        if (failures.isNotEmpty()) throw GradleException(failures.joinToString("\n"))
+    }
+}
+
+tasks.register("scriptPolicy") {
+    group = "verification"
+    description = "Report remaining non-Gradle operator scripts as policy violations."
+    doLast {
+        val violations = fileTree("scripts").files + fileTree("bin") {
+            include("*.sh", "*.cjs", "oroboros-*", "mux", "modelmux-cli", "trikeshed-btrfs")
+        }.files
+        val shells = file("build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
+            if (Regex("commandLine\\(\"(bash|sh|zsh)\"").containsMatchIn(line)) "build.gradle.kts:${index + 1}: ${line.trim()}" else null
+        }
+        val remaining = violations.sorted().map { it.relativeTo(projectDir).path } + shells
+        if (remaining.isNotEmpty()) throw GradleException("Remaining script entrypoints:\n" + remaining.joinToString("\n"))
     }
 }
 
@@ -1409,3 +1536,44 @@ tasks.register<Copy>("stageKotlinJs") {
 }
 // The staged bundle lands in a directory other JVM tasks read; Gradle wants that ordering said.
 tasks.matching { it.name == "jvmJar" || it.name == "jvmTest" || it.name == "stageDaemonLib" }.configureEach { mustRunAfter("stageKotlinJs") }
+
+tasks.register<Exec>("spacegraphBrowserCheck") {
+    group = "verification"
+    description = "Isolated SpaceGraph provider, interaction and screenshot checks against the local server."
+    timeout.set(Duration.ofSeconds(180))
+    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "src/jvmTest/js/spacegraph-browser.check.cjs")
+    providers.gradleProperty("browserModules").orNull?.let { environment("NODE_PATH", it) }
+    environment("SPACEGRAPH_BASE_URL", providers.gradleProperty("spacegraphBaseUrl").orElse("http://127.0.0.1:8888").get())
+    environment("SPACEGRAPH_LOCAL_ASSETS", providers.gradleProperty("spacegraphLocalAssets").orElse("false").get())
+    environment("SPACEGRAPH_OFFLINE", providers.gradleProperty("spacegraphOffline").orElse("false").get())
+    environment("SPACEGRAPH_LIVE", providers.gradleProperty("spacegraphLive").orElse("false").get())
+}
+
+tasks.register<Exec>("landscapeCheck") {
+    group = "verification"
+    description = "Check shared landscape selection, layout, and Shake contracts."
+    timeout.set(Duration.ofSeconds(180))
+    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "--test", "src/jvmTest/js/landscape.test.cjs")
+}
+
+tasks.register<Exec>("installSpacegraphDependencies") {
+    group = "forge"
+    workingDir("design/spacegraph7-port")
+    commandLine(providers.gradleProperty("browserNpm").orElse("npm").get(), "ci", "--ignore-scripts", "--no-audit", "--no-fund")
+    inputs.files("design/spacegraph7-port/package.json", "design/spacegraph7-port/package-lock.json")
+    outputs.dir("design/spacegraph7-port/node_modules")
+    timeout.set(Duration.ofSeconds(180))
+}
+tasks.register<Exec>("bundleSpacegraph") {
+    group = "forge"
+    dependsOn("installSpacegraphDependencies")
+    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "design/spacegraph7-port/node_modules/esbuild/bin/esbuild",
+        "src/commonMain/resources/web/narchy/spacegraph/SpatialWorkspace.mjs", "--bundle", "--format=iife", "--minify",
+        "--supported:template-literal=false", "--legal-comments=inline", "--outfile=src/commonMain/resources/web/spacegraph-shadow.js")
+    inputs.dir("src/commonMain/resources/web/narchy/spacegraph")
+    outputs.file("src/commonMain/resources/web/spacegraph-shadow.js")
+    timeout.set(Duration.ofSeconds(180))
+}
+tasks.matching { it.name.endsWith("ProcessResources") || it.name == "generateForgeAssets" }.configureEach {
+    mustRunAfter("bundleSpacegraph")
+}

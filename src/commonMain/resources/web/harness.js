@@ -17,6 +17,7 @@ const Harness = {
     return el;
   },
   message(value) { $("#status").textContent = value; },
+  connectionStatus(value) {const el=$("#connection");if(el.textContent!==value)el.textContent=value;el.title=value;},
   inspectionOnly(name=this.selected) {return (this.drafts.get(name)||this.board["lcnc/program/"+name]?.document)?.controls?.inspectionOnly===true;},
   programs() {
     return [...new Set([...Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document), ...[...this.drafts.keys()].map(n=>"lcnc/program/"+n)])].sort();
@@ -601,7 +602,7 @@ const Harness = {
   fit(all) {
     if (!all) {
       const target=this.parentTarget();if(!target)return;
-      if(target.node){this.focusElement(target.node.el,LandscapeNavigation.node(this.selected,target.handle.nodeId));this.viewNode=target.node;}
+      if(target.node){this.focusElement(target.node._childHost||target.node.el,LandscapeNavigation.node(this.selected,target.handle.nodeId));this.viewNode=target.node;}
       else {const box=this.positions.get("lcnc/program/"+this.selected);if(box)this.focus(box,LandscapeNavigation.program(this.selected));}
       return;
     }
@@ -692,25 +693,7 @@ const Harness = {
       this.inspect("lcnc/snapshot/head");
     }catch(e){this.message("Snapshot failed: "+e.message);}
   },
-  async layoutHints(document,parentId) {
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
-    try{
-      const pending=(document.nodes||[]).map(n=>[n,0]);let count=0;
-      while(pending.length){const [n,depth]=pending.pop();
-        if(++count>1500||depth>32)throw Error("Layout matching size budget exceeded");
-        for(const child of n.children||[])pending.push([child,depth+1]);
-      }
-      // Proximity ranks layout hints across the document, not just today's Shake reach.
-      // These proposals move boxes only; normal Shake keeps its own reach and effect rules.
-      const body=JSON.stringify({program:document,options:{parentId,reach:Number.MAX_SAFE_INTEGER}});
-      if(new TextEncoder().encode(body).length>1048576)throw Error("Layout request payload limit exceeded");
-      const response=await fetch("/api/lcnc/treeshake",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body});
-      const result=JSON.parse(await Landscape.readText(response,2097152));
-      if(!response.ok||!result.ok)throw Error(result.detail||result.error||response.status);
-      if(parentId!=null&&result.parentId!==parentId)throw Error("Server did not confirm the selected parent");
-      return result.made||[];
-    }finally{clearTimeout(timer);}
-  },
+  async layoutHints(document,parentId) {return PatchLayout.hints(document,parentId);},
   async shake(options) { return requestTreeShake(this,options,this.selected); },
   showConnections(program,result,summary) {
     this.connectionReport={program,result};
@@ -771,7 +754,7 @@ const Harness = {
   reconnect(reason="Reconnecting") {
     this.live=false;Landscape.refreshActivity();
     this.stream?.close();this.connectionGeneration++;
-    $("#connection").textContent=reason;$("#connection").classList.remove("live");
+    this.connectionStatus(reason);$("#connection").classList.remove("live");
     clearTimeout(this.reconnectTimer);this.reconnectTimer=setTimeout(()=>this.connect(),500);
   },
   async connect() {
@@ -780,7 +763,7 @@ const Harness = {
     const generation=++this.connectionGeneration,initial=!this.ready;
     const bookmark=initial?LandscapeNavigation.decode(location.hash):null;
     let buffer=[],hydrating=true,chain=Promise.resolve();
-    $("#connection").textContent="Syncing";
+    this.connectionStatus("Syncing");
     try {
       const response=await fetch("/blackboard/board");if(!response.ok)throw Error("Snapshot "+response.status);
       const snapshot=await response.json();if(generation!==this.connectionGeneration)return;
@@ -819,7 +802,7 @@ const Harness = {
       if(bookmark){this.restoreCamera(bookmark.camera);this.focusKey=bookmark.focus;applyView();redraw();}
       else if(initial&&this.surface==="graal")this.focus(Landscape.objectBox,LandscapeNavigation.object(""));
       else if(initial&&!requested)this.fit(this.surface!=="panels");
-      $("#connection").textContent="Live";$("#connection").classList.add("live");
+      this.connectionStatus("Live");$("#connection").classList.add("live");
       this.live=true;Landscape.refreshActivity();
     }catch(e){if(generation===this.connectionGeneration){this.message("Blackboard unavailable: "+e.message);this.reconnect();}}
   },

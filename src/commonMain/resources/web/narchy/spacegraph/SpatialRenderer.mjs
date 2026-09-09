@@ -7,6 +7,10 @@ export class SpatialRenderer {
     this.canvas = document.createElement('canvas'); this.canvas.setAttribute('aria-label', 'LCNC extruded scene');
     this.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
     this.context = this.canvas.getContext('2d');
+    this.textCache = new Map();
+    this.fontsChanged = () => {this.textCache.clear();this.svgSource=null;this.render();};
+    document.fonts?.addEventListener('loadingdone',this.fontsChanged);
+    this.fonts = getComputedStyle(host);
     this.pointers = new Map();
     const pinch = () => {const [a,b]=[...this.pointers.values()];return b?{x:(a[0]+b[0])/2,y:(a[1]+b[1])/2,d:Math.hypot(b[0]-a[0],b[1]-a[1])}:null;};
     this.handlers = {
@@ -52,15 +56,19 @@ export class SpatialRenderer {
     this.hasCamera=true;this.render();return this.packet;
   }
   cameraValue() { return this.hasCamera?this.engine.camera():null; }
-  changed() { this.render(); this.callbacks.viewChanged(); }
+  changed() { if(!this.renderRequest)this.renderRequest=requestAnimationFrame(()=>{this.renderRequest=0;this.render();});this.callbacks.viewChanged(); }
   fit() { this.engine.fit(); this.changed(); }
   zoom(factor) { this.engine.zoom(factor,this.host.clientWidth/2,this.host.clientHeight/2); this.changed(); }
-  focus(id) { this.engine.focus(id); this.changed(); }
+  focus(id) {
+    if(this.width!==this.host.clientWidth||this.height!==this.host.clientHeight)this.resize();
+    this.engine.focus(id); this.changed();
+  }
   highlight(id) { this.engine.select(id); this.render(); }
   setBackend(backend) {
     if (!['gl','canvas','svg'].includes(backend)) throw new Error(`Unknown provider ${backend}`);
     if (backend==='gl' && !this.gl) this.openGL();
     this.backend=backend; this.output.replaceChildren();
+    this.svgSource=null;
     if (backend==='gl') this.output.append(this.glCanvas,this.canvas);
     else if (backend==='canvas') this.output.append(this.canvas);
     this.resize();
@@ -80,6 +88,7 @@ export class SpatialRenderer {
     } catch(error) { gl.deleteProgram(program); throw error; }
     finally { shaders.forEach(s=>gl.deleteShader(s)); }
     this.gl=gl; this.glCanvas=canvas; this.program=program; this.buffer=gl.createBuffer();
+    this.bufferCapacity=0;this.uploadedVertices=null;
     gl.useProgram(program); gl.bindBuffer(gl.ARRAY_BUFFER,this.buffer);
     const position=gl.getAttribLocation(program,'point'),color=gl.getAttribLocation(program,'color');
     gl.enableVertexAttribArray(position);gl.vertexAttribPointer(position,2,gl.FLOAT,false,24,0);
@@ -90,22 +99,50 @@ export class SpatialRenderer {
   }
   resize() {
     this.width=Math.max(1,this.host.clientWidth); this.height=Math.max(1,this.host.clientHeight);
-    this.ratio=Math.min(devicePixelRatio||1,2); this.engine.resize(this.width,this.height);
-    for(const canvas of [this.canvas,this.glCanvas]) if(canvas) {canvas.width=Math.round(this.width*this.ratio);canvas.height=Math.round(this.height*this.ratio);}
+    this.ratio=devicePixelRatio||1; this.engine.resize(this.width,this.height);
+    for(const canvas of [this.canvas,this.glCanvas]) if(canvas) {
+      const w=Math.round(this.width*this.ratio),h=Math.round(this.height*this.ratio);
+      if(canvas.width!==w)canvas.width=w;if(canvas.height!==h)canvas.height=h;
+    }
     this.render();
+  }
+  font(family) {return family==='monospace'?(this.fonts.getPropertyValue('--mono').trim()||family):family==='sans-serif'?(this.fonts.getPropertyValue('--sans').trim()||family):family;}
+  text(text,size,family,weight,maxWidth) {
+    const font=`${weight||400} ${size}px ${this.font(family)}`,c=this.context;
+    c.font=font;c.fontKerning='normal';c.letterSpacing='0px';
+    const key=JSON.stringify([font,maxWidth,text]);
+    if(this.textCache.has(key))return this.textCache.get(key);
+    let shown=text;
+    if(maxWidth!=null&&c.measureText(text).width>maxWidth){
+      const chars=Array.from(text),ellipsis='\u2026';let low=0,high=chars.length;
+      while(low<high){const mid=Math.ceil((low+high)/2);if(c.measureText(chars.slice(0,mid).join('')+ellipsis).width<=maxWidth)low=mid;else high=mid-1;}
+      shown=c.measureText(ellipsis).width<=maxWidth?chars.slice(0,low).join('')+ellipsis:'';
+    }
+    if(this.textCache.size>=2048)this.textCache.clear();
+    this.textCache.set(key,shown);return shown;
   }
   render() {
     if (!this.hasCamera) return;
     if (this.backend==='svg') {
-      const doc=new DOMParser().parseFromString(this.engine.svg(),'image/svg+xml');
+      const source=this.engine.svg();if(this.svgSource===source)return;this.svgSource=source;
+      const doc=new DOMParser().parseFromString(source,'image/svg+xml');
       if(doc.querySelector('parsererror'))throw new Error('Invalid common SVG projection');
+      for(const label of doc.querySelectorAll('text')){
+        const family=label.getAttribute('font-family'),width=label.getAttribute('data-max-width');
+        label.textContent=this.text(label.textContent,+label.getAttribute('font-size'),family,+label.getAttribute('font-weight')||400,width?+width:null);
+        label.setAttribute('font-family',this.font(family));label.style.letterSpacing='0px';label.style.fontKerning='normal';
+      }
       this.output.replaceChildren(document.importNode(doc.documentElement,true)); return;
     }
     const data=this.engine.frame(this.backend==='gl'),c=this.context;
     c.setTransform(this.ratio,0,0,this.ratio,0,0);c.clearRect(0,0,this.width,this.height);
     if(this.backend==='gl') {
-      const gl=this.gl;gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight);gl.clearColor(235/255,239/255,240/255,1);gl.clear(gl.COLOR_BUFFER_BIT);
-      gl.bufferData(gl.ARRAY_BUFFER,data.vertices,gl.DYNAMIC_DRAW);gl.drawArrays(gl.TRIANGLES,0,data.vertices.length/6);
+      const gl=this.gl;gl.viewport(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight);gl.clearColor(16/255,20/255,27/255,1);gl.clear(gl.COLOR_BUFFER_BIT);
+      if(this.uploadedVertices!==data.vertices){
+        if(!this.bufferCapacity||this.bufferCapacity<data.vertices.byteLength){this.bufferCapacity=Math.max(4096,data.vertices.byteLength*2);gl.bufferData(gl.ARRAY_BUFFER,this.bufferCapacity,gl.DYNAMIC_DRAW);}
+        gl.bufferSubData(gl.ARRAY_BUFFER,0,data.vertices);this.uploadedVertices=data.vertices;
+      }
+      gl.drawArrays(gl.TRIANGLES,0,data.vertices.length/6);
       this.vertices=data.vertices.length/6;
     } else {c.fillStyle=data.background;c.fillRect(0,0,data.width,data.height);}
     for(const item of data.items) {
@@ -113,11 +150,11 @@ export class SpatialRenderer {
       if(item.type==='path'&&this.backend==='canvas') {
         c.beginPath();for(const [op,...args] of item.path){if(op==='M')c.moveTo(...args);else if(op==='L')c.lineTo(...args);else if(op==='Q')c.quadraticCurveTo(...args);else if(op==='C')c.bezierCurveTo(...args);else if(op==='Z')c.closePath();}
         if(item.fill){c.fillStyle=item.fill;c.fill();}if(item.stroke){c.strokeStyle=item.stroke;c.lineWidth=item.width;c.setLineDash(item.dash);c.lineDashOffset=item.dashOffset;c.stroke();}
-      } else if(item.type==='text') {c.font=`${item.size}px ${item.font}`;c.fillStyle=item.color;c.fillText(item.text,item.position[0],item.position[1],item.maxWidth||10000);}
+      } else if(item.type==='text') {const text=this.text(item.text,item.size,item.font,item.weight,item.maxWidth);c.fillStyle=item.color;c.fillText(text,item.position[0],item.position[1]);}
       c.restore();
     }
   }
-  destroy() {this.resizeObserver.disconnect();for(const [event,handler]of Object.entries(this.handlers))this.host.removeEventListener(event,handler);if(this.gl){this.gl.deleteBuffer(this.buffer);this.gl.deleteProgram(this.program);}this.output.remove();}
+  destroy() {cancelAnimationFrame(this.renderRequest);document.fonts?.removeEventListener('loadingdone',this.fontsChanged);this.textCache.clear();this.resizeObserver.disconnect();for(const [event,handler]of Object.entries(this.handlers))this.host.removeEventListener(event,handler);if(this.gl){this.gl.deleteBuffer(this.buffer);this.gl.deleteProgram(this.program);}this.output.remove();}
 }
 
 window.SpaceGraphRenderer=SpatialRenderer;

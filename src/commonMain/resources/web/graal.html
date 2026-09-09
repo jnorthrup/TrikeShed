@@ -1651,7 +1651,7 @@ async function toggleAot(){const p=$('aot');if(p.style.display==='flex')return h
   await loadAot();
   const s=aotState;
   $('aotBody').innerHTML='<table class="kv">'+Object.entries(s).map(([k,v])=>'<tr><td>'+esc(k)+'</td><td>'+esc(v)+'</td></tr>').join('')+'</table>'+
-    (s.exists?'<div style="margin-top:8px"><a href="/api/graal/aot/blob" style="color:var(--commit)">download opaque HotSpot archive</a> · <button onclick="captureAot()">capture into Couch/CAS</button></div>':'<div style="margin-top:8px;color:var(--dim)">AOT trains by default now: this run is recording; the archive lands on daemon exit and loads next boot (TRIKESHED_AOT_DEFAULT=0 disables)</div>')+
+    (s.exists?'<div style="margin-top:8px"><a href="/api/graal/aot/blob" style="color:var(--commit)">download opaque HotSpot archive</a> · <button onclick="captureAot()">capture into Couch/CAS</button></div>':'<div style="margin-top:8px;color:var(--dim)">'+(s.error?'AOT state unavailable':s.cacheOutput?'Recording configured; archive pending':s.cacheInput?'Configured archive unavailable':'AOT is not configured for this process')+'</div>')+
     '<div style="margin-top:8px;color:var(--dim)">The archive is opaque VM state. Decompilation uses its mated .class blobs through java.lang.classfile, never fake parsing of the .aot container.</div>';
   show('aot');}
 async function captureAot(){

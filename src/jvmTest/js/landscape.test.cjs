@@ -26,11 +26,12 @@ function fixture() {
   }
   const context = vm.createContext({
     document:{getElementById:element}, $:selector=>element(selector.slice(1)),
-    URL, URLSearchParams, AbortController, TextDecoder, TextEncoder, Uint8Array, setTimeout, clearTimeout,
-    PatchLayout:patchLayout, LandscapeNavigation:navigation,
+    URL, URLSearchParams, AbortController, TextDecoder, TextEncoder, Uint8Array, setTimeout, clearTimeout, performance,
+    PatchForces:require(path.join(web,"vendor/d3-force-3.0.0.js")), LandscapeNavigation:navigation,
     G:{nodes:[],wires:[]},
     fetch:async()=>{throw Error("unexpected fetch");},
   });
+  vm.runInContext(fs.readFileSync(path.join(web,"patch-layout.js"),"utf8"),context);
   vm.runInContext(fs.readFileSync(path.join(web,"landscape.js"),"utf8")+"\nglobalThis.landscape=Landscape;",context);
   const harness = fs.readFileSync(path.join(web,"harness.js"),"utf8").split("\nAUTOSAVE=false;")[0];
   vm.runInContext(harness+"\nglobalThis.harness=Harness;",context);
@@ -98,12 +99,12 @@ test("Fit, FD, Shake and drag resolve one stable parent handle",async()=>{
   assert.equal(harness.parentTarget().node,inner);
   for(const id of ["fitBtn","fdBtn","shakeBtn"])assert.match(element(id).title,/a \/ outer \/ inner/);
   let focused,saves=0,resized,request;
-  harness.focusElement=el=>{focused=el;};harness.fit(false);assert.equal(focused,inner.el);
+  harness.focusElement=el=>{focused=el;};harness.fit(false);assert.equal(focused,inner._childHost);
   context.resizeParentFrames=node=>{resized=node;};context.save=()=>{saves++;};context.requestAnimationFrame=fn=>fn();context.fitToContent=()=>harness.fit(false);
   vm.runInContext(patch.slice(patch.indexOf("async function fdLayout("),patch.indexOf("/* TREESHAKE")),context);
   harness.layoutHints=async()=>[];
   const untouched=[outer,inner,other].map(n=>[n.x,n.y]);
-  await context.fdLayout();assert.equal(resized,inner);assert.equal(focused,inner.el);assert.equal(saves,1);
+  await context.fdLayout();assert.equal(resized,inner);assert.equal(focused,inner._childHost);assert.equal(saves,1);
   assert.deepEqual([outer,inner,other].map(n=>[n.x,n.y]),untouched);
   harness.document=()=>({nodes:[{id:"outer",children:[{id:"inner",children:[{id:"leaf"}]}]}],wires:[{from:["other","value"],to:["leaf","x"]}]});
   context.fetch=async(url,options)=>{request=JSON.parse(options.body);return {ok:true,json:async()=>({ok:true,parentId:"inner"})};};

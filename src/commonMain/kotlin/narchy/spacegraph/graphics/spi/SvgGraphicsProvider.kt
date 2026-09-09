@@ -48,7 +48,7 @@ class SvgGraphicsProvider : GraphicsOperations {
                             if (item.dash.size > 0) append(" stroke-dasharray=\"${item.dash.view.joinToString(" ")}\" stroke-dashoffset=\"${item.dashOffset}\"")
                             append("/>")
                         }
-                        is DrawItem.Text -> append("<text x=\"${item.position.x}\" y=\"${item.position.y}\" fill=\"${item.color.css}\" font-size=\"${item.size}\" font-family=\"${escape(item.font)}\">${escape(item.text)}</text>")
+                        is DrawItem.Text -> append("<text x=\"${item.position.x}\" y=\"${item.position.y}\" fill=\"${item.color.css}\" font-size=\"${item.size}\" font-family=\"${escape(item.font)}\" font-weight=\"${item.weight}\" data-max-width=\"${item.maxWidth ?: ""}\">${escape(item.text)}</text>")
                         is DrawItem.Image -> {
                             val r = item.bounds
                             append("<image x=\"${r.x}\" y=\"${r.y}\" width=\"${r.width}\" height=\"${r.height}\" href=\"${escape(item.resource)}\" preserveAspectRatio=\"xMidYMid meet\"/>")

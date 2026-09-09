@@ -11,6 +11,9 @@ import narchy.spacegraph.graphics.spi.*
 @JsExport
 class BrowserSpatialEngine {
     private val view = SpatialView()
+    private var cachedFrame: FramePlan? = null
+    private var cachedData: dynamic = null
+    private var cachedSvg: String? = null
     fun project(name: String, document: String, geometry: String, spacing: Double, reset: Boolean): dynamic {
         val program = LcncProgramConfix.fromJson(name, document)
         val scene = LcncExtrusion.project(program, LcncExtrusion.measurements(JsonSupport.parse(geometry)), spacing)
@@ -20,8 +23,12 @@ class BrowserSpatialEngine {
     }
     fun resize(width: Int, height: Int) { view.viewport = Viewport(width.coerceAtLeast(1), height.coerceAtLeast(1)) }
     fun frame(gl: Boolean): dynamic {
-        val frame = view.frame(); val data = value(FrameJson.value(frame))
-        if (gl) {
+        val frame = view.frame()
+        if (cachedFrame !== frame) {
+            cachedFrame = frame; cachedData = value(FrameJson.value(frame)); cachedSvg = null
+        }
+        val data = cachedData
+        if (gl && data.vertices == null) {
             val vertices = FrameTriangles.vertices(frame)
             val count = vertices.size * 6
             val floats = js("new Float32Array(count)")
@@ -36,7 +43,10 @@ class BrowserSpatialEngine {
         }
         return data
     }
-    fun svg(): String = SvgGraphicsProvider.encode(view.frame()).a
+    fun svg(): String {
+        frame(false)
+        return cachedSvg ?: SvgGraphicsProvider.encode(cachedFrame!!).a.also { cachedSvg = it }
+    }
     fun camera(): dynamic = value(mapOf("position" to xyz(view.camera.position), "center" to xyz(view.camera.center),
         "zoom" to view.camera.zoom, "mode" to view.camera.mode.name, "near" to view.camera.near, "far" to view.camera.far, "fov" to view.camera.fieldOfView))
     fun pick(x: Double, y: Double): dynamic {

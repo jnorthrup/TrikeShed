@@ -5,7 +5,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,7 +31,7 @@ class ReteAdmissionTest {
     }
 
     @Test
-    fun admissionsRecordRealSupportAndRefractionDoesNotInventDuplicates() = runBlocking {
+    fun admissionsRecordRealSupportAndRefractionDoesNotInventDuplicates() = runTest {
         val net = network()
         net.tell("a")
         net.tell("a")
@@ -47,7 +47,7 @@ class ReteAdmissionTest {
     }
 
     @Test
-    fun boundedHistoryReportsEvictionAndSurvivesFactRetraction() = runBlocking {
+    fun boundedHistoryReportsEvictionAndSurvivesFactRetraction() = runTest {
         val net = network(2)
         net.tell("a"); net.tell("b"); net.tell("c")
         net.retract(FactId("probe", "b"))
@@ -59,7 +59,7 @@ class ReteAdmissionTest {
     }
 
     @Test
-    fun sinkSuccessAndFailureAreNotReportedAsCompletedActions() = runBlocking {
+    fun sinkSuccessAndFailureAreNotReportedAsCompletedActions() = runTest {
         val net = network()
         net.productionSink = { }
         net.tell("ok")
@@ -69,7 +69,7 @@ class ReteAdmissionTest {
     }
 
     @Test
-    fun zeroCapacityRetainsNoReceiptsAndNegativeCapacityIsRejected() = runBlocking {
+    fun zeroCapacityRetainsNoReceiptsAndNegativeCapacityIsRejected() = runTest {
         val net = network(0)
         net.tell("a")
         assertEquals(1L, net.admissionSnapshot().dropped)

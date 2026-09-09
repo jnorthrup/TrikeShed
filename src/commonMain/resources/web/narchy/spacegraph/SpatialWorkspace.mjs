@@ -3,9 +3,10 @@ import './SpatialRenderer.mjs';
 /* The LCNC document owns all effects; this workspace owns only presentation. */
 (() => {
   'use strict';
-  let open=false,backend='gl',response,request,timer,serial=0,selected=null,pendingPort=null;
+  let open=false,backend='svg',response,request,timer,serial=0,selected=null,pendingPort=null;
   let workspace,surface,inspector,tree,badge,renderer,provider,modeButton,editButton,tools,query,observer;
   let resetCamera=true,dirtyAlignment=true,heldParams=null,lastIdentity='',paletteWasOpen=false;
+  let fallback='',treeKey='',projectionKey='',providerState;
   const $=id=>document.getElementById(id);
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
   const node=id=>typeof G!=='undefined'?G.nodes.find(n=>n.id===id):null;
@@ -49,7 +50,9 @@ import './SpatialRenderer.mjs';
     paintInspector();paintTree();
   }
   function paintTree(){
-    if(!response)return;const filter=query.value.toLowerCase();tree.replaceChildren();
+    if(!response)return;const filter=query.value.toLowerCase();
+    const key=JSON.stringify([selected,filter,response.scene.nodes.map(n=>[n.id,n.title,n.type,n.level,n.color,n.ports.length])]);
+    if(key===treeKey)return;treeKey=key;tree.replaceChildren();
     for(const n of response.scene.nodes){
       if(filter&&!`${n.id} ${n.title} ${n.type}`.toLowerCase().includes(filter))continue;
       const b=el('button','sg-tree-node');b.setAttribute('aria-pressed',String(n.id===selected));b.title=n.id;b.dataset.nodeId=n.id;b.style.paddingLeft=`${12+Math.min(n.level,8)*12}px`;
@@ -85,14 +88,28 @@ import './SpatialRenderer.mjs';
   }
   function moveNode(id,dx,dy,commit=true){const n=node(id);if(!n)return;const scale=n.el.getBoundingClientRect().width/view.z/n.el.offsetWidth;n.x+=dx/scale;n.y+=dy/scale;n.el.style.left=`${n.x}px`;n.el.style.top=`${n.y}px`;if(n._parentScope)growRingWorldFor(n);redraw();if(commit)save();else schedule();}
   function report(error){badge.textContent=error.message||String(error);badge.dataset.error='true';}
-  function useProvider(value){try{renderer.setBackend(value);backend=value;provider.value=value;schedule();}catch(error){backend='canvas';provider.value='canvas';renderer.setBackend('canvas');report(`GL unavailable: ${error.message}`);schedule();}}
+  function providerStatus(){
+    providerState.textContent=backend.toUpperCase();providerState.dataset.fallback=String(!!fallback);
+    providerState.title=fallback||`Active renderer: ${backend.toUpperCase()}`;
+    provider.value=backend;
+    if(response){const scene=response.scene;badge.textContent=`${backend.toUpperCase()} · ${scene.nodes.length} nodes · ${scene.cables.length} cables${scene.issues.length?` · ${scene.issues.length} unprojected`:''}${fallback?' · '+fallback:''}`;badge.dataset.error=String(!!fallback);}
+  }
+  function useProvider(value,persist=true){
+    if(persist)try{localStorage.setItem('spacegraph.renderer',value);}catch{}
+    try{renderer.setBackend(value);backend=value;fallback='';}
+    catch(error){backend='canvas';renderer.setBackend('canvas');fallback=`${value.toUpperCase()} unavailable: ${error.message}`;}
+    providerStatus();
+  }
   function refresh(){
     if(!open||typeof serialize!=='function'||!renderer)return;
     try{
       const identity=G.nodes.map(n=>n.id).join('|'),document=serialize(),name=$('panelName').value||'canvas';
-      const scene=renderer.project(name,document,measurements(),0,resetCamera||lastIdentity!==identity);
+      const geometry=measurements(),key=JSON.stringify([name,document,geometry]);
+      if(key===projectionKey&&!resetCamera&&!dirtyAlignment){providerStatus();return;}
+      const scene=key===projectionKey&&!resetCamera?response.scene:renderer.project(name,document,geometry,0,resetCamera||lastIdentity!==identity);
+      projectionKey=key;
       response={scene,alignment:lastIdentity===identity?response?.alignment:null};lastIdentity=identity;resetCamera=false;
-      badge.textContent=`${backend.toUpperCase()} · ${scene.nodes.length} nodes · ${scene.cables.length} cables${scene.issues.length?` · ${scene.issues.length} unprojected`:''}`;delete badge.dataset.error;
+      providerStatus();
       if(!inspector.contains(window.document.activeElement))paintInspector();paintTree();
       if(dirtyAlignment){
         dirtyAlignment=false;request?.abort();const active=new AbortController(),current=++serial;request=active;
@@ -112,16 +129,19 @@ import './SpatialRenderer.mjs';
     const spatial=el('div','sg-spatial-tools');spatial.dataset.spatial='';provider=el('select');provider.setAttribute('aria-label','Rendering provider');for(const value of ['gl','canvas','svg']){const o=el('option','',value.toUpperCase());o.value=value;provider.append(o);}provider.onchange=()=>useProvider(provider.value);
     const fit=command('Frame scene','search',()=>{resetCamera=true;schedule();});fit.id='sg-fit';
     const move=command('Move nodes','pencil',()=>{const on=renderer.mode!=='move';renderer.mode=on?'move':'pan';move.setAttribute('aria-pressed',String(on));});move.id='sg-move';move.setAttribute('aria-pressed','false');
-    spatial.append(provider,fit,move,command('Zoom in','plus',()=>renderer.zoom(1.3)),command('Zoom out','search',()=>renderer.zoom(1/1.3)));tools.append(spatial);
+    providerState=el('span','sg-provider','SVG');providerState.setAttribute('role','status');providerState.setAttribute('aria-label','Active renderer');
+    spatial.append(providerState,provider,fit,move,command('Zoom in','plus',()=>renderer.zoom(1.3)),command('Zoom out','minus',()=>renderer.zoom(1/1.3)));tools.append(spatial);
     workspace=el('main','sg-workspace');workspace.id='spacegraph-shadow';workspace.hidden=true;
     const navigator=el('nav','sg-navigator');navigator.setAttribute('aria-label','Scene nodes');const nh=el('header');nh.append(el('strong','','Nodes'));navigator.append(nh);
     query=el('input');query.type='search';query.placeholder='Find a node';query.setAttribute('aria-label','Find a node');query.oninput=paintTree;navigator.append(query);tree=el('div','sg-tree');navigator.append(tree);
     surface=el('div','sg-surface');surface.id='sg-surface';surface.setAttribute('aria-label','Spatial canvas');surface.tabIndex=0;
     inspector=el('aside','sg-inspector');inspector.setAttribute('aria-label','Node inspector');workspace.append(navigator,surface,inspector);document.body.append(workspace);
-    badge=el('div','sg-badge','Preparing scene');badge.setAttribute('role','status');workspace.append(badge);
+    badge=el('div','sg-badge','Preparing scene');badge.setAttribute('role','status');surface.append(badge);
     spatial.append(command('Node inspector','panels-top-left',()=>{if(matchMedia('(max-width:650px)').matches)document.body.classList.toggle('sg-inspecting');else document.body.classList.toggle('sg-inspector-hidden');}));
     if(typeof SpaceGraphRenderer==='undefined'){report('Spatial renderer asset unavailable');activate(false);return;}
-    try {renderer=new SpaceGraphRenderer(surface,{select,moveNode,viewChanged:()=>{},unavailable:message=>{useProvider('canvas');report(message);}});useProvider('gl');}
+    try {renderer=new SpaceGraphRenderer(surface,{select,moveNode,viewChanged:()=>{},unavailable:message=>{useProvider('canvas',false);fallback=message;providerStatus();}});
+      let preferred='svg';try{const value=localStorage.getItem('spacegraph.renderer');if(['gl','canvas','svg'].includes(value))preferred=value;}catch{}
+      useProvider(preferred,false);}
     catch(error){report(error);activate(false);return;}
     new ResizeObserver(()=>schedule()).observe(surface);
     observer=new MutationObserver(records=>{if(records.some(r=>{
@@ -131,7 +151,7 @@ import './SpatialRenderer.mjs';
     }))schedule();});
     observer.observe($('world'),{attributes:true,attributeFilter:['class','style'],childList:true,subtree:true,characterData:true});
     $('fitBtn').addEventListener('click',()=>{if(open){resetCamera=true;schedule();}});
-    window.SpaceGraphWorkspace={select,activate,refresh:()=>schedule(true),measurements,get scene(){return response?.scene;},get renderer(){return renderer;},get backend(){return backend;}};
+    window.SpaceGraphWorkspace={select,activate,refresh:()=>schedule(true),measurements,get selected(){return selected;},get scene(){return response?.scene;},get renderer(){return renderer;},get backend(){return backend;}};
     icons();activate(new URLSearchParams(location.search).get('spacegraph')==='1');
   });
   addEventListener('lcnc:shadow-update',()=>schedule(true));

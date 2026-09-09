@@ -23,7 +23,7 @@ object FrameJson {
                         PathPart.Close -> listOf("Z")
                     } }))
                 is DrawItem.Text -> common.putAll(mapOf("type" to "text", "text" to item.text, "position" to point(item.position),
-                    "color" to item.color.css, "size" to item.size, "font" to item.font, "maxWidth" to item.maxWidth))
+                    "color" to item.color.css, "size" to item.size, "font" to item.font, "weight" to item.weight, "maxWidth" to item.maxWidth))
                 is DrawItem.Image -> common.putAll(mapOf("type" to "image", "resource" to item.resource, "bounds" to rect(item.bounds)))
                 is DrawItem.Content -> common.putAll(mapOf("type" to "content", "kind" to item.kind, "content" to item.content,
                     "bounds" to rect(item.bounds), "capability" to item.requiredCapability.name))

@@ -41,6 +41,22 @@ data class ExtrudedNode(
 }
 data class ExtrudedCable(val id: String, val from: ExtrudedPort, val to: ExtrudedPort, val points: Series<Vec3>)
 data class ExtrudedScene(val nodes: Series<ExtrudedNode>, val cables: Series<ExtrudedCable>, val issues: Series<String>) {
+    private val byId = nodes.view.associateBy { it.id }
+    fun screenBounds(node: ExtrudedNode, camera: GraphCamera, viewport: Viewport): Rect {
+        val a = camera.project(node.position + Vec3(-node.size.x / 2, node.size.y / 2), viewport)!!
+        val b = camera.project(node.position + Vec3(node.size.x / 2, -node.size.y / 2), viewport)!!
+        return Rect(min(a.x, b.x), min(a.y, b.y), abs(b.x - a.x), abs(b.y - a.y))
+    }
+    fun clip(node: ExtrudedNode, camera: GraphCamera, viewport: Viewport): Rect {
+        var clip = viewport.bounds
+        var parent = node.parent
+        while (parent != null) {
+            val ancestor = byId[parent] ?: break
+            clip = clip.intersection(screenBounds(ancestor, camera, viewport)) ?: return Rect(0.0, 0.0, 0.0, 0.0)
+            parent = ancestor.parent
+        }
+        return clip
+    }
     private val children = nodes.view.groupBy { it.parent }.mapValues { it.value.toSeries() }
     val branches: MetaSeries<String?, Series<ExtrudedNode>> = null j { parent: String? -> children[parent] ?: emptySeriesOf() }
     fun subtree(id: String): Series<ExtrudedNode> {

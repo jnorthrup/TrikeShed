@@ -916,60 +916,7 @@ function toggleNodeCollapsed(n,button){
   button.title=n.collapsed?"Expand node":"Collapse node (keep contents)";
   applyNodeFrame(n);resizeParentFrames(n._parentScope);redraw();save();
 }
-function layoutRing(n,preserve=false){
-  const kids=(n.children||[]).filter(c=>c.el);
-  const rings=kids.filter(c=>c.children&&c.children.length);
-  for(const r of rings) layoutRing(r,preserve);     // inward first — post-order
-  // Moving into a scaled host must not change shrink-to-fit widths mid-layout.
-  if(typeof Harness!=="undefined")for(const c of kids)c.el.style.width=(c.el.offsetWidth||210)+"px";
-  if(preserve&&n._ringWorld){
-    for(const c of kids){c.el.classList.add("inring");c.el.style.position="absolute";c.el.style.left=c.x+"px";c.el.style.top=c.y+"px";n._ringWorld.appendChild(c.el);}
-    resizeParentFrames(n,false);
-    return {w:parseFloat(n._ringWorld.style.width),h:parseFloat(n._ringWorld.style.height)};
-  }
-  const sizes=new Map(kids.map(c=>[c,{w:c.el.offsetWidth||210,h:c.el.offsetHeight||96}]));
-  const ins=kids.filter(c=>c.type==="scope.in");
-  const outs=kids.filter(c=>c.type==="scope.out");
-  const mids=kids.filter(c=>!ins.includes(c)&&!outs.includes(c)&&!rings.includes(c));
-  const sz=c=>sizes.get(c);
-  const stackH=a=>a.length?a.reduce((s,c)=>s+sz(c).h,0)+(a.length-1)*RING_GAP:0;
-  const rowW=a=>a.length?a.reduce((s,c)=>s+sz(c).w,0)+(a.length-1)*RING_GAP:0;
-  const rowH=a=>a.length?Math.max(...a.map(c=>sz(c).h)):0;
-  const colW=a=>a.length?Math.max(...a.map(c=>sz(c).w)):0;
-  const top=mids.filter((_,i)=>i%2===0), bot=mids.filter((_,i)=>i%2===1);
-  const centerW=Math.max(rowW(rings),rowW(top),rowW(bot),140);
-  const centerH=Math.max(rowH(rings),stackH(ins),stackH(outs),60);
-  const W=colW(ins)+centerW+colW(outs)+4*RING_EDGE;
-  const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
-  const host=n._childHost;
-  const rw=n._ringWorld||host;
-  if(n._ringWorld){
-    rw.style.width=W+"px"; rw.style.height=H+"px";
-    if(typeof Harness!=="undefined")n._view={x:0,y:0,z:Math.min(1,560/W,360/H)};
-    // applyRingView sizes the frame from the world × this ring's zoom, so the
-    // floor is never re-set to the unscaled W/H behind a zoomed interior.
-    applyRingView(n);
-    applyNodeFrame(n);
-  } else {
-    host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
-  }
-  // the shared center sits mid-CENTER-BAND (between the in and out edges),
-  // so asymmetric edge columns never squeeze the inner shells into them
-  const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
-  const place=(c,x,y)=>{ c.x=x; c.y=y; c.el.classList.add("inring"); c.el.style.position="absolute";
-    c.el.style.left=x+"px"; c.el.style.top=y+"px"; rw.appendChild(c.el); };
-  let y=cy-stackH(ins)/2;
-  for(const c of ins){ place(c,RING_EDGE,y); y+=sz(c).h+RING_GAP; }
-  y=cy-stackH(outs)/2;
-  for(const c of outs){ place(c,W-RING_EDGE-sz(c).w,y); y+=sz(c).h+RING_GAP; }
-  let x=cx-rowW(top)/2;
-  for(const c of top){ place(c,x,RING_EDGE); x+=sz(c).w+RING_GAP; }
-  x=cx-rowW(bot)/2;
-  for(const c of bot){ place(c,x,H-RING_EDGE-sz(c).h); x+=sz(c).w+RING_GAP; }
-  x=cx-rowW(rings)/2;                               // the innermost shell
-  for(const c of rings){ place(c,x,cy-sz(c).h/2); x+=sz(c).w+RING_GAP; }
-  return {w:W,h:H};
-}
+function layoutRing(n,preserve=false){return PatchLayout.ringLayout(n,{preserve,resize:resizeParentFrames,frame:applyNodeFrame});}
 /* per-ring camera: each ring window carries its own {x,y,z} — the fractal
    physics. Outer scales compound, so pointer math divides by the product. */
 function ringScaleOf(m){ let s=1,q=m._parentScope; while(q){ s*=((q._view&&q._view.z)||1); q=q._parentScope; } return s; }
@@ -981,7 +928,7 @@ function resizeParentFrames(parent,ancestors=true){
     const w=Math.max(1,...children.map(c=>c.x+(c.el?.offsetWidth||200)+RING_EDGE));
     const h=Math.max(1,...children.map(c=>c.y+(c.el?.offsetHeight||100)+RING_EDGE));
     n._ringWorld.style.width=w+"px";n._ringWorld.style.height=h+"px";
-    n._view={x:0,y:0,z:Math.min(1,560/w,360/h)};applyRingView(n);
+    n._view=PatchLayout.ringView(w,h);applyRingView(n);
     applyNodeFrame(n);
   }
 }
@@ -1757,65 +1704,7 @@ function redraw(){
 let dragWire=null;
 /* One bounded settlement of the selected parent's direct children. Matching
    proposes gravity links; only Shake or an explicit connection installs wires. */
-async function fdLayout(){
-  if(fdLayout.busy)return;
-  const target=typeof Harness!=="undefined"?Harness.parentTarget():null;
-  if(typeof Harness!=="undefined"&&!target)return;
-  const nodes=(target?target.nodes:G.nodes.filter(n=>!n._parentScope)).filter(n=>n.el);
-  const origin=target?.origin||{x:0,y:0},parent=target?.node||null;
-  const revision=typeof Harness!=="undefined"?Harness.parentRevision:0;
-  if(nodes.length<2){ $("#status").textContent="fd: nothing to place"; return; }
-  const name=target?.handle.program,document=target?Harness.document():null,snapshot=JSON.stringify(document);
-  const boxes=nodes.map(n=>({id:n.id,x:n.x-origin.x,y:n.y-origin.y,w:n.el.offsetWidth||220,h:n.el.offsetHeight||120}));
-  const current=()=>nodes.every((n,i)=>G.nodes.includes(n)&&(n.el.offsetWidth||220)===boxes[i].w&&(n.el.offsetHeight||120)===boxes[i].h)&&
-    (!target||(Harness.selected===name&&Harness.parentRevision===revision&&JSON.stringify(Harness.document())===snapshot));
-  fdLayout.busy=true;$("#fdBtn").disabled=true;$("#status").textContent="Checking nearby patches";
-  try{
-    if(nodes.length>PatchLayout.limits.nodes)throw Error("Layout size budget exceeded; select a smaller scope");
-    let hints=[],warning="";
-    if(target)try{hints=await Harness.layoutHints(document,target.handle.nodeId);}
-    catch(e){warning="; existing cables only: "+e.message;}
-    if(!current())throw Error("Layout discarded: document or selected parent changed");
-    const byId=new Map(G.nodes.map(n=>[n.id,n])),selected=new Map(nodes.map(n=>[n.id,n]));
-    const topOf=id=>{let n=byId.get(id);while(n&&n._parentScope&&n._parentScope!==parent)n=n._parentScope;return n;};
-    const edges=[],seen=new Set();
-    // DOM coordinates are divided by the full enclosing scale, including ring zoom.
-    const pin=(id,dir,port,top)=>{
-      const n=byId.get(id);if(n!==top)return null;
-      const el=[...n.el.querySelectorAll?.(".port")||[]].find(p=>p.dataset.dir===dir&&p.dataset.port===port&&p.closest(".node")===n.el);
-      if(!el)return null;
-      const a=el.getBoundingClientRect(),b=n.el.getBoundingClientRect(),scale=view.z*ringScaleOf(n);
-      return {x:(a.left+a.width/2-b.left)/scale-(n.el.offsetWidth||220)/2,y:(a.top+a.height/2-b.top)/scale-(n.el.offsetHeight||120)/2};
-    };
-    const add=(from,to,hint)=>{
-      const a=topOf(from[0]),b=topOf(to[0]);if(!a||!b||a===b||!selected.has(a.id)||!selected.has(b.id))return;
-      const key=JSON.stringify([from,to]);if(seen.has(key))return;seen.add(key);
-      edges.push({from:a.id,to:b.id,out:pin(from[0],"out",from[1],a),in:pin(to[0],"in",to[1],b),hint});
-    };
-    for(const w of G.wires)add(w.from,w.to,false);
-    for(const h of hints)add([name+"::"+h.fromNode,h.fromPort],[name+"::"+h.toNode,h.toPort],true);
-    $("#status").textContent="Settling nearby patches";
-    const result=await PatchLayout.layout(boxes,edges,{valid:current});
-    if(!current())throw Error("Layout discarded: document or selected parent changed");
-    if(target&&!parent){
-      const left=Math.min(...result.positions.map(p=>p.x)),top=Math.min(...result.positions.map(p=>p.y));
-      const box={x:origin.x+left-24,y:origin.y+top-64,
-        w:Math.max(...result.positions.map((p,i)=>p.x+boxes[i].w))-left+48,
-        h:Math.max(...result.positions.map((p,i)=>p.y+boxes[i].h))-top+88};
-      const obstacles=[];
-      for(const [other,anchor] of Harness.mounts){if(other===name)continue;const b=Harness.bounds(other);
-        obstacles.push({x:anchor.x+b.left-24,y:anchor.y+b.top-64,w:b.w+48,h:b.h+88});}
-      const position=PatchLayout.placement(box,obstacles);
-      origin.x+=position.x-box.x;origin.y+=position.y-box.y;
-    }
-    for(const p of result.positions){const n=selected.get(p.id);n.x=origin.x+p.x;n.y=origin.y+p.y;n.el.style.left=n.x+"px";n.el.style.top=n.y+"px";}
-    if(parent)resizeParentFrames(parent);
-    redraw();save();
-    requestAnimationFrame(()=>{redraw();if(typeof Harness==="undefined"||Harness.selected===name&&Harness.parentRevision===revision)fitToContent();});
-    $("#status").textContent="fd: "+nodes.length+" boxes, "+result.segments+" segments, "+result.hints+" candidate pulls; cables unchanged"+warning;
-  }catch(e){$("#status").textContent=e.message;}
-  finally{fdLayout.busy=false;$("#fdBtn").disabled=false;}
-}
+async function fdLayout(){return PatchLayout.settle(typeof Harness!=="undefined"?Harness:null);}
 /* TREESHAKE requests and verdicts are shared in patch-shake.js. */
 /**
  * Resolve a live picklist: "<runner>#<path>" — run the node through the ordinary

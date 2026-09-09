@@ -48,7 +48,7 @@ sealed interface DrawItem {
     data class Text(
         override val entityId: String, val text: String, val position: Vec3,
         val color: Rgba = Rgba.BLACK, val size: Double = 14.0, val font: String = "sans-serif",
-        val maxWidth: Double? = null, override val clip: Rect? = null,
+        val maxWidth: Double? = null, override val clip: Rect? = null, val weight: Int = 400,
     ) : DrawItem
     data class Image(
         override val entityId: String, val resource: String, val bounds: Rect, override val clip: Rect? = null,

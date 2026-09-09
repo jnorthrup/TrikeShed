@@ -2277,12 +2277,16 @@ object OroborosDaemon {
             }
         }
 
-        // Initial two-plane reconcile. File reads and CAS writes stay off the
-        // reactor thread. Three independent runCatching blocks ensure a failure
-        // in one plane (e.g. memory bridge) does not prevent another (build
-        // plane) from completing — specifically, classpath.tsv must always be
-        // written so --boot-forge hydration works.
+        // Publish the build plane before repository scans or belief admission can delay it.
+        // These are attachment bytes; the running JVM may use the AOT JAR classpath.
         withContext(Dispatchers.IO) {
+            runCatching {
+                val buildPaths = reconcileBuildPlane(buildPlanes, gitState.headSha())
+                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
+            }.onFailure {
+                System.err.println("[OROBOROS] build plane reconcile failed: ${it.message}")
+                it.printStackTrace()
+            }
             // ── Foundation: git + worktree reconcile ──
             val reconcileResult = runCatching {
                 val headSha = gitState.headSha()
@@ -2375,10 +2379,8 @@ object OroborosDaemon {
                 it.printStackTrace()
             }
 
-            // ── Build plane reconcile + hermes home (must always run — writes classpath.tsv) ──
+            // ── Hermes home reconcile ──
             runCatching {
-                val buildPaths = reconcileBuildPlane(buildPlanes, headSha)
-                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
                 if (hermesHomeDir.isDirectory) {
                     val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, System.currentTimeMillis())
                     System.err.println("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")
@@ -2386,7 +2388,7 @@ object OroborosDaemon {
                     System.err.println("[OROBOROS] Hermes home skipped: $hermesHomeDir not found")
                 }
             }.onFailure {
-                System.err.println("[OROBOROS] build plane reconcile failed: ${it.message}")
+                System.err.println("[OROBOROS] Hermes home reconcile failed: ${it.message}")
                 it.printStackTrace()
             }
         }

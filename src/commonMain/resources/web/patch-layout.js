@@ -158,5 +158,143 @@
     return {positions:nodes.map(n=>({id:n.id,x:n.x,y:n.y})),segments:packed.length,links:links.length,
       hints:links.filter(l=>l.hint).length,steps,ticks,elapsedMs:now()-start};
   }
-  return {layout,placement,limits};
+  async function hints(document,parentId) {
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+    try{
+      const pending=(document.nodes||[]).map(n=>[n,0]);let count=0;
+      while(pending.length){const [n,depth]=pending.pop();
+        if(++count>1500||depth>32)throw Error("Layout matching size budget exceeded");
+        for(const child of n.children||[])pending.push([child,depth+1]);
+      }
+      // Proximity ranks layout hints across the document, not just today's Shake reach.
+      // These proposals move boxes only; normal Shake keeps its own reach and effect rules.
+      const body=JSON.stringify({program:document,options:{parentId,reach:Number.MAX_SAFE_INTEGER}});
+      if(new TextEncoder().encode(body).length>1048576)throw Error("Layout request payload limit exceeded");
+      const response=await fetch("/api/lcnc/treeshake",{method:"POST",signal:controller.signal,headers:{"Content-Type":"application/json"},body});
+      const result=JSON.parse(await Landscape.readText(response,2097152));
+      if(!response.ok||!result.ok)throw Error(result.detail||result.error||response.status);
+      if(parentId!=null&&result.parentId!==parentId)throw Error("Server did not confirm the selected parent");
+      return result.made||[];
+    }finally{clearTimeout(timer);}
+  }
+
+async function settle(owner){
+  if(settle.busy)return;
+  const target=owner!=null?owner.parentTarget():null;
+  if(owner!=null&&!target)return;
+  const nodes=(target?target.nodes:G.nodes.filter(n=>!n._parentScope)).filter(n=>n.el);
+  const origin=target?.origin||{x:0,y:0},parent=target?.node||null;
+  const revision=owner!=null?owner.parentRevision:0;
+  if(nodes.length<2){ $("#status").textContent="fd: nothing to place"; return; }
+  const name=target?.handle.program,document=target?owner.document():null,snapshot=JSON.stringify(document);
+  const boxes=nodes.map(n=>({id:n.id,x:n.x-origin.x,y:n.y-origin.y,w:n.el.offsetWidth||220,h:n.el.offsetHeight||120}));
+  const current=()=>nodes.every((n,i)=>G.nodes.includes(n)&&(n.el.offsetWidth||220)===boxes[i].w&&(n.el.offsetHeight||120)===boxes[i].h)&&
+    (!target||(owner.selected===name&&owner.parentRevision===revision&&owner.parentTarget()?.handle.nodeId===target.handle.nodeId&&JSON.stringify(owner.document())===snapshot));
+  settle.busy=true;$("#fdBtn").disabled=true;$("#status").textContent="Checking nearby patches";
+  try{
+    if(nodes.length>PatchLayout.limits.nodes)throw Error("Layout size budget exceeded; select a smaller scope");
+    let hints=[],warning="";
+    if(target)try{hints=await owner.layoutHints(document,target.handle.nodeId);}
+    catch(e){warning="; existing cables only: "+e.message;}
+    if(!current())throw Error("Layout discarded: document or selected parent changed");
+    const byId=new Map(G.nodes.map(n=>[n.id,n])),selected=new Map(nodes.map(n=>[n.id,n]));
+    const topOf=id=>{let n=byId.get(id);while(n&&n._parentScope&&n._parentScope!==parent)n=n._parentScope;return n;};
+    const edges=[],seen=new Set();
+    // DOM coordinates are divided by the full enclosing scale, including ring zoom.
+    const pin=(id,dir,port,top)=>{
+      const n=byId.get(id);if(n!==top)return null;
+      const el=[...n.el.querySelectorAll?.(".port")||[]].find(p=>p.dataset.dir===dir&&p.dataset.port===port&&p.closest(".node")===n.el);
+      if(!el)return null;
+      const a=el.getBoundingClientRect(),b=n.el.getBoundingClientRect(),scale=view.z*ringScaleOf(n);
+      return {x:(a.left+a.width/2-b.left)/scale-(n.el.offsetWidth||220)/2,y:(a.top+a.height/2-b.top)/scale-(n.el.offsetHeight||120)/2};
+    };
+    const add=(from,to,hint)=>{
+      const a=topOf(from[0]),b=topOf(to[0]);if(!a||!b||a===b||!selected.has(a.id)||!selected.has(b.id))return;
+      const key=JSON.stringify([from,to]);if(seen.has(key))return;seen.add(key);
+      edges.push({from:a.id,to:b.id,out:pin(from[0],"out",from[1],a),in:pin(to[0],"in",to[1],b),hint});
+    };
+    for(const w of G.wires)add(w.from,w.to,false);
+    for(const h of hints)add([owner.layoutNodeId?.(h.fromNode)??name+"::"+h.fromNode,h.fromPort],[owner.layoutNodeId?.(h.toNode)??name+"::"+h.toNode,h.toPort],true);
+    $("#status").textContent="Settling nearby patches";
+    const result=await PatchLayout.layout(boxes,edges,{valid:current});
+    if(!current())throw Error("Layout discarded: document or selected parent changed");
+    if(target&&!parent&&owner.mounts){
+      const left=Math.min(...result.positions.map(p=>p.x)),top=Math.min(...result.positions.map(p=>p.y));
+      const box={x:origin.x+left-24,y:origin.y+top-64,
+        w:Math.max(...result.positions.map((p,i)=>p.x+boxes[i].w))-left+48,
+        h:Math.max(...result.positions.map((p,i)=>p.y+boxes[i].h))-top+88};
+      const obstacles=[];
+      for(const [other,anchor] of owner.mounts){if(other===name)continue;const b=owner.bounds(other);
+        obstacles.push({x:anchor.x+b.left-24,y:anchor.y+b.top-64,w:b.w+48,h:b.h+88});}
+      const position=PatchLayout.placement(box,obstacles);
+      origin.x+=position.x-box.x;origin.y+=position.y-box.y;
+    }
+    for(const p of result.positions){const n=selected.get(p.id);n.x=origin.x+p.x;n.y=origin.y+p.y;n.el.style.left=n.x+"px";n.el.style.top=n.y+"px";}
+    if(parent){if(owner.resizeParent)owner.resizeParent(parent);else resizeParentFrames(parent);}
+    redraw();save();
+    requestAnimationFrame(()=>{redraw();if(owner==null||owner.selected===name&&owner.parentRevision===revision)fitToContent();});
+    $("#status").textContent="fd: "+nodes.length+" boxes, "+(result.links-result.hints)+" cable links, "+result.segments+" connected groups, "+result.hints+" candidate pulls; cables unchanged"+warning;
+  }catch(e){$("#status").textContent=e.message;}
+  finally{settle.busy=false;$("#fdBtn").disabled=false;}
+}
+
+  function ringView(width,height){return {x:0,y:0,z:Math.min(1,560/width,360/height)};}
+
+function ringLayout(n,options={}){
+  const {preserve=false,resize,frame}=options;
+  const kids=(n.children||[]).filter(c=>c.el);
+  const rings=kids.filter(c=>c.children&&c.children.length);
+  for(const r of rings) ringLayout(r,options);     // inward first — post-order
+  // Moving into a scaled host must not change shrink-to-fit widths mid-layout.
+  for(const c of kids)c.el.style.width=(c.el.offsetWidth||210)+"px";
+  if(preserve&&n._ringWorld){
+    for(const c of kids){c.el.classList.add("inring");c.el.style.position="absolute";c.el.style.left=c.x+"px";c.el.style.top=c.y+"px";n._ringWorld.appendChild(c.el);}
+    resize(n,false);
+    return {w:parseFloat(n._ringWorld.style.width),h:parseFloat(n._ringWorld.style.height)};
+  }
+  const sizes=new Map(kids.map(c=>[c,{w:c.el.offsetWidth||210,h:c.el.offsetHeight||96}]));
+  const ins=kids.filter(c=>c.type==="scope.in");
+  const outs=kids.filter(c=>c.type==="scope.out");
+  const mids=kids.filter(c=>!ins.includes(c)&&!outs.includes(c)&&!rings.includes(c));
+  const sz=c=>sizes.get(c);
+  const stackH=a=>a.length?a.reduce((s,c)=>s+sz(c).h,0)+(a.length-1)*RING_GAP:0;
+  const rowW=a=>a.length?a.reduce((s,c)=>s+sz(c).w,0)+(a.length-1)*RING_GAP:0;
+  const rowH=a=>a.length?Math.max(...a.map(c=>sz(c).h)):0;
+  const colW=a=>a.length?Math.max(...a.map(c=>sz(c).w)):0;
+  const top=mids.filter((_,i)=>i%2===0), bot=mids.filter((_,i)=>i%2===1);
+  const centerW=Math.max(rowW(rings),rowW(top),rowW(bot),140);
+  const centerH=Math.max(rowH(rings),stackH(ins),stackH(outs),60);
+  const W=colW(ins)+centerW+colW(outs)+4*RING_EDGE;
+  const H=(top.length?rowH(top)+RING_EDGE:0)+centerH+(bot.length?rowH(bot)+RING_EDGE:0)+2*RING_EDGE;
+  const host=n._childHost;
+  const rw=n._ringWorld||host;
+  if(n._ringWorld){
+    rw.style.width=W+"px"; rw.style.height=H+"px";
+    n._view=ringView(W,H);
+    // applyRingView sizes the frame from the world × this ring's zoom, so the
+    // floor is never re-set to the unscaled W/H behind a zoomed interior.
+    applyRingView(n);
+    frame?.(n);
+  } else {
+    host.style.minWidth=W+"px"; host.style.minHeight=H+"px";
+  }
+  // the shared center sits mid-CENTER-BAND (between the in and out edges),
+  // so asymmetric edge columns never squeeze the inner shells into them
+  const cx=colW(ins)+2*RING_EDGE+centerW/2, cy=(top.length?rowH(top)+RING_EDGE:0)+RING_EDGE+centerH/2;
+  const place=(c,x,y)=>{ c.x=x; c.y=y; c.el.classList.add("inring"); c.el.style.position="absolute";
+    c.el.style.left=x+"px"; c.el.style.top=y+"px"; rw.appendChild(c.el); };
+  let y=cy-stackH(ins)/2;
+  for(const c of ins){ place(c,RING_EDGE,y); y+=sz(c).h+RING_GAP; }
+  y=cy-stackH(outs)/2;
+  for(const c of outs){ place(c,W-RING_EDGE-sz(c).w,y); y+=sz(c).h+RING_GAP; }
+  let x=cx-rowW(top)/2;
+  for(const c of top){ place(c,x,RING_EDGE); x+=sz(c).w+RING_GAP; }
+  x=cx-rowW(bot)/2;
+  for(const c of bot){ place(c,x,H-RING_EDGE-sz(c).h); x+=sz(c).w+RING_GAP; }
+  x=cx-rowW(rings)/2;                               // the innermost shell
+  for(const c of rings){ place(c,x,cy-sz(c).h/2); x+=sz(c).w+RING_GAP; }
+  return {w:W,h:H};
+}
+
+  return {layout,placement,limits,hints,settle,ringView,ringLayout};
 });

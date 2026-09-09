@@ -45,8 +45,7 @@ want to hear about.
 
 ```bash
 git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed
-./gradlew hotswapFeed          # builds the live class tree (JDK 25; GraalVM CE 25 unlocks the sub-VMs)
-bin/oroboros-daemon --watch    # the daemon: store, board, console — one process, one port
+./gradlew runOroborosDaemon --args='--watch'  # builds the live feed and launches with HotSwapAgent (JDK 25)
 ```
 
 Then open **http://localhost:8888** and poke it where it counts:
@@ -64,8 +63,8 @@ Then open **http://localhost:8888** and poke it where it counts:
 - 💡 [It should also…](https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback,idea&title=%5Bidea%5D%20&body=**The%20workload%20I%20care%20about:**%0A%0A**What%27s%20missing:**) — tell us about the workload you *wanted* to throw at it.
 
 No issue is too small and none needs polish — two angry sentences and a log
-line beat a week of silence. The daemon logs everything to
-`logs/oroboros-daemon.log`; the last thirty lines of that file plus what you
+line beat a week of silence. The Gradle daemon task forwards its output to
+the terminal; the last thirty lines plus what you
 dragged, clicked, or expected is a perfect report.
 
 ---
