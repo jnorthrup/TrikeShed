@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.FileChannel
+import java.nio.channels.SocketChannel
 import java.nio.channels.NonReadableChannelException
 import java.nio.channels.NonWritableChannelException
 import java.nio.file.AccessDeniedException
@@ -23,6 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger
 internal val jvmUringOperations = UringOp.caps(
     UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
     UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE,
+    // The socket half of the emulation: the vocabulary already names these, and a stream fd
+    // reaches them through the same table a file does.
+    UringOp.SEND, UringOp.RECV, UringOp.CONNECT, UringOp.SHUTDOWN,
 )
 
 /** One descriptor record shared by FileImpl and submission execution. */
@@ -30,6 +34,22 @@ internal sealed interface JvmDescriptor {
     fun close()
     fun size(): Long
     fun isOpen(): Boolean
+}
+
+/**
+ * A stream socket, addressed through the same table as a file.
+ *
+ * The point of the uring waist is that commonMain speaks ONE submission vocabulary and the
+ * backend varies underneath -- a real ring on Linux, emulation elsewhere. That only holds if
+ * every kind of fd is reachable through the same table, so a socket is a descriptor here rather
+ * than a second mechanism beside it. READ/RECV and WRITE/SEND land on the same ops a file uses;
+ * the descriptor decides what they mean.
+ */
+internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
+    override fun close() = channel.close()
+    override fun isOpen(): Boolean = channel.isOpen
+    /** A stream has no size; -1 is what the file path returns for an unknown extent. */
+    override fun size(): Long = -1L
 }
 
 internal class JvmChannelDescriptor(val channel: FileChannel) : JvmDescriptor {
@@ -112,6 +132,7 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.CLOSE -> { owned.remove(sub.fd); JvmFileTable.close(sub.fd) }
                 else -> {
                     val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
+                    if (descriptor is JvmSocketDescriptor) return socketExecute(descriptor.channel, sub)
                     val channel = (descriptor as? JvmChannelDescriptor)?.channel ?: return -95
                     when (sub.opcode) {
                         UringOp.READ, UringOp.WRITE -> transfer(channel, sub)
@@ -129,6 +150,30 @@ internal class JvmUserspaceChannelBackend(
         } catch (failure: Exception) { jvmIoError(failure) }
     }
 
+    /** Stream IO under the same ops. Offsets are meaningless on a stream and are refused, not ignored. */
+    private fun socketExecute(channel: SocketChannel, sub: UringSubmission): Int = when (sub.opcode) {
+        UringOp.READ, UringOp.RECV, UringOp.WRITE, UringOp.SEND -> {
+            val buffer = sub.buffer
+            when {
+                buffer == null || sub.len < 0 || sub.len > buffer.remaining() -> -22
+                sub.offset != -1L && sub.offset != 0L -> -22   // ESPIPE in spirit: a stream has no offset
+                (sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV) && buffer.isReadOnly() -> -22
+                else -> {
+                    val position = buffer.position()
+                    val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + position, sub.len)
+                    val n = if (sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV) channel.read(nio)
+                            else channel.write(nio)
+                    if (n > 0) buffer.position(position + n)
+                    // EOF on a stream is a zero-byte completion, same as the file path.
+                    if (n < 0) 0 else n
+                }
+            }
+        }
+        UringOp.SHUTDOWN -> { channel.shutdownOutput(); 0 }
+        UringOp.CONNECT -> if (channel.finishConnect()) 0 else -115   // EINPROGRESS
+        else -> -95
+    }
+
     private fun transfer(channel: FileChannel, sub: UringSubmission): Int {
         val buffer = sub.buffer ?: return -22
         if (sub.len < 0 || sub.len > buffer.remaining() || sub.offset < -1L) return -22
@@ -141,11 +186,7 @@ internal class JvmUserspaceChannelBackend(
             if (sub.offset == -1L) channel.write(nio) else channel.write(nio, sub.offset)
         }
         if (count > 0) buffer.position(position + count)
-        // EOF is -1 here, not 0. Real io_uring reports end-of-file as a zero-byte completion, and the
-        // io_uring-wiring branch coerced to that; but this codebase's convention is FileChannel's -1,
-        // which JvmUserspaceChannelBackendTest asserts and callers distinguish from a legitimate
-        // zero-length read. Flipping to 0 is a whole-codebase decision, not a per-callsite one.
-        return count
+        return count.coerceAtLeast(0) // io_uring EOF is a successful zero-byte completion.
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
@@ -189,6 +230,15 @@ internal actual object FilesImpl {
 }
 
 internal actual object ChannelsImpl {
-    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl =
-        throw UnsupportedOperationException("Socket construction requires a supported uring SOCKET adapter")
+    /**
+     * A stream socket in the shared fd table. Non-blocking, because the waist is a
+     * submission/completion model and a blocking read would stall the whole ring.
+     * domain/type/protocol are the POSIX triple; only AF_INET/SOCK_STREAM is emulated here,
+     * and anything else is refused rather than silently downgraded.
+     */
+    actual fun socket(domain: Int, type: Int, protocol: Int): FileImpl {
+        require(type == 1) { "only SOCK_STREAM is emulated here, got type=$type" }
+        val channel = SocketChannel.open().apply { configureBlocking(false) }
+        return FileImpl(JvmFileTable.register(JvmSocketDescriptor(channel)))
+    }
 }
