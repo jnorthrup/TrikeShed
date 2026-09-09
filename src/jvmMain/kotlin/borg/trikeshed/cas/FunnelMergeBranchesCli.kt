@@ -230,8 +230,13 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
     private fun gitIn(dir: File, vararg args: String): Pair<Int, String> {
         val pb = ProcessBuilder(listOf("git") + args).directory(dir).redirectErrorStream(true)
         val proc = pb.start()
-        val out = proc.inputStream.bufferedReader().readText()
-        return proc.waitFor() to out
+        val outFuture = java.util.concurrent.CompletableFuture.supplyAsync { proc.inputStream.bufferedReader().readText() }
+        val finished = proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
+        if (!finished) {
+            proc.destroyForcibly()
+            return -1 to "Error: git command timed out"
+        }
+        return proc.exitValue() to outFuture.get()
     }
 
     private fun gradle(dir: File, task: String): Pair<Int, String> {
@@ -239,7 +244,12 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
         val pb = ProcessBuilder(if (gradlew.canExecute()) "./gradlew" else "gradle", task, "--console=plain", "-q")
             .directory(dir).redirectErrorStream(true)
         val proc = pb.start()
-        val out = proc.inputStream.bufferedReader().readText()
-        return proc.waitFor() to out
+        val outFuture = java.util.concurrent.CompletableFuture.supplyAsync { proc.inputStream.bufferedReader().readText() }
+        val finished = proc.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
+        if (!finished) {
+            proc.destroyForcibly()
+            return -1 to "Error: gradle command timed out"
+        }
+        return proc.exitValue() to outFuture.get()
     }
 }
