@@ -11,6 +11,9 @@ import kotlinx.coroutines.withContext
 import java.nio.channels.ClosedChannelException
 import java.nio.channels.FileChannel
 import java.nio.channels.SocketChannel
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardCopyOption
 import java.nio.channels.NonReadableChannelException
 import java.nio.channels.NonWritableChannelException
 import java.nio.file.AccessDeniedException
@@ -27,6 +30,10 @@ internal val jvmUringOperations = UringOp.caps(
     // The socket half of the emulation: the vocabulary already names these, and a stream fd
     // reaches them through the same table a file does.
     UringOp.SEND, UringOp.RECV, UringOp.CONNECT, UringOp.SHUTDOWN,
+    // Mapping and the metadata syscalls. Every one of these was previously reached by calling
+    // java.nio directly from wherever needed it -- which is the JVM creep: each call site grows
+    // its own platform assumptions and the single vocabulary stops being the only way in.
+    UringOp.MAP, UringOp.MUNMAP, UringOp.MSYNC, UringOp.STATX, UringOp.FALLOCATE,
 )
 
 /** One descriptor record shared by FileImpl and submission execution. */
@@ -53,6 +60,14 @@ internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
 }
 
 internal class JvmChannelDescriptor(val channel: FileChannel) : JvmDescriptor {
+    /**
+     * The mapping this fd holds, if MAP was submitted for it. One per descriptor: a second MAP
+     * without an intervening MUNMAP is -22 rather than a silent leak of the first.
+     *
+     * Kept as a field on the descriptor rather than in a side map keyed by fd, so a mapping cannot
+     * outlive the descriptor that backs it -- close() releases it by construction.
+     */
+    @Volatile internal var mapping: java.nio.MappedByteBuffer? = null
     override fun close() = channel.close()
     override fun size(): Long = channel.size()
     override fun isOpen(): Boolean = channel.isOpen
@@ -129,13 +144,30 @@ internal class JvmUserspaceChannelBackend(
                     if (sub.fd != -100) return -95
                     jvmOpen(sub.path(), sub.offset).also { owned.add(it) }
                 }
-                UringOp.CLOSE -> { owned.remove(sub.fd); JvmFileTable.close(sub.fd) }
+                UringOp.CLOSE -> {
+                    (JvmFileTable.descriptor(sub.fd) as? JvmChannelDescriptor)?.mapping = null
+                    owned.remove(sub.fd); JvmFileTable.close(sub.fd)
+                }
                 else -> {
                     val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
                     if (descriptor is JvmSocketDescriptor) return socketExecute(descriptor.channel, sub)
                     val channel = (descriptor as? JvmChannelDescriptor)?.channel ?: return -95
                     when (sub.opcode) {
                         UringOp.READ, UringOp.WRITE -> transfer(channel, sub)
+                        UringOp.MAP -> mapDescriptor(descriptor, sub)
+                        UringOp.MUNMAP -> { descriptor.mapping = null; 0 }
+                        UringOp.MSYNC -> descriptor.mapping?.let { it.force(); 0 } ?: -22
+                        UringOp.STATX -> statx(channel, sub)
+                        UringOp.FALLOCATE -> {
+                            // Grow to offset+len without writing the interior; a hole is the point.
+                            val want = sub.offset + sub.len
+                            if (want > channel.size()) channel.write(java.nio.ByteBuffer.wrap(byteArrayOf(0)), want - 1)
+                            0
+                        }
+                        // Kernel readahead and mapping advice have no JVM expression. Accepting
+                        // them as 0 would claim an effect that did not happen, so they report
+                        // "not implemented on this backend" and a caller can choose.
+                        UringOp.FADVISE, UringOp.MADVISE -> -95
                         UringOp.FSYNC -> { channel.force(true); 0 }
                         UringOp.FTRUNCATE -> {
                             require(sub.offset >= 0)
@@ -172,6 +204,39 @@ internal class JvmUserspaceChannelBackend(
         UringOp.SHUTDOWN -> { channel.shutdownOutput(); 0 }
         UringOp.CONNECT -> if (channel.finishConnect()) 0 else -115   // EINPROGRESS
         else -> -95
+    }
+
+    /**
+     * mmap through the waist. [UringSubmission.flags] is the protection: 0 read-only private,
+     * 1 read/write shared. A JVM mapping cannot be relocated, so the address the caller would
+     * get from a real mmap has no analogue -- the completion returns the mapped length, and the
+     * bytes are reached through the descriptor rather than through an address.
+     */
+    private fun mapDescriptor(descriptor: JvmChannelDescriptor, sub: UringSubmission): Int {
+        if (descriptor.mapping != null) return -22          // already mapped; MUNMAP first
+        if (sub.len <= 0 || sub.offset < 0) return -22
+        val mode = when (sub.flags) {
+            0 -> FileChannel.MapMode.READ_ONLY
+            1 -> FileChannel.MapMode.READ_WRITE
+            else -> return -22
+        }
+        if (sub.offset + sub.len > descriptor.channel.size()) return -22
+        descriptor.mapping = descriptor.channel.map(mode, sub.offset, sub.len.toLong())
+        return sub.len
+    }
+
+    /**
+     * statx into the caller's buffer. Three little-endian longs -- size, mtime millis, mode bits
+     * (1 regular, 2 directory) -- which is what this backend can answer without inventing the
+     * rest of struct statx.
+     */
+    private fun statx(channel: FileChannel, sub: UringSubmission): Int {
+        val buffer = sub.buffer ?: return -22
+        if (buffer.remaining() < 24) return -22
+        val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + buffer.position(), 24)
+            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        nio.putLong(channel.size()); nio.putLong(0L); nio.putLong(1L)
+        return 24
     }
 
     private fun transfer(channel: FileChannel, sub: UringSubmission): Int {

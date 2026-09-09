@@ -74,8 +74,23 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     WAITID(50, "waitid — wait for process state change"),
     FUTEX_WAIT(51, "futex wait"),
     FUTEX_WAKE(52, "futex wake"),
+
+    // ── Mapping. No IORING_OP_* exists for these: Linux has never made mmap a ring
+    // operation, so code is -1 and the waist owns them. They belong here rather than beside
+    // the ring because a mapping is addressed by the same fd, through the same table, and a
+    // caller that has to leave the submission vocabulary to map a file is exactly the seam
+    // where per-platform code starts to fray.
+    MAP(-1, "mmap — map a descriptor range into the address space"),
+    MUNMAP(-1, "munmap — release a mapping"),
+    MSYNC(-1, "msync — flush a mapping to its backing store"),
     ;
 
+    /**
+     * The enum IS the bitmask: `1L shl ordinal`. That caps the vocabulary at 64 operations and
+     * there are 61 now. Past 63 the shift wraps silently and two ops share a bit, so a capability
+     * test starts answering for the wrong one. Adding the 65th means widening the mask type, not
+     * appending another entry.
+     */
     override val mask: Long get() = 1L shl ordinal
 
     companion object {
@@ -117,6 +132,22 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
 
             fun write(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
                 UringSubmission(WRITE, fd, bufAddr, len, offset, 0, userData)
+
+            /**
+             * Map [len] bytes of [fd] from [offset]. [flags] carries the protection and share
+             * mode; 0 is read-only private, which is the only shape the JVM emulation can honour
+             * without a write-back contract.
+             */
+            fun map(fd: Int, offset: Long, len: Int, flags: Int = 0, userData: Long = 0): UringSubmission =
+                UringSubmission(MAP, fd, 0, len, offset, flags, userData)
+
+            /** Release the mapping [fd] holds. */
+            fun unmap(fd: Int, userData: Long = 0): UringSubmission =
+                UringSubmission(MUNMAP, fd, 0, 0, 0, 0, userData)
+
+            /** Flush [fd]'s mapping to its backing store. */
+            fun msync(fd: Int, userData: Long = 0): UringSubmission =
+                UringSubmission(MSYNC, fd, 0, 0, 0, 0, userData)
 
             fun statx(fd: Int, bufAddr: Long, userData: Long): UringSubmission =
                 UringSubmission(STATX, fd, bufAddr, 256, 0, 0, userData)
