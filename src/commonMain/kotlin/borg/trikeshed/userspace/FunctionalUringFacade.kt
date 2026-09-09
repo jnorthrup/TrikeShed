@@ -37,6 +37,17 @@ import kotlin.coroutines.CoroutineContext
 public interface UserspaceChannelBackend {
     val capabilities: Long get() = 0L
     val nativeCapabilities: Long get() = 0L
+
+    /** Word-1 capabilities. Zero until the vocabulary crosses its 64th operation. */
+    val capabilitiesHigh: Long get() = 0L
+
+    /**
+     * Whether this backend answers [op]. The only correct test once the vocabulary spans two
+     * words: `capabilities and op.mask` reads word 0 only, and an op in word 1 shares its bit
+     * value with one in word 0, so that test would answer for the wrong operation.
+     */
+    fun supports(op: UringOp): Boolean =
+        if (op.word == 0) capabilities and op.mask != 0L else capabilitiesHigh and op.mask != 0L
     val availability: String get() = "emulated"
 
     /**

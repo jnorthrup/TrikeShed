@@ -9,7 +9,8 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 /**
  * Portable operations with explicit linux/io_uring.h IORING_OP_* codes.
  *
- * Each entry's [mask] is `1L shl ordinal` so the enum IS the Long bitmask.
+ * Each entry's [mask] is `1L shl (ordinal and 63)` within its [UringOp.word], so a capability
+ * is two Longs once the vocabulary passes 64 operations.
  * Capabilities compose with `or`, test with [BitMasked.andAlso].
  *
  * [code] is independent of the capability bit position. -1 denotes an operation
@@ -89,12 +90,22 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     ;
 
     /**
-     * The enum IS the bitmask: `1L shl ordinal`. That caps the vocabulary at 64 operations and
-     * there are 61 entries now, 59 distinct bits. Past 63 the shift wraps silently and two ops share a bit, so a capability
-     * test starts answering for the wrong one. Adding the 65th means widening the mask type, not
-     * appending another entry.
+     * Which capability word this op's bit lives in: 0 for the first 64 ops, 1 for the next 64.
+     *
+     * The mask used to be `1L shl ordinal`, which capped the vocabulary at 64 -- past 63 the shift
+     * wraps silently and two ops share a bit, so a capability test starts answering for the wrong
+     * operation. Widening to a 128-bit mask type would ripple through ~137 call sites and cost the
+     * single-word AND that makes the test free. A second word is additive instead: everything
+     * already written keeps working, because every op that exists today lives in word 0.
      */
-    override val mask: Long get() = 1L shl ordinal
+    val word: Int get() = ordinal ushr 6
+
+    /**
+     * The bit within [word]. Two ops in different words share a bit value, so this is only half an
+     * answer -- use [UserspaceChannelBackend.supports] rather than `capabilities and op.mask` for
+     * anything that must stay correct past the 64th operation.
+     */
+    override val mask: Long get() = 1L shl (ordinal and 63)
 
     companion object {
         val CAP_MANDATORY: Long = READ or WRITE or CLOSE or STATX
@@ -103,7 +114,19 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         val CAP_NET_IO: Long = SEND or RECV or ACCEPT or CONNECT or
             SENDMSG or RECVMSG or SHUTDOWN
 
-        fun caps(vararg ops: UringOp): Long = ops.fold(0L) { acc: Long, op: UringOp -> op or acc }
+        /** Word-0 capabilities. Ops from word 1 are ignored here; use [capsHigh] for those. */
+        fun caps(vararg ops: UringOp): Long {
+            var acc = 0L; var i = 0
+            while (i < ops.size) { val op = ops[i]; if (op.word == 0) acc = acc or op.mask; i++ }
+            return acc
+        }
+
+        /** Word-1 capabilities: the 65th op onward. Zero until the vocabulary crosses 64. */
+        fun capsHigh(vararg ops: UringOp): Long {
+            var acc = 0L; var i = 0
+            while (i < ops.size) { val op = ops[i]; if (op.word == 1) acc = acc or op.mask; i++ }
+            return acc
+        }
 
         /**
          * One io_uring SQE. The only type crossing [FunctionalUringFacade].

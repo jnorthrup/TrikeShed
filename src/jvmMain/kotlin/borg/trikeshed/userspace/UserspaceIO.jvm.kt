@@ -24,6 +24,9 @@ import java.nio.file.StandardOpenOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
+/** POSIX_FADV_WILLNEED / MADV_WILLNEED. The one advice this backend can actually act on. */
+private const val ADVICE_WILLNEED = 3
+
 internal val jvmUringOperations = UringOp.caps(
     UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
     UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE,
@@ -34,6 +37,9 @@ internal val jvmUringOperations = UringOp.caps(
     // java.nio directly from wherever needed it -- which is the JVM creep: each call site grows
     // its own platform assumptions and the single vocabulary stops being the only way in.
     UringOp.MAP, UringOp.MUNMAP, UringOp.MSYNC, UringOp.STATX, UringOp.FALLOCATE,
+    // Advisory, and answered rather than refused: the emulation must not differ from a native
+    // ring in what it CAN do, only in how fast it does it.
+    UringOp.FADVISE, UringOp.MADVISE,
 )
 
 /** One descriptor record shared by FileImpl and submission execution. */
@@ -164,10 +170,13 @@ internal class JvmUserspaceChannelBackend(
                             if (want > channel.size()) channel.write(java.nio.ByteBuffer.wrap(byteArrayOf(0)), want - 1)
                             0
                         }
-                        // Kernel readahead and mapping advice have no JVM expression. Accepting
-                        // them as 0 would claim an effect that did not happen, so they report
-                        // "not implemented on this backend" and a caller can choose.
-                        UringOp.FADVISE, UringOp.MADVISE -> -95
+                        UringOp.FADVISE -> advise(channel, sub)
+                        UringOp.MADVISE -> when (sub.flags) {
+                            // madvise(WILLNEED) on a mapping is exactly MappedByteBuffer.load():
+                            // fault the pages in now rather than on first touch.
+                            ADVICE_WILLNEED -> descriptor.mapping?.let { it.load(); 0 } ?: -22
+                            else -> 0
+                        }
                         UringOp.FSYNC -> { channel.force(true); 0 }
                         UringOp.FTRUNCATE -> {
                             require(sub.offset >= 0)
@@ -237,6 +246,37 @@ internal class JvmUserspaceChannelBackend(
             .order(java.nio.ByteOrder.LITTLE_ENDIAN)
         nio.putLong(channel.size()); nio.putLong(0L); nio.putLong(1L)
         return 24
+    }
+
+    /**
+     * posix_fadvise. [UringSubmission.flags] is the advice, [offset] and [len] the range.
+     *
+     * These previously returned -95, on the reasoning that returning 0 would claim an effect that
+     * did not happen. That was the wrong reading of the contract: advice is advisory, and
+     * posix_fadvise returning 0 has never promised the kernel acted -- only that the advice was
+     * well-formed and received. Refusing it made the emulation diverge from a native ring in
+     * capability rather than in performance, which is the one way this waist must not differ:
+     * a caller would have to branch on which backend it got, and that branch is the fraying.
+     *
+     * WILLNEED is honoured for real by reading the range so the page cache holds it. The rest are
+     * accepted and ignored, which is precisely what a kernel is permitted to do with them.
+     */
+    private fun advise(channel: FileChannel, sub: UringSubmission): Int {
+        if (sub.offset < 0 || sub.len < 0) return -22
+        if (sub.flags != ADVICE_WILLNEED) return 0
+        val length = if (sub.len == 0) (channel.size() - sub.offset) else sub.len.toLong()
+        if (length <= 0L) return 0
+        // A page-sized touch per page is enough to fault the range in; the bytes are discarded.
+        val scratch = java.nio.ByteBuffer.allocate(4096)
+        var at = sub.offset
+        val end = sub.offset + length
+        while (at < end) {
+            scratch.clear()
+            val n = channel.read(scratch, at)
+            if (n <= 0) break
+            at += n
+        }
+        return 0
     }
 
     private fun transfer(channel: FileChannel, sub: UringSubmission): Int {
