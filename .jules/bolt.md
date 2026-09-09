@@ -259,3 +259,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-11-21 - Series collection return type mismatch
 **Learning:** In TrikeShed, `Series` implements the standard Kotlin `List` interface. The custom `.filter` extension natively returns a `Series`. Therefore, chaining `.toList()` or `.map { it }` on the result of `Series.filter { ... }` just to satisfy a `List` return type is an anti-pattern. It creates an unnecessary O(N) memory allocation and copy.
 **Action:** Return the `Series` directly whenever a `List` is expected instead of coercing it to an `ArrayList` via `.toList()` or `.map { it }`.
+
+## 2026-11-21 - Avoid intermediate List allocations when mapping and filtering Series
+**Learning:** In TrikeShed, using `(0 until series.size).map { series[it] }.filter { ... }.toSeries()` or `...plus(item).toSeries()` on a `Series` object creates expensive intermediate `ArrayList` allocations, wasting O(N) memory and time. The `Series` collection provides a zero-allocation `j` infix constructor for mapping/appending elements and a native `.filter` extension (which requires importing `borg.trikeshed.lib.filter`) that returns a filtered `Series` natively.
+**Action:** Use the `j` infix constructor (e.g., `(size + 1) j { i -> if (i < size) arr[i] else new_element }`) and native `.filter` extensions directly on `Series` collections to prevent intermediate List heap allocations.

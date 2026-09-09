@@ -1,0 +1,4 @@
+echo "" >> .jules/bolt.md
+echo "## 2026-11-21 - Avoid intermediate List allocations when mapping and filtering Series" >> .jules/bolt.md
+echo "**Learning:** In TrikeShed, using \`(0 until series.size).map { series[it] }.filter { ... }.toSeries()\` or \`...plus(item).toSeries()\` on a \`Series\` object creates expensive intermediate \`ArrayList\` allocations, wasting O(N) memory and time. The \`Series\` collection provides a zero-allocation \`j\` infix constructor for mapping/appending elements and a native \`.filter\` extension (which requires importing \`borg.trikeshed.lib.filter\`) that returns a filtered \`Series\` natively." >> .jules/bolt.md
+echo "**Action:** Use the \`j\` infix constructor (e.g., \`(size + 1) j { i -> if (i < size) arr[i] else new_element }\`) and native \`.filter\` extensions directly on \`Series\` collections to prevent intermediate List heap allocations." >> .jules/bolt.md
