@@ -40,6 +40,7 @@ internal val jvmUringOperations = UringOp.caps(
     // Advisory, and answered rather than refused: the emulation must not differ from a native
     // ring in what it CAN do, only in how fast it does it.
     UringOp.FADVISE, UringOp.MADVISE,
+    UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT,
 )
 
 /** One descriptor record shared by FileImpl and submission execution. */
@@ -149,6 +150,22 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
                     jvmOpen(sub.path(), sub.offset).also { owned.add(it) }
+                }
+                // Path syscalls. The path rides in the submission buffer, and renameat carries
+                // both halves NUL-separated -- one buffer, because an SQE has one address field
+                // and inventing a second channel for the second path would be a shape only this
+                // backend understands.
+                UringOp.UNLINKAT -> { Files.delete(Paths.get(sub.path())); 0 }
+                UringOp.MKDIRAT -> { Files.createDirectories(Paths.get(sub.path())); 0 }
+                UringOp.RENAMEAT -> {
+                    val both = sub.path()
+                    val split = both.indexOf('\u0000')
+                    if (split <= 0 || split == both.length - 1) return -22
+                    Files.move(
+                        Paths.get(both.substring(0, split)), Paths.get(both.substring(split + 1)),
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                    0
                 }
                 UringOp.CLOSE -> {
                     (JvmFileTable.descriptor(sub.fd) as? JvmChannelDescriptor)?.mapping = null
