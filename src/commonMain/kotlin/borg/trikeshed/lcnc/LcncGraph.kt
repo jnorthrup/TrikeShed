@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.filter
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -89,18 +90,21 @@ data class LcncConfixControls(
     fun addMatingPoint(point: LcncPatchMatingPoint): LcncConfixControls {
         point.validate()
         require((0 until matingPoints.size).none { matingPoints[it].id == point.id }) { "duplicate mating point: ${point.id}" }
-        return copy(matingPoints = (0 until matingPoints.size).map { matingPoints[it] }.plus(point).toSeries())
+        // Bolt: Use zero-allocation 'j' constructor instead of intermediate List allocations and copies via .map { ... }.plus(...).toSeries()
+        return copy(matingPoints = (matingPoints.size + 1) j { i -> if (i < matingPoints.size) matingPoints[i] else point })
     }
 
     fun updateMatingPoint(point: LcncPatchMatingPoint): LcncConfixControls {
         point.validate()
         require((0 until matingPoints.size).any { matingPoints[it].id == point.id }) { "unknown mating point: ${point.id}" }
-        return copy(matingPoints = (0 until matingPoints.size).map { if (matingPoints[it].id == point.id) point else matingPoints[it] }.toSeries())
+        // Bolt: Use zero-allocation 'j' constructor instead of intermediate List allocations via .map { ... }.toSeries()
+        return copy(matingPoints = matingPoints.size j { i -> if (matingPoints[i].id == point.id) point else matingPoints[i] })
     }
 
     fun removeMatingPoint(id: String): LcncConfixControls {
         require((0 until matingPoints.size).any { matingPoints[it].id == id }) { "unknown mating point: $id" }
-        return copy(matingPoints = (0 until matingPoints.size).map { matingPoints[it] }.filter { it.id != id }.toSeries())
+        // Bolt: Use native Series.filter directly to avoid intermediate List allocations via .map { ... }.filter { ... }.toSeries()
+        return copy(matingPoints = matingPoints.filter { it.id != id })
     }
 }
 
