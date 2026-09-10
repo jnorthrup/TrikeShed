@@ -20,6 +20,10 @@ private class GraalWireDocumentSafetySubject {
     fun touch(): String = "ok"
 }
 
+private class GraalWireConstantSubject {
+    fun value(): String = "sk-test-GRAAL-BYTECODE-CANARY-123456789"
+}
+
 class GraalWireDocumentSafetyTest {
     @Test
     fun graalDocRedactsCredentialFieldsAndBlocksContentPreview() = runTest {
@@ -62,6 +66,121 @@ class GraalWireDocumentSafetyTest {
         assertEquals(403, blocked.status)
         assertFalse(blocked.body.contains(canary), "blocked content response must not serialize bytes")
         assertFalse(blocked.body.contains(cid.value), "blocked content response must not serialize cid")
+    }
+
+    @Test
+    fun sensitiveIdHidesOpaquePayloadAcrossDocumentSheetAndContent() = runTest {
+        val database = database("trikeshed")
+        val id = "keymux/provider"
+        val opaque = "q73m2p9v6c8n4t5w"
+        val unrelatedPayload = "opaque-provider-material"
+        val cid = attach(database, id, opaque.encodeToByteArray(), "text/plain")
+        val attached = assertNotNull(database.store.get(id))
+        assertTrue(database.store.put(attached.copy(fields = attached.fields + listOf(
+            Field("provider", "test-provider"),
+            Field("value", opaque),
+            Field("payload", mapOf("label" to unrelatedPayload)),
+            Field("label", listOf(mapOf("value" to opaque))),
+        )), database.store.head.getRev(id)))
+        val wire = GraalWire(JvmVitals(), database.store, null, this, database)
+
+        for (route in listOf("doc", "sheet")) {
+            val response = wire.route("GET", "/api/graal/$route?id=keymux%2Fprovider", "", null)!!
+            assertEquals(200, response.status, route)
+            assertFalse(response.body.contains(opaque), "$route must hide opaque credential values")
+            assertFalse(response.body.contains(unrelatedPayload), "$route must hide the whole payload")
+            assertFalse(response.body.contains(cid.value), "$route must hide the attachment address")
+            assertTrue(response.body.contains("[redacted]"), route)
+        }
+        val content = wire.route("GET", "/api/graal/content?id=keymux%2Fprovider", "", null)!!
+        assertEquals(403, content.status)
+        assertEquals(null, content.bytes)
+        assertFalse(content.body.contains(opaque))
+    }
+
+    @Test
+    fun nestedCredentialFieldBlocksNeutralDocumentPreview() = runTest {
+        val database = database("trikeshed")
+        val id = "settings/provider"
+        val opaque = "w49n7q2m5c3t8p6v"
+        val cid = attach(database, id, opaque.encodeToByteArray(), "text/plain")
+        val attached = assertNotNull(database.store.get(id))
+        assertTrue(database.store.put(attached.copy(fields = attached.fields + Field(
+            "configuration", listOf(mapOf("authentication" to mapOf("clientSecret" to opaque))),
+        )), database.store.head.getRev(id)))
+        val wire = GraalWire(JvmVitals(), database.store, null, this, database)
+
+        val response = wire.route("GET", "/api/graal/doc?id=$id", "", null)!!
+        assertEquals(200, response.status)
+        assertFalse(response.body.contains(opaque))
+        assertFalse(response.body.contains(cid.value))
+        val body = JsonSupport.parse(response.body) as Map<*, *>
+        assertEquals(true, (body["_graal"] as Map<*, *>)["previewBlocked"])
+        val content = wire.route("GET", "/api/graal/content?id=$id", "", null)!!
+        assertEquals(403, content.status)
+        assertEquals(null, content.bytes)
+    }
+
+    @Test
+    fun sensitiveAttachmentsCannotEscapeThroughSourceAliasesOrClassProjection() = runTest {
+        val database = database("trikeshed")
+        val opaque = "c8n2v5w7p4m6q9t3"
+        val sourceId = "keymux/ProviderFixture.kt"
+        val sourceCid = attach(database, sourceId, "val value = \"$opaque\"".encodeToByteArray(), "text/plain")
+        val resource = GraalWireDocumentSafetySubject::class.java.name.replace('.', '/') + ".class"
+        val classBytes = assertNotNull(javaClass.classLoader.getResourceAsStream(resource)?.use { it.readBytes() })
+        val classId = "keymux/ProviderFixture.class"
+        val classCid = attach(database, classId, classBytes, "application/java-vm")
+        val wire = GraalWire(JvmVitals(), database.store, null, this, database)
+
+        for (source in listOf(sourceId, "ProviderFixture.kt")) {
+            val response = wire.route("GET", "/api/graal/decompile?source=$source", "", null)!!
+            assertEquals(403, response.status, "resolved source $source must retain its sensitive classification")
+            assertFalse(response.body.contains(opaque))
+            assertFalse(response.body.contains(sourceCid.value))
+        }
+        val projection = wire.route("GET", "/api/graal/classfile?id=$classId", "", null)!!
+        assertEquals(403, projection.status)
+        assertFalse(projection.body.contains(classCid.value))
+        assertFalse(projection.body.contains("GraalWireDocumentSafetySubject"))
+    }
+
+    @Test
+    fun neutralTextAttachmentWithCredentialContentBlocksRawAndSourcePreview() = runTest {
+        val database = database("trikeshed")
+        val id = "dropzone/Notes.kt"
+        val canary = "sk-test-GRAAL-ATTACHMENT-CANARY-123456789"
+        val cid = attach(database, id, "val value = \"$canary\"".encodeToByteArray(), "text/plain")
+        val wire = GraalWire(JvmVitals(), database.store, null, this, database)
+
+        for (path in listOf(
+            "/api/graal/content?id=$id",
+            "/api/graal/decompile?source=$id",
+            "/api/graal/sheet?id=$id",
+        )) {
+            val response = wire.route("GET", path, "", null)!!
+            assertEquals(403, response.status, path)
+            assertEquals(null, response.bytes, path)
+            assertFalse(response.body.contains(canary), path)
+            assertFalse(response.body.contains(cid.value), path)
+        }
+    }
+
+    @Test
+    fun neutralClassProjectionCannotExposeCredentialConstant() = runTest {
+        val database = database("trikeshed")
+        val resource = GraalWireConstantSubject::class.java.name.replace('.', '/') + ".class"
+        val classBytes = assertNotNull(javaClass.classLoader.getResourceAsStream(resource)?.use { it.readBytes() })
+        val id = "dropzone/GraalWireConstantSubject.class"
+        val cid = attach(database, id, classBytes, "application/java-vm")
+        val wire = GraalWire(JvmVitals(), database.store, null, this, database)
+
+        val projection = wire.route("GET", "/api/graal/classfile?id=$id", "", null)!!
+        assertFalse(projection.body.contains(GraalWireConstantSubject().value()))
+        // The current structural projection omits string constants entirely; that safe
+        // projection may remain available without requiring a blocked response.
+        assertTrue(projection.status == 200 || projection.status == 403)
+        if (projection.status == 403) assertFalse(projection.body.contains(cid.value))
     }
 
     @Test

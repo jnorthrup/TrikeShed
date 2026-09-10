@@ -8,6 +8,7 @@ import borg.trikeshed.couch.Document
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.graal.subvm.HermesCapsule
 import borg.trikeshed.graal.vitals.JvmVitals
+import borg.trikeshed.graal.GraalDocumentPolicy
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -93,20 +94,10 @@ class GraalWire(
         const val EVENTS_PATH = "/api/graal/events"
         val STREAMING: Set<String> = setOf(EVENTS_PATH)
         private const val REDACTED = "[redacted]"
-        private val SENSITIVE_ID = Regex("""(^|[/:._-])(credential|credentials|secret|secrets|token|tokens|apikey|api-key|api_key|keymux)([/:._-]|$)""", RegexOption.IGNORE_CASE)
-        private val SAFE_FIELD_NAMES = setOf(
-            "id", "rev", "type", "kind", "name", "label", "provider", "model", "contenttype",
-            "length", "agentid", "revision", "sequence", "code", "codering8",
-        )
-        private val SENSITIVE_FIELD_NAMES = setOf(
-            "apikey", "apitoken", "accesskey", "accesskeyid", "secretkey", "clientsecret",
-            "token", "refreshtoken", "accesstoken", "password", "authorization", "bearertoken",
-            "privatekey", "providerkey", "credential", "credentials", "secret",
-        )
-        private val SECRET_TEXT_PATTERNS = listOf(
-            Regex("""(?i)\bBearer\s+[A-Za-z0-9._+/=-]{16,}"""),
-            Regex("""(?i)\b(sk|rk|pk|ghp|github_pat|xox[baprs]|ya29|AIza)[A-Za-z0-9._-]{12,}"""),
-        )
+        private val SENSITIVE_ID = GraalDocumentPolicy.SENSITIVE_ID
+        private val SAFE_FIELD_NAMES = GraalDocumentPolicy.SAFE_FIELD_NAMES
+        private val SENSITIVE_FIELD_NAMES = GraalDocumentPolicy.SENSITIVE_FIELD_NAMES
+        private val SECRET_TEXT_PATTERNS = GraalDocumentPolicy.SECRET_TEXT_PATTERNS
     }
 
     suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
@@ -165,7 +156,15 @@ class GraalWire(
                     ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"source_required"}""")
                 val target = graalDocTarget(source)
                     ?: return@withContext JvmKanbanServer.HttpResponse(503, """{"error":"cas_database_unavailable"}""")
+                if (GraalDocumentPolicy.sensitiveDocId(source)) return@withContext JvmKanbanServer.HttpResponse(403, """{"error":"content_preview_blocked"}""")
                 val projection = ClasspathSourceProjection(target.db).project(target.docId)
+                val resolved = (projection["source"] as? Map<*, *>)?.get("id") as? String
+                val sourceDoc = resolved?.let { target.store.get(it) }
+                if (resolved?.let { GraalDocumentPolicy.sensitiveDocId(it) } == true || GraalDocumentPolicy.containsSecretText(projection) ||
+                    sourceDoc?.let { doc ->
+                        val resolvedId = requireNotNull(resolved)
+                        GraalDocumentPolicy.sensitiveDocument(resolvedId, target.db.render(doc, target.store.head.getRev(resolvedId)))
+                    } == true) return@withContext JvmKanbanServer.HttpResponse(403, """{"error":"content_preview_blocked"}""")
                 JvmKanbanServer.HttpResponse(
                     if (projection["error"] == null) 200 else 404,
                     JsonSupport.stringify(projection),
@@ -251,16 +250,25 @@ class GraalWire(
         }
         val (contentType, bytes) = target.db.attachment(target.docId)
             ?: return json(404, mapOf("error" to "content_missing", "id" to id))
+        if (containsSecretText(bytes.decodeToString())) {
+            return json(403, mapOf("error" to "content_preview_blocked"))
+        }
         return JvmKanbanServer.HttpResponse(200, "", contentType, bytes)
     }
 
     private fun classfileProjection(id: String): Map<String, Any?> {
+        if (sensitiveDocId(id)) return mapOf("error" to "content_preview_blocked", "status" to 403)
         val target = graalDocTarget(id)
             ?: return linkedMapOf("error" to "cas_database_unavailable", "status" to 503, "id" to id)
         val doc = target.store.get(target.docId)
-            ?: return ClassfileBlobProjection(target.db, vitals).project(target.docId).withGraalId(id, target)
-        if (isGraalDeleted(doc)) return linkedMapOf("error" to "class_blob_deleted", "status" to 410, "id" to id)
-        return ClassfileBlobProjection(target.db, vitals).project(target.docId).withGraalId(id, target)
+        if (doc != null) {
+            if (isGraalDeleted(doc)) return linkedMapOf("error" to "class_blob_deleted", "status" to 410, "id" to id)
+            val safe = sanitizeGraalDocument(id, target.db.render(doc, target.store.head.getRev(target.docId)))
+            if ((safe["_graal"] as? Map<*, *>)?.get("previewBlocked") == true)
+                return mapOf("error" to "content_preview_blocked", "status" to 403)
+        }
+        val projection = ClassfileBlobProjection(target.db, vitals).project(target.docId).withGraalId(id, target)
+        return if (containsSecretText(projection)) mapOf("error" to "content_preview_blocked", "status" to 403) else projection
     }
 
     private fun Map<String, Any?>.withGraalId(id: String, target: GraalDocTarget): Map<String, Any?> {
@@ -304,7 +312,9 @@ class GraalWire(
                     redacted = true
                 }
                 else -> {
-                    val item = sanitizeGraalValue(key, value, sensitiveFieldName(key, sensitive), sensitive)
+                    val payload = sensitive && (value is Map<*, *> || value is List<*> ||
+                        key.filter { it.isLetterOrDigit() }.lowercase() !in SAFE_FIELD_NAMES)
+                    val item = sanitizeGraalValue(key, value, payload || sensitiveFieldName(key, sensitive), sensitive)
                     out[key] = item.value
                     redacted = redacted || item.redacted
                 }
@@ -345,12 +355,7 @@ class GraalWire(
             else -> if (keySensitive) Sanitized(REDACTED, true) else Sanitized(value, false)
         }
 
-    private fun containsSecretText(value: Any?): Boolean = when (value) {
-        is String -> looksSecretText(value)
-        is Map<*, *> -> value.values.any { containsSecretText(it) }
-        is List<*> -> value.any { containsSecretText(it) }
-        else -> false
-    }
+    private fun containsSecretText(value: Any?): Boolean = GraalDocumentPolicy.containsSecretText(value)
 
     private fun blockedAttachmentStub(value: Any?): Map<String, Any?> {
         val content = ((value as? Map<*, *>)?.get("content") as? Map<*, *>).orEmpty()
@@ -362,28 +367,12 @@ class GraalWire(
         return mapOf("content" to stub)
     }
 
-    private fun sensitiveDocId(id: String): Boolean {
-        val normalized = id.replace('\\', '/').lowercase()
-        val file = normalized.substringAfterLast('/')
-        if (file == ".env" || file.startsWith(".env.") || file.endsWith(".env")) return true
-        return SENSITIVE_ID.containsMatchIn(normalized)
-    }
+    private fun sensitiveDocId(id: String): Boolean = GraalDocumentPolicy.sensitiveDocId(id)
 
-    private fun sensitiveFieldName(name: String, documentSensitive: Boolean): Boolean {
-        val compact = name.filter { it.isLetterOrDigit() }.lowercase()
-        if (compact in SAFE_FIELD_NAMES) return false
-        if (compact in SENSITIVE_FIELD_NAMES) return true
-        if (compact.contains("apikey") || compact.contains("token") || compact.contains("password")) return true
-        if (compact.contains("secret") || compact.contains("credential") || compact.contains("authorization")) return true
-        if (compact.endsWith("privatekey") || compact.endsWith("providerkey")) return true
-        return documentSensitive && compact == "key"
-    }
+    private fun sensitiveFieldName(name: String, documentSensitive: Boolean): Boolean =
+        GraalDocumentPolicy.sensitiveFieldName(name, documentSensitive)
 
-    private fun looksSecretText(value: String): Boolean {
-        val text = value.trim()
-        if (text.length < 16) return false
-        return SECRET_TEXT_PATTERNS.any { it.containsMatchIn(text) }
-    }
+    private fun looksSecretText(value: String): Boolean = GraalDocumentPolicy.looksSecretText(value)
 
     /**
      * The 30k-foot terrain: every live document as `[id, bytes]`. The console builds the
@@ -487,6 +476,7 @@ class GraalWire(
             }
             else -> fields
         }
+        if (containsSecretText(projection)) return json(403, mapOf("error" to "content_preview_blocked"))
         if (projection !== fields && projection["error"] != null) return JvmKanbanServer.HttpResponse(
             (projection["status"] as? Number)?.toInt() ?: 404, JsonSupport.stringify(projection),
         )

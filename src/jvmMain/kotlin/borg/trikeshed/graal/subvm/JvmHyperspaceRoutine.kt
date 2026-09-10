@@ -101,7 +101,7 @@ class JvmHyperspaceRoutine(
         val req = parseHtxRequest(url = "$baseUrl/chat/completions", method = HtxMethod.POST, body = ByteSeries(body.encodeToByteArray())).copy(headers = headers)
         val resp = htx.request(req)
         val respBody = resp.body.toArray().decodeToString()
-        if (resp.status !in 200..299) throw IllegalStateException("Hyperspace LLM call failed ${resp.status}: ${respBody.take(500)}")
+        if (resp.status !in 200..299) throw IllegalStateException("Hyperspace LLM call failed ${resp.status}")
         return respBody
     }
 
