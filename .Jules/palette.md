@@ -126,6 +126,6 @@
 ## 2024-05-27 - Context-Specific ARIA Labels for generic buttons
 **Learning:** Adding ARIA labels to generic icon-only or poorly labeled buttons (like 'Fit') provides essential context for screen reader users, but adding ARIA labels that duplicate visible text (like 'Add a page') is redundant and violates WCAG 2.5.3 (Label in Name) best practices unless it provides significant extra context.
 **Action:** Before adding an ARIA label, verify the element's existing text content. Only add `aria-label` if the visible text is insufficient or absent (e.g., icon-only buttons), or if it adds crucial missing context.
-## 2026-09-09 - Synchronizing active states for duplicate navigation links in ModelMux
-**Learning:** When managing view state in a single-page application, updating the active state (such as the `aria-current="page"` attribute and visual active CSS class) on only one set of buttons using `document.querySelector` leaves duplicate navigation elements showing an incorrect, stale state to screen readers and visual users.
-**Action:** When managing view state changes dynamically, ensure the script iterates over *all* instances of the navigation buttons corresponding to that view using `document.querySelectorAll().forEach` to update `aria-current` synchronously.
+## $(date +%Y-%m-%d) - Synchronizing active states for duplicate navigation items
+**Learning:** When managing view state in a single-page application, ensure that all duplicate instances of navigation buttons for the active view (e.g., both topbar and sidebar buttons) consistently receive the `aria-current="page"` attribute and visual active state updates to prevent ambiguous states for screen reader users.
+**Action:** Use `document.querySelectorAll` instead of `document.querySelector` to apply state changes to all instances of a duplicated control simultaneously, rather than just the primary one.
