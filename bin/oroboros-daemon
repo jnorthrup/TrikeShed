@@ -17,6 +17,10 @@
 #   --hermes-console           eagerly boot the VT220 panel (otherwise lazy)
 #   --aot-cache <file>         load an existing JDK 25 JEP 483 cache
 #   --aot-record <file>        train and write a cache when this daemon exits
+#   --live                     run off build/live and build/staging directly, with hot-swap.
+#                              The default pins a private copy of the classpath first, so a
+#                              build in this checkout cannot replace files a running daemon
+#                              still needs.
 #   --boot-forge <path>        forge home holding the TrikeShed install (classpath manifest
 #                              + CAS); default $TRIKESHED_BOOT_FORGE or ~/.local/forge.
 #                              Used when the checkout's build dirs are absent — the runtime
@@ -28,11 +32,13 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # --boot-forge is consumed here (pre-scan: it decides the classpath, which is
 # resolved before the main flag loop); everything else passes through untouched.
 BOOT_FORGE="${TRIKESHED_BOOT_FORGE:-$HOME/.local/forge}"
+SNAPSHOT=1
 _PASS=()
 _PREV=""
 for _a in "$@"; do
   if [[ "$_PREV" == "--boot-forge" ]]; then BOOT_FORGE="$_a"; _PREV=""; continue; fi
   if [[ "$_a" == "--boot-forge" ]]; then _PREV="$_a"; continue; fi
+  if [[ "$_a" == "--live" ]]; then SNAPSHOT=0; continue; fi
   _PASS+=("$_a")
 done
 set -- ${_PASS[@]+"${_PASS[@]}"}
@@ -110,6 +116,48 @@ hydrate_runtime() {
     mv "$fresh" "$runtime"
 }
 
+# Pin the classpath the daemon will run from, so a later build cannot replace it.
+#
+# The dev classpath points straight at build/live/classes, build/processedResources
+# and build/staging/lib — every one of which is some Gradle task's output directory.
+# Any build in the checkout while a daemon is running rewrites the files that daemon
+# is executing: `jvmJar`, `stageDaemonLib` and `hotswapFeed` all do it, and so does a
+# second agent or another window that has no idea a daemon is up. What that produces
+# is not a clean failure. It is a JVM that keeps serving until it needs a class it
+# has not loaded yet, then dies with no stack worth reading and no cause anyone can
+# attribute. That is the shape of the 8888 death on 2026-09-09.
+#
+# So: hardlink the classpath into a per-instance directory and run from THAT. A
+# hardlink survives the usual replacement, which is unlink-then-create — Gradle's
+# Sync and Copy both work that way, so the new file lands on a new inode and this
+# snapshot keeps the bytes the daemon actually loaded. On APFS `cp -c` clones instead,
+# which is a true copy-on-write snapshot for the same O(1) cost; the plain copy is the
+# last resort. This is the same trick hydrate_runtime already uses to pull blobs out
+# of the CAS, applied to the checkout instead of the forge.
+#
+# Cost: one directory of links per instance, reclaimed on the next launch for the
+# same port.
+snapshot_runtime() {
+    local dest="$1"
+    local src rel
+    rm -rf "$dest.next" || return 1
+    mkdir -p "$dest.next" || return 1
+    # Whole-tree clone, one process per tree rather than one per file. `cp -Rc` is
+    # APFS clonefile: copy-on-write, O(1) per file, no bytes moved. GNU `cp -Rl`
+    # hardlinks for the same effect on Linux. Plain -R is the last resort and is the
+    # only one that actually costs disk.
+    for pair in "$CLASSES:classes" "$RESOURCES:resources" "$LIB:lib"; do
+        src="${pair%%:*}"; rel="${pair##*:}"
+        if [[ ! -d "$src" ]]; then mkdir -p "$dest.next/$rel"; continue; fi
+        cp -Rc "$src" "$dest.next/$rel" 2>/dev/null \
+            || cp -Rl "$src" "$dest.next/$rel" 2>/dev/null \
+            || cp -R  "$src" "$dest.next/$rel" 2>/dev/null \
+            || return 1
+    done
+    rm -rf "$dest"
+    mv "$dest.next" "$dest" || return 1
+}
+
 # Classpath resolution, in preference order:
 #   1. checkout build dirs (dev mode: hotswapFeed keeps them live)
 #   2. forge-home hydration (no checkout build needed — the forge IS the install)
@@ -117,8 +165,27 @@ hydrate_runtime() {
 AGENT_JAR="$ROOT/build/libs/hotswap-agent.jar"
 HOTSWAP_WATCH="$ROOT/build/live"
 if [[ -d "$CLASSES" && -d "$LIB" ]]; then
-    CP="$CLASSES:$RESOURCES:$LIB/*"
-    AOT_HOME="$ROOT/build/live"; AOT_LIBDIR="$LIB"
+    # --live keeps the old behaviour, and hot-swap REQUIRES it: the agent watches
+    # build/live for changed classes, and a snapshot is by definition the thing that
+    # stops changing. Pinning and hot-swapping are opposite intentions, so asking for
+    # both is refused rather than silently granting one.
+    if [[ "$SNAPSHOT" == "1" ]]; then
+        SNAP_DIR="${TRIKESHED_RUNTIME_ROOT:-$ROOT/build/runtime}/$_PORT"
+        if snapshot_runtime "$SNAP_DIR"; then
+            echo "[oroboros-daemon] runtime pinned at $SNAP_DIR — builds in this checkout cannot replace it" >&2
+            CP="$SNAP_DIR/classes:$SNAP_DIR/resources:$SNAP_DIR/lib/*"
+            AOT_HOME="$SNAP_DIR"; AOT_LIBDIR="$SNAP_DIR/lib"
+            AGENT_JAR=""   # nothing to watch: this tree is pinned on purpose
+        else
+            echo "[oroboros-daemon] could not pin the runtime; running off the live build dirs (a build WILL disturb this daemon)" >&2
+            CP="$CLASSES:$RESOURCES:$LIB/*"
+            AOT_HOME="$ROOT/build/live"; AOT_LIBDIR="$LIB"
+        fi
+    else
+        echo "[oroboros-daemon] --live: running off the build dirs, hot-swap enabled (a build in this checkout WILL disturb this daemon)" >&2
+        CP="$CLASSES:$RESOURCES:$LIB/*"
+        AOT_HOME="$ROOT/build/live"; AOT_LIBDIR="$LIB"
+    fi
 elif hydrate_runtime "$BOOT_FORGE"; then
     RUNTIME="$BOOT_FORGE/.oroboros/runtime"
     echo "[oroboros-daemon] classpath hydrated from forge $BOOT_FORGE" >&2
@@ -138,7 +205,9 @@ else
 fi
 
 DAEMON_JVM_ARGS=()
-if [[ -f "$AGENT_JAR" ]]; then
+if [[ -z "$AGENT_JAR" ]]; then
+    echo "[oroboros-daemon] hot-swap off: the runtime is pinned (pass --live to hot-swap instead)" >&2
+elif [[ -f "$AGENT_JAR" ]]; then
     DAEMON_JVM_ARGS+=("-javaagent:$AGENT_JAR=$HOTSWAP_WATCH")
 else
     echo "[oroboros-daemon] hotswap-agent.jar not found ($AGENT_JAR); running without hot-swap" >&2

@@ -150,7 +150,7 @@ $(printf '\033[1mup.\033[0m')  home=$HOME_DIR  port=$PORT
   prove the stack:     bin/mux stack --port $PORT
   prove the board:     scripts/demo-mcp-kanban.sh --evidence proof.json
   when it misbehaves:  scripts/oroboros-doctor.sh --port $PORT
-  stop it:             pkill -f "build/live/classes.*--kanban-port $PORT"
+  stop it:             pkill -f "OroborosDaemon.*--kanban-port $PORT"
   log:                 $LOG
 EOF
 
