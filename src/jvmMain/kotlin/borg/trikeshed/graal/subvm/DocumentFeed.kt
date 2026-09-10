@@ -20,6 +20,7 @@ import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.pointcut.PointcutEvent
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.DocumentExtent
+import borg.trikeshed.userspace.nio.DocumentBytes
 import borg.trikeshed.userspace.nio.DocumentInputElement
 import borg.trikeshed.userspace.nio.Volume
 import kotlinx.coroutines.CoroutineScope
@@ -45,6 +46,7 @@ class DocumentFeed private constructor(
     private val cas: CasStore,
     private val points: PointcutBlackboardAdapter,
     private val tikaOptions: TikaRuntime.TikaOptions,
+    private val stagingLba: Long?,
     val routeId: String,
     val job: kotlinx.coroutines.CompletableJob,
 ) : CoroutineContext.Element {
@@ -60,7 +62,9 @@ class DocumentFeed private constructor(
             modelId: String,
             routeId: String = "document-${UUID.randomUUID()}",
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
+            stagingLba: Long? = null,
         ): DocumentFeed {
+            require(stagingLba == null || stagingLba in 0..volume.capacity) { "Invalid document staging region" }
             val job = SupervisorJob(scope.coroutineContext[Job])
             val owner = CoroutineScope(scope.coroutineContext + job)
             val nlp = CoreNlpRuntime()
@@ -71,7 +75,7 @@ class DocumentFeed private constructor(
                     observer = DocumentCuratorObserver { name, correlation, refs ->
                         land(points, name, correlation, mapOf("receipts" to List(refs.size) { refs[it].value }))
                     })
-                return DocumentFeed(input, curator, nlp, cas, points, tikaOptions, routeId, job).also { it.start() }
+                return DocumentFeed(input, curator, nlp, cas, points, tikaOptions, stagingLba, routeId, job).also { it.start() }
             } catch (failure: Throwable) {
                 withContext(NonCancellable) {
                     try { curator?.drain() } finally {
@@ -97,8 +101,9 @@ class DocumentFeed private constructor(
             muxContext: CoroutineContext,
             modelId: String,
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
+            stagingLba: Long? = null,
         ): DocumentFeed = create(scope, volume, cas, log, bag, points, documentModel(brain, muxContext), modelId,
-            tikaOptions = tikaOptions)
+            tikaOptions = tikaOptions, stagingLba = stagingLba)
 
         private fun land(
             points: PointcutBlackboardAdapter,
@@ -164,19 +169,40 @@ class DocumentFeed private constructor(
         observe("routeStart", routeId)
     }
 
-    /** Serialized CAS access and route requests; NLP/model work fans out inside the curator. */
+    /** Serialized CAS access and route requests; the curator owns NLP-before-model sequencing. */
     suspend fun submit(extent: DocumentExtent): Receipt = gate.withLock {
         check(!closed.get()) { "Document feed is closed" }
-        val source = input.read(extent)
+        submit(input.read(extent))
+    }
+
+    /** Only a caller-reserved staging region may receive HTTP/LCNC source bytes. */
+    suspend fun submit(bytes: ByteArray, name: String, mediaType: String? = null): Receipt = gate.withLock {
+        check(!closed.get()) { "Document feed is closed" }
+        val lba = checkNotNull(stagingLba) { "Document source staging is not configured" }
+        require(name.isNotBlank()) { "Document source name must not be blank" }
+        submit(input.stage(lba, bytes, name, mediaType))
+    }
+
+    /** Re-admit exact retained source bytes through the same staging and extraction path. */
+    suspend fun submit(originalCid: ContentId, name: String, mediaType: String? = null): Receipt = gate.withLock {
+        check(!closed.get()) { "Document feed is closed" }
+        val lba = checkNotNull(stagingLba) { "Document source staging is not configured" }
+        require(name.isNotBlank()) { "Document source name must not be blank" }
+        val bytes = cas.get(originalCid) ?: error("Missing original document $originalCid")
+        check(ContentId.of(bytes) == originalCid) { "Original document CID mismatch" }
+        submit(input.stage(lba, bytes, name, mediaType))
+    }
+
+    private suspend fun submit(source: DocumentBytes): Receipt {
         check(cas.put(source.bytes) == source.cid)
         val body = JsonSupport.stringify(mapOf("originalCid" to source.cid.value,
-            "name" to extent.name, "mediaType" to extent.mediaType))
+            "name" to source.extent.name, "mediaType" to source.extent.mediaType))
         val reply = withContext(Dispatchers.IO) {
             CamelRuntime.request(routeId, CamelRuntime.Request(body))
         }
         val cid = ContentId(reply.body)
         val recordBytes = cas.get(cid) ?: error("Camel returned an unretained curation receipt")
-        Receipt(cid, DocumentCuratorCodec.decode(recordBytes))
+        return Receipt(cid, DocumentCuratorCodec.decode(recordBytes))
     }
 
     /** No new submissions; finish the active exchange before stopping its dependencies. */
