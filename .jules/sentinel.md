@@ -67,3 +67,8 @@
 **Vulnerability:** ProcessBuilder in `OroborosDaemon.kt` inherited the host process environment variables by default when spawning `git fetch` and `git rev-parse`, potentially leaking daemon secrets like API keys to git credential helpers or pre-commit hooks.
 **Learning:** Process spawns, even for trusted binaries like `git`, must explicitly clear the environment and use a whitelisted environment to prevent accidental leakages through credential helpers or hooks.
 **Prevention:** Always explicitly call `environment().clear()` and populate it with `GuestEnvironment.curated()` before starting any process with `ProcessBuilder`.
+
+## 2024-05-28 - [Denial of Service and Env Leak in FunnelMergeBranchesCli]
+**Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout and while synchronously reading from the process `InputStream` in `gitIn` and `gradle` functions of `FunnelMergeBranchesCli.kt`. The `ProcessBuilder` was also inheriting the host environment variables, potentially leaking secrets to arbitrary processes.
+**Learning:** `Process.waitFor()` without a timeout and synchronous reading before it guarantees a pipe buffer deadlock DoS if the process hangs or fills the buffer. Inherited `ProcessBuilder` environments leak sensitive host daemon secrets.
+**Prevention:** Always read process streams asynchronously (e.g., using `CompletableFuture.supplyAsync`), use bounded `waitFor(timeout, TimeUnit)` with forceful termination `destroyForcibly()` on timeout, and always explicitly clear and populate `environment()` with `GuestEnvironment.curated()`.
