@@ -68,7 +68,7 @@
 **Learning:** Process spawns, even for trusted binaries like `git`, must explicitly clear the environment and use a whitelisted environment to prevent accidental leakages through credential helpers or hooks.
 **Prevention:** Always explicitly call `environment().clear()` and populate it with `GuestEnvironment.curated()` before starting any process with `ProcessBuilder`.
 
-## 2024-09-09 - [Denial of Service via Pipe Buffer Deadlock in CLI Tools]
-**Vulnerability:** The `FunnelMergeBranchesCli` spawned `git` and `gradle` child processes with synchronous `readText()` on `inputStream` followed by unbounded `waitFor()`.
-**Learning:** Even in CLI scripts or internal tools, OS pipe buffer deadlocks can cause the entire tool to hang indefinitely if a child process produces more output than the pipe buffer limit while the parent thread is blocked reading synchronously or waiting.
-**Prevention:** Ensure all `ProcessBuilder` spawns, regardless of the context (daemon or CLI), use asynchronous stream reading (`CompletableFuture.supplyAsync`) and bounded `waitFor(timeout)` with forceful termination.
+## 2024-05-28 - [Denial of Service and Env Leak in FunnelMergeBranchesCli]
+**Vulnerability:** Found `waitFor()` being called on a `Process` without a timeout and while synchronously reading from the process `InputStream` in `gitIn` and `gradle` functions of `FunnelMergeBranchesCli.kt`. The `ProcessBuilder` was also inheriting the host environment variables, potentially leaking secrets to arbitrary processes.
+**Learning:** `Process.waitFor()` without a timeout and synchronous reading before it guarantees a pipe buffer deadlock DoS if the process hangs or fills the buffer. Inherited `ProcessBuilder` environments leak sensitive host daemon secrets.
+**Prevention:** Always read process streams asynchronously (e.g., using `CompletableFuture.supplyAsync`), use bounded `waitFor(timeout, TimeUnit)` with forceful termination `destroyForcibly()` on timeout, and always explicitly clear and populate `environment()` with `GuestEnvironment.curated()`.
