@@ -85,7 +85,8 @@ class SpaceGraph(initial: GraphSpec = GraphSpec(), val historyLimit: Int = 128) 
     val canRedo get() = redo.isNotEmpty()
     fun node(id: String) = nodes[id]
     fun edge(id: String) = edges[id]
-    fun snapshot() = GraphSpec(nodes.values.toList().toSeries(), edges.values.toList().toSeries(), camera)
+    // Bolt: Use native toSeries to prevent O(N) allocation
+    fun snapshot() = GraphSpec(nodes.values.toSeries(), edges.values.toSeries(), camera)
     fun subscribe(listener: (GraphChange) -> Unit): () -> Unit { listeners.add(listener); return { listeners.remove(listener) } }
     fun execute(command: GraphCommand, recordHistory: Boolean = true) {
         val before = snapshot()
@@ -195,6 +196,7 @@ class GraphBuilder {
     fun edge(id: String, source: String, target: String, kind: EdgeKind = EdgeKind.Edge, data: NodeData = NodeData()) {
         edges.add(EdgeSpec(id, source, target, kind, data))
     }
-    fun build() = GraphSpec(nodes.toList().toSeries(), edges.toList().toSeries(), camera)
+    // Bolt: Use native toSeries to prevent O(N) allocation
+    fun build() = GraphSpec(nodes.toSeries(), edges.toSeries(), camera)
 }
 fun graph(build: GraphBuilder.() -> Unit) = GraphBuilder().apply(build).build()
