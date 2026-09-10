@@ -259,3 +259,7 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2026-11-21 - Series collection return type mismatch
 **Learning:** In TrikeShed, `Series` implements the standard Kotlin `List` interface. The custom `.filter` extension natively returns a `Series`. Therefore, chaining `.toList()` or `.map { it }` on the result of `Series.filter { ... }` just to satisfy a `List` return type is an anti-pattern. It creates an unnecessary O(N) memory allocation and copy.
 **Action:** Return the `Series` directly whenever a `List` is expected instead of coercing it to an `ArrayList` via `.toList()` or `.map { it }`.
+
+## 2024-06-05 - Avoid .view.toList() coercion on Series to satisfy List returns
+**Learning:** In TrikeShed, Series implements List. Coercing a filtered Series to a List via .view.toList() is unnecessary and causes O(N) allocation.
+**Action:** Return the Series directly instead of calling .view.toList().

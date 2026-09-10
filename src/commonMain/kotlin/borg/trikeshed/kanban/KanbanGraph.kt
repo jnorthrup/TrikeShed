@@ -107,7 +107,7 @@ data class KanbanGraph(
     fun edgesInGroup(group: String?): List<KanbanEdge> =
         if (group == null) emptyList()
         // Bolt: Removed redundant identity map to avoid O(N) allocation
-        else edges.filter { it.group == group }.view.toList()
+        else edges.filter { it.group == group }
 }
 
 fun interface KanbanPredicate { fun test(card: KanbanCardState, edge: KanbanEdge): Boolean }
