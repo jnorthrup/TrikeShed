@@ -9,6 +9,7 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfContext
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
+import kotlin.concurrent.Volatile
 
 data class UringCompletion(
     val userData: Long,
@@ -114,8 +115,13 @@ object Liburing : LiburingFacade by LiburingImpl {
     @Volatile private var submitPrograms: Array<UringEbpfProgram>? = null
     @Volatile private var completePrograms: Array<UringEbpfProgram>? = null
 
-    /** Attach a program to its declared phase. Attachment is rare; submission is not. */
-    @Synchronized
+    /**
+     * Attach a program to its declared phase.
+     *
+     * Attach at setup, before submissions flow: there is no lock here because commonMain has no
+     * portable one, and a ring belongs to one thread anyway. Reads on the submission path are
+     * volatile, so a program attached before the first prep is seen by it.
+     */
     fun attach(program: UringEbpfProgram) {
         when (program.phase) {
             UringEbpfPhase.SUBMIT -> submitPrograms = (submitPrograms ?: emptyArray()) + program
@@ -123,8 +129,7 @@ object Liburing : LiburingFacade by LiburingImpl {
         }
     }
 
-    /** Detach everything. */
-    @Synchronized
+    /** Detach everything. Same rule as [attach]: not while submissions are in flight. */
     fun detachAll() { submitPrograms = null; completePrograms = null }
 
     /** -1 is EPERM: the veto is an error the caller sees, not a silently dropped submission. */
