@@ -126,3 +126,7 @@
 ## 2024-05-27 - Context-Specific ARIA Labels for generic buttons
 **Learning:** Adding ARIA labels to generic icon-only or poorly labeled buttons (like 'Fit') provides essential context for screen reader users, but adding ARIA labels that duplicate visible text (like 'Add a page') is redundant and violates WCAG 2.5.3 (Label in Name) best practices unless it provides significant extra context.
 **Action:** Before adding an ARIA label, verify the element's existing text content. Only add `aria-label` if the visible text is insufficient or absent (e.g., icon-only buttons), or if it adds crucial missing context.
+
+## 2026-09-07 - Bridging global drag events to local drop zones
+**Learning:** When an application has a specific drop zone but allows users to drag files anywhere over the window to initiate a drop, failing to provide a global 'dragover' visual affordance on the drop zone leaves users uncertain if their action is valid until they precisely hover over the target.
+**Action:** Bind global 'dragover', 'dragleave', and 'drop' events to the document to add a temporary visual active state class to the specific drop zone element, providing immediate feedback.

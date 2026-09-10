@@ -114,7 +114,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   text-align: center;
   transition: all 0.2s;
 }
-.drop-zone:hover, .drop-zone:focus-visible {
+.drop-zone:hover, .drop-zone:focus-visible, .drop-zone.drag-active {
   border-color: var(--accent);
   background: var(--accent-soft);
   outline: none;
