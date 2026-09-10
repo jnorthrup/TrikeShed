@@ -82,7 +82,7 @@ class BtrfsUringFileVolume private constructor(
 
     constructor(
         imagePath: String,
-        blockSize: Int = NioBtrfsGraalBlobStore.SECTOR_MIN.toInt(),
+        blockSize: Int = DEFAULT_BLOCK_SIZE,
         capacity: Long,
         entries: Int = 8,
         ebpfPrograms: List<UringEbpfProgram> = emptyList(),
@@ -95,6 +95,7 @@ class BtrfsUringFileVolume private constructor(
     )
 
     companion object {
+        const val DEFAULT_BLOCK_SIZE: Int = 4096
         private const val O_RDWR: Int = 2
         private const val O_CREAT: Int = 64
         private const val O_EXCL: Int = 128
@@ -107,7 +108,7 @@ class BtrfsUringFileVolume private constructor(
         suspend fun open(
             channel: UringChannel,
             imagePath: String,
-            blockSize: Int = NioBtrfsGraalBlobStore.SECTOR_MIN.toInt(),
+            blockSize: Int = DEFAULT_BLOCK_SIZE,
             capacity: Long,
             create: Boolean = true,
             resize: Boolean = create,

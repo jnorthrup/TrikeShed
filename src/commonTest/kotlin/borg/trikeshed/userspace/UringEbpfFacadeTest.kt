@@ -4,6 +4,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ebpf.UringEbpfContext
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfContextLayout
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfInsn
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
@@ -16,6 +17,7 @@ import kotlin.test.assertFailsWith
 class UringEbpfFacadeTest {
 
     private class RecordingBackend : UserspaceChannelBackend {
+        override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.READ, UringOp.WRITE)
         val submissions = mutableListOf<UringSubmission>()
 
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
@@ -62,7 +64,7 @@ class UringEbpfFacadeTest {
     }
 
     @Test
-    fun completion_hook_runs_after_backend_result() {
+    fun completion_hook_cannot_rewrite_backend_result() {
         val addOne = UringEbpfProgram.of(
             name = "add-one",
             phase = UringEbpfPhase.COMPLETE,
@@ -78,11 +80,11 @@ class UringEbpfFacadeTest {
         facade.enqueue(UringSubmission(UringOp.NOP, fd = -1, addr = 0, len = 0, offset = 0, userData = 7))
         facade.submit()
 
-        assertEquals(listOf(SelectionResult(81, 7)), facade.wait(minComplete = 1))
+        assertEquals(listOf(SelectionResult(80, 7)), facade.wait(minComplete = 1))
     }
 
     @Test
-    fun batch_enqueue_preserves_order_with_rejected_and_admitted_entries() = runTest {
+    fun batch_enqueue_preserves_identity_with_rejected_and_admitted_entries() = runTest {
         val rejectWrites = UringEbpfProgram.of(
             name = "reject-write-async",
             phase = UringEbpfPhase.SUBMIT,
@@ -112,6 +114,28 @@ class UringEbpfFacadeTest {
             ),
             result,
         )
+    }
+
+    @Test
+    fun executable_program_is_independent_of_input_and_inspection_array_mutation() {
+        val instructions = longArrayOf(UringEbpfInsn.mov64Imm(UringEbpfInsn.R0, -13), UringEbpfInsn.exit())
+        val program = UringEbpfProgram.of("admission", UringEbpfPhase.SUBMIT, instructions)
+        instructions[0] = UringEbpfInsn.mov64Imm(UringEbpfInsn.R0, 0)
+        program.instructions[0] = UringEbpfInsn.mov64Imm(UringEbpfInsn.R0, 0)
+        val context = UringEbpfContext(UringEbpfPhase.SUBMIT,
+            UringOp.Companion.Submissions.nop(11), null)
+        assertEquals(-13L, program.run(context, 0))
+    }
+
+    @Test
+    fun verifier_rejects_conditional_backward_jump_before_any_io() {
+        assertFailsWith<IllegalArgumentException> {
+            UringEbpfProgram.of("loop", UringEbpfPhase.COMPLETE, longArrayOf(
+                UringEbpfInsn.mov64Imm(UringEbpfInsn.R0, 0),
+                UringEbpfInsn.jeq64Imm(UringEbpfInsn.R0, 0, offset = -1),
+                UringEbpfInsn.exit(),
+            ))
+        }
     }
 
     @Test

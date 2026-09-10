@@ -84,10 +84,12 @@ sealed interface UringEbpfVerifyResult {
 class UringEbpfProgram private constructor(
     val name: String,
     val phase: UringEbpfPhase,
-    val instructions: LongArray,
+    private val bytecode: LongArray,
 ) {
+    /** Inspection cannot mutate verified executable instructions. */
+    val instructions: LongArray get() = bytecode.copyOf()
     fun run(context: UringEbpfContext, initialR0: Long): Long =
-        UringEbpfVm.run(instructions, context, initialR0)
+        UringEbpfVm.run(bytecode, context, initialR0)
 
     companion object {
         fun of(name: String, phase: UringEbpfPhase, instructions: LongArray): UringEbpfProgram {
@@ -113,6 +115,8 @@ private enum class UringEbpfRegType {
 
 private object UringEbpfVerifier {
     private const val MAX_INSNS = 4096
+    private val executableOpcodes = setOf(0x95, 0x05, 0xb7, 0xbf, 0x07, 0x17, 0x47, 0x57, 0xa7,
+        0x0f, 0x1f, 0x4f, 0x5f, 0xaf, 0x15, 0x55, 0x25, 0x35, 0x1d, 0x5d, 0x2d, 0x3d, 0x61, 0x79, 0x7b)
 
     fun verify(instructions: LongArray): UringEbpfVerifyResult {
         if (instructions.isEmpty()) return UringEbpfVerifyResult.Failure(0, "empty program")
@@ -132,6 +136,8 @@ private object UringEbpfVerifier {
             val off = offset(raw)
             val cls = op and 0x07
             val base = op and 0xf0
+            if (dst > 10 || src > 10) return UringEbpfVerifyResult.Failure(pc, "register outside R0..R10")
+            if (op !in executableOpcodes) return UringEbpfVerifyResult.Failure(pc, "unsupported executor opcode")
             when {
                 op == 0x95 -> Unit
                 op == 0x05 -> {
@@ -149,8 +155,9 @@ private object UringEbpfVerifier {
                         0x10, 0x20, 0x30, 0x50 -> Unit
                         else -> return UringEbpfVerifyResult.Failure(pc, "unsupported jump opcode 0x${op.toString(16)}")
                     }
-                    jumpTarget(pc, off, instructions.size)
+                    val target = jumpTarget(pc, off, instructions.size)
                         ?: return UringEbpfVerifyResult.Failure(pc, "jump outside program")
+                    if (target <= pc) return UringEbpfVerifyResult.Failure(pc, "backward jumps are not accepted")
                     if (pc + 1 >= instructions.size) return UringEbpfVerifyResult.Failure(pc, "conditional jump has no fallthrough")
                 }
                 cls == 0x07 -> {

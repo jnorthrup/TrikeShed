@@ -36,7 +36,7 @@ internal val jvmUringOperations = UringOp.caps(
     // Mapping and the metadata syscalls. Every one of these was previously reached by calling
     // java.nio directly from wherever needed it -- which is the JVM creep: each call site grows
     // its own platform assumptions and the single vocabulary stops being the only way in.
-    UringOp.MAP, UringOp.MUNMAP, UringOp.MSYNC, UringOp.STATX, UringOp.FALLOCATE,
+    UringOp.STATX, UringOp.FALLOCATE,
     // Advisory, and answered rather than refused: the emulation must not differ from a native
     // ring in what it CAN do, only in how fast it does it.
     UringOp.FADVISE, UringOp.MADVISE,
@@ -67,14 +67,6 @@ internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
 }
 
 internal class JvmChannelDescriptor(val channel: FileChannel) : JvmDescriptor {
-    /**
-     * The mapping this fd holds, if MAP was submitted for it. One per descriptor: a second MAP
-     * without an intervening MUNMAP is -22 rather than a silent leak of the first.
-     *
-     * Kept as a field on the descriptor rather than in a side map keyed by fd, so a mapping cannot
-     * outlive the descriptor that backs it -- close() releases it by construction.
-     */
-    @Volatile internal var mapping: java.nio.MappedByteBuffer? = null
     override fun close() = channel.close()
     override fun size(): Long = channel.size()
     override fun isOpen(): Boolean = channel.isOpen
@@ -147,6 +139,7 @@ internal class JvmUserspaceChannelBackend(
         return try {
             when (sub.opcode) {
                 UringOp.NOP -> 0
+                UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
                     jvmOpen(sub.path(), sub.offset).also { owned.add(it) }
@@ -168,7 +161,6 @@ internal class JvmUserspaceChannelBackend(
                     0
                 }
                 UringOp.CLOSE -> {
-                    (JvmFileTable.descriptor(sub.fd) as? JvmChannelDescriptor)?.mapping = null
                     owned.remove(sub.fd); JvmFileTable.close(sub.fd)
                 }
                 else -> {
@@ -177,9 +169,6 @@ internal class JvmUserspaceChannelBackend(
                     val channel = (descriptor as? JvmChannelDescriptor)?.channel ?: return -95
                     when (sub.opcode) {
                         UringOp.READ, UringOp.WRITE -> transfer(channel, sub)
-                        UringOp.MAP -> mapDescriptor(descriptor, sub)
-                        UringOp.MUNMAP -> { descriptor.mapping = null; 0 }
-                        UringOp.MSYNC -> descriptor.mapping?.let { it.force(); 0 } ?: -22
                         UringOp.STATX -> statx(channel, sub)
                         UringOp.FALLOCATE -> {
                             // Grow to offset+len without writing the interior; a hole is the point.
@@ -188,13 +177,10 @@ internal class JvmUserspaceChannelBackend(
                             0
                         }
                         UringOp.FADVISE -> advise(channel, sub)
-                        UringOp.MADVISE -> when (sub.flags) {
-                            // madvise(WILLNEED) on a mapping is exactly MappedByteBuffer.load():
-                            // fault the pages in now rather than on first touch.
-                            ADVICE_WILLNEED -> descriptor.mapping?.let { it.load(); 0 } ?: -22
-                            else -> 0
+                        UringOp.FSYNC -> {
+                            if (sub.operationFlags and 1.inv() != 0) return -22
+                            channel.force(sub.operationFlags and 1 == 0); 0
                         }
-                        UringOp.FSYNC -> { channel.force(true); 0 }
                         UringOp.FTRUNCATE -> {
                             require(sub.offset >= 0)
                             if (sub.offset <= channel.size()) channel.truncate(sub.offset)
@@ -233,25 +219,6 @@ internal class JvmUserspaceChannelBackend(
     }
 
     /**
-     * mmap through the waist. [UringSubmission.flags] is the protection: 0 read-only private,
-     * 1 read/write shared. A JVM mapping cannot be relocated, so the address the caller would
-     * get from a real mmap has no analogue -- the completion returns the mapped length, and the
-     * bytes are reached through the descriptor rather than through an address.
-     */
-    private fun mapDescriptor(descriptor: JvmChannelDescriptor, sub: UringSubmission): Int {
-        if (descriptor.mapping != null) return -22          // already mapped; MUNMAP first
-        if (sub.len <= 0 || sub.offset < 0) return -22
-        val mode = when (sub.flags) {
-            0 -> FileChannel.MapMode.READ_ONLY
-            1 -> FileChannel.MapMode.READ_WRITE
-            else -> return -22
-        }
-        if (sub.offset + sub.len > descriptor.channel.size()) return -22
-        descriptor.mapping = descriptor.channel.map(mode, sub.offset, sub.len.toLong())
-        return sub.len
-    }
-
-    /**
      * statx into the caller's buffer. Three little-endian longs -- size, mtime millis, mode bits
      * (1 regular, 2 directory) -- which is what this backend can answer without inventing the
      * rest of struct statx.
@@ -265,22 +232,12 @@ internal class JvmUserspaceChannelBackend(
         return 24
     }
 
-    /**
-     * posix_fadvise. [UringSubmission.flags] is the advice, [offset] and [len] the range.
-     *
-     * These previously returned -95, on the reasoning that returning 0 would claim an effect that
-     * did not happen. That was the wrong reading of the contract: advice is advisory, and
-     * posix_fadvise returning 0 has never promised the kernel acted -- only that the advice was
-     * well-formed and received. Refusing it made the emulation diverge from a native ring in
-     * capability rather than in performance, which is the one way this waist must not differ:
-     * a caller would have to branch on which backend it got, and that branch is the fraying.
-     *
-     * WILLNEED is honoured for real by reading the range so the page cache holds it. The rest are
-     * accepted and ignored, which is precisely what a kernel is permitted to do with them.
+    /** JDK fallback: valid cache-policy hints are accepted; WILLNEED reads the requested range.
+     * It makes no residency guarantee and is reported as emulation in nativeCapabilities.
      */
     private fun advise(channel: FileChannel, sub: UringSubmission): Int {
-        if (sub.offset < 0 || sub.len < 0) return -22
-        if (sub.flags != ADVICE_WILLNEED) return 0
+        if (sub.offset < 0 || sub.len < 0 || sub.operationFlags !in 0..5) return -22
+        if (sub.operationFlags != ADVICE_WILLNEED) return 0
         val length = if (sub.len == 0) (channel.size() - sub.offset) else sub.len.toLong()
         if (length <= 0L) return 0
         // A page-sized touch per page is enough to fault the range in; the bytes are discarded.
@@ -289,6 +246,7 @@ internal class JvmUserspaceChannelBackend(
         val end = sub.offset + length
         while (at < end) {
             scratch.clear()
+            scratch.limit(minOf(scratch.capacity().toLong(), end - at).toInt())
             val n = channel.read(scratch, at)
             if (n <= 0) break
             at += n
@@ -297,17 +255,24 @@ internal class JvmUserspaceChannelBackend(
     }
 
     private fun transfer(channel: FileChannel, sub: UringSubmission): Int {
-        val buffer = sub.buffer ?: return -22
-        if (sub.len < 0 || sub.len > buffer.remaining() || sub.offset < -1L) return -22
-        if (sub.opcode == UringOp.READ && buffer.isReadOnly()) return -22
-        val position = buffer.position()
-        val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + position, sub.len)
+        val buffer = sub.buffer
+        if (sub.len < 0 || sub.offset < -1L) return -22
+        if (buffer != null && (sub.len > buffer.remaining() || sub.opcode == UringOp.READ && buffer.isReadOnly())) return -22
+        val position = buffer?.position() ?: 0
+        val nio = if (buffer != null) java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + position, sub.len)
+        else {
+            if (sub.addr == 0L && sub.len != 0) return -14
+            sub.memory?.let { memory ->
+                if (!memory.isOpen || sub.addr < memory.address || sub.addr - memory.address > memory.length - sub.len) return -22
+            }
+            java.lang.foreign.MemorySegment.ofAddress(sub.addr).reinterpret(sub.len.toLong()).asByteBuffer()
+        }
         val count = if (sub.opcode == UringOp.READ) {
             if (sub.offset == -1L) channel.read(nio) else channel.read(nio, sub.offset)
         } else {
             if (sub.offset == -1L) channel.write(nio) else channel.write(nio, sub.offset)
         }
-        if (count > 0) buffer.position(position + count)
+        if (count > 0) buffer?.position(position + count)
         return count.coerceAtLeast(0) // io_uring EOF is a successful zero-byte completion.
     }
 

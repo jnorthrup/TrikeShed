@@ -46,8 +46,8 @@ enum class OpCode(val code: Byte) {
     WRITE_FIXED(5),
     POLL_ADD(6),
     POLL_REMOVE(7),
-    RECV(10),
-    SEND(11);
+    RECV(27),
+    SEND(26);
 
     companion object {
         fun fromCode(code: Byte): OpCode? = entries.find { it.code == code }

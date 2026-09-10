@@ -40,6 +40,8 @@ interface ChannelOperations : CoroutineContext.Element {
         fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
         /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
         fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
+        /** Settle admitted requests and release the owned submission backend. */
+        fun close() {}
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }

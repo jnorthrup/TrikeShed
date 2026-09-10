@@ -311,10 +311,13 @@ elements.
 
 ## Userspace I/O and structured completion
 
-TrikeShed's CCEK I/O model combines Java NIO patterns with native or emulated
-Linux kernel I/O, including `io_uring`, through userspace NIO in Kotlin
-`commonMain`. Unix, TCP/IP, and file streams share asynchronous Kotlin channel
-and flow abstractions for fan-out and fan-in.
+Userspace NIO is uring-centric. Kotlin `commonMain` owns one submission and
+completion contract, buffer ownership, bounded delivery and drain. Kernel
+`io_uring` executes supported operations when setup, operation probes and a
+reachable runtime binding permit it; uring-compatible emulation is required
+otherwise. Runtime language does not determine kernel availability. Existing
+NIO-shaped channel APIs adapt to this contract. Unix, TCP/IP and file streams
+compose through ordinary Kotlin channels and flows under owning SupervisorJobs.
 
 Each composition defines its expected final element state and the intermediate
 tasks required to reach it. Nested and parallel coroutines are owned by one

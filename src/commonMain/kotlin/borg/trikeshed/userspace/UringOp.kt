@@ -7,14 +7,13 @@ import borg.trikeshed.context.or
 import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
- * Portable operations with explicit linux/io_uring.h IORING_OP_* codes.
+ * Supported portable subset of linux/io_uring.h IORING_OP_* codes (liburing 2.15).
  *
- * Each entry's [mask] is `1L shl (ordinal and 63)` within its [UringOp.word], so a capability
- * is two Longs once the vocabulary passes 64 operations.
+ * Each entry's [mask] is `1L shl ordinal` so the enum IS the Long bitmask.
  * Capabilities compose with `or`, test with [BitMasked.andAlso].
  *
- * [code] is independent of the capability bit position. -1 denotes an operation
- * without a kernel opcode, which must be emulated or rejected.
+ * [code] is independent of the capability bit position. Unique negative codes
+ * identify userspace extensions, which must be emulated or rejected.
  */
 enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     NOP(0, "no-op"),
@@ -48,8 +47,8 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     OPENAT2(28, "openat2 — open with resolve flags"),
     EPOLL_CTL(29, "epoll_ctl — add/modify epoll interest"),
     SPLICE(30, "splice — zero-copy pipe transfer"),
-    PROVIDE_BUFFERS(31, "provide kernel-side buffer ring"),
-    REMOVE_BUFFERS(32, "remove kernel-side buffer ring"),
+    PROVIDE_BUFFERS(31, "provide buffers for selection by buffer group"),
+    REMOVE_BUFFERS(32, "remove buffers from a selection group"),
     TEE(33, "tee — duplicate pipe data"),
     SHUTDOWN(34, "socket shutdown"),
     RENAMEAT(35, "renameat — rename relative to dirfd"),
@@ -63,10 +62,10 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     FGETXATTR(43, "fgetxattr — get extended attr by fd"),
     GETXATTR(44, "getxattr — get extended attr by path"),
     FLISTXATTR(-1, "flistxattr — list extended attrs by fd"),
-    LISTXATTR(-1, "listxattr — list extended attrs by path"),
-    FREMOVEXATTR(-1, "fremovexattr — remove extended attr by fd"),
-    REMOVEXATTR(-1, "removexattr — remove extended attr by path"),
-    GETDENTS(-1, "getdents64 — read directory entries"),
+    LISTXATTR(-2, "listxattr — list extended attrs by path"),
+    FREMOVEXATTR(-3, "fremovexattr — remove extended attr by fd"),
+    REMOVEXATTR(-4, "removexattr — remove extended attr by path"),
+    GETDENTS(-5, "getdents64 — read directory entries"),
     SOCKET(45, "socket — create socket"),
     URING_CMD(46, "uring_cmd — driver-specific command"),
     SEND_ZC(47, "zerocopy send"),
@@ -75,37 +74,13 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     WAITID(50, "waitid — wait for process state change"),
     FUTEX_WAIT(51, "futex wait"),
     FUTEX_WAKE(52, "futex wake"),
-
-    // ── Mapping. No IORING_OP_* exists for these: Linux has never made mmap a ring
-    // operation, so code is -1 and the waist owns them. They belong here rather than beside
-    // the ring because a mapping is addressed by the same fd, through the same table, and a
-    // caller that has to leave the submission vocabulary to map a file is exactly the seam
-    // where per-platform code starts to fray.
-    MAP(-1, "mmap — map a descriptor range into the address space"),
-    // These share MAP's capability bit. The mask answers "can this backend map memory", not
-    // "which of the three is this" -- no backend supports mmap without munmap, and dispatch is by
-    // opcode identity regardless. Three bits for one capability was waste against a 64-op ceiling.
-    MUNMAP(-1, "munmap — release a mapping") { override val mask: Long get() = MAP.mask },
-    MSYNC(-1, "msync — flush a mapping to its backing store") { override val mask: Long get() = MAP.mask },
     ;
 
-    /**
-     * Which capability word this op's bit lives in: 0 for the first 64 ops, 1 for the next 64.
-     *
-     * The mask used to be `1L shl ordinal`, which capped the vocabulary at 64 -- past 63 the shift
-     * wraps silently and two ops share a bit, so a capability test starts answering for the wrong
-     * operation. Widening to a 128-bit mask type would ripple through ~137 call sites and cost the
-     * single-word AND that makes the test free. A second word is additive instead: everything
-     * already written keeps working, because every op that exists today lives in word 0.
-     */
-    val word: Int get() = ordinal ushr 6
+    override val mask: Long get() = 1L shl ordinal
 
-    /**
-     * The bit within [word]. Two ops in different words share a bit value, so this is only half an
-     * answer -- use [UserspaceChannelBackend.supports] rather than `capabilities and op.mask` for
-     * anything that must stay correct past the 64th operation.
-     */
-    override val mask: Long get() = 1L shl (ordinal and 63)
+    init {
+        require(ordinal < Long.SIZE_BITS) { "Portable capability subset exceeds a Long" }
+    }
 
     companion object {
         val CAP_MANDATORY: Long = READ or WRITE or CLOSE or STATX
@@ -114,23 +89,13 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         val CAP_NET_IO: Long = SEND or RECV or ACCEPT or CONNECT or
             SENDMSG or RECVMSG or SHUTDOWN
 
-        /** Word-0 capabilities. Ops from word 1 are ignored here; use [capsHigh] for those. */
-        fun caps(vararg ops: UringOp): Long {
-            var acc = 0L; var i = 0
-            while (i < ops.size) { val op = ops[i]; if (op.word == 0) acc = acc or op.mask; i++ }
-            return acc
-        }
-
-        /** Word-1 capabilities: the 65th op onward. Zero until the vocabulary crosses 64. */
-        fun capsHigh(vararg ops: UringOp): Long {
-            var acc = 0L; var i = 0
-            while (i < ops.size) { val op = ops[i]; if (op.word == 1) acc = acc or op.mask; i++ }
-            return acc
-        }
+        fun caps(vararg ops: UringOp): Long = ops.fold(0L) { acc: Long, op: UringOp -> op or acc }
 
         /**
-         * One io_uring SQE. The only type crossing [FunctionalUringFacade].
-         * Fields map 1:1 to struct io_uring_sqe.
+         * Common submission contract crossing [FunctionalUringFacade].
+         * [flags] holds IOSQE flags; [operationFlags] holds the opcode-specific
+         * union (advice, fsync flags, etc.). [code] is encoded by the backend.
+         * Heap buffers and mapping owners remain borrowed through completion.
          */
         data class UringSubmission(
             val opcode: UringOp,
@@ -141,6 +106,9 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
             val flags: Int = 0,
             val userData: Long = 0,
             val buffer: ByteBuffer? = null,
+            val operationFlags: Int = 0,
+            val bufferIndex: Int = -1,
+            val memory: MemoryMapping? = null,
         )
 
         /** Convenience constructors. */
@@ -150,7 +118,7 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
                 require(path.isNotEmpty() && '\u0000' !in path)
                 val bytes = path.encodeToByteArray()
                 return UringSubmission(OPENAT, -100, 0, bytes.size, flags.toLong(),
-                    userData = userData, buffer = ByteBuffer(bytes))
+                    userData = userData, buffer = ByteBuffer(bytes), operationFlags = 438)
             }
 
             fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
@@ -159,21 +127,12 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
             fun write(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
                 UringSubmission(WRITE, fd, bufAddr, len, offset, 0, userData)
 
-            /**
-             * Map [len] bytes of [fd] from [offset]. [flags] carries the protection and share
-             * mode; 0 is read-only private, which is the only shape the JVM emulation can honour
-             * without a write-back contract.
-             */
-            fun map(fd: Int, offset: Long, len: Int, flags: Int = 0, userData: Long = 0): UringSubmission =
-                UringSubmission(MAP, fd, 0, len, offset, flags, userData)
-
-            /** Release the mapping [fd] holds. */
-            fun unmap(fd: Int, userData: Long = 0): UringSubmission =
-                UringSubmission(MUNMAP, fd, 0, 0, 0, 0, userData)
-
-            /** Flush [fd]'s mapping to its backing store. */
-            fun msync(fd: Int, userData: Long = 0): UringSubmission =
-                UringSubmission(MSYNC, fd, 0, 0, 0, 0, userData)
+            /** Owned advice follows the common admission/drain lifetime of its mapping. */
+            fun madvise(memory: MemoryMapping, offset: Long = 0, len: Int, advice: Int, userData: Long): UringSubmission {
+                require(offset >= 0 && len >= 0 && offset <= memory.length && len <= memory.length - offset)
+                return UringSubmission(MADVISE, -1, memory.address + offset, len, 0,
+                    userData = userData, operationFlags = advice, memory = memory)
+            }
 
             fun statx(fd: Int, bufAddr: Long, userData: Long): UringSubmission =
                 UringSubmission(STATX, fd, bufAddr, 256, 0, 0, userData)

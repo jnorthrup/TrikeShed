@@ -8,6 +8,10 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
  * Channel factory — backed by expect/actual [ChannelsImpl].
  */
 object Channels {
+    fun open(scope: kotlinx.coroutines.CoroutineScope, entries: Int = 256,
+             ebpfPrograms: List<UringEbpfProgram> = emptyList()): Channel =
+        Channel(FunctionalUringFacade.create(scope, entries, ebpfPrograms = ebpfPrograms))
+
     fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): Channel =
         Channel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
 
@@ -49,8 +53,14 @@ class Channel(
     fun truncate(file: File, size: Long, userData: Long) =
         facade.truncate(file.impl, size, userData)
 
-    fun map(file: File, mode: String, position: Long, size: Long, userData: Long) =
-        facade.map(file.impl, mode, position, size, userData)
+
+    val capabilities: Long get() = facade.capabilities
+    val nativeCapabilities: Long get() = facade.nativeCapabilities
+    val availability: String get() = facade.availability
+    fun enqueue(submission: UringOp.Companion.UringSubmission) = facade.enqueue(submission)
+    suspend fun drain() = facade.drain()
+    suspend fun close() = facade.close()
+    fun closeNow() = facade.closeNow()
 
     fun submit(): Int = facade.submit()
 

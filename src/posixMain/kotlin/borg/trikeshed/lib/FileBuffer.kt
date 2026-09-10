@@ -4,6 +4,8 @@ package borg.trikeshed.lib
 import borg.trikeshed.lib.long.LongSeries
 import kotlinx.cinterop.*
 import platform.posix.munmap
+import platform.posix.PROT_READ
+import platform.posix.PROT_WRITE
 import simple.PosixFile
 import simple.PosixOpenOpts
 import kotlin.coroutines.CoroutineContext
@@ -58,7 +60,7 @@ actual class FileBuffer actual constructor(
             else PosixOpenOpts.withFlags(PosixOpenOpts.O_Rdwr),
         )
         val len: ULong = if (blkSize == (-1L)) file!!.size.toULong() else blkSize.toULong()
-        buffer = file!!.mmap(len, offset = initialOffset)
+        buffer = file!!.mmap(len, prot = PROT_READ or if (readOnly) 0 else PROT_WRITE, offset = initialOffset)
         mappedLength = len
     }
 
@@ -69,6 +71,7 @@ actual class FileBuffer actual constructor(
         (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value
 
     actual fun put(index: Long, value: Byte) {
+        check(!readOnly) { "FileBuffer is read-only" }
         (buffer!!.toLong() + index).toCPointer<ByteVar>()!!.pointed.value = value
     }
 }

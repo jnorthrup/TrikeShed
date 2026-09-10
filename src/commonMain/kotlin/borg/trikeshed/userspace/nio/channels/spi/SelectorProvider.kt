@@ -29,7 +29,7 @@ public abstract class SelectorProvider {
 internal object UringSelectorProvider : SelectorProvider() {
     override fun openDatagramChannel(): DatagramChannel = DatagramChannel.open()
     override fun openDatagramChannel(protocolFamily: String): DatagramChannel = DatagramChannel.open(protocolFamily)
-    override fun openPipe(): Pipe = throw UnsupportedOperationException("pipe")
+    override fun openPipe(): Pipe = borg.trikeshed.userspace.nio.channels.UringPipe()
     override fun openSelector(): AbstractSelector = throw UnsupportedOperationException("selector")
     override fun openServerSocketChannel(): ServerSocketChannel = ServerSocketChannel.open()
     override fun openSocketChannel(): SocketChannel = SocketChannel.open()

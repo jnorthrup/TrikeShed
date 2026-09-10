@@ -6,13 +6,22 @@ import borg.trikeshed.userspace.reactor.toInterests
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.SelectionResult
+import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UserspaceChannelBackend
+import borg.trikeshed.userspace.UringCompletion
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.j
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import java.nio.channels.FileChannel
 import java.nio.channels.SelectionKey
 import java.nio.channels.SelectableChannel
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
@@ -20,22 +29,9 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Extension to convert custom ByteBuffer to NIO ByteBuffer
- */
-private fun ByteBuffer.toNioByteBuffer(): java.nio.ByteBuffer {
-    val nio = java.nio.ByteBuffer.wrap(array(), arrayOffset(), capacity())
-    nio.position(position())
-    nio.limit(limit())
-    return nio
-}
-
-/**
- * JVM stub implementation of [ChannelOperations].
- * 
- * This is a DEV/CI stub only. Production uses Linux io_uring (kernel-level).
- * This stub retains blocking NIO for local development, but executes queued
- * operations on daemon workers. `submit()` must return promptly so the common
- * reactor's cancellable completion/timeout loop keeps control of the caller.
+ * JVM descriptor provider for legacy [ChannelOperations]. Queued read/write
+ * operations use the common uring facade with an explicitly emulated adapter.
+ * Existing DNS/connect scheduling remains owned by this provider.
  */
 class JvmChannelOperations(
     private val entries: Int = 2,
@@ -238,154 +234,120 @@ class JvmChannelOperations(
         socketChannels[fd]
 }
 
-// Moved out of inner class to avoid 'Class is prohibited here' error
-private data class PendingOp(
-    val fd: Int,
-    val buf: ByteBuffer,
-    val read: Boolean,
-    val user: Long,
-    val offset: Long = 0L,
-)
-
-/** Standalone ChannelHandle implementation */
+/** Legacy handle whose admission, completion queue and drain belong to commonMain. */
 class JvmChannelHandle(
     private val ops: JvmChannelOperations,
     private val capacity: Int,
 ) : ChannelOperations.ChannelHandle {
+    override val id: Int = ops.fdCounter.incrementAndGet()
+    private val lock = Any()
+    private var nextRequest = 0L
+    private data class Request(val fd: Int, val userData: Long, val opcode: UringOp, val len: Int)
+    private val requests = mutableMapOf<Long, Request>()
+    private val facade = FunctionalUringFacade(capacity, object : UserspaceChannelBackend {
+        override val capabilities: Long = UringOp.READ.mask or UringOp.WRITE.mask
+        override val availability: String = "emulated: JVM registered file/socket descriptors"
 
-    override val id: Int get() = ops.fdCounter.incrementAndGet()
+        override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
+            submissions.map { execute(it) }
 
-    private val pendingLock = Any()
-    private val pending = java.util.ArrayDeque<PendingOp>()
-    private val submitted = java.util.ArrayDeque<PendingOp>()
-    private var workerScheduled = false
-    private val completed = ConcurrentLinkedQueue<ChannelResult>()
-
-    override fun read(buffer: ByteBuffer, offset: Long): Int = -1
-    override fun write(buffer: ByteBuffer, offset: Long): Int = -1
-
-    override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-        synchronized(pendingLock) {
-            pending.add(PendingOp(fd, buffer, read = true, user = userData))
-        }
-        return 0
-    }
-
-    override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-        synchronized(pendingLock) {
-            pending.add(PendingOp(fd, buffer, read = false, user = userData))
-        }
-        return 0
-    }
-
-    override fun prepAccept(serverFd: Int, userData: Long): Int = -1
-    override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int = -1
-    override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int = -1
-
-    override fun submit(): Int {
-        var scheduleWorker = false
-        val submittedCount = synchronized(pendingLock) {
-            var count = 0
-            while (pending.isNotEmpty()) {
-                submitted.add(pending.removeFirst())
-                count++
-            }
-            if (submitted.isNotEmpty() && !workerScheduled) {
-                workerScheduled = true
-                scheduleWorker = true
-            }
-            count
-        }
-        if (scheduleWorker && !ops.schedule(::drainSubmitted)) {
-            rejectSubmitted()
-        }
-        return submittedCount
-    }
-
-    private fun drainSubmitted() {
-        try {
-            while (true) {
-                val op = synchronized(pendingLock) {
-                    if (submitted.isEmpty()) null else submitted.removeFirst()
-                } ?: break
-                completed.add(execute(op))
-            }
-        } finally {
-            var reschedule = false
-            synchronized(pendingLock) {
-                workerScheduled = false
-                if (submitted.isNotEmpty()) {
-                    workerScheduled = true
-                    reschedule = true
+        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
+            withContext(Dispatchers.IO + NonCancellable) {
+                val completed = Array(submissions.size) {
+                    val result = execute(submissions[it])
+                    UringCompletion(result.userData, result.res, 0)
                 }
+                completed.size j { completed[it] }
             }
-            if (reschedule && !ops.schedule(::drainSubmitted)) {
-                rejectSubmitted()
+    })
+
+    private fun enqueue(submission: UringSubmission, userData: Long): Int = synchronized(lock) {
+        val token = nextRequest++
+        facade.enqueue(submission.copy(userData = token))
+        requests[token] = Request(submission.fd, userData, submission.opcode, submission.len)
+        0
+    }
+
+    override fun read(buffer: ByteBuffer, offset: Long): Int = -9
+    override fun write(buffer: ByteBuffer, offset: Long): Int = -9
+
+    override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.READ, fd, 0, buffer.remaining(), -1, buffer = buffer), userData)
+
+    override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.WRITE, fd, 0, buffer.remaining(), -1, buffer = buffer), userData)
+
+    override fun prepAccept(serverFd: Int, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.ACCEPT, serverFd, 0, 0, 0), userData)
+
+    override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0), userData)
+
+    override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0), userData)
+
+    override fun submit(): Int = synchronized(lock) { facade.submit() }
+
+    override fun wait(minComplete: Int): List<ChannelResult> = synchronized(lock) {
+        facade.wait(minComplete).map { completion ->
+            val request = checkNotNull(requests.remove(completion.userData)) { "foreign channel completion" }
+            // Keep the older reactor convention at its boundary only. Common CQEs
+            // use successful EOF=0 and would-block=-EAGAIN without ambiguity.
+            val result = when {
+                completion.res == -11 -> 0
+                completion.res == 0 && request.opcode == UringOp.READ && request.len > 0 -> -1
+                else -> completion.res
             }
+            ChannelResult(request.fd, result, request.userData)
         }
     }
 
-    private fun rejectSubmitted() {
-        val rejected = synchronized(pendingLock) {
-            workerScheduled = false
-            buildList {
-                while (submitted.isNotEmpty()) {
-                    add(submitted.removeFirst())
-                }
-            }
-        }
-        rejected.forEach { op ->
-            completed.add(ChannelResult(op.fd, -1, op.user))
-        }
+    override fun close() = synchronized(lock) {
+        facade.closeNow()
+        requests.clear()
+        // These descriptors are borrowed from ops; their caller closes them.
     }
 
-    private fun execute(op: PendingOp): ChannelResult {
-        val fc = ops.fileChannels[op.fd]
-        if (fc != null) {
-            val nioBuf = op.buf.toNioByteBuffer()
-            val res = try {
-                if (op.read) {
-                    val n = fc.read(nioBuf, op.offset)
-                    if (n > 0) op.buf.position(op.buf.position() + n)
-                    n
+    private fun execute(submission: UringSubmission): SelectionResult {
+        fun completion(result: Int) = SelectionResult(result, submission.userData)
+        if (submission.opcode != UringOp.READ && submission.opcode != UringOp.WRITE) return completion(-95)
+        val buffer = submission.buffer ?: return completion(-22)
+        val reading = submission.opcode == UringOp.READ
+        if (submission.len < 0 || submission.len > buffer.remaining() || submission.offset < -1 ||
+            (reading && buffer.isReadOnly())) return completion(-22)
+        val file = ops.fileChannels[submission.fd]
+        val socket = ops.socketChannels[submission.fd] as? SocketChannel
+        if (file == null && socket == null) return completion(-9)
+        return try {
+            val nio = java.nio.ByteBuffer.wrap(buffer.array(),
+                buffer.arrayOffset() + buffer.position(), submission.len).slice()
+            val result = if (file != null) {
+                val count = if (reading) {
+                    if (submission.offset == -1L) file.read(nio) else file.read(nio, submission.offset)
                 } else {
-                    val n = fc.write(nioBuf, op.offset)
-                    if (n > 0) op.buf.position(op.buf.position() + n)
-                    n
+                    if (submission.offset == -1L) file.write(nio) else file.write(nio, submission.offset)
                 }
-            } catch (e: Exception) {
-                -1
-            }
-            return ChannelResult(op.fd, res, op.user)
-        }
-
-        val sc = ops.socketChannels[op.fd] as? SocketChannel
-            ?: return ChannelResult(op.fd, -1, op.user)
-        val nioBuf = op.buf.toNioByteBuffer()
-        val res = try {
-            val readiness = ops.connectionReadiness(op.fd, sc)
-            if (readiness <= 0) {
-                return ChannelResult(op.fd, readiness, op.user)
-            }
-            if (op.read) {
-                val n = sc.read(nioBuf)
-                if (n > 0) op.buf.position(op.buf.position() + n)
-                n
+                if (count < 0) 0 else count
             } else {
-                val n = sc.write(nioBuf)
-                if (n > 0) op.buf.position(op.buf.position() + n)
-                n
+                val readiness = ops.connectionReadiness(submission.fd, socket!!)
+                if (readiness == 0) return completion(-11)
+                if (readiness < 0) return completion(-107)
+                val count = if (reading) socket.read(nio) else socket.write(nio)
+                when { count < 0 -> 0; count == 0 && submission.len > 0 -> -11; else -> count }
             }
-        } catch (e: Exception) {
-            ops.recordFailure(op.fd, if (op.read) "read" else "write", e)
-            -1
-        }
-        return ChannelResult(op.fd, res, op.user)
-    }
-
-    override fun wait(minComplete: Int): List<ChannelResult> = buildList {
-        while (true) {
-            add(completed.poll() ?: break)
+            if (result > 0) buffer.position(buffer.position() + result)
+            completion(result)
+        } catch (failure: Exception) {
+            if (socket != null) ops.recordFailure(submission.fd, if (reading) "read" else "write", failure)
+            completion(when (failure) {
+                is java.nio.channels.ClosedChannelException,
+                is java.nio.channels.NonReadableChannelException,
+                is java.nio.channels.NonWritableChannelException -> -9
+                is java.nio.channels.NotYetConnectedException -> -107
+                is IllegalArgumentException, is java.nio.ReadOnlyBufferException -> -22
+                is SecurityException -> -13
+                else -> -5
+            })
         }
     }
 }

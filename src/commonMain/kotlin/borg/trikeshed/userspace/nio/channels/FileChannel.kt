@@ -35,7 +35,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     public abstract fun transferFrom(src: ReadableByteChannel, position: Long, count: Long): Long
     public abstract fun read(dst: ByteBuffer, position: Long): Int
     public abstract fun write(src: ByteBuffer, position: Long): Int
-    public abstract fun map(mode: MapMode, position: Long, size: Long): ByteBuffer
+    public abstract fun map(mode: MapMode, position: Long, size: Long): borg.trikeshed.userspace.MemoryMapping
     public abstract fun lock(position: Long, size: Long, shared: Boolean): FileLock
     public abstract fun lock(): FileLock
     public abstract fun tryLock(position: Long, size: Long, shared: Boolean): FileLock?

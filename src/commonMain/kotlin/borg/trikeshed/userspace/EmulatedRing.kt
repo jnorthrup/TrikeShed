@@ -1,39 +1,39 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
-/**
- * A [LiburingFacade] served by a [UserspaceChannelBackend].
- *
- * Every platform had the same hole: the facade answered "liburing unavailable" unless a native
- * binding existed, while a backend implementing the same operations sat beside it. Two entry
- * points, one wired. A facade that fails anywhere pushes callers back to the platform's own IO
- * library, and that is the fraying the single vocabulary exists to prevent.
- *
- * This is the fallback for all of them, written once in commonMain rather than five times. It is
- * SQ/CQ shaped because the facade is: [stage] queues a submission, [submit] runs the batch through
- * the backend and turns each result into a completion, [waitCqe] and [peekCqe] reap.
- *
- * Whether the backend underneath is emulation or a real ring is not this class's business.
- * `openUserspaceChannelBackend` already probes -- `discoverJvmUringBackend` on the JVM,
- * `discoverNodeUringBackend` on Node -- so a host with io_uring gets it through here without this
- * class knowing, and a host without it gets the emulation at the same call.
- *
- * **A ring belongs to one thread.** There is no locking here, which is io_uring's own model: a
- * ring is owned by its creator and sharing one requires the caller's own synchronisation.
+/** Common bounded SQ/CQ coordinator. Platform backends execute effects only.
+ * Synchronous callers serialize access; coroutine callers use FunctionalUringFacade.
  */
 internal class EmulatedRing(private val backend: UserspaceChannelBackend) : LiburingFacade {
-
     private val sq = ArrayDeque<UringSubmission>()
     private val cq = ArrayDeque<UringCompletion>()
+    private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
+    private var capacity = 0
+    private var draining = false
+    private var closed = false
+    private var executing = false
+    private var failure: Throwable? = null
+    internal val isClosed: Boolean get() = closed
 
     /** The separator between renameat's two paths, by code point so the source stays ASCII. */
     private val nul: String = 0.toChar().toString()
 
-    private fun stage(submission: UringSubmission): Result<Unit> {
+    private fun stage(submission: UringSubmission): Result<Unit> = runCatching {
+        check(capacity > 0 && !closed && !draining) { "ring is not accepting submissions" }
+        check(!executing) { "ring is executing" }
+        failure?.let { throw it }
+        check(sq.size + cq.size < capacity) { "submission queue full" }
+        require(submission.len >= 0) { "negative transfer length" }
+        require(sq.none { it.userData == submission.userData } && cq.none { it.userData == submission.userData }) {
+            "duplicate outstanding userData"
+        }
         sq.addLast(submission)
-        return Result.success(Unit)
     }
 
     /**
@@ -44,7 +44,12 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     private fun paths(vararg parts: String): ByteBuffer =
         ByteBuffer(parts.joinToString(nul).encodeToByteArray())
 
-    override fun open(entries: Int, flags: Int): Result<Unit> = Result.success(Unit)
+    override fun open(entries: Int, flags: Int): Result<Unit> = runCatching {
+        check(capacity == 0 && !closed) { "ring is already open or closed" }
+        require(entries > 0) { "entries must be positive" }
+        require(flags == 0) { "setup flags are unsupported by the common facade" }
+        capacity = entries
+    }
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.READ, fd, bufAddress, len, offset, 0, userData))
@@ -62,81 +67,231 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         stage(UringSubmission(UringOp.CLOSE, fd, 0L, 0, 0L, 0, userData))
 
     override fun prepFsync(fd: Int, userData: Long, datasync: Boolean): Result<Unit> =
-        stage(UringSubmission(UringOp.FSYNC, fd, 0L, 0, 0L, if (datasync) 1 else 0, userData))
+        stage(UringSubmission(UringOp.FSYNC, fd, 0L, 0, 0L, userData = userData, operationFlags = if (datasync) 1 else 0))
 
     override fun prepFtruncate(fd: Int, size: Long, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.FTRUNCATE, fd, 0L, 0, size, 0, userData))
 
-    override fun prepMmap(fd: Int, addr: Long, len: Int, prot: Int, flags: Int, offset: Long, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MAP, fd, addr, len, offset, prot, userData))
-
-    override fun prepMunmap(addr: Long, len: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MUNMAP, addr.toInt(), 0L, len, 0L, 0, userData))
-
     override fun prepSendmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0L, flags, userData))
+        stage(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0L, userData = userData, operationFlags = flags))
 
     override fun prepRecvmsg(fd: Int, msgHdrPtr: Long, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0L, flags, userData))
+        stage(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0L, userData = userData, operationFlags = flags))
 
     override fun prepOpenat(dfd: Int, path: String, flags: Int, mode: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.OPENAT, -100, 0L, path.length, flags.toLong(), mode, userData, paths(path)))
+        stage(UringSubmission(UringOp.OPENAT, dfd, 0L, path.encodeToByteArray().size, flags.toLong(), userData = userData, buffer = paths(path), operationFlags = mode))
 
     override fun prepStatx(dfd: Int, path: String, flags: Int, mask: Int, bufAddress: Long, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.STATX, dfd, bufAddress, 256, 0L, flags, userData, paths(path)))
+        stage(UringSubmission(UringOp.STATX, dfd, bufAddress, 256, mask.toLong(), userData = userData, buffer = paths(path), operationFlags = flags))
 
-    override fun prepFallocate(fd: Int, mode: Int, offset: Long, len: Long, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.FALLOCATE, fd, 0L, len.toInt(), offset, mode, userData))
+    override fun prepFallocate(fd: Int, mode: Int, offset: Long, len: Long, userData: Long): Result<Unit> = runCatching {
+        require(len in 0..Int.MAX_VALUE.toLong()) { "allocation length exceeds submission representation" }
+        stage(UringSubmission(UringOp.FALLOCATE, fd, 0L, len.toInt(), offset, userData = userData, operationFlags = mode)).getOrThrow()
+    }
 
     override fun prepFadvise(fd: Int, offset: Long, len: Int, advice: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.FADVISE, fd, 0L, len, offset, advice, userData))
+        stage(UringSubmission(UringOp.FADVISE, fd, 0L, len, offset, userData = userData, operationFlags = advice))
 
     override fun prepMadvise(addr: Long, length: Int, advice: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MADVISE, addr.toInt(), 0L, length, 0L, advice, userData))
-
-    override fun prepMsync(addr: Long, length: Int, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MSYNC, addr.toInt(), 0L, length, 0L, flags, userData))
+        stage(UringSubmission(UringOp.MADVISE, -1, addr, length, 0L, userData = userData, operationFlags = advice))
 
     override fun prepRenameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.RENAMEAT, oldDfd, 0L, oldPath.length, newDfd.toLong(), flags, userData, paths(oldPath, newPath)))
+        stage(UringSubmission(UringOp.RENAMEAT, oldDfd, 0L, oldPath.length, newDfd.toLong(), userData = userData, buffer = paths(oldPath, newPath), operationFlags = flags))
 
     override fun prepUnlinkat(dfd: Int, path: String, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.UNLINKAT, dfd, 0L, path.length, 0L, flags, userData, paths(path)))
+        stage(UringSubmission(UringOp.UNLINKAT, dfd, 0L, path.length, 0L, userData = userData, buffer = paths(path), operationFlags = flags))
 
-    override fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MKDIRAT, dfd, 0L, path.length, 0L, mode, userData, paths(path)))
+    private var registeredBuffers: Series<ByteBuffer>? = null
+    private var registeredMemory: Series<MemoryMapping>? = null
+    private var kernelRegistered = false
 
-    override fun submit(): Result<Int> {
-        if (sq.isEmpty()) return Result.success(0)
-        val batch = sq.toList()
-        sq.clear()
-        return runCatching {
-            for (result in backend.submitBatch(batch)) cq.addLast(UringCompletion(result.userData, result.res, 0))
-            batch.size
+    private fun registrationAvailable() {
+        failure?.let { throw it }
+        check(capacity > 0 && !closed && !draining && !executing) { "ring is not open for registration" }
+        check(registeredBuffers == null && registeredMemory == null) { "buffers already registered" }
+    }
+
+    /** Compatibility storage for emulated heap transfers; no native pinning is claimed. */
+    override fun registerBuffers(buffers: List<ByteBuffer>): Result<Int> = runCatching {
+        registrationAvailable()
+        require(buffers.isNotEmpty()) { "empty buffer registration" }
+        registeredBuffers = buffers.toTypedArray().toSeries()
+        buffers.size
+    }
+
+    override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = runCatching {
+        registrationAvailable()
+        require(buffers.size > 0) { "empty buffer registration" }
+        val snapshot = Array(buffers.size) { buffers[it] }.toSeries()
+        var retained = 0
+        try {
+            for (i in 0 until snapshot.size) {
+                val memory = snapshot[i]
+                require(memory.length in 1..Int.MAX_VALUE.toLong()) { "registered mapping length exceeds transfer representation" }
+                memory.retain()
+                retained++
+            }
+            val registration = backend.registerBuffers(snapshot)
+            if (registration.isFailure && registration.exceptionOrNull() !is UnsupportedOperationException) registration.getOrThrow()
+            kernelRegistered = registration.isSuccess
+            registeredMemory = snapshot
+        } catch (error: Throwable) {
+            for (i in 0 until retained) snapshot[i].release()
+            throw error
         }
     }
 
-    /**
-     * Not blocking: the work completes inside [submit], so a wait that found the queue empty would
-     * sleep forever rather than briefly. Answering null beats hanging on a semantic this cannot
-     * honour.
-     */
-    override fun waitCqe(): Result<UringCompletion?> = Result.success(cq.removeFirstOrNull())
-
-    override fun peekCqe(): Result<UringCompletion?> = Result.success(cq.firstOrNull())
-
-    override fun cqAdvance(count: Int) {
-        var remaining = count
-        while (remaining-- > 0 && cq.isNotEmpty()) cq.removeFirst()
+    override fun unregisterBuffers(): Result<Unit> = runCatching {
+        check(capacity > 0 && !closed && !executing) { "ring is not available for unregistration" }
+        check(sq.none { it.bufferIndex >= 0 }) { "registered buffers still have staged requests" }
+        val memory = registeredMemory
+        check(memory != null || registeredBuffers != null) { "no buffers registered" }
+        if (memory != null) {
+            if (kernelRegistered) backend.unregisterBuffers().getOrThrow()
+            kernelRegistered = false
+            for (i in 0 until memory.size) memory[i].release()
+            registeredMemory = null
+        }
+        registeredBuffers = null
     }
 
-    /** Fanout is the native ring's mechanism; there is nothing asynchronous here to fan out from. */
-    override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
-    override fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {}
+    override fun registerFiles(fds: IntArray): Result<Int> = unsupported()
+    override fun unregisterFiles(): Result<Unit> = unsupported()
 
-    override fun drain(): Result<Unit> = submit().map { }
+    override fun prepReadFixed(fd: Int, bufIndex: Int, len: Int, offset: Long, userData: Long): Result<Unit> =
+        fixed(UringOp.READ_FIXED, fd, bufIndex, len, offset, userData)
 
-    override fun close(): Result<Unit> = runCatching {
-        backend.close(); sq.clear(); cq.clear()
+    override fun prepWriteFixed(fd: Int, bufIndex: Int, len: Int, offset: Long, userData: Long): Result<Unit> =
+        fixed(UringOp.WRITE_FIXED, fd, bufIndex, len, offset, userData)
+
+    private fun fixed(op: UringOp, fd: Int, bufIndex: Int, len: Int, offset: Long, userData: Long): Result<Unit> = runCatching {
+        require(bufIndex >= 0 && len >= 0) { "invalid fixed buffer range" }
+        val memory = registeredMemory
+        if (memory != null) {
+            require(bufIndex < memory.size) { "buffer index is not registered" }
+            val owner = memory[bufIndex]
+            require(len.toLong() <= owner.length) { "fixed transfer exceeds registered mapping" }
+            stage(UringSubmission(op, fd, owner.address, len, offset, userData = userData,
+                bufferIndex = bufIndex, memory = owner)).getOrThrow()
+        } else {
+            val buffers = checkNotNull(registeredBuffers) { "no buffers registered" }
+            require(bufIndex < buffers.size) { "buffer index is not registered" }
+            val buffer = buffers[bufIndex]
+            require(len <= buffer.remaining()) { "fixed transfer exceeds registered buffer" }
+            stage(UringSubmission(op, fd, 0L, len, offset, userData = userData,
+                buffer = buffer, bufferIndex = bufIndex)).getOrThrow()
+        }
+    }
+
+    override fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.MKDIRAT, dfd, 0L, path.length, 0L, userData = userData, buffer = paths(path), operationFlags = mode))
+
+    override fun submit(): Result<Int> = runCatching {
+        check(capacity > 0 && !closed && !executing) { "ring is not available for submission" }
+        failure?.let { throw it }
+        if (sq.isEmpty()) return@runCatching 0
+        val batch = Array(sq.size) { sq.removeFirst() }.toSeries()
+        executing = true
+        try {
+            // List is the platform compatibility boundary; the owned snapshot remains Series.
+            val effects = Array(batch.size) { index ->
+                val submission = batch[index]
+                if (submission.bufferIndex < 0 || (kernelRegistered && submission.memory != null &&
+                        backend.supportsFixedBuffer(submission.fd))) submission
+                else {
+                    val memory = submission.memory
+                    val buffer = submission.buffer ?: ByteBuffer(submission.len).also {
+                        if (submission.opcode == UringOp.WRITE_FIXED) {
+                            requireNotNull(memory).read(0, it.array(), 0, submission.len)
+                        }
+                    }
+                    submission.copy(opcode = if (submission.opcode == UringOp.READ_FIXED) UringOp.READ else UringOp.WRITE,
+                        buffer = buffer, bufferIndex = -1, addr = 0L)
+                }
+            }.toSeries()
+            val results = backend.submitBatch(List(effects.size) { effects[it] })
+            check(results.size == batch.size) { "backend did not settle every submission" }
+            val identities = mutableSetOf<Long>()
+            for (result in results) {
+                check(identities.add(result.userData) && (0 until batch.size).any { batch[it].userData == result.userData }) {
+                    "backend completion identity mismatch"
+                }
+            }
+            for (result in results) {
+                val index = (0 until batch.size).first { batch[it].userData == result.userData }
+                val submission = batch[index]
+                if (effects[index].opcode == UringOp.READ && submission.opcode == UringOp.READ_FIXED &&
+                    submission.memory != null && result.res > 0) {
+                    check(result.res <= submission.len) { "backend read exceeds requested length" }
+                    submission.memory.write(0, requireNotNull(effects[index].buffer).array(), 0, result.res)
+                }
+                cq.addLast(UringCompletion(result.userData, result.res, 0))
+            }
+            batch.size
+        } catch (error: Throwable) {
+            // The backend contract settles borrowed resources on return, including failure.
+            // Do not retry an ambiguously completed batch or invent successful CQEs.
+            failure = error
+            throw error
+        } finally {
+            executing = false
+        }
+    }
+
+    private fun reap(): Result<UringCompletion?> = runCatching {
+        check(capacity > 0 && !closed) { "ring is not open" }
+        val completion = cq.removeFirstOrNull() ?: return@runCatching null
+        handlers[completion.userData]?.toTypedArray()?.forEach { handler ->
+            // Observers cannot turn an executed transfer into another errno or byte count.
+            runCatching { handler(completion) }
+        }
+        completion
+    }
+
+    override fun waitCqe(): Result<UringCompletion?> = reap()
+    override fun peekCqe(): Result<UringCompletion?> = reap()
+    override fun cqAdvance(count: Int) { require(count >= 0) }
+
+    override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
+        check(!closed) { "ring is closed" }
+        handlers.getOrPut(token) { mutableListOf() }.add(handler)
+    }
+    override fun removeFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
+        handlers[token]?.remove(handler)
+        if (handlers[token].isNullOrEmpty()) handlers.remove(token)
+    }
+
+    override fun drain(): Result<Unit> {
+        if (closed) return Result.success(Unit)
+        draining = true
+        return submit().map { }
+    }
+
+    override fun close(): Result<Unit> {
+        if (closed) return Result.success(Unit)
+        var error = drain().exceptionOrNull()
+        if (registeredMemory != null || registeredBuffers != null) {
+            unregisterBuffers().exceptionOrNull()?.let { if (error == null) error = it }
+        }
+        try {
+            // Even after a failed submission, backend return settled its borrows. Teardown
+            // must still run; a successful close also settles failed unregistration.
+            backend.close()
+            registeredMemory?.let { memory -> for (i in 0 until memory.size) memory[i].release() }
+            registeredMemory = null
+            registeredBuffers = null
+            kernelRegistered = false
+            closed = true
+            while (cq.isNotEmpty()) reapBeforeClose()
+            handlers.clear()
+        } catch (closeError: Throwable) {
+            if (error == null) error = closeError else if (error !== closeError) error?.addSuppressed(closeError)
+        }
+        return error?.let { Result.failure(it) } ?: Result.success(Unit)
+    }
+
+    private fun reapBeforeClose() {
+        val completion = cq.removeFirst()
+        handlers[completion.userData]?.toTypedArray()?.forEach { handler -> runCatching { handler(completion) } }
     }
 }

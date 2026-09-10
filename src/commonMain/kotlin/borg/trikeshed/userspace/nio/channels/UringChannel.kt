@@ -10,7 +10,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  * Unified io_uring-style submission queue.
  *
  * Two APIs coexist:
- * 1. **Typed** — [read], [write], [accept], [connect], [close], [sync], [truncate], [map] + [submit]/[wait]/[peek]
+ * 1. **Typed** — [read], [write], [accept], [connect], [close], [sync], [truncate] + [submit]/[wait]/[peek]
  * 2. **Unified** — [enqueue] any [UringSubmission], then [submit]/[wait]/[peek]
  *
  * The typed API is sugar that creates [UringSubmission] internally.
@@ -41,9 +41,6 @@ class UringChannel(
 
     fun truncate(file: File, size: Long, userData: Long) =
         facade.truncate(file.impl, size, userData)
-
-    fun map(file: File, mode: String, position: Long, size: Long, userData: Long) =
-        facade.map(file.impl, mode, position, size, userData)
 
     val capabilities: Long get() = facade.capabilities
     val nativeCapabilities: Long get() = facade.nativeCapabilities

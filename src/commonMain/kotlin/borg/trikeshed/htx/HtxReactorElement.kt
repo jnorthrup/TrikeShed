@@ -112,7 +112,7 @@ class HtxReactorElement(
             }
             parseHtxResponse(readAll(connection.handle, connection.fd))
         } finally {
-            channelOperations.close(connection.fd)
+            try { connection.handle.close() } finally { channelOperations.close(connection.fd) }
         }
     }
 
@@ -154,7 +154,7 @@ class HtxReactorElement(
                 }
             }
         } finally {
-            channelOperations.close(connection.fd)
+            try { connection.handle.close() } finally { channelOperations.close(connection.fd) }
         }
     }
 
@@ -172,7 +172,8 @@ class HtxReactorElement(
             channelOperations.close(fd)
             "HTX reactor connect failed for ${request.target.host}:${request.target.port}"
         }
-        return HtxConnection(fd, channelOperations.openChannel())
+        return try { HtxConnection(fd, channelOperations.openChannel()) }
+        catch (failure: Throwable) { channelOperations.close(fd); throw failure }
     }
 
     private suspend fun writeAll(

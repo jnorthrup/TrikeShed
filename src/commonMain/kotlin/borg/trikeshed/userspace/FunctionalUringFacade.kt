@@ -2,8 +2,8 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
@@ -27,46 +27,25 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
-/**
- * Interface abstracting the underlying polling/completion logic.
- *
- * Implemented natively (Posix, Wasm, JS) or via JvmReactorOperations.
- * All completions are guaranteed to return via [submitBatch]
- * in the same order (userData preserved).
+/** OS effects only. Exactly one CQE per SQE; completion order is unspecified.
+ * Buffers remain borrowed until the call settles, including on cancellation.
+ * Unsupported operations return -EOPNOTSUPP; failed effects return negative errno.
  */
 public interface UserspaceChannelBackend {
     val capabilities: Long get() = 0L
     val nativeCapabilities: Long get() = 0L
 
-    /** Word-1 capabilities. Zero until the vocabulary crosses its 64th operation. */
-    val capabilitiesHigh: Long get() = 0L
-
-    /**
-     * Whether this backend answers [op]. The only correct test once the vocabulary spans two
-     * words: `capabilities and op.mask` reads word 0 only, and an op in word 1 shares its bit
-     * value with one in word 0, so that test would answer for the wrong operation.
-     */
-    fun supports(op: UringOp): Boolean =
-        if (op.word == 0) capabilities and op.mask != 0L else capabilitiesHigh and op.mask != 0L
     val availability: String get() = "emulated"
 
-    /**
-     * What the uring discovery probe found, when a backend was chosen by probing.
-     * Added by the io_uring wiring: `openUserspaceChannelBackend` overrides it, and
-     * `UringProbeReport` is how a caller tells a real ring from this emulation.
-     */
     val probeReport: UringProbeReport? get() = null
-
-    /**
-     * Submit a batch of [UringSubmission] entries and return completions.
-     *
-     * In an ideal implementation, this maps directly to io_uring_submit().
-     * In compatibility layers, this multiplexes Java NIO / JS Fetch / Wasm IO.
-     */
+    /** Descriptor compatibility with this backend's registered kernel buffers. */
+    fun supportsFixedBuffer(fd: Int): Boolean = true
     fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
-
-    /** One completion per entry, in submission order; cancellation must propagate. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
+
+    /** Control-plane resource registration; fixed requests remain owned by commonMain. */
+    fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
+    fun unregisterBuffers(): Result<Unit> = unsupported()
 
     fun close() {}
 }
@@ -89,8 +68,8 @@ public class FunctionalUringFacade(
     companion object Key : CoroutineContext.Key<FunctionalUringFacade> {
         fun create(
             scope: CoroutineScope,
-            entries: Int,
-            backend: UserspaceChannelBackend,
+            entries: Int = 256,
+            backend: UserspaceChannelBackend = openUserspaceChannelBackend(entries),
             ebpfPrograms: List<UringEbpfProgram> = emptyList(),
             containmentPolicy: borg.trikeshed.userspace.containment.ContainmentPolicy =
                 borg.trikeshed.userspace.containment.ContainmentPolicy.MAXIMUM,
@@ -120,6 +99,7 @@ public class FunctionalUringFacade(
     // At most entries batches are admitted, each containing at most entries SQEs.
     private val input = Queue<Batch>(entries)
     private val capacity = Semaphore(entries)
+    private val outstanding = HashSet<Long>()
     private var active = 0
     private val drained = CompletableDeferred<Unit>()
     private val termination = CompletableDeferred<Unit>()
@@ -129,57 +109,7 @@ public class FunctionalUringFacade(
     val nativeCapabilities: Long get() = backend.nativeCapabilities
     val availability: String get() = backend.availability
 
-    // -- Unified UringSubmission API --
-
-    /**
-     * Ops that are deterministically rejected to close covert signaling
-     * channels (Legion Modelling Doc 04, Layer 2 — xattr is a documented
-     * malleable surface for steganographic coordination per Doc 02 §1).
-     * These are never submitted to the kernel; they fail immediately.
-     *
-     * Source of truth: [containmentPolicy.layer2Metadata.rejectedXattrOps].
-     * When policy is MAXIMUM, this is the full 8-op xattr set.
-     * Doc 04 §2: "Complete disabling or strict filtering of setxattr,
-     * getxattr, listxattr, and removexattr."
-     */
-    private val REJECTED_OPS: Set<UringOp> =
-        containmentPolicy.layer2Metadata.rejectedXattrOps
-
-    /**
-     * Ops whose metadata results are quantized to collapse micro-timing
-     * side-channels (Legion Doc 04, Layer 2 §2 — "Deterministic Clock &
-     * Inode Virtualization"). STATX returns synthetic, quantized timestamps.
-     *
-     * Active only when [containmentPolicy.layer2Metadata.quantizeTimestamps]
-     * is true; otherwise the set is empty and completions pass through.
-     */
-    private val METADATA_QUANTIZED_OPS: Set<UringOp> =
-        if (containmentPolicy.layer2Metadata.quantizeTimestamps) {
-            setOf(
-                UringOp.STATX,
-                UringOp.FGETXATTR,
-                UringOp.GETXATTR,
-                UringOp.FLISTXATTR,
-                UringOp.LISTXATTR,
-                UringOp.GETDENTS
-            )
-        } else emptySet()
-
-    /**
-     * Quantization boundary for file timestamps (Doc 04 §2).
-     * mtime/ctime/atime are rounded to the nearest epoch boundary.
-     * 3600 = 1 hour — coarse enough to eliminate micro-timing encoding.
-     */
-    private val timestampQuantumSeconds: Long =
-        containmentPolicy.layer2Metadata.timestampQuantumSeconds
-
-    /**
-     * Fixed synthetic epoch for quantized timestamps. All statx results
-     * return mtime/ctime/atime = 0 unless overridden by policy.
-     * Doc 04 §2: "or fixed to epoch 0, eliminating micro-timing."
-     */
-    private val syntheticEpoch: Long =
-        containmentPolicy.layer2Metadata.syntheticEpoch
+    private val REJECTED_OPS: Set<UringOp> = containmentPolicy.layer2Metadata.rejectedXattrOps
 
     private val consumer = scope?.let {
         val ownedScope = CoroutineScope(it.coroutineContext + this + requireNotNull(supervisor))
@@ -198,6 +128,9 @@ public class FunctionalUringFacade(
                     for (batch in input) {
                         try {
                             val result = runCatching { execution.withLock { facade.executeBatch(batch.submissions) } }
+                            // Settlement releases the common borrow before publishing its result.
+                            // drain must not depend on an external caller being scheduled again.
+                            admission.withLock { release(batch.submissions) }
                             batch.result.trySend(result).getOrThrow()
                         } finally {
                             batch.result.close()
@@ -230,12 +163,12 @@ public class FunctionalUringFacade(
         require(submission.opcode !in REJECTED_OPS) {
             "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
         }
-        require(pending.size < entries) { "submission queue full" }
-        val rejected = runSubmitPrograms(submission)
-        if (rejected != null) {
-            completions.addLast(SelectionResult(rejected, submission.userData))
-            return@synchronous
+        require(pending.size + completions.size < entries) { "submission queue full" }
+        require(submission.userData !in outstanding &&
+            pending.none { it.userData == submission.userData } && completions.none { it.userData == submission.userData }) {
+            "Duplicate outstanding userData"
         }
+        submission.memory?.retain()
         pending.addLast(submission)
     }
 
@@ -265,7 +198,8 @@ public class FunctionalUringFacade(
             "non-loopback CONNECT rejected by containment policy: $address:$port " +
                 "(allowed=${containmentPolicy.layer3Syscall.allowedEgress})"
         }
-        enqueue(UringOp.Companion.Submissions.connect(file.id, 0L, port, userData))
+        // This legacy signature has no encoded sockaddr to submit.
+        throw UnsupportedOperationException("CONNECT requires an encoded socket address")
     }
 
     fun close(file: FileImpl, userData: Long) {
@@ -281,31 +215,30 @@ public class FunctionalUringFacade(
         enqueue(UringSubmission(UringOp.FTRUNCATE, file.id, 0, 0, size, userData = userData))
     }
 
-    fun map(file: FileImpl, mode: String, position: Long, size: Long, userData: Long) {
-        throw UnsupportedOperationException("Memory mapping is not a submission-queue operation")
-    }
-
     // -- Completion drain --
 
     /** Suspend through the backend; never invoke the synchronous compatibility path. */
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        require(submissions.size in 0..entries) { "submission queue full" }
+        validate(submissions)
+        val batchSubmissions = Array(submissions.size) { submissions[it] }.toSeries()
         currentCoroutineContext().ensureActive()
         if (supervisor == null) {
             admission.withLock {
                 currentCoroutineContext().ensureActive()
                 check(!closing) { "Uring is draining or closed" }
+                reserve(batchSubmissions)
                 active++
             }
             try {
                 val result = withContext(NonCancellable) {
-                    runCatching { execution.withLock { executeBatch(submissions) } }
+                    runCatching { execution.withLock { executeBatch(batchSubmissions) } }
                 }
                 currentCoroutineContext().ensureActive()
                 return result.getOrThrow()
             } finally {
                 withContext(NonCancellable) {
                     admission.withLock {
+                        release(batchSubmissions)
                         active--
                         if (closing && active == 0) drained.complete(Unit)
                     }
@@ -313,15 +246,23 @@ public class FunctionalUringFacade(
             }
         }
 
-        admission.withLock { check(!closing && supervisor.isActive) { "Uring is draining or closed" } }
+        admission.withLock {
+            check(!closing && supervisor.isActive) { "Uring is draining or closed" }
+            checkIdentities(batchSubmissions)
+        }
         capacity.acquire()
         var admitted = false
         try {
             val batch = admission.withLock {
                 currentCoroutineContext().ensureActive()
                 check(!closing && supervisor.isActive) { "Uring is draining or closed" }
-                val batch = Batch(Array(submissions.size) { submissions[it] }.toSeries())
-                input.trySend(batch).getOrThrow()
+                checkIdentities(batchSubmissions)
+                val batch = Batch(batchSubmissions)
+                reserve(batchSubmissions)
+                try { input.trySend(batch).getOrThrow() } catch (failure: Throwable) {
+                    release(batchSubmissions)
+                    throw failure
+                }
                 admitted = true
                 batch
             }
@@ -335,32 +276,14 @@ public class FunctionalUringFacade(
     }
 
     private suspend fun executeBatch(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        val ordered = arrayOfNulls<UringCompletion>(submissions.size)
-        val admitted = mutableListOf<UringSubmission>()
-        val admittedIndexes = mutableListOf<Int>()
-        for (i in 0 until submissions.size) {
-            val submission = submissions[i]
-            require(submission.opcode !in REJECTED_OPS) {
-                "Operation rejected by containment policy: ${submission.opcode}"
-            }
-            val rejected = runSubmitPrograms(submission)
-            if (rejected == null) {
-                admitted += submission
-                admittedIndexes += i
-            } else {
-                ordered[i] = UringCompletion(submission.userData, rejected, 0)
-            }
+        val result = ArrayList<UringCompletion>(submissions.size)
+        val admitted = partition(submissions, result)
+        if (admitted.isNotEmpty()) {
+            val cqes = backend.batchEnqueue(admitted.toSeries())
+            correlate(admitted, cqes) { result.add(it) }
         }
-        val result = if (admitted.isEmpty()) emptyList()
-        else backend.batchEnqueue(admitted.toSeries()).toList()
-        check(result.size == admitted.size) { "Backend lost submission completions" }
-        for (i in 0 until admitted.size) {
-            val submission = admitted[i]
-            val completion = result[i]
-            check(completion.userData == submission.userData) { "Backend changed completion correlation" }
-            ordered[admittedIndexes[i]] = sanitizeCompletion(submission, completion)
-        }
-        return ordered.map { it ?: error("missing completion") }.toSeries()
+        val array = result.toTypedArray()
+        return array.size j { array[it] }
     }
 
     /** Submit the prepared queue and suspend until every entry has completed. */
@@ -369,7 +292,8 @@ public class FunctionalUringFacade(
             check(!closing) { "Uring is draining or closed" }
             pending.toList().toSeries().also { pending.clear() }
         }
-        return batchEnqueue(batch)
+        try { return batchEnqueue(batch) }
+        finally { for (i in 0 until batch.size) batch[i].memory?.release() }
     }
 
     fun submit(): Int = synchronous {
@@ -378,21 +302,18 @@ public class FunctionalUringFacade(
     }
 
     private fun submitPending(): Int {
-        val submitted = pending.size
-        if (submitted == 0) return 0
-
-        val unified = mutableListOf<UringSubmission>()
-        while (pending.isNotEmpty()) {
-            unified.add(pending.removeFirst())
+        val submissions = pending.toTypedArray()
+        pending.clear()
+        try {
+        val result = ArrayList<UringCompletion>(submissions.size)
+        val admitted = partition(submissions.toSeries(), result)
+        if (admitted.isNotEmpty()) {
+            val cqes = backend.submitBatch(admitted.asList())
+            correlate(admitted, cqes.size j { UringCompletion(cqes[it].userData, cqes[it].res, 0) }) { result.add(it) }
         }
-
-        if (unified.isNotEmpty()) {
-            val results = backend.submitBatch(unified)
-            check(results.size == unified.size) { "Backend lost submission completions" }
-            val sanitized = results.mapIndexed { i, r -> sanitizeCompletion(unified[i], r) }
-            completions.addAll(sanitized)
-        }
-        return submitted
+        for (cqe in result) completions.addLast(SelectionResult(cqe.res, cqe.userData))
+        return admitted.size
+        } finally { submissions.forEach { it.memory?.release() } }
     }
 
     fun wait(minComplete: Int = 1): List<SelectionResult> = synchronous {
@@ -479,40 +400,72 @@ public class FunctionalUringFacade(
         }
     }
 
-    private fun runSubmitPrograms(submission: UringSubmission): Int? {
-        if (submitPrograms.isEmpty()) return null
+    private fun checkIdentities(submissions: Series<UringSubmission>) {
+        for (i in 0 until submissions.size) {
+            val userData = submissions[i].userData
+            require(userData !in outstanding && pending.none { it.userData == userData } &&
+                completions.none { it.userData == userData }) { "Duplicate outstanding userData" }
+        }
+    }
+
+    private fun reserve(submissions: Series<UringSubmission>) {
+        checkIdentities(submissions)
+        var retained = 0
+        try {
+            for (i in 0 until submissions.size) {
+                submissions[i].memory?.retain()
+                retained++
+            }
+        } catch (failure: Throwable) {
+            for (i in 0 until retained) submissions[i].memory?.release()
+            throw failure
+        }
+        for (i in 0 until submissions.size) outstanding.add(submissions[i].userData)
+    }
+
+    private fun release(submissions: Series<UringSubmission>) {
+        for (i in 0 until submissions.size) {
+            outstanding.remove(submissions[i].userData)
+            submissions[i].memory?.release()
+        }
+    }
+
+    private fun validate(submissions: Series<UringSubmission>) {
+        require(submissions.size in 0..entries) { "submission queue full" }
+        val identities = HashSet<Long>()
+        for (i in 0 until submissions.size) require(identities.add(submissions[i].userData)) { "Duplicate outstanding userData" }
+    }
+    private fun rejection(submission: UringSubmission): Int? {
+        if (submission.opcode in containmentPolicy.layer2Metadata.rejectedXattrOps) return -13
+        // SQE flags (links, multishot, fixed resources, etc.) require explicit semantics.
+        if (submission.flags != 0 || (backend.capabilities and submission.opcode.mask) == 0L) return -95
         val context = UringEbpfContext(UringEbpfPhase.SUBMIT, submission, null)
         for (program in submitPrograms) {
-            val value = program.run(context, 0L)
-            if (value < 0L) return value.toCompletionResult()
+            val value = program.run(context, 0)
+            if (value < 0) return value.coerceAtLeast(Int.MIN_VALUE.toLong()).toInt()
         }
         return null
     }
-
-    private fun sanitizeCompletion(submission: UringSubmission, result: UringCompletion): UringCompletion {
-        val contained = if (submission.opcode in METADATA_QUANTIZED_OPS) {
-            UringCompletion(result.userData, syntheticEpoch.toInt(), result.flags)
-        } else result
-        if (completionPrograms.isEmpty()) return contained
-        var completion = contained
-        var value = contained.res.toLong()
-        for (program in completionPrograms) {
-            val context = UringEbpfContext(UringEbpfPhase.COMPLETE, submission, completion)
-            value = program.run(context, value)
-            completion = completion.copy(res = value.toCompletionResult())
+    private fun partition(submissions: Series<UringSubmission>, rejected: MutableList<UringCompletion>): Array<UringSubmission> {
+        validate(submissions)
+        val admitted = ArrayList<UringSubmission>(submissions.size)
+        for (i in 0 until submissions.size) {
+            val sqe = submissions[i]
+            val error = rejection(sqe)
+            if (error == null) admitted.add(sqe) else rejected.add(UringCompletion(sqe.userData, error, 0))
         }
-        return completion
+        return admitted.toTypedArray()
     }
-
-    private fun sanitizeCompletion(submission: UringSubmission, result: SelectionResult): SelectionResult {
-        val completion = sanitizeCompletion(submission, UringCompletion(result.userData, result.res, 0))
-        return SelectionResult(completion.res, completion.userData)
-    }
-
-    private fun Long.toCompletionResult(): Int {
-        require(this in Int.MIN_VALUE.toLong()..Int.MAX_VALUE.toLong()) {
-            "eBPF completion result out of Int range: $this"
+    private inline fun correlate(submissions: Array<UringSubmission>, results: Series<UringCompletion>, accept: (UringCompletion) -> Unit) {
+        check(results.size == submissions.size) { "Backend lost submission completions" }
+        val byIdentity = submissions.associateByTo(HashMap(submissions.size)) { it.userData }
+        for (i in 0 until results.size) {
+            val cqe = results[i]
+            val sqe = byIdentity.remove(cqe.userData) ?: error("Unknown or duplicate completion: ${cqe.userData}")
+            // Completion programs observe actual results. Their return cannot alter
+            // bytes transferred, errno, descriptor identity, or CQE flags after effects.
+            for (program in completionPrograms) program.run(UringEbpfContext(UringEbpfPhase.COMPLETE, sqe, cqe), cqe.res.toLong())
+            accept(cqe)
         }
-        return toInt()
     }
 }

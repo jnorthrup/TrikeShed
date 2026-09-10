@@ -26,6 +26,9 @@ TRIKESHED_HAMCREST=$(dependency org.hamcrest hamcrest-core 1.3)
 [[ -f "$TRIKESHED_SUPPORT_JAR" ]] || { printf 'Set TRIKESHED_SUPPORT_JAR to an existing support build.\n' >&2; exit 2; }
 
 COMMON_SOURCES=(
+  src/commonMain/kotlin/borg/trikeshed/userspace/EmulatedRing.kt
+  src/commonMain/kotlin/borg/trikeshed/userspace/LiburingSession.kt
+  src/commonMain/kotlin/borg/trikeshed/userspace/MemoryMapping.kt
   src/commonMain/kotlin/borg/trikeshed/platform/HostDescriptor.kt
   src/commonMain/kotlin/borg/trikeshed/platform/PlatformHost.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt
@@ -44,6 +47,7 @@ COMMON_SOURCES=(
   src/commonMain/kotlin/borg/trikeshed/userspace/nio/spi/UringCapabilityReport.kt
 )
 JVM_SOURCES=(
+  src/jvmMain/kotlin/borg/trikeshed/userspace/MemoryMapping.jvm.kt
   src/jvmMain/kotlin/borg/trikeshed/platform/HostDescriptor.jvm.kt
   src/jvmMain/kotlin/borg/trikeshed/platform/PlatformHost.jvm.kt
   src/jvmMain/kotlin/borg/trikeshed/userspace/UserspaceIO.jvm.kt
@@ -75,7 +79,7 @@ printf 'Linux module and CQE fixtures are simulated; the runtime check uses the 
   "${TEST_SOURCES[@]}" > "$TRIKESHED_VERIFY_OUT/compile-tests.log" 2>&1 || {
     cat "$TRIKESHED_VERIFY_OUT/compile-tests.log"; exit 1;
   }
-java -cp "$TRIKESHED_VERIFY_OUT/uring-host-tests.jar:$TRIKESHED_TEST_CP" org.junit.runner.JUnitCore \
+java --enable-native-access=ALL-UNNAMED -cp "$TRIKESHED_VERIFY_OUT/uring-host-tests.jar:$TRIKESHED_TEST_CP" org.junit.runner.JUnitCore \
   borg.trikeshed.platform.HostDescriptorJvmTest \
   borg.trikeshed.userspace.UringModuleProbeTest \
   borg.trikeshed.userspace.UringJvmDiscoveryTest | tee "$TRIKESHED_VERIFY_OUT/host-probe.log"

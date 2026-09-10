@@ -32,9 +32,7 @@ internal class UringFileChannel(
         val completion = channel.wait(1).singleOrNull()
         if (completion == null || completion.userData != token) throw IOException("Invalid $op completion for token $token")
         val count = completion.res
-        // This JVM adapter reports NIO EOF (-1); native uring reports zero.
-        val eof = op == UringOp.READ && count == -1 && offset >= size()
-        if (count < 0 && !eof) throw IOException("$op failed: $count")
+        if (count < 0) throw IOException("$op failed: $count")
         if (buffer != null) {
             if (count > remaining || buffer.position() != start + maxOf(0, count)) {
                 throw IOException("Invalid $op transfer: count=$count remaining=$remaining position=${buffer.position()}")
@@ -177,24 +175,25 @@ internal class UringFileChannel(
         return execute(UringOp.WRITE, src, position)
     }
 
-    override fun map(mode: MapMode, position: Long, size: Long): ByteBuffer {
-        channel.map(file, mode.toString(), position, size, nextToken++)
-        channel.submit()
-        channel.wait(1)
-        val buf = ByteBuffer.allocateDirect(size.toInt())
-        val saved = pos
-        pos = position
-        read(buf)
-        pos = saved
-        buf.flip()
-        return buf
+    override fun map(mode: MapMode, position: Long, size: Long): borg.trikeshed.userspace.MemoryMapping {
+        checkOpen()
+        if (!readable) throw NonReadableChannelException()
+        val protection = when (mode) {
+            MapMode.READ_ONLY -> 1
+            MapMode.READ_WRITE, MapMode.PRIVATE -> {
+                if (mode === MapMode.READ_WRITE && !writable) throw NonWritableChannelException()
+                3
+            }
+            else -> throw IllegalArgumentException("Unknown mapping mode")
+        }
+        val flags = if (mode === MapMode.PRIVATE) 2 else 1
+        return borg.trikeshed.userspace.mapMemory(0, size, protection, flags, file.id, position)
     }
 
-    override fun lock(position: Long, size: Long, shared: Boolean): FileLock = object : FileLock(this, position, size, shared) {
-        override fun isValid(): Boolean = acquiredBy().isOpen()
-        override fun release() {}
-    }
-    override fun lock(): FileLock = lock(0, size(), true)
-    override fun tryLock(position: Long, size: Long, shared: Boolean): FileLock? = null
-    override fun tryLock(): FileLock? = null
+    override fun lock(position: Long, size: Long, shared: Boolean): FileLock =
+        throw UnsupportedOperationException("File locking is not implemented")
+    override fun lock(): FileLock = lock(0, Long.MAX_VALUE, false)
+    override fun tryLock(position: Long, size: Long, shared: Boolean): FileLock? =
+        throw UnsupportedOperationException("File locking is not implemented")
+    override fun tryLock(): FileLock? = tryLock(0, Long.MAX_VALUE, false)
 }
