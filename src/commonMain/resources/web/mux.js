@@ -254,7 +254,7 @@
   document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state.live)void poll(true);});
   window.addEventListener("resize",()=>{if(page==="stats")renderStats();});
   document.title=titles[page][0]+" | Forge";$("#pageTitle").textContent=titles[page][0];$("#eyebrow").textContent=titles[page][1];$("#breadcrumb").textContent="Workspace / "+titles[page][0];
-  $("#"+page+"View").hidden=false;document.querySelectorAll('[data-page="'+page+'"]').forEach(el=>el.setAttribute("aria-current","page"));
+  $("#"+page+"View").hidden=false;document.querySelectorAll('[data-page="'+page+'"]').forEach(el => el.setAttribute("aria-current","page"));
   html("#pageActions",page==="keys"?'<a href="/mux/stats">Quota activity '+icon("arrow-up-right")+'</a>':page==="stats"?btn("export-activity","Export activity","download"):'<button class="primary" data-action="new">'+icon("plus")+'New session</button>');
   render();void poll(true);
   async function loop(){await poll();setTimeout(loop,2000);}setTimeout(loop,2000);
