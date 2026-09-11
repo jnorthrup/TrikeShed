@@ -108,8 +108,12 @@ internal fun nodeUringRequire(process: dynamic): dynamic {
     var moduleApi: dynamic = if (jsTypeOf(process?.getBuiltinModule) == "function") {
         process.getBuiltinModule("module")
     } else null
-    if (moduleApi == null)
-        moduleApi = js("typeof module !== 'undefined' && typeof module.require === 'function' ? module.require('module') : null")
+    if (moduleApi == null) {
+        // Variable argument: a string literal would let webpack statically resolve 'module'
+        // into the browser bundle. Same idiom as lib/JsNode.kt nodeRequire.
+        val name = "module"
+        moduleApi = js("typeof module !== 'undefined' && typeof module.require === 'function' ? module.require(name) : null")
+    }
     if (jsTypeOf(moduleApi?.createRequire) != "function" || jsTypeOf(process?.cwd) != "function") return null
     return moduleApi.createRequire((process.cwd() as String).trimEnd('/') + "/.trikeshed-uring.cjs")
 }

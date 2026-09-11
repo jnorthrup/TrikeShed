@@ -1,1 +1,0 @@
-./gradlew jvmMainClasses --console=plain

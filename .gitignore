@@ -77,7 +77,7 @@ yarn-error.log*
 # Native/build artifacts
 liburing/
 quiche/
-io_uring_interop/
+src/linuxMain/io_uring_interop/
 741809350620169c43b4f2d5b4ccece5efff4056/
 
 # Model/checkpoint artifacts

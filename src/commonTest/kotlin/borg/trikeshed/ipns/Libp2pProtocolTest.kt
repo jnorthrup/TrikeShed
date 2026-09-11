@@ -1,6 +1,6 @@
 package borg.trikeshed.ipns
 
-import kotlinx.coroutines.runBlocking
+import borg.trikeshed.runBlocking
 import kotlin.test.*
 
 class Libp2pProtocolTest {

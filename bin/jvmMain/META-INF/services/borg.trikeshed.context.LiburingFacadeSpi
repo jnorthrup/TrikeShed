@@ -1,5 +1,0 @@
-# SPI descriptor for LiburingFacadeSpi.
-# Add concrete implementation class names here, one per line.
-# Example:
-# borg.trikeshed.userspace.kernel.jvm.JnaLiburingFacadeSpi
-# borg.trikeshed.userspace.kernel.jvm.PanamaLiburingFacadeSpi
