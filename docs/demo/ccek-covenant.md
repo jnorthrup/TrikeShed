@@ -90,9 +90,8 @@ The absence of a landed D-letters decision artifact is stated plainly: the desig
 
 ## 6. Unblock Relationship
 
-The inert escape-velocity elements (`IpfsAdapter`, `CasReplicationElement`, reconcile elements) are explicitly "pending a complete CCEK implementation." This is quoted from the source comments' intent:
+The inert escape-velocity elements (`CasReplicationElement`, reconcile elements) are explicitly "pending a complete CCEK implementation." This is quoted from the source comments' intent:
 
-- `cas/IpfsAdapter.kt:1` — "intentionally inert pending a complete CCEK implementation"
 - `cas/CasReplicationElement.kt:1` — "intentionally inert pending a complete CCEK implementation"
 
 CCEK completion — giving these elements proper CCEK owners with lifecycle management — is the unblock for wave 2's escape-velocity deliverable. See [escape-velocity.md](escape-velocity.md).
@@ -117,3 +116,5 @@ Direction audit (current tree):
 **Falsifiable gate:** grep the core packages (`ccek/`, `userspace/reactor/`) for `mcp`/`acp` imports; the only permitted hit is the pinned `Seat.kt` inversion above (or fewer, once flattened). Any new hit is a covenant violation.
 
 > **Status:** verified-live for the direction audit (one known inversion, pinned); design-covenant for the adapter-macro boundary itself.
+
+The former Kubo HTTP adapter was removed; native IPFS/IPNS transport is a separate gap, not a request to reintroduce an external daemon. See [hermetic-cas.md](../hermetic-cas.md).

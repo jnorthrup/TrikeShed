@@ -195,7 +195,7 @@ class CouchWireRouter(
         else -> WireReply.methodNotAllowed(m)
     }
 
-    /** `/api/v0/block/get?arg=` and `/api/v0/block/put` — the shape HtxIpfsAdapter already speaks. */
+    /** IPFS-shaped block aliases of the local CAS; no Kubo daemon or outgoing RPC is involved. */
     private fun ipfs(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply? {
         if (rest.getOrNull(0) != "block") return null
         return when (rest.getOrNull(1)) {

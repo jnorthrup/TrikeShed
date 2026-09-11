@@ -82,10 +82,10 @@ every other route. What is written here is the state after that.*
 |-|------|------|
 | ✅ | `cas/LineCas.kt` (474 L), `TreeCas.kt`, `FunnelResidualMerge.kt` (768 L) | line CAS (`contentCid`, `linkedKey`, `spineCid`), fanout-k Merkle over it, N-way spine merge |
 | ✅ | `cas/ContentAddress.kt`, `CasManifest.kt`, `BlockIndex.kt`, `VolumeCasStore.kt`, `job/CasStore.kt`, `MmapCasStore`, `BtrfsCasStore`, `btrfs/BtrfsReflinkStore.kt`, `util/oroboros/Sha2CasBus.kt` | CAS stores (memory, mmap, LBA volume, btrfs reflink, sharded files) |
-| ✅ | `cas/IpfsBridge.kt` | CAS blocks as IPFS blocks; IPNS name → `CasManifest` CID (in-memory registry); used via `MemoryBridge` |
-| ✅ | `util/oroboros/MemoryBridge.kt` | Markdown → per-line CAS spine + IPNS publish; Couch IDs `projects/trikeshed/<relative>` — **the path grammar already exists in embryo** |
+| ✅ | `cas/IpfsBridge.kt` | Local CAS blocks; process-local name → `CasManifest` ContentId registry; used via `MemoryBridge` |
+| ✅ | `util/oroboros/MemoryBridge.kt` | Markdown → per-line CAS spine + local name registration; Couch IDs `projects/trikeshed/<relative>` — **the path grammar already exists in embryo** |
 | ✅ | `htx/client/ipfs/CidAndStore.kt` | `CID(bytes)`, `CID.sha256`, `BlockStore` — uses `MessageDigest` in commonMain (on the JS-debt list) |
-| ⛔ | `cas/IpfsAdapter.kt` (`HtxIpfsAdapter` → Kubo `/api/v0/block/*`), `cas/CasReplicationElement.kt` | the live-IPFS and replication hooks — inert |
+| ⛔ | `cas/CasReplicationElement.kt` | replication incomplete; former Kubo adapter removed, native IPFS/IPNS transport absent |
 | ✅ | `pijul/{PatchPrimitives,PatchStorage,PijulDiffParser,PijulChannel}.kt`, `crdt/PijulCrdt.kt` | commutative patch DAG, Blake3 vertices, incremental alive-order; `util/oroboros/VersionGateway.kt` is pijul-flavoured `init/record` |
 | ✅ | `torrent/*` (BT v2 + uTP over HTX) | second bulk replication fabric, already in the daemon |
 | ❌ | — | no git oid codec (sha1/sha256 over `"<type> <len>\0"`), no multihash / CIDv1 / DAG-PB / DAG-CBOR / IPLD; `ContentId` is raw sha256 |
@@ -224,7 +224,7 @@ JvmFileWatchReactorElement(worktree)  ─▶ WorktreeCouchGateway → LineCas �
                                          → ProductionCouchIngress.putIntent(attachmentDoc)  (⛔ un-inert, WP1)
                                       ─▶ CouchChangesProjection.append(frame)        (exists)
                                          ├─▶ lazy-regen checkpoints invalidate       (WP4)
-                                         ├─▶ CasReplicationElement hooks: HtxIpfsAdapter.putBlock,
+                                         ├─▶ CasReplicationElement hooks: native block transport absent,
                                          │   TorrentElement seed, VersionGateway.record   (⛔ un-inert, WP5/7)
                                          └─▶ FlywheelDriver reacts to docs under project/*/kanban|jules  (WP2)
 ```
@@ -242,7 +242,7 @@ The daemon keeps its single-bind, no-JDK-networking, no-`git`-process discipline
 | | *2026-08-30: the mount is done — `POST /{db}/_relax` on `CouchWireRouter`, over the same `CouchDatabase` as `_changes`/`_replicate`/`_cas`, so an envelope put mints a CAS revision and replicates. `_changes`/`_all_docs`/`_bulk_docs`/`_revs_diff`/`_local`/`_cas`/`_replicate` also answer as envelope operations, and `RequestFactoryProxy` drives them from any Kotlin target. Still open in WP2: the `project/<id>/…` grammar and moving `/api/*` to `_design/kanban` shows.* | | |
 | WP3 | `GitObjectReader`: loose (zlib) + pack/idx decoding, oid for blob/tree/commit; `git` column; HEAD walk on ref change | `GitStateCache`, `.git/**` watcher | attachment `git.blob` == `git rev-parse HEAD:<path>` for every tracked file; zero `ProcessOperations` use in the daemon path |
 | WP4 | Lazy views: `_local` checkpoints, incremental fold from `_changes`, spine-CID receipts, `?stale=ok`; un-exclude `ViewServerTest` | `ViewServer`, `MapReduceProofReceipt`, `LineCas` | after 1 doc change the next `GET _view` maps exactly 1 doc, and the receipt proves it |
-| WP5 | multihash + CIDv1 + DAG-PB encoders in commonMain (no `MessageDigest`); un-inert `HtxIpfsAdapter`/`CasReplicationElement`; `ipfs` column; IPNS name = project manifest CID | `CidAndStore`, `IpfsBridge`, `CasManifest` | `ipfs block stat <cid>` agrees with the stored CID for a raw leaf; `CidAndStore` leaves the JS-debt list |
+| WP5 | multihash + CIDv1 + DAG-PB encoders in commonMain (no `MessageDigest`); native commonMain userspace-NIO block/name transport and `CasReplicationElement` completion; `ipfs` column; IPNS name = project manifest CID | `CidAndStore`, `IpfsBridge`, `CasManifest` | raw-leaf CIDv1 encoding matches fixed multicodec test vectors without an external daemon; `CidAndStore` leaves the JS-debt list |
 | WP6 | `_design/forge/_show/index` renders `ForgeApp.renderHtml` from the store; `generateForgePages` = `GET` + write; kanban reads `project/TrikeShed/kanban/*` docs instead of `~/.local/reactor/kanban` | `ForgeBakePages`, `ForgeBoardPersistence` | `docs/index.html` byte-identical from the Gradle task and from HTTP |
 | WP7 | Bind `PijulCrdt` to attachments: hunk identity = `LineNode.linkedKey`; `VersionGateway.record` on `_changes`; `pijul` column; channels = branches | `pijul/*`, `crdt/PijulCrdt`, `FunnelResidualMerge` | a `FunnelResidualMerge` and a `PijulCrdt` apply of the same change set agree on the spine CID |
 | WP8 | `_replicate` (pull/push over `_changes`) with CAS bulk path via ipfs/torrent hooks; second node | `CasReplicationElement`, `TorrentElement` | second node converges to the same project manifest CID |

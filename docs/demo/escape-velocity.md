@@ -64,29 +64,19 @@ Rejected malformed Pijul materialization; intentionally inert pending a complete
 
 > **Status:** degraded — reconcile elements are inert pending CCEK. See [ccek-covenant.md](ccek-covenant.md).
 
-### IPFS Lane (inert)
+### Local CAS aliases; native IPFS/IPNS transport absent
 
 | Path | Role |
 |------|------|
-| `cas/IpfsBridge.kt` | CAS blocks as IPFS blocks — in-memory IPNS, live |
-| `cas/IpfsAdapter.kt` | Live IPFS via Kubo HTTP API — **inert** |
+| `cas/IpfsBridge.kt` | Local CAS blocks and process-local names, live |
+| Former Kubo HTTP adapter | Removed: no production consumers; external daemon dependency excised |
 | `htx/client/ipfs/CidAndStore.kt` | CID + BlockStore |
 | `couch/CouchWireRouter.kt` | `/api/v0/block/*` → `_cas/*` aliases (commonMain) |
 | `src/commonMain resources/openapi/couch-oroboros.openapi.yaml` | OpenAPI spec |
 
-`IpfsAdapter.kt` line 1:
-```
-Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
-```
+`IpfsBridge` supplies local CAS access and a process-local name registry. It creates no signed IPNS records or libp2p/DHT publication. The former Kubo HTTP adapter was removed; it is not an implementation target. `CasReplicationElement` remains independently incomplete.
 
-`CasReplicationElement.kt` line 1:
-```
-Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
-```
-
-Both are inert pending a complete CCEK implementation. The `IpfsBridge` (in-memory IPNS registry) is live for local use, but the Kubo-backed `HtxIpfsAdapter` does not connect to a running IPFS daemon.
-
-> **Status:** degraded — IpfsAdapter and CasReplicationElement are inert. IpfsBridge is live for local-only use.
+> **Status:** local-only. See [hermetic-cas.md](../hermetic-cas.md).
 
 ## The Absorber (incomplete)
 
@@ -107,6 +97,6 @@ The headline deliverable for wave 2: **git blobs self-served from the CAS store,
 This means:
 1. Git objects (blobs, trees, commits) decoded from the absorbed `.git/**` bytes and served as CAS citizens — no external `git` process.
 2. The pijul gateway no longer shells out to a CLI; patch operations run through `PijulCrdt` directly.
-3. The inert CCEK elements (`IpfsAdapter`, `CasReplicationElement`, reconcile elements) are un-inerted by giving them a CCEK owner.
+3. The inert CCEK elements (`CasReplicationElement`, reconcile elements) are un-inerted by giving them a CCEK owner.
 
 See [ccek-covenant.md](ccek-covenant.md) for why CCEK completion is the unblock for wave 2.

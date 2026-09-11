@@ -5,12 +5,14 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.collections.associative.LinearHashMap
 
 /**
- * IpfsBridge maps IPFS concepts to TrikeShed's CAS and Manifests.
- * - CAS blocks as IPFS blocks.
- * - IPNS names resolve to CasManifest CIDs.
+ * Local CAS block access and process-local names for manifest content IDs.
+ *
+ * The existing IPFS/IPNS-shaped names are local vocabulary only: this class does not
+ * contact Kubo, publish signed IPNS records, or participate in libp2p/DHT discovery.
+ * Block persistence and I/O are owned by the supplied CasStore; names live only in memory.
  */
 open class IpfsBridge(private val cas: CasStore) {
-    // Map of IPNS name to Manifest CID
+    // Process-local name index; no remote publication is implied.
     private val ipnsRegistry = LinearHashMap<String, ContentId>()
 
     fun putBlock(data: ByteArray): ContentId {

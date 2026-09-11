@@ -10,7 +10,7 @@ import borg.trikeshed.memory.memoryFile
  * [WorktreeCouchGateway] first places every source/document blob under Couch
  * metadata backed by CAS. This bridge then gives Markdown files the deeper
  * memory treatment: per-line CAS spines, line index ingestion, logical memory
- * metadata, and IPNS publication of the spine CID.
+ * metadata, and process-local naming of the spine CID through IpfsBridge.
  *
  * Source attachments and memory projections use different Couch IDs. The
  * attachment remains at `projects/trikeshed/<relative>`; its projection lives
