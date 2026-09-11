@@ -1,0 +1,258 @@
+{
+    "mode": "emulated",
+    "rows": 16,
+    "warmup": 0,
+    "iterations": 1,
+    "tracing": true,
+    "trace_controls": {
+        "placement": "both",
+        "opcodes": [],
+        "phases": [],
+        "every": 1
+    },
+    "java": "25.0.4.1+1-jvmci-25.3-b22",
+    "os": "Mac OS X",
+    "arch": "aarch64",
+    "closure": "Cursor -> IsamDataFile -> JvmIsamOperations -> userspace FileChannel/UringChannel -> FunctionalUringFacade -> backend -> real files",
+    "timing_contract": "Application intervals include serialization/decoding, facade work, backend IO and optional trace bookkeeping. Backend intervals enclose only real submitBatch. They are nested, not additive; their difference is not pure facade latency.",
+    "trace_gaps": "Synchronous ISAM does not exercise cancellation admission/drain; negative ECANCELED completions are counted if observed. Trace records backend admission after facade validation, not pre-validation rejects. STATX completion24 is the normalized metadata payload width; native kernel STATX CQE0 is translated by the backend. Independent expected-file verification and benchmark logging are outside workload IO.",
+    "backend_selection": {
+        "availability": "emulated: Java file primitives; kernel bridge not selected",
+        "capabilities": 257965391881,
+        "native_capabilities": 0
+    },
+    "status": "verified",
+    "samples": [
+        {
+            "layout": "row_major",
+            "status": "verified",
+            "rows": 16,
+            "data_bytes": 208,
+            "verified_cells": 48,
+            "query_checksum": -1.359375,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 85578584,
+                    "backend_ns": 10081583
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 16987083,
+                    "backend_ns": 3858832
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 2748250,
+                    "backend_ns": 356919
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 6762584,
+                    "backend_ns": 786500
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 7270042,
+                    "backend_ns": 790252
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 226916,
+                    "backend_ns": 112666
+                }
+            ],
+            "iteration": 0
+        },
+        {
+            "layout": "type_grouped",
+            "status": "verified",
+            "rows": 16,
+            "data_bytes": 208,
+            "verified_cells": 48,
+            "query_checksum": -1.359375,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 23151708,
+                    "backend_ns": 13765252
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 16986750,
+                    "backend_ns": 10268876
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 1692417,
+                    "backend_ns": 423916
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 3547834,
+                    "backend_ns": 1067123
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 4280083,
+                    "backend_ns": 1239249
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 138333,
+                    "backend_ns": 28000
+                }
+            ],
+            "iteration": 0
+        }
+    ],
+    "requests": 264,
+    "read_bytes": 1492,
+    "written_bytes": 733,
+    "backend_errors": 0,
+    "cancelled_completions": 0,
+    "backend_channels": [
+        {
+            "channel": 0,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 1,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 2,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 3,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 4,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 5,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 6,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 7,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 8,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoInt.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 9,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoByte.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 10,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 11,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 12,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 13,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoInt.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 14,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoByte.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 15,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 16,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin.meta",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 17,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoInt.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 18,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.IoByte.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        },
+        {
+            "channel": 19,
+            "path": "/var/folders/kd/t4gdhlf137n0zbd6x34z1hcm0000gn/T/trikeshed-isam-bench-1053557217070791071/rows.bin",
+            "availability": "emulated: Java file primitives; kernel bridge not selected",
+            "capabilities": 257965391881,
+            "native_capabilities": 0
+        }
+    ],
+    "trace_event_limit": 100000,
+    "trace_omitted_events": 0
+}

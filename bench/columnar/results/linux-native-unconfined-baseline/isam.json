@@ -1,0 +1,842 @@
+{
+    "mode": "native",
+    "rows": 256,
+    "warmup": 1,
+    "iterations": 3,
+    "tracing": false,
+    "trace_controls": {
+        "placement": "off",
+        "opcodes": [],
+        "phases": [],
+        "every": 1
+    },
+    "java": "25.0.4+7-LTS",
+    "os": "Linux",
+    "arch": "aarch64",
+    "closure": "Cursor -> IsamDataFile -> JvmIsamOperations -> userspace FileChannel/UringChannel -> FunctionalUringFacade -> backend -> real files",
+    "timing_contract": "Application intervals include serialization/decoding, facade work, backend IO and optional trace bookkeeping. Backend intervals enclose only real submitBatch. They are nested, not additive; their difference is not pure facade latency.",
+    "trace_gaps": "Synchronous ISAM does not exercise cancellation admission/drain; negative ECANCELED completions are counted if observed. Trace records backend admission after facade validation, not pre-validation rejects. STATX completion24 is the normalized metadata payload width; native kernel STATX CQE0 is translated by the backend. Independent expected-file verification and benchmark logging are outside workload IO.",
+    "backend_selection": {
+        "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+        "capabilities": 65929273,
+        "native_capabilities": 65929273
+    },
+    "status": "verified",
+    "samples": [
+        {
+            "layout": "row_major",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 7425293,
+                    "backend_ns": 4963346
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 7427210,
+                    "backend_ns": 4471633
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 691841,
+                    "backend_ns": 88959
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 8502972,
+                    "backend_ns": 5540818
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 1452559,
+                    "backend_ns": 485841
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 81543,
+                    "backend_ns": 9917
+                }
+            ],
+            "iteration": 0
+        },
+        {
+            "layout": "row_major",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 7946299,
+                    "backend_ns": 5618933
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 6831619,
+                    "backend_ns": 4310178
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 674716,
+                    "backend_ns": 119291
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 7157415,
+                    "backend_ns": 5171934
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 7039456,
+                    "backend_ns": 5400029
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 97792,
+                    "backend_ns": 29917
+                }
+            ],
+            "iteration": 1
+        },
+        {
+            "layout": "row_major",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 6768370,
+                    "backend_ns": 5326612
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 7051831,
+                    "backend_ns": 4888269
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 535590,
+                    "backend_ns": 79710
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 5682190,
+                    "backend_ns": 4010173
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 2535071,
+                    "backend_ns": 1637777
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 54376,
+                    "backend_ns": 10083
+                }
+            ],
+            "iteration": 2
+        },
+        {
+            "layout": "type_grouped",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 18374210,
+                    "backend_ns": 14637159
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 10707248,
+                    "backend_ns": 7439799
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 1279223,
+                    "backend_ns": 168794
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 6651826,
+                    "backend_ns": 3748413
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 4238923,
+                    "backend_ns": 2652161
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 164669,
+                    "backend_ns": 27959
+                }
+            ],
+            "iteration": 0
+        },
+        {
+            "layout": "type_grouped",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 10896042,
+                    "backend_ns": 8504321
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 6361364,
+                    "backend_ns": 4070456
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 815509,
+                    "backend_ns": 34960
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 3964671,
+                    "backend_ns": 2430735
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 3597874,
+                    "backend_ns": 2057476
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 141584,
+                    "backend_ns": 17375
+                }
+            ],
+            "iteration": 1
+        },
+        {
+            "layout": "type_grouped",
+            "status": "verified",
+            "rows": 256,
+            "data_bytes": 3328,
+            "verified_cells": 768,
+            "query_checksum": -0.828125,
+            "stages": [
+                {
+                    "phase": "write",
+                    "application_ns": 9683486,
+                    "backend_ns": 6691280
+                },
+                {
+                    "phase": "append",
+                    "application_ns": 6780286,
+                    "backend_ns": 4087385
+                },
+                {
+                    "phase": "open",
+                    "application_ns": 875843,
+                    "backend_ns": 35000
+                },
+                {
+                    "phase": "read_decode",
+                    "application_ns": 3692626,
+                    "backend_ns": 2413125
+                },
+                {
+                    "phase": "query_projection",
+                    "application_ns": 4376550,
+                    "backend_ns": 2377766
+                },
+                {
+                    "phase": "close",
+                    "application_ns": 176335,
+                    "backend_ns": 57626
+                }
+            ],
+            "iteration": 2
+        }
+    ],
+    "requests": 12576,
+    "read_bytes": 55888,
+    "written_bytes": 27892,
+    "backend_errors": 0,
+    "cancelled_completions": 0,
+    "backend_channels": [
+        {
+            "channel": 0,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 1,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 2,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 3,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 4,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 5,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 6,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 7,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 8,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 9,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 10,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 11,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 12,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 13,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 14,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 15,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 16,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 17,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 18,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 19,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 20,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 21,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 22,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 23,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 24,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 25,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 26,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 27,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 28,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 29,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 30,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 31,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 32,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 33,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 34,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 35,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 36,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 37,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 38,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 39,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 40,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 41,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 42,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 43,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 44,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 45,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 46,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 47,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 48,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 49,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 50,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 51,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 52,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 53,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 54,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 55,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 56,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 57,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 58,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 59,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 60,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 61,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 62,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 63,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 64,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 65,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 66,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 67,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 68,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 69,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 70,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 71,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 72,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 73,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 74,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 75,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 76,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin.meta",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 77,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoInt.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 78,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.IoByte.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        },
+        {
+            "channel": 79,
+            "path": "/tmp/trikeshed-isam-bench-12927396201893217833/rows.bin",
+            "availability": "AVAILABLE: Setup, operation probe and kernel NOP completed; unsupported operations retain emulated uring semantics",
+            "capabilities": 65929273,
+            "native_capabilities": 65929273
+        }
+    ],
+    "trace_event_limit": 100000,
+    "trace_omitted_events": 0
+}
