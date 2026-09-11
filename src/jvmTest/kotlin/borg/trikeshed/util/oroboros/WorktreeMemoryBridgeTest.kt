@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 
 class WorktreeMemoryBridgeTest {
     @Test
-    fun worktreeCouchCasMemorySpineAndIpnsCompose() {
+    fun worktreeCouchCasMemorySpineAndAliasesCompose() {
         val root = Files.createTempDirectory("oroboros-worktree-")
         val forge = Files.createTempDirectory("oroboros-forge-")
         try {
@@ -62,7 +62,7 @@ class WorktreeMemoryBridgeTest {
             assertEquals(1, indexes.route(IndexKind.Taxonomy).entryCount)
 
             val spineCid = assertNotNull(memory.spineCidOf(memoryPath))
-            assertEquals(spineCid, ipfs.resolveIpns("memory:$memoryPath"))
+            assertEquals(spineCid, ipfs.resolveAlias("memory:$memoryPath"))
             assertTrue(memory.spineOf(memoryPath) != null)
 
             root.resolve("README.md").deleteIfExists()
@@ -75,7 +75,7 @@ class WorktreeMemoryBridgeTest {
             assertEquals(listOf("projects/trikeshed/README.md"), afterDelete.deletedPaths)
             assertEquals(1, bridge.bridge(afterDelete, "test"))
             assertNull(memory.get(memoryPath))
-            assertNull(ipfs.resolveIpns("memory:$memoryPath"))
+            assertNull(ipfs.resolveAlias("memory:$memoryPath"))
             assertEquals(0, indexes.route(IndexKind.Taxonomy).entryCount)
 
             indexes.close()

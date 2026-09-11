@@ -104,12 +104,13 @@ set union.
 
 ### IPFS — the same blocks, off the machine
 
-`IpfsBridge.putBlock/getBlock/resolveIpns`.
+`IpfsBridge.putBlock/getBlock/resolveAlias` provides local CAS blocks and names.
+Public IPNS uses the daemon's persistent publisher through `/api/v0/name/publish`
+and `/api/v0/name/resolve`.
 
-CAS blocks, git objects and IPFS blocks are all sha-addressed immutable bytes.
-The bridge is an identity map, not a translation — which is why this plane is a
-costume and not a port. IPNS names the channel head. The loop closes with no server
-in it:
+CAS blocks and git objects use internal content IDs; publication converts the
+digest to a CID with an explicit codec. IPNS can name the channel head. The
+following block-transfer loop still requires provider and retrieval work:
 
 ```
 patch ─▶ CAS blob ─▶ IPFS block ─▶ IPNS head

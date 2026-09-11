@@ -50,7 +50,8 @@ subnet, but content is addressed by CID at any ring. A memory write:
   1. Ring 0: CasStore.put(bytes) -> ContentId; CasReplicationHook.onPut
      fires -> CID advertised to mesh DHT
   2. Ring 1: LineCas.spineInto -> each line CID also CAS-put + replicated
-  3. spineCid = CasManifest identity -> publishable via IpfsBridge.publishIpns
+  3. spineCid = CasManifest identity -> process-local IpfsBridge.bindAlias;
+     public IPNS publication uses the daemon's persistent publisher separately
   4. Ring -1: NUID with Capability.Cas("memory") routes the write to the
      correct subnet via DHT lookup
 

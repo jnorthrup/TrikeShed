@@ -3,6 +3,20 @@ package borg.trikeshed.couch
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.io.ContentTypes
 import borg.trikeshed.relaxfactory.CouchHttpSurface
+import borg.trikeshed.ipns.IpnsCid
+import borg.trikeshed.ipns.IpnsDht
+import borg.trikeshed.ipns.IpnsDhtFailure
+import borg.trikeshed.ipns.IpnsEncoding
+import borg.trikeshed.ipns.IpnsName
+import borg.trikeshed.ipns.IpnsPublisher
+import borg.trikeshed.ipns.IpnsPublishReport
+import borg.trikeshed.ipns.IpnsRecord
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlin.time.Clock
 
 /** A rendered reply: status, content type, raw bytes. Binary-safe so attachments and blocks can flow. */
 data class WireReply(val status: Int, val contentType: String, val bytes: ByteArray) {
@@ -37,6 +51,8 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
  *   GET|PUT|DELETE /{db}/{id…}                    document JSON (`_attachments` stubs rendered)
  *   GET    /{db}/{id…}/content[?rev]              attachment bytes of a path document (rev = a CAS-held revision)
  *   GET    /api/v0/block/get?arg={cid}  POST /api/v0/block/put     IPFS-shaped aliases of _cas
+ *   POST   /api/v0/name/publish?arg={path}   POST /api/v0/name/republish    configured native IPNS publisher
+ *   GET|POST /api/v0/name/resolve?arg={name}   GET /api/v0/name/status     verified DHT result / local lifecycle
  *   GET    /{anything}                            vhost: rewrite of the root ddoc → attachment bytes
  *
  * [attachmentPrefix] is the logical prefix rewrites resolve under (`projects/trikeshed/`).
@@ -195,14 +211,128 @@ class CouchWireRouter(
         else -> WireReply.methodNotAllowed(m)
     }
 
-    /** IPFS-shaped block aliases of the local CAS; no Kubo daemon or outgoing RPC is involved. */
-    private fun ipfs(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply? {
+    /** Block aliases stay local; name routes use the configured native IPNS context elements. */
+    private suspend fun ipfs(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply? {
+        if (rest.getOrNull(0) == "name") return ipns(m, rest, query)
         if (rest.getOrNull(0) != "block") return null
         return when (rest.getOrNull(1)) {
             "get" -> query["arg"]?.let { db.blockGet(it) }?.let { WireReply(200, "application/octet-stream", it) } ?: WireReply.notFound("no such block")
             "put" -> if (m != "POST") WireReply.methodNotAllowed(m) else db.blockPut(body).let { WireReply.json(200, mapOf("Key" to it.value, "Size" to body.size)) }
             else -> null
         }
+    }
+
+    private suspend fun ipns(m: String, rest: List<String>, query: Map<String, String>): WireReply? {
+        if (rest.size != 2) return null
+        val operation = rest[1]
+        val permitted = when (operation) {
+            "publish", "republish" -> m == "POST"
+            "resolve" -> m == "GET" || m == "POST"
+            "status" -> m == "GET"
+            else -> return null
+        }
+        if (!permitted) return WireReply.methodNotAllowed(m)
+        val context = currentCoroutineContext()
+        return when (operation) {
+            "publish" -> {
+                val value = query["arg"] ?: return WireReply.badRequest("arg is required")
+                try { ipnsPath(value) }
+                catch (failure: IllegalArgumentException) { return WireReply.badRequest(failure.message ?: "invalid IPNS value") }
+                val publisher = context[IpnsPublisher] ?: return ipnsUnavailable("IPNS publisher is not configured")
+                ipnsOperation { ipnsPublication(publisher.publish(value)) }
+            }
+            "republish" -> {
+                val publisher = context[IpnsPublisher] ?: return ipnsUnavailable("IPNS publisher is not configured")
+                if (publisher.latest == null) return WireReply.badRequest("no IPNS record has been published")
+                ipnsOperation { ipnsPublication(publisher.republish()) }
+            }
+            "resolve" -> {
+                val argument = query["arg"] ?: return WireReply.badRequest("arg is required")
+                val name = try { IpnsName.parse(argument) }
+                catch (failure: IllegalArgumentException) { return WireReply.badRequest(failure.message ?: "invalid IPNS name") }
+                val dht = context[IpnsDht] ?: return ipnsUnavailable("IPNS DHT is not configured")
+                ipnsOperation {
+                    val result = dht.resolveReport(name, Clock.System.now())
+                    val value = mutableMapOf<String, Any?>(
+                        "Name" to name.toString(), "quorumReached" to result.quorumReached,
+                        "validResponses" to result.valid.size, "quorumRequired" to result.quorumRequired,
+                        "lookupExhausted" to result.lookup.exhausted, "queryLimitReached" to result.lookup.queryLimitReached,
+                        "candidateLimitReached" to result.lookup.candidateLimitReached,
+                        "rejectedPeerAdvertisements" to result.lookup.replies.view.sumOf { it.message?.rejectedPeers ?: 0 },
+                        "peers" to result.valid.view.map { mapOf("id" to IpnsEncoding.base58(it.peer.id),
+                            "sequence" to it.record.sequence.toString(), "validUntil" to it.record.validUntil.toString()) },
+                        "failures" to result.failures.view.map(::ipnsFailure),
+                        "repairAcknowledgements" to result.repairs.view.count { it.failure == null },
+                        "repairFailures" to result.repairs.view.mapNotNull { it.failure?.let(::ipnsFailure) })
+                    result.selected?.let {
+                        value[if (result.quorumReached) "Path" else "candidatePath"] = it.value
+                        value["sequence"] = it.sequence.toString()
+                        value["validUntil"] = it.validUntil.toString()
+                    }
+                    when {
+                        result.quorumReached -> WireReply.json(200, value)
+                        result.absent -> WireReply.json(404, value + mapOf("error" to "not_found", "reason" to "IPNS record not found"))
+                        else -> WireReply.json(503, value + mapOf("error" to "ipns_quorum_incomplete",
+                            "reason" to "${result.valid.size} of ${result.quorumRequired} required valid responses"))
+                    }
+                }
+            }
+            else -> {
+                val publisher = context[IpnsPublisher] ?: return ipnsUnavailable("IPNS publisher is not configured")
+                // Snapshot each observation once; status does not enqueue or perform publication.
+                val latest = publisher.latest
+                val lastReport = publisher.lastReport
+                val lastFailure = publisher.lastFailure
+                WireReply.json(200, mapOf("Name" to publisher.name.toString(), "lifecycle" to publisher.lifecycleState.name,
+                    "latest" to latest?.let(::ipnsRecord), "lastReport" to lastReport?.let(::ipnsPublicationValue),
+                    "lastFailure" to lastFailure?.let { mapOf("type" to it::class.simpleName, "reason" to it.message) }))
+            }
+        }
+    }
+
+    private fun ipnsPath(value: String) {
+        require(value.length <= 4096 && value.encodeToByteArray().size <= 8192 && value.none { it < ' ' || it == '\u007f' }) { "invalid IPNS path length or control character" }
+        val parts = value.split('/', limit = 4)
+        require(parts.size >= 3 && parts[0].isEmpty() && parts[2].isNotEmpty()) { "arg must be /ipfs/CID or /ipns/name" }
+        when (parts[1]) {
+            "ipfs" -> IpnsCid.parse(parts[2])
+            "ipns" -> IpnsName.parse(parts[2])
+            else -> throw IllegalArgumentException("arg must be /ipfs/CID or /ipns/name")
+        }
+    }
+
+    private fun ipnsRecord(record: IpnsRecord): Map<String, Any?> = mapOf("Name" to record.name.toString(),
+        "Value" to record.value, "sequence" to record.sequence.toString(), "validUntil" to record.validUntil.toString())
+
+    private fun ipnsFailure(failure: IpnsDhtFailure): Map<String, Any?> = mapOf(
+        "peer" to IpnsEncoding.base58(failure.peer.id), "stage" to failure.stage.name, "reason" to failure.reason)
+
+    private fun ipnsPublicationValue(report: IpnsPublishReport): Map<String, Any?> = ipnsRecord(report.record) + mapOf(
+        "complete" to report.complete, "acknowledgements" to report.acknowledgements.size, "replicaTarget" to report.replicaTarget,
+        "primaryAcknowledgements" to report.primaryAcknowledgements.size, "replacementAcknowledgements" to report.replacementAcknowledgements.size,
+        "putAttempts" to report.putAttempts, "lookupExhausted" to report.lookup.exhausted,
+        "queryLimitReached" to report.lookup.queryLimitReached, "candidateLimitReached" to report.lookup.candidateLimitReached,
+        "rejectedPeerAdvertisements" to report.lookup.replies.view.sumOf { it.message?.rejectedPeers ?: 0 },
+        "peers" to report.acknowledgements.view.map { IpnsEncoding.base58(it.id) },
+        "replacementPeers" to report.replacementAcknowledgements.view.map { IpnsEncoding.base58(it.id) },
+        "failures" to report.failures.view.map(::ipnsFailure))
+
+    private fun ipnsPublication(report: IpnsPublishReport): WireReply {
+        val value = ipnsPublicationValue(report)
+        return if (report.complete) WireReply.json(200, value) else WireReply.json(503,
+            value + mapOf("error" to "ipns_replication_incomplete", "reason" to "${report.acknowledgements.size} of ${report.replicaTarget} required acknowledgements"))
+    }
+
+    private fun ipnsUnavailable(reason: String) = WireReply.json(503, mapOf("error" to "ipns_unavailable", "reason" to reason))
+
+    private suspend fun ipnsOperation(action: suspend () -> WireReply): WireReply = try {
+        action()
+    } catch (failure: CancellationException) {
+        // A child operation timeout is reportable; cancellation of this HTTP request must propagate.
+        currentCoroutineContext().ensureActive()
+        ipnsUnavailable("${failure::class.simpleName}: ${failure.message}")
+    } catch (failure: Exception) {
+        ipnsUnavailable("${failure::class.simpleName}: ${failure.message}")
     }
 
     private fun design(m: String, rest: List<String>, query: Map<String, String>, body: ByteArray): WireReply {

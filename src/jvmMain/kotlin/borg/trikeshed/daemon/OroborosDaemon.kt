@@ -257,10 +257,12 @@ object OroborosDaemon {
                 // Job so a child failing during shutdown cannot cancel its siblings mid-close —
                 // the same idiom AsyncContextElement already uses for its own elements.
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
+                var ipnsNode: borg.trikeshed.ipns.IpnsNode? = null
                 try {
-                    with(daemonScope) { mainImpl(args) }
+                    with(daemonScope) { mainImpl(args) { ipnsNode = it } }
                 } finally {
-                    daemonScope.cancel()
+                    try { ipnsNode?.close() }
+                    finally { daemonScope.cancel() }
                 }
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -269,7 +271,96 @@ object OroborosDaemon {
         }
     }
 
-    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(args: Array<String>) {
+    private suspend fun lcncStores(
+        moduleContext: borg.trikeshed.module.ModuleContext,
+        promptStore: borg.trikeshed.lcnc.PromptStore,
+        snapshotService: borg.trikeshed.forge.server.WorkspaceSnapshotService,
+        projectCorpus: borg.trikeshed.forge.server.JvmProjectCorpus,
+    ) {
+        // Stored prompts: prompt.get / prompt.render / prompt.list over the store, prompt.save the
+        // one write; then the ledger thaws and the seeds install where no head exists.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
+        promptStore.register(moduleContext)
+        snapshotService.register(moduleContext)
+        System.err.println("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
+        promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
+            System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
+        }
+        // (the program ledger thaws far below, after the LAST runner registration — see there)
+        // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
+        // project.docs / project.read / project.extract over the mounted project databases.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
+        // Pure/presentation node runners: canvas-authored programs (preset-kanban)
+        // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        // Phase-1 twin removal: `pick` is not a Kotlin lambda. Its existing
+        // panels.html RUNNERS method executes in one HostAccess.NONE GraalJS
+        // context per invocation; registry() loads that resource on IO.
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.CanvasJsPureNodes.registry())
+    }
+
+    private fun healthSocket(healthSock: File): ServerSocketChannel? {
+        // Bind with retry: a prior daemon may have left a stale socket file
+        // even after the JVM exited; the bind() then creates a regular file
+        // instead of a UNIX socket. Retry up to 3× with the file removed
+        // between attempts so we always end up with a real socket.
+        var serverSocket: ServerSocketChannel? = null
+        var bindAttempt = 0
+        while (serverSocket == null && bindAttempt < 3) {
+            try {
+                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
+                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
+                serverSocket.configureBlocking(false)
+            } catch (e: Throwable) {
+                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
+                try { serverSocket?.close() } catch (_: Exception) {}
+                serverSocket = null
+                if (healthSock.exists()) healthSock.delete()
+                bindAttempt++
+            }
+        }
+        if (serverSocket == null) {
+            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            return null
+        }
+
+        return serverSocket
+    }
+
+    private fun CoroutineScope.ipnsNode(
+        oroborosDir: File,
+        ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+    ): borg.trikeshed.ipns.IpnsNode {
+        val node = borg.trikeshed.ipns.jvmIpnsNode(
+            File(oroborosDir, "ipns.journal").absolutePath, coroutineContext,
+            bootstrap = System.getenv("TRIKESHED_IPNS_BOOTSTRAP")
+                ?: borg.trikeshed.ipns.IpnsDhtAddresses.PUBLIC_BOOTSTRAP,
+        )
+        ownIpns(node)
+        return node
+    }
+
+    private fun CoroutineScope.couchWire(
+        db: borg.trikeshed.couch.Couch,
+        replicator: borg.trikeshed.couch.replicate.CouchReplicator,
+        targets: Map<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget>,
+        views: borg.trikeshed.couch.IncrementalViewRegistry,
+        node: borg.trikeshed.ipns.IpnsNode,
+    ): borg.trikeshed.forge.server.CouchWire {
+        val report = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
+        launch { report.open() }
+        return borg.trikeshed.forge.server.CouchWire(
+            router = borg.trikeshed.couch.CouchWireRouter(db, WorktreeCouchGateway.WORKTREE_PREFIX,
+                replicator = replicator, report = report, rpcTargets = targets) { ddoc, view -> views.lookup(ddoc, view) },
+            replicator = replicator,
+            scope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default),
+            ipns = node,
+        )
+    }
+
+    private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(
+        args: Array<String>, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+    ) {
         // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
         // + codex/opencode credential files), then the legacy derived-name env
         // lane (LLM_<X>_KEY), then the hermes CREDENTIAL POOL as the borrowing
@@ -353,29 +444,7 @@ object OroborosDaemon {
         val healthSock = File(oroborosDir, "health.sock")
         if (healthSock.exists()) healthSock.delete()
 
-        // Bind with retry: a prior daemon may have left a stale socket file
-        // even after the JVM exited; the bind() then creates a regular file
-        // instead of a UNIX socket. Retry up to 3× with the file removed
-        // between attempts so we always end up with a real socket.
-        var serverSocket: ServerSocketChannel? = null
-        var bindAttempt = 0
-        while (serverSocket == null && bindAttempt < 3) {
-            try {
-                serverSocket = ServerSocketChannel.open(StandardProtocolFamily.UNIX)
-                serverSocket.bind(UnixDomainSocketAddress.of(healthSock.toPath()))
-                serverSocket.configureBlocking(false)
-            } catch (e: Throwable) {
-                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed: ${e.message}")
-                try { serverSocket?.close() } catch (_: Exception) {}
-                serverSocket = null
-                if (healthSock.exists()) healthSock.delete()
-                bindAttempt++
-            }
-        }
-        if (serverSocket == null) {
-            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
-            return
-        }
+        val serverSocket = healthSocket(healthSock) ?: return
 
         val healthJob = launch(Dispatchers.IO) {
             while (isActive) {
@@ -510,7 +579,9 @@ object OroborosDaemon {
         // This selects the host-filesystem CAS backend. UserspaceBtrfs worlds below
         // use FileOperations independently of whether the host filesystem is Btrfs.
         val casRootPath = fileOps.resolvePath(forgeHome.absolutePath, "cas")
+        val ipnsNode = ipnsNode(oroborosDir, ownIpns)
         val casBacking = withContext(Dispatchers.IO) {
+            ipnsNode.open()
             borg.trikeshed.btrfs.JvmFilesystemTypeProbe.probe(casRootPath)
         }
         val casSelection = (System.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
@@ -646,26 +717,9 @@ object OroborosDaemon {
         val couchReplicator = borg.trikeshed.couch.replicate.CouchReplicator(couchDb, peerHttp)
         val requestFactoryRpcTargets =
             java.util.concurrent.ConcurrentHashMap<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget>()
-        // The ReportServer, declared here rather than beside the other wires because the router
-        // needs it: with it attached, every `_view` and every envelope `query` puts its map and
-        // reduce facts on the CCEK report bus. Without it those events had no producer at all.
-        val reportReactorForWires = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
-        launch { reportReactorForWires.open() }
-        val couchWire = borg.trikeshed.forge.server.CouchWire(
-            router = borg.trikeshed.couch.CouchWireRouter(
-                couchDb,
-                WorktreeCouchGateway.WORKTREE_PREFIX,
-                replicator = couchReplicator,
-                report = reportReactorForWires,
-                rpcTargets = requestFactoryRpcTargets,
-            ) { ddoc, view ->
-                incrementalViews.lookup(ddoc, view)
-            },
-            replicator = couchReplicator,
-            // NOT the runBlocking scope: async/continuous replication must run on real workers,
-            // not queued behind the daemon's single-threaded root event loop.
-            scope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default),
-        )
+        val couchWire = couchWire(couchDb, couchReplicator,
+            requestFactoryRpcTargets, incrementalViews, ipnsNode)
+        val reportReactorForWires = requireNotNull(couchWire.router.report)
 
         // Kanban HTTP server (CCEK litebike listener, no JDK networking) — starts before
         // the reactive cycle so the port is bound. Driver is available at this point.
@@ -1342,26 +1396,7 @@ object OroborosDaemon {
             enabledBy = if ("--agents" in args) "--agents" else if (System.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
         )
         System.err.println("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
-        // Stored prompts: prompt.get / prompt.render / prompt.list over the store, prompt.save the
-        // one write; then the ledger thaws and the seeds install where no head exists.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
-        promptStore.register(moduleContext)
-        snapshotService.register(moduleContext)
-        System.err.println("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
-        promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
-            System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
-        }
-        // (the program ledger thaws far below, after the LAST runner registration — see there)
-        // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
-        // project.docs / project.read / project.extract over the mounted project databases.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
-        // Pure/presentation node runners: canvas-authored programs (preset-kanban)
-        // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
-        // Phase-1 twin removal: `pick` is not a Kotlin lambda. Its existing
-        // panels.html RUNNERS method executes in one HostAccess.NONE GraalJS
-        // context per invocation; registry() loads that resource on IO.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.CanvasJsPureNodes.registry())
+        lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
         // selection:null. Hermes' own state.db answers "what actually replied",
@@ -2096,7 +2131,7 @@ object OroborosDaemon {
 
 
         // ── Memory bridge: routes memory-eligible reconcile files through
-        //    MemoryStore.put() so they get per-line spines + IPFS publication.
+        //    MemoryStore.put() so they get per-line spines and local aliases.
         val ipfsBridge = borg.trikeshed.cas.IpfsBridge(casStore)
         val memoryBridge = borg.trikeshed.util.oroboros.MemoryBridge(
             memoryStore,
@@ -2338,7 +2373,7 @@ object OroborosDaemon {
             runCatching {
                 val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
                 System.err.println(
-                    "[OROBOROS] Memory bridge: $bridged memory files bridged (spines + IPFS)"
+                    "[OROBOROS] Memory bridge: $bridged memory files bridged (spines + local aliases)"
                 )
                 // ── Belief minting feed: epistemic signals from the memory plane land in the bag.
                 // FNV identity stays on the signal's CIDs; the BAG key gets the feature-coded
@@ -2447,14 +2482,12 @@ object OroborosDaemon {
 
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
         val reactiveJob = SupervisorJob(mainJob)
-        val reactiveScope = CoroutineScope(coroutineContext + reactiveJob)
 
-        // Shutdown: cancel Jobs only — never nest runBlocking in a signal handler.
-        // Structured concurrency unwinds the finally block in mainImpl which
-        // closes every CCEK element in scope.
+        // Wake the daemon without cancelling resource owners: their close paths
+        // must drain admitted work before the daemon supervisor is cancelled.
         val sigHandler = SignalHandler {
             isRunning = false
-            mainJob?.cancel()
+            reactiveJob.cancel()
         }
         Signal.handle(Signal("TERM"), sigHandler)
         Signal.handle(Signal("INT"), sigHandler)
@@ -2492,9 +2525,7 @@ object OroborosDaemon {
         })
         try {
             if (watch) {
-                while (isRunning) {
-                    delay(intervalMs)
-                }
+                reactiveJob.join()
             } else {
                 // --once: settle the reactive elements, then exit.
                 delay(intervalMs)

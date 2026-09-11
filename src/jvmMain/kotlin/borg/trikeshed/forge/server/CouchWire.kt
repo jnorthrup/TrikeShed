@@ -35,6 +35,7 @@ class CouchWire(
     private val replicator: CouchReplicator?,
     private val scope: CoroutineScope,
     private val defaultHeartbeatMs: Long = 15_000,
+    private val ipns: borg.trikeshed.ipns.IpnsNode? = null,
 ) {
     val db: Couch get() = router.db
 
@@ -68,7 +69,10 @@ class CouchWire(
         // Until 2026-09-05 the `/{db}` guard below swallowed them: the router answered them in
         // every in-process test and the daemon 404'd them on the socket (CouchWireSocketTest).
         if (p.startsWith("/api/v0/")) {
-            val reply = router.handle(method, path, bodyOf(payload)) ?: return null
+            val reply = if (p.startsWith("/api/v0/name/") && ipns != null)
+                ipns.request { router.handle(method, path, bodyOf(payload)) }
+            else router.handle(method, path, bodyOf(payload))
+            if (reply == null) return null
             return JvmKanbanServer.HttpResponse(reply.status, "", reply.contentType, reply.bytes)
         }
 

@@ -10,7 +10,7 @@ import borg.trikeshed.memory.memoryFile
  * [WorktreeCouchGateway] first places every source/document blob under Couch
  * metadata backed by CAS. This bridge then gives Markdown files the deeper
  * memory treatment: per-line CAS spines, line index ingestion, logical memory
- * metadata, and process-local naming of the spine CID through IpfsBridge.
+ * metadata, and local aliases for the spine CID through IpfsBridge.
  *
  * Source attachments and memory projections use different Couch IDs. The
  * attachment remains at `projects/trikeshed/<relative>`; its projection lives
@@ -30,7 +30,7 @@ class MemoryBridge(
                 val relative = attachmentPath.removePrefix(WorktreeCouchGateway.WORKTREE_PREFIX)
                 val memoryPath = "/memories/${WorktreeCouchGateway.WORKTREE_PREFIX}$relative"
                 if (memoryStore.delete(memoryPath)) bridged++
-                ipfsBridge.unpublishIpns("memory:$memoryPath")
+                ipfsBridge.removeAlias("memory:$memoryPath")
             }
         }
         for (attachmentPath in snapshot.paths) {
@@ -53,7 +53,7 @@ class MemoryBridge(
                     kind = "repository-document",
                 )
                 val spineCid = memoryStore.spineCidOf(memoryPath) ?: return@runCatching
-                ipfsBridge.publishIpns("memory:$memoryPath", spineCid)
+                ipfsBridge.bindAlias("memory:$memoryPath", spineCid)
                 bridged++
             }
         }

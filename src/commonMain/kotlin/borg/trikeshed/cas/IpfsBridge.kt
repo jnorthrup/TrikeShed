@@ -12,15 +12,14 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlin.time.Clock
 
 /**
- * Local CAS block access and process-local names for manifest content IDs.
+ * Local CAS block access and instance-local aliases for manifest content IDs.
  *
- * String aliases remain process-local. Typed public IPNS operations compose the persistent
- * publisher and authenticated DHT from the caller's context. No daemon or HTTP routing service.
+ * String aliases remain local to this bridge. Typed public IPNS operations compose the persistent
+ * publisher and authenticated DHT from the caller's context.
  * Block persistence and I/O are owned by the supplied CasStore.
  */
 open class IpfsBridge(private val cas: CasStore) {
-    // Process-local name index; no remote publication is implied.
-    private val ipnsRegistry = LinearHashMap<String, ContentId>()
+    private val aliases = LinearHashMap<String, ContentId>()
 
     fun putBlock(data: ByteArray): ContentId {
         return cas.put(data)
@@ -30,14 +29,14 @@ open class IpfsBridge(private val cas: CasStore) {
         return cas.get(cid)
     }
 
-    open fun publishIpns(name: String, manifestCid: ContentId) {
-        ipnsRegistry[name] = manifestCid
+    open fun bindAlias(name: String, manifestCid: ContentId) {
+        aliases[name] = manifestCid
     }
 
-    open fun unpublishIpns(name: String): Boolean = ipnsRegistry.remove(name) != null
+    open fun removeAlias(name: String): Boolean = aliases.remove(name) != null
 
-    fun resolveIpns(name: String): ContentId? {
-        return ipnsRegistry[name]
+    fun resolveAlias(name: String): ContentId? {
+        return aliases[name]
     }
 
     /** Publish this CAS block digest as a raw CIDv1 using the context's durable signing identity. */

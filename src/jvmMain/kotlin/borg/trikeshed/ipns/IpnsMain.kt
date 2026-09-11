@@ -44,7 +44,7 @@ fun main(args: Array<String>) {
                 val replicas = options["replicas"]?.toInt() ?: 20
                 val quorum = options["quorum"]?.toInt() ?: minOf(16, replicas)
                 val privateAddresses = options["allow-private"]?.toBooleanStrict() ?: false
-                val bootstrap = IpnsDhtAddresses.bootstrap((options["bootstrap"] ?: IPNS_BOOTSTRAP).split(',').toSeries(), privateAddresses)
+                val bootstrap = IpnsDhtAddresses.bootstrap((options["bootstrap"] ?: IpnsDhtAddresses.PUBLIC_BOOTSTRAP).split(',').toSeries(), privateAddresses)
                 val timeout = options["rpc-timeout"]?.toLong() ?: 15000L
                 val tls = JvmLibp2pTls(identity, crypto)
                 dialer = UringLibp2pDialer(tls::backend, parentJob = coroutineContext[Job], timeoutMillis = timeout,
@@ -183,9 +183,3 @@ private class IpnsIoTrace : UringTrace {
 
 private fun jsonObject(block: MutableMap<String, Any?>.() -> Unit): Map<String, Any?> = linkedMapOf<String, Any?>().apply(block)
 private fun emit(value: Map<String, Any?>) = println(JsonSupport.stringify(value))
-
-// Official Amino bootstrappers, numeric DNS snapshot 2026-09-11; --bootstrap replaces this set.
-private const val IPNS_BOOTSTRAP = "/ip4/54.38.47.166/tcp/4001/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb," +
-    "/ip4/15.235.144.210/tcp/4001/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt," +
-    "/ip4/51.81.93.51/tcp/4001/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa," +
-    "/ip4/147.135.44.132/tcp/4001/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN"

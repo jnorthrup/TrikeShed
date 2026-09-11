@@ -26,19 +26,19 @@ import kotlin.test.assertEquals
 class MemoryBridgeDegradationTest {
 
     /**
-     * When publishIpns throws (the AIOOBE), bridge() must not propagate —
+     * When bindAlias throws (the AIOOBE), bridge() must not propagate —
      * it degrades and continues processing remaining paths.
      */
     @Test
-    fun bridgeDegradesOnPublishIpnsAioobe() {
+    fun bridgeDegradesOnBindAliasAioobe() {
         val cas = CasStore.inMemory()
         val couch = CouchStoreFactory.inMemory()
         val attachments = CouchAttachmentGateway(couch, cas)
         val memory = MemoryStore(cas, couch)
 
-        // IpfsBridge that throws AIOOBE on every publishIpns call
+        // IpfsBridge that throws AIOOBE on every bindAlias call
         val brokenIpfs = object : IpfsBridge(cas) {
-            override fun publishIpns(name: String, manifestCid: ContentId) {
+            override fun bindAlias(name: String, manifestCid: ContentId) {
                 throw ArrayIndexOutOfBoundsException(
                     "OpenAddressingMap.set: slot=16 capacity=16"
                 )
@@ -72,15 +72,15 @@ class MemoryBridgeDegradationTest {
         // CRITICAL: bridge() must NOT throw — the AIOOBE is caught per-path
         val bridged = bridge.bridge(snapshot, "test")
 
-        // publishIpns threw for both files, so bridged==0 (bridged++ is after the throw)
+        // bindAlias threw for both files, so bridged==0 (bridged++ is after the throw)
         assertEquals(0, bridged, "bridge() should degrade, not crash")
 
-        // Memory files were stored (put() succeeded before publishIpns threw)
-        assertEquals(2, memory.listPaths().size, "memory files stored despite IPNS failure")
+        // Memory files were stored (put() succeeded before bindAlias threw)
+        assertEquals(2, memory.listPaths().size, "memory files stored despite alias binding failure")
     }
 
     /**
-     * When publishIpns AIOOBEs on the first file but succeeds on subsequent files,
+     * When bindAlias AIOOBEs on the first file but succeeds on subsequent files,
      * bridge() must still process the successful ones.
      */
     @Test
@@ -93,7 +93,7 @@ class MemoryBridgeDegradationTest {
         // Crashes on first call, succeeds thereafter
         val crashingIpfs = object : IpfsBridge(cas) {
             private var calls = 0
-            override fun publishIpns(name: String, manifestCid: ContentId) {
+            override fun bindAlias(name: String, manifestCid: ContentId) {
                 calls++
                 if (calls == 1) {
                     throw ArrayIndexOutOfBoundsException(
@@ -134,7 +134,7 @@ class MemoryBridgeDegradationTest {
 
     /**
      * Existing happy-path behavior: bridge() returns the correct count and
-     * IPNS entries are resolvable.
+     * local aliases are resolvable.
      */
     @Test
     fun bridgeHappyPathUnchanged() {
@@ -166,6 +166,6 @@ class MemoryBridgeDegradationTest {
         assertEquals(memoryPath, memory.listPaths()[0])
 
         val spineCid = memory.spineCidOf(memoryPath)
-        assertEquals(spineCid, ipfs.resolveIpns("memory:$memoryPath"))
+        assertEquals(spineCid, ipfs.resolveAlias("memory:$memoryPath"))
     }
 }

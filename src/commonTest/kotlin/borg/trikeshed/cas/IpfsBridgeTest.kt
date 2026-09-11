@@ -30,30 +30,30 @@ class IpfsBridgeTest {
     }
 
     @Test
-    fun testIpnsResolution() {
+    fun testAliasResolution() {
         val cas = CasStore.inMemory()
         val bridge = IpfsBridge(cas)
         
         // This registry names local CAS content; no IPNS network publication occurs.
         val manifestCid = ContentId.of("dummy-manifest-content".encodeToByteArray())
         
-        bridge.publishIpns("my-node", manifestCid)
+        bridge.bindAlias("my-node", manifestCid)
         
-        val resolved = bridge.resolveIpns("my-node")
+        val resolved = bridge.resolveAlias("my-node")
         assertEquals(manifestCid, resolved)
         
-        assertNull(bridge.resolveIpns("unknown-node"))
+        assertNull(bridge.resolveAlias("unknown-node"))
         val replacement = bridge.putBlock("replacement manifest".encodeToByteArray())
-        bridge.publishIpns("my-node", replacement)
-        assertEquals(replacement, bridge.resolveIpns("my-node"))
-        assertTrue(bridge.unpublishIpns("my-node"))
-        assertNull(bridge.resolveIpns("my-node"))
-        assertFalse(bridge.unpublishIpns("my-node"))
+        bridge.bindAlias("my-node", replacement)
+        assertEquals(replacement, bridge.resolveAlias("my-node"))
+        assertTrue(bridge.removeAlias("my-node"))
+        assertNull(bridge.resolveAlias("my-node"))
+        assertFalse(bridge.removeAlias("my-node"))
 
         // CAS data can be shared without making names global to the process or a network.
-        bridge.publishIpns("my-node", replacement)
+        bridge.bindAlias("my-node", replacement)
         val other = IpfsBridge(cas)
         assertNotNull(other.getBlock(replacement))
-        assertNull(other.resolveIpns("my-node"))
+        assertNull(other.resolveAlias("my-node"))
     }
 }
