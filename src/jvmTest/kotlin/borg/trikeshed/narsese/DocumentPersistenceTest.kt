@@ -261,7 +261,7 @@ class DocumentPersistenceTest {
         override fun write(srcs: Array<out ByteBuffer>): Long = error("positional write required")
         override fun transferTo(position: Long, count: Long, target: WritableByteChannel): Long = error("unused")
         override fun transferFrom(src: ReadableByteChannel, position: Long, count: Long): Long = error("unused")
-        override fun map(mode: MapMode, position: Long, size: Long): ByteBuffer = error("unused")
+        override fun map(mode: MapMode, position: Long, size: Long): borg.trikeshed.userspace.MemoryMapping = error("unused")
         override fun lock(position: Long, size: Long, shared: Boolean): FileLock = error("unused")
         override fun lock(): FileLock = error("unused")
         override fun tryLock(position: Long, size: Long, shared: Boolean): FileLock? = error("unused")

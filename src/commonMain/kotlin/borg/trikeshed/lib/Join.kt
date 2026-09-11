@@ -105,11 +105,14 @@ inline infix fun <X, C, Domain> MetaSeries<Domain, X>.α(/*crossinline*/ xform: 
     a j { i -> xform(this[i]) }
 
 /** Iterable projection. */
-inline infix fun <X, C, Subject : Iterable<X>> Subject.α(crossinline xform: (X) -> C) = let { it: Subject ->
-    val xes: Subject = this@α
-    val join: Series<X> =
-        ((xes as? Series<X>) ?: ((xes as? List<X>)?.size j xes::get) ?: xes.toList().toSeries()) as Series<X>
-    join α xform //{ x:X->xform(x) }
+inline infix fun <X, C, Subject : Iterable<X>> Subject.α(crossinline xform: (X) -> C): Series<C> {
+    val indexed = this as? Series<X>
+    val source: Series<X> = when {
+        indexed != null -> indexed
+        this is List<*> -> (this as List<X>).toSeries()
+        else -> toList().toSeries()
+    }
+    return source α { xform(it) }
 }
 // ── Left identity / constant anchor ────────────────────────────
 
