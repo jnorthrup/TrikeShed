@@ -50,6 +50,11 @@ val guestModules: Map<String, List<String>> = mapOf(
     "camel-mail" to listOf(
         "org.apache.camel:camel-mail:4.8.5",
     ),
+    // JDBC belongs to the mounted guest department, never the TrikeShed host classpath.
+    "camel-jdbc" to listOf(
+        "org.apache.camel:camel-jdbc:4.8.5",
+        "com.h2database:h2:2.3.232",
+    ),
     // Text/metadata extraction. Listed so the door is open; note that unlike the other
     // two, Tika still has a real host-side consumer (JvmTikaIngestAdapter.kt), so it
     // cannot leave TrikeShed's classpath until that adapter moves guest-side too.
@@ -72,6 +77,7 @@ val guestModules: Map<String, List<String>> = mapOf(
  */
 val departmentParents: Map<String, String> = mapOf(
     "camel-mail" to "camel",
+    "camel-jdbc" to "camel",
 )
 
 fun gradleName(module: String): String =
@@ -102,6 +108,7 @@ guestModules.forEach { (module, coordinates) ->
         val resolved = cfg
         outputs.dir(libDir)
         val parentModule = departmentParents[module]
+        parentModule?.let { dependsOn("install${gradleName(it)}") }
         val parentLib = parentModule?.let { layout.projectDirectory.dir("$it/lib").asFile }
         doLast {
             libDir.deleteRecursively()

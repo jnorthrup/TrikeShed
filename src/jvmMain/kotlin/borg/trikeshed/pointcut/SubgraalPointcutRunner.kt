@@ -16,11 +16,18 @@ import java.io.InputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.io.OutputStream
 
+/**
+ * Synchronous guest evaluation with optional execution-listener publication.
+ * [languages] limits guest initialization; [traceExecution] separates numerical execution
+ * from observation overhead. A zero [statementLimit] disables the Graal statement counter.
+ */
 class SubgraalPointcutRunner(
     statementLimit: Long = 10000,
     outStream: OutputStream = System.out,
     errStream: OutputStream = System.err,
-    inStream: InputStream = System.`in`
+    inStream: InputStream = System.`in`,
+    languages: Set<String> = setOf("python", "js", "llvm"),
+    traceExecution: Boolean = true,
 ) : AutoCloseable {
 
     private val _events = MutableSharedFlow<PointcutEvent>(extraBufferCapacity = 10000)
@@ -28,6 +35,7 @@ class SubgraalPointcutRunner(
 
     private val armedPaths = ConcurrentHashMap.newKeySet<String>()
 
+    /** Select a file path or an in-memory source name before that source is evaluated. */
     fun arm(path: String) {
         armedPaths.add(path)
     }
@@ -42,12 +50,11 @@ class SubgraalPointcutRunner(
      * `mlir-opt --convert-to-llvm | mlir-translate --mlir-to-llvmir | llvm-as`
      * which produces the `.bc` file that Sulong consumes.
      */
-    private val context: Context = Context.newBuilder("python", "js", "llvm")
+    private val context: Context = Context.newBuilder(*languages.toTypedArray())
         .allowHostAccess(HostAccess.NONE)
         .allowNativeAccess(true)
         .allowHostClassLookup { false }
         .allowExperimentalOptions(true)
-        .option("llvm.verifyBitcode", "false")
         .out(outStream)
         .err(errStream)
         .`in`(inStream)
@@ -56,8 +63,9 @@ class SubgraalPointcutRunner(
                 .statementLimit(statementLimit, null)
                 .build()
         )
+        .also { if ("llvm" in languages) it.option("llvm.verifyBitcode", "false") }
         .build().apply {
-            getBindings("python").putMember("java_trikeshed_publish", org.graalvm.polyglot.proxy.ProxyExecutable { args ->
+            if ("python" in languages) getBindings("python").putMember("java_trikeshed_publish", org.graalvm.polyglot.proxy.ProxyExecutable { args ->
                 // opcode: Byte, typedefName: String, methodName: String, siteIdx: Int, depth: Byte, isAfter: Boolean
                 val opcode = args[0].asByte()
                 val typedefName = args[1].asString()
@@ -70,14 +78,14 @@ class SubgraalPointcutRunner(
             })
         }
 
-    private val listener = ExecutionListener.newBuilder()
+    private val listener = if (traceExecution) ExecutionListener.newBuilder()
         .onEnter(::handleEventEnter)
         .onReturn(::handleEventReturn)
         .statements(true)
         .roots(true)
         .collectReturnValue(true)
-        .sourceFilter { armedPaths.isEmpty() || it.path in armedPaths }
-        .attach(context.engine)
+        .sourceFilter { armedPaths.isEmpty() || it.path?.let(armedPaths::contains) == true || it.name in armedPaths }
+        .attach(context.engine) else null
 
     private fun handleEventEnter(event: ExecutionEvent) {
         handleEvent(event, true)
@@ -140,8 +148,9 @@ class SubgraalPointcutRunner(
         TypedefProductionSystem.publish(synapse)
     }
 
-    fun eval(language: String, sourceCode: String): org.graalvm.polyglot.Value {
-        val source = Source.newBuilder(language, sourceCode, "eval.\$language").build()
+    @JvmOverloads
+    fun eval(language: String, sourceCode: String, sourceName: String = "eval.$language"): org.graalvm.polyglot.Value {
+        val source = Source.newBuilder(language, sourceCode, sourceName).build()
         return context.eval(source)
     }
 
@@ -151,7 +160,10 @@ class SubgraalPointcutRunner(
     }
 
     override fun close() {
-        listener.close()
-        context.close()
+        try {
+            listener?.close()
+        } finally {
+            context.close()
+        }
     }
 }

@@ -106,6 +106,9 @@ data object CamelLinkage {
         Linkage("pop3s", "poll a POP3 mailbox over TLS", Locality.NETWORK, "camel-mail"),
         Linkage("smtp", "send mail", Locality.NETWORK, "camel-mail"),
         Linkage("smtps", "send mail over TLS", Locality.NETWORK, "camel-mail"),
+
+        // A registry DataSource can reach another machine; the endpoint URI cannot establish locality.
+        Linkage("jdbc", "execute SQL through a registered JDBC DataSource", Locality.NETWORK, "camel-jdbc"),
     )
 
     private val byScheme: Map<String, Linkage> = known.associateBy { it.scheme }

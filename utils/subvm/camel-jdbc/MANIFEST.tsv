@@ -1,0 +1,9 @@
+# guest module	camel-jdbc
+# parent	camel
+# declared	org.apache.camel:camel-jdbc:4.8.5
+# declared	com.h2database:h2:2.3.232
+# inherited	9 jars from camel
+# resolved	2 jars	2715365 bytes
+file	size	sha256
+camel-jdbc-4.8.5.jar	64208	538a4e1e84ab943e23f3e7638e137dace63995c50d04308a0943d774073f7b3b
+h2-2.3.232.jar	2651157	8dae62d22db8982c3dcb3826edb9c727c5d302063a67eef7d63d82de401f07d3
