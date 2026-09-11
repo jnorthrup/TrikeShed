@@ -45,7 +45,9 @@ internal object DocumentCuratorCodec {
         "polarity" to p.polarity, "modality" to p.modality,
     ))
 
-    fun encode(record: DocumentCurationRecord): ByteArray = CanonicalCbor.encodeMap(mapOf(
+    fun encode(record: DocumentCurationRecord): ByteArray = CanonicalCbor.encodeMap(record(record))
+
+    fun record(record: DocumentCurationRecord): Map<String, Any?> = mapOf(
         "version" to 1, "source" to source(record.source), "modelId" to record.modelId,
         "model" to record.model?.let { mapOf("content" to it.content, "providerId" to it.providerId, "modelId" to it.modelId,
             "promptTokens" to it.usage.promptTokens, "completionTokens" to it.usage.completionTokens,
@@ -56,7 +58,7 @@ internal object DocumentCuratorCodec {
         "submitted" to record.submittedReceiptCids.values { it.value },
         "duplicates" to record.duplicateReceiptCids.values { it.value },
         "observerFailures" to record.observerFailures.values(),
-    ))
+    )
 
     fun decode(bytes: ByteArray): DocumentCurationRecord {
         val m = CanonicalCbor.decodeMap(bytes)
