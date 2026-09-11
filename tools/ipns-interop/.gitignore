@@ -1,5 +1,0 @@
-/ipns-interop
-*.journal
-*.lock
-!evidence/public-*-payload.bin
-!evidence/failed-local-publish.log

@@ -40,6 +40,12 @@ This exposes a place to observe and compare I/O adaptation while retaining the e
 
 ## Verification
 
-See `tools/ipns-interop/README.md` and its retained evidence for actual local and public network publication, independently resolved versions, signatures, exact wire bytes and transport traces. The Go process uses upstream libp2p/Boxo directly and starts a fresh identity and empty store for each resolution. Production does not invoke it. Official IPNS fixtures and API/codec details are in [IPNS records](ipns-records.md).
+Run the in-tree checks with:
+
+```sh
+./gradlew jvmTest --tests 'borg.trikeshed.ipns.*' --tests 'borg.trikeshed.cas.IpfsBridgeTest' --tests 'borg.trikeshed.userspace.UringConformanceTest'
+```
+
+The 2026-09-11 TrikeShed runtime run obtained 20 validated public PUT acknowledgements and a fresh TrikeShed resolver obtained 20 valid responses for quorum16, selecting sequence1 over a stale sequence0 response. The publisher's signed wire and the resolver's selected wire matched. A periodic local run completed five publications and drained all ten observed transport descriptors. These are historical observations; signed records expire at EOL. Run `publish` and `resolve` with `--trace` to capture current behavior. Official IPNS fixtures and API/codec details are in [IPNS records](ipns-records.md).
 
 Primary protocol references: [IPNS records](https://specs.ipfs.tech/ipns/ipns-record/), [Amino Kademlia DHT](https://specs.ipfs.tech/routing/kad-dht/), [libp2p TLS](https://github.com/libp2p/specs/blob/master/tls/tls.md), [yamux](https://github.com/libp2p/specs/blob/master/yamux/README.md), and [official bootstrappers](https://docs.ipfs.tech/concepts/public-utilities/#amino-dht-bootstrappers).
