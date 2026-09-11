@@ -263,3 +263,6 @@ The code looks correct and fully optimized. The tests passed on the relevant par
 ## 2024-06-05 - Avoid .view.toList() coercion on Series to satisfy List returns
 **Learning:** In TrikeShed, Series implements List. Coercing a filtered Series to a List via .view.toList() is unnecessary and causes O(N) allocation.
 **Action:** Return the Series directly instead of calling .view.toList().
+## 2025-02-28 - Avoid intermediate ArrayList allocations with filterIsInstance
+**Learning:** By default, `Iterable.filterIsInstance<T>()` iterates over the entire collection and allocates a new `ArrayList` containing the filtered items.
+**Action:** Replace `for (item in list.filterIsInstance<T>())` with a standard `for (item in list)` loop containing an `if (item is T)` check to eliminate intermediate allocations. Similarly, replace `.filterIsInstance<T>().firstOrNull { ... }` with `.firstOrNull { it is T && ... } as? T`.
