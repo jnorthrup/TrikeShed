@@ -33,3 +33,6 @@ operator fun Cursor.get(vararg names: CharSequence): Cursor = select(*names)
 
 /** `cursor[-"debug"]` — column exclusion by name. */
 operator fun Cursor.get(excluded: ColumnExclusion): Cursor = without(excluded.name)
+
+/** Two exclusions retain the inline marker; use [without] for an arbitrary number of names. */
+operator fun Cursor.get(first: ColumnExclusion, second: ColumnExclusion): Cursor = without(first.name, second.name)

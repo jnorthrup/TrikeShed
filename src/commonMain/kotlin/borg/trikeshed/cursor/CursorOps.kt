@@ -49,7 +49,7 @@ internal inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> 
         val cols = this.columnNames
         val indices = names.map { name: CharSequence ->
             var idx = -1
-            for (i in 0 until cols.size) if (cols[i] == name) { idx = i; break }
+            for (i in 0 until cols.size) if (cols[i].contentEquals(name)) { idx = i; break }
             if (idx == -1) error("Column '$name' not found") else idx
         }.toIntArray()
         return select(*indices)
@@ -59,9 +59,9 @@ internal inline fun <A, B> join(a: A, noinline f: (Int) -> B): Join<A, (Int) -> 
     fun Cursor.col(vararg names: CharSequence): Cursor = select(*names)
 
     /** Column exclusion by name. */
-    fun Cursor.without(name: CharSequence): Cursor {
+    fun Cursor.without(vararg names: CharSequence): Cursor {
         val cols = this.columnNames
-        val indices = (0 until cols.size).filter { c: Int -> cols[c] != name }.toIntArray()
+        val indices = (0 until cols.size).filter { c: Int -> names.none { cols[c].contentEquals(it) } }.toIntArray()
         return select(*indices)
     }
 

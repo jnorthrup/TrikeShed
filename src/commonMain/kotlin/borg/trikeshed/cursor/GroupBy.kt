@@ -2,63 +2,77 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.lib.*
 
-@PublishedApi internal data class GroupState(
-    val keys: List<List<Any?>>,
-    val slabs: List<IntArray>,
-    val colCount: Int,
-    val axisPos: IntArray,
-    val axisSet: BooleanArray,
-)
-
-@PublishedApi internal fun Cursor.buildGroups(axis: IntArray): GroupState {
-    val colCount = this[0].size
-    // ⚡ Bolt: Pre-build BooleanArray lookup for O(1) indexed access to prevent O(N) list scans in the Series mapping lambda below.
-    val axisSet = BooleanArray(colCount) { it in axis }
-    val clusters = linkedMapOf<Series<Any?>, IntAccumulator>()
-    for (r in 0 until size) {
-        val row = this[r] as ReifiedSplitSeries2<*, *>
-        val key = axis.size j { i: Int -> row.leftSeries[axis[i]] }
-        clusters.getOrPut(key) { IntAccumulator() }.add(r)
-    }
-    val keys = clusters.keys.toList()
-    val slabs = clusters.values.map { acc -> acc.toIntArray().also { acc.close() } }
-    val axisPos = IntArray(colCount) { -1 }.also { a -> axis.forEachIndexed { pos, col -> a[col] = pos } }
-    @Suppress("UNCHECKED_CAST")
-    return GroupState(keys as List<List<Any?>>, slabs, colCount, axisPos, axisSet)
+/** A structural, snapshotted key at the hash-index boundary; Series itself has identity equality. */
+internal class CursorKey(val cells: Array<Any?>) : Series<Any?> by (cells.size j cells::get) {
+    override fun equals(other: Any?): Boolean = other is CursorKey && cells.contentEquals(other.cells)
+    override fun hashCode(): Int = cells.contentHashCode()
 }
 
-/** Group by axis columns; non-key columns become Series<Any?> of grouped row values. */
+internal fun RowVec.key(axis: IntArray): CursorKey {
+    val source = values
+    return CursorKey(Array(axis.size) { source[axis[it]] })
+}
+
+/** Validate ordinals without evaluating values outside the key columns. */
+internal fun Cursor.requireColumns(columns: IntArray) {
+    require(columns.all { it >= 0 }) { "Column indices must be nonnegative" }
+    if (size > 0) require(columns.all { it < width }) { "Column index outside cursor width $width" }
+}
+
+/** First-occurrence group order, source order within groups. Only keys and row ordinals materialize. */
+fun Cursor.groupClusters(axis: IntArray): Series<IntArray> {
+    requireColumns(axis)
+    val clusters = linkedMapOf<CursorKey, MutableList<Int>>()
+    for (r in 0 until size) clusters.getOrPut(this[r].key(axis)) { mutableListOf() }.add(r)
+    val slabs = Array(clusters.size) { IntArray(0) }
+    clusters.values.forEachIndexed { i, indices -> slabs[i] = indices.toIntArray() }
+    return slabs.size j slabs::get
+}
+
+/** Group by axis columns; non-key columns are lazy Series with array metadata and the original child schema. */
 fun Cursor.groupBy(vararg axis: Int): Cursor {
+    val slabs = groupClusters(axis)
     if (size == 0) return this
-    val (keys, slabs, colCount, axisPos, axisSet) = buildGroups(axis)
-    val row0 = this.b(0)
-    val cm: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
-    return keys.size j { cy ->
-        val rowIndices = slabs[cy]; val key = keys[cy]
-        colCount j { cx ->
-            if (axisSet[cx]) key[axisPos[cx]] j { cm[cx] }
-            else (rowIndices.size j { i: Int -> this[rowIndices[i]][cx].a }) j { cm[cx] }
+    val axisSet = BooleanArray(width) { it in axis }
+    return slabs.size j { group ->
+        val rows = slabs[group]
+        val exemplar = this[rows[0]]
+        exemplar.size j { column ->
+            val cell = exemplar[column]
+            if (axisSet[column]) cell
+            else (rows.size j { i: Int -> this[rows[i]].values[column] }) j {
+                val meta = cell.b()
+                ColumnMeta(meta.name, IOMemento.IoArray, meta)
+            }
         }
     }
 }
 
-/** Group by axis columns, reducing non-key columns with [reducer]. */
+/** Reduce non-key columns in source order with a null initial accumulator, retaining the exemplar metadata. */
 inline fun Cursor.groupBy(axis: IntArray, crossinline reducer: RowReducer): Cursor {
+    val slabs = groupClusters(axis)
     if (size == 0) return this
-    val (keys, slabs, colCount, axisPos, axisSet) = buildGroups(axis)
-    val row0 = this.b(0)
-    val cm: Series<ColumnMeta> = row0.a j { c: Int -> row0.b(c).b() }
-    val valueIndices = (0 until colCount).filter { !axisSet[it] }
-    return keys.size j { cy ->
-        val rowIndices = slabs[cy]; val key = keys[cy]
-        val acc = arrayOfNulls<Any?>(colCount)
-        for (ri in rowIndices) for (cx in valueIndices) {
-            val row = this[ri] as ReifiedSplitSeries2<*, *>
-            acc[cx] = reducer(acc[cx], row.leftSeries[cx])
-        }
-        colCount j { cx ->
-            if (axisSet[cx]) key[axisPos[cx]] j { cm[cx] }
-            else acc[cx] j { cm[cx] }
+    val axisSet = BooleanArray(width) { it in axis }
+    return slabs.size j { group ->
+        val rows = slabs[group]
+        val exemplar = this[rows[0]]
+        exemplar.size j { column ->
+            val cell = exemplar[column]
+            if (axisSet[column]) cell
+            else {
+                var accumulator: Any? = null
+                for (row in rows) accumulator = reducer(accumulator, this[row].values[column])
+                accumulator j cell.b
+            }
         }
     }
+}
+
+/** Stable row ordering with an explicit key comparator; no stringification of numeric keys. */
+fun Cursor.ordered(axis: IntArray, comparator: Comparator<Series<Any?>>): Cursor {
+    requireColumns(axis)
+    val keys = Array(size) { row -> this[row].key(axis) }
+    val indices = Array(size) { it }
+    indices.sortWith(Comparator { left, right -> comparator.compare(keys[left], keys[right]) })
+    return size j { row -> this[indices[row]] }
 }
