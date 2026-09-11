@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IpnsDhtTest[jvm]" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-09-11T16:53:14.593Z" hostname="Mac.lan" time="0.092">
+  <properties/>
+  <testcase name="multiaddrPolicyAndUnsignedDistance()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.002"/>
+  <testcase name="newestMinorityWinsAndRepairsStalePeers()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.008"/>
+  <testcase name="validAbsenceAndInvalidSignatureAreDistinct()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.005"/>
+  <testcase name="recordAndCloserPeerRoundTrip()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.002"/>
+  <testcase name="publicMultiTransportPeersDoNotDiscardRecordOrOtherPeers()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.002"/>
+  <testcase name="exactPutAcknowledgementRequired()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.005"/>
+  <testcase name="queryLimitLeavesExplicitIncompleteLookup()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.007"/>
+  <testcase name="transportFailureIsNotAbsenceAndTimeoutClosesStreams()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.02"/>
+  <testcase name="storageRejectionsUseNearestQueriedReplacementsWithoutDuplicatePuts()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.019"/>
+  <testcase name="iterativeLookupDiscoversAndDrainsBoundedRounds()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.012"/>
+  <testcase name="protobufWireAndDefaultPutType()[jvm]" classname="borg.trikeshed.ipns.IpnsDhtTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

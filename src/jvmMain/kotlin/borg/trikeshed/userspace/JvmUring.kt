@@ -42,9 +42,11 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         UringOp.NOP, UringOp.FSYNC, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
         UringOp.OPENAT, UringOp.CLOSE, UringOp.READ, UringOp.WRITE, UringOp.STATX,
         UringOp.FADVISE, UringOp.MADVISE, UringOp.FTRUNCATE,
+        UringOp.CONNECT, UringOp.SEND, UringOp.RECV, UringOp.SHUTDOWN, UringOp.UNLINKAT,
     )
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
-        if (capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
+        if (op !in setOf(UringOp.CONNECT, UringOp.SEND, UringOp.RECV, UringOp.SHUTDOWN, UringOp.UNLINKAT) &&
+            capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
             mask or op.mask else mask
     }
     override val availability = "io_uring: JNI setup and operation probe succeeded; unsupported kernel ops use POSIX emulation"
@@ -75,10 +77,11 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         if (sub.len < 0) return -22
+        if (sub.opcode == UringOp.UNLINKAT) return legacy.execute(sub)
         // MADVISE addresses the process VM and remains valid after the originating fd closes.
         if (sub.opcode == UringOp.MADVISE) return nativeExecute(sub, -1)
         val descriptor = JvmFileTable.descriptor(sub.fd)
-        if (descriptor is JvmChannelDescriptor) return legacy.execute(sub)
+        if (descriptor is JvmChannelDescriptor || descriptor is JvmSocketDescriptor) return legacy.execute(sub)
         if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && descriptor !is JvmNativeDescriptor) return -9
         val buffer = sub.buffer
         if (sub.opcode == UringOp.STATX &&

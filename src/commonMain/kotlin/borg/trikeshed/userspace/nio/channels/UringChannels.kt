@@ -5,6 +5,7 @@ import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
+import borg.trikeshed.userspace.containment.ContainmentPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.ensureActive
@@ -16,12 +17,16 @@ object UringChannels {
     fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel =
         UringChannel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
 
-    fun open(scope: CoroutineScope, entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel {
+    fun open(scope: CoroutineScope, entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList(),
+             containmentPolicy: ContainmentPolicy = ContainmentPolicy.MAXIMUM): UringChannel {
         require(entries > 0) { "entries must be positive" }
         requireNotNull(scope.coroutineContext[Job]) { "Uring requires an owning Job" }.ensureActive()
-        val backend = openUserspaceChannelBackend(entries)
+        val raw = openUserspaceChannelBackend(entries)
+        val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
+            borg.trikeshed.userspace.UringTraceBackend(raw, it)
+        } ?: raw
         try {
-            return UringChannel(FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms))
+            return UringChannel(FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy))
         } catch (failure: Throwable) {
             runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure

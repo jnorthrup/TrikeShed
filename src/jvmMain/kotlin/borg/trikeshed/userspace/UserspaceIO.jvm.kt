@@ -102,7 +102,7 @@ internal fun UringSubmission.path(): String {
     }
 }
 
-internal fun jvmOpen(path: String, flags: Long): Int {
+internal fun jvmOpen(path: String, flags: Long, permissions: Int = 438): Int {
     require(flags >= 0 && flags and (3L or 64L or 128L or 512L).inv() == 0L)
     val mode = flags.toInt() and 3
     require(mode != 3)
@@ -115,7 +115,16 @@ internal fun jvmOpen(path: String, flags: Long): Int {
         options.add(if (flags and 128L != 0L) StandardOpenOption.CREATE_NEW else StandardOpenOption.CREATE)
     }
     if (flags and 512L != 0L) { require(mode != 0); options.add(StandardOpenOption.TRUNCATE_EXISTING) }
-    val channel = FileChannel.open(Paths.get(path), options)
+    require(permissions in 0..511)
+    val permissionSet = java.nio.file.attribute.PosixFilePermission.values().filterIndexed { index, _ ->
+        permissions and (1 shl (8 - index)) != 0
+    }.toSet()
+    val target = Paths.get(path)
+    val creating = flags and 64L != 0L
+    val posix = target.fileSystem.supportedFileAttributeViews().contains("posix")
+    require(!creating || posix || permissions == 438) { "Cannot enforce POSIX creation permissions on this provider" }
+    val channel = if (creating && posix) FileChannel.open(target, options,
+        java.nio.file.attribute.PosixFilePermissions.asFileAttribute(permissionSet)) else FileChannel.open(target, options)
     return JvmFileTable.register(JvmChannelDescriptor(channel))
 }
 
@@ -142,7 +151,7 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
-                    jvmOpen(sub.path(), sub.offset).also { owned.add(it) }
+                    jvmOpen(sub.path(), sub.offset, sub.operationFlags).also { owned.add(it) }
                 }
                 // Path syscalls. The path rides in the submission buffer, and renameat carries
                 // both halves NUL-separated -- one buffer, because an SQE has one address field
@@ -209,12 +218,34 @@ internal class JvmUserspaceChannelBackend(
                             else channel.write(nio)
                     if (n > 0) buffer.position(position + n)
                     // EOF on a stream is a zero-byte completion, same as the file path.
-                    if (n < 0) 0 else n
+                    if (n < 0) 0 else if (n == 0 && sub.len > 0) -11 else n
                 }
             }
         }
         UringOp.SHUTDOWN -> { channel.shutdownOutput(); 0 }
-        UringOp.CONNECT -> if (channel.finishConnect()) 0 else -115   // EINPROGRESS
+        UringOp.CONNECT -> {
+            val bytes = sub.buffer
+            if (bytes == null || sub.len !in setOf(16, 28) || sub.len > bytes.remaining() || sub.operationFlags != 0) -22
+            else {
+                val start = bytes.arrayOffset() + bytes.position()
+                val array = bytes.array()
+                val family = (array[start].toInt() and 255) or ((array[start + 1].toInt() and 255) shl 8)
+                val port = ((array[start + 2].toInt() and 255) shl 8) or (array[start + 3].toInt() and 255)
+                val address = when {
+                    family == 2 && sub.len == 16 -> java.net.InetAddress.getByAddress(array.copyOfRange(start + 4, start + 8))
+                    family == 10 && sub.len == 28 -> java.net.Inet6Address.getByAddress(null,
+                        array.copyOfRange(start + 8, start + 24),
+                        (0..3).fold(0) { n, i -> n or ((array[start + 24 + i].toInt() and 255) shl (8 * i)) })
+                    else -> throw IllegalArgumentException("Invalid CONNECT sockaddr")
+                }
+                val remote = java.net.InetSocketAddress(address, port)
+                if (channel.isConnected) {
+                    if (channel.remoteAddress == remote) 0 else -106
+                } else if (channel.isConnectionPending) {
+                    if (channel.remoteAddress != remote) -114 else if (channel.finishConnect()) 0 else -115
+                } else if (channel.connect(remote)) 0 else -115
+            }
+        }
         else -> -95
     }
 

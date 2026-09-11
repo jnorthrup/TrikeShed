@@ -1,0 +1,438 @@
+> Task :checkJvmMainComposeLibrariesCompatibility
+> Task :kmpPartiallyResolvedDependenciesChecker SKIPPED
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :convertXmlValueResourcesForCommonMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForCommonMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForCommonMain NO-SOURCE
+> Task :generateResourceAccessorsForCommonMain SKIPPED
+> Task :convertXmlValueResourcesForJvmMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForJvmMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForJvmMain NO-SOURCE
+> Task :generateResourceAccessorsForJvmMain SKIPPED
+> Task :convertXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :copyNonXmlValueResourcesForNonPosixMain NO-SOURCE
+> Task :prepareComposeResourcesTaskForNonPosixMain NO-SOURCE
+> Task :generateResourceAccessorsForNonPosixMain SKIPPED
+> Task :generateActualResourceCollectorsForJvmMain SKIPPED
+> Task :generateComposeResClass SKIPPED
+> Task :generateExpectResourceCollectorsForCommonMain SKIPPED
+> Task :generateForgeAssets UP-TO-DATE
+> Task :assembleJvmMainResources UP-TO-DATE
+> Task :fetchSumoCorpus UP-TO-DATE
+> Task :jvmProcessResources UP-TO-DATE
+> Task :processJvmMainResources SKIPPED
+> Task :compileKotlinJvm
+w: Opt-in requirement marker 'kotlinx.cinterop.ExperimentalForeignApi' is unresolved. Make sure it's present in the module dependencies.
+w: Opt-in requirement marker 'kotlinx.cinterop.UnsafeNumber' is unresolved. Make sure it's present in the module dependencies.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/btrfs/BtrfsRaidImage.kt:176:67 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Throwable'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cas/LineCas.kt:437:23 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/charstr/CharStr.kt:79:93 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/charstr/CharStrCached.kt:215:53 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/CircularQueue.kt:38:30 Unnecessary safe call on a non-null receiver of type '(T (of class CirQlar<T>)) -> Unit'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:40:63 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:40:82 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:45:68 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:45:87 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:50:64 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:50:83 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:56:66 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:56:85 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:68:18 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/JournalSeries.kt:68:37 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/RingSeries.kt:56:47 Unchecked cast of 'Any?' to 'T (of class RingSeries<T>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/RingSeries.kt:126:71 Unchecked cast of 'Any?' to 'T (of class RingSeries<T>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/RingSeries.kt:143:73 Unchecked cast of 'Any?' to 'T (of class RingSeries<T>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/StrictFibonacciHeap.kt:142:51 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/_m.kt:19:107 Unchecked cast of 'Pair<K (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get), V (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)>' to 'T (of fun <K, V, P : Join<K, V>, T : Pair<K, V>> get)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/Cbor.kt:134:25 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:91:37 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:92:44 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:111:54 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:111:88 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:129:54 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:130:44 Unchecked cast of 'Any?' to 'V? (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:153:45 Unchecked cast of 'Any?' to 'IK (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/associative/LinearHashMap.kt:153:66 Unchecked cast of 'Any?' to 'V (of class OpenAddressingMap<K : Any, V, IK : Any>)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/collections/multiindex/MultiIndexContainer.kt:114:85 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/SplatAsyncContextElement.kt:27:39 Suppression of error 'INVISIBLE_REFERENCE' might compile and work, but the compiler behavior is UNSPECIFIED and WILL NOT BE PRESERVED. Please report your use case to the Kotlin issue tracker instead: https://kotl.in/issue
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:57:38 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:59:48 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/lcnc/LcncFanoutElement.kt:59:67 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/context/nuid/SignalJobBridgeElement.kt:210:27 'fun CoroutineScope.launch(context: Job, start: CoroutineStart = ..., block: suspend CoroutineScope.() -> Unit): Job' is deprecated. Passing a Job to coroutine builders breaks structured concurrency, leading to hard-to-diagnose errors. This pattern should be avoided. This overload will be deprecated with an error in the future.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:23:27 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:64:79 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ConfixDocStore.kt:109:35 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchHeadProjection.kt:153:79 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IntArray'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchReportReactorElement.kt:112:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/CouchReportReactorElement.kt:112:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/IncrementalViewRegistry.kt:137:9 Expression is unused.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/ViewServer.kt:41:23 Unchecked cast of 'Comparable<*>' to 'Comparable<Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/persistence/DurableCouchPersistence.kt:78:29 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/couch/persistence/DurableCouchPersistence.kt:80:30 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/CursorOps.kt:21:10 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/CursorTensor.kt:281:92 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/ReifiedSplitSeries2.kt:29:62 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/ReifiedSplitSeries2.kt:37:63 Unchecked cast of 'Join<Int, (Int) -> Any?>?' to 'Join<Int, (Int) -> () -> ColumnMeta>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:34:41 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:63:41 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:113:38 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/cursor/Zoom.kt:127:65 Unchecked cast of 'Join<*, *>' to 'Join<Int, *>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/dht/routing/RoutingEvent.kt:46:35 Unchecked cast of 'RoutingEventElement<*>?' to 'RoutingEventElement<TNum (of fun <TNum : Comparable<TNum>> publishRoutingEvent)>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:231:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeApp.kt:231:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/ForgeDoc.kt:540:58 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeSurfaceProjection.kt:235:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ForgeSurfaceProjection.kt:235:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ModelMuxSurfaceProjection.kt:78:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ModelMuxSurfaceProjection.kt:78:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ReteFireSurfaceProjection.kt:177:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/blackboard/ReteFireSurfaceProjection.kt:177:40 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:27:40 Unchecked cast of 'Any?' to 'List<Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:28:46 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:73:44 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/gallery/ForgeGalleryRenderer.kt:78:71 Unchecked cast of 'Any?' to 'List<String>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:95:34 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:95:53 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:161:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/server/ForgeRoutes.kt:161:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/window/ForgeWindowManager.kt:39:86 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/forge/window/ForgeWindowManager.kt:39:105 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/BlackboardChangesFactElement.kt:157:28 'val changes: SharedFlow<Join<ConfixIndex, Series<Byte>>>' is deprecated. Partial last-write notifications only. Collect revisions and read snapshot()/replay().
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:162:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:162:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:176:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:176:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:196:47 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graal/ConfixBlackboard.kt:196:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/graph/query/CausalGraphAdapter.kt:44:41 Expression is unused.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsPublisher.kt:74:21 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ipns/IpnsPublisher.kt:136:23 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsRecord'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:103:64 Unchecked cast of 'Array<Any?>' to 'Array<Synapse? (of fun <Synapse> create)>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:215:35 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/IsamWireProtoDsl.kt:215:54 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:84:32 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:84:42 'fun Instant.toLocalDateTime(timeZone: TimeZone): LocalDateTime' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:85:42 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:98:11 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:100:35 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:101:40 'val epochSeconds: Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:102:42 'val nanosecondsOfSecond: Int' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IOMemento.kt:109:13 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:170:37 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileDsl.kt:181:32 Unchecked cast of 'Join<Int, (Int) -> ColumnMeta>' to 'Join<Int, (Int) -> RecordMeta>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/isam/meta/IsamMetaFileReader.kt:252:32 Unchecked cast of 'Join<Int, (Int) -> ColumnMeta>' to 'Join<Int, (Int) -> RecordMeta>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:50:50 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:57:50 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/CanonicalCbor.kt:126:16 This extension is shadowed by a member: 'val operationName: String' defined in 'borg.trikeshed.job.JobCommand'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobRepository.kt:80:46 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JobCheckpoint'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:80:57 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:81:60 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:82:52 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt:83:64 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/BrainClient.kt:297:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'KeyMux'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/BrainClient.kt:515:20 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/BrainClient.kt:515:39 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesDurableTodoQueue.kt:147:26 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesDurableTodoQueue.kt:147:45 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesSessionCard.kt:32:28 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesSessionCard.kt:32:47 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesSessionCard.kt:314:65 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/JulesSessionCard.kt:314:84 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/TrikeHtxHttpClient.kt:53:11 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:66:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:66:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:95:17 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:95:36 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:134:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:134:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:318:25 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:318:44 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:333:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:333:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:345:19 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/jules/ui/JulesBlackboardAdapter.kt:345:38 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt:289:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JobSnapshot'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/BoardStoreElement.kt:530:50 Unnecessary safe call on a non-null receiver of type 'CardRow'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeBoardFSM.kt:250:33 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeBoardFSM.kt:250:52 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanDaemon.kt:221:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanDaemon.kt:221:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/ForgeKanbanIngest.kt:104:86 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanGraphConfix.kt:37:80 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanGraphConfix.kt:38:162 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:313:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/kanban/KanbanTypes.kt:313:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:179:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:179:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:290:52 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:290:71 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:318:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:318:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:403:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:403:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:405:52 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/BrainMuxNodes.kt:405:71 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/CcekConstruction.kt:25:33 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:25:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:26:41 Unchecked cast of 'Any?' to 'List<Map<String, String>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:31:27 Unchecked cast of 'Map<*, *>' to 'Map<String, String>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:54:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:55:41 Unchecked cast of 'Any?' to 'List<Map<String, String>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:59:57 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:93:41 Unchecked cast of 'Any?' to 'List<Map<String, String>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncSheetNodes.kt:104:35 Unchecked cast of 'Any?' to 'List<List<Any?>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTreeShake.kt:21:87 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTreeShake.kt:195:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<LcncTreeShake.CandidatePair>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTypeCheck.kt:320:59 Condition is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/LcncTypeCheck.kt:329:37 Condition is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:78:30 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:78:49 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:83:45 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:83:64 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:93:49 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:93:68 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:131:48 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/MuxAgentTricks.kt:131:67 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/TribunalNodes.kt:111:75 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/LcncIngestPipeline.kt:148:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lcnc/rollup/RollupReducer.kt:25:17 Condition is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Densification.kt:16:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FacetedRow.kt:14:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:40 'fun plus(duration: Duration): Instant' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/FibonacciReporter.kt:56:56 'fun Instant.toLocalDateTime(timeZone: TimeZone): LocalDateTime' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/IntAccumulator.kt:7:67 'expect class IntAccumulator : CoroutineContext.Element' is deprecated. Resolve via IntAccumulator.Key in coroutine context.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:15:12 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:16:12 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/System.kt:16:73 'object System : Any' is deprecated. Use SystemOperations: coroutineContext[SystemOperations.Key] or SystemOperations.default.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twin.kt:15:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twin.kt:28:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:7:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:10:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:13:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:16:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/Twins.kt:19:1 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/long/LineScan.kt:24:22 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/lib/long/LineScan.kt:60:22 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:236:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:236:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:268:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/litebike/LitebikeListenerElement.kt:268:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/Manifold.kt:13:37 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/Manifold.kt:21:41 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/Manifold.kt:37:41 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:31:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:58:60 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:62:20 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:66:35 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:66:49 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:69:21 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:69:35 'constructor(packed: Long): BudgetCoord' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:85:17 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:98:18 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:108:18 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/manifold/ManifoldConcept.kt:118:44 'class BudgetCoord : Any' is deprecated. Dead twin: canonical BudgetCoord lives in borg.trikeshed.cursor (DenseTwins.kt) with pf/df/qf float accessors. Do not construct new ones here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:175:56 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/memvid/MemvidStoragePipeline.kt:176:62 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/ModelResponse.kt:104:43 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/modelmux/ModelResponse.kt:104:62 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/BeliefBagElement.kt:253:25 Unnecessary non-null assertion (!!) on a non-null receiver of type 'HijackBeliefBag.Slot'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/CuratorLedger.kt:46:32 Elvis operator (?:) always returns the left operand of non-nullable type 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:67:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:68:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/narsese/HijackBeliefBag.kt:69:13 'lateinit' is unnecessary: definitely initialized in constructors.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/panama/PanamaInduction.kt:25:21 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/panama/PanamaInduction.kt:25:40 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:283:16 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:385:56 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Join<Int, (Int) -> Char>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/Confix.kt:385:74 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Join<Int, (Int) -> Char>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:104:27 This declaration needs opt-in. Its usage should be marked with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:182:51 This declaration needs opt-in. Its usage should be marked with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/ConfixSerialFormat.kt:226:18 Base declaration of supertype 'CompositeDecoder' needs opt-in. The declaration override should be annotated with '@kotlinx.serialization.ExperimentalSerializationApi' or '@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)'
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/confix/RowVecBuilder.kt:236:13 Check for instance is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/csv/CSVUtil.kt:23:1 'inline' modifier is deprecated. Use 'value' instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/csv/CsvBitmap.kt:119:51 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:269:40 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> *>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:269:70 Unchecked cast of 'Join<Int, (Int) -> *>' to 'Join<Int, (Int) -> Char>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/json/Json.kt:404:52 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> Char>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/json/JsonBitmap.kt:134:51 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:70:60 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:268:65 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:278:28 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/parse/kursive/sql/SqlAst.kt:311:65 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/openapi/OpenApiRawParser.kt:8:46 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/openapi/OpenApiReactorResolver.kt:3:59 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/wireproto/ReactorEndpoint.kt:43:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reactor/wireproto/ReactorEndpoint.kt:43:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ConfixReducers.kt:75:70 Unnecessary safe call on a non-null receiver of type 'SpanEvent.Span'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ConfixReducers.kt:177:39 Unchecked cast of 'Any' to 'ReductionCarrier<Join<ConfixStructuralKey, List<ConfixReducers.ScanToken>>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:68:24 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncKeyAlg.kt:73:29 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncReductions.kt:29:33 Unchecked cast of 'Any' to 'Map<String, Any>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncValueAlg.kt:147:31 Unchecked cast of 'V? (of fun <K, V> mergeMaps)' to 'V (of fun <K, V> mergeMaps)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/LcncValueAlg.kt:147:45 Unchecked cast of 'V? (of fun <K, V> mergeMaps)' to 'V (of fun <K, V> mergeMaps)'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/ReducerRegistry.kt:6:44 This extension is shadowed by a member: 'val category: String' defined in 'borg.trikeshed.context.nuid.Capability'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/reduction/TrajectoryReduction.kt:160:64 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/relaxfactory/ViewRoute.kt:143:37 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/torrent/PeerWireProtocol.kt:88:9 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:231:57 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:232:63 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:278:57 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/treedoc/TreeDocPipeline.kt:279:63 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> RowVec>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/ChannelRunner.kt:39:39 Suppression of error 'INVISIBLE_REFERENCE' might compile and work, but the compiler behavior is UNSPECIFIED and WILL NOT BE PRESERVED. Please report your use case to the Kotlin issue tracker instead: https://kotl.in/issue
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/EmulatedRing.kt:288:87 Unnecessary safe call on a non-null receiver of type 'Throwable'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/concurrency/Channel.kt:36:40 This is a delicate API and its use requires care. Make sure you fully read and understand documentation of the declaration that is marked as a delicate API.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/containment/CrossInstanceCollusionDetector.kt:111:41 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/containment/CrossInstanceCollusionDetector.kt:111:66 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:39:35 The corresponding parameter in the supertype 'Comparable' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/charset/Charset.kt:43:32 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/ebpf/engine/X86_64Jit.kt:39:32 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/SecureDirectoryStream.kt:9:39 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/AclEntry.kt:18:25 The corresponding parameter in the supertype 'Any' is named 'other'. This may cause problems when calling this function with named arguments.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:18:9 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:22 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:23:32 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:32:51 'fun toString(): String' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:43:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:27 'class Instant : Comparable<Instant>' is deprecated. Use kotlin.time.Instant instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/attribute/FileTime.kt:48:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:16:85 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:17:97 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/nio/file/spi/FileSystemProvider.kt:18:85 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt:165:22 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ForgeReactorExample.kt:165:41 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:42:28 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:42:47 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:58:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:58:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:67:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:67:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:90:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/ModelApiCache.kt:90:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:694:29 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/userspace/reactor/MuxReactorElement.kt:694:48 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosGateway.kt:12:71 Unchecked cast of 'Any?' to 'Join<OroborosNetworkK<*>, (OroborosNetworkK<*>) -> Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/util/oroboros/OroborosNetwork.kt:62:13 Condition is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:41:51 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/borg/trikeshed/ws/Rfc6455Handshake.kt:41:70 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/CouchKeyStore.kt:101:34 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/HarnessSource.kt:282:54 Unchecked cast of 'Any?' to 'Map<String, Any?>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/HermesCredentialSource.kt:133:36 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/HermesCredentialSource.kt:133:55 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/KeyMux.kt:254:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/keymux/KeyMux.kt:254:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:240:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:240:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:287:65 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:328:35 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:328:54 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:370:93 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:370:112 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:399:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:399:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:411:54 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:411:73 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:445:92 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:445:111 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:457:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:457:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:473:42 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:473:61 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:595:39 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:595:58 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:603:50 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/ModelMux.kt:603:69 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/MuxActivity.kt:51:112 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/MuxActivity.kt:51:131 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/MuxActivity.kt:58:23 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/modelmux/MuxActivity.kt:58:42 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/commonMain/kotlin/narchy/spacegraph/graphics/spi/FrameTriangles.kt:19:17 Condition is always 'true'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/bench/UxMetricsBenchmark.kt:38:33 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/bench/UxMetricsBenchmark.kt:51:26 Cast is redundant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsStoreHarness.kt:317:68 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/btrfs/BtrfsStoreHarness.kt:317:121 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:23:52 Unchecked cast of '(Int) -> Join<Any?, ColumnMeta↻>' to '() -> ColumnMeta'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:44:40 This cast can never succeed.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:72:40 This cast can never succeed.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:84:41 This cast can never succeed.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:131:33 Unchecked cast of '(Int) -> Join<Any?, ColumnMeta↻>' to '() -> ColumnMeta'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/couch/viewserver/GraalVmCursorHost.kt:163:17 Unchecked cast of 'Join<Join<Int, (Int) -> Any?>, () -> ColumnMeta>' to 'Join<Int, (Int) -> Join<Any?, ColumnMeta↻>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:210:13 Expected performance impact from inlining is insignificant. Inlining works best for functions with parameters of function types.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:271:62 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:272:57 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:273:65 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:274:66 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:275:66 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:276:55 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:277:63 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:278:64 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/cursor/TypedefProductionSystem.kt:279:64 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/daemon/OroborosDaemon.kt:384:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ServerSocketChannel'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/dag/demo/BlackboardDagDemo.kt:23:47 'val id: Long' is deprecated. Deprecated in Java.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:83:68 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:84:65 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWebhookBindings.kt:85:65 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/CouchWire.kt:140:13 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:287:60 Unnecessary safe call on a non-null receiver of type 'Any'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:597:83 Elvis operator (?:) always returns the left operand of non-nullable type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:844:28 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> *>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:853:31 Unchecked cast of 'Any?' to 'Join<Int, (Int) -> *>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/GraalWire.kt:858:37 Unchecked cast of 'Any?' to 'Join<ContentId, OverlapCounts>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt:447:44 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/forge/server/PatchWire.kt:447:63 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/InProcessIsolate.kt:114:43 'static fun allowInternalResourceAccess(fileSystem: FileSystem!): FileSystem!' is deprecated. Deprecated in Java.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:88:53 Projection is redundant: the corresponding type parameter of 'Set<out AccessMode>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/TrikeShedGraalVfs.kt:113:22 Projection is redundant: the corresponding type parameter of 'Set<out OpenOption>' has the same variance.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/subvm/harness/DocumentFeedHarness.kt:143:89 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/graal/vitals/AllocationSites.kt:29:47 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/hermes/tool/Og1RingTool.kt:180:32 Unchecked cast of 'Any?' to 'List<Map<String, Any?>>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:34:24 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsJournal'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:47:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'UringLibp2pDialer'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:69:30 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:70:97 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:70:156 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:71:51 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:78:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:78:78 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:79:63 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:81:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:82:59 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/IpnsMain.kt:94:55 Unnecessary non-null assertion (!!) on a non-null receiver of type 'IpnsPublisher'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/ipns/JvmLibp2pTls.kt:72:71 Unnecessary safe call on a non-null receiver of type 'SSLEngine'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/job/BtrfsCasStore.kt:141:57 Redundant call of conversion method.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/kanban/module/KanbanModule.kt:106:40 Unnecessary non-null assertion (!!) on a non-null receiver of type 'TurnReviewElement'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/mux/MuxCli.kt:261:80 Unnecessary safe call on a non-null receiver of type 'Join<String?, String>'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/relaxfactory/RelaxHttpServerJvm.kt:50:35 Unnecessary safe call on a non-null receiver of type 'ByteSeries'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/torrent/PeerWireHandler.kt:111:13 'when' is exhaustive so 'else' is redundant here.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/ingress/QueueGraphWork.kt:63:31 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/ingress/QueueGraphWork.kt:63:50 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/keymuxd/KeyMuxDaemon.kt:192:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ServerSocketChannel'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/keymuxd/KeyMuxDaemon.kt:214:31 Unnecessary safe call on a non-null receiver of type 'ServerSocketChannel'.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/keymuxd/KeyMuxDaemon.kt:225:46 'interface Clock : Any' is deprecated. Use kotlin.time.Clock instead.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/utils/keymuxd/KeyMuxDaemon.kt:225:65 'fun toEpochMilliseconds(): Long' is deprecated. kotlinx.datetime.Instant is superseded by kotlin.time.Instant.
+w: file:///Users/jim/.codex/worktrees/b163/TrikeShed/src/jvmMain/kotlin/borg/trikeshed/wiki/WikiNodes.kt:759:85 Cast is redundant.
+
+> Task :compileJvmMainJava UP-TO-DATE
+> Task :jvmMainClasses
+> Task :jvmJar
+> Task :stageDaemonLib
+
+> Task :ipns FAILED
+{"operation":"publish", "name":"k51qzi5uqu5dlxv4tq7032qoh49k71s9opjkioigsqn8jz18c4z638q27lcsm2", "complete":false, "acknowledgements":0, "replicaTarget":1, "lookupExhausted":true, "queryLimitReached":false, "candidateLimitReached":false, "value":"/ipfs/bafkqaaa", "sequence":"0", "validUntil":"2026-09-13T16:28:41.533919Z", "wireBase64":"QkBkhxiZ3NC6fWdjWkGQDfIZGXkHSKDhcvri3YiwuhSqcdszfx+caB8yq3jK+lPOqMhLQSo3byv7RJ1V6Q33CpYESmGlY1RUTBsAAABF2WS4AGVWYWx1ZU4vaXBmcy9iYWZrcWFhYWhTZXF1ZW5jZQBoVmFsaWRpdHlYGzIwMjYtMDktMTNUMTY6Mjg6NDEuNTMzOTE5WmxWYWxpZGl0eVR5cGUA", "peers":[], "failures":[{"peer":{"id":"12D3KooWLpGMqHJbhePwquELdcjE9fR8Z2F7mTChRLM6KvszVrVu", "addresses":["BH8AAAEG7PalAyYAJAgBEiCjafz2831/VOod/vUPDO1cASIvYuX60x1eqWOcYP1J4A=="]}, "stage":"FIND_NODE", "reason":"UringIOException: WRITE failed: -5"}]}
+
+[Incubating] Problems report is available at: file:///Users/jim/.codex/worktrees/b163/TrikeShed/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':ipns' (registered in build file 'build.gradle.kts').
+> Process 'command '/Users/jim/.sdkman/candidates/java/25.0.4.1-graal/bin/java'' finished with non-zero exit value 2
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 1m 19s
+10 actionable tasks: 5 executed, 5 up-to-date

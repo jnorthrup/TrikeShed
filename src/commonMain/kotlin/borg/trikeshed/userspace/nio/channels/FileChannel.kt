@@ -11,6 +11,7 @@ import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
+import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission
 import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
 import borg.trikeshed.userspace.nio.file.File
 
@@ -48,8 +49,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
             open(path.toString(), options, *attrs)
 
         fun open(path: String, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
-            require(attrs.isEmpty()) { "File attributes are not supported" }
-            return open(path, options) { UringChannels.open() }
+            return open(path, options, permissions = creationPermissions(attrs)) { UringChannels.open() }
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())
         fun open(path: String, vararg options: OpenOption): FileChannel = open(path, options.toSet())
@@ -57,6 +57,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
         internal fun open(
             path: String,
             options: Set<OpenOption>,
+            permissions: Int = 438,
             channelFactory: () -> UringChannel,
         ): FileChannel {
             val supported = setOf(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
@@ -71,7 +72,8 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
             if (StandardOpenOption.CREATE in options || StandardOpenOption.CREATE_NEW in options) flags = flags or 64
             if (StandardOpenOption.CREATE_NEW in options) flags = flags or 128
             if (StandardOpenOption.TRUNCATE_EXISTING in options) flags = flags or 512
-            val submission = Submissions.openat(path, flags, 0)
+            require(permissions in 0..511)
+            val submission = Submissions.openat(path, flags, 0).copy(operationFlags = permissions)
             val channel = channelFactory()
             try {
                 channel.enqueue(submission)
@@ -86,6 +88,14 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
                 runCatching { channel.closeNow() }.exceptionOrNull()?.let { if (it !== failure) failure.addSuppressed(it) }
                 throw failure
             }
+        }
+
+        private fun creationPermissions(attrs: Array<out FileAttribute<*>>): Int {
+            require(attrs.size <= 1 && attrs.all { it.name() == "posix:permissions" }) { "Unsupported file attributes" }
+            if (attrs.isEmpty()) return 438
+            val values = attrs.single().value() as? Set<*> ?: error("POSIX permissions must be a set")
+            require(values.all { it is PosixFilePermission })
+            return values.fold(0) { mask, permission -> mask or (1 shl (8 - (permission as PosixFilePermission).ordinal)) }
         }
     }
 

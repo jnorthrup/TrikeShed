@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IpnsJournalTest[jvm]" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-09-11T16:53:14.293Z" hostname="Mac.lan" time="0.295">
+  <properties/>
+  <testcase name="serialPublicationRenewalAndDrainPersistBeforeNetwork()[jvm]" classname="borg.trikeshed.ipns.IpnsJournalTest" time="0.226"/>
+  <testcase name="operationTimeoutRetainsWorkerAndRetriesDurableRecord()[jvm]" classname="borg.trikeshed.ipns.IpnsJournalTest" time="0.019"/>
+  <testcase name="durableIdentityVersionsPermissionsLeaseAndTornTail()[jvm]" classname="borg.trikeshed.ipns.IpnsJournalTest" time="0.017"/>
+  <testcase name="cancelledOwnerFinallyReleasesJournalLease()[jvm]" classname="borg.trikeshed.ipns.IpnsJournalTest" time="0.011"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

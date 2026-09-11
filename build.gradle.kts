@@ -1723,3 +1723,10 @@ tasks.register<Exec>("bundleSpacegraph") {
 tasks.matching { it.name.endsWith("ProcessResources") || it.name == "generateForgeAssets" }.configureEach {
     mustRunAfter("bundleSpacegraph")
 }
+
+// Native IPNS client; its transport and durable state use the common uring facade.
+tasks.register<JavaExec>("ipns") {
+    useStagedJvmClasspath()
+    mainClass.set("borg.trikeshed.ipns.IpnsMainKt")
+    providers.gradleProperty("ipnsArgs").orNull?.let { args(it.split(Regex("\\s+")).filter(String::isNotBlank)) }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IpnsRecordTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-11T16:53:14.686Z" hostname="Mac.lan" time="0.027">
+  <properties/>
+  <testcase name="namesCidAndIdentityCopies()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.004"/>
+  <testcase name="signedFieldsTamperNameExpiryAndLegacyBinding()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.004"/>
+  <testcase name="binaryCidAndEmptyValuesNormalizeAfterVerification()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.003"/>
+  <testcase name="rfc8032Ed25519Vector()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.002"/>
+  <testcase name="canonicalCborBoundsAndAuthenticatedExtensions()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.001"/>
+  <testcase name="protobufOverflowTruncationAndDuplicateRecordFields()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.001"/>
+  <testcase name="unsignedOrderCacheAndDeterministicTies()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.003"/>
+  <testcase name="officialIpip0428Fixtures()[jvm]" classname="borg.trikeshed.ipns.IpnsRecordTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

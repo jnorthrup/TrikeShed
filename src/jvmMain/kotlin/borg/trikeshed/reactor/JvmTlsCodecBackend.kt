@@ -29,7 +29,10 @@ import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 
-class JvmTlsCodecBackend : TlsCodecBackend {
+class JvmTlsCodecBackend @JvmOverloads constructor(
+    /** Optional byte-codec engine provision: callers own in-memory identity and peer trust policy. */
+    private val engineFactory: ((TlsConfig, TlsFlowState) -> SSLEngine)? = null,
+) : TlsCodecBackend {
     private data class EngineHandle(
         val engine: SSLEngine,
         var started: Boolean = false,
@@ -227,6 +230,7 @@ class JvmTlsCodecBackend : TlsCodecBackend {
         config: TlsConfig,
         state: TlsFlowState,
     ): SSLEngine {
+        engineFactory?.let { return it(config, state) }
         val role = state.route.a
         val peer = state.route.b
         val context = createSslContext(config, role)

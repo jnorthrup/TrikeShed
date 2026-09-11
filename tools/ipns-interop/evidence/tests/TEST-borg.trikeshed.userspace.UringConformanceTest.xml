@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="UringConformanceTest[jvm]" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-09-11T16:53:14.775Z" hostname="Mac.lan" time="0.043">
+  <properties/>
+  <testcase name="statx_preserves_slice_bounds_and_rejects_invalid_buffers()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.006"/>
+  <testcase name="file_handle_and_submission_share_descriptor_lifetime()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.002"/>
+  <testcase name="selected_backend_disposable_file_contract()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.009"/>
+  <testcase name="ebpf_admission_protects_real_file_and_completion_preserves_performed_io()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.005"/>
+  <testcase name="backend_close_releases_opened_descriptors()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.002"/>
+  <testcase name="emulated_disposable_file_contract()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.007"/>
+  <testcase name="drain_executes_prepared_file_write_before_descriptor_cleanup()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.003"/>
+  <testcase name="file_channel_open_and_partial_transfer_use_real_submissions()[jvm]" classname="borg.trikeshed.userspace.UringConformanceTest" time="0.006"/>
+  <system-out><![CDATA[uring selection: HOST_UNSUPPORTED: JNI io_uring requires a known Linux arm64 or x86_64 host; capabilities=257965391881; native=0
+uring report: NIO backend=uring_emulated uring=false caps=nop,fsync,connect,fallocate,ftruncate,openat,close,statx,read,write,fadvise,madvise,send,recv,shutdown,renameat,unlinkat,mkdirat; probe=HOST_UNSUPPORTED
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

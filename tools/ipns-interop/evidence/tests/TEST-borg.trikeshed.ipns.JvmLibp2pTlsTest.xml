@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="JvmLibp2pTlsTest[jvm]" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-09-11T16:53:14.713Z" hostname="Mac.lan" time="0.054">
+  <properties/>
+  <testcase name="issued_identity_certificate_authenticates_only_its_peer()[jvm]" classname="borg.trikeshed.ipns.JvmLibp2pTlsTest" time="0.051"/>
+  <testcase name="published_libp2p_ed25519_certificate_vector()[jvm]" classname="borg.trikeshed.ipns.JvmLibp2pTlsTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
