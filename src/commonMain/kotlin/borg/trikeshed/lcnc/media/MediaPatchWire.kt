@@ -91,8 +91,15 @@ fun MediaPatch.Companion.fromMap(map: Map<String, Any?>): MediaPatch? {
             MediaPatchPayload.Bytes(contentType, bytes)
         }
         map.containsKey("cells") -> {
-            val rawCells = (map["cells"] as? List<*>)?.filterIsInstance<Map<String, Any?>>() ?: emptyList()
-            val cellsList = rawCells.map { cellMap -> VtCell.fromMap(cellMap) }
+            val rawCells = map["cells"] as? List<*> ?: emptyList<Any?>()
+            // Bolt: Avoid intermediate ArrayList allocations from filterIsInstance and map
+            val cellsList = ArrayList<VtCell>(rawCells.size)
+            for (rawCell in rawCells) {
+                if (rawCell is Map<*, *>) {
+                    @Suppress("UNCHECKED_CAST")
+                    cellsList.add(VtCell.fromMap(rawCell as Map<String, Any?>))
+                }
+            }
             MediaPatchPayload.TerminalCells(cellsList.toSeries())
         }
         else -> MediaPatchPayload.Text("")
