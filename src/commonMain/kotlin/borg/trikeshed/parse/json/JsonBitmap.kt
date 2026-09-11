@@ -4,6 +4,9 @@ package borg.trikeshed.parse.json
 
 import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.EscapeIncrement
 import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.QuoteIncrement
+import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.UtfInitiatorOrContinuation
+import borg.trikeshed.lib.CZero.nz
+import borg.trikeshed.lib.CZero.z
 
 object JsonBitmap {
 
@@ -38,95 +41,98 @@ object JsonBitmap {
         }
     }
 
-    /**
-     * Scalar byte classification: structural event in the low two bits, lexer event
-     * in the high two bits of each nibble. Earlier input occupies the high nibble.
-     * An odd final byte leaves a zero low nibble; retain the original byte count.
-     *
-     * The structural-bitmap idea was also explored in jnorthrup/simdjsonbitmapcodec
-     * (c3c90fb07ca9e4c8b4fc3c62688ffc1cad4718c3). This repairs TrikeShed's existing
-     * two-stage implementation; it does not import that repository's bit masks.
-     */
+    /** we code a 2+2 bit pixel per input byte which marks the state of the lexer and the js state machine*/
+    @OptIn(ExperimentalUnsignedTypes::class)
     fun encode(input: UByteArray): UByteArray {
-        val output = UByteArray(input.size / 2 + input.size % 2)
+        val output = UByteArray(input.size)
         for (i in input.indices) {
-            val event = JsStateEvent.test(input[i]) or (LexerEvents.test(input[i]) shl 2)
-            val shift = if (i % 2 == 0) 4 else 0
-            output[i / 2] = output[i / 2] or (event shl shift).toUByte()
+            val jsStateEvent = JsStateEvent.test(input[i])
+            val lexerEvent = LexerEvents.test(input[i])
+            val i1 = i / 2
+            if (i % 2 == 0) output[i1] = (jsStateEvent or (lexerEvent shl 2) shl 4).toUByte()
+            else output[i1] = output[i1] or (jsStateEvent or (lexerEvent shl 2)).toUByte()
         }
         return output
     }
 
-    /**
-     * Compact a contiguous stream of [encode] nibbles in place, retaining quote
-     * and escape state across array boundaries (including empty arrays). Split
-     * the encoded bytes into chunks; independently padded odd input chunks cannot
-     * be concatenated without their individual lengths.
+    /** we receive an array of 2+2 bit pixels
+     * we have a state machine similar to the simdjson example which uses a
+     * state transition bitmap of 2 bits per json byte and a 2 bit mask state machine
+     * where odd quotes mask the jsStateEvent and odd escapes mask the quote state changes
      *
-     * The first ceil(inputSize / 4) bytes of the concatenated arrays contain two-bit
-     * [JsStateEvent] ordinals, most significant slot first. Remaining bits/bytes
-     * are zeroed; array identities and sizes are retained. Omit [inputSize] only
-     * when every input nibble is meaningful (or treating final padding as input).
+     * the quote and escape counter is persistent across next adjacent neighbors effectively incrementint
+     * the counters for the next bitplane and inverting the mask for the next bitplane.
      *
-     * This is a lexical index, not JSON or UTF-8 validation. Non-ASCII UTF-8 bytes
-     * cannot be ASCII quotes, backslashes or structural punctuation. Only an ASCII
-     * backslash inside a string escapes the next byte. Unterminated strings remain
-     * masked through the end of the supplied stream.
+     * the counter for escapes only goes up to 1, and the next byte always decrements
+     * that counter whether or not that is an escape or not.
+     *
+     * escapes outside of the odd quotes are ignored.  utf bytes outside of the odd quotes are ignored.
+     *
+     * any non-0 masking bit forced the jsStateEvent to be Unchanged(0)
+     *
+     *
      */
+    @OptIn(ExperimentalUnsignedTypes::class)
     fun decode(
+        /** array of 4-bit bitmaps*/
         input: Array<UByteArray>,
-        inputSize: UInt = input.sumOf { it.size.toLong() * 2 }.also {
-            require(it <= UInt.MAX_VALUE.toLong()) { "Bitmap input exceeds UInt byte count" }
-        }.toUInt(),
-    ): Array<UByteArray> {
-        require(inputSize.toLong() <= input.sumOf { it.size.toLong() * 2 }) {
-            "Input byte count exceeds bitmap capacity"
-        }
-        var remaining = inputSize.toLong()
-        var quoted = false
-        var escaped = false
-        var outputChunk = 0
-        var outputByte = 0
-        var outputBits = 0
-        var outputSlots = 0
+        /** the known size of input bytes, or an estimate by default*/
+        inputSize: UInt = input.sumOf { it.size.toUInt() * 2U },
+    ):
+            /** 2 bits out*/
+            Array<UByteArray> {
+        var quoteCounter = 0
+        var escapeCounter = 0
+        var inputX = 0
+        var inputY = 0 //4 bits
+        var outputX = 0
+        var outputY = 0 //2 bits
+        var maskedSoFar = 0
 
-        for (chunk in input) {
-            for (index in chunk.indices) {
-                if (remaining == 0L) break
-                // Capture BOTH nibbles before any write can overwrite their byte.
-                val packed = chunk[index].toInt()
-                for (shift in 4 downTo 0 step 4) {
-                    if (remaining == 0L) break
-                    val nibble = (packed shr shift) and 0xf
-                    val lexer = nibble shr 2
-                    val structural = if (quoted) 0 else nibble and 3
-                    when {
-                        escaped -> escaped = false
-                        quoted && lexer == EscapeIncrement.ordinal -> escaped = true
-                        lexer == QuoteIncrement.ordinal -> quoted = !quoted
-                    }
-                    outputBits = outputBits or (structural shl (6 - outputSlots * 2))
-                    outputSlots++
-                    remaining--
-                    if (outputSlots == 4 || remaining == 0L) {
-                        while (outputByte == input[outputChunk].size) {
-                            outputChunk++
-                            outputByte = 0
+        /**
+         * we go 0 to inputSize swapping in bitplanes as we go
+         *
+         * we write results over top of the input array, using half the bits
+         *
+         */
+        do {
+            do {
+                do {
+                    val b: UByte = if ((maskedSoFar % 2).z)
+                        (input[inputY][inputX / 2].toUInt() shr 4).toUByte()
+                    else
+                        input[inputY][inputX / 2] and 0b0000_1111U
+
+                    val maskBits = b.toUInt() shr 2 and 0x3u
+
+                    if ((quoteCounter % 2).nz) {
+                        when {
+                            (escapeCounter % 2).nz -> escapeCounter = 0
+                            (maskBits and EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
+                            (maskBits and UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
+                            (maskBits and QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
                         }
-                        input[outputChunk][outputByte++] = outputBits.toUByte()
-                        outputBits = 0
-                        outputSlots = 0
-                    }
-                }
-            }
-        }
-        // Reads have finished: discard the old classification tail without erasing
-        // unread nibbles or retaining misleading structural events in unused slots.
-        while (outputChunk < input.size) {
-            input[outputChunk].fill(0u, outputByte)
-            outputChunk++
-            outputByte = 0
-        }
+                    } else
+                        if ((maskBits and QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
+
+                    val jsStateBits = if ((quoteCounter % 2).nz) 0u else b.toUInt() and 0x3u
+//write the jsStateBits 2 bit result right-to-left in the input bits so we can reuse the input array
+                    val writePos = (4 - (outputX % 4)) * 2 // outputX 0..5 0 -> 6 1 -> 4 2 -> 2 3 -> 0 4 -> 6
+                    val writeMask = 0x3u shl writePos
+                    val writeValue = jsStateBits shl writePos
+                    input[outputY][outputX / 4] =
+                        (input[outputY][outputX / 4].toUInt() and writeMask.inv()).toUByte() or writeValue.toUByte()
+                    outputX++
+                    inputX++
+                    maskedSoFar++
+                } while (outputX / 4 < input[outputY].size)
+                outputX = 0
+                outputY++
+            } while (inputX / 2 < input[inputY].size)
+            inputX = 0
+            inputY++
+        } while (maskedSoFar.toUInt() < inputSize.toUInt())
         return input
     }
 }
+
