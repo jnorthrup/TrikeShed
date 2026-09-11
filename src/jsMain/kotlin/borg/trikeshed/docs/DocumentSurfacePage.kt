@@ -138,12 +138,11 @@ object DocumentSurfacePage {
      * exactly as they are using it.
      */
     private suspend fun refreshBlocks() {
-        // Bolt: avoid intermediate ArrayList allocation from filterIsInstance
+        // Bolt: avoid intermediate List/Sequence allocation from filterIsInstance
         for (spec in blocks) {
-            if (spec is RunBlock.Spec) {
-                val state = RunBlock.state(getJson(headUrl(spec))) ?: continue
-                if (runStates.put(spec.ordinal, state) != state) repaint(spec, state)
-            }
+            if (spec !is RunBlock.Spec) continue
+            val state = RunBlock.state(getJson(headUrl(spec))) ?: continue
+            if (runStates.put(spec.ordinal, state) != state) repaint(spec, state)
         }
     }
 
@@ -164,7 +163,7 @@ object DocumentSurfacePage {
      * resolves; another tab reads the same run off the board.
      */
     private suspend fun press(ordinal: Int?, rebuild: Boolean) {
-        // Bolt: avoid intermediate ArrayList allocation from filterIsInstance
+        // Bolt: avoid intermediate List/Sequence allocation from filterIsInstance
         val spec = blocks.firstOrNull { it is RunBlock.Spec && it.ordinal == ordinal } as? RunBlock.Spec ?: return
         val prior = runStates[spec.ordinal]
         val (url, body) = if (rebuild) (RunBlock.rebuildRequest(prior) ?: return) else RunBlock.buildRequest(spec)
