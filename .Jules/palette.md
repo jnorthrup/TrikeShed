@@ -129,3 +129,7 @@
 ## $(date +%Y-%m-%d) - Synchronizing active states for custom UI controls
 **Learning:** When building custom view switchers (like the graph mode toggles 'Causal', 'Concepts', 'Docs' in `script.js` or the navigation links in `mux.js`) that aren't native anchor tags with simple URLs, applying only a visual `.active` class leaves screen reader users without context about the current active view. Furthermore, when duplicate navigation controls exist for the same view, updating only the first match (via `querySelector`) leaves the secondary controls in a stale, ambiguous state.
 **Action:** Always apply `aria-current="page"` via JavaScript when the view changes for custom navigational elements. Additionally, always use `querySelectorAll` to apply these active state changes consistently across *all* duplicate instances of navigation buttons that represent the current view.
+
+## 2026-09-10 - Syncing active states for dynamically generated navigation tabs
+**Learning:** When custom view switchers (like the VM terminal tabs) are dynamically generated and the view changes, failing to apply `aria-current="page"` leaves screen reader users without context about the current active view, and visual users see an active state (like a background color change), but screen reader users hear no change in state unless explicitly announced.
+**Action:** When generating custom view switchers (like tabs) that aren't native links, always apply `aria-current="page"` via JavaScript to the active element when the view changes.
