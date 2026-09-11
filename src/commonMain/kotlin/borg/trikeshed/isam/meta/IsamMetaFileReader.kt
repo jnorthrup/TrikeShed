@@ -40,7 +40,7 @@ import kotlin.math.min
  */
 class IsamMetaFileReader(
     val metafileFilename: String,
-    private val fileOps: FileOperations? = null
+    internal val fileOps: FileOperations? = null
 ) : Usable {
 
     val recordlen: Int get() = constraints.last().end

@@ -39,4 +39,4 @@ uring_prefix="$(cd "$uring_prefix" && pwd)"
     -I"$uring_prefix/include" "$uring_root/src/jvmMain/c/uring_jni.c" \
     -L"$uring_prefix/lib" -Wl,-rpath,"$uring_prefix/lib" -luring \
     -o "$uring_output/libtrikeshed_uring.so"
-echo "Built $uring_output/libtrikeshed_uring.so against $uring_prefix; JNI ABI 2"
+echo "Built $uring_output/libtrikeshed_uring.so against $uring_prefix; JNI ABI 3"

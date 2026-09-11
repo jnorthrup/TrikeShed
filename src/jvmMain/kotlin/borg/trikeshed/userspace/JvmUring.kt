@@ -40,7 +40,7 @@ internal fun jvmNativeChannelBackend(handle: Long): UserspaceChannelBackend = Jv
 private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChannelBackend {
     override val capabilities: Long = UringOp.caps(
         UringOp.NOP, UringOp.FSYNC, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
-        UringOp.OPENAT, UringOp.CLOSE, UringOp.READ, UringOp.WRITE,
+        UringOp.OPENAT, UringOp.CLOSE, UringOp.READ, UringOp.WRITE, UringOp.STATX,
         UringOp.FADVISE, UringOp.MADVISE, UringOp.FTRUNCATE,
     )
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
@@ -81,6 +81,8 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         if (descriptor is JvmChannelDescriptor) return legacy.execute(sub)
         if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && descriptor !is JvmNativeDescriptor) return -9
         val buffer = sub.buffer
+        if (sub.opcode == UringOp.STATX &&
+            (buffer == null || buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.offset != 0L || sub.addr != 0L)) return -22
         if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.OPENAT) {
             if (sub.opcode == UringOp.OPENAT && buffer == null) return -22
             if (buffer != null && sub.len > buffer.remaining()) return -22
@@ -104,7 +106,7 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
                 JvmFileTable.close(sub.fd)
                 owned.remove(sub.fd)
             }
-            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE)) {
+            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.STATX)) {
                 buffer.position(buffer.position() + result)
             }
         }

@@ -8,6 +8,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ByteOrder
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
@@ -22,7 +23,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     private val descriptors = mutableSetOf<Int>()
     private var closed = false
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
-        UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED) or native.capabilities
+        UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED) or native.capabilities
     override val nativeCapabilities: Long get() = native.capabilities
     override val availability: String get() = native.availability
 
@@ -55,9 +56,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         if (sub.opcode in bufferOps) {
             if (buffer == null) return result(-22)
             if (sub.len > buffer.remaining()) return result(-22)
-            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV) && buffer.isReadOnly()) return result(-22)
+            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX) && buffer.isReadOnly()) return result(-22)
         }
         if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) && sub.offset < -1) return result(-22)
+        if (sub.opcode == UringOp.STATX && (sub.len < 24 || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L)) return result(-22)
         if (sub.opcode == UringOp.FTRUNCATE && sub.offset < 0) return result(-22)
         if (sub.opcode == UringOp.OPENAT) {
             if (sub.len == 0 || sub.offset < 0 || sub.offset > Int.MAX_VALUE || sub.offset.toInt() and OPEN_FLAGS.inv() != 0) return result(-22)
@@ -108,6 +110,21 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
                     else recv(sub.fd, ptr, sub.len.convert(), 0).toInt())
                 }
             }
+            UringOp.STATX -> memScoped {
+                val metadata = alloc<stat>()
+                val status = posixCompletion(fstat(sub.fd, metadata.ptr))
+                if (status < 0) status else {
+                    val kind = when (metadata.st_mode.toInt() and S_IFMT.toInt()) {
+                        S_IFREG.toInt() -> 1L
+                        S_IFDIR.toInt() -> 2L
+                        else -> 0L
+                    }
+                    // The portable payload is size, mtime millis (unavailable here), and file kind.
+                    buffer!!.duplicate().order(ByteOrder.LITTLE_ENDIAN)
+                        .putLong(metadata.st_size).putLong(0L).putLong(kind)
+                    24
+                }
+            }
             UringOp.FSYNC -> PosixUringIO.fsync(sub.fd)
             UringOp.FTRUNCATE -> PosixUringIO.ftruncate(sub.fd, sub.offset)
             UringOp.CLOSE -> PosixUringIO.closeFd(sub.fd)
@@ -126,8 +143,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
 
     private companion object {
         const val OPEN_FLAGS = 3 or 64 or 128 or 512 or 1024
-        val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV)
-        val bufferOps = setOf(UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV)
+        val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
+        val bufferOps = setOf(UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
     }
 }
 

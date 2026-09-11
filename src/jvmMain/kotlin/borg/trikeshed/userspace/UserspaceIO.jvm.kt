@@ -225,10 +225,11 @@ internal class JvmUserspaceChannelBackend(
      */
     private fun statx(channel: FileChannel, sub: UringSubmission): Int {
         val buffer = sub.buffer ?: return -22
-        if (buffer.remaining() < 24) return -22
+        if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.offset != 0L || sub.addr != 0L || sub.operationFlags != 0) return -22
         val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + buffer.position(), 24)
             .order(java.nio.ByteOrder.LITTLE_ENDIAN)
         nio.putLong(channel.size()); nio.putLong(0L); nio.putLong(1L)
+        buffer.position(buffer.position() + 24)
         return 24
     }
 

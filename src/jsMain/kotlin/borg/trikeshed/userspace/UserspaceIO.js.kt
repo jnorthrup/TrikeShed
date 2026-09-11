@@ -6,6 +6,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ByteOrder
 import kotlin.js.jsTypeOf
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
@@ -87,6 +88,21 @@ private fun UringSubmission.nodePath(): String {
     }
 }
 
+/** Encode the facade metadata payload without changing the caller's byte order. */
+private fun jsStatxResult(sub: UringSubmission, size: Long, mtime: Long, kind: Long): Int {
+    if (size < 0) return if (size >= Int.MIN_VALUE.toLong()) size.toInt() else -5
+    val buffer = sub.buffer ?: return -22
+    if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
+    buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).putLong(size).putLong(mtime).putLong(kind)
+    buffer.position(buffer.position() + 24)
+    return 24
+}
+
+private fun jsStatxResult(sub: UringSubmission, metadata: dynamic): Int = jsStatxResult(
+    sub, metadata.size.toString().toLong(), (metadata.mtimeMs as Double).toLong(),
+    if (metadata.isFile() as Boolean) 1L else if (metadata.isDirectory() as Boolean) 2L else 0L,
+)
+
 actual class FileImpl actual constructor(actual val id: Int) {
     actual fun isOpen(): Boolean = JsFileTable.descriptor(id) != null
     actual fun close() { JsFileTable.close(id) }
@@ -111,7 +127,7 @@ internal actual object ChannelsImpl {
 internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
     private val host: dynamic = nodeFs
     override val capabilities = if (host == null) UringOp.NOP.mask else UringOp.caps(
-        UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE,
+        UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE, UringOp.STATX,
     )
     override val availability = if (host == null) "emulated: host file primitives unavailable"
         else "emulated: Node file primitives; no native io_uring bridge selected"
@@ -130,6 +146,10 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
             val buffer = sub.buffer ?: return -22
             if (sub.len < 0 || sub.len > buffer.remaining() || sub.offset < -1 || sub.offset > 9007199254740991L) return -22
             if (sub.opcode == UringOp.READ && buffer.isReadOnly()) return -22
+        }
+        if (sub.opcode == UringOp.STATX) {
+            val buffer = sub.buffer ?: return -22
+            if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
         }
         if (sub.opcode == UringOp.FTRUNCATE && (sub.offset < 0 || sub.offset > 9007199254740991L)) return -22
         return 0
@@ -156,6 +176,7 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
                             buffer.position(buffer.position() + count)
                             count
                         }
+                        UringOp.STATX -> jsStatxResult(sub, host.fstatSync(fd))
                         UringOp.FSYNC -> { host.fsyncSync(fd); 0 }
                         UringOp.FTRUNCATE -> { host.ftruncateSync(fd, sub.offset.toDouble()); 0 }
                         else -> -95
@@ -214,6 +235,17 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
                         else host.write(fd, buffer.array(), start, sub.len, offset, completion)
                     }
                 }
+                UringOp.STATX -> {
+                    val fd = JsFileTable.descriptor(sub.fd)!!.fd
+                    suspendCoroutine { continuation ->
+                        host.fstat(fd, { error: dynamic, metadata: dynamic ->
+                            val result = if (error != null) jsIoError(error) else try {
+                                jsStatxResult(sub, metadata)
+                            } catch (failure: dynamic) { jsIoError(failure) }
+                            continuation.resume(result)
+                        })
+                    }
+                }
                 UringOp.FSYNC, UringOp.FTRUNCATE -> {
                     val fd = JsFileTable.descriptor(sub.fd)!!.fd
                     suspendCoroutine { continuation ->
@@ -269,9 +301,10 @@ internal fun nodeNativeChannelBackend(module: dynamic, handle: dynamic): Userspa
 
 private class NodeNativeChannelBackend(private val module: dynamic, private val handle: dynamic) : UserspaceChannelBackend {
     override val capabilities = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
-        UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE)
+        UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE) or
+        (if (jsTypeOf(module.size) == "function" || jsTypeOf(nodeFs?.fstatSync) == "function") UringOp.STATX.mask else 0L)
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
-        if (capabilities and op.mask != 0L && op.code >= 0 && module.supports(handle, op.code) as Boolean)
+        if (op != UringOp.STATX && capabilities and op.mask != 0L && op.code >= 0 && module.supports(handle, op.code) as Boolean)
             mask or op.mask else mask
     }
     override val availability = "io_uring: Node ABI1 setup and operation probe succeeded; unavailable kernel ops use POSIX emulation"
@@ -287,6 +320,13 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
         if (descriptor != null && descriptor.module == null) return emulated.execute(sub)
         if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && descriptor == null) return -9
         val buffer = sub.buffer
+        if (sub.opcode == UringOp.STATX) {
+            if (buffer == null || buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
+            return try {
+                if (jsTypeOf(module.size) == "function") jsStatxResult(sub, module.size(descriptor!!.fd).toString().toLong(), 0L, 0L)
+                else jsStatxResult(sub, nodeFs.fstatSync(descriptor!!.fd))
+            } catch (failure: dynamic) { jsIoError(failure) }
+        }
         if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.OPENAT) {
             if (buffer == null || sub.len < 0 || sub.len > buffer.remaining()) return -22
             if (sub.opcode == UringOp.READ && buffer.isReadOnly()) return -22

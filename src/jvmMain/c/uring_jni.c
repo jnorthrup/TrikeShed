@@ -34,7 +34,7 @@ static int implemented(int op) {
         case IORING_OP_NOP: case IORING_OP_FSYNC:
         case IORING_OP_READ_FIXED: case IORING_OP_WRITE_FIXED:
         case IORING_OP_OPENAT: case IORING_OP_CLOSE:
-        case IORING_OP_READ: case IORING_OP_WRITE:
+        case IORING_OP_READ: case IORING_OP_WRITE: case IORING_OP_STATX:
         case IORING_OP_FADVISE: case IORING_OP_MADVISE:
         case IORING_OP_FTRUNCATE: return 1;
         default: return 0;
@@ -43,7 +43,7 @@ static int implemented(int op) {
 
 JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_abiVersion(JNIEnv *env, jobject self) {
     (void)env; (void)self;
-    return 2;
+    return 3;
 }
 
 JNIEXPORT jlong JNICALL Java_borg_trikeshed_userspace_JvmUring_open(JNIEnv *env, jobject self, jint entries) {
@@ -154,7 +154,8 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     }
     int fixed = op == IORING_OP_READ_FIXED || op == IORING_OP_WRITE_FIXED;
     int transfer = fixed || op == IORING_OP_READ || op == IORING_OP_WRITE;
-    int has_bytes = op == IORING_OP_OPENAT || ((op == IORING_OP_READ || op == IORING_OP_WRITE) && array);
+    int has_bytes = op == IORING_OP_OPENAT || op == IORING_OP_STATX || ((op == IORING_OP_READ || op == IORING_OP_WRITE) && array);
+    if (op == IORING_OP_STATX && (!array || len < 24 || offset != 0 || address != 0)) return -EINVAL;
     if (has_bytes && (!array || start < 0 || len < 0 || (jlong)start + len > (*env)->GetArrayLength(env, array)))
         return -EINVAL;
     if (transfer && offset < -1) return -EINVAL;
@@ -173,6 +174,7 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     if (has_bytes && !elements) return -ENOMEM;
     void *bytes = elements ? elements + start : (void *)(uintptr_t)address;
     char *path = NULL;
+    struct statx metadata = {0};
     int result = -ENOMEM;
     if (op == 18) {
         if (memchr(bytes, 0, len)) { result = -EINVAL; goto finish; }
@@ -183,7 +185,9 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         bytes = path;
     }
     if (!io_uring_opcode_supported(state->probe, op)) {
-        result = posix_execute(op, fd, bytes, (unsigned)len, offset, (unsigned)operation_flags);
+        result = op == IORING_OP_STATX
+            ? (statx(fd, "", AT_EMPTY_PATH, STATX_SIZE | STATX_MODE | STATX_MTIME, &metadata) == 0 ? 0 : -errno)
+            : posix_execute(op, fd, bytes, (unsigned)len, offset, (unsigned)operation_flags);
         goto finish;
     }
     struct io_uring_sqe *sqe = io_uring_get_sqe(&state->ring);
@@ -195,6 +199,7 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         case 5: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
         case 18: io_uring_prep_openat(sqe, fd, bytes, (int)offset, (mode_t)operation_flags); break;
         case 19: io_uring_prep_close(sqe, fd); break;
+        case 21: io_uring_prep_statx(sqe, fd, "", AT_EMPTY_PATH, STATX_SIZE | STATX_MODE | STATX_MTIME, &metadata); break;
         case 22: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); break;
         case 23: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); break;
         case 24: io_uring_prep_fadvise(sqe, fd, (uint64_t)offset, len, operation_flags); break;
@@ -246,8 +251,21 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         state->exited = 1;
     }
 finish:
+    if (op == IORING_OP_STATX && result == 0) {
+        /* Existing userspace metadata ABI: three little-endian longs. The kernel
+         * CQE returns zero; the facade reports the 24 bytes materialized here. */
+        uint64_t fields[3] = {
+            metadata.stx_size,
+            (uint64_t)metadata.stx_mtime.tv_sec * 1000 + metadata.stx_mtime.tv_nsec / 1000000,
+            S_ISREG(metadata.stx_mode) ? 1 : S_ISDIR(metadata.stx_mode) ? 2 : 0
+        };
+        for (unsigned field = 0; field < 3; field++)
+            for (unsigned byte = 0; byte < 8; byte++)
+                ((unsigned char *)bytes)[field * 8 + byte] = (unsigned char)(fields[field] >> (byte * 8));
+        result = 24;
+    }
     free(path);
-    if (elements) (*env)->ReleaseByteArrayElements(env, array, elements, op == 22 ? 0 : JNI_ABORT);
+    if (elements) (*env)->ReleaseByteArrayElements(env, array, elements, op == 22 || op == 21 ? 0 : JNI_ABORT);
     return result;
 }
 

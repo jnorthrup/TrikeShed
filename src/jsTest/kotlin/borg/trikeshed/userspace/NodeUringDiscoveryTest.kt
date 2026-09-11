@@ -14,6 +14,7 @@ import kotlin.test.assertTrue
 import kotlin.test.assertContentEquals
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 
 /** Linux modules below are synthetic fixtures; they do not execute kernel io_uring. */
@@ -136,14 +137,25 @@ class NodeUringDiscoveryTest {
     @Test
     fun fixturePositiveProbeUsesSharedAdapter() {
         val module = module()
+        module.size = js("function(fd){return BigInt(7)}")
         val discovery = discover(module)
-        assertEquals(UringProbeState.AVAILABLE, discovery.report.state)
+        // Descriptor metadata is emulated even when this synthetic module claims every opcode.
+        assertEquals(UringProbeState.AVAILABLE_LIMITED, discovery.report.state)
         assertTrue(discovery.report.available)
         assertEquals(UringProbePhase.EXECUTION, discovery.report.phase)
         assertEquals(1, module.opened as Int)
         assertEquals(1, module.executed as Int)
         assertEquals(0x7472696b65L.toString(), module.lastUserData.toString() as String)
-        assertNotNull(discovery.backend).close()
+        val backend = assertNotNull(discovery.backend)
+        assertEquals(0L, backend.nativeCapabilities and UringOp.STATX.mask)
+        val fd = backend.submitBatch(listOf(Submissions.openat("fixture", userData = 12))).single().res
+        val metadata = ByteBuffer(24)
+        val stat = UringOp.Companion.UringSubmission(UringOp.STATX, fd, 0, 24, 0, userData = 13, buffer = metadata)
+        assertEquals(24, backend.submitBatch(listOf(stat)).single().res)
+        assertEquals(24, metadata.position())
+        assertEquals(7L, metadata.order(ByteOrder.LITTLE_ENDIAN).getLong(0))
+        assertEquals(0L, metadata.getLong(16), "size-only adapter does not establish a file kind")
+        backend.close()
         assertEquals(1, module.closed as Int)
     }
 
@@ -221,8 +233,22 @@ class NodeUringDiscoveryTest {
             assertEquals(3, destination.position())
             assertContentEquals(byteArrayOf(11, 22, 33, 0, 0), destination.array())
             assertEquals(0, complete(Submissions.read(fd, 0, 2, 3, 5).copy(buffer = destination)))
+            val metadataBytes = ByteArray(30) { 9 }
+            val metadata = ByteBuffer(metadataBytes, 1, 28).position(1)
+            val stat = UringOp.Companion.UringSubmission(UringOp.STATX, fd, 0, 24, 0, userData = 60, buffer = metadata)
+            assertEquals(24, complete(stat))
+            assertEquals(25, metadata.position())
+            assertEquals(3L, metadata.order(ByteOrder.LITTLE_ENDIAN).getLong(1))
+            assertTrue(metadataBytes.take(2).all { it == 9.toByte() })
+            assertTrue(metadataBytes.drop(26).all { it == 9.toByte() })
+            val readOnlyMetadata = ByteBuffer(24).asReadOnlyBuffer()
+            assertEquals(-22, complete(stat.copy(buffer = readOnlyMetadata)))
+            assertEquals(0, readOnlyMetadata.position())
+            assertEquals(-22, complete(stat.copy(buffer = ByteBuffer(23))))
+            assertEquals(-22, complete(stat.copy(buffer = ByteBuffer(24), offset = 1)))
+            assertEquals(-22, complete(stat.copy(buffer = ByteBuffer(24), addr = 1)))
             assertEquals(0, complete(Submissions.close(fd, 6)))
-            println("Node selected backend: OPENAT/WRITE/FSYNC/READ/EOF/CLOSE passed; ${backend.availability}")
+            println("Node selected backend: OPENAT/WRITE/FSYNC/READ/EOF/STATX/CLOSE passed; ${backend.availability}")
         } finally {
             try { facade.closeNow() } finally {
                 filesystem.rmSync(directory, js("({recursive:true,force:true})"))

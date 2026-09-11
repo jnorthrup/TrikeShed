@@ -5,6 +5,8 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
+import borg.trikeshed.userspace.nio.UringIOException
+import borg.trikeshed.userspace.nio.ByteOrder
 
 internal class UringFileChannel(
     private val file: File,
@@ -32,7 +34,7 @@ internal class UringFileChannel(
         val completion = channel.wait(1).singleOrNull()
         if (completion == null || completion.userData != token) throw IOException("Invalid $op completion for token $token")
         val count = completion.res
-        if (count < 0) throw IOException("$op failed: $count")
+        if (count < 0) throw UringIOException(op, count)
         if (buffer != null) {
             if (count > remaining || buffer.position() != start + maxOf(0, count)) {
                 throw IOException("Invalid $op transfer: count=$count remaining=$remaining position=${buffer.position()}")
@@ -96,7 +98,11 @@ internal class UringFileChannel(
 
     override fun position(): Long { checkOpen(); return pos }
     override fun position(newPosition: Long): FileChannel { checkOpen(); require(newPosition >= 0); pos = newPosition; return this }
-    override fun size(): Long { checkOpen(); return file.size().also { if (it < 0) throw IOException("File size unavailable") } }
+    override fun size(): Long {
+        val metadata = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
+        if (execute(UringOp.STATX, metadata) != 24) throw IOException("Invalid STATX metadata width")
+        return metadata.getLong(0).also { if (it < 0) throw IOException("File size unavailable") }
+    }
 
     override fun truncate(size: Long): FileChannel {
         checkOpen()

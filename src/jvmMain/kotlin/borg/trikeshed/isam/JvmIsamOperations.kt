@@ -1,6 +1,5 @@
 package borg.trikeshed.isam
 
-import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -42,7 +41,7 @@ private fun transfer(channel: FileChannel, bytes: ByteArray, offset: Long, read:
     }
 }
 
-private fun closeChannels(channels: Collection<FileChannel>, cause: Throwable? = null) {
+internal fun closeChannels(channels: Collection<FileChannel>, cause: Throwable? = null) {
     var failure = cause
     for (channel in channels) try { channel.close() } catch (caught: Throwable) {
         if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
@@ -53,9 +52,11 @@ private fun closeChannels(channels: Collection<FileChannel>, cause: Throwable? =
 class JvmIsamDataReader internal constructor(
     val datafileFilename: String,
     val metafileFilename: String,
-    val metafile: IsamMetaFileReader,
+    metafile: IsamMetaFileReader,
     private val channelFactory: IsamChannelFactory,
 ) : IsamDataReader {
+    val metafile = if (metafile.fileOps == null)
+        IsamMetaFileReader(metafileFilename, IsamFileOperations(channelFactory)) else metafile
     constructor(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader) :
         this(datafileFilename, metafileFilename, metafile, ::openIsamChannel)
 
@@ -145,6 +146,7 @@ class JvmIsamDataReader internal constructor(
 
 class JvmIsamOperations internal constructor(private val channelFactory: IsamChannelFactory) : IsamOperations {
     constructor() : this(::openIsamChannel)
+    private val metadataFiles = IsamFileOperations(channelFactory)
 
     override fun createReader(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader): IsamDataReader =
         JvmIsamDataReader(datafileFilename, metafileFilename, metafile, channelFactory)
@@ -153,7 +155,7 @@ class JvmIsamOperations internal constructor(private val channelFactory: IsamCha
         require(cursor.size > 0) { "ISAM write needs at least one row to establish its schema" }
         val first = cursor[0]
         val metadata = IsamMetaFileReader.write("$datafilename.meta", rowMetadata(first), varChars,
-            useMonocursorGroupings = useMonocursorGroupings)
+            fileOps = metadataFiles, useMonocursorGroupings = useMonocursorGroupings)
         writeRows(cursor.view, datafilename, metadata, append = false, create = true)
     }
 
@@ -163,9 +165,9 @@ class JvmIsamOperations internal constructor(private val channelFactory: IsamCha
         if (!source.hasNext()) return
         val first = source.next().let { transform?.invoke(it) ?: it }
         val metafilename = "$datafilename.meta"
-        val exists = Files.exists(metafilename)
+        val exists = metadataFiles.exists(metafilename)
         val metadata = if (exists) {
-            val reader = IsamMetaFileReader(metafilename)
+            val reader = IsamMetaFileReader(metafilename, metadataFiles)
             try {
                 reader.open()
                 reader.constraints.also {
@@ -174,7 +176,7 @@ class JvmIsamOperations internal constructor(private val channelFactory: IsamCha
                 }
             } finally { reader.close() }
         } else IsamMetaFileReader.write(metafilename, rowMetadata(first), varChars,
-            useMonocursorGroupings = useMonocursorGroupings)
+            fileOps = metadataFiles, useMonocursorGroupings = useMonocursorGroupings)
         val rows = sequence {
             yield(first)
             while (source.hasNext()) yield(source.next().let { transform?.invoke(it) ?: it })

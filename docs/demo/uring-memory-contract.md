@@ -50,7 +50,7 @@ are separate from this hint.
 
 ## Version and platform boundaries
 
-The JNI build uses checksum-pinned **liburing 2.15**, with JNI ABI 2. A supplied
+The JNI build uses checksum-pinned **liburing 2.15**, with JNI ABI 3. This adds descriptor STATX with the userspace 24-byte metadata result; older JNI modules are rejected before selection. A supplied
 `LIBURING_PREFIX` must provide 2.15 or later. `bin/build-jvm-uring.sh` builds on
 Linux and fetches the pinned dependency when no prefix is supplied.
 

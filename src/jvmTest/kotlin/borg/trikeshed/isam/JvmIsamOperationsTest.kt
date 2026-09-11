@@ -18,6 +18,7 @@ import borg.trikeshed.userspace.UserspaceChannelBackend
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
+import borg.trikeshed.userspace.nio.UringIOException
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.file.File
@@ -69,7 +70,12 @@ class JvmIsamOperationsTest {
 
         fun assertClosed() {
             assertEquals(1, closes, "Facade backend closes exactly once")
-            assertFailsWith<IllegalStateException> { io.submitBatch(emptyList()) }
+            val closedToken = Long.MIN_VALUE + 1
+            assertEquals(
+                SelectionResult(-9, closedToken),
+                io.submitBatch(listOf(UringSubmission(UringOp.NOP, -1, 0, 0, 0, userData = closedToken))).single(),
+                "A real request to the closed backend must return EBADF",
+            )
             val observer = openUserspaceChannelBackend(4)
             try {
                 files.forEach { file ->
@@ -86,11 +92,17 @@ class JvmIsamOperationsTest {
 
     private class Channels(val configure: (Backend, Int) -> Unit = { _, _ -> }) {
         val backends = mutableListOf<Backend>()
+        val dataBackends = mutableListOf<Backend>()
+        val metadataBackends = mutableListOf<Backend>()
 
         fun open(path: String, options: Set<OpenOption>): FileChannel = FileChannel.open(path, options) {
             val backend = Backend().also { backends += it }
             try {
-                configure(backend, backends.lastIndex)
+                if (path.endsWith(".meta")) metadataBackends += backend
+                else {
+                    dataBackends += backend
+                    configure(backend, dataBackends.lastIndex)
+                }
                 UringChannel(FunctionalUringFacade(32, backend))
             } catch (failure: Throwable) {
                 backend.close()
@@ -142,7 +154,9 @@ class JvmIsamOperationsTest {
             assertFails { source.readRow(2) }
         } finally { source.close(); source.close() }
         channels.assertClosed()
-        assertTrue(channels.backends.take(2).all { UringOp.FSYNC in it.operations })
+        assertTrue(channels.dataBackends.take(2).all { UringOp.FSYNC in it.operations })
+        assertTrue(channels.metadataBackends.any { UringOp.WRITE in it.operations && UringOp.FSYNC in it.operations })
+        assertTrue(channels.metadataBackends.any { UringOp.STATX in it.operations && UringOp.READ in it.operations })
     }
 
     @Test
@@ -195,7 +209,7 @@ class JvmIsamOperationsTest {
         assertEquals(1, failure.suppressedExceptions.size)
         assertEquals(0L, Files.size(Path.of(path)))
         assertEquals(0L, Files.size(directory.resolve("rows.IoByte.bin")))
-        assertEquals(2, channels.backends.size)
+        assertEquals(2, channels.dataBackends.size)
         channels.assertClosed()
     }
 
@@ -221,6 +235,23 @@ class JvmIsamOperationsTest {
     }
 
     @Test
+    fun metadata_missing_and_failed_open_preserve_distinct_completion_results() = inDirectory { directory ->
+        val missing = directory.resolve("missing.meta").toString()
+        val channels = Channels()
+        assertFalse(IsamFileOperations(channels::open).exists(missing))
+        channels.assertClosed()
+
+        val backend = Backend().apply { failure = UringOp.OPENAT }
+        val metadata = IsamFileOperations { path, options ->
+            FileChannel.open(path, options) { UringChannel(FunctionalUringFacade(32, backend)) }
+        }
+        val rejected = assertFailsWith<UringIOException> { metadata.exists(missing) }
+        assertEquals(UringOp.OPENAT, rejected.operation)
+        assertEquals(-5, rejected.result)
+        backend.assertClosed()
+    }
+
+    @Test
     fun open_failure_and_malformed_completions_close_owned_resources() = inDirectory { directory ->
         val path = directory.resolve("rows.bin").toString()
         JvmIsamOperations().write(cursor(1 to 2), path, emptyMap(), true)
@@ -228,7 +259,8 @@ class JvmIsamOperationsTest {
         assertFailsWith<IOException> { reader(JvmIsamOperations(failedOpen::open), path).open() }
         failedOpen.assertClosed()
         val malformedOpen = Channels { backend, _ -> backend.corruptToken = UringOp.OPENAT }
-        assertFailsWith<IOException> { reader(JvmIsamOperations(malformedOpen::open), path).open() }
+        val malformed = assertFailsWith<IllegalStateException> { reader(JvmIsamOperations(malformedOpen::open), path).open() }
+        assertTrue(malformed.message.orEmpty().startsWith("Unknown or duplicate completion:"))
         malformedOpen.assertClosed()
         for (result in arrayOf(0, 99, 1)) {
             val channels = Channels { backend, _ -> backend.failure = UringOp.READ; backend.invalidResult = result }

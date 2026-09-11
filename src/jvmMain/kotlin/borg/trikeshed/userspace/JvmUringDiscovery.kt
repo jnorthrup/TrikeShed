@@ -31,8 +31,8 @@ fun discoverJvmUringBackend(entries: Int): UringBackendDiscovery {
         }
         phase = UringProbePhase.LOAD
         System.load(candidate.toString())
-        if (JvmUring.abiVersion() != 2)
-            return unavailable(UringProbeState.ABI_MISMATCH, "JNI bridge protocol must be version 2", module, phase)
+        if (JvmUring.abiVersion() != 3)
+            return unavailable(UringProbeState.ABI_MISMATCH, "JNI bridge protocol must be version 3 (descriptor STATX)", module, phase)
         phase = UringProbePhase.SETUP
         val handle = JvmUring.open(entries)
         if (handle <= 0L) {

@@ -39,7 +39,7 @@ contract; no alternate application file API is introduced here.
 JVM checks `-Dtrikeshed.uring.library=/absolute/path/libtrikeshed_uring.so`, or
 searches `java.library.path` for the mapped `trikeshed_uring` library name. It
 checks ELF magic, class, byte order and machine before `System.load`, then calls
-the repository JNI binding's `abiVersion()` (protocol 1). The runtime loader
+the repository JNI binding's `abiVersion()` (protocol 3). The runtime loader
 checks JNI/linker compatibility, including missing dependencies. CPU architecture
 matching alone cannot establish libc or JNI linkage compatibility. Ring setup
 returns either an owned handle or negative errno; the existing binding performs

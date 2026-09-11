@@ -4,6 +4,8 @@ package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
+import borg.trikeshed.userspace.nio.UringIOException
+import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.file.Path
 import borg.trikeshed.userspace.nio.file.OpenOption
@@ -76,7 +78,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
                 channel.submit()
                 val completion = channel.wait(1).singleOrNull()
                 if (completion == null || completion.userData != submission.userData) throw IOException("Invalid OPENAT completion: $path")
-                if (completion.res < 0) throw IOException("OPENAT failed: ${completion.res}: $path")
+                if (completion.res < 0) throw UringIOException(UringOp.OPENAT, completion.res, path)
                 val file = File.fromFd(completion.res)
                 if (!file.isOpen()) throw IOException("OPENAT returned a closed descriptor: ${completion.res}")
                 return UringFileChannel(file, channel, readable = !write || StandardOpenOption.READ in options, writable = write)

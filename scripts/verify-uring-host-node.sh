@@ -54,6 +54,10 @@ COMMON_SOURCES=(
   src/commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/UringOp.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/Liburing.kt
+  src/commonMain/kotlin/borg/trikeshed/userspace/LiburingSession.kt
+  src/commonMain/kotlin/borg/trikeshed/userspace/EmulatedRing.kt
+  src/commonMain/kotlin/borg/trikeshed/userspace/MemoryMapping.kt
+  src/commonMain/kotlin/borg/trikeshed/lib/Closeable.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/FanoutEvent.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/containment/ContainmentPolicy.kt
   src/commonMain/kotlin/borg/trikeshed/userspace/containment/SyscallGuard.kt
@@ -75,6 +79,7 @@ JS_SOURCES=(
   src/jsMain/kotlin/borg/trikeshed/lib/JsNode.kt
   src/jsMain/kotlin/borg/trikeshed/userspace/UserspaceIO.js.kt
   src/jsMain/kotlin/borg/trikeshed/userspace/Liburing.js.kt
+  src/jsMain/kotlin/borg/trikeshed/userspace/MemoryMapping.js.kt
   src/jsMain/kotlin/borg/trikeshed/userspace/nio/platform/spi/PlatformEndianness.js.kt
   src/jsMain/kotlin/borg/trikeshed/userspace/NodeUringDiscovery.kt
   src/jsMain/kotlin/borg/trikeshed/userspace/nio/spi/NioCapabilityProbe.js.kt

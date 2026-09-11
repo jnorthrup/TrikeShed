@@ -21,6 +21,42 @@ import kotlin.test.assertFails
 
 class UringConformanceTest {
     @Test
+    fun statx_preserves_slice_bounds_and_rejects_invalid_buffers() = runBlocking {
+        val path = Files.createTempFile("trikeshed-statx-", ".bin")
+        Files.write(path, byteArrayOf(2, 3, 5, 7))
+        val backend = openUserspaceChannelBackend(8)
+        val facade = FunctionalUringFacade(8, backend)
+        val fd = UringFileConformance.one(facade, Submissions.openat(path.toString(), 0, 81)).res
+        assertTrue(fd >= 0)
+        try {
+            val storage = ByteArray(32) { 99 }
+            val buffer = ByteBuffer(storage).slice(2, 30).position(1)
+            val request = UringOp.Companion.UringSubmission(UringOp.STATX, fd, 0, 24, 0,
+                userData = 82, buffer = buffer)
+            assertEquals(24, UringFileConformance.one(facade, request).res)
+            assertEquals(25, buffer.position())
+            assertEquals(4L, buffer.order(borg.trikeshed.userspace.nio.ByteOrder.LITTLE_ENDIAN).getLong(1))
+            assertTrue(storage.take(3).all { it == 99.toByte() })
+            assertTrue(storage.drop(27).all { it == 99.toByte() })
+            val short = ByteBuffer(23)
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = short, userData = 83)).res)
+            assertEquals(0, short.position())
+            val readOnly = ByteBuffer(24).asReadOnlyBuffer()
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = readOnly, userData = 84)).res)
+            assertEquals(0, readOnly.position())
+            val invalid = ByteBuffer(24)
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = invalid, offset = 1, userData = 86)).res)
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = invalid, addr = 1, userData = 87)).res)
+            assertEquals(0, invalid.position())
+        } finally {
+            try { UringFileConformance.one(facade, Submissions.close(fd, 85)) } finally {
+                backend.close()
+                Files.deleteIfExists(path)
+            }
+        }
+    }
+
+    @Test
     fun emulated_disposable_file_contract() = runBlocking {
         val backend = openJvmEmulatedChannelBackend()
         assertEquals(0L, backend.nativeCapabilities)
