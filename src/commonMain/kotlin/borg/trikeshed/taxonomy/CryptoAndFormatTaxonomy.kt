@@ -109,7 +109,7 @@ fun Join.Companion.fromCID(cid: borg.trikeshed.htx.client.ipfs.CID): ContentAddr
 }
 
 fun Join.Companion.fromInfoHash(infoHash: borg.trikeshed.torrent.InfoHash): ContentAddressable {
-    return ContentAddressable(HashAlgorithm.SHA256, HashHex(infoHash.hex()))
+    return ContentAddressable(if (infoHash.isV2) HashAlgorithm.SHA256 else HashAlgorithm.SHA1, HashHex(infoHash.hex()))
 }
 
 // ============================================================================
@@ -182,4 +182,3 @@ sealed class SerializationFormat(val mimeLabel: String, val isCanonical: Boolean
 typealias SerializedBytes = Join<SerializationFormat, ByteArray>
 
 typealias CanonicalDocument = Join<ContentAddressable, SerializedBytes>
-
