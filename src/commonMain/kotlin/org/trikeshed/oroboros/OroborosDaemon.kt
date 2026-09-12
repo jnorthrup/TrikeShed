@@ -281,33 +281,6 @@ object OroborosDaemon {
         }
     }
 
-    private suspend fun lcncStores(
-        moduleContext: borg.trikeshed.module.ModuleContext,
-        promptStore: borg.trikeshed.lcnc.PromptStore,
-        snapshotService: borg.trikeshed.forge.server.WorkspaceSnapshotService,
-        projectCorpus: borg.trikeshed.forge.server.JvmProjectCorpus,
-    ) {
-        // Stored prompts: prompt.get / prompt.render / prompt.list over the store, prompt.save the
-        // one write; then the ledger thaws and the seeds install where no head exists.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
-        promptStore.register(moduleContext)
-        snapshotService.register(moduleContext)
-        HostSystem.err("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
-        promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
-            HostSystem.err("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
-        }
-        // (the program ledger thaws far below, after the LAST runner registration — see there)
-        // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
-        // project.docs / project.read / project.extract over the mounted project databases.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
-        // Pure/presentation node runners: canvas-authored programs (preset-kanban)
-        // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { HostSystem.currentTimeMillis() })
-        // Phase-1 twin removal: `pick` is not a Kotlin lambda. Its existing
-        // panels.html RUNNERS method executes in one HostAccess.NONE GraalJS
-        // context per invocation; registry() loads that resource on IO.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.CanvasJsPureNodes.registry())
-    }
 
     private fun healthSocket(ops: ChannelOperations, healthSock: File): Int {
         // Bind with retry: a prior daemon may have left a stale socket file
@@ -1426,7 +1399,7 @@ object OroborosDaemon {
             enabledBy = if ("--agents" in args) "--agents" else if (HostSystem.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
         )
         HostSystem.err("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
-        lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
+        borg.trikeshed.lcnc.OroborosLcncWiring.lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
         // selection:null. Hermes' own state.db answers "what actually replied",
@@ -2515,12 +2488,12 @@ object OroborosDaemon {
 
         // Wake the daemon without cancelling resource owners: their close paths
         // must drain admitted work before the daemon supervisor is cancelled.
-        val sigHandler = SignalHandler {
+        val sigHandler = {
             isRunning = false
             reactiveJob.cancel()
         }
-        Signal.handle(Signal("TERM"), sigHandler)
-        Signal.handle(Signal("INT"), sigHandler)
+        borg.trikeshed.platform.PosixSignals.handle("TERM", sigHandler)
+        borg.trikeshed.platform.PosixSignals.handle("INT", sigHandler)
 
         HostSystem.err(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
