@@ -25,7 +25,7 @@ import kotlin.coroutines.EmptyCoroutineContext
  *       return handle.downloadAll()  // downloads all pieces
  *   }
  */
-class TorrentElement(
+class TorrentEngineElement(
     private val blockStore: BlockStore = MemoryBlockStore(),
     private val downloadDir: String? = null,
     parentJob: Job? = null,
@@ -181,4 +181,23 @@ suspend fun TorrentHandle.downloadAll(): ByteArray {
         buf.write(piece)
     }
     return buf.toByteArray()
+}
+
+
+/**
+ * JVM actual of the daemon-facing torrent contract: delegates to the
+ * engine-backed element. The engine (piece wire, trackers, uTP) is the
+ * JVM mechanism; this class is what common code names.
+ */
+actual class TorrentElement actual constructor(
+    parentJob: Job?,
+    reactorContext: CoroutineContext,
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    private val delegate = TorrentEngineElement(
+        parentJob = parentJob,
+        reactorContext = reactorContext,
+    )
+    actual override val key: CoroutineContext.Key<*> get() = delegate.key
+    actual override suspend fun open() = delegate.open()
+    actual override suspend fun close() = delegate.close()
 }
