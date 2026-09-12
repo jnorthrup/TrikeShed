@@ -37,7 +37,7 @@ internal fun jvmNativeChannelBackend(handle: Long): UserspaceChannelBackend = Jv
 /** Native and POSIX-emulated primitives use the same OS descriptors in the JNI bridge. */
 private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChannelBackend {
     override val capabilities: Long get() = jvmUringOperations
-    override val deferredCapabilities: Long get() = UringOp.POLL_ADD.mask
+    override val deferredCapabilities: Long get() = legacy.deferredCapabilities
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
         if (capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
             mask or op.mask else mask
@@ -118,7 +118,7 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
         submissions.flatMap { sub ->
-            if (sub.opcode == UringOp.POLL_ADD && handle != 0L) legacy.submitBatch(listOf(sub))
+            if ((sub.opcode == UringOp.POLL_ADD || sub.opcode == UringOp.CONNECT) && handle != 0L) legacy.submitBatch(listOf(sub))
             else listOf(SelectionResult(execute(sub), sub.userData))
         }
 

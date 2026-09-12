@@ -435,9 +435,6 @@ val buildLiburing = tasks.register<Exec>("buildLiburing") {
 
 kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     if (name == "linuxX64" || name == "linuxArm64") {
-        providers.gradleProperty("uringKonanProperties").orNull?.let { properties ->
-            compilerOptions.freeCompilerArgs.add("-Xoverride-konan-properties=$properties")
-        }
         binaries.executable("uringBenchmark") {
             entryPoint = "borg.trikeshed.userspace.benchmark.uringBenchmarkMain"
         }
@@ -450,9 +447,6 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
                 "-I${project.rootDir}/src/linuxMain/resources/io_uring_interop",
             )
             extraOpts("-libraryPath", liburingBuild.get().dir("src").asFile.absolutePath)
-            providers.gradleProperty("uringKonanProperties").orNull?.let { properties ->
-                extraOpts("-Xoverride-konan-properties", properties)
-            }
             tasks.named(interopProcessingTaskName).configure { dependsOn(buildLiburing) }
         }
     }

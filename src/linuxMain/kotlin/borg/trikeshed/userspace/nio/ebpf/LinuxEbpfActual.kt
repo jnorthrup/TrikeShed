@@ -1,7 +1,6 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
 package borg.trikeshed.userspace.nio.ebpf
 
-import kotlin.native.concurrent.ThreadLocal
 import kotlinx.cinterop.*
 import platform.posix.*
 import platform.linux.*
@@ -23,7 +22,6 @@ private fun bpf(cmd: Int, attr: CValuesRef<ByteVar>?, size: Int): Int {
  * by passing the code to the actual bpf(2) syscall rather than stubbing an insecure
  * mmap PROT_EXEC region.
  */
-@ThreadLocal
 actual fun runNative(code: ByteArray, args: LongArray): Long {
     memScoped {
         val attrSize = 144

@@ -151,9 +151,10 @@ internal class JvmUserspaceChannelBackend(
     override val availability: String = "emulated: JVM file and POSIX socket effects; kernel ring not selected",
 ) : UserspaceChannelBackend {
     override val capabilities: Long get() = jvmUringOperations
-    override val deferredCapabilities: Long get() = UringOp.POLL_ADD.mask
+    override val deferredCapabilities: Long get() = UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT)
     private val owned = mutableSetOf<Int>()
-    private val watches = LinkedHashMap<Long, Pair<JvmDescriptor, Int>>()
+    private data class Watch(val descriptor: JvmDescriptor, val mask: Int, val opcode: UringOp)
+    private val watches = LinkedHashMap<Long, Watch>()
     private val completions = ArrayDeque<SelectionResult>()
     private var closed = false
     private var draining = false
@@ -161,7 +162,11 @@ internal class JvmUserspaceChannelBackend(
     @Synchronized
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
         submissions.mapNotNull { sub ->
-            val result = if (sub.opcode == UringOp.POLL_ADD) pollAdd(sub) else execute(sub)
+            val result = when (sub.opcode) {
+                UringOp.POLL_ADD -> pollAdd(sub)
+                UringOp.CONNECT -> connect(sub)
+                else -> execute(sub)
+            }
             result?.let { SelectionResult(it, sub.userData) }
         }
 
@@ -172,8 +177,25 @@ internal class JvmUserspaceChannelBackend(
         val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
         if (!descriptor.isOpen()) return -9
         if (sub.userData in watches) return -17
-        watches[sub.userData] = descriptor to sub.operationFlags
+        watches[sub.userData] = Watch(descriptor, sub.operationFlags, UringOp.POLL_ADD)
         return null
+    }
+
+    private fun connect(sub: UringSubmission): Int? {
+        if (closed) return -9
+        if (draining) return -125
+        if (sub.flags != 0 || sub.operationFlags != 0) return -95
+        val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
+        if (descriptor !is JvmSocketDescriptor) return -88
+        if (sub.userData in watches) return -17
+        return synchronized(descriptor) {
+            if (!descriptor.isOpen()) return -9
+            val result = JvmSocketSyscalls.connectStart(descriptor.fd, sub.buffer, sub.len)
+            if (result != -115) result else {
+                watches[sub.userData] = Watch(descriptor, 4, UringOp.CONNECT)
+                null
+            }
+        }
     }
 
     override fun reapCompletions(minComplete: Int): List<SelectionResult> {
@@ -187,13 +209,13 @@ internal class JvmUserspaceChannelBackend(
             if (snapshot.isEmpty()) return results
             val immediate = snapshot.map { (_, watch) ->
                 when {
-                    !watch.first.isOpen() -> -9
-                    watch.first is JvmChannelDescriptor -> watch.second and (1 or 4)
+                    !watch.descriptor.isOpen() -> -9
+                    watch.descriptor is JvmChannelDescriptor -> watch.mask and (1 or 4)
                     else -> 0
                 }
             }
             val fds = IntArray(snapshot.size) { index ->
-                val descriptor = snapshot[index].second.first
+                val descriptor = snapshot[index].second.descriptor
                 when {
                     !descriptor.isOpen() -> -1
                     descriptor is JvmSocketDescriptor -> descriptor.fd
@@ -201,15 +223,22 @@ internal class JvmUserspaceChannelBackend(
                     else -> -1
                 }
             }
-            val masks = IntArray(snapshot.size) { snapshot[it].second.second }
+            val masks = IntArray(snapshot.size) { snapshot[it].second.mask }
             // Bound monitor ownership so cancelPending can quiesce a synchronous wait.
             val timeout = if (results.size < minComplete && immediate.none { it != 0 }) 10 else 0
             val (status, ready) = JvmSocketSyscalls.poll(fds, masks, timeout)
             for (index in snapshot.indices) {
-                val result = if (immediate[index] != 0) immediate[index]
+                val event = if (immediate[index] != 0) immediate[index]
                     else if (status < 0) status else ready[index]
-                if (result == 0) continue
-                val token = snapshot[index].first
+                if (event == 0 || event == -4) continue
+                val (token, watch) = snapshot[index]
+                val result = if (watch.opcode != UringOp.CONNECT || event < 0) event
+                else synchronized(watch.descriptor) {
+                    val descriptor = watch.descriptor as JvmSocketDescriptor
+                    if (!descriptor.isOpen() || event and 32 != 0) -9
+                    else JvmSocketSyscalls.connectFinish(descriptor.fd)
+                }
+                if (watch.opcode == UringOp.CONNECT && (result == -115 || result == -114)) continue
                 watches.remove(token)
                 results.add(SelectionResult(result, token))
             }
@@ -222,6 +251,8 @@ internal class JvmUserspaceChannelBackend(
     @Synchronized
     override fun cancelPending() {
         draining = true
+        // Cancel observation, retaining socket identity until CLOSE/backend close. The peer may
+        // already have accepted the connection; no backend effect can still access the sockaddr.
         for (token in watches.keys) completions.addLast(SelectionResult(-125, token))
         watches.clear()
     }
@@ -243,6 +274,7 @@ internal class JvmUserspaceChannelBackend(
                     fd
                 }
                 UringOp.POLL_REMOVE -> {
+                    if (watches[sub.addr]?.opcode != UringOp.POLL_ADD) return -2
                     if (watches.remove(sub.addr) == null) return -2
                     completions.addLast(SelectionResult(-125, sub.addr))
                     0
@@ -316,7 +348,6 @@ internal class JvmUserspaceChannelBackend(
         }
         UringOp.BIND -> JvmSocketSyscalls.bind(fd, sub.buffer, sub.len)
         UringOp.LISTEN -> JvmSocketSyscalls.listen(fd, sub.len)
-        UringOp.CONNECT -> JvmSocketSyscalls.connect(fd, sub.buffer, sub.len)
         UringOp.SHUTDOWN -> JvmSocketSyscalls.shutdown(fd, sub.len)
         UringOp.ACCEPT -> {
             val accepted = JvmSocketSyscalls.accept(fd)

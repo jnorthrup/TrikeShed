@@ -316,7 +316,7 @@ class FunctionalUringFacadeLifecycleTest {
                 override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = error("unexpected submission")
                 override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = error("unexpected submission")
                 override fun close() {
-                    if (failClose) { failClose = false; error("resource release is temporarily unavailable") }
+                    if (failClose) error("resource release is temporarily unavailable")
                     resource.close()
                 }
             }
@@ -326,9 +326,11 @@ class FunctionalUringFacadeLifecycleTest {
                 assertTrue(resource.isOpen)
                 resource[0] = 27
                 assertEquals(27.toByte(), resource[0])
+                failClose = false
                 facade.drain()
                 assertFalse(resource.isOpen, "retry must release the actual backend resource; scoped=$scoped")
             } finally {
+                failClose = false
                 try { runCatching { facade.drain() } } finally { resource.close() }
             }
         }

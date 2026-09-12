@@ -95,7 +95,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
             retained.remove(pinned)
             pinned.unpin()
         }
-        return terminal
+        return checkNotNull(terminal)
     }
 
     actual fun registerBuffers(buffers: borg.trikeshed.lib.Series<MemoryMapping>): Result<Unit> =
@@ -103,7 +103,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
 
     actual fun fadvise(fd: Int, offset: Long, length: Int, advice: Int): Int =
         if (offset < 0 || length < 0 || advice !in 0..5) -22
-        else -zlinux_uring.posix_fadvise(fd, offset, length.toLong(), advice)
+        else -platform.posix.posix_fadvise(fd, offset, length.toLong(), advice)
 
     actual fun unregisterBuffers(): Result<Unit> = ring.unregisterBuffers()
 
