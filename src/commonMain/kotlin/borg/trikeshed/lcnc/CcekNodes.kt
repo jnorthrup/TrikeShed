@@ -576,7 +576,16 @@ object CcekNodes {
         else -> emptyMap()
     }
     private fun rows(value: Any?): List<Map<String, Any?>> = when (value) {
-        is List<*> -> value.filterIsInstance<Map<*, *>>().map { m -> m.entries.associate { (k, v) -> k.toString() to v } }
+        is List<*> -> {
+            // Bolt: Avoid filterIsInstance for Collection Performance
+            val list = ArrayList<Map<String, Any?>>()
+            for (m in value) {
+                if (m is Map<*, *>) {
+                    list.add(m.entries.associate { (k, v) -> k.toString() to v })
+                }
+            }
+            list
+        }
         is String -> if (value.isBlank()) emptyList() else rows(JsonSupport.parse(value))
         else -> emptyList()
     }
