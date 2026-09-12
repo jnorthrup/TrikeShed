@@ -100,7 +100,9 @@ object UringLegos {
                     "res" to linkedMapOf("opcode" to "READ", "res" to cqe.res, "offset" to offset),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                }
             }
         }
     }
@@ -128,7 +130,9 @@ object UringLegos {
                     "res" to linkedMapOf("opcode" to "WRITE", "res" to cqe.res, "offset" to offset),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                }
             }
         }
     }
@@ -147,7 +151,9 @@ object UringLegos {
                     "res" to linkedMapOf("opcode" to "FSYNC", "res" to cqe.res),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
+                }
             }
         }
     }
