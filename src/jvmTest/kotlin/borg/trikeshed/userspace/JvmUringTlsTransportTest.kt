@@ -11,6 +11,7 @@ import borg.trikeshed.reactor.JvmTlsCodecBackendTest
 import borg.trikeshed.reactor.TlsApplicationProtocol
 import borg.trikeshed.reactor.TlsConfig
 import borg.trikeshed.reactor.TlsConnectionState
+import borg.trikeshed.reactor.TlsElement
 import borg.trikeshed.reactor.TlsEndpoint
 import borg.trikeshed.reactor.TlsFlowStage
 import borg.trikeshed.reactor.TlsFrames
@@ -40,12 +41,12 @@ import kotlin.test.assertTrue
 @Timeout(30)
 class JvmUringTlsTransportTest {
     @Test
-    fun tls13SocketHandshakePayloadAndCloseNotify() = runBlocking {
+    fun tls13SocketHandshakePayloadAndServerReceivesCloseNotify() = runBlocking {
         exchange(TlsProtocol.TLS13)
     }
 
     @Test
-    fun tls12SocketHandshakePayloadAndCloseNotify() = runBlocking {
+    fun tls12SocketHandshakePayloadAndServerReceivesCloseNotify() = runBlocking {
         exchange(TlsProtocol.TLS12)
     }
 
@@ -69,9 +70,9 @@ class JvmUringTlsTransportTest {
         val directory = Files.createTempDirectory("uring-tls-")
         val certificate = directory.resolve("certificate.pem")
         val key = directory.resolve("key.pem")
-        Files.writeString(certificate, JvmTlsCodecBackendTest.TEST_CERTIFICATE_PEM)
-        Files.writeString(key, JvmTlsCodecBackendTest.TEST_PRIVATE_KEY_PEM)
-        val ring = FunctionalUringFacade.create(this, 16)
+        var ring: FunctionalUringFacade? = null
+        var clientElement: TlsElement? = null
+        var serverElement: TlsElement? = null
         val descriptors = mutableListOf<Int>()
         var token = 0L
         var admitted = 0L
@@ -80,27 +81,30 @@ class JvmUringTlsTransportTest {
             val id = ++token
             val sqe = UringSubmission(op, fd, 0, len, offset, userData = id, buffer = bytes)
             admitted++
-            val result = ring.batchEnqueue(1 j { sqe })
+            val result = requireNotNull(ring).batchEnqueue(1 j { sqe })
             assertEquals(1, result.size)
             assertEquals(id, result[0].userData)
             settled++
             return result[0].res
         }
         suspend fun socket(): Int = submit(UringOp.SOCKET, 2, len = 6, offset = 1).also {
-            assertTrue(it >= 0, "SOCKET failed: $it; ${ring.availability}")
+            assertTrue(it >= 0, "SOCKET failed: $it; ${ring?.availability}")
             descriptors.add(it)
         }
-        val clientElement = openTlsElement(
-            TlsConfig(trustStore = certificate.toString().takeIf { trustCertificate }, protocols = s_[protocol],
-                alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1], hostnameVerification = true),
-            JvmTlsCodecBackend(), parentJob = coroutineContext[Job],
-        )
-        val serverElement = openTlsElement(
-            TlsConfig(certificateFile = certificate.toString(), privateKeyFile = key.toString(), protocols = s_[protocol],
-                alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1]),
-            JvmTlsCodecBackend(), parentJob = coroutineContext[Job],
-        )
         try {
+            Files.writeString(certificate, JvmTlsCodecBackendTest.TEST_CERTIFICATE_PEM)
+            Files.writeString(key, JvmTlsCodecBackendTest.TEST_PRIVATE_KEY_PEM)
+            ring = FunctionalUringFacade.create(this, 16)
+            clientElement = openTlsElement(
+                TlsConfig(trustStore = certificate.toString().takeIf { trustCertificate }, protocols = s_[protocol],
+                    alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1], hostnameVerification = true),
+                JvmTlsCodecBackend(), parentJob = coroutineContext[Job],
+            )
+            serverElement = openTlsElement(
+                TlsConfig(certificateFile = certificate.toString(), privateKeyFile = key.toString(), protocols = s_[protocol],
+                    alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1]),
+                JvmTlsCodecBackend(), parentJob = coroutineContext[Job],
+            )
             withTimeout(20_000) {
                 val address = ByteBuffer(sockaddrIpv4(byteArrayOf(127, 0, 0, 1), port))
                 val listener = socket()
@@ -116,8 +120,8 @@ class JvmUringTlsTransportTest {
                 assertTrue(serverFd >= 0, "ACCEPT failed: $serverFd")
                 descriptors.add(serverFd)
 
-                val client = clientElement.clientEndpoint(peerName, port)
-                val server = serverElement.serverEndpoint("127.0.0.1", port)
+                val client = requireNotNull(clientElement).clientEndpoint(peerName, port)
+                val server = requireNotNull(serverElement).serverEndpoint("127.0.0.1", port)
                 val pending = mutableMapOf(clientFd to 0, serverFd to 0)
                 val plaintext = mutableMapOf(clientFd to mutableListOf<Byte>(), serverFd to mutableListOf<Byte>())
                 suspend fun emit(fd: Int, peer: Int, frames: TlsFrames) {
@@ -176,26 +180,43 @@ class JvmUringTlsTransportTest {
                 while (pending.getValue(serverFd) > 0) receive(serverFd, clientFd, server)
                 assertEquals(TlsConnectionState.CLOSED, server.flowState.lifecycle)
                 emit(serverFd, clientFd, server.close())
-                assertEquals(TlsConnectionState.CLOSED, client.flowState.lifecycle)
+                // Local close ends the client's codec API. Drain the server's response
+                // as ciphertext; only the server authenticates receipt of close_notify.
+                while (pending.getValue(clientFd) > 0) {
+                    val bytes = ByteBuffer(minOf(113, pending.getValue(clientFd)))
+                    val count = submit(UringOp.READ, clientFd, bytes, offset = -1)
+                    if (count == -11) delay(1) else {
+                        assertTrue(count > 0, "Closure ciphertext READ failed: $count")
+                        pending[clientFd] = pending.getValue(clientFd) - count
+                    }
+                }
+                assertTrue(pending.values.all { it == 0 })
+                assertEquals(TlsConnectionState.CLOSED, client.flowState.lifecycle, "Client is locally closed")
             }
         } finally {
             withContext(NonCancellable) {
-                try {
-                    clientElement.drain()
-                    serverElement.drain()
-                    assertEquals(ElementState.CLOSED, clientElement.state)
-                    assertEquals(ElementState.CLOSED, serverElement.state)
-                } finally {
-                    try {
-                        for (fd in descriptors.asReversed()) assertEquals(0, submit(UringOp.CLOSE, fd))
-                    } finally {
-                        ring.drain()
-                        assertEquals(admitted, settled, "Every admitted socket/transport SQE must settle")
-                        Files.deleteIfExists(key)
-                        Files.deleteIfExists(certificate)
-                        Files.deleteIfExists(directory)
+                var cleanupFailure: Throwable? = null
+                suspend fun release(action: suspend () -> Unit) {
+                    try { action() } catch (failure: Throwable) {
+                        if (cleanupFailure == null) cleanupFailure = failure
+                        else requireNotNull(cleanupFailure).addSuppressed(failure)
                     }
                 }
+                clientElement?.let { element -> release {
+                    element.drain()
+                    assertEquals(ElementState.CLOSED, element.state)
+                } }
+                serverElement?.let { element -> release {
+                    element.drain()
+                    assertEquals(ElementState.CLOSED, element.state)
+                } }
+                for (fd in descriptors.asReversed()) release { assertEquals(0, submit(UringOp.CLOSE, fd)) }
+                release { ring?.drain() }
+                release { assertEquals(admitted, settled, "Every admitted socket/transport SQE must settle") }
+                release { Files.deleteIfExists(key) }
+                release { Files.deleteIfExists(certificate) }
+                release { Files.deleteIfExists(directory) }
+                cleanupFailure?.let { throw it }
             }
         }
     }

@@ -42,8 +42,9 @@ Integration branch: `codex/uring-orbstack`. Source and dependencies travel
 through Git over SSH. The liburing source is pinned by
 `src/linuxMain/resources/META-INF/cinterop/liburing.md`. Do not replace this
 checkout with a filesystem copy. Logs and measured results belong in
-`/root/uring-results`; the local integration worktree is
-`/tmp/trikeshed-uring-integration` until merged.
+`/root/uring-results`; the persistent Mac integration worktree is
+`/Users/jim/work/TrikeShed-uring-orbstack`. The original Mac checkout remains
+`/Users/jim/work/TrikeShed`; concurrent daemon-port edits there are preserved.
 
 The container permits io_uring syscalls with `seccomp=unconfined`. Its SSH
 port is bound to loopback. On/off comparisons use
@@ -81,3 +82,68 @@ x86_64 execution in comparative timings.
 Current verification state is recorded in `/root/uring-results/RESUME.md`.
 Unverified compilation or benchmark work remains open; a built C bridge alone
 does not establish that the Kotlin facade target passes.
+
+## Recorded target state — 2026-09-12
+
+The README's updated build section identifies SDK Java `25.0.4.1-graal` and
+Kotlin `2.4.20`. The checked-in Gradle wrapper is `9.6.1`; the separately
+installed `9.7.0` is not the wrapper. The Mac uses that Graal JDK; the supplied
+ARM64 Linux image uses Temurin `25.0.4`. Compare modes within a host/runtime
+before comparing hosts.
+
+At checkpoint `83eb0bdd5`, Linux `buildLiburing buildNodeUring buildJvmUring`
+passes. Full JVM protocol builds fail before test execution on both hosts:
+365 diagnostics in the committed, unfinished common `OroborosDaemon` port.
+Mac and Linux JS compilation fail with 504 diagnostics: 441 in that daemon,
+57 in other common portability work, and 6 in JS file/watcher actuals.
+These are compile failures, not protocol failures or passing tests. No source
+exclusion was added to bypass them, and no facade benchmark has run.
+
+| Surface | Implementation / required evidence |
+|---|---|
+| TCP and Unix sockets | JVM SQEs execute through scoped POSIX FFM; ring tests cover fd identity, readiness, cancellation and drain. Execution blocked by compilation. |
+| TLS 1.2 and 1.3 | JVM SSLEngine codec; ring transport tests cover fragmented records, bidirectional payloads, certificate/hostname rejection and close-notify receipt. Execution blocked by compilation. |
+| TLS on JS and Kotlin/Native | Current provider is `StubTlsCodecBackend`; unsupported, not a pass. |
+| HTTP/1.1 / HTX / Couch | Real transport paths plus a keep-alive fragmented-header regression; execution blocked by compilation. Some fixture servers still use raw JDK sockets. |
+| WebSocket | Handshake/frame tests exist; parser coverage does not establish a live TLS transport. |
+| HTTP/2 | Detection/taxonomy/ALPN coverage; no complete live HTTP/2 transport demonstrated. |
+| HTTP/3 / QUIC | Current session is a simulation; no real QUIC/TLS/QPACK transport demonstrated. |
+| SCTP | In-memory state-machine coverage; kernel wire transport unsupported. |
+| libp2p / IPNS | Real uring/TLS/yamux/DHT dial path; most tests use mocks. Public DHT mutation is not part of local transport validation. |
+| UDP multicast | Existing raw JDK adapter remains outside the ring replacement. |
+
+JVM protocol command, after the common port compiles:
+
+```sh
+TRIKESHED_URING_MODE=emulated ./gradlew jvmTest -PfocusedTransportSlice=true \
+  --tests 'borg.trikeshed.userspace.*' --tests 'borg.trikeshed.reactor.*' \
+  --tests 'borg.trikeshed.htx.*' --tests 'borg.trikeshed.ws.*' \
+  --tests 'borg.trikeshed.sctp.*' --tests 'borg.trikeshed.http3.*' \
+  --tests 'borg.trikeshed.ipns.*' --console=plain
+```
+
+On Linux, repeat with `TRIKESHED_URING_MODE=native` and
+`JAVA_TOOL_OPTIONS=-Dtrikeshed.uring.library=/root/TrikeShed/build/native/jvm/libtrikeshed_uring.so`.
+Run `auto` separately and inspect the probe report. JVM native file opcodes
+use JNI; socket/poll effects still use POSIX FFM and are excluded from
+`nativeCapabilities`. Native-required mode on the Mac must reject the host.
+
+Node bridge ABI verification (independent of Kotlin compilation):
+
+```sh
+TRIKESHED_URING_MODULE="$PWD/build/native/node/trikeshed_uring.node" \
+  node --test src/jsTest/node/uring_node.test.cjs
+```
+
+Shared JVM benchmark, after the full target builds:
+
+```sh
+TRIKESHED_URING_MODE=emulated ./gradlew uringBenchmarkJvm --console=plain \
+  -PuringBenchmarkArgs='/root/uring-results/emulated-new.bin entries=64 batch=8 bytes=4096 warmup=250 iterations=1000'
+```
+
+Repeat native with a distinct new file. Repeat each mode several times in
+alternating order; keep raw JSON and runtime/probe metadata. The JNI and Node
+bridges currently execute one kernel request per bridge call, so batch-size
+results include that crossing cost. Do not infer native kernel batching from
+the common batch admission size.
