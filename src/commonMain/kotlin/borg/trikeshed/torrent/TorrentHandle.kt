@@ -34,12 +34,16 @@ interface TorrentHandle {
     suspend fun remove()
 }
 
-/**
- * SHA-256 based 32-byte info-hash used in BitTorrent v2 (BEP 52).
- */
-data class InfoHash(val bytes: ByteArray) {
-    init { require(bytes.size == 32) { "InfoHash must be exactly 32 bytes (SHA-256)" } }
-    fun hex(): String = bytes.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+/** Full v1 SHA-1 or v2 SHA-256 identity. Only peer/tracker wire identifiers truncate v2. */
+class InfoHash(bytes: ByteArray) {
+    private val digest = bytes.copyOf()
+    init { require(digest.size == 20 || digest.size == 32) { "InfoHash requires SHA-1 (20) or SHA-256 (32) bytes" } }
+    val bytes: ByteArray get() = digest.copyOf()
+    val wireBytes: ByteArray get() = digest.copyOf(20)
+    val isV2: Boolean get() = digest.size == 32
+    fun hex(): String = digest.joinToString("") { it.toUByte().toString(16).padStart(2, '0') }
+    override fun equals(other: Any?): Boolean = other is InfoHash && digest.contentEquals(other.digest)
+    override fun hashCode(): Int = digest.contentHashCode()
     override fun toString(): String = "InfoHash(" + hex() + ")"
 }
 
@@ -48,7 +52,6 @@ data class InfoHash(val bytes: ByteArray) {
  * Bit i == 1 means at least one peer has piece i.
  */
 class BitField(val bits: ByteArray) {
-    init { require(bits.isNotEmpty()) { "BitField requires at least 1 byte" } }
     val size: Int = bits.size * 8
 
     operator fun get(piece: Int): Boolean {
@@ -69,7 +72,8 @@ class BitField(val bits: ByteArray) {
 
     companion object {
         fun empty(numPieces: Int): BitField {
-            return BitField(ByteArray((numPieces + 7) / 8))
+            require(numPieces >= 0) { "Negative piece count" }
+            return BitField(ByteArray(((numPieces.toLong() + 7) / 8).toInt()))
         }
     }
 }
