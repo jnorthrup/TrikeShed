@@ -1061,15 +1061,20 @@ object OroborosDaemon {
                     //    tick so an armed-then-idle corpus still drains.
                     val freshCids = followed?.transcriptCids
                     if (wikiEvery > 0 && freshCids != null && freshCids.size > 0) {
-                        wikiPending = (wikiPending + (0 until freshCids.size).map { i -> freshCids[i].b.value }).take(32)
+                        // Full backlog retained — truncating here silently dropped CID 33+ of a
+                        // large follow, and unchanged sessions never re-report, so the wiki
+                        // stayed stale until restart (curation-uring review, P1).
+                        wikiPending = wikiPending + (0 until freshCids.size).map { i -> freshCids[i].b.value }
                     }
                     val wikiRunner = wikiLane[0]
                     if (wikiEvery > 0 && wikiRunner != null && wikiPending.isNotEmpty()) {
                         wikiBatchesSeen++
                         if (wikiBatchesSeen >= wikiEvery) {
                             wikiBatchesSeen = 0
-                            val cids = wikiPending
-                            wikiPending = emptyList()
+                            // Bounded batch: take from the backlog, retire only what the run
+                            // recorded as applied. A thrown consolidation leaves the batch in
+                            // place for the next tick (curation-uring review, P1).
+                            val cids = wikiPending.take(32)
                             wikiIterationsDone++
                             runCatching {
                                 val wikiNode = borg.trikeshed.lcnc.LcncNode(
@@ -1084,7 +1089,10 @@ object OroborosDaemon {
                                             "refused=${(report?.get("refused") as? List<*>)?.size ?: "-"}",
                                 )
                             }.onFailure {
-                                HostSystem.err("[OROBOROS] Wiki Maintainer failed (non-fatal): ${it.message}")
+                                // The batch returns to the head of the backlog: failed work is
+                                // pending work, not retired work.
+                                wikiPending = cids + wikiPending
+                                HostSystem.err("[OROBOROS] Wiki Maintainer failed (non-fatal, batch requeued): ${it.message}")
                             }
                         }
                     }
