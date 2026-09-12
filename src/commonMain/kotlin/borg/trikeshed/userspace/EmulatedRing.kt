@@ -67,6 +67,24 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     override fun prepConnect(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.CONNECT, fd, addrPtr, addrLen, 0L, 0, userData))
 
+    override fun prepSocket(domain: Int, type: Int, protocol: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.SOCKET, domain, 0L, protocol, type.toLong(), 0, userData))
+
+    override fun prepBind(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.BIND, fd, addrPtr, addrLen, 0L, 0, userData))
+
+    override fun prepListen(fd: Int, backlog: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.LISTEN, fd, 0L, backlog, 0L, 0, userData))
+
+    override fun prepPollAdd(fd: Int, pollMask: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.POLL_ADD, fd, 0L, 0, 0L, userData = userData, operationFlags = pollMask))
+
+    override fun prepPollRemove(targetUserData: Long, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.POLL_REMOVE, -1, targetUserData, 0, 0L, 0, userData))
+
+    override fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.SHUTDOWN, fd, 0L, how, 0L, 0, userData))
+
     override fun prepClose(fd: Int, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.CLOSE, fd, 0L, 0, 0L, 0, userData))
 

@@ -61,6 +61,24 @@ interface LiburingFacade {
     /** io_uring_prep_mkdirat(sqe, dfd, path, mode). */
     fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> = unsupported()
 
+    /** io_uring_prep_socket(sqe, domain, type, protocol, flags). res = new fd. */
+    fun prepSocket(domain: Int, type: Int, protocol: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_bind(sqe, fd, addr, addrlen). res = 0 or -errno. */
+    fun prepBind(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_listen(sqe, fd, backlog). res = 0 or -errno. */
+    fun prepListen(fd: Int, backlog: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_poll_add(sqe, fd, pollMask). The CQE fires on readiness. */
+    fun prepPollAdd(fd: Int, pollMask: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_poll_remove(sqe, targetUserData). Cancels a poll watch. */
+    fun prepPollRemove(targetUserData: Long, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_shutdown(sqe, fd, how). */
+    fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> = unsupported()
+
     /** Kernel registration of native memory, or retained common emulation when unsupported. */
     fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
 

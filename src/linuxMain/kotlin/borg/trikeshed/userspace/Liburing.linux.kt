@@ -129,6 +129,36 @@ internal class LinuxLiburingFacade : LiburingFacade {
             )
         }
 
+    override fun prepSocket(domain: Int, type: Int, protocol: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_socket(sqe, domain, type, protocol, 0u)
+        }
+
+    override fun prepBind(fd: Int, addrPtr: Long, addrLen: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_bind(sqe, fd, addrPtr.toCPointer<ByteVar>()?.reinterpret(), addrLen.toUInt())
+        }
+
+    override fun prepListen(fd: Int, backlog: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_listen(sqe, fd, backlog.toUInt())
+        }
+
+    override fun prepPollAdd(fd: Int, pollMask: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_poll_add(sqe, fd, pollMask.toUInt())
+        }
+
+    override fun prepPollRemove(targetUserData: Long, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_poll_remove(sqe, targetUserData)
+        }
+
+    override fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> =
+        prepare(userData) { sqe ->
+            io_uring_prep_shutdown(sqe, fd, how)
+        }
+
     override fun prepClose(fd: Int, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
             io_uring_prep_close(sqe, fd)
