@@ -1,5 +1,7 @@
 package borg.trikeshed.couch.isam
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
@@ -23,11 +25,15 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
     }
 
     override suspend fun replay(onFrame: suspend (Long, ByteArray) -> Unit): Long {
-        channel.position(0)
+        withContext(Dispatchers.IO) {
+            channel.position(0)
+        }
         var lastValidSequence = 0L
 
         while (true) {
-            val startPos = channel.position()
+            val startPos = withContext(Dispatchers.IO) {
+                channel.position()
+            }
             // Try to read header to know frame size
             val headerBuf = ByteBuffer.allocate(WalFrame.HEADER_SIZE)
             var read = 0
@@ -39,7 +45,9 @@ class JvmDurableAppendLog(private val file: File) : DurableAppendLog {
             if (read < WalFrame.HEADER_SIZE) {
                 // Incomplete header, stop replay
                 // Truncate partial frame to maintain integrity
-                channel.truncate(startPos)
+                withContext(Dispatchers.IO) {
+                    channel.truncate(startPos)
+                }
                 break
             }
 

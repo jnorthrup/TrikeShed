@@ -6,23 +6,18 @@ import kotlin.coroutines.CoroutineContext
 /**
  * Platform channel/socket factory — replaces [borg.trikeshed.userspace.nio.channels.UringChannels] + ChannelImpl expect.
  *
- * io_uring submission/completion ring abstraction: prepare operations, submit batch, wait for completions.
+ * io_uring submission/completion ring abstraction. The socket lifecycle is
+ * submission-only: every operation prepares an SQE on a [ChannelHandle] and
+ * reports through its CQE — `IORING_OP_SOCKET` (res = fd), `IORING_OP_BIND` /
+ * `IORING_OP_LISTEN` / `IORING_OP_CONNECT` (res = 0 or -errno), `IORING_OP_ACCEPT`
+ * (res = fd), `IORING_OP_CLOSE` (res = 0). No synchronous network syscall lives
+ * in this interface; the backend executes the ring.
  */
 interface ChannelOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ChannelOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
     fun openChannel(entries: Int = 256): ChannelHandle
-    fun socket(domain: Int, type: Int, protocol: Int): Int
-
-    /** Bind socket to address/port. Returns 0 on success, negative on error. */
-    fun bind(fd: Int, port: Int): Int
-    /** Listen for incoming connections. Returns 0 on success. */
-    fun listen(fd: Int, backlog: Int = 128): Int
-    /** Accept an incoming connection. Returns new fd, or -1 if none pending. */
-    fun accept(fd: Int): Int
-    /** Connect to remote host:port. Returns 0 on success, negative on error. */
-    fun connect(fd: Int, host: String, port: Int): Int
 
     interface ChannelHandle {
         val id: Int
@@ -34,8 +29,18 @@ interface ChannelOperations : CoroutineContext.Element {
         fun readv(fd: Int, buffer: ByteBuffer, userData: Long = 0L): Int = -1
         /** Async socket write — queues an SQE; userData echoed back in ChannelResult. */
         fun writev(fd: Int, buffer: ByteBuffer, userData: Long = 0L): Int = -1
-        /** Async accept on a listening fd — queues an accept SQE. */
+        /** IORING_OP_ACCEPT — queues an accept SQE; CQE res = new fd or -errno. */
         fun prepAccept(serverFd: Int, userData: Long = 0L): Int = -1
+        /** IORING_OP_SOCKET — queues a socket-creation SQE; CQE res = new fd or -errno. */
+        fun prepSocket(domain: Int, type: Int, protocol: Int, userData: Long = 0L): Int = -1
+        /** IORING_OP_BIND — queues a bind SQE; [address] is the encoded sockaddr; CQE res = 0 or -errno. */
+        fun prepBind(fd: Int, address: ByteBuffer, userData: Long = 0L): Int = -1
+        /** IORING_OP_LISTEN — queues a listen SQE; CQE res = 0 or -errno. */
+        fun prepListen(fd: Int, backlog: Int = 128, userData: Long = 0L): Int = -1
+        /** IORING_OP_CONNECT — queues a connect SQE; [address] is the encoded sockaddr; CQE res = 0 or -errno. */
+        fun prepConnect(fd: Int, address: ByteBuffer, userData: Long = 0L): Int = -1
+        /** IORING_OP_CLOSE — queues a close SQE; CQE res = 0 or -errno. */
+        fun prepClose(fd: Int, userData: Long = 0L): Int = -1
         /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
         fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
         /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
@@ -45,9 +50,6 @@ interface ChannelOperations : CoroutineContext.Element {
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }
-
-    /** Close a file/socket descriptor. Returns 0 on success, negative on error. */
-    fun close(fd: Int): Int
 }
 
 data class ChannelResult(val fd: Int, val res: Int, val userData: Long)

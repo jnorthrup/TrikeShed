@@ -74,6 +74,9 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     WAITID(50, "waitid — wait for process state change"),
     FUTEX_WAIT(51, "futex wait"),
     FUTEX_WAKE(52, "futex wake"),
+    SYNC_FILE_RANGE(8, "sync_file_range — flush page cache / writeback"),
+    BIND(56, "bind — bind socket to address (sockaddr; sockaddr_un for UNIX)"),
+    LISTEN(57, "listen — mark socket passive"),
     ;
 
     override val mask: Long get() = 1L shl ordinal

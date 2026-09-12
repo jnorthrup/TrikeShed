@@ -1441,7 +1441,9 @@ tasks.register<JavaExec>("queueGraphWork") {
 tasks.register("commonMainPurity") {
     group = "verification"
     description = "Check commonMain for JVM-specific imports and patterns"
-    val sources = fileTree("src/commonMain") { include("**/*.kt") }
+    // Scope to the Kotlin source dir: resources/ carries vendored data (subvm, tspy,
+    // ingest) whose own jvmMain is legitimately JVM code, not commonMain sources.
+    val sources = fileTree("src/commonMain/kotlin") { include("**/*.kt") }
     inputs.files(sources)
     doLast {
         val forbidden = Regex("^\\s*import\\s+(java\\.|javax\\.|sun\\.|com\\.sun\\.)")

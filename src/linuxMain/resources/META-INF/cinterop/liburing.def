@@ -30,8 +30,8 @@ headers.linux = \
 #ac.h
 #headerFilter = liburing/* sys/*
 compilerOpts = -D_GNU_SOURCE
-compilerOpts.linux = -I/usr/include -I/usr/include/x86_64-linux-gnu -Iliburing/src/include -Iio_uring_interop
-linkerOpts.linux =  -Lliburing/src  -luring -luring-ffi
+compilerOpts.linux = -I/usr/include -I/usr/include/x86_64-linux-gnu -Isrc/linuxMain/resources/liburing/src/include -Isrc/linuxMain/resources/io_uring_interop
+linkerOpts.linux = -Lsrc/linuxMain/resources/liburing/src  -luring -luring-ffi
 ---
 
 #define CATQUEUE_DEPTH 256

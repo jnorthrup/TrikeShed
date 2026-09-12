@@ -67,6 +67,15 @@ class JvmChannelOperations(
         JvmChannelHandle(this, entries)
 
     override fun socket(domain: Int, type: Int, protocol: Int): Int {
+        if (domain == 1) { // AF_UNIX
+            val ch = try {
+                java.nio.channels.SocketChannel.open(java.net.StandardProtocolFamily.UNIX).apply { configureBlocking(false) }
+            } catch (e: Exception) {
+                recordFailure(0, "socket AF_UNIX", e)
+                return -1
+            }
+            return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.ACCEPT, Interest.CONNECT)))
+        }
         val ch: SelectableChannel = SocketChannel.open().apply { configureBlocking(false) }
         return registerChannelInternal(ch, Interest.toMask(setOf(Interest.READ, Interest.ACCEPT, Interest.CONNECT)))
     }
@@ -92,9 +101,50 @@ class JvmChannelOperations(
 
     override fun accept(fd: Int): Int {
         val server = socketChannels[fd] as? ServerSocketChannel ?: return -1
-        val client = server.accept() ?: return -1
+        val client = try {
+            server.accept()
+        } catch (e: Exception) {
+            recordFailure(fd, "accept", e)
+            return -1
+        } ?: return -1
         client.configureBlocking(false)
         return registerChannelInternal(client, Interest.toMask(setOf(Interest.READ)))
+    }
+
+    override fun bindUnix(fd: Int, path: String): Int {
+        // A UNIX server socket is a ServerSocketChannel (not a SocketChannel),
+        // mirroring the TCP path where bind() opens its own ServerSocketChannel.
+        val oldCh = socketChannels[fd]
+        if (oldCh != null) { try { oldCh.close() } catch (_: Exception) {} }
+        val serverCh = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
+            .apply { configureBlocking(false) }
+        socketChannels[fd] = serverCh
+        return try {
+            serverCh.bind(java.net.UnixDomainSocketAddress.of(path))
+            0
+        } catch (e: Exception) {
+            recordFailure(fd, "bindUnix $path", e)
+            -1
+        }
+    }
+
+    override fun connectUnix(fd: Int, path: String): Int {
+        val ch = socketChannels[fd] as? SocketChannel ?: return -9
+        connectionPhases[fd] = ConnectionPhase.CONNECTING
+        if (!schedule {
+            try {
+                ch.configureBlocking(false)
+                val connected = ch.connect(java.net.UnixDomainSocketAddress.of(path))
+                connectionPhases[fd] = if (connected || ch.isConnected) ConnectionPhase.CONNECTED else ConnectionPhase.CONNECTING
+                socketInterests[fd] = setOf(Interest.READ, Interest.WRITE, Interest.CONNECT)
+            } catch (e: Exception) {
+                if (socketChannels[fd] === ch) recordFailure(fd, "connectUnix $path", e)
+            }
+        }) {
+            recordFailure(fd, "schedule connectUnix $path", java.util.concurrent.RejectedExecutionException("JVM channel worker is closed"))
+            return -1
+        }
+        return 0
     }
 
     override fun connect(fd: Int, host: String, port: Int): Int {

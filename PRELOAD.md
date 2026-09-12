@@ -322,7 +322,57 @@ compose through ordinary Kotlin channels and flows under owning SupervisorJobs.
 Each composition defines its expected final element state and the intermediate
 tasks required to reach it. Nested and parallel coroutines are owned by one
 supervisor scope or explicitly parented nested supervisor scopes. A straight
-channel pipeline is a first-class composition; branching is introduced where
-the work requires it. Kotlin coroutine scopes contain the work, with fan-in
+channel pipeline is a first-class composition; branching is introduced where the
+work requires it. Kotlin coroutine scopes contain the work, with fan-in
 where branches must be collected.
- 
+
+# RULES — current mechanics (appended 2026-09-11)
+
+Binding rules, not preferences. The reward function is authenticity and
+parsimony: do no extra. Finish unfinished code; never induce a false
+completion. This file is the implementation contract.
+
+## Naming / taxonomy
+- lead with zero-cost taxonomical abstractions favoring value classes and type-aliases  
+- do not invent paradigm -- first-time nouns/verbs are typeo's when no intro is specific
+- conversational verbs /nouns/adjectives have no place in code naming
+
+## Build hygiene — no rug pull
+- The debt-ratchet exclusion files (`gradle/*-target-debt.excludes`) are the
+  rug pull: hiding code from a compile is forbidden. No excluded compiles, no
+  excluded tests. Pay the debt in the compile itself.
+- No scripts. No garbage in the root dir. No broken code saved for later.
+- `TODO()` is the sanctioned escape hatch: write real code where a target can
+  back it; mark the genuine gap with `TODO()` where it cannot. Never delete
+  the `expect` to hide it.
+
+## expect / actual placement
+- `expect`/`actual` lives ONLY in the userspace-nio commonMain SPI impls.
+  Anywhere a cross-target difference is genuinely required outside that SPI,
+  the declaration becomes a plain common declaration (no `expect`).
+
+## uring gating — all targets
+- IO follows uring kernel-module detection on every target, not just Linux.
+  Each target probes for the Linux io_uring kernel module / native binding;
+  the JVM in particular gates on module presence and captures IO through the
+  emulated uring backend when the module is absent.
+- The commonMain NIO uring facade shall not differ from liburing.
+  `capabilities` is identical across real ring and emulation;
+  `nativeCapabilities` alone marks which is executing, so the facade is one
+  contract regardless of backend.
+
+## platform codec / endian framing
+- `platformCodec` expresses the major runtime invariants and the endian
+  uptake, and frames IO.
+- NIO IO must not assert endian translation when Kotlin does not. The
+  ByteBuffer/uring framing is endian-honest: it does not inject a byte order
+  the JVM/JDK NIO layer would not, and it matches what the uring kernel
+  accepts. The JVM `java.nio.ByteOrder.nativeOrder()` assumption is the
+  hazard; the facade's framing owns the bytes, not the JDK's.
+
+## Test standing 
+- Tests older than 30 days have no standing — they expire as development guidance. 
+- Concurrent branch development demands TDD Red/Green, and reading intent before reverting code based on test results.  working on main is reference in all other cases.
+
+
+

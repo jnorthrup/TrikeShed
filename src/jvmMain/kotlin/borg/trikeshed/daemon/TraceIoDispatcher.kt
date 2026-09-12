@@ -6,7 +6,7 @@ import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-object TraceIoDispatcher {
+object TraceIoDispatcher {//requires SupervisorJob
     private val executor = ThreadPoolExecutor(
         1, 1, // single‑threaded to preserve write order
         0L, TimeUnit.MILLISECONDS,

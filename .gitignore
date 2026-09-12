@@ -75,9 +75,9 @@ yarn-error.log*
 .tspy/
 
 # Native/build artifacts
-liburing/
+src/linuxMain/resources/liburing/
 quiche/
-src/linuxMain/io_uring_interop/
+src/linuxMain/resources/io_uring_interop/
 741809350620169c43b4f2d5b4ccece5efff4056/
 
 # Model/checkpoint artifacts
