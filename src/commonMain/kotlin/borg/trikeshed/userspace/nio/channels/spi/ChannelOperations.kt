@@ -19,6 +19,13 @@ interface ChannelOperations : CoroutineContext.Element {
 
     fun openChannel(entries: Int = 256): ChannelHandle
 
+    /**
+     * Resolve a host to IPv4 octets for a CONNECT/BIND SQE sockaddr.
+     * DNS has no ring opcode; resolution is control-plane, the address it
+     * yields rides the SQE. Returns null when the host cannot be resolved.
+     */
+    fun resolve(host: String): ByteArray? = null
+
     interface ChannelHandle {
         val id: Int
         /** File read at offset (pread). */

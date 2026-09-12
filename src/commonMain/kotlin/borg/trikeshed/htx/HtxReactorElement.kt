@@ -112,7 +112,7 @@ class HtxReactorElement(
             }
             parseHtxResponse(readAll(connection.handle, connection.fd))
         } finally {
-            try { connection.handle.close() } finally { channelOperations.close(connection.fd) }
+            closeConnection(connection)
         }
     }
 
@@ -147,33 +147,54 @@ class HtxReactorElement(
                     readTlsPlaintext(connection.handle, connection.fd, endpoint),
                 )
             } finally {
-                try {
-                    flushTlsFrames(connection.handle, connection.fd, endpoint.close())
-                } finally {
-                    tls.close()
-                }
+                runCatching { flushTlsFrames(connection.handle, connection.fd, endpoint.close()) }
+                tls.close()
             }
         } finally {
-            try { connection.handle.close() } finally { channelOperations.close(connection.fd) }
+            closeConnection(connection)
         }
     }
 
+    /** CLOSE is an SQE like everything else: prep on the connection's ring, settle, drop the ring. */
+    private fun closeConnection(connection: HtxConnection) {
+        try {
+            connection.handle.prepClose(connection.fd)
+            connection.handle.submit()
+            connection.handle.wait(1)
+        } finally {
+            connection.handle.close()
+        }
+    }
+
+    /** Encoded IPv4 sockaddr for a CONNECT SQE; null when DNS resolution fails. */
+    private fun connectAddress(ops: ChannelOperations, host: String, port: Int): ByteBuffer? =
+        ops.resolve(host)?.let { octets ->
+            ByteBuffer(borg.trikeshed.userspace.nio.channels.sockaddrIpv4(octets, port))
+        }
+
     private fun openConnection(request: HtxRequest): HtxConnection {
-        val fd = channelOperations.socket(
-            SocketDomain.AF_INET.posix,
-            SocketType.SOCK_STREAM.mask,
-            SocketProtocol.IPPROTO_TCP.posix,
-        )
-        check(fd >= 0) {
-            "HTX reactor could not allocate socket for ${request.target.host}:${request.target.port}"
+        val ops = channelOperations
+        val handle = ops.openChannel()
+        // socket(2) is an SQE: IORING_OP_SOCKET settles with the new fd in res.
+        handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
+        handle.submit()
+        val fd = handle.wait(1).firstOrNull { it.res >= 0 }?.res ?: run {
+            handle.close()
+            error("HTX reactor socket SQE failed for ${request.target.host}:${request.target.port}")
         }
-        val connect = channelOperations.connect(fd, request.target.host, request.target.port)
-        check(connect >= 0) {
-            channelOperations.close(fd)
-            "HTX reactor connect failed for ${request.target.host}:${request.target.port}"
+        // connect(2) is an SQE carrying the encoded sockaddr; res = 0 or -errno.
+        val address = requireNotNull(connectAddress(ops, request.target.host, request.target.port)) {
+            "HTX reactor could not resolve ${request.target.host} for CONNECT"
         }
-        return try { HtxConnection(fd, channelOperations.openChannel()) }
-        catch (failure: Throwable) { channelOperations.close(fd); throw failure }
+        handle.prepConnect(fd, address)
+        handle.submit()
+        val connect = handle.wait(1).firstOrNull()?.res ?: -1
+        // A non-blocking connect may report EINPROGRESS (-115): readiness arrives
+        // on the write path's CQEs, which is the kernel ring's contract too.
+        check(connect == 0 || connect == -115) {
+            "HTX reactor connect SQE failed for ${request.target.host}:${request.target.port}: $connect"
+        }
+        return HtxConnection(fd, handle)
     }
 
     private suspend fun writeAll(

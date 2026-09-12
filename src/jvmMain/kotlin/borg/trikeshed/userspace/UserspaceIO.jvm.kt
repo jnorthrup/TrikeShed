@@ -6,22 +6,14 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.nio.channels.ClosedChannelException
-import java.nio.channels.FileChannel
-import java.nio.channels.SocketChannel
-import java.nio.file.Files
-import java.nio.file.LinkOption
-import java.nio.file.StandardCopyOption
-import java.nio.channels.NonReadableChannelException
-import java.nio.channels.NonWritableChannelException
-import java.nio.file.AccessDeniedException
-import java.nio.file.FileAlreadyExistsException
-import java.nio.file.NoSuchFileException
-import java.nio.file.Paths
-import java.nio.file.StandardOpenOption
+import borg.trikeshed.userspace.nio.channels.SocketDomain
+import borg.trikeshed.userspace.nio.channels.sockaddrFamily
+import borg.trikeshed.userspace.nio.channels.sockaddrOctets
+import borg.trikeshed.userspace.nio.channels.sockaddrPort
+import java.nio.channels.*
+import java.nio.file.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicInteger
 
 /** POSIX_FADV_WILLNEED / MADV_WILLNEED. The one advice this backend can actually act on. */
@@ -31,8 +23,11 @@ internal val jvmUringOperations = UringOp.caps(
     UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
     UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE,
     // The socket half of the emulation: the vocabulary already names these, and a stream fd
-    // reaches them through the same table a file does.
+    // reaches them through the same table a file does. SOCKET/BIND/LISTEN/ACCEPT settle
+    // the lifecycle SQEs; their CQEs carry the new fd or 0/-errno like the kernel's.
+    UringOp.SOCKET, UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT,
     UringOp.SEND, UringOp.RECV, UringOp.CONNECT, UringOp.SHUTDOWN,
+    UringOp.POLL_ADD, UringOp.POLL_REMOVE,
     // Mapping and the metadata syscalls. Every one of these was previously reached by calling
     // java.nio directly from wherever needed it -- which is the JVM creep: each call site grows
     // its own platform assumptions and the single vocabulary stops being the only way in.
@@ -66,6 +61,16 @@ internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
     override fun size(): Long = -1L
 }
 
+/**
+ * A listening socket. Its CQE-producing op is ACCEPT (res = new fd or -errno);
+ * every other op on this descriptor is a shape mismatch and is refused.
+ */
+internal class JvmServerSocketDescriptor(val channel: ServerSocketChannel) : JvmDescriptor {
+    override fun close() = channel.close()
+    override fun isOpen(): Boolean = channel.isOpen
+    override fun size(): Long = -1L
+}
+
 internal class JvmChannelDescriptor(val channel: FileChannel) : JvmDescriptor {
     override fun close() = channel.close()
     override fun size(): Long = channel.size()
@@ -77,6 +82,8 @@ internal object JvmFileTable {
     private val files = ConcurrentHashMap<Int, JvmDescriptor>()
     fun register(descriptor: JvmDescriptor): Int = nextId.getAndIncrement().also { files[it] = descriptor }
     fun descriptor(fd: Int): JvmDescriptor? = files[fd]
+    /** Bind never changes an fd: swap the descriptor behind it (UNIX listener rebind). */
+    fun replace(fd: Int, descriptor: JvmDescriptor): JvmDescriptor? = files.put(fd, descriptor)
     fun close(fd: Int): Int {
         val descriptor = files.remove(fd) ?: return -9
         return try { descriptor.close(); 0 } catch (failure: Exception) { jvmIoError(failure) }
@@ -100,6 +107,78 @@ internal fun UringSubmission.path(): String {
         bytes.arrayOffset() + bytes.position() + len, throwOnInvalidSequence = true).also {
         require('\u0000' !in it)
     }
+}
+
+/**
+ * SOCKET SQE execution. Encoding follows io_uring_prep_socket: the SQE carries
+ * domain in the fd field, protocol in len, type in offset; res = new fd or
+ * -errno. AF_INET yields a stream descriptor; AF_UNIX yields a UNIX stream.
+ */
+internal fun jvmSocket(domain: Int, protocol: Int, type: Int): Int = try {
+    require(type and 1 != 0) { "only SOCK_STREAM is emulated here, got type=$type" }
+    val channel = when (domain) {
+        SocketDomain.AF_INET.posix -> SocketChannel.open()
+        SocketDomain.AF_UNIX.posix -> SocketChannel.open(java.net.StandardProtocolFamily.UNIX)
+        else -> return -95
+    }
+    channel.configureBlocking(false)
+    JvmFileTable.register(JvmSocketDescriptor(channel))
+} catch (failure: Exception) { jvmIoError(failure) }
+
+/**
+ * BIND SQE execution. The address rides the SQE buffer as encoded sockaddr
+ * bytes ([sockaddrFamily]/[sockaddrPort]/[sockaddrOctets] decode it); a UNIX
+ * path binds a listener directly — NIO has no UNIX client-listen split.
+ * res = 0 or -errno.
+ */
+internal fun jvmBind(fd: Int, address: ByteBuffer?, len: Int): Int {
+    if (address == null || len <= 0 || len > address.remaining()) return -22
+    val bytes = ByteArray(len).also {
+        address.duplicate().get(it)
+    }
+    return try {
+        when (sockaddrFamily(bytes)) {
+            SocketDomain.AF_UNIX.posix -> {
+                val path = bytes.decodeToString(2, bytes.size).trimEnd('\u0000')
+                require(path.isNotEmpty())
+                // The kernel keeps the fd across bind; so does the table. The UNIX
+                // listener replaces the stream descriptor behind the same fd.
+                val server = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
+                    .apply { configureBlocking(false) }
+                server.bind(java.net.UnixDomainSocketAddress.of(path))
+                JvmFileTable.replace(fd, JvmServerSocketDescriptor(server))?.close()
+                0
+            }
+            SocketDomain.AF_INET.posix -> {
+                val descriptor = JvmFileTable.descriptor(fd) ?: return -9
+                val channel = (descriptor as? JvmSocketDescriptor)?.channel ?: return -22
+                channel.bind(java.net.InetSocketAddress(java.net.InetAddress.getByAddress(sockaddrOctets(bytes)), sockaddrPort(bytes)))
+                0
+            }
+            else -> -95
+        }
+    } catch (failure: Exception) { jvmIoError(failure) }
+}
+
+/**
+ * CONNECT SQE execution. The address rides the SQE buffer as encoded sockaddr
+ * bytes; res = 0, -EINPROGRESS (-115), or -errno. Non-blocking, so an in-flight
+ * connection reports -115 and completes on a later CQE — the kernel's contract.
+ */
+internal fun jvmConnect(fd: Int, address: ByteBuffer?, len: Int): Int {
+    if (address == null || len <= 0 || len > address.remaining()) return -22
+    val bytes = ByteArray(len).also { address.duplicate().get(it) }
+    val descriptor = JvmFileTable.descriptor(fd) ?: return -9
+    val channel = (descriptor as? JvmSocketDescriptor)?.channel ?: return -22
+    return try {
+        require(sockaddrFamily(bytes) == SocketDomain.AF_INET.posix && bytes.size == 16) { "Invalid CONNECT sockaddr" }
+        val remote = java.net.InetSocketAddress(java.net.InetAddress.getByAddress(sockaddrOctets(bytes)), sockaddrPort(bytes))
+        when {
+            channel.isConnected -> if (channel.remoteAddress == remote) 0 else -106
+            channel.isConnectionPending -> if (channel.remoteAddress != remote) -114 else if (channel.finishConnect()) 0 else -115
+            else -> if (channel.connect(remote)) 0 else -115
+        }
+    } catch (failure: Exception) { jvmIoError(failure) }
 }
 
 internal fun jvmOpen(path: String, flags: Long, permissions: Int = 438): Int {
@@ -128,6 +207,78 @@ internal fun jvmOpen(path: String, flags: Long, permissions: Int = 438): Int {
     return JvmFileTable.register(JvmChannelDescriptor(channel))
 }
 
+/**
+ * The backend's readiness substrate for POLL_ADD execution. The Selector lives
+ * here — inside the actual — never in service code. A single watch thread
+ * selects and queues readiness signals for registered userData tokens.
+ */
+internal object JvmPollRegistry {
+    private val selector: Selector = Selector.open()
+    private val watches = ConcurrentHashMap<Long, Pair<Int, SelectionKey>>()
+    private val pending = ConcurrentLinkedQueue<Triple<Long, Int, Int>>() // userData, fd, mask
+
+    init {
+        Thread({
+            while (selector.isOpen) {
+                try {
+                    selector.select(500)
+                } catch (_: Exception) {
+                    break
+                }
+                val ready = selector.selectedKeys()
+                for (key in ready) {
+                    val token = key.attachment() as? Long ?: continue
+                    val fd = watches[token]?.first ?: continue
+                    var mask = 0
+                    if (key.isReadable || key.isAcceptable) mask = mask or 0x1
+                    if (key.isWritable) mask = mask or 0x4
+                    if (key.isConnectable) mask = mask or 0x2
+                    if (mask != 0) pending.add(Triple(token, fd, mask))
+                }
+                ready.clear()
+            }
+        }, "trikeshed-uring-poll").apply { isDaemon = true }.start()
+    }
+
+    fun add(fd: Int, mask: Int, userData: Long): Int {
+        if (userData == 0L) return -22
+        val descriptor = JvmFileTable.descriptor(fd) ?: return -9
+        val channel = when (descriptor) {
+            is JvmSocketDescriptor -> descriptor.channel
+            is JvmServerSocketDescriptor -> descriptor.channel
+            else -> return -95
+        }
+        var ops = 0
+        if (mask and 0x1 != 0 || mask and 0x40000000 != 0) ops = ops or SelectionKey.OP_READ or SelectionKey.OP_ACCEPT
+        if (mask and 0x4 != 0) ops = ops or SelectionKey.OP_WRITE
+        if (mask and 0x2 != 0) ops = ops or SelectionKey.OP_CONNECT
+        return try {
+            selector.wakeup()
+            val key = channel.register(selector, ops, userData)
+            watches[userData] = fd to key
+            0
+        } catch (failure: Exception) { jvmIoError(failure) }
+    }
+
+    fun remove(userData: Long) {
+        watches.remove(userData)?.second?.cancel()
+        selector.wakeup()
+    }
+
+    /** Drain queued readiness signals (userData, fd, mask); empty when none fired. */
+    fun drain(): List<Triple<Long, Int, Int>> {
+        val out = ArrayList<Triple<Long, Int, Int>>()
+        while (true) {
+            val next = pending.poll() ?: break
+            out.add(next)
+        }
+        return out
+    }
+}
+
+internal fun jvmPollAdd(fd: Int, mask: Int, userData: Long): Int =
+    JvmPollRegistry.add(fd, mask, userData)
+
 /** Blocking OS primitives servicing commonMain uring submissions; this is emulation. */
 internal class JvmUserspaceChannelBackend(
     override val availability: String = "emulated: Java file primitives; kernel bridge not selected",
@@ -148,6 +299,45 @@ internal class JvmUserspaceChannelBackend(
         return try {
             when (sub.opcode) {
                 UringOp.NOP -> 0
+                // Socket lifecycle as SQEs: creation, bind, listen and accept each
+                // settle one CQE. res carries the new fd (SOCKET/ACCEPT), 0 or
+                // -errno (BIND/LISTEN) — the same result the kernel ring reports.
+                UringOp.SOCKET -> {
+                    val fd = jvmSocket(sub.fd, sub.len, sub.offset.toInt())
+                    if (fd >= 0) owned.add(fd)
+                    fd
+                }
+                UringOp.BIND -> jvmBind(sub.fd, sub.buffer, sub.len)
+                UringOp.CONNECT -> jvmConnect(sub.fd, sub.buffer, sub.len)
+                // Poll watches are registrations on the backend's readiness
+                // substrate; the CQE fires when the fd becomes ready. mask
+                // (EPOLLIN/OUT semantics) rides operationFlags.
+                UringOp.POLL_ADD -> jvmPollAdd(sub.fd, sub.operationFlags, sub.userData)
+                UringOp.POLL_REMOVE -> {
+                    // POLLOUT removal by userData is the kernel contract.
+                    if (sub.userData == 0L) return -22
+                    JvmPollRegistry.remove(sub.userData); 0
+                }
+                UringOp.LISTEN -> {
+                    // NIO ServerSocketChannel listens implicitly at bind; the SQE's
+                    // backlog (len) has no JVM knob. LISTEN therefore verifies the
+                    // descriptor is a bound listener and settles 0.
+                    if (sub.len < 0) return -22
+                    val descriptor = JvmFileTable.descriptor(sub.fd)
+                    if (descriptor !is JvmServerSocketDescriptor) return -22
+                    if (!descriptor.channel.isOpen) return -9
+                    0
+                }
+                UringOp.ACCEPT -> {
+                    val descriptor = JvmFileTable.descriptor(sub.fd)
+                    val server = (descriptor as? JvmServerSocketDescriptor)?.channel ?: return -22
+                    val client = try { server.accept() } catch (failure: Exception) { return jvmIoError(failure) }
+                        ?: return -11
+                    client.configureBlocking(false)
+                    val fd = JvmFileTable.register(JvmSocketDescriptor(client))
+                    owned.add(fd)
+                    fd
+                }
                 UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
@@ -203,7 +393,8 @@ internal class JvmUserspaceChannelBackend(
         } catch (failure: Exception) { jvmIoError(failure) }
     }
 
-    /** Stream IO under the same ops. Offsets are meaningless on a stream and are refused, not ignored. */
+    /** Stream IO under the same ops. Offsets are meaningless on a stream and are refused, not ignored.
+     * A connecting socket finishes its connect on the first writable CQE attempt (-EAGAIN until then). */
     private fun socketExecute(channel: SocketChannel, sub: UringSubmission): Int = when (sub.opcode) {
         UringOp.READ, UringOp.RECV, UringOp.WRITE, UringOp.SEND -> {
             val buffer = sub.buffer
@@ -211,6 +402,8 @@ internal class JvmUserspaceChannelBackend(
                 buffer == null || sub.len < 0 || sub.len > buffer.remaining() -> -22
                 sub.offset != -1L && sub.offset != 0L -> -22   // ESPIPE in spirit: a stream has no offset
                 (sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV) && buffer.isReadOnly() -> -22
+                channel.isConnectionPending -> -11   // -EAGAIN: connect still in flight
+                !channel.isConnected -> -107
                 else -> {
                     val position = buffer.position()
                     val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + position, sub.len)
@@ -308,14 +501,15 @@ internal class JvmUserspaceChannelBackend(
         return count.coerceAtLeast(0) // io_uring EOF is a successful zero-byte completion.
     }
 
-    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
-        withContext(Dispatchers.IO) {
-            val results = Array(submissions.size) { index ->
-                val sub = submissions[index]
-                UringCompletion(sub.userData, execute(sub), 0)
-            }
-            results.size j { results[it] }
+    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        // Direct execution: the effect is already non-blocking in this backend;
+        // a dispatcher hop here would be wrapper theater, not safety.
+        val results = Array(submissions.size) { index ->
+            val sub = submissions[index]
+            UringCompletion(sub.userData, execute(sub), 0)
         }
+        return results.size j { results[it] }
+    }
 
     @Synchronized
     override fun close() {

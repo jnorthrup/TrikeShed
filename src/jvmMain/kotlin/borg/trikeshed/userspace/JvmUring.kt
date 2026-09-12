@@ -5,7 +5,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** JNI boundary. The shared facade owns admission, cancellation and completion delivery. */
@@ -125,14 +124,15 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
         submissions.map { SelectionResult(execute(it), it.userData) }
 
-    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
-        withContext(Dispatchers.IO) {
-            val results = Array(submissions.size) { index ->
-                val sub = submissions[index]
-                UringCompletion(sub.userData, execute(sub), 0)
-            }
-            results.size j { results[it] }
+    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        // Direct execution on the caller's context: the JNI ring is asynchronous;
+        // a dispatcher hop here would be wrapper theater.
+        val results = Array(submissions.size) { index ->
+            val sub = submissions[index]
+            UringCompletion(sub.userData, execute(sub), 0)
         }
+        return results.size j { results[it] }
+    }
 
     @Synchronized
     override fun close() {

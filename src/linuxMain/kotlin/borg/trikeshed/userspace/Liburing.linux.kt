@@ -28,6 +28,19 @@ import zlinux_uring.io_uring_wait_cqe
 
 internal actual object LiburingImpl : LiburingFacade by LiburingSession()
 
+/**
+ * Compile-time native-depth gate for the Linux actual.
+ *
+ * 1 = liburing cinterop (the compiled-in kernel ring; probes opcode support)
+ *
+ * The facade surface is byte-identical above; this const exists so the three
+ * targets present one gate shape — JVM, JS and Linux each pin a native depth
+ * ceiling that the runtime probe cannot exceed. Going more native means
+ * raising the const, never adding a second API.
+ */
+internal const val LINUX_NATIVE_URING_LEVEL: Int = 1
+
+
 /** Each userspace backend owns one of these rings. The legacy singleton is separate. */
 internal class LinuxLiburingFacade : LiburingFacade {
     private var ring: CPointer<io_uring>? = null

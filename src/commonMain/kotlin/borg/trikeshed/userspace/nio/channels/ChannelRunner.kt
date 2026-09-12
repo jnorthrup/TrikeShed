@@ -35,22 +35,24 @@ class ChannelRunner(
      *  multi-coroutine contention (FIFO queue). */
     private val writers = mutableMapOf<Int, MutableList<CompletableDeferred<Unit>>>()
 
+    /** The ring this runner creates sockets on; one handle, one CQE per SQE. */
+    private val socketRing = channelOps.openChannel(16)
+
     private var running = false
 
     /** Open a TCP listener socket and register for accept events.
      *  Used by servers. The returned fd is a ServerSocketChannel-equivalent. */
-    fun tcpListen(host: String, port: Int): Int {
-        val fd = channelOps.socket(2 /* AF_INET */, 1 /* SOCK_STREAM */, 0)
-        reactorOps.register(fd, setOf(Interest.ACCEPT))
-        return fd
-    }
+    fun tcpListen(host: String, port: Int): Int = tcpSocket()
 
     /** Open a TCP client socket and register for connect events.
      *  Used by clients dialing out. */
-    fun tcpDial(host: String, port: Int): Int {
-        val fd = channelOps.socket(2 /* AF_INET */, 1 /* SOCK_STREAM */, 0)
-        reactorOps.register(fd, setOf(Interest.CONNECT))
-        return fd
+    fun tcpDial(host: String, port: Int): Int = tcpSocket()
+
+    /** socket(2) as an SQE: prep, submit, wait for the fd CQE. */
+    private fun tcpSocket(): Int {
+        socketRing.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
+        socketRing.submit()
+        return socketRing.wait(1).firstOrNull()?.res ?: -1
     }
 
     /** Deprecated: ambiguous between listen and dial. Use tcpListen() or tcpDial(). */

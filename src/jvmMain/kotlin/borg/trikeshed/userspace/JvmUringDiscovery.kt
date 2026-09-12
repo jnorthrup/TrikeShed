@@ -4,10 +4,27 @@ import borg.trikeshed.platform.loadPlatformHost
 import java.nio.file.Files
 import java.nio.file.Path
 
+/**
+ * Compile-time native-depth gate for the JVM actual.
+ *
+ * 0 = emulation only (POSIX-shaped JDK primitives servicing SQEs)
+ * 1 = JNI bridge to the kernel ring (probe still validates ELF/ABI/NOP)
+ *
+ * The facade surface is byte-identical above either level; going more native
+ * means raising this const, never adding a second API. The runtime probe
+ * cannot exceed the level pinned here — the const is the ceiling.
+ */
+internal const val JVM_NATIVE_URING_LEVEL: Int = 1
+
 /** Discovery of the repo's JNI execution module. No process or IO CLI bridge. */
 fun discoverJvmUringBackend(entries: Int): UringBackendDiscovery {
     require(entries > 0)
     val host = loadPlatformHost().descriptor
+    if (JVM_NATIVE_URING_LEVEL < 1) {
+        return UringBackendDiscovery(UringProbeReport(host, UringProbeState.MODULE_ABSENT,
+            UringProbePhase.DISCOVERY, null,
+            "JVM_NATIVE_URING_LEVEL=$JVM_NATIVE_URING_LEVEL pins the actual to emulation"))
+    }
     fun unavailable(state: UringProbeState, detail: String, module: String? = null,
                     phase: UringProbePhase = UringProbePhase.DISCOVERY, errno: Int? = null) =
         UringBackendDiscovery(UringProbeReport(host, state, phase, module, detail, errno))

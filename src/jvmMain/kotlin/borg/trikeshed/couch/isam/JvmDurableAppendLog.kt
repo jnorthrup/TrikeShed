@@ -3,9 +3,10 @@ package borg.trikeshed.couch.isam
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.RandomAccessFile
+import java.io.File
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
-import java.io.File
+
 
 /**
  * JVM specific file-backed implementation of DurableAppendLog.

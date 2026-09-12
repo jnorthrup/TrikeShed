@@ -8,6 +8,18 @@ import borg.trikeshed.platform.normalizeHostArchitecture
 import borg.trikeshed.platform.normalizeHostOs
 import kotlin.js.jsTypeOf
 
+/**
+ * Compile-time native-depth gate for the JS actual.
+ *
+ * 0 = emulation only (host primitives servicing SQEs)
+ * 1 = ABI-probed @trikeshed/uring Node module (probe validates exports/NAPI/setup)
+ *
+ * The facade surface is byte-identical above either level; going more native
+ * means raising this const, never adding a second API. The runtime probe
+ * cannot exceed the level pinned here — the const is the ceiling.
+ */
+internal const val JS_NATIVE_URING_LEVEL: Int = 1
+
 /** Resolve the configured Node module through Node's loader, then probe its shared uring backend. */
 fun discoverNodeUringBackend(entries: Int): UringBackendDiscovery = discoverNodeUringBackend(
     entries, loadPlatformHost().descriptor, processObj,
@@ -25,6 +37,9 @@ internal fun discoverNodeUringBackend(
     fun unavailable(state: UringProbeState, detail: String, module: String? = null,
                     phase: UringProbePhase = UringProbePhase.DISCOVERY, errno: Int? = null) =
         UringBackendDiscovery(UringProbeReport(host, state, phase, module, detail, errno))
+    if (JS_NATIVE_URING_LEVEL < 1)
+        return unavailable(UringProbeState.MODULE_ABSENT,
+            "JS_NATIVE_URING_LEVEL=$JS_NATIVE_URING_LEVEL pins the actual to emulation")
     if (host.runtime != HostRuntime.NODE_JS)
         return unavailable(UringProbeState.RUNTIME_RESTRICTED, "No Node runtime with native module access was identified")
     uringHostConstraint(host)?.let {

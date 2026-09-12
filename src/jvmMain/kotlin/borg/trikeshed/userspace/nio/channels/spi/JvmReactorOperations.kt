@@ -1,137 +1,82 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.reactor.Interest
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.time.Duration
-import java.nio.channels.SelectionKey
-import java.nio.channels.Selector
-import java.nio.channels.spi.SelectorProvider as JdkSelectorProvider
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 /**
- * JVM implementation of [ReactorOperations] using Java NIO Selector.
- *
- * Single-threaded event loop: register interests -> select -> signal ready.
- * Designed to be driven by the coroutine scheduler via suspend poll().
- *
- * NO GLOBAL STATE - each instance owns its Selector and registry.
- * Thread-safe via ConcurrentHashMap; Selector runs on a dedicated thread.
+ * JVM actual of the reactor SPI. Readiness is POLL_ADD / POLL_REMOVE SQEs on
+ * the uring facade — the same ring, same CQE contract, one IO flavor. The
+ * Selector is the backend's emulation substrate for POLL_ADD execution; this
+ * class stages watch SQEs and settles their readiness CQEs. No selector, no
+ * registry, no dispatcher hop lives here.
  */
-class JvmReactorOperations(
-    private val selector: Selector = JdkSelectorProvider.provider().openSelector(),
-    // Optional bridge to JvmChannelOperations so register(fd, interests) can
-    // lazily pick up a channel that was created on the channel-ops side
-    // (e.g. via accept()) without coupling the classes in their constructors.
-    private val channelOpsBridge: (Int) -> java.nio.channels.SelectableChannel? = { null },
-) : ReactorOperations {
+class JvmReactorOperations : ReactorOperations {
 
-    // fd -> (Channel, interests, userData)
-    private val fdRegistry = ConcurrentHashMap<Int, RegistryEntry>()
-    private val fdCounter = AtomicInteger(1000)
+    // One facade per reactor for watch submission; entries bound the watch count.
+    private val watchFacade = openBackendFacade(64)
+    private var nextToken = 0L
+
+    // token -> (fd, interests, userData) for readiness mapping.
+    private val watches = HashMap<Long, Triple<Int, Set<Interest>, Long>>()
+
+    private fun interestMask(interests: Set<Interest>): Int {
+        var mask = 0
+        if (Interest.READ in interests) mask = mask or 0x1        // EPOLLIN
+        if (Interest.WRITE in interests) mask = mask or 0x4       // EPOLLOUT
+        if (Interest.CONNECT in interests) mask = mask or 0x2     // EPOLLRDHUP~connect
+        return mask
+    }
 
     override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
-        // Look up in our own registry first; if missing, try the bridge so
-        // dynamically accepted fds become visible to the Selector.
-        val existing = fdRegistry[fd]
-        val channel = existing?.channel ?: channelOpsBridge(fd) ?: return
-        val mask = Interest.toMask(interests)
-        fdRegistry[fd] = RegistryEntry(channel, interests, userData)
-
-        var ops = 0
-        if (Interest.READ in interests) ops = ops or SelectionKey.OP_READ
-        if (Interest.WRITE in interests) ops = ops or SelectionKey.OP_WRITE
-        if (Interest.ACCEPT in interests) ops = ops or SelectionKey.OP_ACCEPT
-        if (Interest.CONNECT in interests) ops = ops or SelectionKey.OP_CONNECT
-
-        try {
-            channel.register(selector, ops)
-        } catch (e: Exception) {
-            selector.keys().firstOrNull { it.channel() == channel }?.cancel()
-            channel.register(selector, ops)
-        }
+        val token = ++nextToken
+        watches[token] = Triple(fd, interests, userData)
+        watchFacade.enqueue(
+            UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = token, operationFlags = interestMask(interests))
+        )
+        watchFacade.submit()
     }
 
     override fun deregister(fd: Int) {
-        fdRegistry.remove(fd)?.channel?.let { ch ->
-            selector.keys().firstOrNull { it.channel() == ch }?.cancel()
+        val matches = watches.filterValues { it.first == fd }
+        for ((token, _) in matches) {
+            watchFacade.enqueue(UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = token))
+            watches.remove(token)
         }
+        if (matches.isNotEmpty()) watchFacade.submit()
     }
 
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
-        return withContext(Dispatchers.IO) {
-            var result: List<ReactorSignal>? = null
-            while (isActive && result == null) {
-                result = suspendCancellableCoroutine { cont ->
-                    cont.invokeOnCancellation {
-                        selector.wakeup()
-                    }
-
-                    var n = 0
-                    try {
-                        if (timeout == Duration.ZERO) {
-                            n = selector.selectNow()
-                        } else {
-                            // Constraint 1: Every blocking IO call has a JVM-level timeout.
-                            // We use 1000ms max timeout if duration is infinite.
-                            val ms = if (timeout.isInfinite()) 1000L else timeout.inWholeMilliseconds.coerceAtLeast(1L)
-                            n = selector.select(ms)
-                        }
-                    } catch (e: Exception) {
-                        if (cont.isActive) {
-                            cont.resumeWithException(e)
-                        }
-                        return@suspendCancellableCoroutine
-                    }
-
-                    if (n == 0) {
-                        if (cont.isActive) {
-                            if (!timeout.isInfinite()) {
-                                cont.resume(emptyList())
-                            } else {
-                                // Resume with null to loop again in the while loop
-                                cont.resume(null)
-                            }
-                        }
-                    } else {
-                        val ready = selector.selectedKeys().mapNotNull { key ->
-                            val fd = fdRegistry.entries.firstOrNull { it.value.channel == key.channel() }?.key
-                                ?: return@mapNotNull null
-                            val sig = mutableSetOf<Interest>()
-                            if (key.isReadable) sig.add(Interest.READ)
-                            if (key.isWritable) sig.add(Interest.WRITE)
-                            if (key.isAcceptable) sig.add(Interest.ACCEPT)
-                            if (key.isConnectable) sig.add(Interest.CONNECT)
-                            val userData = fdRegistry[fd]?.userData ?: 0L
-                            ReactorSignal(fd, sig, userData)
-                        }
-                        selector.selectedKeys().clear()
-                        if (cont.isActive) {
-                            cont.resume(ready)
-                        }
-                    }
-                }
+        val deadline = if (timeout.isInfinite()) -1L else System.currentTimeMillis() + timeout.inWholeMilliseconds
+        val signals = ArrayList<ReactorSignal>()
+        while (true) {
+            // Settle readiness CQEs the backend substrate queued.
+            for ((token, fd, mask) in backendDrain()) {
+                val watch = watches[token] ?: continue
+                val ready = mutableSetOf<Interest>()
+                if (mask and 0x1 != 0) ready.add(Interest.READ)
+                if (mask and 0x4 != 0) ready.add(Interest.WRITE)
+                if (mask and 0x2 != 0) ready.add(Interest.CONNECT)
+                if (mask and 0x1 != 0 && watch.second.contains(Interest.ACCEPT)) ready.add(Interest.ACCEPT)
+                signals.add(ReactorSignal(watch.first, ready, watch.third))
             }
-            result ?: emptyList()
+            if (signals.isNotEmpty()) return signals
+            when {
+                deadline == -1L -> kotlinx.coroutines.delay(10)
+                System.currentTimeMillis() >= deadline -> return signals // empty on timeout
+                else -> kotlinx.coroutines.delay(1)
+            }
         }
     }
-
-    fun bindChannel(ch: java.nio.channels.SelectableChannel, interests: Set<Interest>, userData: Long = 0L): Int {
-        val fd = fdCounter.incrementAndGet()
-        fdRegistry[fd] = RegistryEntry(ch, interests, userData)
-        register(fd, interests, userData)
-        return fd
-    }
-
-    private data class RegistryEntry(
-        val channel: java.nio.channels.SelectableChannel,
-        var interests: Set<Interest>,
-        val userData: Long,
-    )
 }
+
+/** Per-reactor facade over the canonical probed backend. */
+private fun openBackendFacade(entries: Int): borg.trikeshed.userspace.FunctionalUringFacade =
+    borg.trikeshed.userspace.FunctionalUringFacade(
+        entries,
+        borg.trikeshed.userspace.openUserspaceChannelBackend(entries),
+    )
+
+private fun backendDrain(): List<Triple<Long, Int, Int>> =
+    borg.trikeshed.userspace.JvmPollRegistry.drain()
