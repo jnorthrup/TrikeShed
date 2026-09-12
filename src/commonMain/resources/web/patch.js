@@ -2114,7 +2114,7 @@ document.getElementById("qsBtn").addEventListener("click",()=>{
   +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
   +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
   +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
-  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+  +'<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:#7b8496;margin-left:14px;cursor:pointer">close</button></div>';
  d.onclick=function(e){if(e.target===d)d.remove()};
  document.body.appendChild(d);
 });
