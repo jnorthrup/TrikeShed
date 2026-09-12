@@ -78,7 +78,8 @@ class PromptStore(
         return doc
     }
 
-    override fun heads(): List<PromptHead> = heads.values.toList().map {
+    // Bolt: Avoid intermediate O(N) list allocations by using native map
+    override fun heads(): List<PromptHead> = heads.values.map {
         PromptHead(it.name, it.cid, it.previousCid, it.role, it.variables, it.tags, it.text.length, savedAt[it.name] ?: 0L)
     }
 
