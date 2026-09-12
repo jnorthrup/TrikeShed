@@ -36,6 +36,13 @@ object UringLegos {
     @Volatile private var shared: borg.trikeshed.userspace.FunctionalUringFacade? = null
     private val sharedMutex = kotlinx.coroutines.sync.Mutex()
 
+    /**
+     * ONE token space for the shared ring, allocated once and retained until the
+     * CQE settles. Per-call restarts would collide with concurrently in-flight
+     * invocations (the facade rejects duplicate outstanding userData — correctly).
+     */
+    private val nextToken = java.util.concurrent.atomic.AtomicLong(1L)
+
     private suspend fun ring(): borg.trikeshed.userspace.FunctionalUringFacade {
         shared?.let { return it }
         return sharedMutex.withLock {
@@ -78,13 +85,12 @@ object UringLegos {
         val len = (node.params["len"]?.toIntOrNull() ?: 65536).coerceIn(1, 8 * 1024 * 1024)
         val buffer = ByteArray(len)
         onRing { facade ->
-            var token = 1L
-            val open = Submissions.openat(path, userData = token++)
+                        val open = Submissions.openat(path, userData = nextToken.getAndIncrement())
             val fd = settle(facade, listOf(open)).first { it.userData == open.userData }.res
             check(fd >= 0) { "uring.read: OPENAT failed res=$fd (${errno(fd)})" }
             try {
                 val read = UringSubmission(
-                    UringOp.READ, fd, 0, len, offset, userData = token++,
+                    UringOp.READ, fd, 0, len, offset, userData = nextToken.getAndIncrement(),
                     buffer = ByteBuffer(buffer),
                 )
                 val cqe = settle(facade, listOf(read)).first { it.userData == read.userData }
@@ -94,7 +100,7 @@ object UringLegos {
                     "res" to linkedMapOf("opcode" to "READ", "res" to cqe.res, "offset" to offset),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = token)))
+                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
             }
         }
     }
@@ -107,14 +113,13 @@ object UringLegos {
         val payload = (inputs["bytes"]?.toString() ?: "").encodeToByteArray()
         val offset = node.params["offset"]?.toLongOrNull() ?: 0L
         onRing { facade ->
-            var token = 1L
-            // O_WRONLY|O_CREAT|O_TRUNC = 0x241; mode 0600.
-            val open = Submissions.openat(path, flags = 0x241, userData = token++)
+                        // O_WRONLY|O_CREAT|O_TRUNC = 0x241; mode 0600.
+            val open = Submissions.openat(path, flags = 0x241, userData = nextToken.getAndIncrement())
             val fd = settle(facade, listOf(open)).first { it.userData == open.userData }.res
             check(fd >= 0) { "uring.write: OPENAT failed res=$fd (${errno(fd)})" }
             try {
                 val write = UringSubmission(
-                    UringOp.WRITE, fd, 0, payload.size, offset, userData = token++,
+                    UringOp.WRITE, fd, 0, payload.size, offset, userData = nextToken.getAndIncrement(),
                     buffer = ByteBuffer(payload),
                 )
                 val cqe = settle(facade, listOf(write)).first { it.userData == write.userData }
@@ -123,7 +128,7 @@ object UringLegos {
                     "res" to linkedMapOf("opcode" to "WRITE", "res" to cqe.res, "offset" to offset),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = token)))
+                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
             }
         }
     }
@@ -132,18 +137,17 @@ object UringLegos {
     fun fsync() = LcncNodeRunner { node, _ ->
         val path = requireNotNull(node.params["path"]?.takeIf { it.isNotBlank() }) { "uring.fsync: path is required" }
         onRing { facade ->
-            var token = 1L
-            val open = Submissions.openat(path, userData = token++)
+                        val open = Submissions.openat(path, userData = nextToken.getAndIncrement())
             val fd = settle(facade, listOf(open)).first { it.userData == open.userData }.res
             check(fd >= 0) { "uring.fsync: OPENAT failed res=$fd (${errno(fd)})" }
             try {
-                val fsync = Submissions.fsync(fd, userData = token++)
+                val fsync = Submissions.fsync(fd, userData = nextToken.getAndIncrement())
                 val cqe = settle(facade, listOf(fsync)).first { it.userData == fsync.userData }
                 mapOf<String, Any?>(
                     "res" to linkedMapOf("opcode" to "FSYNC", "res" to cqe.res),
                 )
             } finally {
-                settle(facade, listOf(Submissions.close(fd, userData = token)))
+                settle(facade, listOf(Submissions.close(fd, userData = nextToken.getAndIncrement())))
             }
         }
     }
