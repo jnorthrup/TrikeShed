@@ -173,7 +173,7 @@ class JvmTlsCodecBackendTest {
         return buffer.copyOf(count)
     }
 
-    private companion object {
+    companion object {
         const val TEST_CERTIFICATE_PEM = """
 -----BEGIN CERTIFICATE-----
 MIIDCTCCAfGgAwIBAgIUHXfIkLXh2NqIZgZaWD/WlAiz7SYwDQYJKoZIhvcNAQEL

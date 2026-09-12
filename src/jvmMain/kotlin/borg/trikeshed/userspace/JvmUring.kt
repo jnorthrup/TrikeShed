@@ -5,7 +5,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
-import kotlinx.coroutines.withContext
 
 /** JNI boundary. The shared facade owns admission, cancellation and completion delivery. */
 internal object JvmUring {
@@ -37,15 +36,10 @@ internal fun jvmNativeChannelBackend(handle: Long): UserspaceChannelBackend = Jv
 
 /** Native and POSIX-emulated primitives use the same OS descriptors in the JNI bridge. */
 private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChannelBackend {
-    override val capabilities: Long = UringOp.caps(
-        UringOp.NOP, UringOp.FSYNC, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
-        UringOp.OPENAT, UringOp.CLOSE, UringOp.READ, UringOp.WRITE, UringOp.STATX,
-        UringOp.FADVISE, UringOp.MADVISE, UringOp.FTRUNCATE,
-        UringOp.CONNECT, UringOp.SEND, UringOp.RECV, UringOp.SHUTDOWN, UringOp.UNLINKAT,
-    )
+    override val capabilities: Long get() = jvmUringOperations
+    override val deferredCapabilities: Long get() = UringOp.POLL_ADD.mask
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
-        if (op !in setOf(UringOp.CONNECT, UringOp.SEND, UringOp.RECV, UringOp.SHUTDOWN, UringOp.UNLINKAT) &&
-            capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
+        if (capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
             mask or op.mask else mask
     }
     override val availability = "io_uring: JNI setup and operation probe succeeded; unsupported kernel ops use POSIX emulation"
@@ -76,7 +70,8 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         if (sub.len < 0) return -22
-        if (sub.opcode == UringOp.UNLINKAT) return legacy.execute(sub)
+        if (sub.opcode in setOf(UringOp.SOCKET, UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.POLL_REMOVE))
+            return legacy.execute(sub)
         // MADVISE addresses the process VM and remains valid after the originating fd closes.
         if (sub.opcode == UringOp.MADVISE) return nativeExecute(sub, -1)
         val descriptor = JvmFileTable.descriptor(sub.fd)
@@ -122,16 +117,27 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
     )
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-        submissions.map { SelectionResult(execute(it), it.userData) }
+        submissions.flatMap { sub ->
+            if (sub.opcode == UringOp.POLL_ADD && handle != 0L) legacy.submitBatch(listOf(sub))
+            else listOf(SelectionResult(execute(sub), sub.userData))
+        }
+
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> = legacy.reapCompletions(minComplete)
+
+    override fun cancelPending() = legacy.cancelPending()
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        // Direct execution on the caller's context: the JNI ring is asynchronous;
-        // a dispatcher hop here would be wrapper theater.
-        val results = Array(submissions.size) { index ->
-            val sub = submissions[index]
-            UringCompletion(sub.userData, execute(sub), 0)
+        val outstanding = HashSet<Long>(submissions.size)
+        for (index in 0 until submissions.size) outstanding.add(submissions[index].userData)
+        val results = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
+        results.forEach { outstanding.remove(it.userData) }
+        while (outstanding.isNotEmpty()) {
+            val settled = reapCompletions(0)
+            settled.forEach { outstanding.remove(it.userData) }
+            results.addAll(settled)
+            if (outstanding.isNotEmpty()) kotlinx.coroutines.delay(1)
         }
-        return results.size j { results[it] }
+        return results.size j { UringCompletion(results[it].userData, results[it].res, 0) }
     }
 
     @Synchronized

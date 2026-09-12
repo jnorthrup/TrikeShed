@@ -36,7 +36,7 @@ class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
             deregister(fd)
             return
         }
-        if (watches[fd] == interests to userData) return
+        if (watches[fd] == (interests to userData)) return
         deregister(fd)
         // The remaining slot admits POLL_REMOVE while every watch is pending.
         check(watches.size < 63) { "Reactor watch capacity exceeded" }

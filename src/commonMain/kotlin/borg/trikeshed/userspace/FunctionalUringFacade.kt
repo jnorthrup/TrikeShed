@@ -114,6 +114,7 @@ public class FunctionalUringFacade(
     val capabilities: Long get() = backend.capabilities
     val nativeCapabilities: Long get() = backend.nativeCapabilities
     val availability: String get() = backend.availability
+    val probeReport: UringProbeReport? get() = backend.probeReport
 
     private val REJECTED_OPS: Set<UringOp> = containmentPolicy.layer2Metadata.rejectedXattrOps
 
@@ -143,8 +144,8 @@ public class FunctionalUringFacade(
                         }
                     }
                 } finally {
-                    stopAdmission()
                     try {
+                        stopAdmission()
                         execution.withLock { closeBackend() }
                         termination.complete(Unit)
                     } catch (failure: Throwable) {
@@ -264,7 +265,15 @@ public class FunctionalUringFacade(
         val admitted = partition(submissions, result)
         if (admitted.isNotEmpty()) {
             val cqes = backend.batchEnqueue(admitted.toSeries())
-            correlate(admitted, cqes) { result.add(it) }
+            val batchResults = ArrayList<UringCompletion>(admitted.size)
+            admission.withLock {
+                for (i in 0 until cqes.size) {
+                    val cqe = cqes[i]
+                    if (cqe.userData in inFlight) settle(listOf(SelectionResult(cqe.res, cqe.userData)))
+                    else batchResults.add(cqe)
+                }
+            }
+            correlate(admitted, batchResults.toSeries()) { result.add(it) }
         }
         val array = result.toTypedArray()
         return array.size j { array[it] }
@@ -325,6 +334,8 @@ public class FunctionalUringFacade(
             capacityChanged.complete(Unit)
             for (submission in submissions) {
                 if (completions.any { it.userData == submission.userData }) continue
+                if (submission.userData in inFlight &&
+                    backend.deferredCapabilities and submission.opcode.mask != 0L) continue
                 inFlight.remove(submission.userData)
                 completions.addLast(SelectionResult(-5, submission.userData))
                 submission.memory?.release()
@@ -383,6 +394,7 @@ public class FunctionalUringFacade(
         check(supervisor == null && active == 0) { "suspend drain() is required for active or scoped uring" }
         closing = true
         input.close()
+        capacityChanged.complete(Unit)
         try {
             if (pending.isNotEmpty()) submitPending()
         } finally {
@@ -411,6 +423,7 @@ public class FunctionalUringFacade(
         closing = true
         input.close()
         capacityChanged.complete(Unit)
+        backend.cancelPending()
         if (active == 0) drained.complete(Unit)
     }
 
@@ -516,6 +529,7 @@ public class FunctionalUringFacade(
         for (i in 0 until submissions.size) require(identities.add(submissions[i].userData)) { "Duplicate outstanding userData" }
     }
     private fun rejection(submission: UringSubmission): Int? {
+        if (closing && backend.deferredCapabilities and submission.opcode.mask != 0L) return -125
         if (submission.opcode in containmentPolicy.layer2Metadata.rejectedXattrOps) return -13
         // SQE flags (links, multishot, fixed resources, etc.) require explicit semantics.
         if (submission.flags != 0 || (backend.capabilities and submission.opcode.mask) == 0L) return -95
@@ -537,15 +551,26 @@ public class FunctionalUringFacade(
         return admitted.toTypedArray()
     }
     private inline fun correlate(submissions: Array<UringSubmission>, results: Series<UringCompletion>, accept: (UringCompletion) -> Unit) {
-        check(results.size == submissions.size) { "Backend lost submission completions" }
+        var failure: Throwable? = if (results.size == submissions.size) null
+            else IllegalStateException("Backend lost submission completions")
         val byIdentity = submissions.associateByTo(HashMap(submissions.size)) { it.userData }
         for (i in 0 until results.size) {
             val cqe = results[i]
-            val sqe = byIdentity.remove(cqe.userData) ?: error("Unknown or duplicate completion: ${cqe.userData}")
+            val sqe = byIdentity.remove(cqe.userData)
+            if (sqe == null) {
+                val invalid = IllegalStateException("Unknown or duplicate completion: ${cqe.userData}")
+                if (failure == null) failure = invalid else failure.addSuppressed(invalid)
+                continue
+            }
             // Completion programs observe actual results. Their return cannot alter
             // bytes transferred, errno, descriptor identity, or CQE flags after effects.
-            for (program in completionPrograms) program.run(UringEbpfContext(UringEbpfPhase.COMPLETE, sqe, cqe), cqe.res.toLong())
             accept(cqe)
+            for (program in completionPrograms) try {
+                program.run(UringEbpfContext(UringEbpfPhase.COMPLETE, sqe, cqe), cqe.res.toLong())
+            } catch (observerFailure: Throwable) {
+                if (failure == null) failure = observerFailure else failure.addSuppressed(observerFailure)
+            }
         }
+        failure?.let { throw it }
     }
 }

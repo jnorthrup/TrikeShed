@@ -3,7 +3,9 @@ package borg.trikeshed.userspace.nio.channels
 /**
  * Sockaddr encoders for SQE-borne addresses. BIND and CONNECT carry the address
  * as SQE buffer bytes; encoding is the caller's job, decoding the backend's.
- * Layout matches struct sockaddr_in / sockaddr_un as the kernel parses them:
+ * The facade uses the Linux little-endian sockaddr ABI on every runtime.
+ * Current native Linux targets are x86_64 and arm64; emulated targets decode
+ * this framing before calling their host API (it is not a BSD sockaddr).
  * family is little-endian u16, port big-endian ("network order"), payload
  * zero-padded to the struct size.
  */
@@ -35,11 +37,20 @@ fun sockaddrUnix(path: String): ByteArray {
 
 /** Address family from encoded sockaddr bytes (little-endian u16). */
 fun sockaddrFamily(bytes: ByteArray): Int =
-    (bytes[0].toInt() and 255) or ((bytes[1].toInt() and 255) shl 8)
+    bytes.let {
+        require(it.size >= 2) { "sockaddr requires an address family" }
+        (it[0].toInt() and 255) or ((it[1].toInt() and 255) shl 8)
+    }
 
 /** struct sockaddr_in port field (big-endian u16 at offset 2). */
 fun sockaddrPort(bytes: ByteArray): Int =
-    ((bytes[2].toInt() and 255) shl 8) or (bytes[3].toInt() and 255)
+    bytes.let {
+        require(it.size >= 16 && sockaddrFamily(it) == SocketDomain.AF_INET.posix) { "IPv4 sockaddr requires 16 bytes and AF_INET" }
+        ((it[2].toInt() and 255) shl 8) or (it[3].toInt() and 255)
+    }
 
 /** struct sockaddr_in address octets (offset 4..8). */
-fun sockaddrOctets(bytes: ByteArray): ByteArray = bytes.copyOfRange(4, 8)
+fun sockaddrOctets(bytes: ByteArray): ByteArray {
+    require(bytes.size >= 16 && sockaddrFamily(bytes) == SocketDomain.AF_INET.posix) { "IPv4 sockaddr requires 16 bytes and AF_INET" }
+    return bytes.copyOfRange(4, 8)
+}

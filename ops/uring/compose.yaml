@@ -1,0 +1,20 @@
+services:
+  workspace:
+    image: trikeshed-uring-workspace:2026-09-12
+    pull_policy: never
+    container_name: trikeshed-uring-bench
+    restart: unless-stopped
+    init: true
+    entrypoint: ["/usr/sbin/sshd"]
+    command: ["-D", "-e", "-o", "PasswordAuthentication=no", "-o", "PermitRootLogin=prohibit-password", "-o", "AllowAgentForwarding=yes"]
+    ports:
+      - "127.0.0.1:22229:22"
+    volumes:
+      - workspace:/root
+    security_opt:
+      - seccomp=unconfined
+
+volumes:
+  workspace:
+    external: true
+    name: trikeshed-uring-home

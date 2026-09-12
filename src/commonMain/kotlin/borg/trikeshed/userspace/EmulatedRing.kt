@@ -243,7 +243,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     }
 
     private fun deferred(submission: UringSubmission): Boolean =
-        backend.deferredCapabilities and submission.opcode.mask != 0L
+        backend.deferredCapabilities and (inFlight[submission.userData]?.b?.opcode ?: submission.opcode).mask != 0L
 
     private fun failed(error: Throwable) {
         val previous = failure

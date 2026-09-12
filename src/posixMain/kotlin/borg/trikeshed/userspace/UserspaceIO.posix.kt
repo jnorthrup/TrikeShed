@@ -12,9 +12,6 @@ import borg.trikeshed.userspace.nio.ByteOrder
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.withContext
 import platform.posix.*
 
 private class PosixUserspaceChannelBackend(private val entries: Int) : UserspaceChannelBackend {
@@ -23,7 +20,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     private val descriptors = mutableSetOf<Int>()
     private var closed = false
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
-        UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.CLOSE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED) or native.capabilities
+        UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE,
+        UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
     override val nativeCapabilities: Long get() = native.capabilities
     override val availability: String get() = native.availability
 
@@ -39,12 +37,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
-        withContext(Dispatchers.Default + NonCancellable) {
-            synchronized(lock) {
-                require(submissions.size <= entries) { "submission queue full" }
-                val completions = Array(submissions.size) { execute(submissions[it]) }
-                completions.size j { completions[it] }
-            }
+        synchronized(lock) {
+            require(submissions.size <= entries) { "submission queue full" }
+            val completions = Array(submissions.size) { execute(submissions[it]) }
+            completions.size j { completions[it] }
         }
 
     private fun execute(sub: UringSubmission): UringCompletion {
@@ -84,6 +80,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         val buffer = sub.buffer
         return when (sub.opcode) {
             UringOp.NOP -> 0
+            UringOp.FADVISE -> native.fadvise(sub.fd, sub.offset, sub.len, sub.operationFlags)
             UringOp.MADVISE -> adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
             UringOp.OPENAT -> {
                 val start = buffer!!.arrayOffset() + buffer.position()

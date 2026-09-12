@@ -25,6 +25,21 @@ import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
     @Test
+    fun fragmentedHeaderCompletesBeforeThePeerCloses() = runTest {
+        val response = httpResponse(200, "x".repeat(2048))
+        val operations = FakeChannelOperations(
+            listOf(listOf(response.copyOfRange(0, 7), response.copyOfRange(7, response.size))),
+            endOfStreamResult = -11,
+        )
+        val element = openHtxReactorElement(channelOperations = operations)
+        try {
+            val result = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+            assertEquals(HtxExchangeLifecycle.RESPONDED, result.state.lifecycle)
+            assertEquals("x".repeat(2048), result.state.response?.body?.asString())
+        } finally { element.drain() }
+    }
+
+    @Test
     fun connectFailureClosesSocketAndRingBeforeReturningFailure() = runTest {
         val operations = FakeChannelOperations(emptyList(), connectResult = -111)
         val element = openHtxReactorElement(channelOperations = operations)
@@ -190,6 +205,7 @@ private class FakeChannelOperations(
     private val connectionReads: List<List<ByteArray>>,
     val connectResult: Int = 0,
     private val address: ByteArray? = byteArrayOf(127, 0, 0, 1),
+    val endOfStreamResult: Int = 0,
 ) : ChannelOperations {
     val closedDescriptors = mutableListOf<Int>()
     var openedHandles = 0
@@ -256,7 +272,7 @@ private class FakeChannelOperations(
         override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
             pending.addLast {
                 val chunk = operations.readChunk(fd)
-                if (chunk == null) ChannelResult(fd, 0, userData)
+                if (chunk == null) ChannelResult(fd, operations.endOfStreamResult, userData)
                 else {
                     buffer.put(chunk, 0, chunk.size)
                     ChannelResult(fd, chunk.size, userData)

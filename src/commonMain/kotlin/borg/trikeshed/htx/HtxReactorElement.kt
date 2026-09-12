@@ -83,9 +83,11 @@ class HtxReactorElement(
     ): HtxExchangeResult =
         try {
             val transportRequest = request.withTransportDefaults()
-            val response = when (transportRequest.target.transportProtocol) {
-                HtxTransportProtocol.HTTP -> exchangePlain(transportRequest)
-                HtxTransportProtocol.HTTPS -> exchangeTls(transportRequest)
+            val response = kotlinx.coroutines.withTimeout(30_000L) {
+                when (transportRequest.target.transportProtocol) {
+                    HtxTransportProtocol.HTTP -> exchangePlain(transportRequest)
+                    HtxTransportProtocol.HTTPS -> exchangeTls(transportRequest)
+                }
             }
             HtxExchangeResult(
                 state.copy(
@@ -344,7 +346,7 @@ class HtxReactorElement(
         }
 
         private fun scanBoundary() {
-            val start = maxOf(0, size - lastScan - 3)
+            val start = maxOf(0, lastScan - 3)
             var i = start
             while (i <= size - 4) {
                 if (buf[i] == CR && buf[i + 1] == LF && buf[i + 2] == CR && buf[i + 3] == LF) {
@@ -532,7 +534,7 @@ suspend fun openHtxReactorElement(
         channelOperations = channelOperations,
         tlsBackend = tlsBackend,
         tlsConfig = tlsConfig,
-        parentJob = parentJob,
+        parentJob = parentJob ?: currentCoroutineContext()[Job],
     ).also { it.open() }
 
 suspend fun openHtxReactorElement(
@@ -557,7 +559,7 @@ suspend fun openHtxReactorElement(
         channelOperations = channelOperations,
         tlsBackend = activeSupervisor.service<TlsCodecBackend>(),
         tlsConfig = tlsConfig,
-        parentJob = parentJob,
+        parentJob = parentJob ?: currentCoroutineContext()[Job],
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
     ).also { it.open() }
 }

@@ -87,17 +87,17 @@ internal class LinuxLiburingFacade : LiburingFacade {
         val detail = prepared.exceptionOrNull() ?: submitted.exceptionOrNull() ?: completion?.exceptionOrNull()
         // Only a NOP has been prepared here: no caller buffer or descriptor is
         // borrowed, so discarding this probe cannot release application memory.
-        val currentRing = ring
-        if (currentRing != null) {
-            io_uring_queue_exit(currentRing)
-            nativeHeap.free(currentRing.rawValue)
-            ring = null
-        }
-        probe?.let { zlinux_uring.io_uring_free_probe(it) }
-        probe = null
-        requests.clear()
-        inFlight = 0
+        exitRing()
         return Result.failure(IllegalStateException("io_uring NOP execution probe failed: ${terminal?.res ?: detail?.message}"))
+    }
+
+    /** Without SQPOLL, a sole unconsumed SQE has never lent its buffers to the kernel. */
+    fun abandonUnsubmitted(userData: Long): Boolean {
+        val currentRing = ring ?: return false
+        if (currentRing.pointed.flags and zlinux_uring.IORING_SETUP_SQPOLL.toUInt() != 0u ||
+            inFlight != 1 || requests[userData] != 1 || zlinux_uring.io_uring_sq_ready(currentRing) != 1u) return false
+        exitRing()
+        return true
     }
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
@@ -214,16 +214,23 @@ internal class LinuxLiburingFacade : LiburingFacade {
     }
 
     override fun close(): Result<Unit> {
-        val currentRing = ring ?: return Result.success(Unit)
+        if (ring == null) return Result.success(Unit)
         val drained = drain()
         if (drained.isFailure) return drained
+        exitRing()
+        return Result.success(Unit)
+    }
+
+    private fun exitRing() {
+        val currentRing = ring ?: return
         probe?.let { zlinux_uring.io_uring_free_probe(it) }
         probe = null
         io_uring_queue_exit(currentRing)
         nativeHeap.free(currentRing.rawValue)
         ring = null
+        requests.clear()
+        inFlight = 0
         handlers.clear()
-        return Result.success(Unit)
     }
 
     override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> {

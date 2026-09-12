@@ -22,6 +22,31 @@ import kotlin.test.assertTrue
 
 class UringJvmDiscoveryTest {
     @Test
+    fun requestedModeBypassesSetupOrRequiresNativeExecution() {
+        val priorMode = System.getProperty("trikeshed.uring.mode")
+        val priorLibrary = System.getProperty("trikeshed.uring.library")
+        try {
+            System.setProperty("trikeshed.uring.library", "/missing/trikeshed-uring-library")
+            System.setProperty("trikeshed.uring.mode", "emulated")
+            val discovery = discoverJvmUringBackend(2)
+            assertNull(discovery.backend)
+            assertTrue(discovery.report.description.contains("native setup bypassed"))
+            val backend = openUserspaceChannelBackend(2)
+            try {
+                assertEquals(jvmUringOperations, backend.capabilities)
+                assertEquals(0L, backend.nativeCapabilities)
+            } finally { backend.close() }
+            System.setProperty("trikeshed.uring.mode", "native")
+            assertFailsWith<IllegalStateException> { discoverJvmUringBackend(2) }
+            System.setProperty("trikeshed.uring.mode", "invalid")
+            assertFailsWith<IllegalArgumentException> { discoverJvmUringBackend(2) }
+        } finally {
+            if (priorMode == null) System.clearProperty("trikeshed.uring.mode") else System.setProperty("trikeshed.uring.mode", priorMode)
+            if (priorLibrary == null) System.clearProperty("trikeshed.uring.library") else System.setProperty("trikeshed.uring.library", priorLibrary)
+        }
+    }
+
+    @Test
     fun linkageFailureFixture() {
         val failure = UnsatisfiedLinkError("simulated missing JNI submission symbol")
         var closes = 0

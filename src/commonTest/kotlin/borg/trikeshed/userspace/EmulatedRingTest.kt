@@ -29,12 +29,32 @@ class EmulatedRingTest {
         var seen = emptyList<UringSubmission>()
         var effect: (UringSubmission) -> Int = { it.len }
         var completions: (List<SelectionResult>) -> List<SelectionResult> = { it }
+        override var deferredCapabilities = 0L
+        val pending = mutableListOf<UringSubmission>()
+        val ready = mutableListOf<SelectionResult>()
+        val waits = mutableListOf<Int>()
+        var cancellation = true
         var closed = false
         override fun registerBuffers(buffers: Series<MemoryMapping>) = registration
         override fun unregisterBuffers() = unregistration
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
             seen = submissions
-            return completions(submissions.map { SelectionResult(res = effect(it), userData = it.userData) })
+            val immediate = mutableListOf<SelectionResult>()
+            for (submission in submissions) {
+                if (deferredCapabilities and submission.opcode.mask != 0L) pending.add(submission)
+                else immediate.add(SelectionResult(res = effect(submission), userData = submission.userData))
+            }
+            return completions(immediate)
+        }
+        override fun reapCompletions(minComplete: Int): List<SelectionResult> {
+            waits.add(minComplete)
+            return ready.toList().also { ready.clear() }
+        }
+        override fun cancelPending() {
+            if (cancellation) {
+                for (submission in pending) ready.add(SelectionResult(-125, submission.userData))
+                pending.clear()
+            }
         }
         override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = error("synchronous test backend")
         override fun close() { closed = true }
@@ -210,7 +230,7 @@ class EmulatedRingTest {
         ring.close().getOrThrow()
     }
 
-    @Test fun malformedBackendResultsSettleEveryAdmissionAsFailure() {
+    @Test fun malformedBackendResultsPreserveOnlyUnambiguousOutcomes() {
         val malformed = arrayOf(
             listOf(SelectionResult(0, 1)),
             listOf(SelectionResult(0, 1), SelectionResult(0, 1)),
@@ -223,7 +243,8 @@ class EmulatedRingTest {
             ring.prepClose(3, 1).getOrThrow()
             ring.prepClose(4, 2).getOrThrow()
             assertTrue(ring.submit().isFailure)
-            assertEquals(UringCompletion(1, -5, 0), ring.waitCqe().getOrThrow())
+            val firstResult = if (results.count { it.userData == 1L } == 1) 0 else -5
+            assertEquals(UringCompletion(1, firstResult, 0), ring.waitCqe().getOrThrow())
             assertEquals(UringCompletion(2, -5, 0), ring.waitCqe().getOrThrow())
             assertNull(ring.waitCqe().getOrThrow())
             assertTrue(ring.close().isFailure)
@@ -268,6 +289,108 @@ class EmulatedRingTest {
         ring.prepClose(6, 2).getOrThrow()
         ring.close().getOrThrow()
         assertTrue(backend.closed)
+        memory.close()
+    }
+
+    @Test fun deferredCompletionsRetainBoundsIdentitiesAndFixedBuffers() {
+        val backend = Backend().also { it.deferredCapabilities = UringOp.READ.mask }
+        val memory = MemoryMapping(Memory(), 3)
+        val ring = EmulatedRing(backend)
+        ring.open(2, 0).getOrThrow()
+        ring.registerBuffers(arrayOf(memory).toSeries()).getOrThrow()
+        ring.prepReadFixed(5, 0, 1, 0, 1).getOrThrow()
+        assertEquals(1, ring.submit().getOrThrow())
+        assertTrue(ring.prepClose(6, 1).isFailure)
+        assertNull(ring.peekCqe().getOrThrow())
+        assertEquals(0, backend.waits.last())
+        assertTrue(ring.unregisterBuffers().isFailure)
+        assertFailsWith<IllegalStateException> { memory.close() }
+        ring.prepClose(6, 2).getOrThrow()
+        assertEquals(1, ring.submit().getOrThrow())
+        assertTrue(ring.prepClose(7, 3).isFailure)
+        assertEquals(UringCompletion(2, 0, 0), ring.waitCqe().getOrThrow())
+        requireNotNull(backend.pending.single().buffer).put(0, 42)
+        backend.pending.clear()
+        backend.ready.add(SelectionResult(1, 1))
+        assertEquals(UringCompletion(1, 1, 0), ring.waitCqe().getOrThrow())
+        assertEquals(1, backend.waits.last())
+        assertEquals(42.toByte(), memory[0])
+        assertNull(ring.peekCqe().getOrThrow())
+        ring.unregisterBuffers().getOrThrow()
+        memory.close()
+        ring.close().getOrThrow()
+    }
+
+    @Test fun drainCancelsDeferredAdmissionsAndDispatchesOnce() {
+        val backend = Backend().also { it.deferredCapabilities = UringOp.ACCEPT.mask }
+        val ring = EmulatedRing(backend)
+        ring.open(1, 0).getOrThrow()
+        var observed = 0
+        ring.registerFanoutHandler(1) {
+            assertEquals(-125, it.res)
+            observed++
+        }
+        ring.prepAccept(5, 1).getOrThrow()
+        assertEquals(1, ring.submit().getOrThrow())
+        ring.drain().getOrThrow()
+        assertTrue(ring.prepAccept(5, 2).isFailure)
+        assertTrue(backend.pending.isEmpty())
+        ring.close().getOrThrow()
+        ring.close().getOrThrow()
+        assertEquals(1, observed)
+        assertTrue(backend.closed)
+    }
+
+    @Test fun failedCancellationRetainsRegistrationUntilTerminalCompletion() {
+        val backend = Backend().also {
+            it.registration = Result.success(Unit)
+            it.deferredCapabilities = UringOp.READ_FIXED.mask
+            it.cancellation = false
+        }
+        val memory = MemoryMapping(Memory(), 3)
+        val ring = EmulatedRing(backend)
+        ring.open(1, 0).getOrThrow()
+        ring.registerBuffers(arrayOf(memory).toSeries()).getOrThrow()
+        ring.prepReadFixed(5, 0, 1, 0, 1).getOrThrow()
+        assertEquals(1, ring.submit().getOrThrow())
+        assertTrue(ring.close().isFailure)
+        assertFalse(ring.isClosed)
+        assertFalse(backend.closed)
+        assertTrue(ring.unregisterBuffers().isFailure)
+        assertFailsWith<IllegalStateException> { memory.close() }
+        var observed = 0
+        ring.registerFanoutHandler(1) {
+            assertEquals(-125, it.res)
+            observed++
+        }
+        backend.cancellation = true
+        assertTrue(ring.close().isFailure)
+        assertTrue(ring.isClosed)
+        assertTrue(backend.closed)
+        assertEquals(1, observed)
+        memory.close()
+    }
+
+    @Test fun submissionFailureRetainsEarlierDeferredAdmissions() {
+        val backend = Backend().also {
+            it.registration = Result.success(Unit)
+            it.deferredCapabilities = UringOp.READ_FIXED.mask
+        }
+        val memory = MemoryMapping(Memory(), 3)
+        val ring = EmulatedRing(backend)
+        ring.open(2, 0).getOrThrow()
+        ring.registerBuffers(arrayOf(memory).toSeries()).getOrThrow()
+        ring.prepReadFixed(5, 0, 1, 0, 1).getOrThrow()
+        assertEquals(1, ring.submit().getOrThrow())
+        backend.effect = { error("failed synchronous effect") }
+        ring.prepClose(6, 2).getOrThrow()
+        assertTrue(ring.submit().isFailure)
+        assertEquals(UringCompletion(2, -5, 0), ring.waitCqe().getOrThrow())
+        assertTrue(ring.unregisterBuffers().isFailure)
+        assertFailsWith<IllegalStateException> { memory.close() }
+        assertTrue(ring.drain().isFailure)
+        assertEquals(UringCompletion(1, -125, 0), ring.waitCqe().getOrThrow())
+        assertTrue(ring.close().isFailure)
         memory.close()
     }
 

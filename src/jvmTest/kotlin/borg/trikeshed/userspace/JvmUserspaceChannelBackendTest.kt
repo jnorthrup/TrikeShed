@@ -69,7 +69,7 @@ class JvmUserspaceChannelBackendTest {
             assertEquals(2, backend.execute(Submissions.read(fd, 0, 2, 5, 6).copy(buffer = sliced)))
             assertContentEquals(byteArrayOf(7, 10, 20, 7, 7), target)
             assertEquals(-22, backend.execute(Submissions.read(fd, 0, 1, 5, 7).copy(buffer = sliced.asReadOnlyBuffer())))
-            assertEquals(-1, backend.execute(Submissions.read(fd, 0, 1, 16, 8).copy(buffer = ByteBuffer(1))))
+            assertEquals(0, backend.execute(Submissions.read(fd, 0, 1, 16, 8).copy(buffer = ByteBuffer(1))))
             assertEquals(0, backend.execute(Submissions.close(fd, 9)))
             assertEquals(-9, backend.execute(Submissions.close(fd, 10)))
         } finally {

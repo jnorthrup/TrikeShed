@@ -36,7 +36,7 @@ static int implemented(int op) {
         case IORING_OP_OPENAT: case IORING_OP_CLOSE:
         case IORING_OP_READ: case IORING_OP_WRITE: case IORING_OP_STATX:
         case IORING_OP_FADVISE: case IORING_OP_MADVISE:
-        case IORING_OP_FTRUNCATE: return 1;
+        case IORING_OP_FTRUNCATE: case IORING_OP_FALLOCATE: return 1;
         default: return 0;
     }
 }
@@ -126,6 +126,7 @@ static int posix_execute(int op, int fd, void *bytes, unsigned len, jlong offset
     switch (op) {
         case 0: return 0;
         case 3: result = operation_flags & IORING_FSYNC_DATASYNC ? fdatasync(fd) : fsync(fd); break;
+        case 17: result = fallocate(fd, (int)operation_flags, offset, len); break;
         case 18: result = openat(fd, bytes, (int)offset, (mode_t)operation_flags); break;
         case 19: result = close(fd); break;
         case 4: case 22: result = offset == -1 ? (int)read(fd, bytes, len) : (int)pread(fd, bytes, len, offset); break;
@@ -149,7 +150,8 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     if (len < 0) return -EINVAL;
     if (op == IORING_OP_FSYNC) {
         if ((unsigned)operation_flags & ~IORING_FSYNC_DATASYNC) return -EOPNOTSUPP;
-    } else if (op != IORING_OP_MADVISE && op != IORING_OP_FADVISE && op != IORING_OP_OPENAT && operation_flags != 0) {
+    } else if (op != IORING_OP_MADVISE && op != IORING_OP_FADVISE && op != IORING_OP_OPENAT &&
+               op != IORING_OP_FALLOCATE && operation_flags != 0) {
         return -EOPNOTSUPP;
     }
     int fixed = op == IORING_OP_READ_FIXED || op == IORING_OP_WRITE_FIXED;
@@ -195,6 +197,7 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     switch (op) {
         case 0: io_uring_prep_nop(sqe); break;
         case 3: io_uring_prep_fsync(sqe, fd, (unsigned)operation_flags); break;
+        case 17: io_uring_prep_fallocate(sqe, fd, operation_flags, offset, (uint64_t)len); break;
         case 4: io_uring_prep_read_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
         case 5: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
         case 18: io_uring_prep_openat(sqe, fd, bytes, (int)offset, (mode_t)operation_flags); break;

@@ -30,6 +30,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class FunctionalUringFacadeLifecycleTest {
     private class Backend(val heldToken: Long? = null, val failedToken: Long? = null) : UserspaceChannelBackend {
+        override val capabilities = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.WRITE, UringOp.STATX)
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         val submissions = mutableListOf<UringSubmission>()
@@ -195,13 +196,13 @@ class FunctionalUringFacadeLifecycleTest {
             val result = facade.batchEnqueue(listOf(
                 submission(1, UringOp.WRITE), submission(2, UringOp.STATX), submission(3),
             ).toSeries()).toList()
-            assertEquals(listOf(UringCompletion(1, -13, 0), UringCompletion(2, 1, 0), UringCompletion(3, 81, 0)), result)
+            assertEquals(listOf(UringCompletion(1, -13, 0), UringCompletion(2, 80, 0), UringCompletion(3, 80, 0)), result,
+                "completion programs must preserve the backend's actual result")
             assertEquals(listOf(UringOp.STATX, UringOp.NOP), backend.submissions.map { it.opcode })
-            assertFailsWith<IllegalArgumentException> {
-                facade.batchEnqueue(listOf(submission(6, UringOp.SETXATTR)).toSeries())
-            }
+            assertEquals(UringCompletion(6, -13, 0), facade.batchEnqueue(listOf(submission(6, UringOp.SETXATTR)).toSeries())[0],
+                "an admitted forbidden effect settles exactly one rejection CQE")
             assertFailsWith<IllegalStateException> { facade.batchEnqueue(batch(4)) }
-            assertEquals(81, facade.batchEnqueue(batch(5))[0].res)
+            assertEquals(80, facade.batchEnqueue(batch(5))[0].res)
             assertEquals(0, backend.synchronousCalls)
             assertEquals(0, backend.closes)
         } finally {

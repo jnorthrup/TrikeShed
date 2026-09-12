@@ -47,6 +47,7 @@ class ChannelRunner(
     private var supervisor: CompletableJob? = null
     private var polling: Job? = null
     private var dispatching: Job? = null
+    private var dispatchFailure: Throwable? = null
 
     /** Open a TCP listener socket and register for accept events.
      *  Used by servers. The returned fd is a ServerSocketChannel-equivalent. */
@@ -105,6 +106,7 @@ class ChannelRunner(
     suspend fun readAsync(fd: Int, timeoutMs: Long = 60_000L): Int? {
         check(state < ElementState.DRAINING) { "Channel runner is draining or closed" }
         check(fd !in readers) { "A read is already pending for fd=$fd" }
+        check(readers.size < 63) { "Read readiness capacity exceeded" }
         val deferred = CompletableDeferred<Int>()
         readers[fd] = deferred
         return try {
@@ -122,6 +124,7 @@ class ChannelRunner(
     suspend fun writeAsync(fd: Int, timeoutMs: Long = 60_000L): Unit? {
         check(state < ElementState.DRAINING) { "Channel runner is draining or closed" }
         val deferred = CompletableDeferred<Unit>()
+        check(fd in writers || writers.size < 63) { "Write readiness capacity exceeded" }
         val queue = writers.getOrPut(fd) { mutableListOf() }
         check(queue.size < 16) { "Write readiness queue is full for fd=$fd" }
         queue.add(deferred)
@@ -161,7 +164,12 @@ class ChannelRunner(
         val ownedScope = CoroutineScope(scope.coroutineContext + owner + channelOps + reactorOps)
         dispatching = ownedScope.launch {
             for (signal in signals) {
-                onSignal(signal)
+                try {
+                    onSignal(signal)
+                } catch (failure: Throwable) {
+                    if (dispatchFailure == null) dispatchFailure = failure
+                    stop()
+                }
                 if (Interest.READ in signal.ready) {
                     readers.remove(signal.fd)?.complete(1)
                 }
@@ -215,5 +223,6 @@ class ChannelRunner(
                 state = ElementState.CLOSED
             }
         }
+        dispatchFailure?.let { throw it }
     }
 }
