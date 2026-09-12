@@ -52,7 +52,7 @@ td.rev{color:var(--dim);max-width:130px}
   <button onclick="firstPage()" title="Apply filter">go</button>
   <button onclick="newDoc()">new document</button>
   <span id="info">…</span>
-  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><a onclick="qsInstall()" style="color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</a><a onclick="qsFeedback()" style="color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</a></span>
+  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button onclick="qsInstall()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button onclick="qsFeedback()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
 </div>
 <div id="wrap">
   <div id="list">
@@ -152,7 +152,7 @@ function qsInstall(){
   +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 &mdash; drop a REAL folder on /graal, run a stored program via POST /api/lcnc/run, abuse the board. Every stumble is a bug we want.</div>'
   +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button> '
   +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README &#8599;</a>'
-  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+  +'<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:#7b8496;margin-left:14px;cursor:pointer">close</button></div>';
  d.onclick=function(e){if(e.target===d)d.remove()};
  document.body.appendChild(d);
 }
