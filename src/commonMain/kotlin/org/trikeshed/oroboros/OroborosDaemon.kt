@@ -26,6 +26,12 @@ import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import borg.trikeshed.lcnc.ccek.ccekReactorBinding
+import borg.trikeshed.platform.HostSystem
+import borg.trikeshed.platform.InstantShim
+import borg.trikeshed.platform.randomUuid
+import borg.trikeshed.common.File
+import borg.trikeshed.common.Files
+import borg.trikeshed.common.Path
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -99,9 +105,9 @@ internal class BuildPlanes(
 internal fun reconcileBuildPlane(planes: BuildPlanes, revision: String): Int {
     var n = 0
     with(planes) {
-        if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
-        if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
-        if (resourcesDir.isDirectory) n += resourcesGateway.reconcile(resourcesDir.absolutePath, "oroboros", revision, System.currentTimeMillis()).paths.size
+        if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
+        if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
+        if (resourcesDir.isDirectory) n += resourcesGateway.reconcile(resourcesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
         if (agentJar.isFile) {
             val bytes = agentJar.readBytes()
             val cid = borg.trikeshed.job.ContentId.of(bytes)
@@ -111,7 +117,7 @@ internal fun reconcileBuildPlane(planes: BuildPlanes, revision: String): Int {
                     borg.trikeshed.util.oroboros.OroborosAttachmentRef(
                         path = path, contentType = "application/java-archive",
                         length = bytes.size.toLong(), contentId = cid,
-                        agentId = "oroboros", revision = revision, sequence = System.currentTimeMillis(),
+                        agentId = "oroboros", revision = revision, sequence = HostSystem.currentTimeMillis(),
                     ),
                     bytes,
                 )
@@ -236,7 +242,7 @@ object OroborosDaemon {
             is ForgeCliArgs.Result.Error -> die(r.message)
         }
         val agentsResolved = agents
-            ?: System.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
+            ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED
         return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved)
     }
@@ -286,9 +292,9 @@ object OroborosDaemon {
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PromptNodes.registry(promptStore))
         promptStore.register(moduleContext)
         snapshotService.register(moduleContext)
-        System.err.println("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
+        HostSystem.err("[OROBOROS] workspace snapshots: " + snapshotService.restore() + " in the ledger" + (snapshotService.head?.let { ", head " + it.cid.take(19) } ?: ""))
         promptStore.thaw(borg.trikeshed.lcnc.LcncPromptSeeds.all()).let { restored ->
-            System.err.println("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
+            HostSystem.err("[OROBOROS] prompts: $restored head(s) restored from the ledger; ${promptStore.list().size} on the board")
         }
         // (the program ledger thaws far below, after the LAST runner registration — see there)
         // Project documents as typed workflow input (Forge genesis, Cut F): project.list /
@@ -296,7 +302,7 @@ object OroborosDaemon {
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         // Pure/presentation node runners: canvas-authored programs (preset-kanban)
         // complete HEADLESS via /api/lcnc/run — the curl-able smoke-test lane.
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { System.currentTimeMillis() })
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { HostSystem.currentTimeMillis() })
         // Phase-1 twin removal: `pick` is not a Kotlin lambda. Its existing
         // panels.html RUNNERS method executes in one HostAccess.NONE GraalJS
         // context per invocation; registry() loads that resource on IO.
@@ -317,14 +323,14 @@ object OroborosDaemon {
             if (candidate >= 0 && ops.bindUnix(candidate, healthSock.absolutePath) == 0 && ops.listen(candidate) == 0) {
                 fd = candidate
             } else {
-                System.err.println("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed")
+                HostSystem.err("[OROBOROS] health.sock bind attempt ${bindAttempt + 1} failed")
                 if (candidate >= 0) ops.close(candidate)
                 if (healthSock.exists()) healthSock.delete()
                 bindAttempt++
             }
         }
         if (fd < 0) {
-            System.err.println("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
+            HostSystem.err("[OROBOROS] health.sock bind FAILED after 3 attempts; aborting")
         }
         return fd
     }
@@ -334,8 +340,8 @@ object OroborosDaemon {
         ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
     ): borg.trikeshed.ipns.IpnsNode {
         val node = borg.trikeshed.ipns.jvmIpnsNode(
-            File(oroborosDir, "ipns.journal").absolutePath, coroutineContext,
-            bootstrap = System.getenv("TRIKESHED_IPNS_BOOTSTRAP")
+            File(Files.resolvePath(oroborosDir, "ipns.journal")).absolutePath, coroutineContext,
+            bootstrap = HostSystem.getenv("TRIKESHED_IPNS_BOOTSTRAP")
                 ?: borg.trikeshed.ipns.IpnsDhtAddresses.PUBLIC_BOOTSTRAP,
         )
         ownIpns(node)
@@ -386,16 +392,16 @@ object OroborosDaemon {
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
-            System.err.println("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
+            HostSystem.err("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
         }
 
         val config = parseConfig(args)
         // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
-        val envInterval = System.getenv("FLYWHEEL_CYCLE_INTERVAL")
+        val envInterval = HostSystem.getenv("FLYWHEEL_CYCLE_INTERVAL")
         val intervalMs = if (envInterval != null) {
             val ms = envInterval.toLongOrNull()
             if (ms != null && ms > 0) {
-                System.err.println("[OROBOROS] FLYWHEEL_CYCLE_INTERVAL=${ms}ms (env override)")
+                HostSystem.err("[OROBOROS] FLYWHEEL_CYCLE_INTERVAL=${ms}ms (env override)")
                 ms
             } else {
                 config.intervalMs
@@ -408,15 +414,15 @@ object OroborosDaemon {
         val kanbanPort = config.kanbanPort
         val positional = config.positional
 
-        val home = System.getProperty("user.home")
+        val home = HostSystem.getProperty("user.home")
             ?: die("System property user.home not set")
         val (forgeHome, repoDir) = withContext(Dispatchers.IO) {
-            val canonicalForge = File(home, ".local/forge")
+            val canonicalForge = File(Files.resolvePath(home, ".local/forge"))
             val fHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
-            val rDir = File(positional.getOrNull(1) ?: System.getProperty("user.dir"))
+            val rDir = File(positional.getOrNull(1) ?: HostSystem.getProperty("user.dir"))
             val gitDir = rDir.resolve(".git")
             if (!gitDir.exists()) {
-                System.err.println("[OROBOROS] $rDir is not a git work tree. Aborting.")
+                HostSystem.err("[OROBOROS] $rDir is not a git work tree. Aborting.")
                 exitProcess(1)
             }
             // The bug class that dumps a gigabyte CAS into a source tree: forgeHome
@@ -425,7 +431,7 @@ object OroborosDaemon {
             val fCanon = fHome.canonicalFile
             val rCanon = rDir.canonicalFile
             if (fCanon.path == rCanon.path || fCanon.path.startsWith(rCanon.path + File.separator)) {
-                System.err.println("[OROBOROS] REFUSED: forgeHome $fCanon is inside the repo worktree $rCanon — daemon state never lands in source trees. Use ~/.local/forge*.")
+                HostSystem.err("[OROBOROS] REFUSED: forgeHome $fCanon is inside the repo worktree $rCanon — daemon state never lands in source trees. Use ~/.local/forge*.")
                 exitProcess(1)
             }
             fHome.mkdirs()
@@ -439,11 +445,11 @@ object OroborosDaemon {
         // already done. Health is the one surface that must exist BEFORE the slow
         // parts, not after them: it answers 'am I alive' while the answer is still
         // in doubt. It needs only forgeHome and daemonStartTime, both known here.
-        daemonStartTime = System.currentTimeMillis()
+        daemonStartTime = HostSystem.currentTimeMillis()
 
-        val oroborosDir = File(forgeHome, ".oroboros")
+        val oroborosDir = File(Files.resolvePath(forgeHome, ".oroboros"))
         oroborosDir.mkdirs()
-        val healthSock = File(oroborosDir, "health.sock")
+        val healthSock = File(Files.resolvePath(oroborosDir, "health.sock"))
         if (healthSock.exists()) healthSock.delete()
 
         // The health socket is a CCEK reactor service: its descriptor lifecycle
@@ -454,7 +460,7 @@ object OroborosDaemon {
         nioSupervisor.open()
         val channelOps = nioSupervisor.service<ChannelOperations>()
             ?: run {
-                System.err.println("[OROBOROS] no ChannelOperations service; aborting")
+                HostSystem.err("[OROBOROS] no ChannelOperations service; aborting")
                 return
             }
 
@@ -471,7 +477,7 @@ object OroborosDaemon {
                         delay(100)
                         continue
                     }
-                    val uptimeMs = System.currentTimeMillis() - daemonStartTime
+                    val uptimeMs = HostSystem.currentTimeMillis() - daemonStartTime
 
                     // Backward-compatible ALIVE line (cycle fields retired with the flywheel)
                     val aliveLine = "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
@@ -509,7 +515,7 @@ object OroborosDaemon {
         // addressable under the same prefix it was written with.
         WorktreeCouchGateway.WORKTREE_PREFIX = "projects/${repoDir.name.lowercase()}/"
 
-        if (System.getProperty("os.name").lowercase().contains("linux")) {
+        if (HostSystem.getProperty("os.name").lowercase().contains("linux")) {
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_SOCKET)
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_CONNECT)
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_EXECVE)
@@ -528,7 +534,7 @@ object OroborosDaemon {
             nioSupervisor = nioSupervisor,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
-        System.err.println("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
+        HostSystem.err("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
 
         // ── MuxReactorElement: the live key+quota surface ────────────────
         // Owns lease/quota state for both ModelMux.chat/stream/embed and the
@@ -550,7 +556,7 @@ object OroborosDaemon {
         // all run through. Modules access it via the binding's
         // reactorScope for coroutine dispatch.
         val ccekBinding = ccekReactorBinding(coroutineContext + Dispatchers.Default + nioSupervisor + fileOps + htxElement + muxReactor)
-        System.err.println("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
+        HostSystem.err("[OROBOROS] CCEK binding open: reactor=${ccekBinding.reactorScope}")
         // Seed from already-resolved KeyMux env keys so the ReactorSource
         // (read path `llm.*.key`) returns real keyIds the very first cycle.
         // Each resolved key becomes one MuxCredentialRecord; later calls to
@@ -578,7 +584,7 @@ object OroborosDaemon {
                 )
             }
         }
-        System.err.println("[OROBOROS] MuxReactor open: ${muxReactor.state} — KeyMux/ModelMux live")
+        HostSystem.err("[OROBOROS] MuxReactor open: ${muxReactor.state} — KeyMux/ModelMux live")
 
         // ── TorrentElement: BitTorrent v2 + uTP transport sharing HTX/TLS ──
         // Tracker announces flow through the same HtxElement → HtxReactorElement
@@ -591,7 +597,7 @@ object OroborosDaemon {
             reactorContext = htxElement + muxReactor + nioSupervisor,
         )
         torrentElement.open()
-        System.err.println("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
+        HostSystem.err("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
 
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
         // Built before the HTTP tier so the server can host the PWA and the build out of it.
@@ -604,7 +610,7 @@ object OroborosDaemon {
             ipnsNode.open()
             borg.trikeshed.btrfs.JvmFilesystemTypeProbe.probe(casRootPath)
         }
-        val casSelection = (System.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
+        val casSelection = (HostSystem.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
         var btrfsCasStore: borg.trikeshed.btrfs.BtrfsReflinkStore? = null
         val casStore: borg.trikeshed.job.CasStore = withContext(Dispatchers.IO) {
             when (casSelection) {
@@ -618,8 +624,8 @@ object OroborosDaemon {
                             fsProbe = borg.trikeshed.btrfs.JvmFilesystemTypeProbe,
                         )
                     } catch (t: Throwable) {
-                        System.err.println("[OROBOROS] CAS STORE REFUSED: TRIKESHED_CAS=btrfs but $casRootPath is not on btrfs — ${t.message}")
-                        System.err.println("[OROBOROS] BOOT ABORTED: no silent fallback to FileCasStore (mission-002 decision D6).")
+                        HostSystem.err("[OROBOROS] CAS STORE REFUSED: TRIKESHED_CAS=btrfs but $casRootPath is not on btrfs — ${t.message}")
+                        HostSystem.err("[OROBOROS] BOOT ABORTED: no silent fallback to FileCasStore (mission-002 decision D6).")
                         exitProcess(1)
                     }
                     btrfsCasStore = store
@@ -627,12 +633,12 @@ object OroborosDaemon {
                 }
                 "file" -> FileCasStore(fileOps, casRootPath)
                 else -> {
-                    System.err.println("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
+                    HostSystem.err("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
                     exitProcess(1)
                 }
             }
         }
-        System.err.println(
+        HostSystem.err(
             "[OROBOROS] CAS STORE SELECTED: ${casStore::class.java.name} casRoot=$casRootPath " +
                     "TRIKESHED_CAS=$casSelection fstype=${casBacking?.first ?: "<undeterminable>"} " +
                     "source=${casBacking?.second ?: "<undeterminable>"}"
@@ -641,7 +647,7 @@ object OroborosDaemon {
         // is a BtrfsReflinkStore member, absent from the CasStore base class.
         val casReflinkWire = btrfsCasStore?.let {
             borg.trikeshed.forge.server.CasReflinkWire(it, casRootPath).also { _ ->
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] CAS reflink routes armed: " +
                             borg.trikeshed.forge.server.CasReflinkWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" }
                 )
@@ -654,8 +660,8 @@ object OroborosDaemon {
         // The running build is an attachment set too (rxf-rsync lineage: classes and jars served
         // from the store). `build/…` is excluded from the worktree plane, so two narrow gateways
         // absorb exactly the live classpath: build/live/classes and build/staging/lib.
-        val buildClassesDir = File(repoDir, "build/live/classes")
-        val stagingLibDir = File(repoDir, "build/staging/lib")
+        val buildClassesDir = File(Files.resolvePath(repoDir, "build/live/classes"))
+        val stagingLibDir = File(Files.resolvePath(repoDir, "build/staging/lib"))
         val buildClassesGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
             prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/live/classes/",
@@ -669,7 +675,7 @@ object OroborosDaemon {
         // Third narrow plane: jvm resources (web/*, META-INF/services) — without them a
         // forge-booted instance serves no console page. Plus the hotswap agent jar, so the
         // hydrated runtime is launchable end-to-end from the manifest alone.
-        val processedResourcesDir = File(repoDir, "build/processedResources/jvm/main")
+        val processedResourcesDir = File(Files.resolvePath(repoDir, "build/processedResources/jvm/main"))
         val resourcesGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
             prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/resources/",
@@ -680,8 +686,8 @@ object OroborosDaemon {
             classesGateway = buildClassesGateway, classesDir = buildClassesDir,
             libGateway = stagingLibGateway, libDir = stagingLibDir,
             resourcesGateway = resourcesGateway, resourcesDir = processedResourcesDir,
-            agentJar = File(repoDir, "build/libs/hotswap-agent.jar"),
-            manifestFile = File(forgeHome, ".oroboros/manifests/classpath.tsv"),
+            agentJar = File(Files.resolvePath(repoDir, "build/libs/hotswap-agent.jar")),
+            manifestFile = File(Files.resolvePath(forgeHome, ".oroboros/manifests/classpath.tsv")),
         )
         // ── Agent home: ~/.hermes is colocated history, not repo state — a fourth narrow gateway,
         // same shape as the build planes. Excludes are the agent's OWN install/cache material
@@ -690,7 +696,7 @@ object OroborosDaemon {
         // memories, cron, config) is what "teleport a clone" means: the agent's memory, not its jar.
         // ONE-SHOT, no watcher: a home directory's caches/logs churn constantly and a live watch on
         // 2.7GB of it would dwarf the repo's own file-event volume for no replication benefit.
-        val hermesHomeDir = File(System.getProperty("user.home"), ".hermes")
+        val hermesHomeDir = File(HostSystem.getProperty("user.home"), ".hermes")
         val hermesHomeGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
             prefix = "homes/hermes/",
@@ -726,11 +732,11 @@ object OroborosDaemon {
         val incrementalViews = borg.trikeshed.couch.IncrementalViewRegistry(
             db = couchDb,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
-            log = { msg -> System.err.println("[OROBOROS] $msg") },
+            log = { msg -> HostSystem.err("[OROBOROS] $msg") },
         )
         launch {
             incrementalViews.open()
-            System.err.println("[OROBOROS] incremental-view registry: ${incrementalViews.state}")
+            HostSystem.err("[OROBOROS] incremental-view registry: ${incrementalViews.state}")
         }
         // One replicator, held by both mountings: `POST _replicate` drives it as a route, and the
         // RequestFactory's `replicate` operation drives the same object inside a batch.
@@ -785,12 +791,12 @@ object OroborosDaemon {
         )
         val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
             root = File(
-                config.hermesRoot ?: System.getenv("HERMES_SOURCE_ROOT")
-                ?: File(home, ".hermes/hermes-agent").absolutePath,
+                config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
+                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath,
             ).toPath(),
             sleeve = File(
-                config.hermesSleeve ?: System.getenv("HERMES_GRAAL_SLEEVE")
-                ?: File(repoDir, "graalpy-sleeve/hermes").absolutePath,
+                config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
+                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath,
             ).toPath(),
         )
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
@@ -820,7 +826,7 @@ object OroborosDaemon {
         // trailing the writer by at most one put.
         borg.trikeshed.cas.LineCasIndexPersistence.restore(couchStore, casStore)?.let { restored ->
             memoryStore.restoreIndex(restored)
-            System.err.println("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
+            HostSystem.err("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
             // Durable fact, not a log line: the board carries what the boot actually did.
             daemonBlackboard.put(
                 "daemon/linecas-index",
@@ -830,23 +836,23 @@ object OroborosDaemon {
         }
         memoryStore.onIndexIngest = { idx ->
             runCatching { borg.trikeshed.cas.LineCasIndexPersistence.write(couchStore, casStore, idx) }
-                .onFailure { t -> System.err.println("[OROBOROS] LineCasIndex persist failed: ${t.message}") }
+                .onFailure { t -> HostSystem.err("[OROBOROS] LineCasIndex persist failed: ${t.message}") }
         }
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
         val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
-        System.err.println("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
+        HostSystem.err("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
 
         // ── BeliefBagElement: the daemon-owned NarseseBag (AIKR belief bound) ──
         // Flagged (--belief-bag / TRIKESHED_BELIEF_BAG=1) while phases P3..P8 land.
         // Evidence spills to the SAME forge-home CAS the store uses; the WAL rides
         // .oroboros (a ForgeHome-reserved prefix). DecayTick = daily curation pulse.
-        val beliefBagEnabled = "--belief-bag" in args || System.getenv("TRIKESHED_BELIEF_BAG") == "1"
+        val beliefBagEnabled = "--belief-bag" in args || HostSystem.getenv("TRIKESHED_BELIEF_BAG") == "1"
         val beliefBag: borg.trikeshed.narsese.BeliefBagElement? = if (beliefBagEnabled) {
-            val walDir = File(forgeHome, ".oroboros").apply { mkdirs() }
+            val walDir = File(Files.resolvePath(forgeHome, ".oroboros")).apply { mkdirs() }
             val bag = borg.trikeshed.narsese.BeliefBagElement(
                 capacity = 4096,
                 cas = casStore,
-                wal = borg.trikeshed.couch.isam.JvmDurableAppendLog(File(walDir, "belief.wal")),
+                wal = borg.trikeshed.couch.isam.JvmDurableAppendLog(File(Files.resolvePath(walDir, "belief.wal"))),
                 decayFn = { b -> borg.trikeshed.narsese.AttentionEconomy.decay(b) },
                 priorityFloor = borg.trikeshed.narsese.CurationState.STALE.floor,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -858,7 +864,7 @@ object OroborosDaemon {
                     bag.intake.send(borg.trikeshed.narsese.BeliefIntake.DecayTick)
                 }
             }
-            System.err.println("[OROBOROS] BeliefBag open: ${bag.state} — ${bag.size} beliefs (capacity 4096, WAL ${walDir}/belief.wal)")
+            HostSystem.err("[OROBOROS] BeliefBag open: ${bag.state} — ${bag.size} beliefs (capacity 4096, WAL ${walDir}/belief.wal)")
             bag
         } else null
 
@@ -873,13 +879,13 @@ object OroborosDaemon {
         val hermesMemoryFiles: borg.trikeshed.memory.HermesMemoryFiles? = beliefBag?.let { bag ->
             val files = borg.trikeshed.memory.HermesMemoryFiles(
                 bag = bag,
-                memoriesDir = File(forgeHome, "memories"),
+                memoriesDir = File(Files.resolvePath(forgeHome, "memories")),
                 evaluatorCid = borg.trikeshed.job.ContentId.of("oroboros-session".encodeToByteArray()),
             )
             // session start: user edits are authoritative evidence, then freeze the render
             launch(Dispatchers.IO) {
                 val deltas = files.ingestUserEdits()
-                if (deltas > 0) System.err.println("[OROBOROS] MEMORY.md user edits re-ingested: $deltas deltas")
+                if (deltas > 0) HostSystem.err("[OROBOROS] MEMORY.md user edits re-ingested: $deltas deltas")
             }
             files
         }
@@ -973,15 +979,15 @@ object OroborosDaemon {
                     runCatching {
                         couchDb.put(
                             "kif-ledger/${cid.hex}",
-                            mapOf("kif" to kif, "source" to "curator.teach", "atMs" to System.currentTimeMillis()),
+                            mapOf("kif" to kif, "source" to "curator.teach", "atMs" to HostSystem.currentTimeMillis()),
                             null,
                         )
-                    }.onFailure { System.err.println("[OROBOROS] curator kif-ledger write failed (non-fatal): ${it.message}") }
+                    }.onFailure { HostSystem.err("[OROBOROS] curator kif-ledger write failed (non-fatal): ${it.message}") }
                     // The couch write above does not survive a restart — casBacked rebuilds its
                     // head projection empty at every boot, so the bodies persist in CAS but
                     // nothing can find them again. The file is the durable plane.
                     runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendAxiom(forgeHome, kif) }
-                        .onFailure { System.err.println("[OROBOROS] curator axiom ledger write failed (non-fatal): ${it.message}") }
+                        .onFailure { HostSystem.err("[OROBOROS] curator axiom ledger write failed (non-fatal): ${it.message}") }
                 },
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
             )
@@ -995,7 +1001,7 @@ object OroborosDaemon {
             borg.trikeshed.forge.server.BeliefWire(beliefBag, turnReview, hermesMemoryFiles, curatorImpulse)
         } else null
         if (causalityRete != null) {
-            System.err.println("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.size() ?: 0} axioms (ground theory ${curatorImpulse?.theorySize ?: 0} forms, impulses are ${curatorImpulse?.agentClass})")
+            HostSystem.err("[OROBOROS] CausalityRete live: ${causalityRete.rules.size} eternal rules; CuratorImpulse bank: ${curatorImpulse?.knowledgeBank?.size() ?: 0} axioms (ground theory ${curatorImpulse?.theorySize ?: 0} forms, impulses are ${curatorImpulse?.agentClass})")
             launch {
                 causalityRete.firings.collect { firing ->
                     daemonBlackboard.put(
@@ -1030,14 +1036,14 @@ object OroborosDaemon {
         // registration arms slot 0, the loop polls it — null just means "not wired yet".
         val wikiLane = arrayOf<borg.trikeshed.lcnc.LcncNodeRunner?>(null)
         if (curatorImpulse != null) {
-            val profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) }
+            val profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) }
                 ?: File(hermesHomeDir.absolutePath)
-            val archiveProfile = System.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
-                ?: File(System.getProperty("user.home"), ".hermes.prev").takeIf { it.isDirectory }
+            val archiveProfile = HostSystem.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
+                ?: File(HostSystem.getProperty("user.home"), ".hermes.prev").takeIf { it.isDirectory }
             // Wiki Maintainer lane cadence: one pass per N transcript-cid
             // batches (the arXiv outer loop k); WIKI_CONSOLIDATE_EVERY=0
             // disables the lane entirely.
-            val wikiEvery = System.getenv("WIKI_CONSOLIDATE_EVERY")?.toIntOrNull() ?: 1
+            val wikiEvery = HostSystem.getenv("WIKI_CONSOLIDATE_EVERY")?.toIntOrNull() ?: 1
             var wikiBatchesSeen = 0
             var wikiIterationsDone = 0
             // Transcript cids that landed before the runner was armed; drained
@@ -1046,9 +1052,9 @@ object OroborosDaemon {
             launch(Dispatchers.Default) {
                 runCatching {
                     val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(profileDir, archiveProfile, memoryStore)
-                    System.err.println("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
+                    HostSystem.err("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
                 }.onFailure {
-                    System.err.println("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
+                    HostSystem.err("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
                 }
 
                 val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
@@ -1063,12 +1069,12 @@ object OroborosDaemon {
                         checkpoint = f.checkpoint
                         followed = f
                         if (f.landed.isNotEmpty() || f.transcriptCids.size > 0) {
-                            System.err.println(
+                            HostSystem.err(
                                 "[OROBOROS] Curator followed ${f.transcriptCids.size} changed transcripts: ${f.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
                             )
                         }
                     }.onFailure {
-                        System.err.println("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
+                        HostSystem.err("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
                     }
                     // ── the arXiv outer loop (WikiSkill 2608.27454): every time
                     //    the feeder lands NEW transcript cids, the Wiki
@@ -1099,13 +1105,13 @@ object OroborosDaemon {
                                     params = mapOf("iteration" to wikiIterationsDone.toString()),
                                 )
                                 val report = wikiRunner.run(wikiNode, mapOf("cids" to cids))["report"] as? Map<*, *>
-                                System.err.println(
+                                HostSystem.err(
                                     "[OROBOROS] Wiki Maintainer iteration $wikiIterationsDone: ok=${report?.get("ok")} " +
                                             "applied=${(report?.get("applied") as? List<*>)?.size ?: "-"} " +
                                             "refused=${(report?.get("refused") as? List<*>)?.size ?: "-"}",
                                 )
                             }.onFailure {
-                                System.err.println("[OROBOROS] Wiki Maintainer failed (non-fatal): ${it.message}")
+                                HostSystem.err("[OROBOROS] Wiki Maintainer failed (non-fatal): ${it.message}")
                             }
                         }
                     }
@@ -1119,13 +1125,13 @@ object OroborosDaemon {
                                 )
                                 if (baselines != null) {
                                     baselinesLanded = true
-                                    System.err.println(
+                                    HostSystem.err(
                                         "[OROBOROS] Hermes baselines landed: watermark=${baselines.watermark.size} training=${baselines.training?.sessionCid?.value?.take(18) ?: "-"} corpus=${baselines.corpus.cid.value.take(18)}@${baselines.corpus.seq}",
                                     )
                                 }
                             }
                         }.onFailure {
-                            System.err.println("[OROBOROS] Hermes baseline computation failed (non-fatal): ${it.message}")
+                            HostSystem.err("[OROBOROS] Hermes baseline computation failed (non-fatal): ${it.message}")
                         }
                     }
                     delay(5_000L)
@@ -1140,12 +1146,12 @@ object OroborosDaemon {
         val projectScopes = borg.trikeshed.forge.server.ProjectScopes(
             fileOps, attachmentGateway, couchIndexBridge, casStore, beliefBag,
             projectDbs = projectDbRegistry,
-            ledgerFile = File(forgeHome, ".oroboros/projects.tsv"),
-            filesRoot = File(forgeHome, "files"),
+            ledgerFile = File(Files.resolvePath(forgeHome, ".oroboros/projects.tsv")),
+            filesRoot = File(Files.resolvePath(forgeHome, "files")),
         )
         val projectDbWire = borg.trikeshed.forge.server.ProjectDbWire(projectDbRegistry, uploads = projectScopes)
         val projectMiner = borg.trikeshed.forge.server.ProjectMiner(
-            projectDbRegistry, projectScopes, casStore, beliefBag, File(forgeHome, "files"),
+            projectDbRegistry, projectScopes, casStore, beliefBag, File(Files.resolvePath(forgeHome, "files")),
         )
         // ── Brain pin = Hermes' live session. Hermes records, per session, the
         // model and the resolved runtime it actually runs on
@@ -1173,10 +1179,10 @@ object OroborosDaemon {
         // Refreshed (limits + pre-charge, meters kept) whenever the ledger changes.
         val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
-            val now = System.currentTimeMillis()
+            val now = HostSystem.currentTimeMillis()
             val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
             quotaLegion.refresh(borg.trikeshed.jules.HermesModelUsage.ledgerRows(db), now)
-            System.err.println(
+            HostSystem.err(
                 "[OROBOROS] quota legion from hermes ledger ($db): " +
                         quotaLegion.limitsByProvider.entries.joinToString("; ") { (p, lim) ->
                             "$p proven $lim/day, spent today ${quotaLegion.ledgerSpentFor(p, now)}"
@@ -1230,8 +1236,8 @@ object OroborosDaemon {
                     if (configLaunch == null) "config default ${configOutcome.launch.model} runs api_mode=${configOutcome.launch.apiMode}, not chat_completions" else null
             }
             val built: borg.trikeshed.jules.BrainClient = if (hermesPinReason.isEmpty() && hermesSession != null && hermesModel != null && hermesBaseUrl != null && hermesKey != null) {
-                val seen = java.time.Instant.ofEpochMilli((hermesSession.recencyEpochSeconds * 1000).toLong())
-                System.err.println(
+                val seen = borg.trikeshed.platform.InstantShim.ofEpochMilli((hermesSession.recencyEpochSeconds * 1000).toLong())
+                HostSystem.err(
                     "[OROBOROS] Brain PINNED to hermes session ${hermesSession.id} (${hermesSession.source}, " +
                             (if (hermesSession.isOpen) "open" else "ended") + ", last activity $seen, ${hermesSession.apiCallCount} api calls): " +
                             "$hermesModel @ $hermesBaseUrl (provider=$hermesProvider, api_mode=${hermesSession.runtime.apiMode ?: "chat_completions"}, ${hermesSession.ledger})",
@@ -1246,14 +1252,14 @@ object OroborosDaemon {
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(hermesBaseUrl)
                 borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else if (configLaunch != null) {
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] Brain PINNED to hermes config default (${configLaunch.configFile}; session pin unavailable: $hermesPinReason): " +
                             "${configLaunch.model} @ ${configLaunch.baseUrl} (provider=${configLaunch.provider}, api_mode=${configLaunch.apiMode}, key from ${configLaunch.keySource})",
                 )
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(configLaunch.baseUrl)
                 borg.trikeshed.jules.BrainClient(apiKey = configLaunch.apiKey, base = configLaunch.baseUrl, model = configLaunch.model, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else {
-                System.err.println("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason; config default unavailable: $configReason")
+                HostSystem.err("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason; config default unavailable: $configReason")
                 borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
             }
             val account: Map<String, Any?> = mapOf(
@@ -1265,7 +1271,7 @@ object OroborosDaemon {
                     else -> null
                 },
                 "reason" to listOfNotNull(hermesPinReason.ifEmpty { null }, configReason).joinToString("; ").ifEmpty { null },
-                "builtAtMs" to System.currentTimeMillis(),
+                "builtAtMs" to HostSystem.currentTimeMillis(),
             )
             return built to account
         }
@@ -1288,14 +1294,14 @@ object OroborosDaemon {
         // forge home is what a restart re-reads (the couch index is per boot).
         val promptStore = borg.trikeshed.lcnc.PromptStore(
             attachmentGateway, casStore, borg.trikeshed.lcnc.PromptStore.ledgerFile(forgeHome), lcncPublisher,
-        ) { System.currentTimeMillis() }
+        ) { HostSystem.currentTimeMillis() }
         // The program ledger (AutoTools notion, Cut 0): a published program's bytes are CAS
         // citizens already, but its `panels/<name>` head lives in a couch index rebuilt per boot;
         // <forgeHome>/programs/ledger.jsonl is what a restart re-reads, and the head is re-filed
         // and republished as `lcnc/program/<name>` at the same programCid.
         val programLedger = borg.trikeshed.lcnc.ProgramLedger(
             attachmentGateway, casStore, borg.trikeshed.lcnc.ProgramLedger.ledgerFile(forgeHome), lcncPublisher,
-        ) { System.currentTimeMillis() }
+        ) { HostSystem.currentTimeMillis() }
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
         val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)
@@ -1318,7 +1324,7 @@ object OroborosDaemon {
             mountScope = wireScope,
             miner = projectMiner,
             catalogProvider = { requireNotNull(muxReactor.modelMux()) },
-            sessionSnapshot = File(forgeHome, ".modelmux/sessions.json"),
+            sessionSnapshot = File(Files.resolvePath(forgeHome, ".modelmux/sessions.json")),
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
@@ -1351,7 +1357,7 @@ object OroborosDaemon {
             attachments = attachmentGateway,
             routes = moduleRoutes,
             scope = moduleScope,
-            clock = { System.currentTimeMillis() },
+            clock = { HostSystem.currentTimeMillis() },
             stateDir = forgeHome,
             muxContext = htxElement + muxReactor,
             ccekBinding = ccekBinding,
@@ -1413,12 +1419,12 @@ object OroborosDaemon {
             agentRoster, repoDir = repoDir, forgeHome = forgeHome, cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
         )
         moduleContext.agentRuns = agentRunner
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.AgentNodes.registry(agentRunner) { java.util.UUID.randomUUID().toString() })
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.AgentNodes.registry(agentRunner) { borg.trikeshed.platform.randomUuid().toString() })
         val agentWire = borg.trikeshed.forge.server.AgentWire(
-            agentRunner, daemonBlackboard, probedAtMs = System.currentTimeMillis(),
-            enabledBy = if ("--agents" in args) "--agents" else if (System.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
+            agentRunner, daemonBlackboard, probedAtMs = HostSystem.currentTimeMillis(),
+            enabledBy = if ("--agents" in args) "--agents" else if (HostSystem.getenv("TRIKESHED_AGENTS") != null) "TRIKESHED_AGENTS" else "default",
         )
-        System.err.println("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
+        HostSystem.err("[OROBOROS] coding agents: " + agentRoster.joinToString { it.id + if (it.enabled) " " + it.version else " (" + it.why + ")" })
         lcncStores(moduleContext, promptStore, snapshotService, projectCorpus)
         // ── hermes.lastUsed: the outcome, next to the intent ──────────
         // mux.meta answers "what is modelmux configured to select" and reports
@@ -1546,15 +1552,15 @@ object OroborosDaemon {
                                 "copula" to r.copula.name,
                                 "evidence" to r.evidence.packed.toString(),
                                 "provenanceCid" to (r.provenanceCid ?: ""),
-                                "atMs" to System.currentTimeMillis(),
+                                "atMs" to HostSystem.currentTimeMillis(),
                             ),
                             null,
                         )
-                    }.onFailure { System.err.println("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
+                    }.onFailure { HostSystem.err("[OROBOROS] rete-rule ledger write failed (non-fatal): ${it.message}") }
                     // Same reason as the axiom ledger: couch cannot find its own documents after
                     // a restart, so the durable record of admitted law is the file.
                     runCatching { borg.trikeshed.narsese.NarsDurableLedger.appendRule(forgeHome, r) }
-                        .onFailure { System.err.println("[OROBOROS] rete-rule file ledger write failed (non-fatal): ${it.message}") }
+                        .onFailure { HostSystem.err("[OROBOROS] rete-rule file ledger write failed (non-fatal): ${it.message}") }
                 },
             )
             moduleContext.lcncRunners["nal.rules.fromKg"] = borg.trikeshed.narsese.RuleNodes.rulesFromKgRunner(liveRete)
@@ -1586,7 +1592,7 @@ object OroborosDaemon {
                 runCatching { kifBank.assertKif(kif) }
                 // Durable tee: the in-memory bank dies with the process; the
                 // couch ledger is what the council boot thaw re-asserts from.
-                runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "legal.ingest", "atMs" to System.currentTimeMillis()), null) }
+                runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "legal.ingest", "atMs" to HostSystem.currentTimeMillis()), null) }
             },
         )
         // Evidence-bank injection (§3/§5 gap): queries the shared kifBank for
@@ -1616,7 +1622,7 @@ object OroborosDaemon {
                             // "say OK" (mission-002 M2 measured it four times). The floor
                             // is the seat's authored budget; TRIKESHED_SEAT_MAXTOKENS
                             // overrides for a model that needs more headroom.
-                            val seatBudget = (System.getenv("TRIKESHED_SEAT_MAXTOKENS")?.toIntOrNull() ?: 3000)
+                            val seatBudget = (HostSystem.getenv("TRIKESHED_SEAT_MAXTOKENS")?.toIntOrNull() ?: 3000)
                             val content = brainClient.chat(
                                 listOf("system" to system, "user" to prompt),
                                 maxTokens = seatBudget,
@@ -1720,7 +1726,7 @@ object OroborosDaemon {
             val lcncRoster = if (pinnedSpec == null) discovered else listOf(pinnedSpec) + discovered.filterNot {
                 (it.provider ?: it.name) == pinnedSpec.provider && it.model == pinnedSpec.model
             }
-            System.err.println(
+            HostSystem.err(
                 "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.jules.HermesModelUsage.stateDb()}), " +
                         "${staticSpecs.size} from the static roster; configured default=${pinnedSpec?.model ?: "none"}" +
                         hermesInstances.take(3).joinToString(prefix = " — newest: ", separator = ", ") { "${it.model}@${it.provider}" } +
@@ -1732,7 +1738,7 @@ object OroborosDaemon {
             }
             val lcncCardIds = modelmux.disambiguateModelIds(lcncRosterEntries)
             modelmux.shadowedEntries(lcncRosterEntries).forEach { (entry, id) ->
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] roster collision: ${entry.provider} serves '${entry.model}', " +
                             "already claimed — routable as '$id' (previously unreachable)",
                 )
@@ -1773,9 +1779,9 @@ object OroborosDaemon {
                 )
                 tribunalHolder.instance = tribunal
                 tribunal.awaitRootSeeds()
-                System.err.println("[OROBOROS] tribunal instance live: ${tribunal.laneIds.size} lanes seeded at root (schema job-nexus)")
+                HostSystem.err("[OROBOROS] tribunal instance live: ${tribunal.laneIds.size} lanes seeded at root (schema job-nexus)")
             }.onFailure {
-                System.err.println("[OROBOROS] tribunal instance failed to open (non-fatal): ${it.message}")
+                HostSystem.err("[OROBOROS] tribunal instance failed to open (non-fatal): ${it.message}")
             }
         }
         // ── Legal council (design/legal-council-3x5.md): the 3x5 preset's node
@@ -1818,7 +1824,7 @@ object OroborosDaemon {
             val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
             daemonBlackboard.put("legal-kif/${cid.hex}", kif, "council.record")
             runCatching { kifBank.assertKif(kif) }
-            runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "council", "atMs" to System.currentTimeMillis()), null) }
+            runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "council", "atMs" to HostSystem.currentTimeMillis()), null) }
         }
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.CouncilNodes.registry(
@@ -1868,10 +1874,10 @@ object OroborosDaemon {
             }
             borg.trikeshed.wiki.WikiNodes.WikiReply(content, answeredBy)
         }
-        val wikiRoot = { File(forgeHome, "wiki") }
+        val wikiRoot = { File(Files.resolvePath(forgeHome, "wiki")) }
         val wikiTraces = borg.trikeshed.wiki.WikiTraceSources.loader(
             cas = casStore,
-            profileDir = System.getenv("HERMES_PROFILE")?.let { File(it) } ?: File(hermesHomeDir.absolutePath),
+            profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) } ?: File(hermesHomeDir.absolutePath),
         )
         moduleContext.lcncRunners[borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE] =
             borg.trikeshed.wiki.WikiNodes.consolidateRunner(
@@ -1887,7 +1893,7 @@ object OroborosDaemon {
         // artifact needed an API key. VAL-CROSS-002 found the curation plane hosted, durable and
         // unreachable as itself. These two routes are the read side, and they touch nothing.
         val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(wikiRoot)
-        System.err.println(
+        HostSystem.err(
             "[OROBOROS] Wiki read routes armed: " +
                     borg.trikeshed.forge.server.WikiReadWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" } +
                     " root=${wikiRoot().absolutePath}"
@@ -1962,17 +1968,17 @@ object OroborosDaemon {
                     restored.addAll(borg.trikeshed.narsese.NarsDurableLedger.readRules(forgeHome))
                     if (restored.isNotEmpty()) ruleCount = liveRete.admit(borg.trikeshed.lib.seriesOf(restored))
                 }
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] council thaw: $kifCount kif facts (couch) + $kifFileCount (durable ledger), " +
                             "$caseCount cases re-indexed, $ruleCount eternal rules re-admitted"
                 )
             }.onFailure {
-                System.err.println("[OROBOROS] council thaw failed (non-fatal): ${it.message}")
+                HostSystem.err("[OROBOROS] council thaw failed (non-fatal): ${it.message}")
             }
         }
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
-            liveClassesDir = File(repoDir, "build/live/classes"),
+            liveClassesDir = File(Files.resolvePath(repoDir, "build/live/classes")),
             receipt = { event, id, detail ->
                 daemonBlackboard.put("$event/$id", detail.mapValues { it.value?.toString() ?: "" }, "oroboros")
             },
@@ -1989,7 +1995,7 @@ object OroborosDaemon {
         // outbound NUID acceptance spaces never collide.
         val outboundHookLedger = withContext(Dispatchers.IO) {
             borg.trikeshed.hook.CausalHookDeliveryLedger.open(
-                File(forgeHome, ".hook-deliveries-out.wal"), "hook-delivery-out/",
+                File(Files.resolvePath(forgeHome, ".hook-deliveries-out.wal")), "hook-delivery-out/",
             )
         }
         borg.trikeshed.hook.installOutboundWebhookBridge(couchStore, daemonBlackboard, webhookScope, outboundHookLedger)
@@ -1997,7 +2003,7 @@ object OroborosDaemon {
         // Boot facts land on the board — the durable answer to "what is this daemon".
         daemonBlackboard.put(
             "daemon/boot/kanban",
-            mapOf("port" to "8888", "atMs" to System.currentTimeMillis().toString()),
+            mapOf("port" to "8888", "atMs" to HostSystem.currentTimeMillis().toString()),
             "oroboros",
         )
         // The canvas as RDF, joined with what watches it: productions (Rete),
@@ -2075,20 +2081,20 @@ object OroborosDaemon {
         // it cannot foresee (the corpus-wide republish reads every `panels/` attachment, ledger
         // line or not).
         runCatching { programLedger.thaw() }
-            .onSuccess { restored -> System.err.println("[OROBOROS] programs: $restored head(s) restored from the ledger") }
-            .onFailure { System.err.println("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
+            .onSuccess { restored -> HostSystem.err("[OROBOROS] programs: $restored head(s) restored from the ledger") }
+            .onFailure { HostSystem.err("[OROBOROS] programs: ledger thaw FAILED (${it.message}); the daemon boots without the ledger's heads") }
         launch {
             // KanbanModule is the point of the module system: attached by DEFAULT (the WAL-backed
             // board replaces the fossil plan-parser). TRIKESHED_NO_KANBAN_MODULE=1 opts out.
-            if (System.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
+            if (HostSystem.getenv("TRIKESHED_NO_KANBAN_MODULE") != "1") {
                 runCatching { moduleSupervisor.attach(borg.trikeshed.kanban.module.KanbanModule()) }
-                    .onSuccess { System.err.println("[OROBOROS] module attached: ${it.id} (default) — ${it.describe()}") }
-                    .onFailure { System.err.println("[OROBOROS] KanbanModule attach FAILED: ${it.message}") }
+                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} (default) — ${it.describe()}") }
+                    .onFailure { HostSystem.err("[OROBOROS] KanbanModule attach FAILED: ${it.message}") }
             }
             for (fqcn in config.modules) {
                 runCatching { moduleSupervisor.attach(fqcn) }
-                    .onSuccess { System.err.println("[OROBOROS] module attached: ${it.id} ($fqcn)") }
-                    .onFailure { System.err.println("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
+                    .onSuccess { HostSystem.err("[OROBOROS] module attached: ${it.id} ($fqcn)") }
+                    .onFailure { HostSystem.err("[OROBOROS] module attach FAILED for $fqcn: ${it.message}") }
             }
         }
 
@@ -2106,17 +2112,17 @@ object OroborosDaemon {
             )
             moduleScope.launch {
                 tendon.open()
-                System.err.println("[OROBOROS] project-db tendon: ${pdb.name} — ${tendon.factsApplied} facts")
+                HostSystem.err("[OROBOROS] project-db tendon: ${pdb.name} — ${tendon.factsApplied} facts")
             }
         }
         launch(Dispatchers.IO) {
             for (extra in config.projects) {
                 runCatching { projectScopes.mount(extra) }
-                    .onSuccess { System.err.println("[OROBOROS] project db mounted: ${it.kind} ${it.name} (${it.paths} paths, ${it.docs} docs, ${it.minted} minted)") }
-                    .onFailure { System.err.println("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
+                    .onSuccess { HostSystem.err("[OROBOROS] project db mounted: ${it.kind} ${it.name} (${it.paths} paths, ${it.docs} docs, ${it.minted} minted)") }
+                    .onFailure { HostSystem.err("[OROBOROS] scope mount FAILED for $extra: ${it.message}") }
             }
             val remounted = runCatching { projectScopes.remountLedger() }.getOrElse { 0 }
-            if (remounted > 0) System.err.println("[OROBOROS] project dbs remounted from ledger: $remounted")
+            if (remounted > 0) HostSystem.err("[OROBOROS] project dbs remounted from ledger: $remounted")
         }
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
         if (watch) {
@@ -2132,16 +2138,16 @@ object OroborosDaemon {
                     } catch (t: Throwable) {
                         if (t is kotlinx.coroutines.CancellationException && !isRunning) break
                         attempt++
-                        System.err.println("[OROBOROS] Kanban server failed (attempt $attempt): ${t.message}")
+                        HostSystem.err("[OROBOROS] Kanban server failed (attempt $attempt): ${t.message}")
                         t.printStackTrace()
-                        if (attempt >= 5) { System.err.println("[OROBOROS] Kanban server giving up after $attempt attempts"); break }
+                        if (attempt >= 5) { HostSystem.err("[OROBOROS] Kanban server giving up after $attempt attempts"); break }
                         kotlinx.coroutines.delay(1500L * attempt)
                     }
                 }
             }
-            System.err.println("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike) — Couch 1.6 surface at /$COUCH_DB_NAME, PWA hoisted at /")
+            HostSystem.err("[OROBOROS] Kanban HTTP server launching on :$kanbanPort (CCEK litebike) — Couch 1.6 surface at /$COUCH_DB_NAME, PWA hoisted at /")
         } else {
-            System.err.println("[OROBOROS] --once mode: Kanban server skipped")
+            HostSystem.err("[OROBOROS] --once mode: Kanban server skipped")
         }
 
         // ── Pointcut Subsystem ──
@@ -2181,7 +2187,7 @@ object OroborosDaemon {
             walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { gitWatcher.open() }
-        System.err.println("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
+        HostSystem.err("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
 
         // The Jules causal WAL is an event source, not an out-of-band operator
         // surface. External queue/review appends wake the same serialized cycle
@@ -2203,7 +2209,7 @@ object OroborosDaemon {
                 println("[OROBOROS] jules-wal-event: ${event.type}")
             }
         }
-        System.err.println("[OROBOROS] Jules WAL watcher: ${julesWalWatcher.state} — serialized cycle trigger")
+        HostSystem.err("[OROBOROS] Jules WAL watcher: ${julesWalWatcher.state} — serialized cycle trigger")
 
         // Working-tree plane: source and document files live under Couch/CAS,
         // independently of the `.git/**` identity plane above.
@@ -2243,7 +2249,7 @@ object OroborosDaemon {
             walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { worktreeWatcher.open() }
-        System.err.println("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
+        HostSystem.err("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
 
         launch {
             // Seismic damping: a build refeed or git fetch is thousands of events in seconds;
@@ -2252,7 +2258,7 @@ object OroborosDaemon {
             for (event in worktreeWatcher.events) {
                 worktreeReconcileElement.worktreeDirty.trySend(Unit)
                 cycleTriggers.trySend(Unit)
-                val now = System.currentTimeMillis()
+                val now = HostSystem.currentTimeMillis()
                 if (now - windowStart > 5_000) {
                     if (windowCount > 1) println("[OROBOROS] worktree-quake: $windowCount events in 5s (last: $lastPath)")
                     else if (windowCount == 1) println("[OROBOROS] worktree-event: $lastPath")
@@ -2268,8 +2274,8 @@ object OroborosDaemon {
         for ((dir, phase) in listOf(
             buildClassesDir to "staged",
             stagingLibDir to "staged",
-            File(repoDir, "build/classes/kotlin/jvm/main") to "compiled",
-            File(repoDir, "build/classes/java/jvmMain") to "compiled",
+            File(Files.resolvePath(repoDir, "build/classes/kotlin/jvm/main")) to "compiled",
+            File(Files.resolvePath(repoDir, "build/classes/java/jvmMain")) to "compiled",
         )) {
             val w = JvmFileWatchReactorElement(
                 root = dir.absolutePath,
@@ -2323,8 +2329,8 @@ object OroborosDaemon {
                     }
                     event.path.startsWith(".git/refs/") -> {
                         gitState.invalidateHead()
-                        if (System.currentTimeMillis() - lastRefLogMs > 5_000) {
-                            lastRefLogMs = System.currentTimeMillis()
+                        if (HostSystem.currentTimeMillis() - lastRefLogMs > 5_000) {
+                            lastRefLogMs = HostSystem.currentTimeMillis()
                             println("[OROBOROS] git-event: ref changed → ${event.path} (further ref churn sampled 1/5s)")
                         }
                     }
@@ -2343,9 +2349,9 @@ object OroborosDaemon {
         withContext(Dispatchers.IO) {
             runCatching {
                 val buildPaths = reconcileBuildPlane(buildPlanes, gitState.headSha())
-                System.err.println("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
+                HostSystem.err("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
             }.onFailure {
-                System.err.println("[OROBOROS] build plane reconcile failed: ${it.message}")
+                HostSystem.err("[OROBOROS] build plane reconcile failed: ${it.message}")
                 it.printStackTrace()
             }
             // ── Foundation: git + worktree reconcile ──
@@ -2355,26 +2361,26 @@ object OroborosDaemon {
                     forgeHome = repoDir.absolutePath,
                     agentId = "oroboros",
                     revision = headSha,
-                    sequence = System.currentTimeMillis(),
+                    sequence = HostSystem.currentTimeMillis(),
                 )
                 couchIndexBridge.indexReconciliation(
                     GitCouchGateway.GIT_PREFIX,
                     snap.paths.size j { i: Int -> snap.paths[i] },
                 )
-                System.err.println("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
+                HostSystem.err("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
 
                 val worktreeSnap = worktreeCouchGateway.reconcile(
                     repoRoot = repoDir.absolutePath,
                     agentId = "oroboros",
                     revision = headSha,
-                    sequence = System.currentTimeMillis(),
+                    sequence = HostSystem.currentTimeMillis(),
                 )
                 couchIndexBridge.indexReconciliation(
                     WorktreeCouchGateway.WORKTREE_PREFIX,
                     worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
                 )
                 projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
                             (if (worktreeSnap.skippedDirs.isEmpty()) ""
                             else " — INCOMPLETE: ${worktreeSnap.skippedDirs.size} unreadable dir(s), " +
@@ -2386,7 +2392,7 @@ object OroborosDaemon {
                 )
                 headSha to worktreeSnap
             }.onFailure {
-                System.err.println("[OROBOROS] git/worktree reconcile failed: ${it.message}")
+                HostSystem.err("[OROBOROS] git/worktree reconcile failed: ${it.message}")
                 it.printStackTrace()
             }.getOrNull() ?: return@withContext
 
@@ -2395,7 +2401,7 @@ object OroborosDaemon {
             // ── Memory bridge + belief seeding (degrades independently) ──
             runCatching {
                 val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
-                System.err.println(
+                HostSystem.err(
                     "[OROBOROS] Memory bridge: $bridged memory files bridged (spines + local aliases)"
                 )
                 // ── Belief minting feed: epistemic signals from the memory plane land in the bag.
@@ -2433,30 +2439,30 @@ object OroborosDaemon {
                             mintedSignals++
                         }
                     }
-                    System.err.println("[OROBOROS] BeliefBag seeded: $mintedSignals epistemic signals → ${beliefBag.size} beliefs")
+                    HostSystem.err("[OROBOROS] BeliefBag seeded: $mintedSignals epistemic signals → ${beliefBag.size} beliefs")
                 }
             }.onFailure {
-                System.err.println("[OROBOROS] memory bridge/belief failed: ${it.message}")
+                HostSystem.err("[OROBOROS] memory bridge/belief failed: ${it.message}")
                 it.printStackTrace()
             }
 
             // ── Hermes home reconcile ──
             runCatching {
                 if (hermesHomeDir.isDirectory) {
-                    val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, System.currentTimeMillis())
-                    System.err.println("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")
+                    val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, HostSystem.currentTimeMillis())
+                    HostSystem.err("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")
                 } else {
-                    System.err.println("[OROBOROS] Hermes home skipped: $hermesHomeDir not found")
+                    HostSystem.err("[OROBOROS] Hermes home skipped: $hermesHomeDir not found")
                 }
             }.onFailure {
-                System.err.println("[OROBOROS] Hermes home reconcile failed: ${it.message}")
+                HostSystem.err("[OROBOROS] Hermes home reconcile failed: ${it.message}")
                 it.printStackTrace()
             }
         }
 
         // ── Couch report reactor: CCEK element for map/reduce events ──
         val reportReactor = reportReactorForWires
-        System.err.println("[OROBOROS] Couch report reactor: ${reportReactor.state} — feeding the Graal console flourish feed")
+        HostSystem.err("[OROBOROS] Couch report reactor: ${reportReactor.state} — feeding the Graal console flourish feed")
 
         // ── Tendon: _changes → report bus + Rete facts. Every committed revision (local write,
         //    reconcile, or a peer's replication) is a fact in the production system; the git object
@@ -2472,7 +2478,7 @@ object OroborosDaemon {
         )
         launch {
             changesFacts.open()
-            System.err.println("[OROBOROS] Changes→Rete tendon: ${changesFacts.state} — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
+            HostSystem.err("[OROBOROS] Changes→Rete tendon: ${changesFacts.state} — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
         }
 
         // ── Tendon: daemonBlackboard keys → Rete facts (partition "blackboard"). Admit table is
@@ -2495,12 +2501,12 @@ object OroborosDaemon {
         )
         launch {
             blackboardFacts.open()
-            System.err.println("[OROBOROS] Blackboard→Rete tendon: ${blackboardFacts.state} — ${blackboardFacts.factsApplied} facts from the initial drain of ${daemonBlackboard.keys().size} keys")
+            HostSystem.err("[OROBOROS] Blackboard→Rete tendon: ${blackboardFacts.state} — ${blackboardFacts.factsApplied} facts from the initial drain of ${daemonBlackboard.keys().size} keys")
             graalFacts.open()
-            System.err.println("[OROBOROS] Graal→Rete tendon: ${graalFacts.state}")
+            HostSystem.err("[OROBOROS] Graal→Rete tendon: ${graalFacts.state}")
             // Belt to the tee's brace: anything the network held before the observer attached is projected once.
             kifTee.prime(rete)
-            System.err.println("[OROBOROS] Rete→KIF tee: ${kifTee.trackedCount()} facts projected into the one bank")
+            HostSystem.err("[OROBOROS] Rete→KIF tee: ${kifTee.trackedCount()} facts projected into the one bank")
         }
 
         val mainJob = coroutineContext[kotlinx.coroutines.Job]
@@ -2515,13 +2521,13 @@ object OroborosDaemon {
         Signal.handle(Signal("TERM"), sigHandler)
         Signal.handle(Signal("INT"), sigHandler)
 
-        System.err.println(
+        HostSystem.err(
             "[OROBOROS] daemon up. forgeHome=$forgeHome repo=$repoDir " +
                     "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
         if (!preflight(repoDir)) {
-            System.err.println("[OROBOROS] preflight failed; aborting")
+            HostSystem.err("[OROBOROS] preflight failed; aborting")
             return
         }
 
@@ -2616,13 +2622,13 @@ object OroborosDaemon {
     }
 
     private fun die(msg: String): Nothing {
-        System.err.println("[OROBOROS] $msg")
+        HostSystem.err("[OROBOROS] $msg")
         usage()
         exitProcess(2)
     }
 
     private fun usage() {
-        System.err.println(
+        HostSystem.err(
             """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N]
               [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
               env: JULES_API_KEY (required)
@@ -2654,7 +2660,7 @@ object ReapAppend {
     fun main(args: Array<String>) = runBlocking {
         val listPath = args.getOrNull(0) ?: error("usage: ReapAppend <sid-list.txt> [wal-path]")
         val walPath = args.getOrNull(1)
-            ?: File(System.getProperty("user.home"), ".local/forge/jules-board.wal").absolutePath
+            ?: File(HostSystem.getProperty("user.home"), ".local/forge/jules-board.wal").absolutePath
         val store = JulesBoardStore(JvmAppendWal(File(walPath)).also {
             File(walPath).parentFile.mkdirs()
         })
@@ -2668,7 +2674,7 @@ object ReapAppend {
                 sessionId = sid,
                 commitSha = commitSha,
                 taskId = "reap-pass",
-                at = System.currentTimeMillis(),
+                at = HostSystem.currentTimeMillis(),
             ))
             ok++
         }
