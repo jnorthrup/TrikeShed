@@ -177,7 +177,7 @@ object OroborosDaemon {
         /** Dynamic modules attached at boot: --module <fqcn> (repeatable). Proxy-ctor loaded (app CP, then build/live). */
         val modules: List<String> = emptyList(),
         /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode or TRIKESHED_AGENTS; default codex,opencode. */
-        val agents: Set<String> = borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED,
+        val agents: Set<String> = borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED,
     )
 
     @Volatile
@@ -243,7 +243,7 @@ object OroborosDaemon {
         }
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
-            ?: borg.trikeshed.agent.AgentCli.DEFAULT_ENABLED
+            ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
         return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved)
     }
 
@@ -1388,7 +1388,7 @@ object OroborosDaemon {
         borg.trikeshed.lcnc.CamelRouteLegos.register(moduleContext)
         // The coding-agent lane (Forge genesis, Cut A): the host's CLIs probed once; agent.run /
         // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
-        val agentRoster = borg.trikeshed.agent.AgentCli.probe(config.agents)
+        val agentRoster = borg.trikeshed.agent.AgentCliProbe.probe(config.agents, borg.trikeshed.agent.AgentRegistry.KNOWN)
         val agentRunner = borg.trikeshed.agent.JvmAgentRunner(
             agentRoster, repoDir = repoDir, forgeHome = forgeHome, cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
         )
