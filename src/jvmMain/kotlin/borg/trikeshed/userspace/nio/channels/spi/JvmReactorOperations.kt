@@ -1,82 +1,129 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.ElementState
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.reactor.Interest
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration
+import kotlin.time.TimeSource
 
-/**
- * JVM actual of the reactor SPI. Readiness is POLL_ADD / POLL_REMOVE SQEs on
- * the uring facade — the same ring, same CQE contract, one IO flavor. The
- * Selector is the backend's emulation substrate for POLL_ADD execution; this
- * class stages watch SQEs and settles their readiness CQEs. No selector, no
- * registry, no dispatcher hop lives here.
- */
-class JvmReactorOperations : ReactorOperations {
+/** Readiness is a one-shot POLL_ADD CQE; persistent interests rearm after delivery. */
+class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
+    override val key get() = ReactorOperations.Key
 
-    // One facade per reactor for watch submission; entries bound the watch count.
-    private val watchFacade = openBackendFacade(64)
+    private val watchFacade = FunctionalUringFacade(64, openUserspaceChannelBackend(64))
     private var nextToken = 0L
-
-    // token -> (fd, interests, userData) for readiness mapping.
-    private val watches = HashMap<Long, Triple<Int, Set<Interest>, Long>>()
+    private val watches = HashMap<Int, Pair<Set<Interest>, Long>>()
+    private val tokens = HashMap<Long, Int>()
+    private val signals = ArrayDeque<ReactorSignal>()
 
     private fun interestMask(interests: Set<Interest>): Int {
         var mask = 0
-        if (Interest.READ in interests) mask = mask or 0x1        // EPOLLIN
-        if (Interest.WRITE in interests) mask = mask or 0x4       // EPOLLOUT
-        if (Interest.CONNECT in interests) mask = mask or 0x2     // EPOLLRDHUP~connect
+        if (Interest.READ in interests || Interest.ACCEPT in interests) mask = mask or 0x1
+        if (Interest.WRITE in interests || Interest.CONNECT in interests) mask = mask or 0x4
         return mask
     }
 
     override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
+        check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+        if (interests.isEmpty()) {
+            deregister(fd)
+            return
+        }
+        if (watches[fd] == interests to userData) return
+        deregister(fd)
+        // The remaining slot admits POLL_REMOVE while every watch is pending.
+        check(watches.size < 63) { "Reactor watch capacity exceeded" }
+        watches[fd] = interests.toSet() to userData
+        try {
+            submitWatch(fd)
+            collect()
+        } catch (failure: Throwable) {
+            watches.remove(fd)
+            throw failure
+        }
+    }
+
+    private fun submitWatch(fd: Int) {
+        val watch = watches.getValue(fd)
         val token = ++nextToken
-        watches[token] = Triple(fd, interests, userData)
         watchFacade.enqueue(
-            UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = token, operationFlags = interestMask(interests))
+            UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = token, operationFlags = interestMask(watch.first)),
         )
-        watchFacade.submit()
+        tokens[token] = fd
+        check(watchFacade.submit() == 1) { "POLL_ADD SQE was not submitted" }
     }
 
     override fun deregister(fd: Int) {
-        val matches = watches.filterValues { it.first == fd }
-        for ((token, _) in matches) {
-            watchFacade.enqueue(UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = token))
-            watches.remove(token)
+        watches.remove(fd)
+        signals.removeAll { it.fd == fd }
+        val token = tokens.entries.firstOrNull { it.value == fd }?.key ?: return
+        watchFacade.enqueue(
+            UringSubmission(UringOp.POLL_REMOVE, fd, token, 0, 0, userData = ++nextToken),
+        )
+        check(watchFacade.submit() == 1) { "POLL_REMOVE SQE was not submitted" }
+        collect()
+    }
+
+    private fun collect() {
+        for (cqe in watchFacade.wait(0)) {
+            val fd = tokens.remove(cqe.userData) ?: continue
+            val watch = watches[fd] ?: continue
+            check(cqe.res >= 0) { "POLL_ADD failed for fd=$fd: ${cqe.res}" }
+            val ready = mutableSetOf<Interest>()
+            if (cqe.res and 0x1 != 0) {
+                if (Interest.READ in watch.first) ready.add(Interest.READ)
+                if (Interest.ACCEPT in watch.first) ready.add(Interest.ACCEPT)
+            }
+            if (cqe.res and 0x4 != 0) {
+                if (Interest.WRITE in watch.first) ready.add(Interest.WRITE)
+                if (Interest.CONNECT in watch.first) ready.add(Interest.CONNECT)
+            }
+            // Error/hangup wakes the requested operation so its CQE reports the cause.
+            if (cqe.res and (0x8 or 0x10 or 0x20) != 0) ready.addAll(watch.first)
+            if (ready.isNotEmpty()) signals.addLast(ReactorSignal(fd, ready, watch.second))
         }
-        if (matches.isNotEmpty()) watchFacade.submit()
     }
 
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
-        val deadline = if (timeout.isInfinite()) -1L else System.currentTimeMillis() + timeout.inWholeMilliseconds
-        val signals = ArrayList<ReactorSignal>()
+        check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+        val started = TimeSource.Monotonic.markNow()
         while (true) {
-            // Settle readiness CQEs the backend substrate queued.
-            for ((token, fd, mask) in backendDrain()) {
-                val watch = watches[token] ?: continue
-                val ready = mutableSetOf<Interest>()
-                if (mask and 0x1 != 0) ready.add(Interest.READ)
-                if (mask and 0x4 != 0) ready.add(Interest.WRITE)
-                if (mask and 0x2 != 0) ready.add(Interest.CONNECT)
-                if (mask and 0x1 != 0 && watch.second.contains(Interest.ACCEPT)) ready.add(Interest.ACCEPT)
-                signals.add(ReactorSignal(watch.first, ready, watch.third))
+            collect()
+            if (signals.isNotEmpty()) return buildList {
+                while (signals.isNotEmpty()) add(signals.removeFirst())
             }
-            if (signals.isNotEmpty()) return signals
-            when {
-                deadline == -1L -> kotlinx.coroutines.delay(10)
-                System.currentTimeMillis() >= deadline -> return signals // empty on timeout
-                else -> kotlinx.coroutines.delay(1)
+            for (fd in watches.keys) {
+                if (fd !in tokens.values) submitWatch(fd)
             }
+            collect()
+            if (signals.isNotEmpty()) continue
+            if (!timeout.isInfinite() && started.elapsedNow() >= timeout) return emptyList()
+            delay(1)
         }
     }
+
+    override suspend fun drain(): Unit = withContext(NonCancellable) {
+        if (state == ElementState.CLOSED) return@withContext
+        state = ElementState.DRAINING
+        try {
+            for (fd in watches.keys.toIntArray()) deregister(fd)
+            watchFacade.closeNow()
+        } finally {
+            watches.clear()
+            tokens.clear()
+            signals.clear()
+            supervisor.complete()
+            supervisor.join()
+            state = ElementState.CLOSED
+        }
+    }
+
+    override suspend fun close() = drain()
 }
-
-/** Per-reactor facade over the canonical probed backend. */
-private fun openBackendFacade(entries: Int): borg.trikeshed.userspace.FunctionalUringFacade =
-    borg.trikeshed.userspace.FunctionalUringFacade(
-        entries,
-        borg.trikeshed.userspace.openUserspaceChannelBackend(entries),
-    )
-
-private fun backendDrain(): List<Triple<Long, Int, Int>> =
-    borg.trikeshed.userspace.JvmPollRegistry.drain()

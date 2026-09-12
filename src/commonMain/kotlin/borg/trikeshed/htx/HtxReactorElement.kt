@@ -3,6 +3,8 @@ package borg.trikeshed.htx
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.toList
@@ -21,6 +23,17 @@ import borg.trikeshed.userspace.nio.channels.SocketType
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+typealias HtxDispatch = Join<Join<HtxExchangeState, HtxRequest>, CompletableDeferred<HtxExchangeResult>>
 
 class HtxReactorElement(
     private val channelOperations: ChannelOperations,
@@ -33,14 +46,38 @@ class HtxReactorElement(
 ) : AsyncContextElement(ElementState.CREATED, parentJob), HtxRouteService {
     override val key get() = HtxRouteService.Key
 
+    private val requests = Channel<HtxDispatch>(16)
+    private var worker: Job? = null
+
     override suspend fun open() {
         if (state == ElementState.CREATED) {
             super.open()
             state = ElementState.ACTIVE
+            worker = CoroutineScope(currentCoroutineContext() + supervisor + this + channelOperations).launch {
+                for (dispatch in requests) {
+                    try {
+                        dispatch.b.complete(exchangeRequest(dispatch.a.a, dispatch.a.b))
+                    } catch (failure: Throwable) {
+                        dispatch.b.completeExceptionally(failure)
+                    }
+                }
+            }
         }
     }
 
     override suspend fun exchange(
+        state: HtxExchangeState,
+        request: HtxRequest,
+    ): HtxExchangeResult {
+        check(this.state == ElementState.ACTIVE) { "HTX reactor is not accepting exchanges" }
+        val completion = CompletableDeferred<HtxExchangeResult>()
+        requests.send((state j request) j completion)
+        val result = withContext(NonCancellable) { completion.await() }
+        currentCoroutineContext().ensureActive()
+        return result
+    }
+
+    private suspend fun exchangeRequest(
         state: HtxExchangeState,
         request: HtxRequest,
     ): HtxExchangeResult =
@@ -71,6 +108,7 @@ class HtxReactorElement(
                 ),
             )
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             val failure = t.message ?: "HTX reactor exchange failed"
             HtxExchangeResult(
                 state.copy(
@@ -94,12 +132,21 @@ class HtxReactorElement(
             )
         }
 
-    override suspend fun close() {
-        if (ownedSupervisor != null && ownedSupervisor.state.isLessThan(ElementState.CLOSED)) {
-            ownedSupervisor.close()
+    override suspend fun drain(): Unit = withContext(NonCancellable) {
+        if (state == ElementState.CLOSED) return@withContext
+        state = ElementState.DRAINING
+        requests.close()
+        worker?.join()
+        supervisor.complete()
+        supervisor.join()
+        try {
+            ownedSupervisor?.drain()
+        } finally {
+            state = ElementState.CLOSED
         }
-        super.close()
     }
+
+    override suspend fun close() = drain()
 
     private suspend fun exchangePlain(request: HtxRequest): HtxResponse {
         val connection = openConnection(request)
@@ -125,6 +172,7 @@ class HtxReactorElement(
             val tls = openTlsElement(
                 config = tlsConfig,
                 backend = backend,
+                parentJob = supervisor,
             )
             val endpoint = tls.clientEndpoint(request.target.host, request.target.port)
             try {
@@ -148,7 +196,7 @@ class HtxReactorElement(
                 )
             } finally {
                 runCatching { flushTlsFrames(connection.handle, connection.fd, endpoint.close()) }
-                tls.close()
+                tls.drain()
             }
         } finally {
             closeConnection(connection)
@@ -158,9 +206,10 @@ class HtxReactorElement(
     /** CLOSE is an SQE like everything else: prep on the connection's ring, settle, drop the ring. */
     private fun closeConnection(connection: HtxConnection) {
         try {
-            connection.handle.prepClose(connection.fd)
-            connection.handle.submit()
-            connection.handle.wait(1)
+            check(connection.handle.prepClose(connection.fd) >= 0) { "HTX CLOSE SQE was rejected" }
+            check(connection.handle.submit() == 1) { "HTX CLOSE SQE was not submitted" }
+            val result = connection.handle.wait(1).single().res
+            check(result == 0) { "HTX reactor close failed for fd=${connection.fd}: $result" }
         } finally {
             connection.handle.close()
         }
@@ -174,27 +223,31 @@ class HtxReactorElement(
 
     private fun openConnection(request: HtxRequest): HtxConnection {
         val ops = channelOperations
-        val handle = ops.openChannel()
-        // socket(2) is an SQE: IORING_OP_SOCKET settles with the new fd in res.
-        handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
-        handle.submit()
-        val fd = handle.wait(1).firstOrNull { it.res >= 0 }?.res ?: run {
-            handle.close()
-            error("HTX reactor socket SQE failed for ${request.target.host}:${request.target.port}")
-        }
-        // connect(2) is an SQE carrying the encoded sockaddr; res = 0 or -errno.
         val address = requireNotNull(connectAddress(ops, request.target.host, request.target.port)) {
             "HTX reactor could not resolve ${request.target.host} for CONNECT"
         }
-        handle.prepConnect(fd, address)
-        handle.submit()
-        val connect = handle.wait(1).firstOrNull()?.res ?: -1
-        // A non-blocking connect may report EINPROGRESS (-115): readiness arrives
-        // on the write path's CQEs, which is the kernel ring's contract too.
-        check(connect == 0 || connect == -115) {
-            "HTX reactor connect SQE failed for ${request.target.host}:${request.target.port}: $connect"
+        val handle = ops.openChannel()
+        var fd = -1
+        try {
+            check(handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix) >= 0)
+            check(handle.submit() == 1) { "HTX SOCKET SQE was not submitted" }
+            fd = handle.wait(1).single().res
+            check(fd >= 0) { "HTX reactor socket failed: $fd" }
+            check(handle.prepConnect(fd, address) >= 0)
+            check(handle.submit() == 1) { "HTX CONNECT SQE was not submitted" }
+            val connect = handle.wait(1).single().res
+            check(connect == 0) {
+                "HTX reactor connect SQE failed for ${request.target.host}:${request.target.port}: $connect"
+            }
+            return HtxConnection(fd, handle)
+        } catch (failure: Throwable) {
+            try {
+                if (fd >= 0) closeConnection(HtxConnection(fd, handle)) else handle.close()
+            } catch (closeFailure: Throwable) {
+                failure.addSuppressed(closeFailure)
+            }
+            throw failure
         }
-        return HtxConnection(fd, handle)
     }
 
     private suspend fun writeAll(
@@ -205,14 +258,11 @@ class HtxReactorElement(
         val buffer = ByteBuffer(payload.toArray())
         val completed = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
             while (buffer.hasRemaining()) {
-                handle.writev(fd, buffer)
-                handle.submit()
+                check(handle.writev(fd, buffer) >= 0) { "HTX WRITE SQE was rejected" }
+                check(handle.submit() == 1) { "HTX WRITE SQE was not submitted" }
                 val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
-                check(result >= 0) { "HTX reactor write failed for fd=$fd" }
-                if (result == 0) {
-                    // Non-blocking connect/write readiness is still pending.
-                    // Preserve the buffer position and retry without occupying
-                    // the reactor thread.
+                check(result > 0 || result == -11) { "HTX reactor write failed for fd=$fd: $result" }
+                if (result == -11) {
                     kotlinx.coroutines.delay(10)
                 }
             }
@@ -380,16 +430,13 @@ class HtxReactorElement(
         val buffer = ByteBuffer(capacity)
         var idle = 0
         while (true) {
-            handle.readv(fd, buffer)
-            handle.submit()
+            check(handle.readv(fd, buffer) >= 0) { "HTX READ SQE was rejected" }
+            check(handle.submit() == 1) { "HTX READ SQE was not submitted" }
             val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
-            check(result >= -1) { "HTX reactor read failed for fd=$fd" }
-            // Non-blocking read: 0 = EAGAIN (no data yet, keep waiting);
-            // -1 = EOF (peer closed). Previously 0 was misread as EOF, killing
-            // every TLS handshake before the server's ServerHello could arrive.
+            check(result >= 0 || result == -11) { "HTX reactor read failed for fd=$fd: $result" }
             when {
-                result == -1 -> return null
-                result == 0 -> {
+                result == 0 -> return null
+                result == -11 -> {
                     // Progressive backoff: on a live exchange the next bytes land within
                     // microseconds; sleep only when the peer is genuinely quiet.
                     when {

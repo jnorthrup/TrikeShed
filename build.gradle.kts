@@ -439,6 +439,7 @@ tasks.withType<Test>().configureEach {
     }
     jvmArgs(
         "-Xmx3g",
+        "--enable-native-access=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.constantpool=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
@@ -966,6 +967,10 @@ fun org.gradle.api.tasks.JavaExec.useDaemonAot() {
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     standardInput = System.`in`
     environment("TRIKESHED_AOT_DEFAULT", "1")
+    // FFM (Panama) is a first-class backend gate: the uring JNI bridge and its
+    // Panama successor both cross the native boundary, so the daemon runs with
+    // native access granted rather than under the warning regime.
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
     providers.gradleProperty("daemonArgs").orNull?.let { setArgsString(it) }
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()

@@ -102,6 +102,11 @@ object LcncContracts {
     /** WikiSkill consolidation vocabulary: one pass per invocation, loop outside. */
     const val WIKI_CONSOLIDATE = "wiki.consolidate"
     const val WIKI_PROPOSE = "wiki.propose"
+    /** uring vocabulary: the ring as palette legos — SQE in, CQE out, backend never named here. */
+    const val URING_PROBE = "uring.probe"
+    const val URING_READ = "uring.read"
+    const val URING_WRITE = "uring.write"
+    const val URING_FSYNC = "uring.fsync"
 
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
@@ -1421,6 +1426,37 @@ object LcncContracts {
                 "readChars" to LcncPortContract.LcncParamSpec(v = "9000", ph = "per-read context budget"),
                 "model" to LcncPortContract.LcncParamSpec(ph = "preferred model id"),
                 "contextId" to LcncPortContract.LcncParamSpec(ph = "spend receipt id; also names the read log"),
+            )),
+
+        // ── uring — the ring, as palette legos. Every node runs through the
+        // userspace facade (prep* → submit → CQE); the backend underneath is
+        // the probed actual (Panama/JNI ring or emulation), never chosen here.
+        LcncPortContract(URING_PROBE, "uring probe (capability report: what THIS machine's ring answers)",
+            emptyList(), listOf("report"),
+            outputKinds = mapOf("report" to "json")),
+        LcncPortContract(URING_READ, "uring read (READ SQE at offset → bytes + res)",
+            listOf("path"), listOf("bytes", "res"),
+            inputKinds = mapOf("path" to "text"),
+            outputKinds = mapOf("bytes" to "text", "res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — opened and closed through the ring"),
+                "offset" to LcncPortContract.LcncParamSpec(v = "0", ph = "pread offset"),
+                "len" to LcncPortContract.LcncParamSpec(v = "65536", ph = "max bytes"),
+            )),
+        LcncPortContract(URING_WRITE, "uring write (WRITE SQE at offset ← bytes)",
+            listOf("path", "bytes"), listOf("res"),
+            inputKinds = mapOf("path" to "text", "bytes" to "text"),
+            outputKinds = mapOf("res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — created (0600) through the ring when absent"),
+                "offset" to LcncPortContract.LcncParamSpec(v = "0", ph = "pwrite offset"),
+            )),
+        LcncPortContract(URING_FSYNC, "uring fsync (FSYNC SQE — one CQE on durability)",
+            listOf("path"), listOf("res"),
+            inputKinds = mapOf("path" to "text"),
+            outputKinds = mapOf("res" to "json"),
+            params = mapOf(
+                "path" to LcncPortContract.LcncParamSpec(ta = true, ph = "file path — opened through the ring"),
             )),
     )
 

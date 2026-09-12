@@ -22,18 +22,19 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
-/** OS effects only. Exactly one CQE per SQE; completion order is unspecified.
- * Buffers remain borrowed until the call settles, including on cancellation.
+/** OS effects only. Exactly one terminal CQE per SQE; completion order is unspecified.
+ * Deferred operations retain their buffers until their terminal CQE is reaped.
  * Unsupported operations return -EOPNOTSUPP; failed effects return negative errno.
  */
 public interface UserspaceChannelBackend {
     val capabilities: Long get() = 0L
     val nativeCapabilities: Long get() = 0L
+    /** Operations whose CQE can arrive after [submitBatch] returns. */
+    val deferredCapabilities: Long get() = 0L
 
     val availability: String get() = "emulated"
 
@@ -41,6 +42,10 @@ public interface UserspaceChannelBackend {
     /** Descriptor compatibility with this backend's registered kernel buffers. */
     fun supportsFixedBuffer(fd: Int): Boolean = true
     fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
+    /** Consume deferred CQEs; zero polls, a positive minimum waits for completion. */
+    fun reapCompletions(minComplete: Int = 0): List<SelectionResult> = emptyList()
+    /** Quiesce deferred effects and make their terminal cancellation CQEs reapable. */
+    fun cancelPending() {}
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
 
     /** Control-plane resource registration; fixed requests remain owned by commonMain. */
@@ -52,7 +57,7 @@ public interface UserspaceChannelBackend {
 
 /**
  * Core dispatch layer for userspace channels.
- * Maintains an internal [entries] queue similar to a `ring`.
+ * Owns a bounded submission and completion ring of [entries] admissions.
  *
  * Compatibility callers enqueue operations, then call `submit()`.
  * [Key.create] owns bounded suspend batches; callers close it with [drain].
@@ -88,6 +93,7 @@ public class FunctionalUringFacade(
     }
 
     private val pending = ArrayDeque<UringSubmission>()
+    private val inFlight = HashMap<Long, UringSubmission>()
     private val completions = ArrayDeque<SelectionResult>()
     private val submitPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.SUBMIT }
     private val completionPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.COMPLETE }
@@ -96,9 +102,9 @@ public class FunctionalUringFacade(
     private var closeFailure: Throwable? = null
     private val admission = Mutex()
     private val execution = Mutex()
-    // At most entries batches are admitted, each containing at most entries SQEs.
+    // The bound counts SQEs across batches, submitted effects and unreaped CQEs.
     private val input = Queue<Batch>(entries)
-    private val capacity = Semaphore(entries)
+    private var capacityChanged = CompletableDeferred<Unit>()
     private val outstanding = HashSet<Long>()
     private var active = 0
     private val drained = CompletableDeferred<Unit>()
@@ -134,7 +140,6 @@ public class FunctionalUringFacade(
                             batch.result.trySend(result).getOrThrow()
                         } finally {
                             batch.result.close()
-                            capacity.release()
                         }
                     }
                 } finally {
@@ -163,8 +168,9 @@ public class FunctionalUringFacade(
         require(submission.opcode !in REJECTED_OPS) {
             "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
         }
-        require(pending.size + completions.size < entries) { "submission queue full" }
+        require(occupancy() < entries) { "submission queue full" }
         require(submission.userData !in outstanding &&
+            submission.userData !in inFlight &&
             pending.none { it.userData == submission.userData } && completions.none { it.userData == submission.userData }) {
             "Duplicate outstanding userData"
         }
@@ -222,13 +228,12 @@ public class FunctionalUringFacade(
         validate(submissions)
         val batchSubmissions = Array(submissions.size) { submissions[it] }.toSeries()
         currentCoroutineContext().ensureActive()
+        if (batchSubmissions.size == 0) {
+            admission.withLock { check(!closing) { "Uring is draining or closed" } }
+            return 0 j { error("empty completion queue") }
+        }
         if (supervisor == null) {
-            admission.withLock {
-                currentCoroutineContext().ensureActive()
-                check(!closing) { "Uring is draining or closed" }
-                reserve(batchSubmissions)
-                active++
-            }
+            reserveAwait(batchSubmissions) { active++ }
             try {
                 val result = withContext(NonCancellable) {
                     runCatching { execution.withLock { executeBatch(batchSubmissions) } }
@@ -246,33 +251,12 @@ public class FunctionalUringFacade(
             }
         }
 
-        admission.withLock {
-            check(!closing && supervisor.isActive) { "Uring is draining or closed" }
-            checkIdentities(batchSubmissions)
-        }
-        capacity.acquire()
-        var admitted = false
-        try {
-            val batch = admission.withLock {
-                currentCoroutineContext().ensureActive()
-                check(!closing && supervisor.isActive) { "Uring is draining or closed" }
-                checkIdentities(batchSubmissions)
-                val batch = Batch(batchSubmissions)
-                reserve(batchSubmissions)
-                try { input.trySend(batch).getOrThrow() } catch (failure: Throwable) {
-                    release(batchSubmissions)
-                    throw failure
-                }
-                admitted = true
-                batch
-            }
-            // A cancelled caller may release its buffers only after its effects settle.
-            val result = withContext(NonCancellable) { batch.result.receive() }
-            currentCoroutineContext().ensureActive()
-            return result.getOrThrow()
-        } finally {
-            if (!admitted) capacity.release()
-        }
+        val batch = Batch(batchSubmissions)
+        reserveAwait(batchSubmissions) { input.trySend(batch).getOrThrow() }
+        // A cancelled caller may release its buffers only after its effects settle.
+        val result = withContext(NonCancellable) { batch.result.receive() }
+        currentCoroutineContext().ensureActive()
+        return result.getOrThrow()
     }
 
     private suspend fun executeBatch(submissions: Series<UringSubmission>): Series<UringCompletion> {
@@ -290,10 +274,27 @@ public class FunctionalUringFacade(
     suspend fun submitAwait(): Series<UringCompletion> {
         val batch = synchronous {
             check(!closing) { "Uring is draining or closed" }
-            pending.toList().toSeries().also { pending.clear() }
+            pending.toTypedArray().toSeries().also { submissions ->
+                pending.clear()
+                for (i in 0 until submissions.size) outstanding.add(submissions[i].userData)
+                active++
+            }
         }
-        try { return batchEnqueue(batch) }
-        finally { for (i in 0 until batch.size) batch[i].memory?.release() }
+        try {
+            val result = withContext(NonCancellable) {
+                runCatching { execution.withLock { executeBatch(batch) } }
+            }
+            currentCoroutineContext().ensureActive()
+            return result.getOrThrow()
+        } finally {
+            withContext(NonCancellable) {
+                admission.withLock {
+                    release(batch)
+                    active--
+                    if (closing && active == 0) drained.complete(Unit)
+                }
+            }
+        }
     }
 
     fun submit(): Int = synchronous {
@@ -305,34 +306,77 @@ public class FunctionalUringFacade(
         val submissions = pending.toTypedArray()
         pending.clear()
         try {
-        val result = ArrayList<UringCompletion>(submissions.size)
-        val admitted = partition(submissions.toSeries(), result)
-        if (admitted.isNotEmpty()) {
-            val cqes = backend.submitBatch(admitted.asList())
-            correlate(admitted, cqes.size j { UringCompletion(cqes[it].userData, cqes[it].res, 0) }) { result.add(it) }
+            val rejected = ArrayList<UringCompletion>(submissions.size)
+            val admitted = partition(submissions.toSeries(), rejected)
+            for (submission in submissions) inFlight[submission.userData] = submission
+            for (cqe in rejected) settle(listOf(SelectionResult(cqe.res, cqe.userData)), observe = false)
+            if (admitted.isNotEmpty()) {
+                settle(backend.submitBatch(admitted.asList()))
+                check(admitted.none {
+                    it.userData in inFlight && backend.deferredCapabilities and it.opcode.mask == 0L
+                }) { "Backend lost submission completions" }
+            }
+            return submissions.size
+        } catch (failure: Throwable) {
+            // A failed call is terminal for its batch. Preserve every trustworthy CQE
+            // already received and account for each remaining admission exactly once.
+            closing = true
+            input.close()
+            capacityChanged.complete(Unit)
+            for (submission in submissions) {
+                if (completions.any { it.userData == submission.userData }) continue
+                inFlight.remove(submission.userData)
+                completions.addLast(SelectionResult(-5, submission.userData))
+                submission.memory?.release()
+            }
+            throw failure
         }
-        for (cqe in result) completions.addLast(SelectionResult(cqe.res, cqe.userData))
-        return admitted.size
-        } finally { submissions.forEach { it.memory?.release() } }
+    }
+
+    private fun settle(results: List<SelectionResult>, observe: Boolean = true) {
+        var failure: Throwable? = null
+        for (result in results) {
+            val submission = inFlight.remove(result.userData)
+            if (submission == null) {
+                val invalid = IllegalStateException("Unknown or duplicate completion: ${result.userData}")
+                if (failure == null) failure = invalid else failure.addSuppressed(invalid)
+                continue
+            }
+            try {
+                if (observe) {
+                    val cqe = UringCompletion(result.userData, result.res, 0)
+                    for (program in completionPrograms)
+                        program.run(UringEbpfContext(UringEbpfPhase.COMPLETE, submission, cqe), result.res.toLong())
+                }
+            } catch (observerFailure: Throwable) {
+                if (failure == null) failure = observerFailure else failure.addSuppressed(observerFailure)
+            } finally {
+                completions.addLast(result)
+                submission.memory?.release()
+            }
+        }
+        failure?.let { throw it }
+    }
+
+    private fun reap(minComplete: Int) {
+        if (inFlight.isNotEmpty()) settle(backend.reapCompletions(minComplete.coerceAtMost(inFlight.size)))
+    }
+
+    private fun consumeCompletions(): List<SelectionResult> = buildList {
+        while (completions.isNotEmpty()) add(completions.removeFirst())
+        signalCapacity()
     }
 
     fun wait(minComplete: Int = 1): List<SelectionResult> = synchronous {
         require(minComplete >= 0) { "minComplete must be non-negative" }
         if (completions.size < minComplete && pending.isNotEmpty()) submitPending()
-
-        buildList {
-            while (completions.isNotEmpty()) {
-                add(completions.removeFirst())
-            }
-        }
+        reap((minComplete - completions.size).coerceAtLeast(0))
+        consumeCompletions()
     }
 
     fun peek(): List<SelectionResult> = synchronous {
-        buildList {
-            while (completions.isNotEmpty()) {
-                add(completions.removeFirst())
-            }
-        }
+        reap(0)
+        consumeCompletions()
     }
 
     fun closeNow() = synchronous {
@@ -348,6 +392,11 @@ public class FunctionalUringFacade(
 
     private fun closeBackend() {
         if (!closed) {
+            if (inFlight.isNotEmpty()) {
+                backend.cancelPending()
+                reap(0)
+                check(inFlight.isEmpty()) { "Backend did not settle cancelled submissions" }
+            }
             closed = true
             try {
                 backend.close()
@@ -361,6 +410,7 @@ public class FunctionalUringFacade(
     private suspend fun stopAdmission() = admission.withLock {
         closing = true
         input.close()
+        capacityChanged.complete(Unit)
         if (active == 0) drained.complete(Unit)
     }
 
@@ -403,13 +453,14 @@ public class FunctionalUringFacade(
     private fun checkIdentities(submissions: Series<UringSubmission>) {
         for (i in 0 until submissions.size) {
             val userData = submissions[i].userData
-            require(userData !in outstanding && pending.none { it.userData == userData } &&
+            require(userData !in outstanding && userData !in inFlight && pending.none { it.userData == userData } &&
                 completions.none { it.userData == userData }) { "Duplicate outstanding userData" }
         }
     }
 
     private fun reserve(submissions: Series<UringSubmission>) {
         checkIdentities(submissions)
+        require(occupancy() + submissions.size <= entries) { "submission queue full" }
         var retained = 0
         try {
             for (i in 0 until submissions.size) {
@@ -427,6 +478,35 @@ public class FunctionalUringFacade(
         for (i in 0 until submissions.size) {
             outstanding.remove(submissions[i].userData)
             submissions[i].memory?.release()
+        }
+        signalCapacity()
+    }
+
+    private fun occupancy(): Int = pending.size + inFlight.size + completions.size + outstanding.size
+
+    private fun signalCapacity() {
+        val previous = capacityChanged
+        capacityChanged = CompletableDeferred()
+        previous.complete(Unit)
+    }
+
+    private suspend fun reserveAwait(submissions: Series<UringSubmission>, admitted: () -> Unit) {
+        while (true) {
+            val changed = admission.withLock {
+                currentCoroutineContext().ensureActive()
+                check(!closing && supervisor?.isActive != false) { "Uring is draining or closed" }
+                checkIdentities(submissions)
+                if (occupancy() + submissions.size <= entries) {
+                    reserve(submissions)
+                    try { admitted() } catch (failure: Throwable) {
+                        release(submissions)
+                        throw failure
+                    }
+                    null
+                } else capacityChanged
+            }
+            if (changed == null) return
+            changed.await()
         }
     }
 

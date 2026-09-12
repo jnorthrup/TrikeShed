@@ -54,7 +54,10 @@ internal sealed interface JvmDescriptor {
  * than a second mechanism beside it. READ/RECV and WRITE/SEND land on the same ops a file uses;
  * the descriptor decides what they mean.
  */
-internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
+internal class JvmSocketDescriptor(
+    val channel: SocketChannel,
+    val domain: Int = SocketDomain.AF_INET.posix,
+) : JvmDescriptor {
     override fun close() = channel.close()
     override fun isOpen(): Boolean = channel.isOpen
     /** A stream has no size; -1 is what the file path returns for an unknown extent. */
@@ -65,7 +68,10 @@ internal class JvmSocketDescriptor(val channel: SocketChannel) : JvmDescriptor {
  * A listening socket. Its CQE-producing op is ACCEPT (res = new fd or -errno);
  * every other op on this descriptor is a shape mismatch and is refused.
  */
-internal class JvmServerSocketDescriptor(val channel: ServerSocketChannel) : JvmDescriptor {
+internal class JvmServerSocketDescriptor(
+    val channel: ServerSocketChannel,
+    val domain: Int = SocketDomain.AF_INET.posix,
+) : JvmDescriptor {
     override fun close() = channel.close()
     override fun isOpen(): Boolean = channel.isOpen
     override fun size(): Long = -1L
@@ -82,8 +88,8 @@ internal object JvmFileTable {
     private val files = ConcurrentHashMap<Int, JvmDescriptor>()
     fun register(descriptor: JvmDescriptor): Int = nextId.getAndIncrement().also { files[it] = descriptor }
     fun descriptor(fd: Int): JvmDescriptor? = files[fd]
-    /** Bind never changes an fd: swap the descriptor behind it (UNIX listener rebind). */
-    fun replace(fd: Int, descriptor: JvmDescriptor): JvmDescriptor? = files.put(fd, descriptor)
+    /** Replace an existing descriptor without creating an unallocated fd. */
+    fun replace(fd: Int, descriptor: JvmDescriptor): JvmDescriptor? = files.replace(fd, descriptor)
     fun close(fd: Int): Int {
         val descriptor = files.remove(fd) ?: return -9
         return try { descriptor.close(); 0 } catch (failure: Exception) { jvmIoError(failure) }
@@ -94,7 +100,17 @@ internal fun jvmIoError(failure: Exception): Int = when (failure) {
     is NoSuchFileException -> -2
     is AccessDeniedException, is SecurityException -> -13
     is FileAlreadyExistsException -> -17
+    is java.net.BindException -> -98
+    is java.net.ConnectException -> -111
+    is java.net.NoRouteToHostException -> -113
+    is java.net.SocketTimeoutException -> -110
     is ClosedChannelException, is NonReadableChannelException, is NonWritableChannelException -> -9
+    is AlreadyBoundException -> -22
+    is AlreadyConnectedException -> -106
+    is ConnectionPendingException -> -114
+    is NotYetConnectedException -> -107
+    is UnresolvedAddressException -> -22
+    is UnsupportedAddressTypeException -> -97
     is IllegalArgumentException -> -22
     is UnsupportedOperationException -> -95
     else -> -5
@@ -115,47 +131,85 @@ internal fun UringSubmission.path(): String {
  * -errno. AF_INET yields a stream descriptor; AF_UNIX yields a UNIX stream.
  */
 internal fun jvmSocket(domain: Int, protocol: Int, type: Int): Int = try {
-    require(type and 1 != 0) { "only SOCK_STREAM is emulated here, got type=$type" }
+    if (type and 0xf != 1) return -94
+    if (type and (0xf or 0x800 or 0x80000).inv() != 0) return -22
+    if (protocol != 0 && (domain != SocketDomain.AF_INET.posix || protocol != 6)) return -93
     val channel = when (domain) {
-        SocketDomain.AF_INET.posix -> SocketChannel.open()
+        SocketDomain.AF_INET.posix -> SocketChannel.open(java.net.StandardProtocolFamily.INET)
         SocketDomain.AF_UNIX.posix -> SocketChannel.open(java.net.StandardProtocolFamily.UNIX)
-        else -> return -95
+        else -> return -97
     }
-    channel.configureBlocking(false)
-    JvmFileTable.register(JvmSocketDescriptor(channel))
+    try {
+        channel.configureBlocking(false)
+        JvmFileTable.register(JvmSocketDescriptor(channel, domain))
+    } catch (failure: Exception) {
+        channel.close()
+        throw failure
+    }
 } catch (failure: Exception) { jvmIoError(failure) }
+
+internal fun jvmSocketAddress(address: ByteBuffer?, len: Int, domain: Int): java.net.SocketAddress {
+    require(address != null && len >= 2 && len <= address.remaining())
+    val bytes = ByteArray(len).also { address.duplicate().get(it) }
+    require(sockaddrFamily(bytes) == domain)
+    return when (domain) {
+        SocketDomain.AF_INET.posix -> {
+            require(len == 16)
+            java.net.InetSocketAddress(java.net.InetAddress.getByAddress(sockaddrOctets(bytes)), sockaddrPort(bytes))
+        }
+        SocketDomain.AF_UNIX.posix -> {
+            require(len in 3..110)
+            val end = (2 until len).firstOrNull { bytes[it] == 0.toByte() } ?: len
+            require(end > 2)
+            java.net.UnixDomainSocketAddress.of(bytes.decodeToString(2, end, throwOnInvalidSequence = true))
+        }
+        else -> throw UnsupportedAddressTypeException()
+    }
+}
 
 /**
  * BIND SQE execution. The address rides the SQE buffer as encoded sockaddr
- * bytes ([sockaddrFamily]/[sockaddrPort]/[sockaddrOctets] decode it); a UNIX
- * path binds a listener directly — NIO has no UNIX client-listen split.
+ * bytes ([sockaddrFamily]/[sockaddrPort]/[sockaddrOctets] decode it).
  * res = 0 or -errno.
  */
 internal fun jvmBind(fd: Int, address: ByteBuffer?, len: Int): Int {
-    if (address == null || len <= 0 || len > address.remaining()) return -22
-    val bytes = ByteArray(len).also {
-        address.duplicate().get(it)
-    }
+    val descriptor = JvmFileTable.descriptor(fd) ?: return -9
+    if (descriptor !is JvmSocketDescriptor) return -88
     return try {
-        when (sockaddrFamily(bytes)) {
-            SocketDomain.AF_UNIX.posix -> {
-                val path = bytes.decodeToString(2, bytes.size).trimEnd('\u0000')
-                require(path.isNotEmpty())
-                // The kernel keeps the fd across bind; so does the table. The UNIX
-                // listener replaces the stream descriptor behind the same fd.
-                val server = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
-                    .apply { configureBlocking(false) }
-                server.bind(java.net.UnixDomainSocketAddress.of(path))
-                JvmFileTable.replace(fd, JvmServerSocketDescriptor(server))?.close()
-                0
+        descriptor.channel.bind(jvmSocketAddress(address, len, descriptor.domain))
+        0
+    } catch (failure: Exception) { jvmIoError(failure) }
+}
+
+/** JDK listen requires replacing the bound channel behind the same logical fd. */
+internal fun jvmListen(fd: Int, backlog: Int): Int {
+    if (backlog < 0) return -22
+    val descriptor = JvmFileTable.descriptor(fd) ?: return -9
+    if (descriptor is JvmServerSocketDescriptor) return if (descriptor.isOpen()) 0 else -9
+    if (descriptor !is JvmSocketDescriptor) return -88
+    if (!descriptor.isOpen()) return -9
+    if (descriptor.channel.isConnected || descriptor.channel.isConnectionPending) return -22
+    return try {
+        val local = descriptor.channel.localAddress ?: when (descriptor.domain) {
+            SocketDomain.AF_INET.posix -> java.net.InetSocketAddress(0)
+            else -> return -22
+        }
+        val family = if (descriptor.domain == SocketDomain.AF_UNIX.posix)
+            java.net.StandardProtocolFamily.UNIX else java.net.StandardProtocolFamily.INET
+        val server = ServerSocketChannel.open(family)
+        try {
+            server.configureBlocking(false)
+            descriptor.close()
+            if (local is java.net.UnixDomainSocketAddress) Files.delete(local.path)
+            server.bind(local, backlog)
+            if (JvmFileTable.replace(fd, JvmServerSocketDescriptor(server, descriptor.domain)) == null) {
+                server.close()
+                return -9
             }
-            SocketDomain.AF_INET.posix -> {
-                val descriptor = JvmFileTable.descriptor(fd) ?: return -9
-                val channel = (descriptor as? JvmSocketDescriptor)?.channel ?: return -22
-                channel.bind(java.net.InetSocketAddress(java.net.InetAddress.getByAddress(sockaddrOctets(bytes)), sockaddrPort(bytes)))
-                0
-            }
-            else -> -95
+            0
+        } catch (failure: Exception) {
+            server.close()
+            throw failure
         }
     } catch (failure: Exception) { jvmIoError(failure) }
 }
@@ -163,16 +217,13 @@ internal fun jvmBind(fd: Int, address: ByteBuffer?, len: Int): Int {
 /**
  * CONNECT SQE execution. The address rides the SQE buffer as encoded sockaddr
  * bytes; res = 0, -EINPROGRESS (-115), or -errno. Non-blocking, so an in-flight
- * connection reports -115 and completes on a later CQE — the kernel's contract.
+ * connection reports -115; a later CONNECT SQE checks completion.
  */
 internal fun jvmConnect(fd: Int, address: ByteBuffer?, len: Int): Int {
-    if (address == null || len <= 0 || len > address.remaining()) return -22
-    val bytes = ByteArray(len).also { address.duplicate().get(it) }
     val descriptor = JvmFileTable.descriptor(fd) ?: return -9
-    val channel = (descriptor as? JvmSocketDescriptor)?.channel ?: return -22
+    val channel = (descriptor as? JvmSocketDescriptor)?.channel ?: return -88
     return try {
-        require(sockaddrFamily(bytes) == SocketDomain.AF_INET.posix && bytes.size == 16) { "Invalid CONNECT sockaddr" }
-        val remote = java.net.InetSocketAddress(java.net.InetAddress.getByAddress(sockaddrOctets(bytes)), sockaddrPort(bytes))
+        val remote = jvmSocketAddress(address, len, descriptor.domain)
         when {
             channel.isConnected -> if (channel.remoteAddress == remote) 0 else -106
             channel.isConnectionPending -> if (channel.remoteAddress != remote) -114 else if (channel.finishConnect()) 0 else -115

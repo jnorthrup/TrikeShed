@@ -626,7 +626,7 @@ utils/htxc/          ← composite build (includeBuild("../.."))
 
 ```bash
 # Environment
-export JAVA_HOME=/Users/jim/.sdkman/candidates/java/25.0.2-graalce
+export JAVA_HOME=$HOME/.sdkman/candidates/java/25.0.4.1-graal
 export PATH="$JAVA_HOME/bin:$PATH"
 
 # Full build + test
@@ -723,8 +723,8 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 
 ```bash
 # 1. Toolchain
-sdk install java 25.0.2-graalce
-sdk use java 25.0.2-graalce
+sdk install java 25.0.4.1-graal
+sdk use java 25.0.4.1-graal
 ./gradlew --version   # Gradle 9.6.1
 
 # 2. Read the algebra
@@ -830,6 +830,9 @@ I've also written ideas that describe (some) goals and ideals of the library:
 
 # build
 
+Toolchain via SDKMAN (preferred when its broker — JFrog — is behaving; it has
+had outages, and the Oracle-direct fallback below covers those):
+
 ```sh
 
 set -e
@@ -842,13 +845,75 @@ fi
 set +u
 source "$SDKMAN_DIR/bin/sdkman-init.sh"
 
-sdk install java 25.0.2-graalce || echo 'manual DL/setup https://github.com/graalvm/graalvm-ce-dev-builds/releases'
-sdk install kotlin 2.4.10
+sdk install java 25.0.4.1-graal || echo 'feed down? use the Oracle-direct path in the next section'
+sdk install kotlin 2.4.20
 sdk install gradle 9.7.0
 hash -r
 set -u
 
 ```
+
+### Linux without SDKMAN (SDKMAN's GraalVM feed has gone dead before)
+
+Download Oracle GraalVM straight from Oracle and lay it into the same
+`JAVA_HOME` the build expects. glibc distros (Debian/Ubuntu/Fedora):
+
+```sh
+set -e
+mkdir -p "$HOME/.sdkman/candidates/java"
+curl -fL https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_linux-aarch64_bin.tar.gz -o /tmp/graalvm.tgz
+# x86_64 instead: https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_linux-x64_bin.tar.gz
+mkdir -p "$HOME/.sdkman/candidates/java/25.0.4.1-graal"
+tar xzf /tmp/graalvm.tgz -C "$HOME/.sdkman/candidates/java/25.0.4.1-graal" --strip-components=1
+ln -sfn 25.0.4.1-graal "$HOME/.sdkman/candidates/java/current"
+
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.4.1-graal"
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version   # Oracle GraalVM 25.0.4+7.1
+```
+
+musl distros (Alpine): the Oracle binaries are glibc-linked and will NOT run
+under plain musl or gcompat. Extract a glibc sidecar and shim the JVM tools
+through its loader — this is the verified recipe:
+
+```sh
+set -e
+apk add --no-cache binutils curl
+
+# 1. GraalVM, same layout as above
+curl -fL https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_linux-aarch64_bin.tar.gz -o /tmp/graalvm.tgz
+mkdir -p "$HOME/.sdkman/candidates/java/25.0.4.1-graal"
+tar xzf /tmp/graalvm.tgz -C "$HOME/.sdkman/candidates/java/25.0.4.1-graal" --strip-components=1
+ln -sfn 25.0.4.1-graal "$HOME/.sdkman/candidates/java/current"
+
+# 2. glibc sidecar (Debian libc6, extracted to /opt/glibc — no base-image swap)
+curl -fL https://deb.debian.org/debian/pool/main/g/glibc/libc6_2.43-5_arm64.deb -o /tmp/glibc.deb
+# x86_64: .../libc6_2.43-5_amd64.deb
+mkdir -p /tmp/libc /opt/glibc
+cd /tmp && ar x /tmp/glibc.deb && tar xf data.tar.xz -C /tmp/libc
+cp -a /tmp/libc/usr/lib/aarch64-linux-gnu/* /opt/glibc/
+cp -a /tmp/libc/usr/lib/ld-linux-aarch64.so.1 /opt/glibc/   # x86_64: ld-linux-x86-64.so.2
+
+# 3. Shim every JVM launcher through the glibc loader
+G="$HOME/.sdkman/candidates/java/25.0.4.1-graal/bin"
+LD=/opt/glibc/ld-linux-aarch64.so.1   # x86_64: /opt/glibc/ld-linux-x86-64.so.2
+for b in java javac jar keytool; do
+  [ -f "$G/$b" ] && [ ! -f "$G/$b.real" ] && mv "$G/$b" "$G/$b.real"
+  printf '#!/bin/sh\nexec %s --library-path /opt/glibc %s/%s.real "$@"\n' "$LD" "$G" "$b" > "$G/$b"
+  chmod +x "$G/$b"
+done
+
+# 4. Persist and verify
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.4.1-graal"
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version   # Oracle GraalVM 25.0.4+7.1 — verified working on Alpine aarch64
+```
+
+kotlin/gradle SDKMAN installs are unaffected by the feed outage; when SDKMAN
+itself is unreachable, pin them by hand the same way or use each project's
+official installer — the build only needs `JAVA_HOME` (gradlew) plus the
+versions in `gradle/libs.versions.toml` (kotlin comes from the build, not the
+toolchain).
 
 ## Build, in anger
 
@@ -859,7 +924,7 @@ test, and run today:
 ```sh
 git clone https://github.com/jnorthrup/TrikeShed && cd TrikeShed
 
-export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.2-graalce"
+export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.4.1-graal"
 export PATH="$JAVA_HOME/bin:$PATH"
 
 # The gate. Not `./gradlew build` — build also drags in JS/WASM targets, some of

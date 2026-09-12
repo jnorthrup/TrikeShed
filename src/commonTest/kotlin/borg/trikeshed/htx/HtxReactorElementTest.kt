@@ -25,6 +25,31 @@ import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
     @Test
+    fun connectFailureClosesSocketAndRingBeforeReturningFailure() = runTest {
+        val operations = FakeChannelOperations(emptyList(), connectResult = -111)
+        val element = openHtxReactorElement(channelOperations = operations)
+        val response = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+
+        assertEquals(HtxExchangeLifecycle.FAILED, response.state.lifecycle)
+        assertEquals(listOf(400), operations.closedDescriptors)
+        assertEquals(1, operations.closedHandles)
+        element.drain()
+        assertEquals(borg.trikeshed.context.ElementState.CLOSED, element.state)
+    }
+
+    @Test
+    fun resolutionFailureDoesNotOpenSocketOrRing() = runTest {
+        val operations = FakeChannelOperations(emptyList(), address = null)
+        val element = openHtxReactorElement(channelOperations = operations)
+        val response = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+
+        assertEquals(HtxExchangeLifecycle.FAILED, response.state.lifecycle)
+        assertEquals(0, operations.openedHandles)
+        assertTrue(operations.closedDescriptors.isEmpty())
+        element.drain()
+    }
+
+    @Test
     fun ccekOpenHtxReactorElementWithChannelOperationsConstructsActiveElement() = runTest {
         val channelOperations = FakeChannelOperations(
             connectionReads = listOf(
@@ -163,7 +188,12 @@ class HtxReactorElementTest {
 
 private class FakeChannelOperations(
     private val connectionReads: List<List<ByteArray>>,
+    val connectResult: Int = 0,
+    private val address: ByteArray? = byteArrayOf(127, 0, 0, 1),
 ) : ChannelOperations {
+    val closedDescriptors = mutableListOf<Int>()
+    var openedHandles = 0
+    var closedHandles = 0
     private var nextFd = 400
     private var nextConnection = 0
     private val readsByFd = linkedMapOf<Int, MutableList<ByteArray>>()
@@ -172,10 +202,14 @@ private class FakeChannelOperations(
 
     override val key get() = ChannelOperations.Key
 
-    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
-        FakeChannelHandle(this)
+    override fun openChannel(entries: Int): ChannelOperations.ChannelHandle {
+        openedHandles++
+        return FakeChannelHandle(this)
+    }
 
-    override fun socket(domain: Int, type: Int, protocol: Int): Int {
+    override fun resolve(host: String): ByteArray? = address
+
+    fun socket(): Int {
         val fd = nextFd++
         val scriptedReads = connectionReads.getOrElse(nextConnection++) { emptyList() }
         readsByFd[fd] = scriptedReads.toMutableList()
@@ -183,16 +217,6 @@ private class FakeChannelOperations(
         connectionOrder.add(fd)
         return fd
     }
-
-    override fun bind(fd: Int, port: Int): Int = 0
-
-    override fun listen(fd: Int, backlog: Int): Int = 0
-
-    override fun accept(fd: Int): Int = -1
-
-    override fun connect(fd: Int, host: String, port: Int): Int = 0
-
-    override fun close(fd: Int): Int = 0
 
     fun recordedRequestText(connectionIndex: Int): String {
         val fd = connectionOrder[connectionIndex]
@@ -222,7 +246,7 @@ private class FakeChannelOperations(
     ) : ChannelOperations.ChannelHandle {
         override val id: Int = 1
 
-        private val pending = ArrayDeque<PendingOp>()
+        private val pending = ArrayDeque<() -> ChannelResult>()
         private var completions: List<ChannelResult> = emptyList()
 
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1
@@ -230,14 +254,46 @@ private class FakeChannelOperations(
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
 
         override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            pending.addLast(PendingOp(fd, buffer, userData, read = true))
+            pending.addLast {
+                val chunk = operations.readChunk(fd)
+                if (chunk == null) ChannelResult(fd, 0, userData)
+                else {
+                    buffer.put(chunk, 0, chunk.size)
+                    ChannelResult(fd, chunk.size, userData)
+                }
+            }
             return 0
         }
 
         override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
-            pending.addLast(PendingOp(fd, buffer, userData, read = false))
+            pending.addLast {
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+                operations.recordWrite(fd, bytes)
+                ChannelResult(fd, bytes.size, userData)
+            }
             return 0
         }
+
+        override fun prepSocket(domain: Int, type: Int, protocol: Int, userData: Long): Int {
+            pending.addLast { ChannelResult(domain, operations.socket(), userData) }
+            return 0
+        }
+
+        override fun prepConnect(fd: Int, address: ByteBuffer, userData: Long): Int {
+            pending.addLast { ChannelResult(fd, operations.connectResult, userData) }
+            return 0
+        }
+
+        override fun prepClose(fd: Int, userData: Long): Int {
+            pending.addLast {
+                operations.closedDescriptors.add(fd)
+                ChannelResult(fd, 0, userData)
+            }
+            return 0
+        }
+
+        override fun close() { operations.closedHandles++ }
 
         override fun prepAccept(serverFd: Int, userData: Long): Int = -1
 
@@ -248,35 +304,14 @@ private class FakeChannelOperations(
         override fun submit(): Int {
             val batch = mutableListOf<ChannelResult>()
             while (pending.isNotEmpty()) {
-                val op = pending.removeFirst()
-                if (op.read) {
-                    val chunk = operations.readChunk(op.fd)
-                    if (chunk == null) {
-                        batch += ChannelResult(op.fd, -1, op.userData)
-                    } else {
-                        op.buffer.put(chunk, 0, chunk.size)
-                        batch += ChannelResult(op.fd, chunk.size, op.userData)
-                    }
-                } else {
-                    val bytes = ByteArray(op.buffer.remaining())
-                    op.buffer.get(bytes)
-                    operations.recordWrite(op.fd, bytes)
-                    batch += ChannelResult(op.fd, bytes.size, op.userData)
-                }
+                batch += pending.removeFirst().invoke()
             }
             completions = batch
             return batch.size
         }
 
-        override fun wait(minComplete: Int): List<ChannelResult> = completions
+        override fun wait(minComplete: Int): List<ChannelResult> = completions.also { completions = emptyList() }
     }
-
-    private data class PendingOp(
-        val fd: Int,
-        val buffer: ByteBuffer,
-        val userData: Long,
-        val read: Boolean,
-    )
 }
 
 private class FakeTlsCodecBackend : TlsCodecBackend {

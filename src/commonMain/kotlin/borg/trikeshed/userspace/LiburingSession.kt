@@ -89,6 +89,10 @@ internal class LiburingSession(
     }
 
     override fun drain(): Result<Unit> = open()?.drain() ?: notOpen()
-    override fun close(): Result<Unit> =
-        (open()?.close() ?: Result.success(Unit)).also { if (it.isSuccess || ring?.isClosed == true) ring = null }
+    override fun close(): Result<Unit> {
+        val current = ring ?: return Result.success(Unit)
+        return current.close().also {
+            if (ring === current && (it.isSuccess || current.isClosed)) ring = null
+        }
+    }
 }

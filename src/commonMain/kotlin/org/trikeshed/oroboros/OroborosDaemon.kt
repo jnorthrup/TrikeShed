@@ -1399,6 +1399,9 @@ object OroborosDaemon {
         // Sub-VM module legos: tika/corenlp/camel/graalce as supervised guest evals
         // over the daemon's own hypervisor (VmSupervisor.current — VmWire's same host).
         borg.trikeshed.lcnc.SubVmLegos.register(moduleContext)
+        // uring legos: the ring as palette nodes — SQE in, CQE out, through the
+        // facade's probed backend; contracts in LcncContracts, one registration site.
+        borg.trikeshed.lcnc.UringLegos.register(moduleContext)
         // The LIFETIME half of camel: vm.camel.up/down/routes hold a CamelContext open past the
         // run that started it, so a poller (timer:, file:, imaps:) has somewhere to live and every
         // Exchange that crosses lands on the board as camel/route/<id>/exchange.

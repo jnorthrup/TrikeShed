@@ -33,25 +33,25 @@ class JvmChannelOperations : ChannelOperations {
  * otherwise, -EAGAIN = -11 while the op would block).
  */
 class JvmChannelHandle(
-    capacity: Int,
+    private val capacity: Int,
 ) : ChannelOperations.ChannelHandle {
     override val id: Int = capacity // ring identity, not a descriptor
     private val facade = FunctionalUringFacade(capacity, openUserspaceChannelBackend(capacity))
     private var nextToken = 0L
-    // caller userData -> (fd, opcode) so CQEs map back to ChannelResult rows.
-    private val staged = HashMap<Long, Pair<Int, UringOp>>()
+    private var closed = false
+    // Ring token -> (fd, caller userData); caller identities may repeat.
+    private val staged = HashMap<Long, Pair<Int, Long>>()
 
+    @Synchronized
     private fun enqueue(submission: UringSubmission, userData: Long): Int {
-        val token = nextToken++
+        if (closed) return -9
+        if (staged.size == capacity) return -11
+        val token = nextToken
         facade.enqueue(submission.copy(userData = token))
-        staged[token] = submission.fd to submission.opcode
-        // Re-key the completion back to the caller's userData.
-        completions[userData] = token
+        nextToken++
+        staged[token] = submission.fd to userData
         return 0
     }
-
-    // caller userData -> internal token awaiting its CQE
-    private val completions = HashMap<Long, Long>()
 
     // This handle is a ring, not a descriptor.
     override fun read(buffer: ByteBuffer, offset: Long): Int = -9
@@ -87,27 +87,23 @@ class JvmChannelHandle(
     override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
         enqueue(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0), userData)
 
-    override fun submit(): Int = facade.submit()
+    @Synchronized
+    override fun submit(): Int = if (closed) -9 else facade.submit()
 
+    @Synchronized
     override fun wait(minComplete: Int): List<ChannelResult> {
-        val results = ArrayList<ChannelResult>()
-        while (results.size < minComplete) {
-            val settled = facade.wait(0)
-            if (settled.isEmpty()) break
-            for (cqe in settled) {
-                val (fd, _) = staged.remove(cqe.userData) ?: continue
-                // Find the caller userData whose token this CQE settles.
-                val caller = completions.entries.firstOrNull { it.value == cqe.userData }?.key ?: continue
-                completions.remove(caller)
-                results.add(ChannelResult(fd, cqe.res, caller))
+        return facade.wait(minComplete).map { cqe ->
+            val (fd, caller) = checkNotNull(staged.remove(cqe.userData)) {
+                "Completion has no admitted channel submission: ${cqe.userData}"
             }
+            ChannelResult(fd, cqe.res, caller)
         }
-        return results
     }
 
+    @Synchronized
     override fun close() {
+        if (closed) return
+        closed = true
         facade.closeNow()
-        staged.clear()
-        completions.clear()
     }
 }
