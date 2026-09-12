@@ -1180,6 +1180,7 @@ object OroborosDaemon {
         val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
             val now = HostSystem.currentTimeMillis()
+            borg.trikeshed.jules.HermesModelUsageJdbc.install()
             val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
             quotaLegion.refresh(borg.trikeshed.jules.HermesModelUsage.ledgerRows(db), now)
             HostSystem.err(

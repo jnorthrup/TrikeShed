@@ -1,6 +1,6 @@
 package borg.trikeshed.jules
 
-import java.io.File
+import borg.trikeshed.common.File
 
 
 /**
@@ -45,7 +45,7 @@ object HermesInstances {
 
     /** Everything Hermes has run or been answered by, newest first, routable rows only. */
     fun known(db: File = HermesModelUsage.stateDb(), sessions: Int = 64, usage: Int = 256): List<Instance> =
-        merge(HermesActiveSession.recent(db, sessions), HermesModelUsage.recent(db, usage))
+        merge(HermesActiveSession.recent(java.io.File(db.absolutePath), sessions), HermesModelUsage.recent(db, usage))
 
     /** Pure merge of the two tables' rows — see the object doc for the rules. */
     internal fun merge(sessions: List<HermesActiveSession.Session>, usage: List<HermesModelUsage.Usage>): List<Instance> {
