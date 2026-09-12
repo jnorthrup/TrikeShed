@@ -30,4 +30,6 @@ actual object Files {
     actual fun resolvePath(vararg parts: String): String = ops.resolvePath(*parts)
     actual fun readZip(path: String): List<Join<String, ByteArray>> = ops.readZip(path)
     actual fun createTempDir(prefix: String): String = ops.createTempDir(prefix)
+
+    actual fun lastModified(filename: String): Long = ops.lastModified(filename)
 }

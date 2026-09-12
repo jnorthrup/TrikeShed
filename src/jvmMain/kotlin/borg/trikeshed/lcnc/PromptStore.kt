@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -9,7 +10,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * THE STORED SET OF PROMPTS — the write side, on the JVM daemon.
@@ -171,6 +171,6 @@ class PromptStore(
     companion object {
         const val ATTACHMENT_PREFIX = "prompts/"
         const val SEED_ACTOR = "seed"
-        fun ledgerFile(forgeHome: File): File = File(forgeHome, "prompts/ledger.jsonl")
+        fun ledgerFile(forgeHome: File): File = forgeHome.resolve("prompts/ledger.jsonl")
     }
 }

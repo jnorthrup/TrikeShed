@@ -34,7 +34,27 @@ value class Path(val absolutePath: String) {
     fun writeBytes(bytes: ByteArray) = Files.write(absolutePath, bytes)
     fun writeText(text: String) = Files.write(absolutePath, text)
 
+    /** Append text (UTF-8); creates the file when absent. */
+    fun appendText(text: String) {
+        val existing = runCatching { Files.readAllBytes(absolutePath) }.getOrDefault(ByteArray(0))
+        Files.write(absolutePath, existing + text.encodeToByteArray())
+    }
+
+    /** Append bytes; creates the file when absent. */
+    fun appendBytes(bytes: ByteArray) {
+        val existing = runCatching { Files.readAllBytes(absolutePath) }.getOrDefault(ByteArray(0))
+        Files.write(absolutePath, existing + bytes)
+    }
+
     fun listFiles(): List<Path> = Files.listDir(absolutePath).map { resolve(it) }
+
+    /** Iterate lines UTF-8; trailing newline handling matches readLines. */
+    fun forEachLine(block: (String) -> Unit) {
+        for (line in Files.readAllLines(absolutePath)) block(line)
+    }
+
+    /** Last-modified epoch millis; 0 when unknown. */
+    fun lastModified(): Long = Files.lastModified(absolutePath)
 
     /** Lexically-normalized absolute spelling — the SPI resolves symlinks where the platform can. */
     val canonicalFile: Path
@@ -42,6 +62,13 @@ value class Path(val absolutePath: String) {
 
     /** Path separator spelling of this path. */
     val path: String get() = absolutePath
+
+
+
+    /** Platform path separator spelling ("/" on posix-family hosts the SPI backs). */
+    companion object {
+        const val separator: String = "/"
+    }
 
 
     override fun toString(): String = absolutePath

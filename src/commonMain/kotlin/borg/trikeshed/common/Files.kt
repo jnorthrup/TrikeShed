@@ -37,4 +37,7 @@ expect object Files {
     fun resolvePath(vararg parts: String): String
     fun readZip(path: String): List<Join<String, ByteArray>>
     fun createTempDir(prefix: String): String
+
+    /** Last-modified epoch millis, 0 when the platform cannot answer. */
+    fun lastModified(filename: String): Long
 }

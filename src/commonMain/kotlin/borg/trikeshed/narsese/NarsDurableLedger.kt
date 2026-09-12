@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
-import java.io.File
+import borg.trikeshed.common.File
+
 
 /**
  * Append-only ledgers on the forge filesystem for what NARS has been taught.
@@ -26,10 +27,10 @@ import java.io.File
 object NarsDurableLedger {
 
     /** Where the ledgers live under a forge home. */
-    fun dir(forgeHome: File): File = File(forgeHome, "nars")
+    fun dir(forgeHome: File): File = forgeHome.resolve("nars")
 
-    fun axiomFile(forgeHome: File): File = File(dir(forgeHome), "kif-ledger.jsonl")
-    fun ruleFile(forgeHome: File): File = File(dir(forgeHome), "rete-rules.jsonl")
+    fun axiomFile(forgeHome: File): File = dir(forgeHome).resolve("kif-ledger.jsonl")
+    fun ruleFile(forgeHome: File): File = dir(forgeHome).resolve("rete-rules.jsonl")
 
     private fun esc(s: String): String = buildString {
         for (c in s) when (c) {
@@ -93,7 +94,7 @@ object NarsDurableLedger {
     /** Distinct taught axioms, oldest first. A line that will not parse is skipped, not fatal. */
     fun readAxioms(forgeHome: File): List<String> {
         val f = axiomFile(forgeHome)
-        if (!f.isFile) return emptyList()
+        if (!f.isFile()) return emptyList()
         val seen = LinkedHashSet<String>()
         f.forEachLine { line -> field(line, "kif")?.takeIf { it.isNotBlank() }?.let { seen.add(it) } }
         return seen.toList()
@@ -102,7 +103,7 @@ object NarsDurableLedger {
     /** Distinct admitted rules, oldest first, reconstructed with their original `ruleCid`. */
     fun readRules(forgeHome: File): List<EternalRule> {
         val f = ruleFile(forgeHome)
-        if (!f.isFile) return emptyList()
+        if (!f.isFile()) return emptyList()
         val out = LinkedHashMap<String, EternalRule>()
         f.forEachLine { line ->
             val antecedent = field(line, "antecedent") ?: return@forEachLine

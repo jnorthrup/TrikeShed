@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -10,7 +11,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * THE PUBLISHED PROGRAMS' DURABLE PLANE (AutoTools notion, Cut 0).
@@ -223,7 +223,7 @@ class ProgramLedger(
         // dies: `isFile` and `readLines` are two syscalls apart, and the file lives in a
         // home an operator may have copied, chmod'ed or replaced under the daemon.
         val lines = withContext(Dispatchers.IO) {
-            runCatching { if (file.isFile) file.readLines().filter { it.isNotBlank() } else emptyList() }
+            runCatching { if (file.isFile()) file.readLines().filter { it.isNotBlank() } else emptyList() }
                 .getOrElse { why ->
                     System.err.println("[OROBOROS] programs: the ledger at ${file.path} could not be read (${why.message}); no head is restored")
                     emptyList()
@@ -244,6 +244,6 @@ class ProgramLedger(
         /** Who the publish route says it is; the ledger records the actor it was given. */
         const val ACTOR = "panels-editor"
 
-        fun ledgerFile(forgeHome: File): File = File(forgeHome, "programs/ledger.jsonl")
+        fun ledgerFile(forgeHome: File): File = forgeHome.resolve("programs/ledger.jsonl")
     }
 }

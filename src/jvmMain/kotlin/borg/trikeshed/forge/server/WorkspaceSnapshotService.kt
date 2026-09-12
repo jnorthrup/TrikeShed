@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.common.File
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNodeRunner
@@ -14,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * The workspace snapshot citizen (Forge genesis, Cut C): composed from the blackboard and
@@ -91,7 +91,7 @@ class WorkspaceSnapshotService(
     /** Boot: re-read the ledger (last line is the head), re-announce the head on the board. */
     suspend fun restore(): Int {
         val f = ledger ?: return 0
-        val lines = withContext(Dispatchers.IO) { if (f.isFile) f.readLines().filter { it.isNotBlank() } else emptyList() }
+        val lines = withContext(Dispatchers.IO) { if (f.isFile()) f.readLines().filter { it.isNotBlank() } else emptyList() }
         val parsed = lines.mapNotNull { runCatching { JsonSupport.parseMap(it) }.getOrNull() }
         synchronized(lineage) { lineage.clear(); lineage.addAll(parsed.reversed()) }
         val last = parsed.lastOrNull() ?: return 0
@@ -118,6 +118,6 @@ class WorkspaceSnapshotService(
 
     companion object {
         const val LEGO = "workspace.snapshot"
-        fun ledgerFile(forgeHome: File): File = File(forgeHome, "snapshots/ledger.jsonl")
+        fun ledgerFile(forgeHome: File): File = forgeHome.resolve("snapshots/ledger.jsonl")
     }
 }

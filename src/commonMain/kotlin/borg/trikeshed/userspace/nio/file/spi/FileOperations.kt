@@ -47,6 +47,9 @@ interface FileOperations : CoroutineContext.Element {
     fun readZip(path: String): List<Join<String, ByteArray>>
     fun createTempDir(prefix: String): String
 
+    /** Last-modified epoch millis; 0 when unknown. */
+    fun lastModified(filename: String): Long = 0L
+
     /** Close a file descriptor. Returns 0 on success. */
     fun close(fd: Int): Int
     /** Return file size in bytes. */

@@ -1,9 +1,9 @@
 package borg.trikeshed.daemon
 
 import kotlinx.coroutines.Dispatchers
+import borg.trikeshed.common.File
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Reactive git-state cache — reads `.git` data model directly.
@@ -65,7 +65,7 @@ class GitStateCache(private val repoDir: File) {
      */
     fun isTreeClean(): Boolean {
         if (treeValid) return cachedTreeClean
-        val indexFile = File(repoDir, ".git/index")
+        val indexFile = repoDir.resolve(".git/index")
         val currentIndexMtime = if (indexFile.exists()) ((indexFile.lastModified() / 1000L) * 1000L) else 0L
         cachedTreeClean = currentIndexMtime == lastKnownIndexMtime
         treeValid = true
@@ -74,7 +74,7 @@ class GitStateCache(private val repoDir: File) {
 
     /** Called by the daemon after it mutates the tree (commit, merge, etc). */
     fun markTreeMutated() {
-        val indexFile = File(repoDir, ".git/index")
+        val indexFile = repoDir.resolve(".git/index")
         lastKnownIndexMtime = if (indexFile.exists()) ((indexFile.lastModified() / 1000L) * 1000L) else 0L
         treeValid = false
     }
@@ -105,7 +105,7 @@ class GitStateCache(private val repoDir: File) {
      * (direct SHA), and packed-refs fallback.
      */
     private suspend fun resolveHead(): String = withContext(context = Dispatchers.IO) {
-        val headFile = File(repoDir, ".git/HEAD")
+        val headFile = repoDir.resolve(".git/HEAD")
         if (!headFile.exists()) return@withContext ""
         val headContent = headFile.readText().trim()
 
@@ -115,11 +115,11 @@ class GitStateCache(private val repoDir: File) {
         // Symbolic ref: `ref: refs/heads/master`
         if (headContent.startsWith("ref: ")) {
             val refPath = headContent.removePrefix("ref: ")
-            val refFile = File(repoDir, ".git/$refPath")
+            val refFile = repoDir.resolve(".git/$refPath")
             if (refFile.exists()) return@withContext refFile.readText().trim()
 
             // Fallback: packed-refs
-            val packedRefs = File(repoDir, ".git/packed-refs")
+            val packedRefs = repoDir.resolve(".git/packed-refs")
             if (packedRefs.exists()) {
                 val refLine = packedRefs.readLines().find { it.endsWith(" $refPath") }
                 if (refLine != null) return@withContext refLine.substringBefore(" ").trim()

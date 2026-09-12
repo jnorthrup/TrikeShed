@@ -1,12 +1,12 @@
 package borg.trikeshed.wiki
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.common.File
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * WikiSkill (arXiv 2608.27454) as two ordinary LCNC legos.
@@ -76,26 +76,26 @@ object WikiNodes {
 
     /** The three-layer wiki under the forge home. Never the repo worktree. */
     class WikiHome(val root: File) {
-        val patterns = File(root, "patterns")
-        val skills = File(root, "skills")
-        val rawResponses = File(root, "raw-responses")
-        val readLogs = File(root, "read-log")
-        val index = File(root, "index.md")
-        val logs = File(root, "logs.md")
-        val skillImpact = File(root, "skill-impact.md")
+        val patterns = root.resolve("patterns")
+        val skills = root.resolve("skills")
+        val rawResponses = root.resolve("raw-responses")
+        val readLogs = root.resolve("read-log")
+        val index = root.resolve("index.md")
+        val logs = root.resolve("logs.md")
+        val skillImpact = root.resolve("skill-impact.md")
 
         fun ensure() {
             patterns.mkdirs(); skills.mkdirs(); rawResponses.mkdirs(); readLogs.mkdirs()
         }
 
         fun patternFiles(): List<File> =
-            patterns.listFiles()?.filter { it.isFile && it.name.endsWith(".md") }?.sortedBy { it.name } ?: emptyList()
+            patterns.listFiles()?.filter { it.isFile() && it.name.endsWith(".md") }?.sortedBy { it.name } ?: emptyList()
 
         /** Resolve a wiki-relative path, refusing anything that escapes the wiki root. */
         fun resolve(rel: String): File? {
             val cleaned = rel.trim().removePrefix("./").removePrefix("wiki/")
             if (cleaned.isEmpty() || cleaned.startsWith("/") || cleaned.contains("..")) return null
-            val f = File(root, cleaned)
+            val f = root.resolve(cleaned)
             val canonicalRoot = root.canonicalFile.path + File.separator
             return if ((f.canonicalFile.path + File.separator).startsWith(canonicalRoot)) f else null
         }
@@ -136,8 +136,8 @@ object WikiNodes {
         val priorPatterns = withContext(Dispatchers.IO) {
             home.patternFiles().map { it.name to it.readText() }
         }
-        val priorIndex = withContext(Dispatchers.IO) { if (home.index.isFile) home.index.readText() else "" }
-        val priorLogs = withContext(Dispatchers.IO) { if (home.logs.isFile) home.logs.readText() else "" }
+        val priorIndex = withContext(Dispatchers.IO) { if (home.index.isFile()) home.index.readText() else "" }
+        val priorLogs = withContext(Dispatchers.IO) { if (home.logs.isFile()) home.logs.readText() else "" }
 
         // ── the sampled traces ──
         val loaded = ArrayList<WikiTrace>()
@@ -181,7 +181,7 @@ object WikiNodes {
             "responseChars" to reply.content.length,
             "response" to reply.content,
         )
-        val captureFile = File(home.rawResponses, "${safeName(contextId)}.json")
+        val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
         withContext(Dispatchers.IO) { captureFile.writeText(JsonSupport.stringify(capture)) }
 
         // ── parse the edit script; a non-JSON reply is a LOUD no-op ──
@@ -210,7 +210,7 @@ object WikiNodes {
         val resolvedCids = loaded.map { it.cid }
 
         suspend fun current(rel: String): String? = staged[rel]
-            ?: withContext(Dispatchers.IO) { home.resolve(rel)?.takeIf { it.isFile }?.readText() }
+            ?: withContext(Dispatchers.IO) { home.resolve(rel)?.takeIf { it.isFile() }?.readText() }
 
         for (raw in (script["edits"] as List<*>)) {
             val edit = (raw as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: continue
@@ -371,13 +371,13 @@ object WikiNodes {
         val baseContextId = node.params["contextId"]?.takeIf { it.isNotBlank() }
             ?: "wiki.propose/${clock()}"
 
-        val index = withContext(Dispatchers.IO) { if (home.index.isFile) home.index.readText() else "(index.md is empty)" }
-        val impact = withContext(Dispatchers.IO) { if (home.skillImpact.isFile) home.skillImpact.readText() else "(no prior proposals)" }
+        val index = withContext(Dispatchers.IO) { if (home.index.isFile()) home.index.readText() else "(index.md is empty)" }
+        val impact = withContext(Dispatchers.IO) { if (home.skillImpact.isFile()) home.skillImpact.readText() else "(no prior proposals)" }
         val existingSkills = withContext(Dispatchers.IO) {
-            home.skills.listFiles()?.filter { it.isDirectory }?.map { it.name }?.sorted() ?: emptyList()
+            home.skills.listFiles()?.filter { it.isDirectory() }?.map { it.name }?.sorted() ?: emptyList()
         }
 
-        val readLog = File(home.readLogs, "${safeName(baseContextId)}.jsonl")
+        val readLog = home.readLogs.resolve("${safeName(baseContextId)}.jsonl")
         val readOrder = ArrayList<Map<String, Any?>>()
         val turnRecords = ArrayList<Map<String, Any?>>()
         val transcript = StringBuilder()
@@ -401,7 +401,7 @@ object WikiNodes {
             )
             lastModel = reply.model
             val responseCid = casPut(reply.content.encodeToByteArray())
-            val captureFile = File(home.rawResponses, "${safeName(contextId)}.json")
+            val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
             withContext(Dispatchers.IO) {
                 captureFile.writeText(JsonSupport.stringify(linkedMapOf<String, Any?>(
                     "pass" to "wiki.propose",
@@ -505,24 +505,24 @@ object WikiNodes {
             ))
         }
 
-        val skillDir = File(home.skills, skill)
+        val skillDir = home.skills.resolve(skill)
         val written = ArrayList<String>()
         withContext(Dispatchers.IO) {
             skillDir.mkdirs()
             if (kind == "new") {
-                File(skillDir, "SKILL.md").writeText(skillMd)
+                skillDir.resolve("SKILL.md").writeText(skillMd)
                 written.add("skills/$skill/SKILL.md")
-                File(skillDir, "PURPOSE.md").writeText(purposeMd)
+                skillDir.resolve("PURPOSE.md").writeText(purposeMd)
                 written.add("skills/$skill/PURPOSE.md")
                 if (diff.isNotBlank()) {
-                    File(skillDir, "proposal-${safeName(baseContextId)}.diff").writeText(diff)
+                    skillDir.resolve("proposal-${safeName(baseContextId)}.diff").writeText(diff)
                     written.add("skills/$skill/proposal-${safeName(baseContextId)}.diff")
                 }
             } else {
-                File(skillDir, "proposal-${safeName(baseContextId)}.diff").writeText(diff)
+                skillDir.resolve("proposal-${safeName(baseContextId)}.diff").writeText(diff)
                 written.add("skills/$skill/proposal-${safeName(baseContextId)}.diff")
                 if (purposeMd.isNotBlank()) {
-                    File(skillDir, "PURPOSE.md").writeText(purposeMd)
+                    skillDir.resolve("PURPOSE.md").writeText(purposeMd)
                     written.add("skills/$skill/PURPOSE.md")
                 }
             }
@@ -550,7 +550,7 @@ object WikiNodes {
             "skill" to skill,
             "kind" to kind,
             "proposalCid" to proposalCid,
-            "artifacts" to written.map { File(home.root, it).absolutePath },
+            "artifacts" to written.map { home.root.resolve(it).absolutePath },
             "relativeArtifacts" to written,
             "initialInputs" to listOf("index.md", "skill-impact.md", "outcome-summary(param)"),
             "turns" to turnRecords,
@@ -576,7 +576,7 @@ object WikiNodes {
         }
         val f = home.resolve(target) ?: return "(path outside the wiki: $target)" to "not_found"
         return withContext(Dispatchers.IO) {
-            if (f.isFile) f.readText().take(limit) to "wiki" else "(no such wiki file: $target)" to "not_found"
+            if (f.isFile()) f.readText().take(limit) to "wiki" else "(no such wiki file: $target)" to "not_found"
         }
     }
 

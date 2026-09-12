@@ -1,6 +1,7 @@
 package borg.trikeshed.memory
 
 import borg.trikeshed.cursor.BudgetCoord
+import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.BeliefBagElement
@@ -9,7 +10,6 @@ import borg.trikeshed.narsese.EvidenceCoord
 import borg.trikeshed.narsese.Nal
 import borg.trikeshed.narsese.RelationKind
 import borg.trikeshed.narsese.SemanticSignal
-import java.io.File
 
 /**
  * HermesMemoryFiles — the frozen-snapshot seam between the belief bag and
@@ -30,14 +30,14 @@ class HermesMemoryFiles(
     private val memoriesDir: File,
     private val evaluatorCid: ContentId,
 ) {
-    private val stampFile = File(memoriesDir, ".render-cid")
+    private val stampFile = memoriesDir.resolve(".render-cid")
 
     /** Diff disk content against the last render; user deltas become heavy evidence. */
     suspend fun ingestUserEdits(fileName: String = "MEMORY.md"): Int {
-        val file = File(memoriesDir, fileName)
-        if (!file.isFile) return 0
+        val file = memoriesDir.resolve(fileName)
+        if (!file.isFile()) return 0
         val disk = file.readText()
-        val lastCid = stampFile.takeIf { it.isFile }?.readText()?.trim()
+        val lastCid = stampFile.takeIf { it.isFile() }?.readText()?.trim()
         if (lastCid != null && ContentId.of(disk.encodeToByteArray()).hex == lastCid) return 0
 
         val diskEntries = BeliefRender.entriesOf(disk)
@@ -80,7 +80,7 @@ class HermesMemoryFiles(
     fun renderTo(fileName: String = "MEMORY.md", cap: Int = BeliefRender.MEMORY_CAP, k: Int = 64): RenderedMemory {
         val rendered = BeliefRender.render(bag.recallTop(k), gloss = { s -> glossTable[s.angular] }, cap = cap)
         memoriesDir.mkdirs()
-        File(memoriesDir, fileName).writeText(rendered.text)
+        memoriesDir.resolve(fileName).writeText(rendered.text)
         stampFile.writeText(rendered.cid.hex)
         renderedEntries = BeliefRender.entriesOf(rendered.text)
         return rendered
@@ -91,9 +91,9 @@ class HermesMemoryFiles(
      * Persisted as a TSV sidecar — captions must survive the process, or every
      * restart would strip the render back to user-authored entries only.
      */
-    private val glossFile = File(memoriesDir, ".glosses.tsv")
+    private val glossFile = memoriesDir.resolve(".glosses.tsv")
     private val glossTable = HashMap<Long, String>().apply {
-        if (glossFile.isFile) {
+        if (glossFile.isFile()) {
             for (line in glossFile.readLines()) {
                 val tab = line.indexOf('\t')
                 if (tab > 0) line.substring(0, tab).toLongOrNull()?.let { put(it, line.substring(tab + 1)) }

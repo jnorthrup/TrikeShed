@@ -249,6 +249,9 @@ class JvmFileOperations : FileOperations {
     override fun createTempDir(prefix: String): String =
         NioFiles.createTempDirectory(prefix).toAbsolutePath().toString()
 
+    override fun lastModified(filename: String): Long =
+        runCatching { NioFiles.getLastModifiedTime(Paths.get(filename)).toMillis() }.getOrDefault(0L)
+
     companion object {
         /**
          * Cap on entries [listDir] will skip in one directory before it stops advancing the
