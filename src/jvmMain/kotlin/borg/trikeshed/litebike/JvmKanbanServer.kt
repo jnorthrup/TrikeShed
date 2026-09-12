@@ -61,14 +61,14 @@ import kotlin.system.exitProcess
  * per-request channel.
  */
 /** A fallthrough route: answers a request this server does not own, or returns null to decline. Streaming routes receive `respond`. */
-typealias ExtraRoute = suspend (method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
+typealias ExtraRoute = borg.trikeshed.litebike.WireExtraRoute
 
 /**
  * A binary-safe route: receives the raw request bytes (head + body) and may answer with bytes.
  * Tried before the static assets and the Forge shell so a store-hosted app can own `/`.
  * Streaming entries (see `streamingPaths`) receive `respond` and write their own headers.
  */
-typealias RawRoute = suspend (method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?) -> JvmKanbanServer.HttpResponse?
+typealias RawRoute = borg.trikeshed.litebike.WireRawRoute
 
 class JvmKanbanServer(
     /** Extension seam: tried after the built-in routes and static assets, first non-null wins (BlackboardWire, VmWire, …). */
@@ -118,22 +118,8 @@ class JvmKanbanServer(
     private val causalWal = CausalWal(File(stateDir, ".causal.wal"))
     private val graphIndex = CausalGraphNodeIndex()
 
-    /** Wire-level HTTP response built by the HTTP worker. Serialized back through the listener as bytes on the same connection. */
-    data class HttpResponse(
-        val status: Int,
-        val body: String,
-        val contentType: String = "application/json; charset=utf-8",
-        /** Binary payload; when set it is written instead of [body]. */
-        val bytes: ByteArray? = null,
-        /**
-         * Extra response headers. Used by routes that must return a verifiable property of the
-         * payload alongside it — `X-Content-Id` on a curation read, so the caller can check the
-         * served bytes against a freeze record without a second request.
-         */
-        val headers: Map<String, String> = emptyMap(),
-    ) {
-        val payloadBytes: ByteArray get() = bytes ?: body.toByteArray(StandardCharsets.UTF_8)
-    }
+    /** The wire HTTP response is the common contract; the server is JVM. */
+    typealias HttpResponse = borg.trikeshed.litebike.WireHttpResponse
 
     /** Marker carrier passed between workers when a request must cross the listener boundary (e.g. submit → board projection). */
     data class HttpWorkItem(
