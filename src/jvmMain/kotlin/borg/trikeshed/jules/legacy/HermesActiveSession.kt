@@ -1,4 +1,6 @@
-package borg.trikeshed.jules
+package borg.trikeshed.jules.legacy
+
+import borg.trikeshed.jules.HermesModelUsage
 
 import borg.trikeshed.parse.json.JsonSupport
 import java.io.File

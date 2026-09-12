@@ -1,5 +1,7 @@
 package borg.trikeshed.wiki
 
+import borg.trikeshed.narsese.legacy.CuratorImpulseFeeder
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.Dispatchers
@@ -11,7 +13,7 @@ import java.sql.DriverManager
  * Where a WikiSkill execution trace comes from, in the daemon.
  *
  * The raw/ layer of the paper's three-layer structure is the CAS: the
- * transcript snapshots [borg.trikeshed.narsese.CuratorImpulseFeeder] writes
+ * transcript snapshots [borg.trikeshed.narsese.legacy.CuratorImpulseFeeder] writes
  * (`/corpus/hermes/transcripts/<session>/<rowId>.md`), addressed by the
  * SHA-256 of the snapshot body.
  *

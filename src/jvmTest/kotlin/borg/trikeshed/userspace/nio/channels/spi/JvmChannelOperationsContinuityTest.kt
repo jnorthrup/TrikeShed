@@ -7,6 +7,7 @@ import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.htx.state
 import borg.trikeshed.lib.asString
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.channels.sockaddrIpv4
 import java.net.InetSocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.util.concurrent.CountDownLatch
@@ -37,77 +38,52 @@ class JvmChannelOperationsContinuityTest {
             }
             serverDone.countDown()
         }
-        val ops = JvmChannelOperations(entries = 1)
-        val workerEntered = CountDownLatch(1)
-        val releaseWorker = CountDownLatch(1)
+        val handle = JvmChannelOperations().openChannel(2)
 
         try {
-            assertTrue(ops.schedule {
-                workerEntered.countDown()
-                releaseWorker.await(5, TimeUnit.SECONDS)
-            })
-            assertTrue(workerEntered.await(5, TimeUnit.SECONDS))
-
-            val fd = ops.socket(0, 0, 0)
+            assertEquals(0, handle.prepSocket(2, 1, 0, 1))
+            val fd = handle.wait(1).single().res
+            assertTrue(fd >= 0)
             val port = (server.localAddress as InetSocketAddress).port
-            assertEquals(0, ops.connect(fd, "127.0.0.1", port))
-
-            val handle = ops.openChannel(1)
-            handle.writev(fd, ByteBuffer(payload))
-            assertEquals(1, handle.submit())
-
-            releaseWorker.countDown()
-            val completion = awaitCompletion(handle)
-            assertEquals(payload.size, completion.res)
+            val address = ByteBuffer(sockaddrIpv4(byteArrayOf(127, 0, 0, 1), port))
+            assertEquals(0, handle.prepConnect(fd, address, 2))
+            assertEquals(0, handle.writev(fd, ByteBuffer(payload), 3))
+            assertEquals(2, handle.submit())
+            assertEquals(listOf(ChannelResult(fd, 0, 2), ChannelResult(fd, payload.size, 3)), handle.wait(2))
             assertTrue(serverDone.await(5, TimeUnit.SECONDS))
             assertContentEquals(payload, received)
-            ops.close(fd)
         } finally {
-            releaseWorker.countDown()
+            handle.close()
             server.close()
             serverThread.join(5_000)
-            ops.ioWorkers.shutdownNow()
         }
     }
 
     @Test
-    fun burstHandlesRemainQueuedInsteadOfManufacturingFailures() {
-        val ops = JvmChannelOperations(entries = 1)
-        val workerEntered = CountDownLatch(1)
-        val releaseWorker = CountDownLatch(1)
+    fun burstHandlesRetainEveryCompletion() {
+        val ops = JvmChannelOperations()
         val handles = ArrayList<ChannelOperations.ChannelHandle>()
-        val fds = ArrayList<Int>()
 
         try {
-            assertTrue(ops.schedule {
-                workerEntered.countDown()
-                releaseWorker.await(5, TimeUnit.SECONDS)
-            })
-            assertTrue(workerEntered.await(5, TimeUnit.SECONDS))
-
-            repeat(16) {
-                val fd = ops.socket(0, 0, 0)
+            repeat(16) { index ->
                 val handle = ops.openChannel(1)
-                fds.add(fd)
                 handles.add(handle)
-                handle.writev(fd, ByteBuffer(byteArrayOf(1)))
+                assertEquals(0, handle.prepSocket(2, 1, 0, index.toLong()))
                 assertEquals(1, handle.submit())
             }
 
-            assertTrue(
-                handles.all { it.wait(minComplete = 0).isEmpty() },
-                "worker saturation must preserve pending operations; it must not synthesize ChannelResult(-1)",
-            )
+            val results = handles.map { it.wait(0).single() }
+            assertTrue(results.all { it.res >= 0 })
+            assertEquals((0L until 16L).toSet(), results.map { it.userData }.toSet())
+            assertEquals(16, results.map { it.res }.toSet().size)
+            assertTrue(handles.all { it.wait(0).isEmpty() })
         } finally {
-            fds.forEach(ops::close)
-            releaseWorker.countDown()
-            ops.ioWorkers.shutdown()
-            ops.ioWorkers.awaitTermination(5, TimeUnit.SECONDS)
+            handles.forEach { it.close() }
         }
     }
 
     @Test
-    fun htxRetriesZeroReadsUntilTheDelayedLoopbackResponseArrives() {
+    fun htxRetriesWouldBlockUntilTheDelayedLoopbackResponseArrives() {
         val responseBody = "still-contiguous"
         val server = ServerSocketChannel.open().apply {
             bind(InetSocketAddress("127.0.0.1", 0))
@@ -133,7 +109,7 @@ class JvmChannelOperationsContinuityTest {
                 }
             }
         }
-        val ops = JvmChannelOperations(entries = 2)
+        val ops = JvmChannelOperations()
         val reactor = HtxReactorElement(channelOperations = ops)
         val port = (server.localAddress as InetSocketAddress).port
 
@@ -156,19 +132,7 @@ class JvmChannelOperationsContinuityTest {
         } finally {
             server.close()
             serverThread.join(5_000)
-            ops.ioWorkers.shutdownNow()
         }
     }
 
-    private fun awaitCompletion(
-        handle: ChannelOperations.ChannelHandle,
-        timeoutMillis: Long = 5_000,
-    ): ChannelResult {
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        while (System.nanoTime() < deadline) {
-            handle.wait(minComplete = 0).firstOrNull()?.let { return it }
-            Thread.sleep(5)
-        }
-        error("timed out waiting for channel completion")
-    }
 }

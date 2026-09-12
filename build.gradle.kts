@@ -12,6 +12,7 @@ import java.security.MessageDigest
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 
 plugins {
@@ -37,6 +38,10 @@ val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull 
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 val viewServerNodeSlice = false
+val linuxHost = System.getProperty("os.name").lowercase().contains("linux")
+val arm64Host = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
+val enableLinuxX64Target = (linuxHost && !arm64Host) || providers.gradleProperty("enableLinuxX64").orNull == "true"
+val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradleProperty("enableLinuxArm64").orNull == "true"
 
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.3.4.1 is the locked runtime (matches the JDK toolchain's bundled Truffle/JVMCI); JDK 25 toolchain.
@@ -109,6 +114,12 @@ kotlin {
             }
         }
         binaries.executable()
+        val jsMainCompilation = compilations.getByName("main")
+        val uringBenchmark = compilations.create("uringBenchmark") {
+            associateWith(jsMainCompilation)
+            defaultSourceSet.kotlin.srcDir("src/jsBenchmark/kotlin")
+        }
+        binaries.executable(uringBenchmark)
     }
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
@@ -187,8 +198,15 @@ kotlin {
         // }
     }
 
-    if (isLinux || providers.gradleProperty("enableLinuxX64").orNull == "true") {
+    if (enableLinuxX64Target) {
         linuxX64 {
+            if (enableNativeSharedLib) {
+                binaries.sharedLib { baseName = "trikeshed" }
+            }
+        }
+    }
+    if (enableLinuxArm64Target) {
+        linuxArm64 {
             if (enableNativeSharedLib) {
                 binaries.sharedLib { baseName = "trikeshed" }
             }
@@ -298,7 +316,7 @@ kotlin {
         // re-deriving the gate, which cannot drift. Creating them unconditionally left linuxMain,
         // linuxTest, mingwX64Main and mingwX64Test attached to no compilation on every Mac build,
         // which is the "Unused Kotlin Source Sets" warning.
-        if (targets.findByName("linuxX64") != null) {
+        if (targets.findByName("linuxX64") != null || targets.findByName("linuxArm64") != null) {
             // linuxMain is an INTERMEDIATE, not linuxX64's default source set, and this project
             // turns off the default hierarchy template (gradle.properties), so nothing would
             // connect the two on its own: linuxMain would be orphaned even on Linux and its
@@ -308,8 +326,10 @@ kotlin {
                 kotlin.exclude("linux_uring/**")
             }
             val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
-            getByName("linuxX64Main").dependsOn(linuxMain)
-            getByName("linuxX64Test").dependsOn(linuxTest)
+            for (target in listOf("linuxX64", "linuxArm64")) {
+                findByName("${target}Main")?.dependsOn(linuxMain)
+                findByName("${target}Test")?.dependsOn(linuxTest)
+            }
         }
         if (targets.findByName("mingwX64") != null) {
             // These two ARE mingwX64's own default source sets, so the target wires the
@@ -373,25 +393,86 @@ tasks.named("checkKotlinGradlePluginConfigurationErrors") {
 // CInterop - Linux production actuals import this binding directly.
 // ─────────────────────────────────────────────────────────────────
 
-val enableLinuxX64Target = System.getProperty("os.name").lowercase().contains("linux")
-    || providers.gradleProperty("enableLinuxX64").orNull == "true"
-
-if (enableLinuxX64Target) {
-    kotlin {
-        linuxX64 {
-            compilations.getByName("main") {
-                cinterops {
-                    val zlinux_uring by creating {
-                        defFile = project.file("io_uring_interop/zlinux_uring.def")
-                        compilerOpts(
-                            "-I${project.rootDir}/liburing/src/include",
-                            "-I${project.rootDir}/io_uring_interop",
-                        )
-                    }
-                }
-            }
+val liburingSource = layout.projectDirectory.dir("src/linuxMain/resources/liburing")
+val prebuiltLiburing = providers.gradleProperty("uringLiburingBuildDir")
+val liburingBuild = layout.dir(prebuiltLiburing.map { project.file(it) })
+    .orElse(layout.buildDirectory.dir("native/liburing"))
+val validatePrebuiltLiburing = tasks.register("validatePrebuiltLiburing") {
+    onlyIf { prebuiltLiburing.isPresent }
+    doLast {
+        val required = listOf("src/liburing.a", "src/include/liburing/compat.h", "src/include/liburing/io_uring_version.h")
+        val missing = required.filter { !liburingBuild.get().file(it).asFile.isFile }
+        check(missing.isEmpty()) {
+            "uringLiburingBuildDir=${liburingBuild.get().asFile} lacks required Linux build artifacts: ${missing.joinToString()}"
         }
     }
+}
+val configureLiburing = tasks.register<Exec>("configureLiburing") {
+    dependsOn(validatePrebuiltLiburing)
+    onlyIf { !prebuiltLiburing.isPresent }
+    inputs.file(liburingSource.file("configure"))
+    inputs.file(liburingSource.file("Makefile.common"))
+    outputs.files(liburingBuild.map { it.file("config-host.mak") }, liburingBuild.map { it.file("config-host.h") },
+        liburingBuild.map { it.file("src/include/liburing/compat.h") },
+        liburingBuild.map { it.file("src/include/liburing/io_uring_version.h") })
+    workingDir(liburingBuild)
+    environment("CFLAGS", "-O3 -fPIC")
+    commandLine("sh", liburingSource.file("configure").asFile.absolutePath, "--use-libc")
+    doFirst {
+        check(linuxHost) { "The liburing build requires a Linux host" }
+        liburingBuild.get().asFile.mkdirs()
+    }
+}
+val buildLiburing = tasks.register<Exec>("buildLiburing") {
+    dependsOn(configureLiburing)
+    onlyIf { !prebuiltLiburing.isPresent }
+    inputs.dir(liburingSource.dir("src"))
+    inputs.file(liburingSource.file("Makefile"))
+    inputs.file(liburingSource.file("Makefile.common"))
+    outputs.files(liburingBuild.map { it.file("src/liburing.a") }, liburingBuild.map { it.file("src/liburing-ffi.a") })
+    commandLine("make", "-C", liburingBuild.get().asFile.absolutePath, "library", "ENABLE_SHARED=0", "-j2")
+}
+
+kotlin.targets.withType<KotlinNativeTarget>().configureEach {
+    if (name == "linuxX64" || name == "linuxArm64") {
+        providers.gradleProperty("uringKonanProperties").orNull?.let { properties ->
+            compilerOptions.freeCompilerArgs.add("-Xoverride-konan-properties=$properties")
+        }
+        binaries.executable("uringBenchmark") {
+            entryPoint = "borg.trikeshed.userspace.benchmark.uringBenchmarkMain"
+        }
+        compilations.getByName("main").cinterops.create("zlinux_uring") {
+            defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
+            packageName("zlinux_uring")
+            compilerOpts(
+                "-I${liburingBuild.get().dir("src/include").asFile.absolutePath}",
+                "-I${liburingSource.dir("src/include").asFile.absolutePath}",
+                "-I${project.rootDir}/src/linuxMain/resources/io_uring_interop",
+            )
+            extraOpts("-libraryPath", liburingBuild.get().dir("src").asFile.absolutePath)
+            providers.gradleProperty("uringKonanProperties").orNull?.let { properties ->
+                extraOpts("-Xoverride-konan-properties", properties)
+            }
+            tasks.named(interopProcessingTaskName).configure { dependsOn(buildLiburing) }
+        }
+    }
+}
+
+val configureNodeUring = tasks.register<Exec>("configureNodeUring") {
+    dependsOn(buildLiburing)
+    inputs.dir("src/jsMain/c")
+    outputs.file(layout.buildDirectory.file("native/node/CMakeCache.txt"))
+    commandLine("cmake", "-S", project.file("src/jsMain/c").absolutePath,
+        "-B", layout.buildDirectory.dir("native/node").get().asFile.absolutePath,
+        "-DURING_INCLUDE_DIR=${liburingBuild.get().dir("src/include").asFile.absolutePath};${liburingSource.dir("src/include").asFile.absolutePath}",
+        "-DURING_LIBRARY=${liburingBuild.get().file("src/liburing.a").asFile.absolutePath}")
+}
+tasks.register<Exec>("buildNodeUring") {
+    dependsOn(configureNodeUring)
+    inputs.dir("src/jsMain/c")
+    inputs.file(liburingBuild.map { it.file("src/liburing.a") })
+    outputs.file(layout.buildDirectory.file("native/node/trikeshed_uring.node"))
+    commandLine("cmake", "--build", layout.buildDirectory.dir("native/node").get().asFile.absolutePath, "--parallel", "2")
 }
 
 if (!focusedTransportSlice) {
@@ -1736,4 +1817,30 @@ tasks.register<JavaExec>("ipns") {
     useStagedJvmClasspath()
     mainClass.set("borg.trikeshed.ipns.IpnsMainKt")
     providers.gradleProperty("ipnsArgs").orNull?.let { args(it.split(Regex("\\s+")).filter(String::isNotBlank)) }
+}
+
+tasks.register<Exec>("buildJvmUring") {
+    dependsOn(buildLiburing)
+    inputs.file("src/jvmMain/c/uring_jni.c")
+    inputs.file(liburingBuild.map { it.file("src/liburing.a") })
+    outputs.file(layout.buildDirectory.file("native/jvm/libtrikeshed_uring.so"))
+    val jdk = System.getProperty("java.home")
+    commandLine("cc", "-O3", "-shared", "-fPIC",
+        "-I$jdk/include", "-I$jdk/include/linux",
+        "-I${liburingBuild.get().dir("src/include").asFile.absolutePath}",
+        "-I${liburingSource.dir("src/include").asFile.absolutePath}",
+        project.file("src/jvmMain/c/uring_jni.c").absolutePath,
+        liburingBuild.get().file("src/liburing.a").asFile.absolutePath,
+        "-o", layout.buildDirectory.file("native/jvm/libtrikeshed_uring.so").get().asFile.absolutePath)
+    doFirst { layout.buildDirectory.dir("native/jvm").get().asFile.mkdirs() }
+}
+
+tasks.register<JavaExec>("uringBenchmarkJvm") {
+    dependsOn("jvmMainClasses")
+    val compilation = kotlin.targets.getByName("jvm").compilations.getByName("main")
+    classpath = files(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
+    mainClass.set("borg.trikeshed.userspace.benchmark.JvmUringBenchmark")
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    systemProperty("java.library.path", layout.buildDirectory.dir("native/jvm").get().asFile.absolutePath)
+    providers.gradleProperty("uringBenchmarkArgs").orNull?.let { setArgsString(it) }
 }

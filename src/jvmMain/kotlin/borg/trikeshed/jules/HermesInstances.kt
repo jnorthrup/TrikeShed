@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.jules.legacy.HermesActiveSession
 import borg.trikeshed.common.File
 
 

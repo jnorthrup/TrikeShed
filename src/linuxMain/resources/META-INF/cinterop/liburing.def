@@ -30,8 +30,7 @@ headers.linux = \
 #ac.h
 #headerFilter = liburing/* sys/*
 compilerOpts = -D_GNU_SOURCE
-compilerOpts.linux = -I/usr/include -I/usr/include/x86_64-linux-gnu -Isrc/linuxMain/resources/liburing/src/include -Isrc/linuxMain/resources/io_uring_interop
-linkerOpts.linux = -Lsrc/linuxMain/resources/liburing/src  -luring -luring-ffi
+staticLibraries.linux = liburing.a
 ---
 
 #define CATQUEUE_DEPTH 256
@@ -55,7 +54,7 @@ static inline void k_io_uring_prep_sendmsg(struct io_uring_sqe *sqe, int fd, voi
     io_uring_prep_sendmsg(sqe, fd, (const struct msghdr *)msg, flags);
 }
 static inline void k_io_uring_prep_recvmsg(struct io_uring_sqe *sqe, int fd, void *msg, unsigned flags) {
-    io_uring_prep_recvmsg(sqe, fd, (const struct msghdr *)msg, flags);
+    io_uring_prep_recvmsg(sqe, fd, (struct msghdr *)msg, flags);
 }
 
 enum t_setup_ret {

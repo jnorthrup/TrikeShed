@@ -20,6 +20,9 @@ import kotlin.js.jsTypeOf
  */
 internal const val JS_NATIVE_URING_LEVEL: Int = 1
 
+internal fun nodeUringMode(process: dynamic = processObj): UringBackendMode =
+    UringBackendMode.parse(process?.env?.TRIKESHED_URING_MODE as? String)
+
 /** Resolve the configured Node module through Node's loader, then probe its shared uring backend. */
 fun discoverNodeUringBackend(entries: Int): UringBackendDiscovery = discoverNodeUringBackend(
     entries, loadPlatformHost().descriptor, processObj,
@@ -37,6 +40,8 @@ internal fun discoverNodeUringBackend(
     fun unavailable(state: UringProbeState, detail: String, module: String? = null,
                     phase: UringProbePhase = UringProbePhase.DISCOVERY, errno: Int? = null) =
         UringBackendDiscovery(UringProbeReport(host, state, phase, module, detail, errno))
+    if (nodeUringMode(process) == UringBackendMode.EMULATED)
+        return unavailable(UringProbeState.MODULE_ABSENT, "TRIKESHED_URING_MODE=emulated bypasses native module loading and setup")
     if (JS_NATIVE_URING_LEVEL < 1)
         return unavailable(UringProbeState.MODULE_ABSENT,
             "JS_NATIVE_URING_LEVEL=$JS_NATIVE_URING_LEVEL pins the actual to emulation")

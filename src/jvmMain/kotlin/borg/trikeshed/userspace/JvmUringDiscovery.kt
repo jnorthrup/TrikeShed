@@ -18,12 +18,22 @@ internal const val JVM_NATIVE_URING_LEVEL: Int = 1
 
 /** Discovery of the repo's JNI execution module. No process or IO CLI bridge. */
 fun discoverJvmUringBackend(entries: Int): UringBackendDiscovery {
+    val mode = UringBackendMode.parse(System.getProperty("trikeshed.uring.mode") ?: System.getenv("TRIKESHED_URING_MODE"))
+    val discovery = discoverJvmUringBackend(entries, mode)
+    check(mode != UringBackendMode.NATIVE || discovery.backend != null) {
+        "Native JVM io_uring required: ${discovery.report.description}"
+    }
+    return discovery
+}
+
+private fun discoverJvmUringBackend(entries: Int, mode: UringBackendMode): UringBackendDiscovery {
     require(entries > 0)
     val host = loadPlatformHost().descriptor
-    if (JVM_NATIVE_URING_LEVEL < 1) {
+    if (JVM_NATIVE_URING_LEVEL < 1 || mode == UringBackendMode.EMULATED) {
         return UringBackendDiscovery(UringProbeReport(host, UringProbeState.MODULE_ABSENT,
             UringProbePhase.DISCOVERY, null,
-            "JVM_NATIVE_URING_LEVEL=$JVM_NATIVE_URING_LEVEL pins the actual to emulation"))
+            if (mode == UringBackendMode.EMULATED) "TRIKESHED_URING_MODE=emulated requested; native setup bypassed"
+            else "JVM_NATIVE_URING_LEVEL=$JVM_NATIVE_URING_LEVEL pins the actual to emulation"))
     }
     fun unavailable(state: UringProbeState, detail: String, module: String? = null,
                     phase: UringProbePhase = UringProbePhase.DISCOVERY, errno: Int? = null) =

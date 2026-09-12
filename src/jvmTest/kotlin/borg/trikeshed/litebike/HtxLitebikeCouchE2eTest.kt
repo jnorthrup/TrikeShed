@@ -14,6 +14,7 @@ import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
@@ -81,8 +82,8 @@ class HtxLitebikeCouchE2eTest {
         }
         awaitPort(port)
 
-        val ops = JvmChannelOperations(entries = 2)
-        val reactor = HtxReactorElement(channelOperations = ops).also { it.open() }
+        val ops = JvmChannelOperations()
+        val reactor = HtxReactorElement(channelOperations = ops, parentJob = coroutineContext[Job]).also { it.open() }
         val client = openHtxClientReactorElement(routeService = reactor)
         val base = "http://127.0.0.1:$port"
 
@@ -262,7 +263,6 @@ class HtxLitebikeCouchE2eTest {
         } finally {
             client.close()
             reactor.close()
-            ops.ioWorkers.shutdownNow()
             bind.cancelAndJoin()
             serverScope.cancel()
             listener.close()

@@ -23,6 +23,14 @@ class NodeUringDiscoveryTest {
     private val process: dynamic get() = js("({env:{}})")
 
     @Test
+    fun fixtureEmulationBypassesNativeModuleAccess() {
+        val process: dynamic = js("({env:{TRIKESHED_URING_MODE:'emulated'}})")
+        val discovery = discoverNodeUringBackend(8, linux, process, { error("Native module access under emulation") })
+        assertNull(discovery.backend)
+        assertTrue("emulated" in discovery.report.detail)
+    }
+
+    @Test
     fun actualHostProbe() {
         val host = loadPlatformHost().descriptor
         val discovery = discoverNodeUringBackend(8)

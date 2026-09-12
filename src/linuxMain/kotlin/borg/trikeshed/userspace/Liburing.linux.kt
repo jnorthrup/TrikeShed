@@ -87,18 +87,22 @@ internal class LinuxLiburingFacade : LiburingFacade {
         val detail = prepared.exceptionOrNull() ?: submitted.exceptionOrNull() ?: completion?.exceptionOrNull()
         // Only a NOP has been prepared here: no caller buffer or descriptor is
         // borrowed, so discarding this probe cannot release application memory.
-        val currentRing = ring
-        if (currentRing != null) {
-            io_uring_queue_exit(currentRing)
-            nativeHeap.free(currentRing.rawValue)
-            ring = null
-        }
-        probe?.let { zlinux_uring.io_uring_free_probe(it) }
-        probe = null
-        requests.clear()
-        inFlight = 0
+        exitRing()
         return Result.failure(IllegalStateException("io_uring NOP execution probe failed: ${terminal?.res ?: detail?.message}"))
     }
+
+    /** Without SQPOLL, a sole unconsumed SQE has never lent its buffers to the kernel. */
+    fun abandonUnsubmitted(userData: Long): Boolean {
+        val currentRing = ring ?: return false
+        if (currentRing.pointed.flags and zlinux_uring.IORING_SETUP_SQPOLL.toUInt() != 0u ||
+            inFlight != 1 || requests[userData] != 1 || zlinux_uring.io_uring_sq_ready(currentRing) != 1u) return false
+        exitRing()
+        return true
+    }
+
+    fun submitted(userData: Long): Boolean = ring?.let {
+        userData in requests && zlinux_uring.io_uring_sq_ready(it) == 0u
+    } == true
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
@@ -214,16 +218,23 @@ internal class LinuxLiburingFacade : LiburingFacade {
     }
 
     override fun close(): Result<Unit> {
-        val currentRing = ring ?: return Result.success(Unit)
+        if (ring == null) return Result.success(Unit)
         val drained = drain()
         if (drained.isFailure) return drained
+        exitRing()
+        return Result.success(Unit)
+    }
+
+    private fun exitRing() {
+        val currentRing = ring ?: return
         probe?.let { zlinux_uring.io_uring_free_probe(it) }
         probe = null
         io_uring_queue_exit(currentRing)
         nativeHeap.free(currentRing.rawValue)
         ring = null
+        requests.clear()
+        inFlight = 0
         handlers.clear()
-        return Result.success(Unit)
     }
 
     override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> {
@@ -272,7 +283,11 @@ internal class LinuxLiburingFacade : LiburingFacade {
     private inline fun prepare(userData: Long, block: (CPointer<zlinux_uring.io_uring_sqe>) -> Unit): Result<Unit> {
         val currentRing = ring ?: return failure("liburing ring is not open")
         val sqe = io_uring_get_sqe(currentRing) ?: return failure("io_uring_get_sqe returned null")
-        block(sqe)
+        try { block(sqe) } catch (error: Throwable) {
+            // get_sqe reserves only the userspace tail; failed preparation was never published.
+            currentRing.pointed.sq.sqe_tail--
+            return Result.failure(error)
+        }
         sqe.pointed.user_data = userData.toULong()
         inFlight++
         requests[userData] = (requests[userData] ?: 0) + 1
@@ -286,7 +301,9 @@ internal class LinuxLiburingFacade : LiburingFacade {
     }
 
     private fun publish(completion: UringCompletion) {
-        handlers[completion.userData]?.toList()?.forEach { it(completion) }
+        handlers[completion.userData]?.toTypedArray()?.forEach { handler ->
+            runCatching { handler(completion) }
+        }
     }
 
     private fun CPointer<io_uring_cqe>.toCompletion(): UringCompletion =

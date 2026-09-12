@@ -74,9 +74,10 @@ private fun jsOpenFlags(host: dynamic, flags: Long): Int {
     return nativeFlags
 }
 
-private fun jsOpen(path: String, flags: Long): Int {
+private fun jsOpen(path: String, flags: Long, mode: Int = 438): Int {
     val host = nodeFs ?: throw UnsupportedOperationException("Host file primitives are unavailable")
-    return JsFileTable.register(host.openSync(path, jsOpenFlags(host, flags), 384) as Int)
+    require(mode in 0..511)
+    return JsFileTable.register(host.openSync(path, jsOpenFlags(host, flags), mode) as Int)
 }
 
 private fun UringSubmission.nodePath(): String {
@@ -138,7 +139,11 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
         if (closed) return -9
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.opcode == UringOp.NOP) return 0
-        if (sub.opcode == UringOp.OPENAT) return if (sub.fd == -100) 0 else -95
+        if (sub.opcode == UringOp.OPENAT) return when {
+            sub.fd != -100 -> -95
+            sub.operationFlags !in 0..511 -> -22
+            else -> 0
+        }
         val descriptor = JsFileTable.descriptor(sub.fd) ?: return -9
         if (sub.opcode == UringOp.CLOSE) return 0
         if (descriptor.module != null) return -95
@@ -161,7 +166,7 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
         return try {
             when (sub.opcode) {
                 UringOp.NOP -> 0
-                UringOp.OPENAT -> jsOpen(sub.nodePath(), sub.offset).also { owned.add(it) }
+                UringOp.OPENAT -> jsOpen(sub.nodePath(), sub.offset, sub.operationFlags).also { owned.add(it) }
                 UringOp.CLOSE -> { owned.remove(sub.fd); JsFileTable.close(sub.fd, sub.userData) }
                 else -> {
                     val fd = JsFileTable.descriptor(sub.fd)!!.fd
@@ -197,7 +202,7 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
                     val path = sub.nodePath()
                     val flags = jsOpenFlags(host, sub.offset)
                     suspendCoroutine { continuation ->
-                        host.open(path, flags, 384, { error: dynamic, fd: dynamic ->
+                        host.open(path, flags, sub.operationFlags, { error: dynamic, fd: dynamic ->
                             continuation.resume(if (error != null) jsIoError(error)
                                 else JsFileTable.register(fd as Int).also { owned.add(it) })
                         })
@@ -284,6 +289,9 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
 actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend {
     require(entries > 0)
     val discovery = discoverNodeUringBackend(entries)
+    check(nodeUringMode() != UringBackendMode.NATIVE || discovery.backend != null) {
+        "Native Node io_uring required: ${discovery.report.description}"
+    }
     val selected = discovery.backend ?: JsUserspaceChannelBackend()
     return object : UserspaceChannelBackend by selected {
         override val probeReport = discovery.report
@@ -315,6 +323,8 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
     private fun execute(sub: UringSubmission): Int {
         if (closed) return -9
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
+        // ABI1 fixes OPENAT's creation mode at 0666 and carries no raw address.
+        if (sub.addr != 0L || sub.operationFlags != (if (sub.opcode == UringOp.OPENAT) 438 else 0)) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         val descriptor = JsFileTable.descriptor(sub.fd)
         if (descriptor != null && descriptor.module == null) return emulated.execute(sub)

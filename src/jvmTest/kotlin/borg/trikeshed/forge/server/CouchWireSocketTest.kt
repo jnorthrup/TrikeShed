@@ -23,6 +23,7 @@ import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -76,10 +77,10 @@ class CouchWireSocketTest {
     fun twoNodesReplicateOverRealSocketsThroughTheHtxClient() = runBlocking {
         // Server coroutines die by cancellation at the end; a handler keeps their last gasps from
         // reaching the thread's uncaught handler, where kotlinx-test would blame the NEXT suite.
-        val serverJob = SupervisorJob()
+        val serverJob = SupervisorJob(coroutineContext[Job])
         val scope = CoroutineScope(serverJob + Dispatchers.IO + CoroutineExceptionHandler { _, _ -> })
-        val ops = JvmChannelOperations(entries = 2)
-        val reactor = HtxReactorElement(channelOperations = ops).also { it.open() }
+        val ops = JvmChannelOperations()
+        val reactor = HtxReactorElement(channelOperations = ops, parentJob = coroutineContext[Job]).also { it.open() }
         val client = openHtxClientReactorElement(routeService = reactor)
         // The daemon's peer exchange, verbatim in shape: parseHtxRequest → element.request → HttpReply.
         val exchange = HttpExchange { method, url, body, contentType ->
@@ -143,7 +144,6 @@ class CouchWireSocketTest {
         } finally {
             client.close()
             reactor.close()
-            ops.ioWorkers.shutdownNow()
             serverJob.cancelAndJoin()
         }
     }
