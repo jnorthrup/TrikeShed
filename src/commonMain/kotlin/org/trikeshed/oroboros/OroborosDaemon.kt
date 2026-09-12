@@ -1030,13 +1030,13 @@ object OroborosDaemon {
                     HostSystem.err("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
                 }
 
-                val feeder = borg.trikeshed.narsese.CuratorImpulseFeeder(profileDir)
-                var checkpoint = borg.trikeshed.narsese.CuratorImpulseFeeder.FollowCheckpoint.empty()
+                val feeder = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder(profileDir)
+                var checkpoint = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowCheckpoint.empty()
                 // I5: baselines are computed once per daemon run, after the first follow has
                 // had a chance to land transcripts — session cids to the blackboard.
                 var baselinesLanded = false
                 while (isActive) {
-                    var followed: borg.trikeshed.narsese.CuratorImpulseFeeder.FollowResult? = null
+                    var followed: borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowResult? = null
                     runCatching {
                         val f = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
                         checkpoint = f.checkpoint
@@ -1153,7 +1153,7 @@ object OroborosDaemon {
         val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
             val now = HostSystem.currentTimeMillis()
-            borg.trikeshed.jules.HermesModelUsageJdbc.install()
+            borg.trikeshed.jules.legacy.HermesModelUsageJdbc.install()
             val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
             quotaLegion.refresh(borg.trikeshed.jules.HermesModelUsage.ledgerRows(db), now)
             HostSystem.err(
@@ -1166,7 +1166,7 @@ object OroborosDaemon {
         refreshQuotaLegion()
         suspend fun buildBrain(): Pair<borg.trikeshed.jules.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
-            val hermesSession = borg.trikeshed.jules.HermesActiveSession.current()
+            val hermesSession = borg.trikeshed.jules.legacy.HermesActiveSession.current()
             val hermesProvider = hermesSession?.runtime?.provider
             suspend fun hermesLane(field: String): String? = hermesProvider?.let { provider ->
                 kotlinx.coroutines.withContext(Dispatchers.IO) {
@@ -1177,7 +1177,7 @@ object OroborosDaemon {
             val hermesBaseUrl = hermesSession?.runtime?.baseUrl ?: hermesLane("base_url")
             val hermesModel = hermesSession?.model?.takeIf { it.isNotBlank() }
             val hermesPinReason: String = when {
-                hermesSession == null -> "no session row in ${borg.trikeshed.jules.HermesActiveSession.stateDb()}"
+                hermesSession == null -> "no session row in ${borg.trikeshed.jules.legacy.HermesActiveSession.stateDb()}"
                 hermesModel == null -> "session ${hermesSession.id} carries no model"
                 hermesProvider == null -> "session ${hermesSession.id} has no resolved runtime provider"
                 !hermesSession.runtime.speaksChatCompletions ->
@@ -1420,7 +1420,7 @@ object OroborosDaemon {
                 "outputTokens" to u.outputTokens,
                 "lastSeenMs" to (u.lastSeenEpochSeconds * 1000).toLong(),
             )
-            val session = borg.trikeshed.jules.HermesActiveSession.current(db)
+            val session = borg.trikeshed.jules.legacy.HermesActiveSession.current(db)
             mapOf(
                 "ledger" to db.absolutePath,
                 "session" to session?.let { s ->

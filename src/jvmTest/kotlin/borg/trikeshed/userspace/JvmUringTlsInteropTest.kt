@@ -21,7 +21,6 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.sockaddrIpv4
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -54,7 +53,7 @@ class JvmUringTlsInteropTest {
         peer(role, port, protocol)
     }
 
-    private suspend fun peer(role: String, port: Int, protocol: TlsProtocol): Unit = coroutineScope {
+    private suspend fun peer(role: String, port: Int, protocol: TlsProtocol): Unit = withTimeout(60_000) {
         val directory = Files.createTempDirectory("uring-tls-peer-")
         val certificate = directory.resolve("certificate.pem")
         val key = directory.resolve("key.pem")
@@ -89,89 +88,87 @@ class JvmUringTlsInteropTest {
                 protocols = s_[protocol], alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1],
                 hostnameVerification = true,
             ), JvmTlsCodecBackend(), parentJob = coroutineContext[Job])
-            withTimeout(60_000) {
-                val address = ByteBuffer(sockaddrIpv4(byteArrayOf(127, 0, 0, 1), port))
-                val fd = if (role == "server") {
-                    val listener = socket()
-                    assertEquals(0, submit(UringOp.BIND, listener, address))
-                    assertEquals(0, submit(UringOp.LISTEN, listener, length = 1))
-                    println("URING_TLS_READY role=server host=127.0.0.1 port=$port protocol=$protocol")
-                    var accepted: Int
-                    do {
-                        accepted = submit(UringOp.ACCEPT, listener)
-                        if (accepted == -11) delay(2)
-                    } while (accepted == -11)
-                    assertTrue(accepted >= 0, "ACCEPT failed: $accepted")
-                    descriptors.add(accepted)
-                    accepted
-                } else {
-                    socket().also { assertEquals(0, submit(UringOp.CONNECT, it, address)) }
-                }
-                val endpoint = if (role == "server") requireNotNull(tls).serverEndpoint("127.0.0.1", port)
-                    else requireNotNull(tls).clientEndpoint("localhost", port)
-                val plaintext = ArrayList<Byte>()
-                suspend fun emit(frames: TlsFrames) {
-                    for (index in 0 until frames.size) {
-                        val frame = frames[index]
-                        when (frame.stage) {
-                            TlsFlowStage.DOWNSTREAM_PLAINTEXT -> {
-                                assertTrue(plaintext.size + frame.payload.rem <= 65536, "Plaintext exceeds fixture bound")
-                                plaintext.addAll(frame.payload.toArray().asList())
-                            }
-                            TlsFlowStage.UPSTREAM_CIPHERTEXT, TlsFlowStage.CLOSE_NOTIFY -> {
-                                val bytes = ByteBuffer(frame.payload.toArray())
-                                while (bytes.hasRemaining()) {
-                                    val count = submit(UringOp.WRITE, fd, bytes, offset = -1)
-                                    if (count == -11) delay(2)
-                                    else assertTrue(count > 0, "Ciphertext WRITE failed: $count")
-                                }
-                            }
-                            else -> Unit
-                        }
-                    }
-                }
-                suspend fun readCiphertext(): ByteArray {
-                    val bytes = ByteBuffer(4096)
-                    while (true) {
-                        val count = submit(UringOp.READ, fd, bytes, offset = -1)
-                        if (count == -11) { delay(2); continue }
-                        assertTrue(count >= 0, "Ciphertext READ failed: $count")
-                        return bytes.array().copyOf(count)
-                    }
-                }
-                suspend fun receive() {
-                    val bytes = readCiphertext()
-                    assertTrue(bytes.isNotEmpty(), "TLS transport EOF before close_notify")
-                    emit(endpoint.downstream(ByteSeries(bytes)))
-                }
-                suspend fun expectPlaintext(expected: ByteArray) {
-                    while (plaintext.size < expected.size) receive()
-                    assertContentEquals(expected, plaintext.toByteArray())
-                    plaintext.clear()
-                }
-                emit(endpoint.handshake())
-                while (!endpoint.isHandshakeComplete) receive()
-                assertEquals(protocol, endpoint.session?.protocol)
-                val payload = ByteArray(8193) { (it % 251).toByte() }
-                val request = "POST /uring-tls HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${payload.size}\r\n\r\n".encodeToByteArray() + payload
-                val response = "HTTP/1.1 200 OK\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n".encodeToByteArray() + payload
-                if (role == "client") {
-                    emit(endpoint.upstream(ByteSeries(request)))
-                    expectPlaintext(response)
-                    emit(endpoint.close())
-                    assertEquals(0, submit(UringOp.SHUTDOWN, fd, length = 1))
-                    // Endpoint.close ends its codec API. Consume peer ciphertext to TCP EOF;
-                    // server role separately verifies receipt of the authenticated client alert.
-                    while (readCiphertext().isNotEmpty()) Unit
-                } else {
-                    expectPlaintext(request)
-                    emit(endpoint.upstream(ByteSeries(response)))
-                    while (endpoint.flowState.lifecycle != TlsConnectionState.CLOSED) receive()
-                    emit(endpoint.close())
-                    assertEquals(0, submit(UringOp.SHUTDOWN, fd, length = 1))
-                }
-                assertEquals(TlsConnectionState.CLOSED, endpoint.flowState.lifecycle)
+            val address = ByteBuffer(sockaddrIpv4(byteArrayOf(127, 0, 0, 1), port))
+            val fd = if (role == "server") {
+                val listener = socket()
+                assertEquals(0, submit(UringOp.BIND, listener, address))
+                assertEquals(0, submit(UringOp.LISTEN, listener, length = 1))
+                println("URING_TLS_READY role=server host=127.0.0.1 port=$port protocol=$protocol")
+                var accepted: Int
+                do {
+                    accepted = submit(UringOp.ACCEPT, listener)
+                    if (accepted == -11) delay(2)
+                } while (accepted == -11)
+                assertTrue(accepted >= 0, "ACCEPT failed: $accepted")
+                descriptors.add(accepted)
+                accepted
+            } else {
+                socket().also { assertEquals(0, submit(UringOp.CONNECT, it, address)) }
             }
+            val endpoint = if (role == "server") requireNotNull(tls).serverEndpoint("127.0.0.1", port)
+                else requireNotNull(tls).clientEndpoint("localhost", port)
+            val plaintext = ArrayList<Byte>()
+            suspend fun emit(frames: TlsFrames) {
+                for (index in 0 until frames.size) {
+                    val frame = frames[index]
+                    when (frame.stage) {
+                        TlsFlowStage.DOWNSTREAM_PLAINTEXT -> {
+                            assertTrue(plaintext.size + frame.payload.rem <= 65536, "Plaintext exceeds fixture bound")
+                            plaintext.addAll(frame.payload.toArray().asList())
+                        }
+                        TlsFlowStage.UPSTREAM_CIPHERTEXT, TlsFlowStage.CLOSE_NOTIFY -> {
+                            val bytes = ByteBuffer(frame.payload.toArray())
+                            while (bytes.hasRemaining()) {
+                                val count = submit(UringOp.WRITE, fd, bytes, offset = -1)
+                                if (count == -11) delay(2)
+                                else assertTrue(count > 0, "Ciphertext WRITE failed: $count")
+                            }
+                        }
+                        else -> Unit
+                    }
+                }
+            }
+            suspend fun readCiphertext(): ByteArray {
+                val bytes = ByteBuffer(4096)
+                while (true) {
+                    val count = submit(UringOp.READ, fd, bytes, offset = -1)
+                    if (count == -11) { delay(2); continue }
+                    assertTrue(count >= 0, "Ciphertext READ failed: $count")
+                    return bytes.array().copyOf(count)
+                }
+            }
+            suspend fun receive() {
+                val bytes = readCiphertext()
+                assertTrue(bytes.isNotEmpty(), "TLS transport EOF before close_notify")
+                emit(endpoint.downstream(ByteSeries(bytes)))
+            }
+            suspend fun expectPlaintext(expected: ByteArray) {
+                while (plaintext.size < expected.size) receive()
+                assertContentEquals(expected, plaintext.toByteArray())
+                plaintext.clear()
+            }
+            emit(endpoint.handshake())
+            while (!endpoint.isHandshakeComplete) receive()
+            assertEquals(protocol, endpoint.session?.protocol)
+            val payload = ByteArray(8193) { (it % 251).toByte() }
+            val request = "POST /uring-tls HTTP/1.1\r\nHost: localhost\r\nContent-Length: ${payload.size}\r\n\r\n".encodeToByteArray() + payload
+            val response = "HTTP/1.1 200 OK\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n".encodeToByteArray() + payload
+            if (role == "client") {
+                emit(endpoint.upstream(ByteSeries(request)))
+                expectPlaintext(response)
+                emit(endpoint.close())
+                assertEquals(0, submit(UringOp.SHUTDOWN, fd, length = 1))
+                // Endpoint.close ends its codec API. Consume peer ciphertext to TCP EOF;
+                // server role separately verifies receipt of the authenticated client alert.
+                while (readCiphertext().isNotEmpty()) Unit
+            } else {
+                expectPlaintext(request)
+                emit(endpoint.upstream(ByteSeries(response)))
+                while (endpoint.flowState.lifecycle != TlsConnectionState.CLOSED) receive()
+                emit(endpoint.close())
+                assertEquals(0, submit(UringOp.SHUTDOWN, fd, length = 1))
+            }
+            assertEquals(TlsConnectionState.CLOSED, endpoint.flowState.lifecycle)
         } finally {
             withContext(NonCancellable) {
                 var cleanupFailure: Throwable? = null

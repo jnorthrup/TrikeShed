@@ -128,18 +128,18 @@ internal object JvmSocketSyscalls {
         return client
     }
 
-    fun connect(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
-        val result = status(connectCall, fd, addr, size)
-        if (result != -115 && result != -114) result else {
-            val ready = poll(intArrayOf(fd), intArrayOf(4), -1).first
-            if (ready < 0) ready else Arena.ofConfined().use { arena ->
-                val error = arena.allocate(int)
-                val bytes = arena.allocate(int).also { it.set(int, 0, 4) }
-                val queried = status(getOptionCall, fd, if (linux) 1 else 0xffff,
-                    if (linux) 4 else 0x1007, error, bytes)
-                if (queried < 0) queried else -errno(error.get(int, 0))
-            }
-        }
+    /** -EINPROGRESS retains completion ownership in the backend; this call never waits. */
+    fun connectStart(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
+        status(connectCall, fd, addr, size)
+    }
+
+    /** Query only after POLLOUT/POLLERR/POLLHUP; zero before readiness does not prove connection. */
+    fun connectFinish(fd: Int): Int = Arena.ofConfined().use { arena ->
+        val error = arena.allocate(int)
+        val bytes = arena.allocate(int).also { it.set(int, 0, 4) }
+        val queried = status(getOptionCall, fd, if (linux) 1 else 0xffff,
+            if (linux) 4 else 0x1007, error, bytes)
+        if (queried < 0) queried else -errno(error.get(int, 0))
     }
 
     fun transfer(fd: Int, buffer: ByteBuffer?, length: Int, read: Boolean, flags: Int): Int {

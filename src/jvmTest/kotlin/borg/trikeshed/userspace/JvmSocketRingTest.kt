@@ -13,8 +13,10 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,8 +24,12 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class JvmSocketRingTest {
-    private fun UserspaceChannelBackend.execute(submission: UringSubmission): Int =
-        submitBatch(listOf(submission)).single().also { assertEquals(submission.userData, it.userData) }.res
+    private fun UserspaceChannelBackend.execute(submission: UringSubmission): Int = runBlocking {
+        withTimeout(5_000) {
+            batchEnqueue(1 j { _: Int -> submission })[0]
+                .also { assertEquals(submission.userData, it.userData) }.res
+        }
+    }
 
     private inline fun socketPair(block: (UserspaceChannelBackend, Int, SocketChannel) -> Unit) {
         val backend = JvmUserspaceChannelBackend()

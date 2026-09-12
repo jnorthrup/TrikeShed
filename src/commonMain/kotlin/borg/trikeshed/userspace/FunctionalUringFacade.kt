@@ -100,6 +100,7 @@ public class FunctionalUringFacade(
     private var closed = false
     private var closing = false
     private var closeFailure: Throwable? = null
+    private var consumerCloseFailure: Throwable? = null
     private val admission = Mutex()
     private val execution = Mutex()
     // The bound counts SQEs across batches, submitted effects and unreaped CQEs.
@@ -149,6 +150,7 @@ public class FunctionalUringFacade(
                         execution.withLock { closeBackend() }
                         termination.complete(Unit)
                     } catch (failure: Throwable) {
+                        if (failure === closeFailure) consumerCloseFailure = failure
                         termination.completeExceptionally(failure)
                     } finally {
                         cancellation.cancel()
@@ -264,16 +266,45 @@ public class FunctionalUringFacade(
         val result = ArrayList<UringCompletion>(submissions.size)
         val admitted = partition(submissions, result)
         if (admitted.isNotEmpty()) {
-            val cqes = backend.batchEnqueue(admitted.toSeries())
+            val cqes = try {
+                backend.batchEnqueue(admitted.toSeries())
+            } catch (failure: Throwable) {
+                if (admitted.any { backend.deferredCapabilities and it.opcode.mask != 0L }) admission.withLock {
+                    closing = true
+                    input.close()
+                    capacityChanged.complete(Unit)
+                    // A transport failure does not prove that a deferred effect stopped.
+                    // Transfer its borrow to the completion queue before the batch releases it.
+                    for (submission in admitted) {
+                        if (backend.deferredCapabilities and submission.opcode.mask != 0L) {
+                            submission.memory?.retain()
+                            inFlight[submission.userData] = submission
+                        }
+                    }
+                }
+                throw failure
+            }
             val batchResults = ArrayList<UringCompletion>(admitted.size)
+            var settlementFailure: Throwable? = null
             admission.withLock {
                 for (i in 0 until cqes.size) {
                     val cqe = cqes[i]
-                    if (cqe.userData in inFlight) settle(listOf(SelectionResult(cqe.res, cqe.userData)))
+                    if (cqe.userData in inFlight) try {
+                        settle(listOf(SelectionResult(cqe.res, cqe.userData)))
+                    } catch (failure: Throwable) {
+                        if (settlementFailure == null) settlementFailure = failure
+                        else settlementFailure?.addSuppressed(failure)
+                    }
                     else batchResults.add(cqe)
                 }
             }
-            correlate(admitted, batchResults.toSeries()) { result.add(it) }
+            try {
+                correlate(admitted, batchResults.toSeries()) { result.add(it) }
+            } catch (failure: Throwable) {
+                if (settlementFailure == null) settlementFailure = failure
+                else settlementFailure?.addSuppressed(failure)
+            }
+            settlementFailure?.let { throw it }
         }
         val array = result.toTypedArray()
         return array.size j { array[it] }
@@ -409,9 +440,10 @@ public class FunctionalUringFacade(
                 reap(0)
                 check(inFlight.isEmpty()) { "Backend did not settle cancelled submissions" }
             }
-            closed = true
             try {
                 backend.close()
+                closed = true
+                closeFailure = null
             } catch (failure: Throwable) {
                 closeFailure = failure
             }
@@ -432,7 +464,17 @@ public class FunctionalUringFacade(
         if (consumer != null) {
             consumer.join()
             requireNotNull(supervisor).join()
-            termination.await()
+            try {
+                termination.await()
+            } catch (failure: Throwable) {
+                try {
+                    execution.withLock { closeBackend() }
+                } catch (cleanup: Throwable) {
+                    if (cleanup !== failure) failure.addSuppressed(cleanup)
+                    throw failure
+                }
+                if (failure !== consumerCloseFailure) throw failure
+            }
         } else {
             drained.await()
             execution.withLock {

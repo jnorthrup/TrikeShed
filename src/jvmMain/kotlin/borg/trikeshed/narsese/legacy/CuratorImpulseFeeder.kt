@@ -1,5 +1,11 @@
-package borg.trikeshed.narsese
+package borg.trikeshed.narsese.legacy
 
+import borg.trikeshed.narsese.CuratorImpulseElement
+import borg.trikeshed.narsese.CuratorLedger
+import borg.trikeshed.narsese.GroupCoherenceEnactment
+import borg.trikeshed.narsese.CuratorImpulse
+import borg.trikeshed.narsese.ReplayScenario
+import borg.trikeshed.narsese.ScenarioTranscripts
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf

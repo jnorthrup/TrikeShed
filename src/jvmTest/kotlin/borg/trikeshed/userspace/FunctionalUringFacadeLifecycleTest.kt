@@ -224,4 +224,115 @@ class FunctionalUringFacadeLifecycleTest {
         assertEquals(1, backend.closes)
         assertFailsWith<IllegalStateException> { channel.enqueue(submission(8)) }
     }
+
+    @Test
+    fun failedDeferredTransportAndCancellationRetainTheDestinationUntilItsCqe() = runTest {
+        val destination = mapMemory(0, 65536, 3, 2 or 0x20, -1, 0)
+        var pending: UringSubmission? = null
+        var failCancellation = true
+        var backendClosed = false
+        val completed = mutableListOf<SelectionResult>()
+        val backend = object : UserspaceChannelBackend {
+            override val capabilities = UringOp.READ.mask
+            override val deferredCapabilities = UringOp.READ.mask
+            override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = error("unexpected sync submission")
+            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+                pending = submissions[0]
+                error("transport failed before the READ completion arrived")
+            }
+            override fun cancelPending() {
+                if (failCancellation) error("cancellation transport is unavailable")
+                pending?.let {
+                    // The admitted READ wins the cancellation race and must still access its destination.
+                    checkNotNull(it.memory)[0] = 42
+                    completed.add(SelectionResult(1, it.userData))
+                    pending = null
+                }
+            }
+            override fun reapCompletions(minComplete: Int): List<SelectionResult> =
+                completed.toList().also { completed.clear() }
+            override fun close() { check(pending == null); backendClosed = true }
+        }
+        val facade = FunctionalUringFacade(2, backend)
+        try {
+            val read = UringSubmission(UringOp.READ, 17, destination.address, 1, 0, userData = 1, memory = destination)
+            assertFailsWith<IllegalStateException> { facade.batchEnqueue(1 j { _: Int -> read }) }
+            assertFailsWith<IllegalStateException> { destination.close() }
+            assertFailsWith<IllegalStateException> { facade.drain() }
+            assertFalse(backendClosed)
+            assertFailsWith<IllegalStateException> { destination.close() }
+            failCancellation = false
+            facade.drain()
+            assertEquals(42.toByte(), destination[0])
+            assertEquals(listOf(SelectionResult(1, 1)), facade.wait(0))
+            destination.close()
+            assertFalse(destination.isOpen)
+            assertTrue(backendClosed)
+        } finally {
+            failCancellation = false
+            try { facade.drain() } finally { destination.close() }
+        }
+    }
+
+    @Test
+    fun foreignCompletionFailureStillPreservesLaterTerminalCompletions() = runTest {
+        val destination = mapMemory(0, 65536, 3, 2 or 0x20, -1, 0)
+        val backend = object : UserspaceChannelBackend {
+            override val capabilities = UringOp.caps(UringOp.READ, UringOp.NOP)
+            override val deferredCapabilities = UringOp.READ.mask
+            override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = emptyList()
+            override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+                destination[0] = 11
+                destination[1] = 12
+                return listOf(
+                    UringCompletion(1, 1, 0), UringCompletion(1, 1, 0),
+                    UringCompletion(2, 1, 0), UringCompletion(submissions[0].userData, 0, 0),
+                ).toSeries()
+            }
+        }
+        val facade = FunctionalUringFacade(4, backend)
+        try {
+            facade.enqueue(UringSubmission(UringOp.READ, 17, destination.address, 1, 0, userData = 1, memory = destination))
+            facade.enqueue(UringSubmission(UringOp.READ, 17, destination.address + 1, 1, 1, userData = 2, memory = destination))
+            assertEquals(2, facade.submit())
+            assertFailsWith<IllegalStateException> { destination.close() }
+            assertFailsWith<IllegalStateException> { facade.batchEnqueue(batch(3)) }
+            assertEquals(listOf(SelectionResult(1, 1), SelectionResult(1, 2)), facade.wait(0))
+            assertEquals(11.toByte(), destination[0])
+            assertEquals(12.toByte(), destination[1])
+            destination.close()
+            assertFalse(destination.isOpen)
+        } finally {
+            try { facade.drain() } finally { destination.close() }
+        }
+    }
+
+    @Test
+    fun failedBackendCloseCanBeRetriedToReleaseItsResourceInBothModes() = runTest {
+        for (scoped in listOf(false, true)) {
+            val resource = mapMemory(0, 65536, 3, 2 or 0x20, -1, 0)
+            var failClose = true
+            val backend = object : UserspaceChannelBackend {
+                override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = error("unexpected submission")
+                override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = error("unexpected submission")
+                override fun close() {
+                    if (failClose) error("resource release is temporarily unavailable")
+                    resource.close()
+                }
+            }
+            val facade = if (scoped) FunctionalUringFacade.create(this, 1, backend) else FunctionalUringFacade(1, backend)
+            try {
+                assertFailsWith<IllegalStateException> { facade.drain() }
+                assertTrue(resource.isOpen)
+                resource[0] = 27
+                assertEquals(27.toByte(), resource[0])
+                failClose = false
+                facade.drain()
+                assertFalse(resource.isOpen, "retry must release the actual backend resource; scoped=$scoped")
+            } finally {
+                failClose = false
+                try { runCatching { facade.drain() } } finally { resource.close() }
+            }
+        }
+    }
 }

@@ -119,7 +119,12 @@ TRIKESHED_URING_MODE=emulated ./gradlew jvmTest -PfocusedTransportSlice=true \
   --tests 'borg.trikeshed.userspace.*' --tests 'borg.trikeshed.reactor.*' \
   --tests 'borg.trikeshed.htx.*' --tests 'borg.trikeshed.ws.*' \
   --tests 'borg.trikeshed.sctp.*' --tests 'borg.trikeshed.http3.*' \
-  --tests 'borg.trikeshed.ipns.*' --console=plain
+  --tests 'borg.trikeshed.ipns.*' --tests 'borg.trikeshed.context.sctp.*' \
+  --tests 'borg.trikeshed.litebike.*' --tests 'borg.trikeshed.forge.server.*' \
+  --tests 'borg.trikeshed.lcnc.LcncCcekModelSocketTest' \
+  --tests 'borg.trikeshed.kanban.module.KanbanModuleHttpTest' \
+  --tests 'borg.trikeshed.torrent.*' --tests 'borg.trikeshed.cli.htx.*' \
+  --rerun-tasks --console=plain
 ```
 
 On Linux, repeat with `TRIKESHED_URING_MODE=native` and
@@ -134,6 +139,74 @@ Node bridge ABI verification (independent of Kotlin compilation):
 TRIKESHED_URING_MODULE="$PWD/build/native/node/trikeshed_uring.node" \
   node --test src/jsTest/node/uring_node.test.cjs
 ```
+
+At `4c88ba689`, both Node ABI tests passed on Linux ARM64, with no skips.
+The file test recorded 9 admissions and 9 settlements; FTRUNCATE was reported
+native. This validates the C/Node boundary, not the uncompiled Kotlin/JS target.
+
+## Cross-host TLS
+
+`JvmUringTlsInteropTest` is opt-in and reports a JUnit skip without
+`TRIKESHED_TLS_ROLE`. It uses the existing localhost test certificate, an
+8193-byte request/echo, TLS 1.2 or 1.3, bounded reads/accept, fd closure and
+ring accounting. It verifies server receipt of the client's authenticated
+close-notify; reciprocal bytes are drained to TCP EOF, not authenticated after
+the local endpoint has closed.
+
+After both JVM targets compile, start the VM server in a dedicated tmux
+session, then wait for `URING_TLS_READY` in its test output:
+
+```sh
+TRIKESHED_URING_MODE=emulated TRIKESHED_TLS_ROLE=server \
+TRIKESHED_TLS_PORT=24443 TRIKESHED_TLS_PROTOCOL=TLS13 \
+  ./gradlew jvmTest --tests borg.trikeshed.userspace.JvmUringTlsInteropTest \
+  --rerun-tasks --console=plain
+```
+
+On the Mac, keep this forward open in another terminal:
+
+```sh
+ssh -N -L 127.0.0.1:24444:127.0.0.1:24443 trikeshed-uring-bench
+```
+
+Run the same test on the Mac with `TRIKESHED_TLS_ROLE=client` and
+`TRIKESHED_TLS_PORT=24444`. Reverse hosts with the Mac server at 24443 and
+`ssh -N -R 127.0.0.1:24444:127.0.0.1:24443 trikeshed-uring-bench`; the VM
+client then uses 24444. Repeat TLS12/TLS13 and the Linux backend modes,
+recording both peers' logs. The server's 60-second transport deadline starts
+after its test begins; precompile both test targets before starting peers.
+
+## Offline ARM64 compiler
+
+The Mac has a dedicated native home at
+`/Users/jim/.konan/trikeshed-macos-aarch64-2.4.20`. It reuses the installed
+Kotlin/Native 2.4.20 binaries and sets `airplaneMode=true` in its own
+`konan/konan.properties`. The ARM64 sysroot is
+`/Users/jim/.konan/trikeshed-linux-arm64-sysroot`; generated liburing headers
+and the Git-built static library are in
+`/Users/jim/.konan/trikeshed-liburing-arm64`. System headers/libraries and
+build artifacts were transferred over SCP, without source-tree copying.
+
+Gradle's native dependency preflight ignores CLI konan-property overrides.
+An initial attempt therefore started an automatic toolchain tarball download;
+it was cancelled and the partial file removed. The dedicated home enforces
+offline mode before that preflight. The installed compiler was not modified.
+
+```sh
+./gradlew compileKotlinLinuxArm64 -PenableLinuxArm64=true \
+  -PuringLiburingBuildDir=/Users/jim/.konan/trikeshed-liburing-arm64 \
+  -Pkotlin.native.home=/Users/jim/.konan/trikeshed-macos-aarch64-2.4.20 \
+  -Dkotlin.native.home=/Users/jim/.konan/trikeshed-macos-aarch64-2.4.20 \
+  --offline --console=plain
+```
+
+Both `-P` and `-D` are required: Gradle selects the distribution with the
+project property, while the cinterop child uses the system property to avoid
+resolving a symlinked compiler JAR back to the original home. The dedicated
+properties also set `gccToolchain.linux_arm64` to the sysroot's `usr` directory.
+The Linux ARM64 cinterop task passes offline. The full compile's current
+failure and next required action are in the resume record. No ARM64 executable
+or native benchmark is claimed yet.
 
 Shared JVM benchmark, after the full target builds:
 

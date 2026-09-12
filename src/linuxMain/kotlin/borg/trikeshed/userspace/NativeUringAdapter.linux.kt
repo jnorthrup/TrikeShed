@@ -59,9 +59,9 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
             if (pinned != null) { retained.remove(pinned); pinned.unpin() }
             prepared.getOrThrow()
         }
-        // A prepared SQE is never built again. liburing retries only SQ entries
-        // not consumed by the kernel after a failed enter. The call retains the
-        // borrow, even if transport failure prevents it from completing.
+        // A prepared SQE is never built again. After enter failure the SQ head
+        // proves whether it remains unsubmitted or must be awaited. The call
+        // retains the borrow until that request settles.
         var entered = false
         var terminal: UringCompletion? = null
         while (terminal == null) {
@@ -74,6 +74,9 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
                         terminal = UringCompletion(submission.userData, -5, 0)
                         break
                     }
+                    // A failed enter can still consume its SQE. Wait on that admission;
+                    // another submit cannot make an already-consumed request progress.
+                    entered = ring.submitted(submission.userData)
                 }
             }
             val received = if (entered) ring.waitCqe() else ring.peekCqe()
@@ -92,7 +95,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
             retained.remove(pinned)
             pinned.unpin()
         }
-        return terminal
+        return checkNotNull(terminal)
     }
 
     actual fun registerBuffers(buffers: borg.trikeshed.lib.Series<MemoryMapping>): Result<Unit> =
@@ -100,7 +103,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
 
     actual fun fadvise(fd: Int, offset: Long, length: Int, advice: Int): Int =
         if (offset < 0 || length < 0 || advice !in 0..5) -22
-        else -zlinux_uring.posix_fadvise(fd, offset, length.toLong(), advice)
+        else -platform.posix.posix_fadvise(fd, offset, length.toLong(), advice)
 
     actual fun unregisterBuffers(): Result<Unit> = ring.unregisterBuffers()
 
