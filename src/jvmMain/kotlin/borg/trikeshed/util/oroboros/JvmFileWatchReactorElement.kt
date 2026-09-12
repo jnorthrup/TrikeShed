@@ -185,7 +185,7 @@ class JvmFileWatchReactorElement(
  * Note: the watcher still registers these at a directory level so OS-level
  * FS events are delivered.  Filters enforced in [PathGlob] apply at event time.
  */
-internal val DEFAULT_WALKER_BLOCKED_SEGMENTS: Set<String> =
+actual val DEFAULT_WALKER_BLOCKED_SEGMENTS: Set<String> =
     setOf(".gradle", ".idea", "build", "node_modules")
 
 /**
@@ -243,4 +243,26 @@ internal class PathGlob(
             return Regex(sb.toString())
         }
     }
+}
+
+/** JVM actual of the common file-watch contract: delegates to the WatchService-backed element. */
+actual class FileWatchReactorElement actual constructor(
+    root: String,
+    parentJob: kotlinx.coroutines.Job?,
+    capacity: Int,
+    includeGlobs: List<String>,
+    excludeGlobs: List<String>,
+    walkerBlockedSegments: Set<String>,
+    walkerBlockedRelativePrefixes: Set<String>,
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    actual companion object Key : AsyncContextKey<FileWatchReactorElement>()
+    private val delegate = JvmFileWatchReactorElement(
+        root, parentJob, capacity, includeGlobs, excludeGlobs,
+        walkerBlockedSegments, walkerBlockedRelativePrefixes,
+    )
+    actual val events: kotlinx.coroutines.channels.ReceiveChannel<FileEvent> get() = delegate.events
+    actual override val key: CoroutineContext.Key<*> get() = Key
+    actual override suspend fun open() = delegate.open()
+    actual override suspend fun drain() = delegate.drain()
+    actual override suspend fun close() = delegate.close()
 }

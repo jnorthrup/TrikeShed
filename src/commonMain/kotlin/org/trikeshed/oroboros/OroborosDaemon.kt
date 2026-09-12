@@ -21,7 +21,7 @@ import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
-import borg.trikeshed.util.oroboros.JvmFileWatchReactorElement
+import borg.trikeshed.util.oroboros.FileWatchReactorElement
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
@@ -2174,7 +2174,7 @@ object OroborosDaemon {
         //    events, not blocking ProcessBuilder calls. ──
         val gitState = GitStateCache(repoDir)
         val cycleTriggers = Channel<Unit>(Channel.CONFLATED)
-        val gitWatcher = JvmFileWatchReactorElement(
+        val gitWatcher = FileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = listOf(".git/**"),
@@ -2192,7 +2192,7 @@ object OroborosDaemon {
         // The Jules causal WAL is an event source, not an out-of-band operator
         // surface. External queue/review appends wake the same serialized cycle
         // that owns API polling, drain, settlement, and dispatch.
-        val julesWalWatcher = JvmFileWatchReactorElement(
+        val julesWalWatcher = FileWatchReactorElement(
             root = forgeHome.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = listOf("jules-board.wal"),
@@ -2234,7 +2234,7 @@ object OroborosDaemon {
         )
         launch(Dispatchers.IO) { gitReconcileElement.open() }
 
-        val worktreeWatcher = JvmFileWatchReactorElement(
+        val worktreeWatcher = FileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
             includeGlobs = emptyList(),
@@ -2277,7 +2277,7 @@ object OroborosDaemon {
             File(Files.resolvePath(repoDir, "build/classes/kotlin/jvm/main")) to "compiled",
             File(Files.resolvePath(repoDir, "build/classes/java/jvmMain")) to "compiled",
         )) {
-            val w = JvmFileWatchReactorElement(
+            val w = FileWatchReactorElement(
                 root = dir.absolutePath,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
                 includeGlobs = emptyList(),
