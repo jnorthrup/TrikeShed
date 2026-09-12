@@ -8,6 +8,7 @@ import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.openUserspaceChannelBackend
+import kotlinx.coroutines.sync.withLock
 
 /**
  * uring legos: the ring on the palette. Each runner drives the userspace
@@ -21,18 +22,34 @@ import borg.trikeshed.userspace.openUserspaceChannelBackend
  */
 object UringLegos {
 
-    /** entries for the per-invocation ring; small — a lego stages a handful of SQEs. */
+    /** entries for the shared lego ring; small — a lego stages a handful of SQEs. */
     private const val RING_ENTRIES = 16
 
-    private suspend fun <T> onRing(block: suspend (borg.trikeshed.userspace.FunctionalUringFacade) -> T): T {
-        val backend = openUserspaceChannelBackend(RING_ENTRIES)
-        val facade = borg.trikeshed.userspace.FunctionalUringFacade(RING_ENTRIES, backend)
-        try {
-            return block(facade)
-        } finally {
-            facade.drain()
+    /**
+     * ONE ring for every lego invocation instead of constructed per call.
+     * Admission/completion counters live across the daemon lifetime where they
+     * belong; the ring dies with the process scope that owns it. (Debt note in
+     * the reactor skill: the owner should be the daemon's module scope as a
+     * CCEK element, drained at daemon drain — the volatile holder is the
+     * interim.)
+     */
+    @Volatile private var shared: borg.trikeshed.userspace.FunctionalUringFacade? = null
+    private val sharedMutex = kotlinx.coroutines.sync.Mutex()
+
+    private suspend fun ring(): borg.trikeshed.userspace.FunctionalUringFacade {
+        shared?.let { return it }
+        return sharedMutex.withLock {
+            shared ?: run {
+                val backend = openUserspaceChannelBackend(RING_ENTRIES)
+                val facade = borg.trikeshed.userspace.FunctionalUringFacade(RING_ENTRIES, backend)
+                shared = facade
+                facade
+            }
         }
     }
+
+    private suspend fun <T> onRing(block: suspend (borg.trikeshed.userspace.FunctionalUringFacade) -> T): T =
+        block(ring())
 
     /** Capability report: what THIS machine's ring answers, straight from the probe. */
     fun probe() = LcncNodeRunner { _, _ ->
