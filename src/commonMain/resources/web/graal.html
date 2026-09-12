@@ -228,7 +228,7 @@ html[data-skin="marker"] #crumb{text-shadow:none}
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
-<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes xterm256 · <b>A</b> AOT · <b>O</b> blackboard · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <a id="qsLink" style="color:var(--commit);cursor:pointer">⚡ install now</a> · <a id="fbLink" style="color:var(--warn);cursor:pointer">⚑ feedback</a></div>
+<div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes xterm256 · <b>A</b> AOT · <b>O</b> blackboard · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <button id="qsLink" style="background:none;border:none;padding:0;font:inherit;color:var(--commit);cursor:pointer">⚡ install now</button> · <button id="fbLink" style="background:none;border:none;padding:0;font:inherit;color:var(--warn);cursor:pointer">⚑ feedback</button></div>
 <div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
 <script>
 'use strict';
@@ -854,7 +854,7 @@ function qsInstall(){
   +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 — drop a REAL folder on this terrain, run a stored program via POST /api/lcnc/run, abuse the board.</div>'
   +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button>'
   +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README ↗</a>'
-  +'<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="color:#7b8496;margin-left:14px;cursor:pointer">close</a></div>';
+  +'<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:#7b8496;margin-left:14px;cursor:pointer">close</button></div>';
  d.onclick=e=>{if(e.target===d)d.remove()};
  document.body.appendChild(d);
 }
@@ -1057,7 +1057,7 @@ async function openDoc(id){
   } else if(att){
     const ct=(att.content_type||'').toLowerCase(),ext=extOf(id),big=(att.length||0)>1500000;
     const proj=document.getElementById('proj');
-    if(big){proj.innerHTML='<a style="cursor:pointer;color:var(--commit)" onclick="this.parentElement.textContent=\'…\';projectBytes(\''+id.replace(/'/g,"\\'")+'\')">'+fmtBytes(att.length)+' — project anyway</a>';}
+    if(big){proj.innerHTML='<button style="background:none;border:none;padding:0;font:inherit;cursor:pointer;color:var(--commit)" onclick="this.parentElement.textContent=\'…\';projectBytes(\''+id.replace(/'/g,"\\'")+'\')">'+fmtBytes(att.length)+' — project anyway</button>';}
     else await projectBytes(id,ct,ext);
   } else document.getElementById('proj').textContent=previewBlocked?'content preview blocked for credential-bearing document':'';
   // ── dag edges ──
