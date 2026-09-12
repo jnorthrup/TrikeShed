@@ -18,6 +18,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
  */
 class UringChannel(
     private val facade: FunctionalUringFacade,
+    internal val trace: borg.trikeshed.userspace.UringTrace? = null,
 ) {
     fun enqueue(submission: UringSubmission) = facade.enqueue(submission)
 

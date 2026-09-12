@@ -1,9 +1,9 @@
 package borg.trikeshed.isam.meta
 
-import borg.trikeshed.common.Files
 import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.RecordMeta
+import borg.trikeshed.isam.IsamFileOperations
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlin.math.min
@@ -38,10 +38,19 @@ import kotlin.math.min
  *
  *
  */
-class IsamMetaFileReader(
+class IsamMetaFileReader private constructor(
     val metafileFilename: String,
-    internal val fileOps: FileOperations? = null
+    private val readLines: (String) -> List<String>,
+    private val explicitFiles: Boolean,
 ) : Usable {
+    constructor(metafileFilename: String, fileOps: FileOperations? = null) :
+        this(metafileFilename, fileOps?.let { it::readAllLines } ?: IsamFileOperations()::readAllLines, fileOps != null)
+
+    internal constructor(metafileFilename: String, files: IsamFileOperations) :
+        this(metafileFilename, files::readAllLines, true)
+
+    internal fun withDefaultFiles(files: IsamFileOperations): IsamMetaFileReader =
+        if (explicitFiles) this else IsamMetaFileReader(metafileFilename, files)
 
     val recordlen: Int get() = constraints.last().end
     val constraints: Series<RecordMeta> get() {
@@ -53,11 +62,7 @@ class IsamMetaFileReader(
 
     override fun open() {
         constraints1 = null
-        val lines = if (fileOps != null) {
-            fileOps.readAllLines(metafileFilename)
-        } else {
-            Files.readAllLines(metafileFilename)
-        }.filterNot { it.isBlank() || it.trim().startsWith('#') }
+        val lines = readLines(metafileFilename).filterNot { it.isBlank() || it.trim().startsWith('#') }
         require(lines.size in 3..4) { "ISAM metadata requires coordinates, names, types and optional groups" }
 
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
@@ -161,6 +166,24 @@ class IsamMetaFileReader(
             varchars: Map<String, Int>,
             fileOps: FileOperations? = null,
             useMonocursorGroupings: Boolean = true
+        ): Series<RecordMeta> = writeMetadata(metafilename, recordMetas, varchars,
+            { path, lines -> if (fileOps != null) fileOps.write(path, lines) else IsamFileOperations().write(path, lines) },
+            useMonocursorGroupings)
+
+        internal fun write(
+            metafilename: String,
+            recordMetas: Series<ColumnMeta>,
+            varchars: Map<String, Int>,
+            metadataFiles: IsamFileOperations,
+            useMonocursorGroupings: Boolean = true,
+        ): Series<RecordMeta> = writeMetadata(metafilename, recordMetas, varchars, metadataFiles::write, useMonocursorGroupings)
+
+        private fun writeMetadata(
+            metafilename: String,
+            recordMetas: Series<ColumnMeta>,
+            varchars: Map<String, Int>,
+            writeLines: (String, List<String>) -> Unit,
+            useMonocursorGroupings: Boolean,
         ): Series<RecordMeta> {
             val lines = mutableListOf<String>()
 
@@ -187,11 +210,7 @@ class IsamMetaFileReader(
                 if (groupTokens.isNotEmpty()) lines.add(groupTokens.joinToString(" "))
             }
 
-            if (fileOps != null) {
-                fileOps.write(metafilename, lines)
-            } else {
-                Files.write(metafilename, lines)
-            }
+            writeLines(metafilename, lines)
             return result
         }
 

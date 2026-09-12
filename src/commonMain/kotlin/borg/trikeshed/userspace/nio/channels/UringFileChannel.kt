@@ -184,6 +184,7 @@ internal class UringFileChannel(
     override fun map(mode: MapMode, position: Long, size: Long): borg.trikeshed.userspace.MemoryMapping {
         checkOpen()
         if (!readable) throw NonReadableChannelException()
+        require(position >= 0 && size > 0 && position <= Long.MAX_VALUE - size) { "Invalid file mapping range" }
         val protection = when (mode) {
             MapMode.READ_ONLY -> 1
             MapMode.READ_WRITE, MapMode.PRIVATE -> {
@@ -193,7 +194,12 @@ internal class UringFileChannel(
             else -> throw IllegalArgumentException("Unknown mapping mode")
         }
         val flags = if (mode === MapMode.PRIVATE) 2 else 1
-        return borg.trikeshed.userspace.mapMemory(0, size, protection, flags, file.id, position)
+        val end = position + size
+        if (end > size()) {
+            if (!writable) throw NonWritableChannelException()
+            execute(UringOp.FTRUNCATE, offset = end)
+        }
+        return borg.trikeshed.userspace.mapFileMemory(size, protection, flags, file.id, position, channel.trace)
     }
 
     override fun lock(position: Long, size: Long, shared: Boolean): FileLock =

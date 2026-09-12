@@ -5,12 +5,10 @@ import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.UringIOException
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 
 /** ISAM metadata uses the same channel factory, facade and backend as the data groups. */
-internal class IsamFileOperations(private val channels: IsamChannelFactory) : FileOperations by JvmFileOperations() {
-    override fun readAllBytes(filename: String): ByteArray {
+internal class IsamFileOperations(private val channels: IsamChannelFactory = ::openIsamChannel) {
+    fun readAllBytes(filename: String): ByteArray {
         val channel = channels(filename, setOf(StandardOpenOption.READ))
         var failure: Throwable? = null
         try {
@@ -29,10 +27,10 @@ internal class IsamFileOperations(private val channels: IsamChannelFactory) : Fi
         finally { closeChannels(listOf(channel), failure) }
     }
 
-    override fun readString(filename: String): String = readAllBytes(filename).decodeToString()
-    override fun readAllLines(filename: String): List<String> = readString(filename).lineSequence().toList()
+    fun readString(filename: String): String = readAllBytes(filename).decodeToString()
+    fun readAllLines(filename: String): List<String> = readString(filename).lineSequence().toList()
 
-    override fun write(filename: String, bytes: ByteArray) {
+    fun write(filename: String, bytes: ByteArray) {
         val channel = channels(filename, setOf(StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING))
         var failure: Throwable? = null
         try {
@@ -48,10 +46,10 @@ internal class IsamFileOperations(private val channels: IsamChannelFactory) : Fi
         finally { closeChannels(listOf(channel), failure) }
     }
 
-    override fun write(filename: String, string: String) = write(filename, string.encodeToByteArray())
-    override fun write(filename: String, lines: List<String>) = write(filename, lines.joinToString("\n", postfix = "\n"))
+    fun write(filename: String, string: String) = write(filename, string.encodeToByteArray())
+    fun write(filename: String, lines: List<String>) = write(filename, lines.joinToString("\n", postfix = "\n"))
 
-    override fun exists(filename: String): Boolean = try {
+    fun exists(filename: String): Boolean = try {
         channels(filename, setOf(StandardOpenOption.READ)).close()
         true
     } catch (failure: UringIOException) {

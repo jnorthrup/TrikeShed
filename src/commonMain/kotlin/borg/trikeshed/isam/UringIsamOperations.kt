@@ -1,0 +1,317 @@
+package borg.trikeshed.isam
+
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.isam.meta.IsamMetaFileReader
+import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.MemoryMapping
+import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.IOException
+import borg.trikeshed.userspace.nio.channels.FileChannel
+import borg.trikeshed.userspace.nio.file.OpenOption
+import borg.trikeshed.userspace.nio.file.StandardOpenOption
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.sync.Mutex
+
+internal typealias IsamChannelFactory = (String, Set<OpenOption>) -> FileChannel
+
+internal fun openIsamChannel(path: String, options: Set<OpenOption>): FileChannel = FileChannel.open(path, options)
+
+enum class IsamReadMode { CHANNEL, MMAP }
+
+private fun groupLength(columns: List<RecordMeta>): Int {
+    val bytes = columns.fold(0L) { total, column ->
+        require(column.begin >= 0 && column.end > column.begin) { "ISAM columns require positive fixed widths" }
+        total + column.end.toLong() - column.begin
+    }
+    require(bytes in 1..Int.MAX_VALUE.toLong()) { "ISAM group row length exceeds buffer capacity" }
+    return bytes.toInt()
+}
+
+private fun groupPath(datafilename: String, columns: List<RecordMeta>, primary: Int): String =
+    if (columns.first().groupId == primary) datafilename else getGroupFilename(datafilename, columns.first().groupName)
+
+/** Complete one fixed-width transfer; FileChannel owns the facade and CQE validation. */
+private fun transfer(channel: FileChannel, bytes: ByteArray, offset: Long, read: Boolean) {
+    require(offset >= 0 && offset <= Long.MAX_VALUE - bytes.size)
+    val buffer = ByteBuffer.wrap(bytes)
+    while (buffer.hasRemaining()) {
+        val position = buffer.position()
+        val remaining = buffer.remaining()
+        val count = if (read) channel.read(buffer, offset + position) else channel.write(buffer, offset + position)
+        if (count <= 0 || count > remaining || buffer.position() != position + count) {
+            throw IOException("Incomplete ISAM ${if (read) "read" else "write"} at ${offset + position}: count=$count remaining=$remaining")
+        }
+    }
+}
+
+internal fun closeChannels(channels: Collection<FileChannel>, cause: Throwable? = null) {
+    var failure = cause
+    for (channel in channels) try { channel.close() } catch (caught: Throwable) {
+        if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
+    }
+    if (cause == null) failure?.let { throw it }
+}
+
+class UringIsamDataReader internal constructor(
+    val datafileFilename: String,
+    val metafileFilename: String,
+    metafile: IsamMetaFileReader,
+    private val channelFactory: IsamChannelFactory,
+    private val readMode: IsamReadMode = IsamReadMode.CHANNEL,
+) : IsamDataReader {
+    val metafile = metafile.withDefaultFiles(IsamFileOperations(channelFactory))
+    constructor(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader,
+                readMode: IsamReadMode = IsamReadMode.CHANNEL) :
+        this(datafileFilename, metafileFilename, metafile, ::openIsamChannel, readMode)
+
+    constructor(scope: CoroutineScope, datafileFilename: String, metafileFilename: String,
+                metafile: IsamMetaFileReader, readMode: IsamReadMode = IsamReadMode.CHANNEL) :
+        this(datafileFilename, metafileFilename, metafile, { path, options -> FileChannel.open(scope, path, options) }, readMode)
+
+    private var constraints: Series<RecordMeta>? = null
+    private var columnsByGroup: Map<String, List<RecordMeta>> = emptyMap()
+    private val groupFiles = mutableMapOf<String, FileChannel>()
+    private val groupMappings = mutableMapOf<String, MemoryMapping>()
+    private val lock = Mutex()
+    private var opened = false
+    private var rows = 0
+
+    override val recordCount: Int get() = exclusive {
+        check(opened) { "ISAM reader is closed" }
+        rows
+    }
+
+    override val readRow: (Int) -> RowVec = { row -> exclusive {
+        check(opened) { "ISAM reader is closed" }
+        require(row in 0 until rows) { "ISAM row is outside the data file" }
+        try {
+            val metadata = requireNotNull(constraints)
+            val groups = columnsByGroup
+            val groupBuffers = mutableMapOf<String, ByteArray>()
+            for ((name, columns) in groups) {
+                val length = groupLength(columns)
+                val bytes = ByteArray(length)
+                val offset = row.toLong() * length
+                if (readMode == IsamReadMode.MMAP) requireNotNull(groupMappings[name]).read(offset, bytes)
+                else transfer(requireNotNull(groupFiles[name]), bytes, offset, read = true)
+                groupBuffers[name] = bytes
+            }
+            // The returned row retains heap bytes and this open's schema, never a channel or mapping.
+            metadata.size j { index: Int ->
+                require(index in 0 until metadata.size) { "ISAM column is outside the row" }
+                val column = metadata[index]
+                val columns = groups.getValue(column.groupName)
+                val offset = columns.takeWhile { it !== column }.sumOf { it.end - it.begin }
+                val bytes = groupBuffers.getValue(column.groupName).copyOfRange(offset, offset + (column.end - column.begin))
+                requireNotNull(column.decoder(bytes)) { "ISAM decoder returned null for ${column.name}" } j { column }
+            }
+        } catch (failure: Throwable) {
+            closeResources(failure)
+            throw failure
+        }
+    } }
+
+    override fun open(): Unit = exclusive {
+        if (opened) return@exclusive
+        check(groupFiles.isEmpty() && groupMappings.isEmpty()) { "ISAM reader cleanup must complete before reopening" }
+        try {
+            metafile.open()
+            val metadata = metafile.constraints
+            val groups = metadata.view.groupBy { it.groupName }
+            val primary = metadata.view.maxOf { it.groupId }
+            var count: Long? = null
+            for ((name, columns) in groups) {
+                val length = groupLength(columns)
+                val channel = channelFactory(groupPath(datafileFilename, columns, primary), setOf(StandardOpenOption.READ))
+                groupFiles[name] = channel
+                val size = channel.size()
+                require(size >= 0 && size % length == 0L) { "ISAM group $name contains an incomplete row" }
+                val groupCount = size / length
+                require(groupCount <= Int.MAX_VALUE && (count == null || count == groupCount)) { "ISAM group row counts disagree or exceed cursor capacity" }
+                count = groupCount
+                if (readMode == IsamReadMode.MMAP && size > 0) {
+                    groupMappings[name] = channel.map(FileChannel.MapMode.READ_ONLY, 0, size)
+                }
+            }
+            rows = requireNotNull(count).toInt()
+            constraints = metadata
+            columnsByGroup = groups
+            opened = true
+        } catch (failure: Throwable) {
+            closeResources(failure)
+            throw failure
+        }
+    }
+
+    override fun close(): Unit = exclusive { closeResources() }
+
+    private fun closeResources(cause: Throwable? = null) {
+        opened = false
+        rows = 0
+        constraints = null
+        columnsByGroup = emptyMap()
+        var failure = cause
+        fun failed(caught: Throwable) {
+            if (failure == null) failure = caught else if (failure !== caught) failure!!.addSuppressed(caught)
+        }
+        // Retain a failed unmap and its descriptor so close can be retried safely.
+        for ((name, mapping) in groupMappings.toMap()) try {
+            mapping.close()
+            groupMappings.remove(name)
+        } catch (caught: Throwable) { failed(caught) }
+        for ((name, channel) in groupFiles.toMap()) if (name !in groupMappings) try {
+            channel.close()
+            groupFiles.remove(name)
+        } catch (caught: Throwable) { failed(caught) }
+        try { metafile.close() } catch (caught: Throwable) { failed(caught) }
+        if (cause == null) failure?.let { throw it }
+    }
+
+    private inline fun <T> exclusive(operation: () -> T): T {
+        check(lock.tryLock()) { "Concurrent ISAM access requires serialization by its owner" }
+        try { return operation() } finally { lock.unlock() }
+    }
+}
+
+class UringIsamOperations internal constructor(
+    private val channelFactory: IsamChannelFactory,
+    private val readMode: IsamReadMode = IsamReadMode.CHANNEL,
+) : IsamOperations {
+    constructor(readMode: IsamReadMode = IsamReadMode.CHANNEL) : this(::openIsamChannel, readMode)
+    constructor(scope: CoroutineScope, readMode: IsamReadMode = IsamReadMode.CHANNEL) :
+        this({ path, options -> FileChannel.open(scope, path, options) }, readMode)
+    private val metadataFiles = IsamFileOperations(channelFactory)
+    private val lock = Mutex()
+
+    override fun createReader(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader): IsamDataReader =
+        UringIsamDataReader(datafileFilename, metafileFilename, metafile, channelFactory, readMode)
+
+    override fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, useMonocursorGroupings: Boolean): Unit = exclusive {
+        require(cursor.size > 0) { "ISAM write needs at least one row to establish its schema" }
+        val first = cursor[0]
+        val metadata = IsamMetaFileReader.write("$datafilename.meta", rowMetadata(first), varChars,
+            metadataFiles = metadataFiles, useMonocursorGroupings = useMonocursorGroupings)
+        writeRows(cursor.view, datafilename, metadata, append = false, create = true)
+    }
+
+    override fun append(msf: Iterable<RowVec>, datafilename: String, varChars: Map<String, Int>,
+                        transform: ((RowVec) -> RowVec)?, useMonocursorGroupings: Boolean): Unit = exclusive {
+        val source = msf.iterator()
+        if (!source.hasNext()) return@exclusive
+        val first = source.next().let { transform?.invoke(it) ?: it }
+        val metafilename = "$datafilename.meta"
+        val exists = metadataFiles.exists(metafilename)
+        val metadata = if (exists) {
+            val reader = IsamMetaFileReader(metafilename, metadataFiles)
+            try {
+                reader.open()
+                reader.constraints.also {
+                    val proposed = IsamMetaFileReader.sanitize(rowMetadata(first), varChars, useMonocursorGroupings)
+                    require(sameSchema(it, proposed, datafilename)) { "ISAM append schema differs from existing metadata" }
+                }
+            } finally { reader.close() }
+        } else IsamMetaFileReader.write(metafilename, rowMetadata(first), varChars,
+            metadataFiles = metadataFiles, useMonocursorGroupings = useMonocursorGroupings)
+        val rows = sequence {
+            yield(first)
+            while (source.hasNext()) yield(source.next().let { transform?.invoke(it) ?: it })
+        }
+        writeRows(rows.asIterable(), datafilename, metadata, append = true, create = !exists)
+    }
+
+    private fun rowMetadata(row: RowVec): Series<ColumnMeta> {
+        require(row.size > 0) { "ISAM requires columns" }
+        return row.size j { index: Int -> row[index].b() }
+    }
+
+    private fun sameSchema(left: Series<RecordMeta>, right: Series<RecordMeta>, filename: String): Boolean {
+        if (left.size != right.size) return false
+        val leftPrimary = left.view.maxOf { it.groupId }
+        val rightPrimary = right.view.maxOf { it.groupId }
+        return (0 until left.size).all { index ->
+            val a = left[index]
+            val b = right[index]
+            a.name == b.name && a.type == b.type && a.end - a.begin == b.end - b.begin &&
+                (if (a.groupId == leftPrimary) filename else getGroupFilename(filename, a.groupName)) ==
+                (if (b.groupId == rightPrimary) filename else getGroupFilename(filename, b.groupName))
+        }
+    }
+
+    private fun writeRows(rows: Iterable<RowVec>, filename: String, metadata: Series<RecordMeta>, append: Boolean, create: Boolean) {
+        val groups = metadata.view.groupBy { it.groupName }
+        val primary = metadata.view.maxOf { it.groupId }
+        val channels = mutableMapOf<String, FileChannel>()
+        val offsets = mutableMapOf<String, Long>()
+        var failure: Throwable? = null
+        try {
+            var existingCount: Long? = null
+            for ((name, columns) in groups) {
+                val options = mutableSetOf<OpenOption>(StandardOpenOption.READ, StandardOpenOption.WRITE)
+                if (create) options.add(StandardOpenOption.CREATE)
+                if (!append) options.add(StandardOpenOption.TRUNCATE_EXISTING)
+                val channel = channelFactory(groupPath(filename, columns, primary), options)
+                channels[name] = channel
+                val length = groupLength(columns)
+                val size = if (append) channel.size() else 0L
+                require(size >= 0 && size % length == 0L) { "ISAM group $name contains an incomplete row" }
+                val count = size / length
+                require(count <= Int.MAX_VALUE && (existingCount == null || existingCount == count)) {
+                    "ISAM group row counts disagree or exceed cursor capacity"
+                }
+                existingCount = count
+                offsets[name] = size
+            }
+            var count = requireNotNull(existingCount)
+            for (row in rows) {
+                require(count < Int.MAX_VALUE) { "ISAM append exceeds cursor capacity" }
+                require(row.size == metadata.size) { "ISAM row width differs from metadata" }
+                // Encode every group before admitting this row's first physical write.
+                val buffers = mutableMapOf<String, ByteArray>()
+                for ((name, columns) in groups) {
+                    val bytes = ByteArray(groupLength(columns))
+                    var offset = 0
+                    for (column in columns) {
+                        val index = metadata.view.indexOf(column)
+                        val cell = row[index]
+                        val source = cell.b()
+                        require(source.name.toString() == column.name && source.type == column.type) { "ISAM row schema differs from metadata" }
+                        val encoded = column.encoder(cell.a)
+                        val width = column.end - column.begin
+                        require(encoded.size <= width && (column.type.networkSize == null || encoded.size == width)) {
+                            "ISAM encoded width differs from metadata for ${column.name}"
+                        }
+                        encoded.copyInto(bytes, offset)
+                        offset += width
+                    }
+                    buffers[name] = bytes
+                }
+                try {
+                    for ((name, bytes) in buffers) {
+                        transfer(channels.getValue(name), bytes, offsets.getValue(name), read = false)
+                    }
+                } catch (caught: Throwable) {
+                    // Restore the failed row across every group; completed rows remain appendable.
+                    for ((name, channel) in channels) try {
+                        channel.truncate(offsets.getValue(name))
+                        channel.force(true)
+                    } catch (cleanup: Throwable) {
+                        if (cleanup !== caught) caught.addSuppressed(cleanup)
+                    }
+                    throw caught
+                }
+                for ((name, bytes) in buffers) offsets[name] = offsets.getValue(name) + bytes.size
+                count++
+            }
+            channels.values.forEach { it.force(true) }
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally { closeChannels(channels.values, failure) }
+    }
+    private inline fun <T> exclusive(operation: () -> T): T {
+        check(lock.tryLock()) { "Concurrent ISAM writes require serialization by their owner" }
+        try { return operation() } finally { lock.unlock() }
+    }
+}
