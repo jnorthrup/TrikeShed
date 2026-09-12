@@ -958,6 +958,7 @@
           td.appendChild(ref);
           const open = document.createElement('button');
           open.className = 'sheet-ref sheet-ref-open'; open.textContent = 'open ↗'; open.title = 'Zoom into this sheet';
+          open.setAttribute('aria-label', 'Zoom into sheet ' + cell.sheet);
           open.addEventListener('click', (ev) => { ev.stopPropagation(); openSheet(cell.sheet); });
           td.appendChild(open);
           if (sheetExpanded[key] && child && depth < 6) td.appendChild(buildSheetTable(child, depth + 1));
@@ -1421,10 +1422,10 @@
     const host = document.createElement('div');
     host.style.cssText = 'display:flex;gap:12px;margin-top:6px;font-size:11px';
     function link(text, title, onClick) {
-      const a = document.createElement('a');
+      const a = document.createElement('button');
       a.textContent = text;
       a.title = title;
-      a.style.cssText = 'color:var(--text-faint);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--text-faint)';
+      a.style.cssText = 'color:var(--text-faint);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--text-faint);background:none;border:none;padding:0;font:inherit;';
       a.addEventListener('click', onClick);
       host.appendChild(a);
       return a;
@@ -1438,7 +1439,7 @@
         '<pre id="qsCmds" style="background:rgba(127,127,127,.12);padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>' +
         '<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="font:inherit;padding:4px 12px;cursor:pointer">copy commands</button>' +
         '<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="margin-left:10px">README \u2197</a>' +
-        '<a onclick="document.querySelector(\'div[data-qs]\').remove()" style="margin-left:14px;cursor:pointer">close</a></div>';
+        '<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;margin-left:14px;cursor:pointer">close</button></div>';
       d.addEventListener('click', (e) => { if (e.target === d) d.remove(); });
       document.body.appendChild(d);
     });
