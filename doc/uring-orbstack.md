@@ -99,9 +99,28 @@ Mac and Linux JS compilation fail with 504 diagnostics: 441 in that daemon,
 These are compile failures, not protocol failures or passing tests. No source
 exclusion was added to bypass them, and no facade benchmark has run.
 
+Checkpoint `6bb24725f` merges the shared port through `823abec8b` and fixes
+JVM CONNECT settlement: nonblocking start, owned readiness/SO_ERROR completion,
+and cancellable observation. Both Mac and Linux JVM protocol attempts still
+report exactly 365 daemon errors. A timeout must own the ring scope or initiate
+drain; timing out one admitted batch deliberately waits for its effects.
+Cancelling CONNECT observation does not claim the peer never connected.
+
+The native channel repair replaces both platform handles with one common-facade
+handle. It preserves zero-byte EOF, `-11` readiness, repeated caller identities,
+bounded admission and CQEs available after close. Socket lifecycle SQEs whose
+POSIX effects are absent complete with `-95`; no live native socket claim is made.
+The offline native frontend reports 507 remaining diagnostics: 462 common,
+30 Linux (watcher, volume and malformed `LinuxPosixFile`), and 15 POSIX
+(process-spawn bindings and a missing Files actual). None identifies the
+changed ring/channel/adapter files. Native tests and executable linking remain
+blocked. Fatal native completion-retrieval failure after kernel consumption
+still needs a proven quiescence/recovery path before this work can be called complete.
+
 | Surface | Implementation / required evidence |
 |---|---|
 | TCP and Unix sockets | JVM SQEs execute through scoped POSIX FFM; ring tests cover fd identity, readiness, cancellation and drain. Execution blocked by compilation. |
+| Native socket lifecycle | Common channel staging is present; POSIX backend capability gaps remain explicit `-95` CQEs. |
 | TLS 1.2 and 1.3 | JVM SSLEngine codec; ring transport tests cover fragmented records, bidirectional payloads, certificate/hostname rejection and close-notify receipt. Execution blocked by compilation. |
 | TLS on JS and Kotlin/Native | Current provider is `StubTlsCodecBackend`; unsupported, not a pass. |
 | HTTP/1.1 / HTX / Couch | Real transport paths plus a keep-alive fragmented-header regression; execution blocked by compilation. Some fixture servers still use raw JDK sockets. |
