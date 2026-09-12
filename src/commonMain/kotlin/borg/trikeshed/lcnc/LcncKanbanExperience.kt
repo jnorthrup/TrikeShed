@@ -12,6 +12,7 @@ import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.view
 
 /**
  * The LCNC-only Kanban surface. It owns no shadow board state: commands enter
@@ -78,8 +79,9 @@ class LcncKanbanExperience(
             "byPriority" to LcncOperationalSheets.byPriority(store).map(SheetSeed::toLcncMap),
             "boardView" to board.toBoardMap(store.lastSequence, "Kanban board (live)"),
             "orchestration" to orchestrationMap,
-            "laneOrder" to orchestration.lanes.toList().sortedBy { it.order }.map { it.id },
-            "conditions" to orchestration.edges.toList().mapNotNull { it.condition?.let { c -> mapOf("edge" to it.id, "predicate" to c.predicate, "parameters" to c.parameters) } },
+            // Bolt: Avoid intermediate O(N) list allocations by replacing .toList() with .view
+            "laneOrder" to orchestration.lanes.view.sortedBy { it.order }.map { it.id },
+            "conditions" to orchestration.edges.view.mapNotNull { it.condition?.let { c -> mapOf("edge" to it.id, "predicate" to c.predicate, "parameters" to c.parameters) } },
         )
     }
 
