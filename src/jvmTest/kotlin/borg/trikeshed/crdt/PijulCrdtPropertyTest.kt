@@ -85,7 +85,6 @@ class PijulCrdtPropertyTest {
      *   p1 then p2 → "A\nB\nX\nC\nY\nD\nE\n"  (X shifted D's start to 8; p2 lands after C)
      *   p2 then p1 → "A\nB\nX\nC\nD\nY\nE\n"  (p2 lands after D at its unshifted start 6)
      */
-    @Ignore
     @Test
     fun independentInsertsCommute() {
         val p1 = patchOf("p1", Change.Insert(2, "X\n"))
@@ -119,7 +118,6 @@ class PijulCrdtPropertyTest {
      * on [2,1,0] it tombstones master's D → "A\nP\nB\nC\nD\nE\n" vs
      * "A\nP\nB\nC\nQ\nE\n".
      */
-    @Ignore
     @Test
     fun replicasConvergeAcrossInterleavings() {
         val patches = listOf(
@@ -187,7 +185,6 @@ class PijulCrdtPropertyTest {
      *   del then ins → "A\nC\nX\n"  (B already zero-length: X attaches after C,
      *                                the last vertex sharing start offset 2)
      */
-    @Ignore
     @Test
     fun deleteAndConcurrentInsertCommute() {
         val del = patchOf("del", Change.Delete(2, 2))

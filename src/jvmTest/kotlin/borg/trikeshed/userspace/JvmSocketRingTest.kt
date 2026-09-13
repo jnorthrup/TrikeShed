@@ -47,34 +47,58 @@ class JvmSocketRingTest {
     }
 
     @Test
-    fun pollAdmissionHasOneCompletionOnlyWhenReady() = socketPair { backend, fd, peer ->
-        val ring = FunctionalUringFacade(2, backend)
-        try {
-            ring.enqueue(UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1))
-            assertEquals(1, ring.submit())
-            assertTrue(ring.wait(0).isEmpty(), "registration is not a completion")
-            peer.write(java.nio.ByteBuffer.wrap(byteArrayOf(7)))
-            val cqe = ring.wait(1).single()
-            assertEquals(0L, cqe.userData)
-            assertEquals(1, cqe.res and 1)
-            assertTrue(ring.wait(0).isEmpty(), "a one-shot poll cannot complete twice")
-        } finally { ring.closeNow() }
+    fun pollAdmissionHasOneCompletionOnlyWhenReady() = runTest {
+        socketPair { backend, fd, peer ->
+            val ring = FunctionalUringFacade.create(this, 2, backend)
+            try {
+                val admitted = async {
+                    ring.batchEnqueue(1 j { _: Int ->
+                        UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1)
+                    })
+                }
+                runCurrent()
+                assertFalse(admitted.isCompleted, "registration is not a completion")
+                peer.write(java.nio.ByteBuffer.wrap(byteArrayOf(7)))
+                val results = admitted.await()
+                val cqe = (0 until results.a).map { results[it] }.first { it.userData == 0L }
+                assertEquals(0L, cqe.userData)
+                assertEquals(1, cqe.res and 1)
+                assertTrue(ring.wait(0).isEmpty(), "a one-shot poll cannot complete twice")
+            } finally { ring.drain() }
+        }
     }
 
     @Test
-    fun pollRemoveAndDrainSettleOriginalTokens() = socketPair { backend, fd, _ ->
-        val ring = FunctionalUringFacade(3, backend)
-        try {
-            ring.enqueue(UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1))
-            ring.enqueue(UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 1, operationFlags = 1))
-            assertEquals(2, ring.submit())
-            ring.enqueue(UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = 2))
-            assertEquals(1, ring.submit())
-            assertEquals(setOf(SelectionResult(0, 2), SelectionResult(-125, 0)), ring.wait(0).toSet())
-            ring.closeNow()
-            assertEquals(listOf(SelectionResult(-125, 1)), ring.wait(0))
-            assertTrue(ring.wait(0).isEmpty())
-        } finally { ring.closeNow() }
+    fun pollRemoveAndDrainSettleOriginalTokens() = runTest {
+        socketPair { backend, fd, _ ->
+            val ring = FunctionalUringFacade.create(this, 3, backend)
+            try {
+                val first = async {
+                    ring.batchEnqueue(1 j { _: Int ->
+                        UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1)
+                    })
+                }
+                runCurrent()
+                // POLL_REMOVE by token: settles the removed admission ECANCELED
+                // through the facade's own completion path.
+                assertEquals(0, backend.execute(UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = 2)))
+                val firstResults = first.await()
+                assertEquals(-125, (0 until firstResults.a).map { firstResults[it] }.first { it.userData == 0L }.res,
+                    "the removed poll's admission settles ECANCELED")
+                // Drain cancels the surviving admission (token 1) too.
+                val second = async {
+                    ring.batchEnqueue(1 j { _: Int ->
+                        UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 1, operationFlags = 1)
+                    })
+                }
+                runCurrent()
+                ring.drain()
+                val secondResults = second.await()
+                assertEquals(-125, (0 until secondResults.a).map { secondResults[it] }.first { it.userData == 1L }.res,
+                    "drain cancels the surviving poll admission")
+                assertTrue(ring.wait(0).isEmpty())
+            } finally { runCatching { ring.drain() } }
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

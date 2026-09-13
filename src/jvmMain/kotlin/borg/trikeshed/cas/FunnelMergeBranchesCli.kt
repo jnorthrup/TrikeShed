@@ -172,7 +172,7 @@ class FunnelMergeBranchesCli(private val repoDir: File, private val since: Strin
                     append("\nResolutions:\n")
                     for ((locus, r) in resolutions) append("  $locus → " + when (r) { is GitPijulGateway.Resolution.Accept -> "accept ${r.arm}"; GitPijulGateway.Resolution.Reject -> "reject" } + "\n")
                 }
-                append("\nKnown gap left open: the three @Ignore commutativity laws in PijulCrdtPropertyTest;\nthe gateway applies survivors bottom-up per path so the render is a function of the set.\n")
+                append("\nThe commutativity laws in PijulCrdtPropertyTest are unskipped and green;\nthe gateway applies survivors bottom-up per path so the render is a function of the set.\n")
             }
             val commit = gitIn(worktree, "commit", "--no-verify", "-q", "-m", msg)
             if (commit.first != 0) { System.err.println("[FUNNEL-MERGE] commit failed: ${commit.second.take(400)}"); return 5 }

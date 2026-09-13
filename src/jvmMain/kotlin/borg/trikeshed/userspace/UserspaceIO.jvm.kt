@@ -151,7 +151,14 @@ internal class JvmUserspaceChannelBackend(
     override val availability: String = "emulated: JVM file and POSIX socket effects; kernel ring not selected",
 ) : UserspaceChannelBackend {
     override val capabilities: Long get() = jvmUringOperations
-    override val deferredCapabilities: Long get() = UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT)
+    override val deferredCapabilities: Long
+        get() = if (connectWatchesPending) UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT) or
+            UringOp.caps(UringOp.WRITE, UringOp.SEND, UringOp.READ, UringOp.RECV)
+        else UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT)
+
+    /** True while a CONNECT watch is unsettled: io on that fd is deferred behind it. */
+    private val connectWatchesPending: Boolean
+        get() = synchronized(this) { watches.values.any { it.opcode == UringOp.CONNECT } }
     private val owned = mutableSetOf<Int>()
     private data class Watch(val descriptor: JvmDescriptor, val mask: Int, val opcode: UringOp)
     private val watches = LinkedHashMap<Long, Watch>()
@@ -165,10 +172,25 @@ internal class JvmUserspaceChannelBackend(
             val result = when (sub.opcode) {
                 UringOp.POLL_ADD -> pollAdd(sub)
                 UringOp.CONNECT -> connect(sub)
+                // Execution dependency: io on an fd with an unsettled CONNECT waits
+                // for the CONNECT CQE; it is re-executed on the following reap.
+                UringOp.WRITE, UringOp.SEND, UringOp.READ, UringOp.RECV ->
+                    if (connectPendingOn(sub.fd)) {
+                        heldBehindConnect[sub.userData] = sub
+                        null
+                    } else execute(sub)
                 else -> execute(sub)
             }
             result?.let { SelectionResult(it, sub.userData) }
         }
+
+    /** io deferred behind an unsettled CONNECT on the same fd. */
+    private val heldBehindConnect = LinkedHashMap<Long, UringSubmission>()
+
+    private fun connectPendingOn(fd: Int): Boolean = synchronized(this) {
+        val descriptor = JvmFileTable.descriptor(fd) ?: return false
+        watches.values.any { it.opcode == UringOp.CONNECT && it.descriptor == descriptor }
+    }
 
     private fun pollAdd(sub: UringSubmission): Int? {
         if (closed) return -9
@@ -201,6 +223,15 @@ internal class JvmUserspaceChannelBackend(
     override fun reapCompletions(minComplete: Int): List<SelectionResult> {
         require(minComplete >= 0)
         val results = ArrayList<SelectionResult>()
+        // A settled CONNECT unblocks the io it held back: execute it now.
+        val stillHeld = LinkedHashMap<Long, UringSubmission>()
+        for ((token, sub) in heldBehindConnect) {
+            if (!connectPendingOn(sub.fd)) {
+                execute(sub)?.let { results.add(SelectionResult(it, token)) }
+            } else stillHeld[token] = sub
+        }
+        heldBehindConnect.clear()
+        heldBehindConnect.putAll(stillHeld)
         var pending: Boolean
         do {
             pending = synchronized(this) {
@@ -245,6 +276,15 @@ internal class JvmUserspaceChannelBackend(
             watches.isNotEmpty()
             }
         } while (results.size < minComplete && pending)
+        // A CONNECT that settled during the poll releases io deferred behind it.
+        val unblocked = LinkedHashMap<Long, UringSubmission>()
+        for ((token, sub) in heldBehindConnect) {
+            if (!connectPendingOn(sub.fd)) {
+                execute(sub)?.let { results.add(SelectionResult(it, token)) }
+            } else unblocked[token] = sub
+        }
+        heldBehindConnect.clear()
+        heldBehindConnect.putAll(unblocked)
         return results
     }
 
@@ -255,6 +295,9 @@ internal class JvmUserspaceChannelBackend(
         // already have accepted the connection; no backend effect can still access the sockaddr.
         for (token in watches.keys) completions.addLast(SelectionResult(-125, token))
         watches.clear()
+        // io deferred behind a CONNECT cannot proceed once the ring is cancelling.
+        for ((token, sub) in heldBehindConnect) completions.addLast(SelectionResult(-125, token))
+        heldBehindConnect.clear()
     }
 
     @Synchronized
@@ -306,7 +349,22 @@ internal class JvmUserspaceChannelBackend(
                 else -> {
                     val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
                     if (descriptor is JvmSocketDescriptor) return synchronized(descriptor) {
-                        if (!descriptor.isOpen()) -9 else socketExecute(descriptor.fd, sub)
+                        if (!descriptor.isOpen()) -9
+                        // CONNECT shares the batch path's deferred contract: immediate results
+                        // return directly; a registered deferral (EINPROGRESS watch) reports 0 —
+                        // the caller settles the outcome through the CQE stream.
+                        else if (sub.opcode == UringOp.CONNECT) {
+                            // Direct contract: immediate results return directly; an EINPROGRESS
+                            // deferral settles synchronously by reaping its registered watch
+                            // (bounded), so the caller receives a settled res like the batch
+                            // path's CQE.
+                            val direct = connect(sub)
+                            if (direct == null) {
+                                val settled = reapCompletions(minComplete = 1)
+                                settled.firstOrNull()?.res ?: -95
+                            } else direct
+                        }
+                        else socketExecute(descriptor.fd, sub)
                     }
                     if (sub.opcode in setOf(UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN)) return -88
                     val channel = (descriptor as? JvmChannelDescriptor)?.channel ?: return -95
@@ -417,17 +475,20 @@ internal class JvmUserspaceChannelBackend(
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        val outstanding = HashSet<Long>(submissions.size)
-        for (index in 0 until submissions.size) outstanding.add(submissions[index].userData)
+        // Submission order is the completion contract: deferred ops (CONNECT watches,
+        // POLL_ADD) settle later via reap, but the caller observes CQEs in the order
+        // the SQEs were queued.
+        val order = List(submissions.size) { index -> submissions[index].userData }
+        val outstanding = order.toHashSet()
+        val byToken = HashMap<Long, Int>()
         val results = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
-        results.forEach { outstanding.remove(it.userData) }
+        results.forEach { outstanding.remove(it.userData); byToken[it.userData] = it.res }
         while (outstanding.isNotEmpty()) {
             val settled = reapCompletions(0)
-            settled.forEach { outstanding.remove(it.userData) }
-            results.addAll(settled)
+            settled.forEach { outstanding.remove(it.userData); byToken[it.userData] = it.res }
             if (outstanding.isNotEmpty()) kotlinx.coroutines.delay(1)
         }
-        return results.size j { UringCompletion(results[it].userData, results[it].res, 0) }
+        return order.size j { index -> UringCompletion(order[index], byToken.getValue(order[index]), 0) }
     }
 
     @Synchronized

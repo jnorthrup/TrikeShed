@@ -299,6 +299,9 @@ public class FunctionalUringFacade(
             admission.withLock {
                 for (i in 0 until cqes.size) {
                     val cqe = cqes[i]
+                    // A CQE for a token already in flight (registered by an earlier
+                    // batch) settles that earlier admission inline; it is not part of
+                    // this batch's correlation set.
                     if (cqe.userData in inFlight) try {
                         settle(listOf(SelectionResult(cqe.res, cqe.userData)))
                     } catch (failure: Throwable) {
@@ -308,6 +311,9 @@ public class FunctionalUringFacade(
                     else batchResults.add(cqe)
                 }
             }
+            // The suspend batch contract settles every admitted submission before
+            // returning — including deferred ops, which reap internally. Correlate
+            // all of them: missing, duplicate or foreign CQEs still fail here.
             try {
                 correlate(admitted, batchResults.toSeries()) { result.add(it) }
             } catch (failure: Throwable) {
@@ -366,7 +372,9 @@ public class FunctionalUringFacade(
                     it.userData in inFlight && backend.deferredCapabilities and it.opcode.mask == 0L
                 }) { "Backend lost submission completions" }
             }
-            return submissions.size
+            // Rejected SQEs settled their own error CQEs above; the returned count
+            // is the number of admissions sent to the backend.
+            return admitted.size
         } catch (failure: Throwable) {
             // A failed call is terminal for its batch. Preserve every trustworthy CQE
             // already received and account for each remaining admission exactly once.

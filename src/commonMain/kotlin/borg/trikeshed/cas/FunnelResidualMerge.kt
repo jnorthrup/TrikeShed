@@ -1,12 +1,12 @@
 package borg.trikeshed.cas
 
+import java.io.ByteArrayOutputStream
 import kotlin.jvm.JvmInline
 
 import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
-import borg.trikeshed.cursor.monotonicNanoTime
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.α
@@ -537,10 +537,16 @@ object FunnelResidualMerge {
         val patchStore = borg.trikeshed.pijul.PatchStorage()
         val provenance = mutableListOf<PijulMergeResult.SourceProvenance>()
 
-        // Seed: apply master's lines as the initial patch.
+        // Seed: apply master's lines as the initial patch. Positions are CHAR
+        // offsets into the growing document (the CRDT's coordinate space), so
+        // each line lands after the previous one and the seed renders
+        // line-for-line.
         val masterLines = masterText.lineSequence().toList()
-        val seedChanges = masterLines.mapIndexed { idx, line ->
-            borg.trikeshed.pijul.Change.Insert(idx, line + "\n")
+        var seedCharOffset = 0
+        val seedChanges = masterLines.map { line ->
+            val change = borg.trikeshed.pijul.Change.Insert(seedCharOffset, line + "\n")
+            seedCharOffset += line.length + 1
+            change
         }
         if (seedChanges.isNotEmpty()) {
             val seedId = borg.trikeshed.patch.Blake3Hash.hash(
@@ -559,17 +565,44 @@ object FunnelResidualMerge {
             val lines = text.lineSequence().toList()
             val sourceResiduals = residuals[s]
 
+            // Line ordinals → char offsets in the master document: the CRDT
+            // anchors inserts by char position, so a residual line re-enters
+            // exactly at its master locus.
+            val lineCharOffset = run {
+                val offsets = IntArray(masterLines.size + 1)
+                var at = 0
+                for ((i, line) in masterLines.withIndex()) { offsets[i] = at; at += line.length + 1 }
+                offsets[masterLines.size] = at
+                offsets
+            }
             val changes = mutableListOf<borg.trikeshed.pijul.Change>()
             for (i in 0 until sourceResiduals.size) {
                 val atom = sourceResiduals[i]
                 val lineIdx = atom.ordinal.raw
                 val content = if (lineIdx < lines.size) lines[lineIdx] else ""
-                changes.add(borg.trikeshed.pijul.Change.Insert(lineIdx, content + "\n"))
+                val charOffset = lineCharOffset[lineIdx.coerceAtMost(masterLines.size)]
+                changes.add(borg.trikeshed.pijul.Change.Insert(charOffset, content + "\n"))
             }
 
             if (changes.isNotEmpty()) {
+                // Content-derived id: same change set ⇒ same patch (the swarm
+                // dedups), and two runs of the same merge produce identical ids so
+                // the CRDT's (patchId, offset) tiebreak is stable across
+                // permutations. Time-based ids would make the tiebreak
+                // nondeterministic.
                 val patchId = borg.trikeshed.patch.Blake3Hash.hash(
-                    ("pijul-merge-$s-${monotonicNanoTime()}").encodeToByteArray()
+                    changes.fold(ByteArrayOutputStream()) { acc, c ->
+                        when (c) {
+                            is borg.trikeshed.pijul.Change.Insert -> {
+                                acc.write(("i${c.pos}:").encodeToByteArray())
+                                acc.write((c.content + "\u0000").encodeToByteArray())
+                            }
+                            is borg.trikeshed.pijul.Change.Delete -> {
+                                acc.write(("d${c.pos}:${c.length}\n").encodeToByteArray())
+                            }
+                        }
+                        acc
+                    }.toByteArray()
                 )
                 val patch = borg.trikeshed.pijul.Patch(
                     id = patchId,

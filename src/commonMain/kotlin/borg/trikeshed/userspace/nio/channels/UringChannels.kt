@@ -21,16 +21,10 @@ object UringChannels {
      */
     fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel {
         require(entries > 0) { "entries must be positive" }
-        val backend = openUserspaceChannelBackend(entries)
-        val owner = SupervisorJob()
-        val scope = CoroutineScope(owner)
-        return try {
-            UringChannel.open(scope, FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms))
-        } catch (failure: Throwable) {
-            owner.complete()
-            runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
-            throw failure
-        }
+        // Sync-contract callers (enqueue/submit/wait) settle every SQE inside the
+        // call, so the raw facade is the honest shape; the channel is still an
+        // Element whose drain() settles the backend.
+        return UringChannel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
     }
 
     fun open(scope: CoroutineScope, entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList(),

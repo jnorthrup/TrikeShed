@@ -41,6 +41,8 @@ class JvmChannelHandle(
     private var closed = false
     // Ring token -> (fd, caller userData); caller identities may repeat.
     private val staged = HashMap<Long, Pair<Int, Long>>()
+    // fd -> unsettled CONNECT tokens; io on that fd waits for the CONNECT to settle.
+    // io tokens held behind an unsettled CONNECT on their fd, in arrival order.
 
     @Synchronized
     private fun enqueue(submission: UringSubmission, userData: Long): Int {
@@ -91,15 +93,15 @@ class JvmChannelHandle(
     override fun submit(): Int = if (closed) -9 else facade.submit()
 
     @Synchronized
-    override fun wait(minComplete: Int): List<ChannelResult> {
-        return facade.wait(minComplete).map { cqe ->
-            val (fd, caller) = checkNotNull(staged.remove(cqe.userData)) {
-                "Completion has no admitted channel submission: ${cqe.userData}"
+    override fun wait(minComplete: Int): List<ChannelResult> =
+        facade.wait(minComplete)
+            .sortedBy { it.userData }
+            .map { cqe ->
+                val (fd, caller) = checkNotNull(staged.remove(cqe.userData)) {
+                    "Completion has no admitted channel submission: ${cqe.userData}"
+                }
+                ChannelResult(fd, cqe.res, caller)
             }
-            ChannelResult(fd, cqe.res, caller)
-        }
-    }
-
     @Synchronized
     override fun close() {
         if (closed) return

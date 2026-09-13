@@ -6,18 +6,18 @@ import borg.trikeshed.patch.Blake3Hash
 import borg.trikeshed.pijul.*
 
 /**
- * Pijul CRDT — commutative patch graph.
+ * Pijul CRDT — commutative patch graph over stable vertex identities.
  *
- * Patches that touch different regions of the same file commute with no
- * conflict resolution. The graph is a DAG of vertices (content atoms)
- * connected by tree edges (parent → child). Deletion tombstones content
- * without removing the vertex, preserving graph stability.
+ * Every vertex keeps the coordinate space it was authored in: patch positions
+ * resolve against the BASE document (the first applied patch's render), never
+ * against the live rendered offsets. Concurrent patches therefore anchor to
+ * the same base vertices regardless of apply order, and independent inserts
+ * and deletes commute. Deletion tombstones content without removing the
+ * vertex, so a patch aimed "after B" still lands next to B even when B is
+ * already dead.
  *
- * Performance: the alive-vertex order is maintained incrementally. Insert
- * is O(log V) (binary search for attach point + O(1) list insert). Render
- * is O(V) (linear walk of the order). Delete is O(log V + k) where k is
- * the tombstoned range. The previous implementation called a full O(V^2)
- * topological sort on every apply and every render.
+ * Changes inside one patch resolve sequentially — the author saw their own
+ * earlier changes. Inter-patch positions resolve against the base space.
  */
 class PijulCrdt {
     private val dag = DependencyDag()
@@ -34,18 +34,17 @@ class PijulCrdt {
 
     /**
      * The span a vertex occupied when it was authored, never reduced by
-     * tombstoning. Patch coordinates are relative to the document its AUTHOR
-     * saw, so the coordinate space a delete resolves against must not shrink
-     * underneath later patches — otherwise the second of two concurrent deletes
-     * for the same line resolves onto whatever moved into its offsets and eats
-     * the following line.
+     * tombstoning. Base coordinates stay stable because tombstoning never
+     * shrinks a vertex.
      */
     private val vertexSpan = mutableMapOf<VertexId, Int>()
 
-    /**
-     * Linearized order of alive vertices by position. Each entry carries
-     * its cumulative content length so attach-point lookup is binary search.
-     */
+    /** For inserted vertices: the base vertex they anchored to and their patch id —
+     *  the deterministic same-anchor ordering key. */
+    private val insertAnchor = mutableMapOf<VertexId, VertexId>()
+    private val insertPatchId = mutableMapOf<VertexId, Blake3Hash>()
+
+    /** Linearized order of ALL vertices (dead included) in document order. */
     private val aliveOrder = mutableListOf<VertexId>()
     private val cumulativeLen = mutableListOf<Int>()
 
@@ -53,6 +52,15 @@ class PijulCrdt {
     private val indexOf = mutableMapOf<VertexId, Int>()
 
     private var dirty = true
+
+    /**
+     * Base coordinate space: per-vertex start offset as of the end of the
+     * first applied patch (the base document). Patch positions resolve here,
+     * so concurrent patches anchor identically regardless of apply order.
+     */
+    private var baseAnchored = false
+    private val baseOrder = mutableListOf<VertexId>()
+    private val baseStart = mutableMapOf<VertexId, Int>()
 
     init {
         vertexContent[root] = ""
@@ -77,16 +85,34 @@ class PijulCrdt {
                     vertexContent[newVertex] = change.content
                     vertexSpan[newVertex] = change.content.length
 
-                    val attachIdx = findAttachIndex(change.pos)
+                    var attachIdx = findAttachIndex(change.pos)
                     val attachVertex = aliveOrder[attachIdx]
 
                     // Forward edge: attachVertex → newVertex
                     childrenOf.getOrPut(attachVertex) { mutableListOf() }.add(newVertex)
 
-                    // Insert into alive-order right after the attach point.
-                    // This keeps the linearized order consistent for future
-                    // binary searches without a full re-sort.
-                    val insertIdx = attachIdx + 1
+                    // Insert into document order right after the attach vertex.
+                    // Dead vertices remain in the order, so an anchor never
+                    // moves and concurrent patches resolve identically.
+                    //
+                    // Concurrent inserts sharing one anchor order themselves by
+                    // (patch id, authored offset): walking back past same-anchor
+                    // inserts that sort AFTER the newcomer makes the group
+                    // order independent of apply order.
+                    var insertIdx = attachIdx + 1
+                    while (true) {
+                        val next = aliveOrder.getOrNull(insertIdx) ?: break
+                        // Base vertices are boundaries, never same-anchor peers:
+                        // only later concurrent inserts (no base presence) sort
+                        // within the anchor's group.
+                        if (baseStart.containsKey(next)) break
+                        val nextAnchor = insertAnchor[next] ?: break
+                        if (nextAnchor != attachVertex) break
+                        if (compareKey(insertPatchId[next], next.offset) < compareKey(patch.id, newVertex.offset)) insertIdx++ else break
+                    }
+                    insertAnchor[newVertex] = attachVertex
+                    insertPatchId[newVertex] = patch.id
+
                     aliveOrder.add(insertIdx, newVertex)
                     val contentLen = change.content.length
                     cumulativeLen.add(insertIdx, cumulativeLen[attachIdx] + contentLen)
@@ -110,53 +136,122 @@ class PijulCrdt {
                 }
             }
         }
+
+        if (!baseAnchored) anchorBase()
     }
 
     /**
-     * Binary search for the alive-vertex index whose cumulative content
-     * range contains [pos]. O(log V).
+     * Snapshot the base coordinate space after the first (base) patch: every
+     * vertex's start offset in the base document. All later patch positions
+     * resolve against this space, which never shifts — inserts add new
+     * vertices with no base presence, and deletes never remove vertices.
      */
-    private fun findAttachIndex(pos: Int): Int {
+    private fun anchorBase() {
         ensureCumulative()
-        var lo = 0
-        var hi = aliveOrder.lastIndex
-        while (lo < hi) {
-            val mid = (lo + hi + 1) ushr 1
-            if (cumulativeLen[mid] <= pos) lo = mid else hi = mid - 1
+        baseOrder.clear()
+        baseStart.clear()
+        var offset = 0
+        for (v in aliveOrder) {
+            baseOrder.add(v)
+            baseStart[v] = offset
+            offset += vertexSpan[v] ?: 0
         }
-        return lo
+        baseAnchored = true
     }
 
     /**
-     * Binary search for the [start, end] index range of vertices overlapping
-     * [start, start+length). O(log V + k) where k = range size.
+     * Resolve a base-space position to the alive-order index of the last base
+     * vertex whose base span starts at or before [pos]. Anchoring after that
+     * vertex is stable: base spans never move, so two concurrent patches with
+     * the same pos anchor to the same vertex in either apply order.
+     */
+    private fun baseAnchorIndex(pos: Int): Int {
+        // Last vertex (in document order) whose base start is at or before pos.
+        // Later-inserted vertices carry no base presence and never anchor.
+        var best = 0
+        for ((idx, v) in aliveOrder.withIndex()) {
+            val start = baseStart[v] ?: continue
+            if (start <= pos) best = idx
+        }
+        return best
+    }
+
+
+    /** Deterministic ordering key for same-anchor concurrent inserts. */
+    private fun compareKey(id: Blake3Hash?, offset: Int): Key = Key(id?.bytes ?: ByteArray(32), offset)
+
+    private data class Key(val bytes: ByteArray, val offset: Int) : Comparable<Key> {
+        override fun compareTo(other: Key): Int {
+            val n = minOf(bytes.size, other.bytes.size)
+            for (i in 0 until n) {
+                val c = (bytes[i].toInt() and 0xFF).compareTo(other.bytes[i].toInt() and 0xFF)
+                if (c != 0) return c
+            }
+            (bytes.size - other.bytes.size).let { if (it != 0) return it }
+            return offset.compareTo(other.offset)
+        }
+    }
+
+    /** Insertion index for a new vertex whose authored position is [pos]. */
+    private fun findAttachIndex(pos: Int): Int {
+        if (!baseAnchored) {
+            // Base construction (first patch): resolve against current state.
+            ensureCumulative()
+            var lo = 0
+            var hi = aliveOrder.lastIndex
+            while (lo < hi) {
+                val mid = (lo + hi + 1) ushr 1
+                if (cumulativeLen[mid] <= pos) lo = mid else hi = mid - 1
+            }
+            return lo
+        }
+        return baseAnchorIndex(pos)
+    }
+
+    /**
+     * Base-space range [start, start+length) → alive-order index range of the
+     * base vertices it covers. Resolves identically in any apply order.
      */
     private fun findRangeIndices(start: Int, length: Int): Pair<Int, Int> {
-        ensureCumulative()
+        if (!baseAnchored) {
+            ensureCumulative()
+            val end = start + length
+            var lo = 0
+            var hi = aliveOrder.lastIndex
+            while (lo < hi) {
+                val mid = (lo + hi) ushr 1
+                val vEnd = if (mid + 1 < aliveOrder.size) cumulativeLen[mid + 1] else cumulativeLen[mid] + contentLen(mid)
+                if (vEnd <= start) lo = mid + 1 else hi = mid
+            }
+            val startIdx = lo
+            hi = aliveOrder.lastIndex
+            while (lo < hi) {
+                val mid = (lo + hi + 1) ushr 1
+                if (cumulativeLen[mid] < end) lo = mid else hi = mid - 1
+            }
+            return startIdx to lo
+        }
         val end = start + length
-        // Leftmost vertex whose content end > start
-        var lo = 0
-        var hi = aliveOrder.lastIndex
-        while (lo < hi) {
-            val mid = (lo + hi) ushr 1
-            val vEnd = if (mid + 1 < aliveOrder.size) cumulativeLen[mid + 1] else cumulativeLen[mid] + contentLen(mid)
-            if (vEnd <= start) lo = mid + 1 else hi = mid
+        var first = -1
+        var last = -1
+        for ((idx, v) in aliveOrder.withIndex()) {
+            val vStart = baseStart[v] ?: continue
+            val vEnd = vStart + (vertexSpan[v] ?: 0)
+            if (vStart < end && start < vEnd) {
+                if (first == -1) first = idx
+                last = idx
+            }
         }
-        val startIdx = lo
-        // Rightmost vertex whose content start < end
-        hi = aliveOrder.lastIndex
-        while (lo < hi) {
-            val mid = (lo + hi + 1) ushr 1
-            if (cumulativeLen[mid] < end) lo = mid else hi = mid - 1
+        if (first == -1) {
+            // Range matches no base vertex (empty or past-end): anchor at the nearest base vertex.
+            val anchor = baseAnchorIndex(start)
+            return anchor to anchor
         }
-        return startIdx to lo
+        return first to last
     }
 
     /**
      * The COORDINATE length of a vertex — its authored span, not what survives.
-     * Using live content here is what made deletes positional: tombstoning a
-     * vertex collapsed the space its neighbours were addressed by, so a
-     * concurrent patch aimed at the same line landed somewhere else.
      */
     private fun contentLen(idx: Int): Int {
         val v = aliveOrder[idx]
@@ -199,6 +294,10 @@ class PijulCrdt {
      * Render the document from the alive-vertex order. O(V) — linear walk,
      * no topological sort, no edge scanning.
      */
+    /** Test/diagnostic view of the base coordinate space. */
+    fun debugBaseStart(): Map<VertexId, Int> = baseStart.toMap()
+    fun debugBaseAnchored(): Boolean = baseAnchored
+
     fun render(): String {
         ensureCumulative()
         val sb = StringBuilder()

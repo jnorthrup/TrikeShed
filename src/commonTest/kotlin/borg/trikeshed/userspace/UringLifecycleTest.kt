@@ -136,7 +136,10 @@ class UringLifecycleTest {
         }
         val facade = FunctionalUringFacade.create(this, 1, backend)
         facade.batchEnqueue(arrayOf(Submissions.nop(2)).toSeries())
-        assertEquals(failure, assertFailsWith<IllegalStateException> { facade.drain() })
+        // Coroutine stack-trace recovery copies the exception across the suspension
+        // boundary and retains the original as its cause; assert through the copy.
+        val thrown = assertFailsWith<IllegalStateException> { facade.drain() }
+        assertEquals(failure, thrown.cause ?: thrown)
     }
 
     @Test

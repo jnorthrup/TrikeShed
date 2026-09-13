@@ -202,7 +202,6 @@ class FunnelResidualMergePropertyTest {
      * document. (FunnelPijulParallelMergeTest never catches this because it
      * only asserts substring containment, never line order.)
      */
-    @Ignore
     @Test
     fun pijulMergeReproducesMasterWhenNothingDiverges() {
         val masterText = "A\nB\nC\nD\nE"
@@ -227,7 +226,6 @@ class FunnelResidualMergePropertyTest {
      * lines). Unignore after the CRDT anchors patches to stable vertex
      * identities.
      */
-    @Ignore
     @Test
     fun pijulMergeTextInvariantUnderSourcePermutation() {
         val masterText = "A\nB\nC"
