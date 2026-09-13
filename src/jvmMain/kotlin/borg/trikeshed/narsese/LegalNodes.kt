@@ -396,15 +396,21 @@ object LegalNodes {
     internal fun runEyecite(text: String): List<Map<String, Any?>> {
         val python = resolveVenvPython() ?: return emptyList()
         return try {
-            val process = ProcessBuilder(python, "-c", EYECITE_SCRIPT).start()
+            val pb = ProcessBuilder(python, "-c", EYECITE_SCRIPT).redirectErrorStream(true)
+            pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
+            val process = pb.start()
+            val future = java.util.concurrent.CompletableFuture.supplyAsync {
+                process.inputStream.bufferedReader(Charsets.UTF_8).readText()
+            }
             process.outputStream.use { it.write(text.toByteArray(Charsets.UTF_8)) }
             val finished = process.waitFor(20, TimeUnit.SECONDS)
             if (!finished) {
                 process.destroyForcibly()
+                process.waitFor()
                 return emptyList()
             }
             if (process.exitValue() != 0) return emptyList()
-            val output = process.inputStream.bufferedReader(Charsets.UTF_8).readText()
+            val output = future.get(5, TimeUnit.SECONDS)
             parseEyeciteJson(output)
         } catch (e: Exception) {
             emptyList()

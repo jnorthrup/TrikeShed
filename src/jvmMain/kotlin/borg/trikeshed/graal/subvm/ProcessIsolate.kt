@@ -185,6 +185,7 @@ class ProcessIsolate(
         inbox.poll(InProcessIsolate.INTERRUPT_GRACE_MS * 2, TimeUnit.MILLISECONDS)
         // Process-tier interrupt is revocation, not a reusable context reset: the wall must fall.
         process.destroyForcibly()
+        process.waitFor()
         alive = false
         return true
     }
@@ -194,7 +195,10 @@ class ProcessIsolate(
 
     override fun close() {
         runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "close")) }
-        if (!process.waitFor(1, TimeUnit.SECONDS)) process.destroyForcibly()
+        if (!process.waitFor(1, TimeUnit.SECONDS)) {
+            process.destroyForcibly()
+            process.waitFor()
+        }
         alive = false
     }
 

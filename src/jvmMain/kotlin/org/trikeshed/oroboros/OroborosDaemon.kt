@@ -2598,9 +2598,10 @@ object OroborosDaemon {
             val finished = p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
             if (!finished) {
                 p.destroyForcibly()
+                p.waitFor()
                 return@withContext ""
             }
-            outAsync.get()
+            outAsync.get(5, java.util.concurrent.TimeUnit.SECONDS)
         }
 
         val local = command("git", "rev-parse", "HEAD")
