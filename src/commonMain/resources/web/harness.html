@@ -57,7 +57,10 @@
   <summary>Topology <span id="topologyCount"></span></summary>
   <div id="detailControl">
     <label for="detailLevel">Detail</label><output id="detailValue" for="detailLevel">50%</output>
-    <input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="Left: overview. Right: more detail. Camera zoom stays unchanged.">
+    <input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="View cutoff = 100% minus Detail. 100% Detail renders at every zoom.">
+    <span>View</span><output id="viewPercent">100%</output>
+    <span>Cutoff</span><output id="detailCutoff">50%</output>
+    <meter id="viewability" aria-label="Viewability" min="0" max="100" low="50" high="100" optimum="100" value="100"></meter>
   </div>
   <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
   <details class="legend-section"><summary>Blobs and heap</summary>

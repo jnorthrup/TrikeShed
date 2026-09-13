@@ -28,7 +28,7 @@ function fixture() {
     document:{getElementById:element}, $:selector=>element(selector.slice(1)),
     URL, URLSearchParams, AbortController, TextDecoder, TextEncoder, Uint8Array, setTimeout, clearTimeout, performance,
     PatchForces:require(path.join(web,"vendor/d3-force-3.0.0.js")), LandscapeNavigation:navigation,
-    G:{nodes:[],wires:[]},
+    G:{nodes:[],wires:[]}, view:{x:0,y:0,z:.5},
     fetch:async()=>{throw Error("unexpected fetch");},
   });
   vm.runInContext(fs.readFileSync(path.join(web,"patch-layout.js"),"utf8"),context);
@@ -290,6 +290,7 @@ test("invalid and incomplete cameras never become navigation state",()=>{
 
 test("collapsed closures retain the original node and re-expand reversibly",()=>{
   const {context}=fixture();
+  context.view.z=.1;
   let width=300;
   const scope={el:{getBoundingClientRect:()=>({width,height:300})}};
   const child={_parentScope:scope};
@@ -299,29 +300,32 @@ test("collapsed closures retain the original node and re-expand reversibly",()=>
   assert.equal(child._parentScope,scope);
 });
 
-test("detail resolves what can be read, holds through the boundary, and releases what cannot",()=>{
-  const {landscape,harness}=fixture();
+test("detail follows the linear view cutoff regardless of node size",()=>{
+  const {context,landscape,harness,element}=fixture();
   const node={id:"a::one",_program:"a"};
-  harness.selected="a";
-  assert.equal(landscape.detailFor(node,{w:79,h:25},false),false,"distant nodes stay the flat fill");
-  assert.equal(landscape.detailFor(node,{w:200,h:100},false),true,"a readable box resolves into the document");
-  assert.equal(landscape.detailFor(node,{w:84,h:28},false),true,"it holds just under the acquire floor, so the boundary cannot flicker");
-  // Detail used to be granted and never taken back, so a dive that resolved a ring's
-  // interior left those panels in the document all the way out: 200px of chrome and 11px
-  // of type painted into 20px of screen, the smear the whole board wore after one dive.
-  assert.equal(landscape.detailFor(node,{w:20,h:10},false),false,"a 20px smear returns to the fill it replaced");
-  assert.equal(landscape.details.size,0);
-  assert.equal(landscape.detailFor(node,{w:200,h:100},true),false,"an absorbed node never resolves");
+  harness.selected="a";landscape.schedule=()=>{};
+  for(const [zoom,detail,visible] of [[.1,100,true],[.1,92,true],[.0799,92,false],[.08,92,true],[.94,6,true],[.94,5,false]]){
+    context.view.z=zoom;landscape.setDetail(detail,false);
+    for(const box of [{w:.01,h:.01},{w:2000,h:1000}])
+      assert.equal(landscape.detailFor(node,box,false),visible,`view ${zoom*100}%, detail ${detail}%`);
+    assert.equal(element("viewPercent").textContent,`${zoom*100}%`);
+    assert.equal(element("detailCutoff").textContent,`${100-detail}%`);
+    assert.equal(element("viewability").value,zoom*100);
+    assert.equal(element("viewability").title,visible?"Rendered":"Overview");
+  }
+  landscape.setDetail(100,false);
+  assert.equal(landscape.detailFor(node,{w:200,h:100},true),false,"viewport clipping still applies");
 });
 
-test("strategy detail arrives at half scale and yields to sparse overview on zoom-out",()=>{
-  const {landscape,harness}=fixture();harness.selected="a";
+test("default detail follows the 50% view cutoff in both zoom directions",()=>{
+  const {context,landscape,harness}=fixture();harness.selected="a";
   const node={id:"a::one",_program:"a"};
   for(const zoom of [.1,.48,.5,.48,1.7,.5,.48,.1]){
+    context.view.z=zoom;
     const box={w:190*zoom,h:135*zoom};
     const detail=landscape.detailFor(node,box,false);
-    assert.equal(detail,zoom!==.1,"normal nodes need not wait for close-up editing");
-    assert.equal(landscape.labelFor(box,detail,false,true),false,"neither tiny overview nor resolved detail gets a duplicate label");
+    assert.equal(detail,zoom>=.5);
+    if(detail||zoom===.1)assert.equal(landscape.labelFor(box,detail,false,true),false,"neither tiny overview nor resolved detail gets a duplicate label");
   }
   const bridge={w:70,h:32};
   assert.equal(landscape.labelFor(bridge,false,false,true),true,"unresolved mid-distance boxes retain orientation");
@@ -360,7 +364,7 @@ test("Detail preference changes resolution at fixed zoom without editing the gra
   assert.equal(preferences.get("blackboard.detail"),"0","drag updates defer preference writes until change");
   landscape.setDetail(100);
   assert.equal(landscape.detailFor(node,{w:50,h:30},false),true);
-  assert.equal(landscape.detailFor(node,{w:19,h:13.5},false),false,"even maximum detail leaves pixel-sized nodes in overview");
+  assert.equal(landscape.detailFor(node,{w:19,h:13.5},false),true,"maximum detail includes tiny visible nodes");
   assert.equal(element("detailLevel").value,"100");
   assert.equal(element("detailValue").textContent,"100%");
   assert.equal(preferences.get("blackboard.detail"),"100");
@@ -382,12 +386,28 @@ test("label collisions preserve an existing label and stay inside scope clipping
   assert.equal(labels[0].y,0);
 });
 
+test("full detail includes tiny nested nodes from every program without a count limit",()=>{
+  const {context,landscape,harness}=fixture();
+  harness.selected="a";landscape.schedule=()=>{};
+  const scope={el:{getBoundingClientRect:()=>({width:1,height:1})}};
+  const nodes=Array.from({length:450},(_,i)=>({id:"b::"+i,_program:"b",_parentScope:scope}));
+  for(const [detail,zoom] of [[100,.01],[100,.1],[100,4],[92,.08]]){
+    context.view.z=zoom;landscape.setDetail(detail,false);
+    for(const node of nodes){
+      assert.equal(context.visibleClosure(node),node,"detail does not collapse a nested scope");
+      assert.equal(landscape.detailFor(node,{w:.01,h:.01},false),true);
+    }
+    assert.equal(landscape.details.size,nodes.length);
+  }
+});
+
 test("an edit in progress outlives the zoom-out that would release it",()=>{
   const {context,landscape,harness}=fixture();
   const field={};
   const node={id:"a::one",_program:"a",el:{contains:element=>element===field}};
   harness.selected="a";
   assert.equal(landscape.detailFor(node,{w:200,h:100},false),true);
+  context.view.z=.1;
   context.document.activeElement=field;
   assert.equal(landscape.detailFor(node,{w:20,h:10},false),true,"the caret keeps its panel alive however small it is drawn");
   context.document.activeElement=null;

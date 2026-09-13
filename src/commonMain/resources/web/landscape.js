@@ -88,6 +88,7 @@ const LandscapeActivity = {
 
 function visibleClosure(node) {
   const measured=Landscape.drawingGeometry;
+  if(Landscape.detailVisible())return node;
   if(typeof Harness!=="undefined"&&node?._program===Harness.selected&&Landscape.details.has(node.id))return node;
   let result=node,parent=node?._parentScope;
   while(parent){const r=measured?.get(parent)?.rect||parent.el.getBoundingClientRect();if(r.width<420||r.height<240)result=parent;parent=parent._parentScope;}
@@ -158,31 +159,34 @@ const Landscape = {
     this.terrain?.setRows(this.rows,this.objectBox,this.dbs);
   },
   schedule() {if(this.pending)return;this.pending=requestAnimationFrame(()=>{this.pending=0;this.draw();});},
-  // Unselected detail is budgeted; the selected program retains priority.
-  detailBudget: 400,
-  // Resolve structure before close-up editing: a standard 190-unit node crosses
-  // this boundary at z=.48. Hysteresis avoids flicker while backing out.
-  detailAcquire: {w:90,h:30}, detailRelease: {w:80,h:26}, detailLevel:50, detailFactor:1,
+  detailLevel:50,
+  viewPercent() {return Math.round(Math.max(0,Math.min(100,view.z*100))*100)/100;},
+  detailVisible() {return this.viewPercent()>=100-this.detailLevel;},
+  updateDetailIndicator() {
+    const percent=this.viewPercent(),cutoff=100-this.detailLevel;
+    for(const [id,value] of [["viewPercent",percent+"%"],["detailCutoff",cutoff+"%"]]){
+      const el=document.getElementById(id);if(el&&el.textContent!==value)el.textContent=value;
+    }
+    const meter=document.getElementById("viewability");
+    if(meter){meter.value=percent;meter.low=cutoff;meter.title=percent>=cutoff?"Rendered":"Overview";}
+  },
   setDetail(value, persist=true) {
     if(value===null||value===""||!Number.isFinite(Number(value)))return;
     this.detailLevel=Math.max(0,Math.min(100,Math.round(Number(value))));
-    this.detailFactor=2**((this.detailLevel-50)/25);
     const slider=document.getElementById("detailLevel"),output=document.getElementById("detailValue");
-    if(slider){slider.value=String(this.detailLevel);slider.setAttribute("aria-valuetext",this.detailLevel+"% detail; higher reveals more without zooming");}
+    if(slider){slider.value=String(this.detailLevel);slider.setAttribute("aria-valuetext",this.detailLevel+"% detail; view cutoff "+(100-this.detailLevel)+"%");}
     if(output)output.textContent=this.detailLevel+"%";
     if(persist)try{localStorage.setItem("blackboard.detail",String(this.detailLevel));}catch(_){}
-    this.schedule();
+    this.updateDetailIndicator();this.schedule();
   },
   detailFor(node, box, absorbed) {
     if(this.detailOwner!==Harness.selected){this.detailOwner=Harness.selected;this.details.clear();}
     const held=this.details.has(node.id);
-    const floor=held?this.detailRelease:this.detailAcquire;
-    const resolved=!absorbed&&box.w>=Math.max(held?32:40,floor.w/this.detailFactor)&&
-      box.h>=Math.max(held?17:20,floor.h/this.detailFactor);
+    const resolved=!absorbed&&this.detailVisible();
     // Other programs may resolve too; selection governs mutation, not visibility.
     // A live edit keeps its original element when zooming back into the overview.
     const editing=held&&node.el&&typeof document.activeElement!=="undefined"&&document.activeElement&&node.el.contains?.(document.activeElement);
-    if((resolved||editing)&&(held||node._program===this.detailOwner||this.details.size<this.detailBudget))this.details.add(node.id);
+    if(resolved||editing)this.details.add(node.id);
     else this.details.delete(node.id);
     return this.details.has(node.id);
   },
@@ -250,6 +254,7 @@ const Landscape = {
   },
   draw() {
     if(typeof Harness==="undefined"||!Harness.ready)return;
+    this.updateDetailIndicator();
     const width=viewport.clientWidth,height=viewport.clientHeight,dpr=devicePixelRatio||1;
     if(this.canvas.width!==Math.round(width*dpr)||this.canvas.height!==Math.round(height*dpr)){
       this.canvas.width=Math.round(width*dpr);this.canvas.height=Math.round(height*dpr);
