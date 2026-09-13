@@ -36,7 +36,7 @@ object NarsDurableLedger {
         for (c in s) when (c) {
             '"' -> append("\\\""); '\\' -> append("\\\\"); '\n' -> append("\\n"); '\r' -> append("\\r")
             '\t' -> append("\\t")
-            else -> if (c < ' ') append("\\u%04x".format(c.code)) else append(c)
+            else -> if (c < ' ') append("\\u" + c.code.toString(16).padStart(4, '0')) else append(c)
         }
     }
 

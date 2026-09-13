@@ -6,6 +6,7 @@ import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.withContext
 
 /**
@@ -118,7 +119,7 @@ object WikiNodes {
         wikiRoot: () -> File,
         traces: WikiTraceLoader,
         casPut: (ByteArray) -> String = { ContentId.of(it).value },
-        clock: () -> Long = { System.currentTimeMillis() },
+        clock: () -> Long = { borg.trikeshed.platform.HostSystem.currentTimeMillis() },
     ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val home = WikiHome(wikiRoot())
         withContext(Dispatchers.IO) { home.ensure() }
@@ -356,7 +357,7 @@ object WikiNodes {
         wikiRoot: () -> File,
         traces: WikiTraceLoader,
         casPut: (ByteArray) -> String = { ContentId.of(it).value },
-        clock: () -> Long = { System.currentTimeMillis() },
+        clock: () -> Long = { borg.trikeshed.platform.HostSystem.currentTimeMillis() },
     ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val home = WikiHome(wikiRoot())
         withContext(Dispatchers.IO) { home.ensure() }

@@ -4,10 +4,12 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -54,7 +56,7 @@ class ProgramLedger(
     private val cas: CasStore,
     private val ledger: File?,
     private val publisher: LcncPublisher?,
-    private val clock: () -> Long = { System.currentTimeMillis() },
+    private val clock: () -> Long = { HostSystem.currentTimeMillis() },
 ) {
 
     data class LedgerLine(val name: String, val cid: String, val previousCid: String?, val atMs: Long, val actor: String) {
@@ -121,7 +123,7 @@ class ProgramLedger(
             // a cancelled boot must stop replaying the ledger, not log its way through it.
             val head = runCatching { restoreHead(name, line) }.getOrElse { why ->
                 if (why is CancellationException) throw why
-                System.err.println("[OROBOROS] programs: '$name' head ${line.cid.take(19)} could not be restored (${why.message}); it is not restored")
+                HostSystem.errLine("[OROBOROS] programs: '$name' head ${line.cid.take(19)} could not be restored (${why.message}); it is not restored")
                 false
             }
             if (head) restored++
@@ -138,7 +140,7 @@ class ProgramLedger(
         if (restored > 0) {
             runCatching { publisher?.publishAll() }.onFailure { why ->
                 if (why is CancellationException) throw why
-                System.err.println("[OROBOROS] programs: $restored head(s) re-filed, but the republish after the thaw failed (${why.message})")
+                HostSystem.errLine("[OROBOROS] programs: $restored head(s) re-filed, but the republish after the thaw failed (${why.message})")
             }
         }
         return restored
@@ -151,7 +153,7 @@ class ProgramLedger(
     private suspend fun restoreHead(name: String, line: LedgerLine): Boolean {
         val short = line.cid.take(19)
         if (publisher?.isPreset(name) == true) {
-            System.err.println("[OROBOROS] programs: '$name' is a preset now; its ledger head $short is not restored")
+            HostSystem.errLine("[OROBOROS] programs: '$name' is a preset now; its ledger head $short is not restored")
             return false
         }
         val id = runCatching { ContentId(line.cid) }.getOrNull() ?: return false
@@ -167,14 +169,14 @@ class ProgramLedger(
         val bytes = read.getOrNull()
         if (bytes == null) {
             val why = read.exceptionOrNull()?.let { "unreadable in the CAS (${it.message})" } ?: "not in the CAS"
-            System.err.println("[OROBOROS] programs: '$name' head $short is in the ledger but $why; it is not restored")
+            HostSystem.errLine("[OROBOROS] programs: '$name' head $short is in the ledger but $why; it is not restored")
             return false
         }
         // Parsed for the refusal, not for the bytes: a blob that no longer reads
         // as a program must not be re-filed as one. The bytes filed are the CAS
         // bytes themselves, so the restored cid is the published cid by identity.
         if (runCatching { LcncProgramConfix.fromJson(name, bytes.decodeToString()) }.getOrNull() == null) {
-            System.err.println("[OROBOROS] programs: '$name' head $short does not read as a program; it is not restored")
+            HostSystem.errLine("[OROBOROS] programs: '$name' head $short does not read as a program; it is not restored")
             return false
         }
         // The re-file is a couch write over a CAS put: a store that refuses either
@@ -183,7 +185,7 @@ class ProgramLedger(
         // CAS just verified against `id` — so what is caught is the write itself.)
         val filed = withContext(Dispatchers.IO) { runCatching { refile(name, line, id, bytes) } }
         filed.exceptionOrNull()?.let { why ->
-            System.err.println("[OROBOROS] programs: '$name' head $short could not be re-filed (${why.message}); it is not restored")
+            HostSystem.errLine("[OROBOROS] programs: '$name' head $short could not be re-filed (${why.message}); it is not restored")
             return false
         }
         lock.withLock { heads[name] = line }
@@ -225,7 +227,7 @@ class ProgramLedger(
         val lines = withContext(Dispatchers.IO) {
             runCatching { if (file.isFile()) file.readLines().filter { it.isNotBlank() } else emptyList() }
                 .getOrElse { why ->
-                    System.err.println("[OROBOROS] programs: the ledger at ${file.path} could not be read (${why.message}); no head is restored")
+                    HostSystem.errLine("[OROBOROS] programs: the ledger at ${file.path} could not be read (${why.message}); no head is restored")
                     emptyList()
                 }
         }
