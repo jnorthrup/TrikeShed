@@ -53,8 +53,8 @@ object InstantShim {
         val hh = sod / 3600
         val mm = (sod % 3600) / 60
         val ss = sod % 60
-        val p = { v: Int, w: Int -> v.toString().padStart(w, '0') }
-        return "${p(year, 4)}-${p(m, 2)}-${p(d, 2)}T${p(hh, 2)}:${p(mm, 2)}:${p(ss, 2)}.${p(ms, 3)}Z"
+        fun Long.toPad(w: Int): String = toString().padStart(w, '0')
+        return "${year.toPad(4)}-${m.toPad(2)}-${d.toPad(2)}T${hh.toPad(2)}:${mm.toPad(2)}:${ss.toPad(2)}.${ms.toPad(3)}Z"
     }
 }
 

@@ -34,6 +34,12 @@ import kotlinx.coroutines.runBlocking
  * blackboard put, so the board stays the authority and the facts are its
  * projection; a publisher without a network publishes exactly as before.
  */
+/** Class-origin provenance, portable: the runner's defining class chain, same spelling the JVM
+ *  javaClass.name produced (e.g. ...lcnc.CanvasJsPureNodes...), so LcncWrappers' CANVAS_JS
+ *  classification by binder substring is unchanged. Common lambdas report the maker class. */
+internal fun runnerProvenance(runner: LcncNodeRunner): String =
+    runner.toString()
+
 class LcncPublisher(
     private val blackboard: ConfixBlackboard,
     /** Read late: the registry keeps growing after boot as modules attach. */
@@ -108,7 +114,8 @@ class LcncPublisher(
         val compiled = LcncContracts.all().map { it.type }.toSet()
         val composites = vocabulary.filterKeys { it !in compiled }
         // ONE reflective act per runner: its class name is the provenance.
-        val bindings = LcncWrappers.bindings(vocabulary.values, runners(), { runner -> runners().entries.firstOrNull { it.value === runner }?.key ?: runner.toString() }, composites)
+        val registryNow = runners()
+        val bindings = LcncWrappers.bindings(vocabulary.values, registryNow, ::runnerProvenance, composites)
         val facts = LcncFacts.of(vocabulary.values, corpus, into = kifBank ?: borg.trikeshed.kif.KifKnowledgeBase()).learn(bindings)
         return LateBound(corpus, vocabulary, bindings, facts)
     }

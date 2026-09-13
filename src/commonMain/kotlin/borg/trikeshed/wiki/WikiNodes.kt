@@ -738,7 +738,7 @@ object WikiNodes {
     }
 
     private fun isoish(ms: Long): String =
-        java.time.Instant.ofEpochMilli(ms).toString()
+        borg.trikeshed.platform.InstantShim.ofEpochMilli(ms)
 
     /** The LAST balanced `{…}` object in [text] that parses as a JSON map. */
     internal fun lastBalancedObject(text: String): Map<String, Any?>? {
