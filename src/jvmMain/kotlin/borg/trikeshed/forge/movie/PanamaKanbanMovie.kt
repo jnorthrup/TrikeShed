@@ -241,6 +241,7 @@ object PanamaKanbanMovie {
         val finished = process.waitFor(10, java.util.concurrent.TimeUnit.MINUTES)
         if (!finished) {
             process.destroyForcibly()
+            process.waitFor()
             throw RuntimeException("ffmpeg encoding timed out")
         }
         val output = runCatching { future.get(1, java.util.concurrent.TimeUnit.MINUTES) }.getOrDefault("")
