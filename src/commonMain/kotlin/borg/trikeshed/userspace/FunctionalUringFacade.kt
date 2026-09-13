@@ -101,6 +101,13 @@ public class FunctionalUringFacade(
     private var closing = false
     private var closeFailure: Throwable? = null
     private var consumerCloseFailure: Throwable? = null
+
+    /**
+     * True when [consumerCloseFailure] was the backend close itself failing (retryable), false when
+     * the consumer failed earlier — stopAdmission, cancelPending, queue teardown — and no successful
+     * close may swallow it.
+     */
+    private var consumerCloseFailureWasBackendClose: Boolean = false
     private val admission = Mutex()
     private val execution = Mutex()
     // The bound counts SQEs across batches, submitted effects and unreaped CQEs.
@@ -150,7 +157,10 @@ public class FunctionalUringFacade(
                         execution.withLock { closeBackend() }
                         termination.complete(Unit)
                     } catch (failure: Throwable) {
-                        if (failure === closeFailure) consumerCloseFailure = failure
+                        consumerCloseFailure = failure
+                        // Classify before any cleanup mutates closeFailure: identity holds here because
+                        // closeBackend stored this exact instance in its own catch moments ago.
+                        consumerCloseFailureWasBackendClose = failure === closeFailure
                         termination.completeExceptionally(failure)
                     } finally {
                         cancellation.cancel()
@@ -473,7 +483,9 @@ public class FunctionalUringFacade(
                     if (cleanup !== failure) failure.addSuppressed(cleanup)
                     throw failure
                 }
-                if (failure !== consumerCloseFailure) throw failure
+                // A repaired backend-close failure no longer describes state; every other
+                // consumer failure (admission, cancelPending, teardown) must still surface.
+                if (!consumerCloseFailureWasBackendClose || closeFailure != null) throw failure
             }
         } else {
             drained.await()

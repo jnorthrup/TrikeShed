@@ -16,7 +16,6 @@ class BlockBinaryAvailabilityTest {
     // Platform binary availability checks
     // ========================================================================
 
-    @Ignore
     @Test
     fun `zstd CLI is available on this system`() {
         val version = runCmd("zstd", "--version")
@@ -27,7 +26,6 @@ class BlockBinaryAvailabilityTest {
         )
     }
 
-    @Ignore
     @Test
     fun `lz4 CLI is available on this system`() {
         val version = runCmd("lz4", "--version")
