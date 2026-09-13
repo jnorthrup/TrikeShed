@@ -563,7 +563,7 @@ function cardEl(it, tree, lane) {
   el.innerHTML = `<div class="t">${escapeHtml(it.title || it.id)}</div>
     ${tags}${deps}${chip}${tally}
     <div class="meta">${owner}${heat}<span>r${it.revision}</span></div>
-    <button class="archive" title="Archive this card">×</button>`;
+    <button class="archive" title="Archive this card" aria-label="Archive this card">×</button>`;
   el.querySelector(".archive").addEventListener("click", () => archiveCard(it));
   // A live flash survives the rebuild: resume the animation at phase.
   const fl = flashes.get(it.id);
