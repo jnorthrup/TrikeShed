@@ -7,7 +7,6 @@ import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.isam.meta.IsamMetaFileReader
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.SelectionResult
@@ -20,10 +19,8 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.UringIOException
 import borg.trikeshed.userspace.nio.channels.FileChannel
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.OpenOption
-import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.Test
@@ -103,7 +100,7 @@ class JvmIsamOperationsTest {
                     dataBackends += backend
                     configure(backend, dataBackends.lastIndex)
                 }
-                UringChannel(FunctionalUringFacade(32, backend))
+                FunctionalUringFacade(32, backend)
             } catch (failure: Throwable) {
                 backend.close()
                 throw failure
@@ -243,7 +240,7 @@ class JvmIsamOperationsTest {
 
         val backend = Backend().apply { failure = UringOp.OPENAT }
         val metadata = IsamFileOperations { path, options ->
-            FileChannel.open(path, options) { UringChannel(FunctionalUringFacade(32, backend)) }
+            FileChannel.open(path, options) { FunctionalUringFacade(32, backend) }
         }
         val rejected = assertFailsWith<UringIOException> { metadata.exists(missing) }
         assertEquals(UringOp.OPENAT, rejected.operation)

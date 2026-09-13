@@ -8,10 +8,8 @@ import borg.trikeshed.lib.*
 // CCEK is the algebra that binds Families 1-3 to execution scope.
 
 /**
- * ElementState — forward-only lifecycle FSM as BitMasked ordinal.
- *
- * CREATED → OPEN → ACTIVE → DRAINING → CLOSED
- * BitMasked enables O(1) state comparison via isAtLeast/isLessThan.
+ * Ordered lifecycle labels used by element admission and cleanup checks.
+ * Each owner implements its transitions and synchronization.
  */
 enum class ElementState(override val mask: UInt) : BitMasked<UInt> {
     CREATED(1u shl 0),
@@ -28,25 +26,6 @@ sealed class LifeK<out R> : OpK<R>() {
     data object State  : LifeK<ElementState>()
     data object FanOut : LifeK<Series<Any?>>()
 }
-
-// ── Lifecycle FSM as MetaSeries ─────────────────────────────────
-
-/** Transition rules ARE a MetaSeries: ElementState → Set<ElementState> */
-typealias LifecycleFSM = MetaSeries<Int, Set<ElementState>>
-
-val LIFECYCLE_TRANSITIONS: LifecycleFSM = ElementState.entries.size j { i ->
-    when (ElementState.entries[i]) {
-        ElementState.CREATED  -> setOf(ElementState.OPEN)
-        ElementState.OPEN     -> setOf(ElementState.ACTIVE)
-        ElementState.ACTIVE   -> setOf(ElementState.DRAINING)
-        ElementState.DRAINING -> setOf(ElementState.CLOSED)
-        ElementState.CLOSED   -> emptySet()
-    }
-}
-
-/** Validate a state transition against the lifecycle FSM. */
-fun ElementState.canTransitionTo(next: ElementState): Boolean =
-    next in LIFECYCLE_TRANSITIONS[this.ordinal]
 
 // ── Interest BitMask ────────────────────────────────────────────
 

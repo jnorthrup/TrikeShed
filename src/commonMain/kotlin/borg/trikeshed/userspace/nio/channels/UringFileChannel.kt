@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.file.File
@@ -10,7 +11,7 @@ import borg.trikeshed.userspace.nio.ByteOrder
 
 internal class UringFileChannel(
     private val file: File,
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
     private val readable: Boolean = true,
     private val writable: Boolean = true,
 ) : FileChannel() {

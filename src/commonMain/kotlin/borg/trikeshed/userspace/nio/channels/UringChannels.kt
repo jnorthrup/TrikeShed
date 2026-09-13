@@ -8,55 +8,34 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.containment.ContainmentPolicy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
 
 /**
  * Channel factory — backed by expect/actual [ChannelsImpl].
  */
 object UringChannels {
-    /**
-     * Scopeless channel: the channel itself is the Element and owns the
-     * supervisor its facade runs under, so drain() settles in-flight work.
-     */
-    fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel {
+    /** Synchronous ring; the caller owns its lifetime. */
+    fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): FunctionalUringFacade {
         require(entries > 0) { "entries must be positive" }
-        // The scopeless channel owns its supervisor: a self-parented SupervisorJob
-        // drives the supervised facade consumer (create), and the channel Element
-        // carries that Job so drain() settles the owned dispatch — no detached
-        // admission escapes the owning scope.
-        val supervisor = SupervisorJob()
-        val scope = CoroutineScope(supervisor)
-        val raw = openUserspaceChannelBackend(entries)
-        val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
-            borg.trikeshed.userspace.UringTraceBackend(raw, it)
-        } ?: raw
+        val backend = openUserspaceChannelBackend(entries)
         try {
-            val facade = FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms)
-            return UringChannel(facade, supervisor)
+            return FunctionalUringFacade(entries, backend, ebpfPrograms = ebpfPrograms)
         } catch (failure: Throwable) {
-            supervisor.cancel()
             runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure
         }
     }
 
     fun open(scope: CoroutineScope, entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList(),
-             containmentPolicy: ContainmentPolicy = ContainmentPolicy.MAXIMUM): UringChannel {
+             containmentPolicy: ContainmentPolicy = ContainmentPolicy.MAXIMUM): FunctionalUringFacade {
         require(entries > 0) { "entries must be positive" }
         requireNotNull(scope.coroutineContext[Job]) { "Uring requires an owning Job" }.ensureActive()
         val raw = openUserspaceChannelBackend(entries)
         val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
             borg.trikeshed.userspace.UringTraceBackend(raw, it)
         } ?: raw
-        val ownerJob = requireNotNull(scope.coroutineContext[Job]) { "Uring requires an owning Job" }
         try {
-            // One owner: the channel Element hangs off the caller's Job — the same
-            // supervisor the facade's consumer answers to — not a sibling root.
-            return UringChannel(
-                FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy),
-                ownerJob,
-            )
+            return FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy)
         } catch (failure: Throwable) {
             runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure

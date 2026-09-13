@@ -158,25 +158,18 @@ These aliases support the project's lightweight JSON indexer/reifier/path select
 
 The userspace side is modeled as explicit async context elements and fanout, not hidden ambient magic.
 
-Ground truths from the code/tests:
+Implementation obligations, not a claim that every element currently meets them:
 - async context keys are singleton identity objects
-- current keys include `NioUserspaceKey`, `LiburingKey`, `FanoutDispatcherKey`
-- element lifecycle is forward-only:
-  - `CREATED`
-  - `OPEN`
-  - `ACTIVE`
-  - `DRAINING`
-  - `CLOSED`
-- elements expose:
-  - `key`
-  - `lifecycleState`
-  - `fanoutSubscribers`
-  - `open()` / `drain()` / `close()`
+- current owners include `FunctionalUringFacade.Key` and `NioSupervisor.Key`
+- lifecycle means admission, ownership of outstanding effects, and awaited cleanup
+- use Kotlin Job, Channel, and Deferred completion where they express that lifecycle
+- retain an enum only where its values govern actual domain behavior
+- typed context lookup does not require a shared lifecycle superclass
 - userspace fanout is structured concurrency via `coroutineScope { launch { ... } }` over listeners
 
 Read this as:
 - key = routing identity
-- lifecycle = explicit state machine
+- lifecycle = enforced admission and completion obligations
 - fanout = structured delivery, not callback soup
 - userspace = composition and coordination layer around effects
 
@@ -373,6 +366,5 @@ completion. This file is the implementation contract.
 ## Test standing 
 - Tests older than 30 days have no standing — they expire as development guidance. 
 - Concurrent branch development demands TDD Red/Green, and reading intent before reverting code based on test results.  working on main is reference in all other cases.
-
 
 

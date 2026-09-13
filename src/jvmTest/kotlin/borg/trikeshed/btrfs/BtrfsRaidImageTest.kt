@@ -1,18 +1,16 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.FunctionalUringFacade
-import borg.trikeshed.userspace.UringCompletion
+import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.UserspaceChannelBackend
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.Volume
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.CompletableDeferred
@@ -35,30 +33,49 @@ import kotlin.test.assertTrue
 
 class BtrfsRaidImageTest {
     private class Backend(private val delegate: UserspaceChannelBackend, var rejectWrites: Boolean) : UserspaceChannelBackend by delegate {
+        override val deferredCapabilities get() = delegate.deferredCapabilities or UringOp.WRITE.mask
         var closes = 0
         var descriptorCloses = 0
         val opened = mutableListOf<Int>()
         var dataOffset: Long? = null
         var entered: CompletableDeferred<Unit>? = null
         var release: CompletableDeferred<Unit>? = null
+        val pending = mutableListOf<UringSubmission>()
+        val opening = mutableSetOf<Long>()
 
-        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-            for (index in 0 until submissions.size) if (submissions[index].opcode == UringOp.CLOSE) descriptorCloses++
-            if (rejectWrites && submissions.size == 1 && submissions[0].opcode == UringOp.WRITE) {
-                return arrayOf(UringCompletion(submissions[0].userData, -5, 0)).toSeries()
-            }
-            if (dataOffset != null && submissions.size == 1 && submissions[0].opcode == UringOp.WRITE &&
-                submissions[0].offset >= dataOffset!!) {
-                entered?.complete(Unit)
-                release?.await()
-            }
-            val result = delegate.batchEnqueue(submissions)
-            for (index in 0 until submissions.size) if (submissions[index].opcode == UringOp.OPENAT) {
-                for (completion in 0 until result.size) if (result[completion].userData == submissions[index].userData && result[completion].res >= 0) {
-                    opened += result[completion].res
+        override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+            val admitted = mutableListOf<UringSubmission>()
+            val rejected = mutableListOf<SelectionResult>()
+            for (submission in submissions) {
+                if (submission.opcode == UringOp.CLOSE) descriptorCloses++
+                if (submission.opcode == UringOp.OPENAT) opening += submission.userData
+                when {
+                    rejectWrites && submission.opcode == UringOp.WRITE ->
+                        rejected += SelectionResult(-5, submission.userData)
+                    submission.opcode == UringOp.WRITE && dataOffset?.let { submission.offset >= it } == true &&
+                        release?.isCompleted == false -> {
+                        pending += submission
+                        entered?.complete(Unit)
+                    }
+                    else -> admitted += submission
                 }
             }
-            return result
+            return observe(rejected + if (admitted.isEmpty()) emptyList() else delegate.submitBatch(admitted))
+        }
+
+        override fun reapCompletions(minComplete: Int): List<SelectionResult> {
+            val result = mutableListOf<SelectionResult>()
+            if (release?.isCompleted == true && pending.isNotEmpty()) {
+                val admitted = pending.toList()
+                pending.clear()
+                result += delegate.submitBatch(admitted)
+            }
+            result += delegate.reapCompletions(0)
+            return observe(result)
+        }
+
+        private fun observe(completions: List<SelectionResult>): List<SelectionResult> = completions.also {
+            for (completion in it) if (opening.remove(completion.userData) && completion.res >= 0) opened += completion.res
         }
 
         override fun close() { closes++; delegate.close() }
@@ -66,7 +83,7 @@ class BtrfsRaidImageTest {
 
     private class Images(val directory: Path) {
         val files = mutableListOf<BtrfsUringFileVolume>()
-        val channels = mutableListOf<UringChannel>()
+        val channels = mutableListOf<FunctionalUringFacade>()
 
         suspend fun member(scope: CoroutineScope, name: String, blocks: Long = 8, create: Boolean = true): BtrfsUringFileVolume {
             val channel = UringChannels.open(scope, entries = 8)
@@ -300,7 +317,7 @@ class BtrfsRaidImageTest {
                 channelFactory = { scope, entries ->
                     val backend = Backend(openUserspaceChannelBackend(entries), rejectWrites = backends.size == 2)
                     backends += backend
-                    UringChannel(FunctionalUringFacade.create(scope, entries, backend))
+                    FunctionalUringFacade.create(scope, entries, backend)
                 })
             try {
                 volume.write(0, ByteBuffer.wrap(payload(4)))
@@ -355,7 +372,7 @@ class BtrfsRaidImageTest {
                 channelFactory = { childScope, entries ->
                     val backend = Backend(openUserspaceChannelBackend(entries), rejectWrites = false)
                     backends += backend
-                    UringChannel(FunctionalUringFacade.create(childScope, entries, backend))
+                    FunctionalUringFacade.create(childScope, entries, backend)
                 })
             try {
                 volume.write(0, ByteBuffer.wrap(expected))
@@ -433,7 +450,7 @@ class BtrfsRaidImageTest {
                 channelFactory = { scope, entries ->
                     val backend = Backend(openUserspaceChannelBackend(entries), rejectWrites = false)
                     backends += backend
-                    UringChannel(FunctionalUringFacade.create(scope, entries, backend))
+                    FunctionalUringFacade.create(scope, entries, backend)
                 })
             try {
                 volume.write(0, ByteBuffer.wrap(expected))

@@ -15,6 +15,12 @@ import zlinux_uring.io_uring_peek_cqe
 import zlinux_uring.io_uring_prep_accept
 import zlinux_uring.io_uring_prep_close
 import zlinux_uring.io_uring_prep_connect
+import zlinux_uring.io_uring_prep_socket
+import zlinux_uring.io_uring_prep_bind
+import zlinux_uring.io_uring_prep_listen
+import zlinux_uring.io_uring_prep_poll_add
+import zlinux_uring.io_uring_prep_poll_remove
+import zlinux_uring.io_uring_prep_shutdown
 import zlinux_uring.io_uring_prep_fsync
 import zlinux_uring.io_uring_prep_ftruncate
 import zlinux_uring.k_io_uring_prep_sendmsg
@@ -91,18 +97,11 @@ internal class LinuxLiburingFacade : LiburingFacade {
         return Result.failure(IllegalStateException("io_uring NOP execution probe failed: ${terminal?.res ?: detail?.message}"))
     }
 
-    /** Without SQPOLL, a sole unconsumed SQE has never lent its buffers to the kernel. */
-    fun abandonUnsubmitted(userData: Long): Boolean {
-        val currentRing = ring ?: return false
-        if (currentRing.pointed.flags and zlinux_uring.IORING_SETUP_SQPOLL.toUInt() != 0u ||
-            inFlight != 1 || requests[userData] != 1 || zlinux_uring.io_uring_sq_ready(currentRing) != 1u) return false
-        exitRing()
-        return true
-    }
+    val submissionSpace: Int get() = ring?.let { zlinux_uring.io_uring_sq_space_left(it).toInt() } ?: 0
+    val pendingSubmissions: Int get() = ring?.let { zlinux_uring.io_uring_sq_ready(it).toInt() } ?: 0
 
-    fun submitted(userData: Long): Boolean = ring?.let {
-        userData in requests && zlinux_uring.io_uring_sq_ready(it) == 0u
-    } == true
+    fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
+        prepare(userData) { sqe -> zlinux_uring.io_uring_prep_cancel64(sqe, targetUserData.toULong(), 0) }
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
@@ -141,7 +140,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
 
     override fun prepListen(fd: Int, backlog: Int, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
-            io_uring_prep_listen(sqe, fd, backlog.toUInt())
+            io_uring_prep_listen(sqe, fd, backlog)
         }
 
     override fun prepPollAdd(fd: Int, pollMask: Int, userData: Long): Result<Unit> =
@@ -151,7 +150,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
 
     override fun prepPollRemove(targetUserData: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe ->
-            io_uring_prep_poll_remove(sqe, targetUserData)
+            io_uring_prep_poll_remove(sqe, targetUserData.toULong())
         }
 
     override fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> =
@@ -186,7 +185,8 @@ internal class LinuxLiburingFacade : LiburingFacade {
 
     override fun submit(): Result<Int> {
         val currentRing = ring ?: return failure("liburing ring is not open")
-        val rc = io_uring_submit(currentRing)
+        var rc: Int
+        do { rc = io_uring_submit(currentRing) } while (rc == -platform.posix.EINTR)
         return if (rc < 0) failure("io_uring_submit failed", rc) else Result.success(rc)
     }
 
@@ -210,7 +210,8 @@ internal class LinuxLiburingFacade : LiburingFacade {
         val currentRing = ring ?: return failure("liburing ring is not open")
         memScoped {
             val cqe = alloc<CPointerVar<io_uring_cqe>>()
-            val rc = io_uring_peek_cqe(currentRing, cqe.ptr)
+            var rc: Int
+            do { rc = io_uring_peek_cqe(currentRing, cqe.ptr) } while (rc == -platform.posix.EINTR)
             if (rc == -platform.posix.EAGAIN) return Result.success(null)
             if (rc < 0) return failure("io_uring_peek_cqe failed", rc)
             val ready = cqe.value ?: return Result.success(null)
@@ -237,9 +238,12 @@ internal class LinuxLiburingFacade : LiburingFacade {
     }
 
     override fun drain(): Result<Unit> {
-        val currentRing = ring ?: return Result.success(Unit)
-        val rc = io_uring_submit(currentRing)
-        if (rc < 0) return failure("io_uring_submit (drain) failed", rc)
+        if (ring == null) return Result.success(Unit)
+        while (pendingSubmissions > 0) {
+            val submitted = submit()
+            if (submitted.isFailure) return Result.failure(submitted.exceptionOrNull()!!)
+            if (submitted.getOrThrow() == 0) return failure("io_uring_submit (drain) made no progress")
+        }
         while (inFlight > 0) {
             val completion = waitCqe()
             if (completion.isFailure) return Result.failure(completion.exceptionOrNull()!!)

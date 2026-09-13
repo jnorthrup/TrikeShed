@@ -6,6 +6,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.UringCompletion
 import borg.trikeshed.userspace.UringOp
@@ -13,7 +14,6 @@ import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.Volume
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.nio.file.File
@@ -65,7 +65,7 @@ class BtrfsUringFileVolume private constructor(
     val imagePath: String,
     override val blockSize: Int,
     override val capacity: Long,
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
     private val file: File?,
     private var fd: Int,
     val backendReport: NioCapabilityReport,
@@ -77,7 +77,7 @@ class BtrfsUringFileVolume private constructor(
         blockSize: Int,
         capacity: Long,
         backendReport: NioCapabilityReport,
-        resources: Join<File, UringChannel>,
+        resources: Join<File, FunctionalUringFacade>,
     ) : this(imagePath, blockSize, capacity, resources.b, resources.a, -1, backendReport, null)
 
     constructor(
@@ -106,7 +106,7 @@ class BtrfsUringFileVolume private constructor(
          * existing image. readOnly requires create=false and resize=false.
          */
         suspend fun open(
-            channel: UringChannel,
+            channel: FunctionalUringFacade,
             imagePath: String,
             blockSize: Int = DEFAULT_BLOCK_SIZE,
             capacity: Long,
@@ -195,7 +195,7 @@ class BtrfsUringFileVolume private constructor(
             capacity: Long,
             entries: Int,
             ebpfPrograms: List<UringEbpfProgram>,
-        ): Join<File, UringChannel> {
+        ): Join<File, FunctionalUringFacade> {
             require(entries > 0) { "entries must be positive" }
             val file = openPreSizedFile(imagePath, blockSize, capacity)
             try {

@@ -1,7 +1,7 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 
@@ -89,7 +89,7 @@ object BtrfsImageIo {
     }
 
     suspend fun writeSeedImage(
-        channel: UringChannel,
+        channel: FunctionalUringFacade,
         imagePath: String,
         totalBytes: ULong,
         backend: NioCapabilityReport,

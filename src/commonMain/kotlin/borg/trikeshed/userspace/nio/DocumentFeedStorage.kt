@@ -4,8 +4,8 @@ import borg.trikeshed.btrfs.BtrfsUringChannelReport
 import borg.trikeshed.btrfs.BtrfsUringFileVolume
 import borg.trikeshed.narsese.DocumentAppendLog
 import borg.trikeshed.narsese.DocumentCasStore
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.channels.FileChannel
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
@@ -29,7 +29,7 @@ class DocumentFeedStorage private constructor(
     val volume: BtrfsUringFileVolume,
     val cas: DocumentCasStore,
     val log: DocumentAppendLog,
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
     private val job: CompletableJob,
 ) {
     companion object {
@@ -64,7 +64,7 @@ class DocumentFeedStorage private constructor(
 
             val job = SupervisorJob(scope.coroutineContext[Job])
             val owner = CoroutineScope(scope.coroutineContext + job)
-            var channel: UringChannel? = null
+            var channel: FunctionalUringFacade? = null
             var volume: BtrfsUringFileVolume? = null
             var cas: DocumentCasStore? = null
             var log: DocumentAppendLog? = null

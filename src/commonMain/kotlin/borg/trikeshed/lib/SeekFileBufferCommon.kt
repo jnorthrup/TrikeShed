@@ -2,7 +2,7 @@ package borg.trikeshed.lib
 
 import borg.trikeshed.lib.long.LongSeries
 import borg.trikeshed.userspace.ByteRegion
-import borg.trikeshed.userspace.nio.channels.UringChannel
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.Files
@@ -25,7 +25,7 @@ class SeekFileBufferCommon(
 ) : LongSeries<Byte>, Usable {
 
     private var file: File? = null
-    private var channel: UringChannel? = null
+    private var channel: FunctionalUringFacade? = null
     private var fileSize: Long = 0
 
     /** Windowed read buffer — 64KB amortizes syscalls, stays in L3. */

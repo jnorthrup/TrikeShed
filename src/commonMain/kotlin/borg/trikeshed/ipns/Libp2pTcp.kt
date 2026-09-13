@@ -4,11 +4,11 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.*
 import borg.trikeshed.reactor.TlsCodecBackend
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.UringIOException
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.nio.file.File
@@ -124,7 +124,7 @@ class UringLibp2pDialer(
 }
 
 internal class Libp2pTcpStream private constructor(
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
     private val file: File,
     private val timeout: Long,
 ) : Libp2pStream {

@@ -1,7 +1,7 @@
 package borg.trikeshed.btrfs
 
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 import kotlinx.coroutines.CoroutineScope
@@ -110,7 +110,7 @@ object NioBtrfsGraalBlobStore {
 
     /** Creates a new seed image exclusively through the selected channel; existing images are preserved. */
     suspend fun writeImageViaUring(
-        channel: UringChannel,
+        channel: FunctionalUringFacade,
         imagePath: String,
         totalBytes: ULong,
         backend: NioCapabilityReport,

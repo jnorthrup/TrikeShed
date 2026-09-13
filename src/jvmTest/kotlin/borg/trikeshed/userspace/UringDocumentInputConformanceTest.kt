@@ -8,7 +8,6 @@ import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.DocumentExtent
 import borg.trikeshed.userspace.nio.DocumentInputElement
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import java.nio.file.Files
@@ -150,5 +149,5 @@ class UringDocumentInputConformanceTest {
         } finally { Files.deleteIfExists(path) }
     }
 
-    private fun UringChannel.report() = BtrfsUringChannelReport(availability, capabilities, nativeCapabilities)
+    private fun FunctionalUringFacade.report() = BtrfsUringChannelReport(availability, capabilities, nativeCapabilities)
 }

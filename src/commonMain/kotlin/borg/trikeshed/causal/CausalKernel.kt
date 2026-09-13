@@ -307,9 +307,6 @@ fun CausalGraph.rankByProximity(
 // ─── CausalPhase: CCEK lifecycle for causal phases ────────────────────────
 
 /**
- * CCEK lifecycle for causal phases — the same state machine as
- * NioUserspaceKey/LiburingKey, applied to the causal graph.
- *
  * The phase tracks where in the Inducted→Dispatched→Delivered→Settled
  * lifecycle a workId currently sits. This IS the kanban column, expressed
  * as a CCEK state instead of a String label.

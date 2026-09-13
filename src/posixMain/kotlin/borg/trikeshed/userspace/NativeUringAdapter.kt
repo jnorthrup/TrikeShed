@@ -6,7 +6,10 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 internal expect class NativeUringAdapter(entries: Int) {
     val capabilities: Long
     val availability: String
-    fun execute(submission: UringSubmission): UringCompletion
+    fun submit(submissions: List<UringSubmission>)
+    fun isPending(userData: Long): Boolean
+    fun reapCompletions(): List<UringCompletion>
+    fun cancelPending(userData: Set<Long>? = null)
     fun fadvise(fd: Int, offset: Long, length: Int, advice: Int): Int
     fun registerBuffers(buffers: borg.trikeshed.lib.Series<MemoryMapping>): Result<Unit>
     fun unregisterBuffers(): Result<Unit>

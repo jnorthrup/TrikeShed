@@ -3,6 +3,7 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.ByteRegion
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
@@ -42,7 +43,7 @@ public abstract class DatagramChannel : AbstractSelectableChannel, ByteChannel, 
 
 internal class UringDatagramChannel(
     private val file: File,
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
 ) : DatagramChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true

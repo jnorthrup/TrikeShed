@@ -2,6 +2,7 @@
 
 package borg.trikeshed.userspace.nio.channels
 
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
@@ -33,7 +34,7 @@ public abstract class ServerSocketChannel : AbstractSelectableChannel, NetworkCh
 
 internal class UringServerSocketChannel(
     private val file: File,
-    private val channel: UringChannel,
+    private val channel: FunctionalUringFacade,
 ) : ServerSocketChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true

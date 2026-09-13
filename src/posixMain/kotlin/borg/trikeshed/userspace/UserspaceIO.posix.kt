@@ -12,17 +12,27 @@ import borg.trikeshed.userspace.nio.ByteOrder
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import platform.posix.*
 
 private class PosixUserspaceChannelBackend(private val entries: Int) : UserspaceChannelBackend {
     private val lock = SynchronizedObject()
     private val native = NativeUringAdapter(entries)
     private val descriptors = mutableSetOf<Int>()
+    private val queued = ArrayDeque<UringSubmission>()
+    private val pending = mutableMapOf<Long, UringSubmission>()
+    private val completed = ArrayDeque<UringCompletion>()
+    private val results = mutableMapOf<Long, CompletableDeferred<UringCompletion>>()
+    private var accepting = true
     private var closed = false
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
         UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE,
         UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
     override val nativeCapabilities: Long get() = native.capabilities
+    override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
 
     override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = synchronized(lock) {
@@ -32,48 +42,229 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     override fun unregisterBuffers(): Result<Unit> = synchronized(lock) { native.unregisterBuffers() }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = synchronized(lock) {
-        require(submissions.size <= entries) { "submission queue full" }
-        submissions.map { execute(it).let { c -> SelectionResult(c.res, c.userData) } }
+        admit(submissions)
+        takeCompletions()
     }
 
-    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> =
-        synchronized(lock) {
-            require(submissions.size <= entries) { "submission queue full" }
-            val completions = Array(submissions.size) { execute(submissions[it]) }
-            completions.size j { completions[it] }
+    private fun admit(
+        submissions: List<UringSubmission>,
+        receivers: Map<Long, CompletableDeferred<UringCompletion>> = emptyMap(),
+    ) {
+        require(queued.size + pending.size + submissions.size <= entries) { "submission queue full" }
+        val tokens = (queued.map { it.userData } + pending.keys).toMutableSet()
+        require(submissions.all { tokens.add(it.userData) }) { "duplicate outstanding userData" }
+        results.putAll(receivers)
+        for (submission in submissions) {
+            val invalid = validate(submission)
+            if (invalid != null) publish(UringCompletion(submission.userData, invalid, 0))
+            else queued.add(submission)
         }
+        dispatch()
+    }
 
-    private fun execute(sub: UringSubmission): UringCompletion {
-        fun result(code: Int) = UringCompletion(sub.userData, code, 0)
-        if (closed) return result(-9)
-        if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return result(-95)
-        if (sub.len < 0) return result(-22)
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> {
+        require(minComplete >= 0)
+        val results = mutableListOf<SelectionResult>()
+        do {
+            val outstanding = synchronized(lock) {
+                poll()
+                results.addAll(takeCompletions())
+                queued.isNotEmpty() || pending.isNotEmpty()
+            }
+            if (results.size >= minComplete || !outstanding) break
+            usleep(1000u)
+        } while (true)
+        return results
+    }
+
+    override fun cancelPending() = synchronized(lock) {
+        accepting = false
+        cancel(null)
+    }
+
+    private fun cancel(tokens: Set<Long>?) {
+        // These requests have not reached the kernel. Submitted requests keep
+        // their buffers until their own terminal CQEs are reaped.
+        val iterator = queued.iterator()
+        while (iterator.hasNext()) {
+            val submission = iterator.next()
+            if (tokens == null || submission.userData in tokens) {
+                iterator.remove()
+                publish(UringCompletion(submission.userData, -125, 0))
+            }
+        }
+        native.cancelPending(tokens)
+    }
+
+    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        require(submissions.size <= entries) { "submission queue full" }
+        val ordered = Array(submissions.size) { submissions[it] }
+        val receivers = ordered.associate { it.userData to CompletableDeferred<UringCompletion>() }
+        require(receivers.size == ordered.size) { "duplicate userData in batch" }
+        suspend fun settle() {
+            while (receivers.values.any { !it.isCompleted }) {
+                synchronized(lock) { poll() }
+                if (receivers.values.any { !it.isCompleted }) delay(1)
+            }
+        }
+        try {
+            while (true) {
+                val admitted = synchronized(lock) {
+                    if (queued.size + pending.size + ordered.size <= entries) {
+                        admit(ordered.asList(), receivers)
+                        true
+                    } else {
+                        poll()
+                        false
+                    }
+                }
+                if (admitted) break
+                delay(1)
+            }
+            settle()
+            val completions = Array(ordered.size) { receivers.getValue(ordered[it].userData).await() }
+            return completions.size j { completions[it] }
+        } catch (failure: Throwable) {
+            val admitted = synchronized(lock) {
+                receivers.any { (token, receiver) -> results[token] === receiver }
+            }
+            if (admitted) try {
+                withContext(NonCancellable) {
+                    synchronized(lock) {
+                        val tokens = receivers.filter { (token, receiver) -> results[token] === receiver }.keys
+                        if (tokens.isNotEmpty()) cancel(tokens)
+                    }
+                    settle()
+                }
+            } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
+    }
+
+    private fun poll() {
+        if (closed) return
+        for (completion in native.reapCompletions()) {
+            val submission = checkNotNull(pending.remove(completion.userData)) {
+                "unknown native completion ${completion.userData}"
+            }
+            complete(submission, completion)
+        }
+        dispatch()
+    }
+
+    private fun validate(sub: UringSubmission): Int? {
+        if (closed || !accepting) return -9
+        if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
+        if (sub.len < 0) return -22
         val buffer = sub.buffer
         if (sub.opcode in bufferOps) {
-            if (buffer == null) return result(-22)
-            if (sub.len > buffer.remaining()) return result(-22)
-            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX) && buffer.isReadOnly()) return result(-22)
+            if (buffer == null) return -22
+            if (sub.len > buffer.remaining()) return -22
+            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX) && buffer.isReadOnly()) return -22
         }
-        if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) && sub.offset < -1) return result(-22)
-        if (sub.opcode == UringOp.STATX && (sub.len < 24 || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L)) return result(-22)
-        if (sub.opcode == UringOp.FTRUNCATE && sub.offset < 0) return result(-22)
+        if (sub.opcode in positioned && sub.offset < -1) return -22
+        if (sub.opcode == UringOp.STATX && (sub.len < 24 || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L)) return -22
+        if (sub.opcode == UringOp.FTRUNCATE && sub.offset < 0) return -22
         if (sub.opcode == UringOp.OPENAT) {
-            if (sub.len == 0 || sub.offset < 0 || sub.offset > Int.MAX_VALUE || sub.offset.toInt() and OPEN_FLAGS.inv() != 0) return result(-22)
+            if (sub.len == 0 || sub.offset < 0 || sub.offset > Int.MAX_VALUE || sub.offset.toInt() and OPEN_FLAGS.inv() != 0) return -22
             val flags = sub.offset.toInt()
             if (flags and 3 == 3 || flags and 128 != 0 && flags and 64 == 0 ||
-                flags and (64 or 128 or 512) != 0 && flags and 3 == 0) return result(-22)
+                flags and (64 or 128 or 512) != 0 && flags and 3 == 0) return -22
             val start = buffer!!.arrayOffset() + buffer.position()
-            if ((start until start + sub.len).any { buffer.array()[it] == 0.toByte() }) return result(-22)
+            if ((start until start + sub.len).any { buffer.array()[it] == 0.toByte() }) return -22
         }
-        val completion = if (native.capabilities and sub.opcode.mask != 0L) native.execute(sub)
-        else result(emulate(sub))
+        return null
+    }
+
+    private fun dispatch() {
+        val nativeBatch = mutableListOf<UringSubmission>()
+        val blocked = mutableListOf<UringSubmission>()
+        val iterator = queued.iterator()
+        while (iterator.hasNext()) {
+            val submission = iterator.next()
+            if (pending.values.any { dependsOn(submission, it) } || blocked.any { dependsOn(submission, it) }) {
+                blocked.add(submission)
+                continue
+            }
+            if (submission.buffer?.remaining()?.let { submission.len > it } == true) {
+                iterator.remove()
+                complete(submission, UringCompletion(submission.userData, -22, 0))
+                continue
+            }
+            if (native.capabilities and submission.opcode.mask != 0L) {
+                iterator.remove()
+                pending[submission.userData] = submission
+                nativeBatch.add(submission)
+            } else {
+                val result = emulate(submission)
+                if (result == -11 && (submission.opcode == UringOp.SEND || submission.opcode == UringOp.RECV)) {
+                    blocked.add(submission)
+                } else {
+                    iterator.remove()
+                    complete(submission, UringCompletion(submission.userData, result, 0))
+                }
+            }
+        }
+        if (nativeBatch.isNotEmpty()) try {
+            native.submit(nativeBatch)
+        } catch (failure: Throwable) {
+            accepting = false
+            for (submission in nativeBatch) {
+                if (!native.isPending(submission.userData)) {
+                    pending.remove(submission.userData)
+                    publish(UringCompletion(submission.userData, -5, 0))
+                }
+            }
+            throw failure
+        }
+    }
+
+    private fun dependsOn(next: UringSubmission, prior: UringSubmission): Boolean {
+        val nextBuffer = next.buffer
+        val priorBuffer = prior.buffer
+        if (nextBuffer != null && priorBuffer != null) {
+            if (nextBuffer === priorBuffer) return true
+            if (nextBuffer.array() === priorBuffer.array()) {
+                val start = nextBuffer.arrayOffset() + nextBuffer.position()
+                val previous = priorBuffer.arrayOffset() + priorBuffer.position()
+                if (start.toLong() < previous.toLong() + prior.len && previous.toLong() < start.toLong() + next.len) return true
+            }
+        }
+        if (next.addr != 0L && prior.addr != 0L && next.len > 0 && prior.len > 0 &&
+            next.opcode in memoryOps && prior.opcode in memoryOps &&
+            next.addr.toULong() < prior.addr.toULong() + prior.len.toULong() &&
+            prior.addr.toULong() < next.addr.toULong() + next.len.toULong()) return true
+        if (next.fd != prior.fd || next.opcode == UringOp.NOP || prior.opcode == UringOp.NOP ||
+            next.opcode == UringOp.MADVISE || prior.opcode == UringOp.MADVISE) return false
+        if (next.opcode in barriers || prior.opcode in barriers) return true
+        if (next.opcode == UringOp.OPENAT || prior.opcode == UringOp.OPENAT) return false
+        if (next.opcode in positioned && prior.opcode in positioned) {
+            if (next.offset == -1L || prior.offset == -1L) return true
+            if (next.opcode in reads && prior.opcode in reads) return false
+            return if (next.offset <= prior.offset) prior.offset - next.offset < next.len
+                else next.offset - prior.offset < prior.len
+        }
+        return (next.opcode in reads && prior.opcode in reads) ||
+            (next.opcode in writes && prior.opcode in writes)
+    }
+
+    private fun complete(sub: UringSubmission, completion: UringCompletion) {
         if (completion.res > 0 && sub.opcode in transferOps) {
             check(completion.res <= sub.len) { "completion exceeds submitted buffer window" }
-            buffer!!.position(buffer.position() + completion.res)
+            sub.buffer!!.position(sub.buffer.position() + completion.res)
         }
         if (sub.opcode == UringOp.OPENAT && completion.res >= 0) descriptors.add(completion.res)
-        if (sub.opcode == UringOp.CLOSE) descriptors.remove(sub.fd)
-        return completion
+        if (sub.opcode == UringOp.CLOSE && completion.res != -125) descriptors.remove(sub.fd)
+        publish(completion)
+    }
+
+    private fun publish(completion: UringCompletion) {
+        val receiver = results.remove(completion.userData)
+        if (receiver == null) completed.add(completion) else receiver.complete(completion)
+    }
+
+    private fun takeCompletions(): List<SelectionResult> = buildList {
+        while (completed.isNotEmpty()) completed.removeFirst().let { add(SelectionResult(it.res, it.userData)) }
     }
 
     private fun emulate(sub: UringSubmission): Int {
@@ -103,8 +294,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
                 buffer!!.array().usePinned { pinned ->
                     val ptr = if (sub.len == 0) null else pinned.addressOf(buffer.arrayOffset() + buffer.position())
                     posixCompletion(if (sub.opcode == UringOp.SEND)
-                        send(sub.fd, ptr, sub.len.convert(), 0).toInt()
-                    else recv(sub.fd, ptr, sub.len.convert(), 0).toInt())
+                        send(sub.fd, ptr, sub.len.convert(), MSG_DONTWAIT).toInt()
+                    else recv(sub.fd, ptr, sub.len.convert(), MSG_DONTWAIT).toInt())
                 }
             }
             UringOp.STATX -> memScoped {
@@ -129,8 +320,14 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         }
     }
 
-    override fun close() = synchronized(lock) {
-        if (!closed) {
+    override fun close() {
+        synchronized(lock) { accepting = false }
+        while (synchronized(lock) {
+            poll()
+            queued.isNotEmpty() || pending.isNotEmpty()
+        }) usleep(1000u)
+        synchronized(lock) {
+            if (closed) return
             native.close()
             descriptors.forEach { platform.posix.close(it) }
             descriptors.clear()
@@ -142,6 +339,11 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         const val OPEN_FLAGS = 3 or 64 or 128 or 512 or 1024
         val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
         val bufferOps = setOf(UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
+        val barriers = setOf(UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.STATX)
+        val positioned = setOf(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
+        val memoryOps = positioned + UringOp.MADVISE
+        val reads = setOf(UringOp.READ, UringOp.READ_FIXED, UringOp.RECV)
+        val writes = setOf(UringOp.WRITE, UringOp.WRITE_FIXED, UringOp.SEND)
     }
 }
 

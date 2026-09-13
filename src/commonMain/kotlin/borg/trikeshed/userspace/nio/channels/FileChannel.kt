@@ -14,6 +14,8 @@ import borg.trikeshed.userspace.nio.file.attribute.FileAttribute
 import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission
 import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
 import borg.trikeshed.userspace.nio.file.File
+import borg.trikeshed.userspace.openUserspaceChannelBackend
+import borg.trikeshed.userspace.FunctionalUringFacade
 
 /**
  * FileChannel wired behind UringFacade.
@@ -49,7 +51,10 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
             open(path.toString(), options, *attrs)
 
         fun open(path: String, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
-            return open(path, options, permissions = creationPermissions(attrs)) { UringChannels.open() }
+            return open(path, options, permissions = creationPermissions(attrs)) {
+                val backend = openUserspaceChannelBackend(256)
+                FunctionalUringFacade(256, backend)
+            }
         }
         fun open(path: Path, vararg options: OpenOption): FileChannel = open(path, options.toSet())
         fun open(path: String, vararg options: OpenOption): FileChannel = open(path, options.toSet())
@@ -58,7 +63,7 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
             path: String,
             options: Set<OpenOption>,
             permissions: Int = 438,
-            channelFactory: () -> UringChannel,
+            channelFactory: () -> FunctionalUringFacade,
         ): FileChannel {
             val supported = setOf(StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE,
                 StandardOpenOption.CREATE_NEW, StandardOpenOption.TRUNCATE_EXISTING)

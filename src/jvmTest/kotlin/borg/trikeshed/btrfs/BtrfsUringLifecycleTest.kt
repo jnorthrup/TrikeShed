@@ -3,6 +3,7 @@ package borg.trikeshed.btrfs
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.SelectionResult
 import borg.trikeshed.userspace.UringCompletion
@@ -10,12 +11,12 @@ import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.UserspaceChannelBackend
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.spi.NioCapabilityReport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -39,8 +40,10 @@ class BtrfsUringLifecycleTest {
         override val capabilities = UringOp.caps(
             UringOp.OPENAT, UringOp.FTRUNCATE, UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.CLOSE,
         )
+        override val deferredCapabilities = heldOpcode?.mask ?: 0L
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
+        val pending = mutableListOf<SelectionResult>()
         val submissions = mutableListOf<UringSubmission>()
         val image = ByteArray(8192)
         val reads = ArrayDeque(readResults)
@@ -48,11 +51,7 @@ class BtrfsUringLifecycleTest {
         var descriptorOpen = false
         var closes = 0
 
-        override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-            error("Connected volume must use the suspend facade")
-
-        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-            val submission = submissions[0]
+        override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = submissions.mapNotNull { submission ->
             this.submissions += submission
             val result = when (submission.opcode) {
                 UringOp.OPENAT -> { descriptorOpen = true; 41 }
@@ -81,12 +80,26 @@ class BtrfsUringLifecycleTest {
                 }
                 else -> error("Unexpected operation: ${submission.opcode}")
             }
-            if (submission.opcode == heldOpcode) {
+            val completion = SelectionResult(result, submission.userData)
+            if (submission.opcode == heldOpcode && !release.isCompleted) {
+                pending += completion
                 entered.complete(Unit)
-                release.await()
+                null
+            } else completion
+        }
+
+        override fun reapCompletions(minComplete: Int): List<SelectionResult> =
+            if (release.isCompleted) pending.toList().also { pending.clear() } else emptyList()
+
+        override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+            val completions = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
+            while (completions.size < submissions.size) {
+                delay(1)
+                completions += reapCompletions(0)
             }
-            val completion = UringCompletion(submission.userData, result, 0)
-            return 1 j { completion }
+            return completions.size j { index ->
+                completions[index].let { UringCompletion(it.userData, it.res, 0) }
+            }
         }
 
         override fun close() { descriptorOpen = false; closes++ }
@@ -94,9 +107,9 @@ class BtrfsUringLifecycleTest {
 
     private val report = NioCapabilityReport("controlled", false, emptyList(), "", 0)
 
-    private fun CoroutineScope.channel(backend: Backend) = UringChannel(FunctionalUringFacade.create(this, 8, backend))
+    private fun CoroutineScope.channel(backend: Backend) = FunctionalUringFacade.create(this, 8, backend)
 
-    private suspend fun open(channel: UringChannel, resize: Boolean = false) =
+    private suspend fun open(channel: FunctionalUringFacade, resize: Boolean = false) =
         BtrfsUringFileVolume.open(channel, "controlled.img", blockSize = 512, capacity = 16,
             create = false, resize = resize, backendReport = report)
 

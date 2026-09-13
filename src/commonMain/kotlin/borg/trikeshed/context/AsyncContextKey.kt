@@ -3,6 +3,6 @@ package borg.trikeshed.context
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Type-safe key for [AsyncContextElement] lookup in [CoroutineContext].
+ * Type-safe key for [CoroutineContext.Element] lookup in [CoroutineContext].
  */
-open class AsyncContextKey<E : AsyncContextElement> : CoroutineContext.Key<E>
+open class AsyncContextKey<E : CoroutineContext.Element> : CoroutineContext.Key<E>

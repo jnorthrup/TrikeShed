@@ -10,12 +10,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Base for all Element lifecycle objects in the coroutine->context->key->element flow.
- * Implementors hold their Key as a companion object singleton.
- *
- * Fanout semantics: an element may channel completions to N downstream
- * subscribers via [fanoutSubscribers]. The element is responsible for
- * dispatching completions to all subscribers atomically from its perspective.
+ * Context element with a supervisor and explicit lifecycle state.
  */
 abstract class AsyncContextElement(
     initialState: ElementState = CREATED,
@@ -25,7 +20,7 @@ abstract class AsyncContextElement(
     /** Parent job passed to the internal SupervisorJob, or null. */
     protected val parentJob: Job? = parentJob
 
-    /** SupervisorJob for this element's coroutine scope. */
+    /** SupervisorJob created from [parentJob]. */
     open val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val stateMutex = Mutex()
@@ -36,11 +31,7 @@ abstract class AsyncContextElement(
     /** Alias for [state] — overrideable in anonymous test subclasses. */
     open val lifecycleState: ElementState get() = state
 
-    /**
-     * Ordered list of downstream fanout subscribers.
-     * Each subscriber is an [AsyncContextElement] that will receive
-     * channelized completions from this element.
-     */
+    /** Downstream elements exposed by subclasses. */
     open val fanoutSubscribers: List<AsyncContextElement> = emptyList()
 
     /** Abstract key property that must be implemented by subclasses. */
@@ -55,14 +46,7 @@ abstract class AsyncContextElement(
         }
     }
 
-    /**
-     * Begin draining: stop accepting new work, process remaining completions,
-     * then transition to [ElementState.CLOSED].
-     *
-     * Admission-gated: exactly one caller performs the cleanup; concurrent
-     * callers suspend on the same supervisor and return only after the winner
-     * has finished — so a return from [drain] means cleanup HAS completed.
-     */
+    /** Completes an opened element's supervisor, then calls [close]. */
     open suspend fun drain() {
         val shouldDrain = stateMutex.withLock {
             if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
@@ -77,7 +61,7 @@ abstract class AsyncContextElement(
             supervisor.join()
             close()
         } else {
-            // Losers observe the same completed cleanup: wait out the winner.
+            // Wait for the supervisor and the separately maintained state.
             supervisor.join()
             while (state.isLessThan(CLOSED)) {
                 kotlinx.coroutines.delay(1)

@@ -17,6 +17,9 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.ChannelResult
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -24,6 +27,41 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
+    @Test
+    fun provider_failure_still_closes_every_resource_and_all_drain_callers_wait() = runTest {
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val closed = mutableListOf<Int>()
+        val failure = IllegalStateException("provider cleanup failed")
+        fun provider(id: Int) = object : borg.trikeshed.context.AsyncContextElement() {
+            override val key = object : kotlin.coroutines.CoroutineContext.Key<kotlin.coroutines.CoroutineContext.Element> {}
+            override suspend fun drain() {
+                if (id == 2) throw failure
+                entered.complete(Unit)
+                release.await()
+            }
+            override suspend fun close() { closed.add(id); super.close() }
+        }
+        val nio = NioSupervisor()
+        nio.register(provider(1))
+        nio.register(provider(2))
+        nio.open()
+        try {
+            val first = async { runCatching { nio.drain() } }
+            entered.await()
+            val second = async(start = CoroutineStart.UNDISPATCHED) { runCatching { nio.drain() } }
+            assertTrue(!first.isCompleted && !second.isCompleted)
+            release.complete(Unit)
+            for (outcome in listOf(first.await(), second.await())) {
+                assertEquals(failure.message, outcome.exceptionOrNull()?.message)
+            }
+            assertEquals(listOf(1, 2), closed.sorted())
+        } finally {
+            release.complete(Unit)
+            runCatching { nio.drain() }
+        }
+    }
+
     @Test
     fun fragmentedHeaderCompletesBeforeThePeerCloses() = runTest {
         val response = httpResponse(200, "x".repeat(2048))

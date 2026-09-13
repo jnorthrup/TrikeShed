@@ -14,9 +14,12 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
         LINUX_NATIVE_URING_LEVEL == 0 -> Result.failure(UnsupportedOperationException("LINUX_NATIVE_URING_LEVEL=0"))
         else -> ring.open(entries, 0).mapCatching { ring.probeExecution().getOrThrow() }
     }
-    private val retained = mutableListOf<Pinned<ByteArray>>()
+    private val requests = mutableMapOf<Long, Pair<UringSubmission, Pinned<ByteArray>?>>()
+    private val cancellations = mutableMapOf<Long, Long>()
+    private val cancelled = mutableSetOf<Long>()
+    private var nextUserData = 0L
     private var transportFailure: String? = null
-    private val quarantined = mutableListOf<UringCompletion>()
+    private var completed = mutableListOf<UringCompletion>()
     private val discoveredCapabilities: Long = if (opened.isSuccess) UringOp.entries.fold(0L) { bits, op ->
         if (op in encoded && ring.supports(op)) bits or op.mask else bits
     } else 0L
@@ -29,73 +32,105 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
             }
         }
     }
-    actual val capabilities: Long get() =
-        if (transportFailure == null || mode == UringBackendMode.NATIVE) discoveredCapabilities else 0L
-    actual val availability: String get() = transportFailure?.let {
-        if (mode == UringBackendMode.NATIVE) "native: io_uring transport failed: $it"
-        else "emulated: io_uring transport disabled: $it"
-    }
+    actual val capabilities: Long get() = discoveredCapabilities
+    actual val availability: String get() = transportFailure?.let { "native: io_uring transport failed: $it" }
         ?: if (opened.isSuccess) "native: io_uring setup, register and NOP execution probes succeeded; features=${ring.features}"
         else "emulated: ${opened.exceptionOrNull()?.message}"
 
-    actual fun execute(submission: UringSubmission): UringCompletion {
+    actual fun submit(submissions: List<UringSubmission>) {
         transportFailure?.let { error("io_uring transport failed: $it") }
-        check(capabilities and submission.opcode.mask != 0L)
-        val buffer = submission.buffer
-        val bytes = if (submission.opcode == UringOp.OPENAT && buffer != null) {
-            ByteArray(submission.len + 1).also {
-                buffer.array().copyInto(it, 0, buffer.arrayOffset() + buffer.position(),
-                    buffer.arrayOffset() + buffer.position() + submission.len)
+        for (submission in submissions) {
+            check(capabilities and submission.opcode.mask != 0L)
+            if (ring.submissionSpace == 0) enter()
+            check(ring.submissionSpace > 0) { "io_uring submission queue full" }
+            val token = ++nextUserData
+            check(token > 0) { "io_uring request identifiers exhausted" }
+            val buffer = submission.buffer
+            val bytes = if (submission.opcode == UringOp.OPENAT && buffer != null) {
+                ByteArray(submission.len + 1).also {
+                    buffer.array().copyInto(it, 0, buffer.arrayOffset() + buffer.position(),
+                        buffer.arrayOffset() + buffer.position() + submission.len)
+                }
+            } else buffer?.array()
+            val start = if (submission.opcode == UringOp.OPENAT) 0 else
+                (buffer?.arrayOffset() ?: 0) + (buffer?.position() ?: 0)
+            val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
+            val prepared = runCatching {
+                val address = if (pinned != null && start < bytes!!.size)
+                    pinned.addressOf(start).rawValue.toLong() else submission.addr
+                ring.prepSubmission(submission.copy(userData = token), address).getOrThrow()
             }
-        } else buffer?.array()
-        val start = if (submission.opcode == UringOp.OPENAT) 0 else
-            (buffer?.arrayOffset() ?: 0) + (buffer?.position() ?: 0)
-        val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
-        if (pinned != null) retained.add(pinned)
-        val address = if (pinned != null && start < bytes!!.size)
-            pinned.addressOf(start).rawValue.toLong() else submission.addr
-        val prepared = ring.prepSubmission(submission, address)
-        if (prepared.isFailure) {
-            if (pinned != null) { retained.remove(pinned); pinned.unpin() }
-            prepared.getOrThrow()
+            if (prepared.isFailure) {
+                pinned?.unpin()
+                prepared.getOrThrow()
+            }
+            requests[token] = submission to pinned
         }
-        // A prepared SQE is never built again. After enter failure the SQ head
-        // proves whether it remains unsubmitted or must be awaited. The call
-        // retains the borrow until that request settles.
-        var entered = false
-        var terminal: UringCompletion? = null
-        while (terminal == null) {
-            if (!entered) {
-                val sent = ring.submit()
-                entered = sent.getOrNull() == 1
-                if (!entered) {
-                    transportFailure = sent.exceptionOrNull()?.message ?: "submit consumed no SQE"
-                    if (ring.abandonUnsubmitted(submission.userData)) {
-                        terminal = UringCompletion(submission.userData, -5, 0)
-                        break
+        enter()
+    }
+
+    actual fun isPending(userData: Long): Boolean = requests.values.any { it.first.userData == userData }
+
+    private fun enter() {
+        if (ring.pendingSubmissions == 0) return
+        ring.submit().onFailure { transportFailure = it.message }.getOrThrow()
+    }
+
+    actual fun reapCompletions(): List<UringCompletion> {
+        if (opened.isFailure) return emptyList()
+        if (completed.isEmpty()) {
+            var failure = runCatching { enter() }.exceptionOrNull()
+            fun record(error: Throwable) {
+                transportFailure = error.message
+                if (failure == null) failure = error else failure!!.addSuppressed(error)
+            }
+            while (true) {
+                val received = ring.peekCqe()
+                if (received.isFailure) {
+                    record(received.exceptionOrNull()!!)
+                    break
+                }
+                val completion = received.getOrNull() ?: break
+                if (cancellations.remove(completion.userData) != null) {
+                    if (completion.res != 0 && completion.res != -platform.posix.ENOENT &&
+                        completion.res != -platform.posix.EALREADY) {
+                        record(IllegalStateException("io_uring cancellation failed: ${completion.res}"))
                     }
-                    // A failed enter can still consume its SQE. Wait on that admission;
-                    // another submit cannot make an already-consumed request progress.
-                    entered = ring.submitted(submission.userData)
+                    continue
                 }
-            }
-            val received = if (entered) ring.waitCqe() else ring.peekCqe()
-            if (received.isFailure) transportFailure = received.exceptionOrNull()?.message ?: "completion retrieval failed"
-            val completion = received.getOrNull()
-            if (completion != null) {
-                if (completion.userData == submission.userData) terminal = completion
-                else {
-                    quarantined.add(completion)
-                    transportFailure = "foreign completion ${completion.userData}"
+                val request = requests.remove(completion.userData)
+                if (request == null) {
+                    record(IllegalStateException("unknown io_uring completion ${completion.userData}"))
+                    continue
                 }
+                // The cancellation CQE never releases this borrow. Only this
+                // original request's terminal CQE proves the kernel is finished.
+                request.second?.unpin()
+                cancelled.remove(completion.userData)
+                completed.add(completion.copy(userData = request.first.userData))
             }
-            if (terminal == null) platform.posix.usleep(1000u)
+            // Report malformed CQEs after examining this CQ batch. Keep every
+            // valid terminal result available to the caller's cleanup reaper.
+            failure?.let { throw it }
         }
-        if (pinned != null) {
-            retained.remove(pinned)
-            pinned.unpin()
+        return completed.also { completed = mutableListOf() }
+    }
+
+    actual fun cancelPending(userData: Set<Long>?) {
+        if (opened.isFailure) return
+        enter()
+        for ((target, request) in requests) {
+            if (userData != null && request.first.userData !in userData) continue
+            if (target in cancelled) continue
+            if (ring.submissionSpace == 0) enter()
+            check(ring.submissionSpace > 0) { "io_uring cancellation queue full" }
+            val token = ++nextUserData
+            check(token > 0) { "io_uring request identifiers exhausted" }
+            ring.prepCancel(target, token).getOrThrow()
+            cancellations[token] = target
+            cancelled.add(target)
         }
-        return checkNotNull(terminal)
+        enter()
     }
 
     actual fun registerBuffers(buffers: borg.trikeshed.lib.Series<MemoryMapping>): Result<Unit> =
@@ -105,12 +140,16 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
         if (offset < 0 || length < 0 || advice !in 0..5) -22
         else -platform.posix.posix_fadvise(fd, offset, length.toLong(), advice)
 
-    actual fun unregisterBuffers(): Result<Unit> = ring.unregisterBuffers()
+    actual fun unregisterBuffers(): Result<Unit> = if (requests.values.any {
+        it.first.opcode == UringOp.READ_FIXED || it.first.opcode == UringOp.WRITE_FIXED
+    }) Result.failure(IllegalStateException("fixed buffer requests are still in flight"))
+    else ring.unregisterBuffers()
 
     actual fun close() {
+        check(requests.isEmpty()) { "io_uring requests must settle before closing their ring" }
         ring.close().getOrThrow()
-        retained.forEach { it.unpin() }
-        retained.clear()
+        cancellations.clear()
+        cancelled.clear()
     }
 
     private companion object {

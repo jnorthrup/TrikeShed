@@ -7,8 +7,12 @@ import platform.posix.*
 internal actual class NativeUringAdapter actual constructor(entries: Int) {
     actual val capabilities: Long = 0L
     actual val availability: String = "emulated: Darwin has no Linux io_uring kernel"
-    actual fun execute(submission: UringSubmission): UringCompletion =
-        UringCompletion(submission.userData, -95, 0)
+    actual fun submit(submissions: List<UringSubmission>) {
+        check(submissions.isEmpty()) { "Darwin has no Linux io_uring kernel" }
+    }
+    actual fun reapCompletions(): List<UringCompletion> = emptyList()
+    actual fun isPending(userData: Long): Boolean = false
+    actual fun cancelPending(userData: Set<Long>?) {}
     actual fun fadvise(fd: Int, offset: Long, length: Int, advice: Int): Int {
         if (offset < 0 || length < 0 || advice !in 0..5) return -22
         return when (advice) {

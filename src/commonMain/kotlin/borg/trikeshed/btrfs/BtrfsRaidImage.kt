@@ -4,9 +4,9 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.Volume
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.CancellationException
@@ -77,7 +77,7 @@ class BtrfsRaidImage private constructor(
     private val scope: CoroutineScope,
     private val owner: CompletableJob,
     private val entries: Int,
-    private val channelFactory: (CoroutineScope, Int) -> UringChannel,
+    private val channelFactory: (CoroutineScope, Int) -> FunctionalUringFacade,
 ) : Volume {
     val config: BtrfsRaidImageConfig get() = metadata.record.config
     override val blockSize: Int get() = volume.blockSize
@@ -196,7 +196,7 @@ class BtrfsRaidImage private constructor(
             resize: Boolean = false,
             entries: Int = 8,
             unavailable: Set<Int> = emptySet(),
-            channelFactory: (CoroutineScope, Int) -> UringChannel = { owner, depth -> UringChannels.open(owner, depth) },
+            channelFactory: (CoroutineScope, Int) -> FunctionalUringFacade = { owner, depth -> UringChannels.open(owner, depth) },
         ): BtrfsRaidImage {
             val config = config.snapshot()
             requireNotNull(scope.coroutineContext[Job]) { "RAID images require an owning Job" }.ensureActive()
@@ -345,7 +345,7 @@ class BtrfsRaidImage private constructor(
             entries: Int,
             create: Boolean,
             resize: Boolean,
-            channelFactory: (CoroutineScope, Int) -> UringChannel,
+            channelFactory: (CoroutineScope, Int) -> FunctionalUringFacade,
         ): BtrfsRaidImageResource {
             require(!resize || create)
             require(!create || resize)
@@ -376,7 +376,7 @@ class BtrfsRaidImage private constructor(
     }
 }
 
-private class BtrfsRaidImageResource(val raw: BtrfsUringFileVolume, private val channel: UringChannel) {
+private class BtrfsRaidImageResource(val raw: BtrfsUringFileVolume, private val channel: FunctionalUringFacade) {
     suspend fun drain() {
         try { raw.drain() } finally { channel.drain() }
     }

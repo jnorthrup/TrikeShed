@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.userspace.nio.channels.UringChannel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -10,7 +9,7 @@ import kotlinx.coroutines.launch
  * Coroutine integration around the userspace Channel.
  */
 class ChannelRunner(
-    val channel: UringChannel,
+    val channel: FunctionalUringFacade,
     val scope: CoroutineScope,
 ) {
     private val pendingOps = mutableMapOf<Long, CompletableDeferred<SelectionResult>>()

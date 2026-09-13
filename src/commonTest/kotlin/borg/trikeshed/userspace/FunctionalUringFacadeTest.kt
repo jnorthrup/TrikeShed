@@ -32,6 +32,7 @@ class FunctionalUringFacadeTest {
             Submissions.write(8, 0, 3, 0, 102).copy(buffer = ByteBuffer(3)),
         ).toSeries()).toList()
         assertEquals(listOf(UringCompletion(102, 3, 0), UringCompletion(101, 2, 0)), result)
+        assertEquals(0, facade.submitAwait().a)
     }
 
     @Test

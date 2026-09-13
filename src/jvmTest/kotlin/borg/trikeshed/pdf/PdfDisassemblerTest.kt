@@ -146,7 +146,7 @@ endcmap
      * RandomAccessFile as the windowed source.
      *
      * NOT routed through [JvmPdfDisassembler.parseFile]/[borg.trikeshed.lib.FileBuffer]:
-     * that path is wired to the shared userspace `UringChannel` JVM backend,
+     * that path is wired to the shared userspace `FunctionalUringFacade` JVM backend,
      * which has a PRE-EXISTING bug unrelated to this disassembler —
      * `JvmUserspaceChannelBackend.submitBatch`'s "auto-register" fallback
      * (UserspaceIO.jvm.kt) opens `Paths.get("")` with an empty option set

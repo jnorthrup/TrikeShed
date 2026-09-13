@@ -40,6 +40,7 @@ class HtxClientReactorElementTest {
                 HtxClientStage.TRANSFER_OPENED,
                 HtxClientStage.REQUEST_DISPATCHED,
                 HtxClientStage.RESPONSE_RECEIVED,
+                HtxClientStage.RESPONSE_OK,
                 HtxClientStage.TRANSFER_CLOSED,
             ),
             frameSubscriber.frames.map { it.stage },
