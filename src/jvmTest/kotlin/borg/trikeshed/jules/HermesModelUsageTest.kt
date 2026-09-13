@@ -19,7 +19,10 @@ class HermesModelUsageTest {
 
     private data class Row(val model: String, val provider: String, val baseUrl: String, val task: String, val calls: Int, val lastSeen: Double)
 
-    private fun mkLedger(dir: File, vararg rows: Row): File {
+    private fun mkLedgerShim(dir: java.io.File, vararg rows: Row): borg.trikeshed.common.Path =
+        borg.trikeshed.common.Path(mkLedger(dir, *rows).absolutePath)
+
+private fun mkLedger(dir: File, vararg rows: Row): File {
         dir.mkdirs()
         val db = File(dir, "state.db")
         DriverManager.getConnection("jdbc:sqlite:${db.absolutePath}").use { conn ->
@@ -60,7 +63,7 @@ class HermesModelUsageTest {
     private val zaiCoding = "https://api.z.ai/api/coding/paas/v4"
     private val synthetic = "https://api.synthetic.new/openai/v1/"
 
-    private fun fixture(): File = mkLedger(
+    private fun fixture(): borg.trikeshed.common.Path = mkLedgerShim(
         Files.createTempDirectory("hermes-ledger").toFile(),
         Row("glm-5.3-flash", "zai", zaiCoding, "", 65, t0 + 100),
         Row("zai-org/GLM-4.7-Flash", "custom:api.synthetic.new", synthetic, "approval", 11, t0 + 200),
@@ -97,19 +100,19 @@ class HermesModelUsageTest {
     fun missingOrBrokenLedgersAnswerEmpty() {
         val root = Files.createTempDirectory("hermes-ledger-missing").toFile()
         val missing = File(root, "state.db")
-        assertEquals(emptyList(), HermesModelUsage.recent(missing))
-        assertNull(HermesModelUsage.lastUsed(missing))
-        assertEquals(emptyList(), HermesModelUsage.provenEndpoints(missing))
+        assertEquals(emptyList(), HermesModelUsage.recent(borg.trikeshed.common.Path(missing.absolutePath)))
+        assertNull(HermesModelUsage.lastUsed(borg.trikeshed.common.Path(missing.absolutePath)))
+        assertEquals(emptyList(), HermesModelUsage.provenEndpoints(borg.trikeshed.common.Path(missing.absolutePath)))
         missing.writeText("this is not a database")
-        assertEquals(emptyList(), HermesModelUsage.recent(missing))
+        assertEquals(emptyList(), HermesModelUsage.recent(borg.trikeshed.common.Path(missing.absolutePath)))
     }
 
     @Test
     fun hermesHomeFollowsHermesHomeEnvThenDefault() {
         val userHome = System.getProperty("user.home")
         assertEquals("/x/profiles/p", HermesModelUsage.hermesHome { if (it == "HERMES_HOME") "/x/profiles/p" else null })
-        assertEquals("$userHome/.hermes", HermesModelUsage.hermesHome { null })
-        assertEquals("$userHome/.hermes", HermesModelUsage.hermesHome { if (it == "HERMES_HOME") "  " else null })
-        assertEquals(File("/x/profiles/p", "state.db"), HermesModelUsage.stateDb("/x/profiles/p"))
+        assertEquals("$userHome/.hermes", HermesModelUsage.hermesHome(getenv = { _: String -> null }))
+        assertEquals("$userHome/.hermes", HermesModelUsage.hermesHome(getenv = { s: String -> if (s == "HERMES_HOME") "  " else null }))
+        assertEquals(HermesModelUsage.stateDb("/x/profiles/p").absolutePath, File("/x/profiles/p", "state.db").absolutePath)
     }
 }

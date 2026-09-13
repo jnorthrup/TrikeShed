@@ -33,7 +33,7 @@ class ProgramLedgerTest {
     }
 
     /** A fresh one of these over the same `cas` and `file` IS the restart. */
-    private class Rig(val cas: CasStore, val file: File) {
+    private class Rig(val cas: CasStore, val file: borg.trikeshed.common.Path) {
         val board = ConfixBlackboard.empty()
         val couch = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(couch, cas)
@@ -64,8 +64,8 @@ class ProgramLedgerTest {
         fun attachmentCid(name: String): String? = gateway.getAttachment("panels/$name")?.first?.contentId?.value
     }
 
-    private fun ledgerFile(): File =
-        File(System.getProperty("java.io.tmpdir"), "program-ledger-${System.nanoTime()}").let { ProgramLedger.ledgerFile(it) }
+    private fun ledgerFile(): borg.trikeshed.common.Path =
+        borg.trikeshed.common.File(System.getProperty("java.io.tmpdir")!!, "program-ledger-${System.nanoTime()}")
 
     @Test
     fun theLedgerChainsEveryVersionAndAFreshRigReplaysTheLastPerName(): Unit = runBlocking {

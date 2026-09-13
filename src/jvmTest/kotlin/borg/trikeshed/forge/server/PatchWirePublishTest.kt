@@ -34,8 +34,8 @@ class PatchWirePublishTest {
      */
     private class Rig(
         val cas: CasStore = CasStore.inMemory(),
-        val ledger: File = File(System.getProperty("java.io.tmpdir"), "patchwire-snapshots-${System.nanoTime()}/snapshots/ledger.jsonl"),
-        val programLedger: File = File(System.getProperty("java.io.tmpdir"), "patchwire-programs-${System.nanoTime()}/programs/ledger.jsonl"),
+        val ledger: borg.trikeshed.common.Path = borg.trikeshed.common.File(System.getProperty("java.io.tmpdir"), "patchwire-snapshots-${System.nanoTime()}/snapshots/ledger.jsonl"),
+        val programLedger: borg.trikeshed.common.Path = borg.trikeshed.common.File(System.getProperty("java.io.tmpdir"), "patchwire-programs-${System.nanoTime()}/programs/ledger.jsonl"),
     ) {
         val couch = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(couch, cas)

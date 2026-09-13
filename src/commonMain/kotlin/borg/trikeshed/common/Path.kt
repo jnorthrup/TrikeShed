@@ -63,17 +63,29 @@ value class Path(val absolutePath: String) {
     /** Path separator spelling of this path. */
     val path: String get() = absolutePath
 
-
+    /** java.io.File.renameTo parity. */
+    fun renameTo(target: Path): Boolean = Files.rename(absolutePath, target.absolutePath)
 
     /** Platform path separator spelling ("/" on posix-family hosts the SPI backs). */
     companion object {
         const val separator: String = "/"
     }
 
-
     override fun toString(): String = absolutePath
 }
 
 /** The type + constructor spelling ported bodies use: `File("a/b")`, `File(parent, child)`. */
+fun File(parent: String, child: String): Path = Path(Files.resolvePath(parent, child))
+
+fun File(parent: Path, child: String): Path = Path(Files.resolvePath(parent.absolutePath, child))
+
+/** The type + constructor spelling ported bodies use. */
 typealias File = Path
 
+
+/** java.io.File-idiom join for ported bodies passing Path args (extension: no expect changes). */
+fun Files.resolvePath(parent: Path, child: String): String = resolvePath(parent.absolutePath, child)
+
+fun Files.resolvePath(parent: String, child: Path): String = resolvePath(parent, child.absolutePath)
+
+fun Files.resolvePath(parent: Path, child: Path): String = resolvePath(parent.absolutePath, child.absolutePath)

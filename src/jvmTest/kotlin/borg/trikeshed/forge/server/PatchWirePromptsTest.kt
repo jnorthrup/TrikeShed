@@ -31,7 +31,7 @@ class PatchWirePromptsTest {
         val gateway = CouchAttachmentGateway(couch, cas)
         val board = ConfixBlackboard.empty()
         val publisher = LcncPublisher(board, { emptyMap() }, gateway)
-        val ledger = File(System.getProperty("java.io.tmpdir"), "patchwire-prompts-${System.nanoTime()}/prompts/ledger.jsonl")
+        val ledger = borg.trikeshed.common.File(System.getProperty("java.io.tmpdir"), "patchwire-prompts-${System.nanoTime()}/prompts/ledger.jsonl")
         val store = PromptStore(gateway, cas, ledger, publisher) { 7L }
         val scopes = ProjectScopes(JvmFileOperations(), gateway, CouchIndexBridge(gateway, MemoryIndexLayer(MemoryStore(cas, couch))), cas, null)
         fun wire(withStore: Boolean = true): PatchWire {

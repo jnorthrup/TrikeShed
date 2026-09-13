@@ -18,9 +18,9 @@ import kotlin.test.assertTrue
  */
 class NarsDurableLedgerTest {
 
-    private fun <T> withForge(block: (java.io.File) -> T): T {
+    private fun <T> withForge(block: (borg.trikeshed.common.Path) -> T): T {
         val home = Files.createTempDirectory("nars-ledger-").toFile()
-        try { return block(home) } finally { home.deleteRecursively() }
+        try { return block(borg.trikeshed.common.Path(home.absolutePath)) } finally { home.deleteRecursively() }
     }
 
     @Test

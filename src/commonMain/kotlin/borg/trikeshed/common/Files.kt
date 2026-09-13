@@ -40,4 +40,7 @@ expect object Files {
 
     /** Last-modified epoch millis, 0 when the platform cannot answer. */
     fun lastModified(filename: String): Long
+
+    /** java.io.File.renameTo parity: rename src onto dst, false when the platform refuses. */
+    fun rename(src: String, dst: String): Boolean
 }

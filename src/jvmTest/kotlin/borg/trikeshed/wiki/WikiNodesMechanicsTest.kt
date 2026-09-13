@@ -95,7 +95,7 @@ class WikiNodesMechanicsTest {
                 ),
             )),
         )
-        val runner1 = WikiNodes.consolidateRunner(dialog1, { root }, traces, clock = { 1_000L })
+        val runner1 = WikiNodes.consolidateRunner(dialog1, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 1_000L })
         val r1 = report(runner1.run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf(
             "cids" to "$cidA,$cidB", "iteration" to "1", "contextId" to "ctx-iter-1",
         )), emptyMap()))
@@ -133,7 +133,7 @@ class WikiNodesMechanicsTest {
                 ),
             )),
         )
-        val runner2 = WikiNodes.consolidateRunner(dialog2, { root }, traces, clock = { 2_000L })
+        val runner2 = WikiNodes.consolidateRunner(dialog2, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 2_000L })
         val r2 = report(runner2.run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf(
             "cids" to cidB, "iteration" to "2", "contextId" to "ctx-iter-2",
         )), emptyMap()))
@@ -180,7 +180,7 @@ class WikiNodesMechanicsTest {
                 mapOf("op" to "create", "file" to "patterns/no-provenance.md", "text" to "# Nothing cited\n"),
             ))),
         )
-        val r = report(WikiNodes.consolidateRunner(dialog, { root }, traces, clock = { 3_000L })
+        val r = report(WikiNodes.consolidateRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 3_000L })
             .run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf("cids" to cidA, "contextId" to "ctx-gate")), emptyMap()))
         assertEquals(true, r["ok"])
         assertFalse(File(root, "patterns/no-provenance.md").exists(), "an unprovenanced page must not be written")
@@ -208,7 +208,7 @@ class WikiNodesMechanicsTest {
                 ),
             ))),
         )
-        val r = report(WikiNodes.consolidateRunner(dialog, { root }, traces, clock = { 3_500L })
+        val r = report(WikiNodes.consolidateRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 3_500L })
             .run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf("cids" to cidB, "contextId" to "ctx-strip")), emptyMap()))
         @Suppress("UNCHECKED_CAST") val applied = r["applied"] as List<Map<String, Any?>>
         @Suppress("UNCHECKED_CAST") val refused = r["refused"] as List<Map<String, Any?>>
@@ -224,7 +224,7 @@ class WikiNodesMechanicsTest {
     fun anUnparsableMaintainerReplyMutatesNothingButIsStillCaptured() = runBlocking {
         val root = File(tmp, "wiki3")
         val dialog = ScriptedDialog("I thought about it but produced no JSON.")
-        val r = report(WikiNodes.consolidateRunner(dialog, { root }, traces, clock = { 4_000L })
+        val r = report(WikiNodes.consolidateRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 4_000L })
             .run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf("cids" to cidA, "contextId" to "ctx-bad")), emptyMap()))
         assertEquals(false, r["ok"])
         assertEquals("unparsable_edit_script", r["error"])
@@ -242,7 +242,7 @@ class WikiNodesMechanicsTest {
                 mapOf("op" to "create", "file" to "/etc/absolute.md", "text" to "nope $cidA"),
             ))),
         )
-        val r = report(WikiNodes.consolidateRunner(dialog, { root }, traces, clock = { 5_000L })
+        val r = report(WikiNodes.consolidateRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 5_000L })
             .run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf("cids" to cidA, "contextId" to "ctx-escape")), emptyMap()))
         @Suppress("UNCHECKED_CAST") val refused = r["refused"] as List<Map<String, Any?>>
         assertEquals(2, refused.size)
@@ -274,7 +274,7 @@ class WikiNodesMechanicsTest {
                 "patterns" to listOf("patterns/marker-blind-verdict.md"),
             )),
         )
-        val r = report(WikiNodes.proposeRunner(dialog, { root }, traces, clock = { 6_000L })
+        val r = report(WikiNodes.proposeRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 6_000L })
             .run(node(LcncContracts.WIKI_PROPOSE, mapOf(
                 "summary" to "0 signals over 12 transcripts", "contextId" to "ctx-prop",
             )), emptyMap()))
@@ -333,7 +333,7 @@ class WikiNodesMechanicsTest {
                 "skillMd" to "x", "purposeMd" to "patterns/p1.md",
             )),
         )
-        val r = report(WikiNodes.proposeRunner(dialog, { root }, traces, clock = { 7_000L })
+        val r = report(WikiNodes.proposeRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 7_000L })
             .run(node(LcncContracts.WIKI_PROPOSE, mapOf("contextId" to "ctx-multi")), emptyMap()))
         assertEquals(false, r["ok"])
         assertEquals("proposal_refused", r["error"])
@@ -351,7 +351,7 @@ class WikiNodesMechanicsTest {
                 "skillMd" to "x", "purposeMd" to "Motivated by nothing in particular.",
             )),
         )
-        val r = report(WikiNodes.proposeRunner(dialog, { root }, traces, clock = { 8_000L })
+        val r = report(WikiNodes.proposeRunner(dialog, { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 8_000L })
             .run(node(LcncContracts.WIKI_PROPOSE, mapOf("contextId" to "ctx-orphan")), emptyMap()))
         assertEquals(false, r["ok"])
         @Suppress("UNCHECKED_CAST") val refusals = r["refusals"] as List<String>

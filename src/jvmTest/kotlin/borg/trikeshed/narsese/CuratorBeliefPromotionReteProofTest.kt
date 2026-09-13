@@ -1,5 +1,6 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.narsese.legacy.CuratorImpulseFeeder
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size

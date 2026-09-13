@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.SocketDomain
 import borg.trikeshed.userspace.nio.channels.SocketType
@@ -20,8 +23,8 @@ class SocketLifecycleSqeTest {
         val backend = openJvmEmulatedChannelBackend()
         val facade = FunctionalUringFacade(16, backend)
         try {
-            facade.enqueue(UringOp.Submissions.socket(
-                SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, 0, userData = 1L))
+            facade.enqueue(UringSubmission(UringOp.SOCKET, SocketDomain.AF_INET.posix, 0,
+                0, SocketType.SOCK_STREAM.mask.toLong(), userData = 1L))
             facade.submit()
             val sockFd = facade.wait(1).single { it.userData == 1L }.res
             assertTrue(sockFd > 0, "SOCKET res=$sockFd")

@@ -1,6 +1,11 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.couch.CouchReportReactorElement
+import kotlinx.coroutines.channels.Channel
+import kotlin.collections.set
+import kotlin.jvm.JvmStatic
+import kotlin.jvm.Volatile
+import kotlin.system.exitProcess
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.torrent.TorrentElement
@@ -32,6 +37,7 @@ import borg.trikeshed.platform.randomUuid
 import borg.trikeshed.common.File
 import borg.trikeshed.common.Files
 import borg.trikeshed.common.Path
+import borg.trikeshed.common.resolvePath
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,13 +50,13 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
+import borg.trikeshed.jules.JulesCause
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.channels.Channel
-import kotlin.collections.set
-import kotlin.jvm.JvmStatic
-import kotlin.jvm.Volatile
-import kotlin.system.exitProcess
-import kotlin.toString
+
+/** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
+private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
 
 //java and sun deps are forbidden
 //syncronous calls, anything not SQE->CQE are absolutely banned here.  what is not written you must write as uring code hosted in commonMain nio code
@@ -105,10 +111,10 @@ internal class BuildPlanes(
 internal fun reconcileBuildPlane(planes: BuildPlanes, revision: String): Int {
     var n = 0
     with(planes) {
-        if (classesDir.isDirectory) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
-        if (libDir.isDirectory) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
-        if (resourcesDir.isDirectory) n += resourcesGateway.reconcile(resourcesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
-        if (agentJar.isFile) {
+        if (classesDir.isDirectory()) n += classesGateway.reconcile(classesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
+        if (libDir.isDirectory()) n += libGateway.reconcile(libDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
+        if (resourcesDir.isDirectory()) n += resourcesGateway.reconcile(resourcesDir.absolutePath, "oroboros", revision, HostSystem.currentTimeMillis()).paths.size
+        if (agentJar.isFile()) {
             val bytes = agentJar.readBytes()
             val cid = borg.trikeshed.job.ContentId.of(bytes)
             val path = agentPrefix + agentJar.name
@@ -149,9 +155,9 @@ internal fun writeClasspathManifest(planes: BuildPlanes, revision: String) {
     if (entries == 0) return
     val file = planes.manifestFile
     file.parentFile?.mkdirs()
-    val tmp = File(file.parentFile, file.name + ".tmp")
+    val tmp = java.io.File(file.parentFile?.absolutePath, file.name + ".tmp")
     tmp.writeText(lines.toString())
-    if (!tmp.renameTo(file)) {
+    if (!tmp.renameTo(java.io.File(file.absolutePath))) {
         file.writeText(lines.toString())
         tmp.delete()
     }
@@ -392,7 +398,7 @@ object OroborosDaemon {
         val (forgeHome, repoDir) = withContext(Dispatchers.IO) {
             val canonicalForge = File(Files.resolvePath(home, ".local/forge"))
             val fHome = File(positional.getOrNull(0) ?: canonicalForge.absolutePath)
-            val rDir = File(positional.getOrNull(1) ?: HostSystem.getProperty("user.dir"))
+            val rDir = File(positional.getOrNull(1) ?: HostSystem.getProperty("user.dir")!!)
             val gitDir = rDir.resolve(".git")
             if (!gitDir.exists()) {
                 HostSystem.err("[OROBOROS] $rDir is not a git work tree. Aborting.")
@@ -488,7 +494,7 @@ object OroborosDaemon {
         // addressable under the same prefix it was written with.
         WorktreeCouchGateway.WORKTREE_PREFIX = "projects/${repoDir.name.lowercase()}/"
 
-        if (HostSystem.getProperty("os.name").lowercase().contains("linux")) {
+        if ((HostSystem.getProperty("os.name") ?: "").lowercase().contains("linux")) {
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_SOCKET)
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_CONNECT)
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_EXECVE)
@@ -669,7 +675,7 @@ object OroborosDaemon {
         // memories, cron, config) is what "teleport a clone" means: the agent's memory, not its jar.
         // ONE-SHOT, no watcher: a home directory's caches/logs churn constantly and a live watch on
         // 2.7GB of it would dwarf the repo's own file-event volume for no replication benefit.
-        val hermesHomeDir = File(HostSystem.getProperty("user.home"), ".hermes")
+        val hermesHomeDir = File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes")
         val hermesHomeGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
             prefix = "homes/hermes/",
@@ -763,14 +769,16 @@ object OroborosDaemon {
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
         val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
-            root = File(
+            root = java.nio.file.Paths.get(
                 config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
-                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath,
-            ).toPath(),
-            sleeve = File(
+                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath
+                ?: error("no hermes root"),
+            ),
+            sleeve = java.nio.file.Paths.get(
                 config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
-                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath,
-            ).toPath(),
+                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath
+                ?: error("no hermes sleeve"),
+            ),
         )
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
         if (config.hermesConsole) wireScope.launch(Dispatchers.IO) { hermesConsole.open() }
@@ -825,7 +833,7 @@ object OroborosDaemon {
             val bag = borg.trikeshed.narsese.BeliefBagElement(
                 capacity = 4096,
                 cas = casStore,
-                wal = borg.trikeshed.couch.isam.JvmDurableAppendLog(File(Files.resolvePath(walDir, "belief.wal"))),
+                wal = borg.trikeshed.couch.isam.JvmDurableAppendLog(jfile(File(Files.resolvePath(walDir, "belief.wal")))),
                 decayFn = { b -> borg.trikeshed.narsese.AttentionEconomy.decay(b) },
                 priorityFloor = borg.trikeshed.narsese.CurationState.STALE.floor,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -1012,7 +1020,7 @@ object OroborosDaemon {
             val profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) }
                 ?: File(hermesHomeDir.absolutePath)
             val archiveProfile = HostSystem.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
-                ?: File(HostSystem.getProperty("user.home"), ".hermes.prev").takeIf { it.isDirectory }
+                ?: File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes.prev").takeIf { it.isDirectory() }
             // Wiki Maintainer lane cadence: one pass per N transcript-cid
             // batches (the arXiv outer loop k); WIKI_CONSOLIDATE_EVERY=0
             // disables the lane entirely.
@@ -1024,13 +1032,13 @@ object OroborosDaemon {
             var wikiPending = emptyList<String>()
             launch(Dispatchers.Default) {
                 runCatching {
-                    val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(profileDir, archiveProfile, memoryStore)
+                    val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(jfile(profileDir), archiveProfile?.let(::jfile), memoryStore)
                     HostSystem.err("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
                 }.onFailure {
                     HostSystem.err("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
                 }
 
-                val feeder = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder(profileDir)
+                val feeder = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder(jfile(profileDir))
                 var checkpoint = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowCheckpoint.empty()
                 // I5: baselines are computed once per daemon run, after the first follow has
                 // had a chance to land transcripts — session cids to the blackboard.
@@ -1127,12 +1135,12 @@ object OroborosDaemon {
         val projectScopes = borg.trikeshed.forge.server.ProjectScopes(
             fileOps, attachmentGateway, couchIndexBridge, casStore, beliefBag,
             projectDbs = projectDbRegistry,
-            ledgerFile = File(Files.resolvePath(forgeHome, ".oroboros/projects.tsv")),
-            filesRoot = File(Files.resolvePath(forgeHome, "files")),
+            ledgerFile = jfile(File(Files.resolvePath(forgeHome, ".oroboros/projects.tsv"))),
+            filesRoot = jfile(File(Files.resolvePath(forgeHome, "files"))),
         )
         val projectDbWire = borg.trikeshed.forge.server.ProjectDbWire(projectDbRegistry, uploads = projectScopes)
         val projectMiner = borg.trikeshed.forge.server.ProjectMiner(
-            projectDbRegistry, projectScopes, casStore, beliefBag, File(Files.resolvePath(forgeHome, "files")),
+            projectDbRegistry, projectScopes, casStore, beliefBag, jfile(File(Files.resolvePath(forgeHome, "files"))),
         )
         // ── Brain pin = Hermes' live session. Hermes records, per session, the
         // model and the resolved runtime it actually runs on
@@ -1306,7 +1314,7 @@ object OroborosDaemon {
             mountScope = wireScope,
             miner = projectMiner,
             catalogProvider = { requireNotNull(muxReactor.modelMux()) },
-            sessionSnapshot = File(Files.resolvePath(forgeHome, ".modelmux/sessions.json")),
+            sessionSnapshot = jfile(File(Files.resolvePath(forgeHome, ".modelmux/sessions.json"))),
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
@@ -1340,7 +1348,7 @@ object OroborosDaemon {
             routes = moduleRoutes,
             scope = moduleScope,
             clock = { HostSystem.currentTimeMillis() },
-            stateDir = forgeHome,
+            stateDir = jfile(forgeHome),
             muxContext = htxElement + muxReactor,
             ccekBinding = ccekBinding,
             programLoader = storedProgramLoader,
@@ -1398,7 +1406,7 @@ object OroborosDaemon {
         // agent.list legos and the claim worker's lane share one runner; receipts are agent/run/<runId>.
         val agentRoster = borg.trikeshed.agent.AgentCliProbe.probe(config.agents, borg.trikeshed.agent.AgentRegistry.KNOWN)
         val agentRunner = borg.trikeshed.agent.JvmAgentRunner(
-            agentRoster, repoDir = repoDir, forgeHome = forgeHome, cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
+            agentRoster, repoDir = jfile(repoDir), forgeHome = jfile(forgeHome), cas = casStore, attachments = attachmentGateway, blackboard = daemonBlackboard,
         )
         moduleContext.agentRuns = agentRunner
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.AgentNodes.registry(agentRunner) { borg.trikeshed.platform.randomUuid().toString() })
@@ -1428,7 +1436,7 @@ object OroborosDaemon {
                 "outputTokens" to u.outputTokens,
                 "lastSeenMs" to (u.lastSeenEpochSeconds * 1000).toLong(),
             )
-            val session = borg.trikeshed.jules.legacy.HermesActiveSession.current(db)
+            val session = borg.trikeshed.jules.legacy.HermesActiveSession.current(jfile(db))
             mapOf(
                 "ledger" to db.absolutePath,
                 "session" to session?.let { s ->
@@ -1859,7 +1867,7 @@ object OroborosDaemon {
         val wikiRoot = { File(Files.resolvePath(forgeHome, "wiki")) }
         val wikiTraces = borg.trikeshed.wiki.WikiTraceSources.loader(
             cas = casStore,
-            profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) } ?: File(hermesHomeDir.absolutePath),
+            profileDir = jfile(HostSystem.getenv("HERMES_PROFILE")?.let { File(it) } ?: File(hermesHomeDir.absolutePath)),
         )
         moduleContext.lcncRunners[borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE] =
             borg.trikeshed.wiki.WikiNodes.consolidateRunner(
@@ -1874,7 +1882,7 @@ object OroborosDaemon {
         // Both wiki legos above call a model to do their work, so until now READING a curated
         // artifact needed an API key. VAL-CROSS-002 found the curation plane hosted, durable and
         // unreachable as itself. These two routes are the read side, and they touch nothing.
-        val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(wikiRoot)
+        val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(wikiRoot = { jfile(wikiRoot()) })
         HostSystem.err(
             "[OROBOROS] Wiki read routes armed: " +
                     borg.trikeshed.forge.server.WikiReadWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" } +
@@ -1960,14 +1968,14 @@ object OroborosDaemon {
         }
         val moduleSupervisor = borg.trikeshed.module.ModuleSupervisor(
             ctx = moduleContext,
-            liveClassesDir = File(Files.resolvePath(repoDir, "build/live/classes")),
+            liveClassesDir = jfile(File(Files.resolvePath(repoDir, "build/live/classes"))),
             receipt = { event, id, detail ->
                 daemonBlackboard.put("$event/$id", detail.mapValues { it.value?.toString() ?: "" }, "oroboros")
             },
         )
         val moduleWire = borg.trikeshed.forge.server.ModuleWire(moduleSupervisor, moduleRoutes)
         val webhookRuntime = borg.trikeshed.forge.server.couchWebhookRuntime(
-            couchStore, daemonBlackboard, forgeHome,
+            couchStore, daemonBlackboard, jfile(forgeHome),
             runners = moduleContext.lcncRunners,
             loadProgram = { name -> borg.trikeshed.lcnc.LcncPresets.all()[name]?.encodeToByteArray() },
         )
@@ -1977,7 +1985,7 @@ object OroborosDaemon {
         // outbound NUID acceptance spaces never collide.
         val outboundHookLedger = withContext(Dispatchers.IO) {
             borg.trikeshed.hook.CausalHookDeliveryLedger.open(
-                File(Files.resolvePath(forgeHome, ".hook-deliveries-out.wal")), "hook-delivery-out/",
+                jfile(File(Files.resolvePath(forgeHome, ".hook-deliveries-out.wal"))), "hook-delivery-out/",
             )
         }
         borg.trikeshed.hook.installOutboundWebhookBridge(couchStore, daemonBlackboard, webhookScope, outboundHookLedger)
@@ -2039,7 +2047,7 @@ object OroborosDaemon {
                     borg.trikeshed.forge.server.HermesConsoleWire.STREAMING +
                     borg.trikeshed.forge.server.BlackboardWire.STREAMING,
             maxRequestBatch = 4096,
-            stateDir = forgeHome,
+            stateDir = jfile(forgeHome),
             moduleRoutes = moduleRoutes,
         )
         // Published programs (AutoTools notion, Cut 0): every head the ledger names is re-filed as
@@ -2159,6 +2167,7 @@ object OroborosDaemon {
         val gitWatcher = FileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
+            capacity = 4096,
             includeGlobs = listOf(".git/**"),
             excludeGlobs = emptyList(),
             // This watcher wants the git DB and nothing else, but the walk is rooted at the repo:
@@ -2177,12 +2186,14 @@ object OroborosDaemon {
         val julesWalWatcher = FileWatchReactorElement(
             root = forgeHome.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
+            capacity = 256,
             includeGlobs = listOf("jules-board.wal"),
             excludeGlobs = emptyList(),
             // One file at the forge root, but the walk is rooted at the forge home — which is
             // where the CAS store lives. Pruning the store's shard tree keeps this watcher the
             // size of the thing it actually watches.
             walkerBlockedSegments = WorktreeCouchGateway.EXCLUDED_SEGMENTS,
+            walkerBlockedRelativePrefixes = emptySet<String>(),
         )
         launch(Dispatchers.IO) { julesWalWatcher.open() }
         launch {
@@ -2219,6 +2230,7 @@ object OroborosDaemon {
         val worktreeWatcher = FileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
+            capacity = 4096,
             includeGlobs = emptyList(),
             // Derived from the gateway's own ignore sets, never hand-listed here again: the
             // hand-listed version omitted `logs/`, so the daemon's log writes woke the watcher
@@ -2262,8 +2274,11 @@ object OroborosDaemon {
             val w = FileWatchReactorElement(
                 root = dir.absolutePath,
                 parentJob = coroutineContext[kotlinx.coroutines.Job],
+                capacity = 1024,
                 includeGlobs = emptyList(),
                 excludeGlobs = emptyList(),
+                walkerBlockedSegments = emptySet(),
+                walkerBlockedRelativePrefixes = emptySet(),
             )
             launch(Dispatchers.IO) {
                 try {
@@ -2361,7 +2376,7 @@ object OroborosDaemon {
                     WorktreeCouchGateway.WORKTREE_PREFIX,
                     worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
                 )
-                projectScopes.registerPrimary(repoDir, worktreeSnap.paths.size)
+                projectScopes.registerPrimary(jfile(repoDir), worktreeSnap.paths.size)
                 HostSystem.err(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
                             (if (worktreeSnap.skippedDirs.isEmpty()) ""
@@ -2430,7 +2445,7 @@ object OroborosDaemon {
 
             // ── Hermes home reconcile ──
             runCatching {
-                if (hermesHomeDir.isDirectory) {
+                if (hermesHomeDir.isDirectory()) {
                     val hermesSnap = hermesHomeGateway.reconcile(hermesHomeDir.absolutePath, "oroboros", headSha, HostSystem.currentTimeMillis())
                     HostSystem.err("[OROBOROS] Hermes home→Couch initial reconcile: ${hermesSnap.paths.size} paths (teleportable clone of ~/.hermes)")
                 } else {
@@ -2566,7 +2581,7 @@ object OroborosDaemon {
     internal suspend fun preflight(repoDir: File): Boolean {
         // git fetch origin master (best-effort, 5s timeout)
         val fetchOk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val builder = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run").directory(repoDir)
+            val builder = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run").directory(jfile(repoDir))
             builder.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
             val fetch = builder.start()
             val finished = fetch.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
@@ -2576,7 +2591,7 @@ object OroborosDaemon {
         if (!fetchOk) return true // offline is OK, we'll poll anyway
 
         suspend fun command(vararg args: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val builder = ProcessBuilder(*args).directory(repoDir).redirectErrorStream(true)
+            val builder = ProcessBuilder(*args).directory(jfile(repoDir)).redirectErrorStream(true)
             builder.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
             val p = builder.start()
             val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readText().trim() }
@@ -2621,12 +2636,8 @@ object OroborosDaemon {
         )
     }
 }
-package borg.trikeshed.daemon
 
-import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
-import borg.trikeshed.utils.kanban.JulesBoardStore
-import kotlinx.coroutines.runBlocking
+
 
 
 /**
@@ -2642,9 +2653,9 @@ object ReapAppend {
     fun main(args: Array<String>) = runBlocking {
         val listPath = args.getOrNull(0) ?: error("usage: ReapAppend <sid-list.txt> [wal-path]")
         val walPath = args.getOrNull(1)
-            ?: File(HostSystem.getProperty("user.home"), ".local/forge/jules-board.wal").absolutePath
-        val store = JulesBoardStore(JvmAppendWal(File(walPath)).also {
-            File(walPath).parentFile.mkdirs()
+            ?: File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".local/forge/jules-board.wal").absolutePath
+        val store = JulesBoardStore(JvmAppendWal(java.io.File(walPath ?: error("no wal-path"))).also {
+            java.io.File(walPath!!).parentFile.mkdirs()
         })
         val sids = File(listPath).readLines().filter { it.isNotBlank() }
         println("appending WorkDrained for ${sids.size} sessions to $walPath")

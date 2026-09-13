@@ -92,4 +92,6 @@ actual object Files {
 
     actual fun createTempDir(prefix: String): String =
         "/tmp/$prefix-${Random.nextLong().toString(16)}"
+
+    actual fun rename(src: String, dst: String): Boolean = TODO("Files.rename: Node renameSync binding pending")
 }

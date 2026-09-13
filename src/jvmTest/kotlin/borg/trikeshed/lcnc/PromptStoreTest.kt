@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
  */
 class PromptStoreTest {
 
-    private class Rig(val cas: CasStore, val ledger: File) {
+    private class Rig(val cas: CasStore, val ledger: borg.trikeshed.common.Path) {
         val board = ConfixBlackboard.empty()
         val couch = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(couch, cas)
@@ -30,7 +30,10 @@ class PromptStoreTest {
         val store = PromptStore(gateway, cas, ledger, publisher) { now }
     }
 
-    private fun ledger(): File = File(System.getProperty("java.io.tmpdir"), "prompt-ledger-${System.nanoTime()}").let { File(it, "prompts/ledger.jsonl") }
+    private fun ledger(): borg.trikeshed.common.Path {
+        val parent = java.io.File(System.getProperty("java.io.tmpdir"), "prompt-ledger-${System.nanoTime()}")
+        return borg.trikeshed.common.File(parent.absolutePath, "prompts/ledger.jsonl")
+    }
 
     @Test
     fun saveChainsLineageAndAByteIdenticalSaveIsANoOp(): Unit = runBlocking {

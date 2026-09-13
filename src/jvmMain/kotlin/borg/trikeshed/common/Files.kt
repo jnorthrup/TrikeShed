@@ -32,4 +32,11 @@ actual object Files {
     actual fun createTempDir(prefix: String): String = ops.createTempDir(prefix)
 
     actual fun lastModified(filename: String): Long = ops.lastModified(filename)
+
+    actual fun rename(src: String, dst: String): Boolean {
+        val source = java.io.File(src)
+        val dest = java.io.File(dst)
+        dest.parentFile?.mkdirs()
+        return source.renameTo(dest)
+    }
 }

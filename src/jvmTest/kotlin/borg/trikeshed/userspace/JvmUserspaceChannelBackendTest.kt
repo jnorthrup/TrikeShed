@@ -19,7 +19,7 @@ class JvmUserspaceChannelBackendTest {
         java.nio.file.Files.write(path, ByteArray(8))
         try {
             val file = UserFiles.open(path.toString(), readOnly = false)
-            val channel = Channels.open(entries = 8)
+            val channel = borg.trikeshed.userspace.nio.channels.UringChannels.open(entries = 8)
             val writeBuffer = ByteBuffer.wrap(byteArrayOf(1, 2, 3, 4))
 
             channel.write(file, writeBuffer, offset = 2L, userData = 11L)

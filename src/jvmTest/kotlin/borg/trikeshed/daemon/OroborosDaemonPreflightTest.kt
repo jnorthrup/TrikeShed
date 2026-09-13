@@ -43,7 +43,7 @@ class OroborosDaemonPreflightTest {
             ProcessBuilder("git", "fetch", "origin", "master").directory(clone).start().waitFor()
 
             // Now clone is diverged from origin/master: preflight must refuse to proceed.
-            assertEquals(false, OroborosDaemon.preflight(clone))
+            assertEquals(false, OroborosDaemon.preflight(borg.trikeshed.common.Path(clone.absolutePath)))
         } finally {
             root.deleteRecursively()
         }

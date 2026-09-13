@@ -78,7 +78,7 @@ class BeliefRenderTest {
         val dir = File.createTempFile("hermes-mem", "").let { f -> f.delete(); f.apply { mkdirs() } }
         val bag = BeliefBagElement(capacity = 64)
         bag.open()
-        val files = HermesMemoryFiles(bag, dir, ContentId.of("session".encodeToByteArray()))
+        val files = HermesMemoryFiles(bag, borg.trikeshed.common.Path(dir.absolutePath), ContentId.of("session".encodeToByteArray()))
         // seed one machine belief with a gloss, render
         val a = HermesMemoryFiles.entryAngular("machine learned this")
         files.gloss(a, "machine learned this")

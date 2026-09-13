@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.jules.legacy.HermesActiveSession
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,7 +27,7 @@ class HermesInstancesTest {
         )
 
     private fun usage(model: String, provider: String, baseUrl: String, task: String, at: Double) =
-        HermesModelUsage.Usage(model, provider, baseUrl, task, 1, 0, 0, at)
+        HermesModelUsage.Usage(model, provider, baseUrl, task, 1, 0, 0, at, ledger = "")
 
     @Test
     fun unionNewestFirstOneRowPerEndpoint() {
@@ -109,6 +110,6 @@ class HermesInstancesTest {
     @Test
     fun emptyTablesListNothing() {
         assertEquals(emptyList(), HermesInstances.merge(emptyList(), emptyList()))
-        assertEquals(emptyList(), HermesInstances.known(java.io.File("/nonexistent/state.db")))
+        assertEquals(emptyList(), HermesInstances.known(borg.trikeshed.common.Path("/nonexistent/state.db")))
     }
 }

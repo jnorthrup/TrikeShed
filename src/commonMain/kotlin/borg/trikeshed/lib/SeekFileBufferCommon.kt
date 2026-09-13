@@ -63,9 +63,11 @@ class SeekFileBufferCommon(
 
     override fun close() {
         if (!isOpen()) return
+        // Every op settles before return, so nothing is in flight here: closeNow is the drain.
+        channel?.closeNow()
+        channel = null
         file?.close()
         file = null
-        channel = null
         windowBase = -1
         windowLimit = -1
     }

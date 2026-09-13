@@ -101,4 +101,6 @@ actual object Files {
         jsMkdir(dir)
         return dir
     }
+
+    actual fun rename(src: String, dst: String): Boolean = TODO("Files.rename: Node renameSync binding pending")
 }

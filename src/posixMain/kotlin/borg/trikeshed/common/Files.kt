@@ -173,5 +173,6 @@ actual object Files {
 
     actual fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 
-
+    actual fun rename(src: String, dst: String): Boolean =
+        platform.posix.rename(src, dst) == 0
 }

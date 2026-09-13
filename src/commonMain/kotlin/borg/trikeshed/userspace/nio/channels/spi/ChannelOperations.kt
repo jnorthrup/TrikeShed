@@ -18,6 +18,35 @@ interface ChannelOperations : CoroutineContext.Element {
     override val key: CoroutineContext.Key<*> get() = Key
 
     fun openChannel(entries: Int = 256): ChannelHandle
+    /** Settle one prepared SQE through a throwaway ring: returns the CQE res. */
+    private fun settleOne(prep: (ChannelHandle) -> Int): Int {
+        val handle = openChannel(4)
+        try {
+            if (prep(handle) < 0) return -1
+            if (handle.submit() != 1) return -1
+            return handle.wait(1).firstOrNull()?.res ?: -1
+        } finally {
+            handle.close()
+        }
+    }
+
+    /** IORING_OP_SOCKET: create a socket; res = fd or -errno. */
+    fun socket(domain: Int, type: Int, protocol: Int): Int = settleOne { it.prepSocket(domain, type, protocol) }
+
+    /** IORING_OP_BIND with an encoded AF_UNIX sockaddr built from [path]. */
+    fun bindUnix(fd: Int, path: String): Int {
+        val bytes = sockaddrUnix(path) ?: return -22
+        return settleOne { it.prepBind(fd, ByteBuffer(bytes)) }
+    }
+
+    /** IORING_OP_LISTEN. */
+    fun listen(fd: Int, backlog: Int = 128): Int = settleOne { it.prepListen(fd, backlog) }
+
+    /** IORING_OP_ACCEPT: res = new fd or -errno. */
+    fun accept(fd: Int): Int = settleOne { it.prepAccept(fd) }
+
+    /** IORING_OP_CLOSE. */
+    fun close(fd: Int): Int = settleOne { it.prepClose(fd) }
 
     /**
      * Resolve a host to IPv4 octets for a CONNECT/BIND SQE sockaddr.
@@ -57,6 +86,16 @@ interface ChannelOperations : CoroutineContext.Element {
         fun submit(): Int
         fun wait(minComplete: Int = 1): List<ChannelResult>
     }
+}
+
+/** Encoded AF_UNIX sockaddr (sun_path, linux shape: family u16 + 108 bytes) or null when too long. */
+fun sockaddrUnix(path: String): ByteArray? {
+    if (path.length > 107) return null
+    val bytes = ByteArray(110)
+    bytes[0] = 1
+    bytes[1] = 0
+    path.encodeToByteArray().copyInto(bytes, 2)
+    return bytes
 }
 
 data class ChannelResult(val fd: Int, val res: Int, val userData: Long)

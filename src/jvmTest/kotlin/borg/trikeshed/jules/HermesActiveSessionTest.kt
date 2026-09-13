@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.jules.legacy.HermesActiveSession
 import java.io.File
 import java.nio.file.Files
 import java.sql.DriverManager
@@ -206,7 +207,7 @@ class HermesActiveSessionTest {
 
     @Test
     fun stateDbFollowsTheSharedHermesHome() {
-        assertEquals(File("/x/profiles/p", "state.db"), HermesActiveSession.stateDb("/x/profiles/p"))
-        assertEquals(HermesModelUsage.stateDb(), HermesActiveSession.stateDb())
+        assertEquals(java.io.File("/x/profiles/p/state.db"), HermesActiveSession.stateDb("/x/profiles/p"))
+        assertEquals(HermesModelUsage.stateDb().absolutePath, HermesActiveSession.stateDb().absolutePath)
     }
 }

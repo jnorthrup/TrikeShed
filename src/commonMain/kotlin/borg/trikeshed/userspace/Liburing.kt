@@ -166,7 +166,7 @@ object Liburing : LiburingFacade by LiburingImpl {
         return true
     }
 
-    private fun vetoed(): Result<Unit> = Result.failure(UringVetoed)
+    private fun vetoed(): Result<Unit> = Result.failure(UringVetoed())
 
     private fun observe(completion: UringCompletion?): UringCompletion? {
         val programs = completePrograms ?: return completion
@@ -255,8 +255,8 @@ object Liburing : LiburingFacade by LiburingImpl {
 }
 
 /** A SUBMIT program refused this submission. EPERM, surfaced rather than swallowed. */
-object UringVetoed : RuntimeException("submission vetoed by an attached eBPF SUBMIT program") {
-    private fun readResolve(): Any = UringVetoed
+class UringVetoed : RuntimeException("submission vetoed by an attached eBPF SUBMIT program") {
+    private fun readResolve(): Any = UringVetoed()
 }
 
 internal expect object LiburingImpl : LiburingFacade {
