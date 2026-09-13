@@ -795,6 +795,7 @@ tasks.register<JavaExec>("runOroborosDaemon") {
 val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
 val daemonAotCpFile = layout.buildDirectory.file("staging/oroboros.aot.cp")
 val daemonAotFingerprintFile = layout.buildDirectory.file("staging/oroboros.aot.fingerprint")
+val daemonAotJvmArgs = listOf("--add-modules=jdk.internal.vm.ci", "--enable-native-access=ALL-UNNAMED")
 
 fun daemonAotJava(): File = File(System.getProperty("java.home"), "bin/java").canonicalFile
 
@@ -820,7 +821,7 @@ fun daemonAotFingerprint(): String {
     val inputs = runtimeFiles + daemonAotClasspath().split(File.pathSeparator).map(::File)
     val fingerprint = buildString {
         appendLine("hotspot-aot-v2")
-        appendLine("--add-modules=jdk.internal.vm.ci")
+        daemonAotJvmArgs.forEach { appendLine(it) }
         appendLine(System.getProperty("os.arch"))
         for (name in listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) appendLine("$name=${System.getenv(name).orEmpty()}")
         for (input in inputs) {
@@ -855,7 +856,7 @@ fun adoptDaemonAot(fingerprint: String): Boolean {
     val archiveHash = daemonAotHash(aot)
     val log = layout.buildDirectory.file("reports/aot/adopt.log").get().asFile
     log.parentFile.mkdirs()
-    val process = ProcessBuilder(listOf(daemonAotJava().path, "--add-modules=jdk.internal.vm.ci",
+    val process = ProcessBuilder(listOf(daemonAotJava().path) + daemonAotJvmArgs + listOf(
         "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info", "-cp", cp, "-version"))
         .redirectErrorStream(true).redirectOutput(log).start()
     try {
@@ -899,7 +900,7 @@ fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
     val tempRoot = File("/tmp").takeIf { it.isDirectory } ?: File(System.getProperty("java.io.tmpdir"))
     val home = Files.createTempDirectory(tempRoot.toPath(), "ts-aot-").toFile()
     val javaBin = daemonAotJava()
-    val command = listOf(javaBin.path, "--add-modules=jdk.internal.vm.ci") + flags + listOf("-Xlog:aot=info", "-cp", daemonAotClasspath(),
+    val command = listOf(javaBin.path) + daemonAotJvmArgs + flags + listOf("-Xlog:aot=info", "-cp", daemonAotClasspath(),
         "borg.trikeshed.daemon.OroborosDaemon", "--watch", "--kanban-port", port.toString(),
         "--interval-ms", "86400000", "--agents", "none", home.resolve("forge").path, projectDir.path)
     log.parentFile.mkdirs()
@@ -1019,10 +1020,7 @@ fun org.gradle.api.tasks.JavaExec.useDaemonAot() {
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     standardInput = System.`in`
     environment("TRIKESHED_AOT_DEFAULT", "1")
-    // FFM (Panama) is a first-class backend gate: the uring JNI bridge and its
-    // Panama successor both cross the native boundary, so the daemon runs with
-    // native access granted rather than under the warning regime.
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    jvmArgs(daemonAotJvmArgs)
     providers.gradleProperty("daemonArgs").orNull?.let { setArgsString(it) }
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()
@@ -1033,7 +1031,7 @@ fun org.gradle.api.tasks.JavaExec.useDaemonAot() {
         val aot = requireDaemonAot()
         setExecutable(daemonAotJava().path)
         classpath = files(daemonAotClasspath().split(File.pathSeparator))
-        jvmArgs("--add-modules=jdk.internal.vm.ci", "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info")
+        jvmArgs("-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info")
         logger.lifecycle("[aot] required cache: $aot; TRIKESHED_AOT_DEFAULT=1")
     }
 }
