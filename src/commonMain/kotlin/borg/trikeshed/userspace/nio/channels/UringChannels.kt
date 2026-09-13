@@ -21,10 +21,24 @@ object UringChannels {
      */
     fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): UringChannel {
         require(entries > 0) { "entries must be positive" }
-        // Sync-contract callers (enqueue/submit/wait) settle every SQE inside the
-        // call, so the raw facade is the honest shape; the channel is still an
-        // Element whose drain() settles the backend.
-        return UringChannel(FunctionalUringFacade(entries, openUserspaceChannelBackend(entries), ebpfPrograms = ebpfPrograms))
+        // The scopeless channel owns its supervisor: a self-parented SupervisorJob
+        // drives the supervised facade consumer (create), and the channel Element
+        // carries that Job so drain() settles the owned dispatch — no detached
+        // admission escapes the owning scope.
+        val supervisor = SupervisorJob()
+        val scope = CoroutineScope(supervisor)
+        val raw = openUserspaceChannelBackend(entries)
+        val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
+            borg.trikeshed.userspace.UringTraceBackend(raw, it)
+        } ?: raw
+        try {
+            val facade = FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms)
+            return UringChannel(facade, supervisor)
+        } catch (failure: Throwable) {
+            supervisor.cancel()
+            runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+            throw failure
+        }
     }
 
     fun open(scope: CoroutineScope, entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList(),

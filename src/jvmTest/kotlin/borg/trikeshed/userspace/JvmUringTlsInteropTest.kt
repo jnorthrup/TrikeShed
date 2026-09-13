@@ -20,12 +20,12 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.sockaddrIpv4
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Timeout
 import java.nio.file.Files
 import kotlin.test.Test
@@ -39,7 +39,24 @@ class JvmUringTlsInteropTest {
     @Test
     fun crossHostTlsPeer() = runBlocking {
         val role = System.getenv("TRIKESHED_TLS_ROLE")
-        assumeTrue(role != null, "Set TRIKESHED_TLS_ROLE=client or server for the cross-host fixture")
+        if (role == null) {
+            // No role pinned: run BOTH peers as coroutines under this test's own
+            // SupervisorJob. The server signals readiness after BIND/LISTEN; the
+            // client waits on that signal before its CONNECT, so neither peer
+            // races the other and both full protocols execute.
+            val port = (20450 until 20514).first { candidate ->
+                runCatching { java.net.ServerSocket(candidate).use { true } }.getOrDefault(false)
+            }
+            val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
+            val server = launch { peer("server", port, TlsProtocol.TLS13) { ready.complete(Unit) } }
+            val client = launch {
+                ready.await()
+                peer("client", port, TlsProtocol.TLS13)
+            }
+            server.join()
+            client.join()
+            return@runBlocking
+        }
         require(role == "client" || role == "server")
         val host = System.getenv("TRIKESHED_TLS_HOST") ?: "127.0.0.1"
         require(host == "127.0.0.1") { "Use an SSH forward bound to 127.0.0.1" }
@@ -53,7 +70,12 @@ class JvmUringTlsInteropTest {
         peer(role, port, protocol)
     }
 
-    private suspend fun peer(role: String, port: Int, protocol: TlsProtocol): Unit = withTimeout(60_000) {
+    private suspend fun peer(
+        role: String,
+        port: Int,
+        protocol: TlsProtocol,
+        onReady: (suspend () -> Unit)? = null,
+    ): Unit = withTimeout(60_000) {
         val directory = Files.createTempDirectory("uring-tls-peer-")
         val certificate = directory.resolve("certificate.pem")
         val key = directory.resolve("key.pem")
@@ -93,6 +115,7 @@ class JvmUringTlsInteropTest {
                 val listener = socket()
                 assertEquals(0, submit(UringOp.BIND, listener, address))
                 assertEquals(0, submit(UringOp.LISTEN, listener, length = 1))
+                onReady?.invoke()
                 println("URING_TLS_READY role=server host=127.0.0.1 port=$port protocol=$protocol")
                 var accepted: Int
                 do {

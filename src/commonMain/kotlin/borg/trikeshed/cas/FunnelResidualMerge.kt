@@ -1,6 +1,5 @@
 package borg.trikeshed.cas
 
-import java.io.ByteArrayOutputStream
 import kotlin.jvm.JvmInline
 
 import borg.trikeshed.collections.associative.FunnelHashIndex
@@ -590,19 +589,15 @@ object FunnelResidualMerge {
                 // the CRDT's (patchId, offset) tiebreak is stable across
                 // permutations. Time-based ids would make the tiebreak
                 // nondeterministic.
+                // Deterministic content-derived id: same change set ⇒ same patch, so
+                // the CRDT's (patchId, offset) tiebreak is stable across permutations.
                 val patchId = borg.trikeshed.patch.Blake3Hash.hash(
-                    changes.fold(ByteArrayOutputStream()) { acc, c ->
+                    changes.joinToString("\u0000") { c ->
                         when (c) {
-                            is borg.trikeshed.pijul.Change.Insert -> {
-                                acc.write(("i${c.pos}:").encodeToByteArray())
-                                acc.write((c.content + "\u0000").encodeToByteArray())
-                            }
-                            is borg.trikeshed.pijul.Change.Delete -> {
-                                acc.write(("d${c.pos}:${c.length}\n").encodeToByteArray())
-                            }
+                            is borg.trikeshed.pijul.Change.Insert -> "i${c.pos}:${c.content}"
+                            is borg.trikeshed.pijul.Change.Delete -> "d${c.pos}:${c.length}"
                         }
-                        acc
-                    }.toByteArray()
+                    }.encodeToByteArray()
                 )
                 val patch = borg.trikeshed.pijul.Patch(
                     id = patchId,

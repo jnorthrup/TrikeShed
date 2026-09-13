@@ -73,31 +73,27 @@ class JvmSocketRingTest {
         socketPair { backend, fd, _ ->
             val ring = FunctionalUringFacade.create(this, 3, backend)
             try {
-                val first = async {
-                    ring.batchEnqueue(1 j { _: Int ->
-                        UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1)
-                    })
-                }
-                runCurrent()
-                // POLL_REMOVE by token: settles the removed admission ECANCELED
-                // through the facade's own completion path.
-                assertEquals(0, backend.execute(UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = 2)))
-                val firstResults = first.await()
-                assertEquals(-125, (0 until firstResults.a).map { firstResults[it] }.first { it.userData == 0L }.res,
-                    "the removed poll's admission settles ECANCELED")
-                // Drain cancels the surviving admission (token 1) too.
-                val second = async {
-                    ring.batchEnqueue(1 j { _: Int ->
-                        UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 1, operationFlags = 1)
+                // Both polls and the removal are admitted through the facade as one
+                // batch; every CQE — including the removal's own token-2 completion —
+                // comes back through the facade's completion path.
+                val results = async {
+                    ring.batchEnqueue(3 j { i: Int ->
+                        when (i) {
+                            0 -> UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 0, operationFlags = 1)
+                            1 -> UringSubmission(UringOp.POLL_ADD, fd, 0, 0, 0, userData = 1, operationFlags = 1)
+                            else -> UringSubmission(UringOp.POLL_REMOVE, fd, 0, 0, 0, userData = 2)
+                        }
                     })
                 }
                 runCurrent()
                 ring.drain()
-                val secondResults = second.await()
-                assertEquals(-125, (0 until secondResults.a).map { secondResults[it] }.first { it.userData == 1L }.res,
-                    "drain cancels the surviving poll admission")
-                assertTrue(ring.wait(0).isEmpty())
-            } finally { runCatching { ring.drain() } }
+                val settled = results.await()
+                val byToken = (0 until settled.a).associate { settled[it].userData to settled[it].res }
+                assertEquals(-125, byToken.getValue(0L), "removed poll settles ECANCELED")
+                assertEquals(-125, byToken.getValue(1L), "drain cancels the surviving poll")
+                assertEquals(0, byToken.getValue(2L), "POLL_REMOVE itself completes successfully")
+                assertTrue(ring.wait(0).isEmpty(), "every token accounted for exactly once")
+            } finally { ring.drain() }
         }
     }
 

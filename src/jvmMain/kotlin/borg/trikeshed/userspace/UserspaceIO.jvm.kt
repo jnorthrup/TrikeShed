@@ -224,14 +224,18 @@ internal class JvmUserspaceChannelBackend(
         require(minComplete >= 0)
         val results = ArrayList<SelectionResult>()
         // A settled CONNECT unblocks the io it held back: execute it now.
+        // Each mutation step synchronizes below; the wait loop releases the
+        // monitor between polls so cancelPending/drain can make progress.
         val stillHeld = LinkedHashMap<Long, UringSubmission>()
-        for ((token, sub) in heldBehindConnect) {
-            if (!connectPendingOn(sub.fd)) {
-                execute(sub)?.let { results.add(SelectionResult(it, token)) }
-            } else stillHeld[token] = sub
+        synchronized(this) {
+            for ((token, sub) in heldBehindConnect) {
+                if (!connectPendingOn(sub.fd)) {
+                    execute(sub)?.let { results.add(SelectionResult(it, token)) }
+                } else stillHeld[token] = sub
+            }
+            heldBehindConnect.clear()
+            heldBehindConnect.putAll(stillHeld)
         }
-        heldBehindConnect.clear()
-        heldBehindConnect.putAll(stillHeld)
         var pending: Boolean
         do {
             pending = synchronized(this) {
@@ -277,14 +281,16 @@ internal class JvmUserspaceChannelBackend(
             }
         } while (results.size < minComplete && pending)
         // A CONNECT that settled during the poll releases io deferred behind it.
-        val unblocked = LinkedHashMap<Long, UringSubmission>()
-        for ((token, sub) in heldBehindConnect) {
-            if (!connectPendingOn(sub.fd)) {
-                execute(sub)?.let { results.add(SelectionResult(it, token)) }
-            } else unblocked[token] = sub
+        synchronized(this) {
+            val unblocked = LinkedHashMap<Long, UringSubmission>()
+            for ((token, sub) in heldBehindConnect) {
+                if (!connectPendingOn(sub.fd)) {
+                    execute(sub)?.let { results.add(SelectionResult(it, token)) }
+                } else unblocked[token] = sub
+            }
+            heldBehindConnect.clear()
+            heldBehindConnect.putAll(unblocked)
         }
-        heldBehindConnect.clear()
-        heldBehindConnect.putAll(unblocked)
         return results
     }
 
@@ -300,11 +306,14 @@ internal class JvmUserspaceChannelBackend(
         heldBehindConnect.clear()
     }
 
-    @Synchronized
     internal fun execute(sub: UringSubmission): Int {
-        if (closed) return -9
-        if (sub.flags != 0) return -95
-        if (capabilities and sub.opcode.mask == 0L) return -95
+        val preflight = synchronized(this) {
+            if (closed) -9
+            else if (sub.flags != 0) -95
+            else if (capabilities and sub.opcode.mask == 0L) -95
+            else null
+        }
+        if (preflight != null) return preflight
         return try {
             when (sub.opcode) {
                 UringOp.NOP -> 0
@@ -313,10 +322,10 @@ internal class JvmUserspaceChannelBackend(
                 // -errno (BIND/LISTEN) — the same result the kernel ring reports.
                 UringOp.SOCKET -> {
                     val fd = jvmSocket(sub.fd, sub.len, sub.offset.toInt())
-                    if (fd >= 0) owned.add(fd)
+                    if (fd >= 0) synchronized(this) { owned.add(fd) }
                     fd
                 }
-                UringOp.POLL_REMOVE -> {
+                UringOp.POLL_REMOVE -> synchronized(this) {
                     if (watches[sub.addr]?.opcode != UringOp.POLL_ADD) return -2
                     if (watches.remove(sub.addr) == null) return -2
                     completions.addLast(SelectionResult(-125, sub.addr))
@@ -325,7 +334,7 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
-                    jvmOpen(sub.path(), sub.offset, sub.operationFlags).also { owned.add(it) }
+                    jvmOpen(sub.path(), sub.offset, sub.operationFlags).also { fd -> synchronized(this) { owned.add(fd) } }
                 }
                 // Path syscalls. The path rides in the submission buffer, and renameat carries
                 // both halves NUL-separated -- one buffer, because an SQE has one address field
@@ -344,7 +353,7 @@ internal class JvmUserspaceChannelBackend(
                     0
                 }
                 UringOp.CLOSE -> {
-                    owned.remove(sub.fd); JvmFileTable.close(sub.fd)
+                    synchronized(this) { owned.remove(sub.fd) }; JvmFileTable.close(sub.fd)
                 }
                 else -> {
                     val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
@@ -360,8 +369,20 @@ internal class JvmUserspaceChannelBackend(
                             // path's CQE.
                             val direct = connect(sub)
                             if (direct == null) {
-                                val settled = reapCompletions(minComplete = 1)
-                                settled.firstOrNull()?.res ?: -95
+                                // Own the completion by token: reap until this CONNECT's
+                                // CQE arrives; re-queue any foreign CQEs for their owners.
+                                // Arrival tracking is nullable: -95 is a valid terminal
+                                // error, not a "still waiting" sentinel.
+                                var settled: Int? = null
+                                while (settled == null) {
+                                    reapCompletions(minComplete = 1).forEach { cqe ->
+                                        if (cqe.userData == sub.userData) settled = cqe.res
+                                        else synchronized(this@JvmUserspaceChannelBackend) {
+                                            completions.addLast(cqe)
+                                        }
+                                    }
+                                }
+                                settled!!
                             } else direct
                         }
                         else socketExecute(descriptor.fd, sub)
@@ -481,11 +502,15 @@ internal class JvmUserspaceChannelBackend(
         val order = List(submissions.size) { index -> submissions[index].userData }
         val outstanding = order.toHashSet()
         val byToken = HashMap<Long, Int>()
-        val results = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
-        results.forEach { outstanding.remove(it.userData); byToken[it.userData] = it.res }
+        fun take(result: SelectionResult) {
+            val token = result.userData
+            if (token !in outstanding) error("foreign or duplicate CQE for token $token")
+            outstanding.remove(token)
+            check(byToken.put(token, result.res) == null) { "duplicate CQE for token $token" }
+        }
+        submitBatch(List(submissions.size) { submissions[it] }).forEach(::take)
         while (outstanding.isNotEmpty()) {
-            val settled = reapCompletions(0)
-            settled.forEach { outstanding.remove(it.userData); byToken[it.userData] = it.res }
+            reapCompletions(0).forEach(::take)
             if (outstanding.isNotEmpty()) kotlinx.coroutines.delay(1)
         }
         return order.size j { index -> UringCompletion(order[index], byToken.getValue(order[index]), 0) }
