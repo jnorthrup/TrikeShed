@@ -43,7 +43,6 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
             mask or op.mask else mask
     }
     override val availability = "io_uring: JNI setup and operation probe succeeded; unsupported kernel ops use POSIX emulation"
-    private val owned = mutableSetOf<Int>()
     private val legacy = JvmUserspaceChannelBackend()
 
     override fun supportsFixedBuffer(fd: Int): Boolean = JvmFileTable.descriptor(fd) is JvmNativeDescriptor
@@ -96,12 +95,11 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         }
         if (result >= 0) {
             if (sub.opcode == UringOp.OPENAT) {
-                return JvmFileTable.register(JvmNativeDescriptor(result)).also { owned.add(it) }
+                return JvmFileTable.register(JvmNativeDescriptor(result))
             }
             if (sub.opcode == UringOp.CLOSE) {
                 (descriptor as JvmNativeDescriptor).completedClose()
                 JvmFileTable.close(sub.fd)
-                owned.remove(sub.fd)
             }
             if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.STATX)) {
                 buffer.position(buffer.position() + result)
@@ -143,8 +141,7 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
     @Synchronized
     override fun close() {
         if (handle == 0L) return
-        owned.forEach { JvmFileTable.close(it) }
-        owned.clear()
+        // Closing a ring does not close descriptors returned by its operations.
         legacy.close()
         JvmUring.close(handle)
         handle = 0L

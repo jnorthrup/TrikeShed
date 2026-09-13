@@ -159,7 +159,6 @@ internal class JvmUserspaceChannelBackend(
     /** True while a CONNECT watch is unsettled: io on that fd is deferred behind it. */
     private val connectWatchesPending: Boolean
         get() = synchronized(this) { watches.values.any { it.opcode == UringOp.CONNECT } }
-    private val owned = mutableSetOf<Int>()
     private data class Watch(val descriptor: JvmDescriptor, val mask: Int, val opcode: UringOp)
     private val watches = LinkedHashMap<Long, Watch>()
     private val completions = ArrayDeque<SelectionResult>()
@@ -320,11 +319,7 @@ internal class JvmUserspaceChannelBackend(
                 // Socket lifecycle as SQEs: creation, bind, listen and accept each
                 // settle one CQE. res carries the new fd (SOCKET/ACCEPT), 0 or
                 // -errno (BIND/LISTEN) — the same result the kernel ring reports.
-                UringOp.SOCKET -> {
-                    val fd = jvmSocket(sub.fd, sub.len, sub.offset.toInt())
-                    if (fd >= 0) synchronized(this) { owned.add(fd) }
-                    fd
-                }
+                UringOp.SOCKET -> jvmSocket(sub.fd, sub.len, sub.offset.toInt())
                 UringOp.POLL_REMOVE -> synchronized(this) {
                     if (watches[sub.addr]?.opcode != UringOp.POLL_ADD) return -2
                     if (watches.remove(sub.addr) == null) return -2
@@ -334,7 +329,7 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
-                    jvmOpen(sub.path(), sub.offset, sub.operationFlags).also { fd -> synchronized(this) { owned.add(fd) } }
+                    jvmOpen(sub.path(), sub.offset, sub.operationFlags)
                 }
                 // Path syscalls. The path rides in the submission buffer, and renameat carries
                 // both halves NUL-separated -- one buffer, because an SQE has one address field
@@ -353,7 +348,7 @@ internal class JvmUserspaceChannelBackend(
                     0
                 }
                 UringOp.CLOSE -> {
-                    synchronized(this) { owned.remove(sub.fd) }; JvmFileTable.close(sub.fd)
+                    JvmFileTable.close(sub.fd)
                 }
                 else -> {
                     val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
@@ -431,7 +426,7 @@ internal class JvmUserspaceChannelBackend(
         UringOp.ACCEPT -> {
             val accepted = JvmSocketSyscalls.accept(fd)
             if (accepted < 0) accepted
-            else JvmFileTable.register(JvmSocketDescriptor(accepted)).also { owned.add(it) }
+            else JvmFileTable.register(JvmSocketDescriptor(accepted))
         }
         else -> -95
     }
@@ -521,8 +516,7 @@ internal class JvmUserspaceChannelBackend(
         if (closed) return
         cancelPending()
         closed = true
-        owned.forEach { JvmFileTable.close(it) }
-        owned.clear()
+        // Returned descriptors belong to their callers and outlive the ring, as on Linux.
     }
 }
 
