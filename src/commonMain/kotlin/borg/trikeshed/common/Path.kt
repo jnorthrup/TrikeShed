@@ -1,5 +1,7 @@
 package borg.trikeshed.common
 
+import kotlin.jvm.JvmInline
+
 /**
  * Path-shaped file handle for commonMain — the [java.io.File] call-shape, owned by the
  * Files SPI. A [Path] is a NAME, not a descriptor: every operation resolves through the
