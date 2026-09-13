@@ -3,7 +3,6 @@ package borg.trikeshed.cas
 
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.userspace.context.AsyncContextElement
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
@@ -17,7 +16,7 @@ object CasReplicationKey : CoroutineContext.Key<CasReplicationElement>
 class CasReplicationElement(
     parentJob: Job? = null,
     capacity: Int = 64
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : borg.trikeshed.context.AsyncContextElement(ElementState.CREATED, parentJob) {
 
     override val key: CoroutineContext.Key<*> get() = CasReplicationKey
 

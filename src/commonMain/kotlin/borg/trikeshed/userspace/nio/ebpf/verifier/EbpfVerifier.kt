@@ -88,7 +88,11 @@ private fun successors(pc: Int, opcode: Int, inst: EbpfInstruction, size: Int): 
 private fun checkInst(inst: EbpfInstruction, state: VerifierState): List<String> {
     val errors = mutableListOf<String>()
     val dr = inst.dstReg(); val sr = inst.srcReg()
-    if (state.registers[dr].type is RegType.NotInitialized) errors += "R$dr used uninitialized"
+    val op = inst.opcode()
+    // MOV defines its destination without reading it: an immediate-source MOV
+    // over an uninitialized register is initialization, not a use.
+    val movDefinesDst = (op and 0xf0) == BPF_MOV && (op and BPF_SRC) == BPF_K
+    if (!movDefinesDst && state.registers[dr].type is RegType.NotInitialized) errors += "R$dr used uninitialized"
     if (sr != 0 && state.registers[sr].type is RegType.NotInitialized) errors += "R$sr used uninitialized"
     // Div-by-zero for reg source
     if ((inst.opcode() and 0x07) == 0x04 && (inst.opcode() and 0xe0) == 0x00) {
@@ -142,7 +146,8 @@ private fun stepInst(inst: EbpfInstruction, state: VerifierState): VerifierState
     val dstType = state.registers[dr].type
 
     if (cls == BPF_ALU64 || cls == BPF_ALU) {
-        val srcIsImm = (op and BPF_SRC) != 0x00
+        // BPF_SRC bit set = BPF_X (register source); clear = BPF_K (immediate).
+        val srcIsImm = (op and BPF_SRC) == 0x00
         val opBase = op and 0xF0
         if (srcIsImm) {
             // Immediate ALU

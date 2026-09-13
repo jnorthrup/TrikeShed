@@ -23,6 +23,24 @@ inline  class SlabFacet(override val mask: Long) : BitMasked<Long> {
     infix fun or(other: SlabFacet) = SlabFacet(mask or other.mask)
     infix fun and(other: SlabFacet) = SlabFacet(mask and other.mask)
     fun has(facet: SlabFacet): Boolean = (mask and facet.mask) != 0L
+
+    companion object {
+        val NONE = SlabFacetFlag.NONE.facet
+        val HOT = SlabFacetFlag.HOT.facet
+        val COLD = SlabFacetFlag.COLD.facet
+        val IMMUTABLE = SlabFacetFlag.IMMUTABLE.facet
+        val DEDUP_CANDIDATE = SlabFacetFlag.DEDUP_CANDIDATE.facet
+        val COMPRESSED_ZSTD = SlabFacetFlag.COMPRESSED_ZSTD.facet
+        val S3_TIERED = SlabFacetFlag.S3_TIERED.facet
+        val SNAPSHOT_ANCHOR = SlabFacetFlag.SNAPSHOT_ANCHOR.facet
+        val WAL_ACTIVE = SlabFacetFlag.WAL_ACTIVE.facet
+        val PERSISTENT = SlabFacetFlag.PERSISTENT.facet
+        val WAL_BUFFER = SlabFacetFlag.WAL_BUFFER.facet
+        val COLUMNAR_EXPORT = SlabFacetFlag.COLUMNAR_EXPORT.facet
+        val EPHEMERAL = SlabFacetFlag.EPHEMERAL.facet
+        val COMPUTED = SlabFacetFlag.COMPUTED.facet
+        val INDEXED = SlabFacetFlag.INDEXED.facet
+    }
 }
 
 enum class SlabFacetFlag(override val mask: Long) : BitMasked<Long> {

@@ -229,11 +229,9 @@ kotlin {
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64 (target now commented out).
                 // implementation(org.jetbrains.compose.ComposePlugin.Dependencies(project).runtime) // REMOVED: breaks macosX64
             }
-            // Slab hollows: GraalJS-eval / DuckDB-c-interop / MiniDuck layers are
-            // entirely TODO() stubs with zero non-test consumers. Keep the files on
-            // disk (user rule: preserve, don't delete) but cut them out of the
-            // commonMain compile path until a real backend lands.
-            kotlin.exclude("**/classfile/slab/**")
+            // Slab tree restored to the compile path: TODO() is the sanctioned
+            // escape hatch (PRELOAD build hygiene); compilation is not bypassed.
+
         }
 
         val commonTest = getByName("commonTest") {
@@ -294,10 +292,6 @@ kotlin {
         }
 
         val jvmTest = getByName("jvmTest") {
-            kotlin.exclude("**/strategy/SignalValidationTest.kt")
-            kotlin.exclude("**/demos/SignalBlackboardDemoTest.kt")
-            kotlin.exclude("**/lib/ReduxListBridgeTest.kt")
-            kotlin.exclude("**/lib/MutableSeriesStrategyTest.kt")
             dependencies {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
@@ -473,23 +467,9 @@ if (!focusedTransportSlice) {
     // Exclude transport tests from global runs to avoid CInterop linker errors
     kotlin {
         sourceSets.getByName("commonTest") {
-            kotlin.exclude("**/transport/**")
-            // userspace transport tests excluded; containment detector tests re-enabled
-            // (they are pure commonMain value tests, no CInterop linkage).
-            // btrfs facet/context/ebpf suites reference slab code that commonMain
-            // excludes (see **/classfile/slab/** above) — keep them out too.
-            kotlin.exclude("**/userspace/btrfs/**")
-            kotlin.exclude("**/userspace/context/**")
-            kotlin.exclude("**/userspace/nio/ebpf/**")
-            kotlin.exclude("**/userspace/network/**")
-            kotlin.exclude("**/userspace/reactor/**")
-            kotlin.exclude("**/ipfs/**")
-            kotlin.exclude("**/quic/**")
-            // kotlin.exclude("**/sctp/**")
-            kotlin.exclude("**/window/**")
-            kotlin.exclude("**/htx/**")
-            // Stale against current CouchStore/CouchAttachmentGateway/Htx APIs; re-enable after reconciliation.
-            kotlin.exclude("**/util/oroboros/**")
+            // transport/ipfs/quic excludes dropped: no matching test sources exist.
+            // Remaining trees restored to the compile path; failures are repaired,
+            // not excluded (PRELOAD: no excluded tests).
         }
     }
 }

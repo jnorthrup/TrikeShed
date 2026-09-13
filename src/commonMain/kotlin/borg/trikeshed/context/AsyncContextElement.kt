@@ -58,6 +58,10 @@ abstract class AsyncContextElement(
     /**
      * Begin draining: stop accepting new work, process remaining completions,
      * then transition to [ElementState.CLOSED].
+     *
+     * Admission-gated: exactly one caller performs the cleanup; concurrent
+     * callers suspend on the same supervisor and return only after the winner
+     * has finished — so a return from [drain] means cleanup HAS completed.
      */
     open suspend fun drain() {
         val shouldDrain = stateMutex.withLock {
@@ -72,6 +76,12 @@ abstract class AsyncContextElement(
             supervisor.complete()
             supervisor.join()
             close()
+        } else {
+            // Losers observe the same completed cleanup: wait out the winner.
+            supervisor.join()
+            while (state.isLessThan(CLOSED)) {
+                kotlinx.coroutines.delay(1)
+            }
         }
     }
 

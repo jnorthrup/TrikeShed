@@ -49,8 +49,14 @@ object UringChannels {
         val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
             borg.trikeshed.userspace.UringTraceBackend(raw, it)
         } ?: raw
+        val ownerJob = requireNotNull(scope.coroutineContext[Job]) { "Uring requires an owning Job" }
         try {
-            return UringChannel(FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy))
+            // One owner: the channel Element hangs off the caller's Job — the same
+            // supervisor the facade's consumer answers to — not a sibling root.
+            return UringChannel(
+                FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy),
+                ownerJob,
+            )
         } catch (failure: Throwable) {
             runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure

@@ -90,11 +90,32 @@ class UringChannel internal constructor(
     val availability: String get() = facade.availability
     fun closeNow() = facade.closeNow()
 
-    /** FSM drain: stop admission, settle in-flight CQEs, join, then CLOSED. */
+    /** FSM drain: settle the bridge buffer, stop admission, settle in-flight CQEs, join, then CLOSED. */
     override suspend fun drain() {
         open()
+        // Buffered-but-unsubmitted work must not escape the drain: settle it here.
+        flushBridged()
         facade.drain()
         super.drain()
+    }
+
+    /** Submit every bridged submission; called by [submit] incrementally and by [drain] finally. */
+    private suspend fun flushBridged() {
+        while (true) {
+            val batch = synchronized(bridged) {
+                if (bridged.isEmpty()) return
+                val taken = bridged.toTypedArray()
+                bridged.clear()
+                taken
+            }
+            val settled = facade.batchEnqueue(batch.toSeries())
+            synchronized(bridgedResults) {
+                for (i in 0 until settled.a) {
+                    val cqe = settled.b(i)
+                    bridgedResults.addLast(SelectionResult(cqe.res, cqe.userData))
+                }
+            }
+        }
     }
 
     override suspend fun close() {
@@ -105,22 +126,10 @@ class UringChannel internal constructor(
 
     fun submit(): Int {
         val job = jobOrNull() ?: return facade.submit()
-        val batch = synchronized(bridged) {
-            val taken = bridged.toTypedArray()
-            bridged.clear()
-            taken
-        }
-        if (batch.isEmpty()) return 0
-        val settled = kotlinx.coroutines.runBlocking(job) {
-            facade.batchEnqueue(batch.toSeries())
-        }
-        synchronized(bridgedResults) {
-            for (i in 0 until settled.a) {
-                val cqe = settled.b(i)
-                bridgedResults.addLast(SelectionResult(cqe.res, cqe.userData))
-            }
-        }
-        return batch.size
+        val before = synchronized(bridged) { bridged.size }
+        if (before == 0) return 0
+        kotlinx.coroutines.runBlocking(job) { flushBridged() }
+        return before
     }
 
     suspend fun submitAwait() = facade.submitAwait()
