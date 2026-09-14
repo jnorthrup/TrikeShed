@@ -256,8 +256,16 @@ class JvmIsamOperationsTest {
         assertFailsWith<IOException> { reader(JvmIsamOperations(failedOpen::open), path).open() }
         failedOpen.assertClosed()
         val malformedOpen = Channels { backend, _ -> backend.corruptToken = UringOp.OPENAT }
-        val malformed = assertFailsWith<IllegalStateException> { reader(JvmIsamOperations(malformedOpen::open), path).open() }
-        assertTrue(malformed.message.orEmpty().startsWith("Unknown or duplicate completion:"))
+        try {
+            val malformed = assertFailsWith<IllegalStateException> { reader(JvmIsamOperations(malformedOpen::open), path).open() }
+            assertTrue(malformed.message.orEmpty().startsWith("Unknown or duplicate completion:"))
+            // The fixture hid this successful OPENAT's identity. The reader never
+            // acquired the descriptor; ring teardown does not own returned fds.
+            val unclaimed = malformedOpen.dataBackends.single().files.single()
+            assertTrue(unclaimed.isOpen(), "The forged completion leaves its descriptor with the fixture")
+        } finally {
+            malformedOpen.dataBackends.flatMap { it.files }.forEach { it.close() }
+        }
         malformedOpen.assertClosed()
         for (result in arrayOf(0, 99, 1)) {
             val channels = Channels { backend, _ -> backend.failure = UringOp.READ; backend.invalidResult = result }
