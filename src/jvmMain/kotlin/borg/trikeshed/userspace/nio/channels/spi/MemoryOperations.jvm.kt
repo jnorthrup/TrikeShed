@@ -1,4 +1,9 @@
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.channels.spi
+
+import borg.trikeshed.userspace.MemoryMappingAccess
+import borg.trikeshed.userspace.JvmFileTable
+import borg.trikeshed.userspace.JvmNativeDescriptor
+import borg.trikeshed.userspace.JvmChannelDescriptor
 
 import java.lang.foreign.Arena
 import java.lang.foreign.FunctionDescriptor
@@ -126,7 +131,9 @@ internal actual fun mapMemoryAccess(address: Long, length: Long, protection: Int
     catch (failure: Throwable) { arena.close(); throw failure }
 }
 
-actual fun adviseMemory(address: Long, length: Long, advice: Int): Int {
+internal actual fun adviseMemoryAccess(address: Long, length: Long, advice: Int): Int {
     if (length < 0 || address < 0 || length > Long.MAX_VALUE - address) return -22
     return JvmMemorySyscalls.advise(address, length, advice)
 }
+
+internal actual fun memoryPageSize(): Long = JvmMemorySyscalls.pageSize

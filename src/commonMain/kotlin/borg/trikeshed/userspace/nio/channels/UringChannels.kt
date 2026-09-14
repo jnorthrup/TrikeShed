@@ -4,6 +4,8 @@ import borg.trikeshed.userspace.ChannelsImpl
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UringTrace
+import borg.trikeshed.userspace.UringTraceBackend
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import borg.trikeshed.userspace.containment.ContainmentPolicy
 import kotlinx.coroutines.CoroutineScope
@@ -15,13 +17,14 @@ import kotlinx.coroutines.ensureActive
  */
 object UringChannels {
     /** Synchronous ring; the caller owns its lifetime. */
-    fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList()): FunctionalUringFacade {
+    fun open(entries: Int = 256, ebpfPrograms: List<UringEbpfProgram> = emptyList(), trace: UringTrace? = null): FunctionalUringFacade {
         require(entries > 0) { "entries must be positive" }
-        val backend = openUserspaceChannelBackend(entries)
+        val raw = openUserspaceChannelBackend(entries)
         try {
+            val backend = trace?.let { UringTraceBackend(raw, it) } ?: raw
             return FunctionalUringFacade(entries, backend, ebpfPrograms = ebpfPrograms)
         } catch (failure: Throwable) {
-            runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+            runCatching { raw.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure
         }
     }
@@ -31,13 +34,11 @@ object UringChannels {
         require(entries > 0) { "entries must be positive" }
         requireNotNull(scope.coroutineContext[Job]) { "Uring requires an owning Job" }.ensureActive()
         val raw = openUserspaceChannelBackend(entries)
-        val backend = scope.coroutineContext[borg.trikeshed.userspace.UringTrace]?.let {
-            borg.trikeshed.userspace.UringTraceBackend(raw, it)
-        } ?: raw
         try {
+            val backend = scope.coroutineContext[UringTrace]?.let { UringTraceBackend(raw, it) } ?: raw
             return FunctionalUringFacade.create(scope, entries, backend, ebpfPrograms, containmentPolicy)
         } catch (failure: Throwable) {
-            runCatching { backend.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+            runCatching { raw.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
             throw failure
         }
     }

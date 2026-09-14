@@ -125,6 +125,7 @@ public class FunctionalUringFacade(
     val nativeCapabilities: Long get() = backend.nativeCapabilities
     val availability: String get() = backend.availability
     val probeReport: UringProbeReport? get() = backend.probeReport
+    internal val trace: UringTrace? get() = (backend as? UringTraceBackend)?.trace
 
     private val REJECTED_OPS: Set<UringOp> = containmentPolicy.layer2Metadata.rejectedXattrOps
 

@@ -354,6 +354,15 @@ completion. This file is the implementation contract.
   `nativeCapabilities` alone marks which is executing, so the facade is one
   contract regardless of backend.
 
+## ISAM and mapped memory
+- ISAM data, metadata, append, flush and file lifetime use the same commonMain
+  userspace NIO/uring facade on every target.
+- mmap is accommodated as an explicitly owned userspace memory lifecycle:
+  mapping, sync, advice, registration retention and unmap stay at the NIO SPI
+  boundary. The trace sleeve distinguishes these VM operations from SQEs/CQEs;
+  mapped access must not be reported as completed disk I/O. No invented uring
+  opcode or platform ISAM I/O bypass substitutes for this boundary.
+
 ## platform codec / endian framing
 - `platformCodec` expresses the major runtime invariants and the endian
   uptake, and frames IO.

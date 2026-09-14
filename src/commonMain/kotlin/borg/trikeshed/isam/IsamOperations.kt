@@ -33,7 +33,7 @@ interface IsamDataReader : Usable {
     val readRow: (Int) -> RowVec
 }
 
-expect fun defaultIsamOperations(): IsamOperations
+fun defaultIsamOperations(): IsamOperations = UringIsamOperations()
 
 fun getGroupFilename(datafilename: String, groupName: String): String {
     val lastSlash = datafilename.lastIndexOf('/')

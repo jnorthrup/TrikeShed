@@ -37,4 +37,30 @@ class MemoryMappingTest {
             unlink(path)
         }
     }
+
+    @Test fun arbitrary_file_ranges_keep_backing_ownership_and_trace_after_descriptor_close() = memScoped {
+        val template = "/tmp/trikeshed-mmap-view-XXXXXX".cstr.getPointer(this)
+        var fd = mkstemp(template)
+        assertTrue(fd >= 0)
+        val path = template.toKString()
+        try {
+            val initial = ByteArray(65536) { 17 }
+            initial.usePinned { assertEquals(initial.size.toLong(), pwrite(fd, it.addressOf(0), initial.size.convert(), 0).toLong()) }
+            MemoryMappingConformance.fileView(fd, initial.size.toLong(), {
+                assertEquals(0, close(fd))
+                fd = -1
+            }, {
+                val reader = open(path, O_RDONLY)
+                assertTrue(reader >= 0)
+                try {
+                    val bytes = ByteArray(initial.size)
+                    bytes.usePinned { assertEquals(bytes.size.toLong(), pread(reader, it.addressOf(0), bytes.size.convert(), 0).toLong()) }
+                    bytes
+                } finally { close(reader) }
+            })
+        } finally {
+            if (fd >= 0) close(fd)
+            unlink(path)
+        }
+    }
 }

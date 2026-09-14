@@ -16,6 +16,10 @@ import borg.trikeshed.userspace.nio.channels.spi.AbstractInterruptibleChannel
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.FunctionalUringFacade
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
+import borg.trikeshed.userspace.UringTrace
 
 /**
  * FileChannel wired behind UringFacade.
@@ -47,6 +51,17 @@ public abstract class FileChannel protected constructor() : AbstractInterruptibl
     public abstract fun tryLock(): FileLock?
 
     companion object {
+        /** Synchronous CQE settlement with the caller's trace; the caller explicitly closes this channel. */
+        fun open(scope: CoroutineScope, path: String, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel {
+            requireNotNull(scope.coroutineContext[Job]) { "File I/O requires an owning Job" }.ensureActive()
+            return open(path, options, permissions = creationPermissions(attrs)) {
+                UringChannels.open(trace = scope.coroutineContext[UringTrace])
+            }
+        }
+
+        fun open(scope: CoroutineScope, path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel =
+            open(scope, path.toString(), options, *attrs)
+
         fun open(path: Path, options: Set<OpenOption>, vararg attrs: FileAttribute<*>): FileChannel =
             open(path.toString(), options, *attrs)
 

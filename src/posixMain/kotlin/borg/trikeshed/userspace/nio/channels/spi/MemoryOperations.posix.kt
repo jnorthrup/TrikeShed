@@ -1,6 +1,9 @@
 @file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, kotlin.experimental.ExperimentalNativeApi::class)
 
-package borg.trikeshed.userspace
+package borg.trikeshed.userspace.nio.channels.spi
+
+import borg.trikeshed.userspace.MemoryMappingAccess
+import borg.trikeshed.userspace.posixCompletion
 
 import kotlinx.cinterop.*
 import kotlin.native.OsFamily
@@ -51,8 +54,10 @@ internal actual fun mapMemoryAccess(address: Long, length: Long, protection: Int
     return PosixMemoryAccess(base, length)
 }
 
-actual fun adviseMemory(address: Long, length: Long, advice: Int): Int {
+internal actual fun adviseMemoryAccess(address: Long, length: Long, advice: Int): Int {
     if (length < 0 || address < 0 || length > Long.MAX_VALUE - address) return -22
     if (!linuxMemory && advice !in 0..3) return -95
     return posixCompletion(madvise(address.toCPointer<ByteVar>(), length.convert(), advice))
 }
+
+internal actual fun memoryPageSize(): Long = getpagesize().toLong().also { check(it > 0) }

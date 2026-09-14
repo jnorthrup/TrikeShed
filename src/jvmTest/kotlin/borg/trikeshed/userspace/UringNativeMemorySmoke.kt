@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.userspace.nio.channels.spi.JvmMemorySyscalls
+
 import borg.trikeshed.lib.j
 import java.nio.file.Files
 

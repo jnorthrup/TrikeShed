@@ -35,6 +35,7 @@ class EmulatedRingTest {
         val waits = mutableListOf<Int>()
         var cancellation = true
         var closed = false
+        var closeFailure: Throwable? = null
         override fun registerBuffers(buffers: Series<MemoryMapping>) = registration
         override fun unregisterBuffers() = unregistration
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
@@ -57,7 +58,7 @@ class EmulatedRingTest {
             }
         }
         override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> = error("synchronous test backend")
-        override fun close() { closed = true }
+        override fun close() { closeFailure?.let { throw it }; closed = true }
     }
 
     @Test fun madviseUsesFullAddressAndAdviceField() {
@@ -101,6 +102,38 @@ class EmulatedRingTest {
         memory.close()
         assertTrue(raw.closed)
         ring.close().getOrThrow()
+    }
+
+    @Test fun failedUnregisterAndBackendCloseRetainMappingUntilTeardownRetry() {
+        val unregisterFailure = IllegalStateException("kernel refused unregister")
+        val closeFailure = IllegalStateException("ring teardown failed")
+        val backend = Backend().also {
+            it.registration = Result.success(Unit)
+            it.unregistration = Result.failure(unregisterFailure)
+            it.closeFailure = closeFailure
+        }
+        val raw = Memory()
+        val memory = MemoryMapping(raw, 3)
+        val ring = EmulatedRing(backend)
+        ring.open(1, 0).getOrThrow()
+        ring.registerBuffers(arrayOf(memory).toSeries()).getOrThrow()
+        assertSame(unregisterFailure, ring.close().exceptionOrNull())
+        assertFalse(ring.isClosed)
+        assertFalse(backend.closed)
+        assertFalse(raw.closed)
+        assertFailsWith<IllegalStateException> { memory.close() }
+        assertTrue(memory.isOpen)
+
+        // Successful backend teardown settles the registration even if unregister still fails.
+        backend.closeFailure = null
+        assertSame(unregisterFailure, ring.close().exceptionOrNull())
+        assertTrue(ring.isClosed)
+        assertTrue(backend.closed)
+        assertFalse(raw.closed)
+        memory.close()
+        assertTrue(raw.closed)
+        ring.close().getOrThrow()
+        memory.close()
     }
 
     @Test fun commonFallbackCopiesOnlyCompletedReadBytes() {

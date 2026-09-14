@@ -16,7 +16,32 @@ interface UringTrace : CoroutineContext.Element {
     fun submit(channel: Long, submission: UringSubmission)
     fun complete(channel: Long, submission: UringSubmission, result: Int)
     fun failed(channel: Long, submission: UringSubmission, failure: String)
+    /** Completed VM/lifetime operations, separate from SQEs and CQEs. No mapped payload is observed. */
+    fun memory(event: MemoryTraceEvent) {}
 }
+
+enum class MemoryOperation { MAP, SYNC, UNMAP, RETAIN, RELEASE, READ, WRITE }
+
+/** One terminal event per operation; length describes a memory range, never transferred disk bytes.
+ * Mapping identity and its observer survive descriptor/ring closure. A negative retained count
+ * means closed. Failure text is bounded; observer exceptions cannot change memory ownership.
+ */
+data class MemoryTraceEvent(
+    val mapping: Long,
+    val operation: MemoryOperation,
+    val address: Long,
+    val length: Long,
+    val offset: Long,
+    val backingAddress: Long,
+    val backingLength: Long,
+    val fd: Int,
+    val fileOffset: Long,
+    val protection: Int,
+    val flags: Int,
+    val elapsedNanos: Long,
+    val retained: Int,
+    val failure: String?,
+)
 
 @OptIn(ExperimentalAtomicApi::class)
 private val traceChannel = AtomicLong(1)
@@ -24,7 +49,7 @@ private val traceChannel = AtomicLong(1)
 @OptIn(ExperimentalAtomicApi::class)
 internal class UringTraceBackend(
     private val backend: UserspaceChannelBackend,
-    private val trace: UringTrace,
+    val trace: UringTrace,
 ) : UserspaceChannelBackend by backend {
     private val id = traceChannel.fetchAndAdd(1)
     init { trace.channel(id, backend.availability, backend.nativeCapabilities) }
