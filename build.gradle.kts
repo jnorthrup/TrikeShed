@@ -169,7 +169,7 @@ kotlin {
             compilations.getByName("main") {
                 cinterops {
                     val posixSpawn = create("posixSpawn") {
-                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
+                        defFile = project.file("src/posixMain/resources/META-INF/cinterop/posix_spawn.def")
                     }
                 }
             }
@@ -191,7 +191,7 @@ kotlin {
         //     compilations.getByName("main") {
         //         cinterops {
         //             create("posixSpawn") {
-        //                 defFile = project.file("src/macosMain/resources/META-INF/cinterop/posix_spawn.def")
+        //                 defFile = project.file("src/posixMain/resources/META-INF/cinterop/posix_spawn.def")
         //             }
         //         }
         //     }
@@ -311,13 +311,9 @@ kotlin {
         // linuxTest, mingwX64Main and mingwX64Test attached to no compilation on every Mac build,
         // which is the "Unused Kotlin Source Sets" warning.
         if (targets.findByName("linuxX64") != null || targets.findByName("linuxArm64") != null) {
-            // linuxMain is an INTERMEDIATE, not linuxX64's default source set, and this project
-            // turns off the default hierarchy template (gradle.properties), so nothing would
-            // connect the two on its own: linuxMain would be orphaned even on Linux and its
-            // linux_uring exclude would quietly do nothing. Connect it by hand, both ways.
+            // The default hierarchy template is disabled; connect the shared Linux sources.
             val linuxMain = maybeCreate("linuxMain").apply {
                 dependsOn(posixMain)
-                kotlin.exclude("linux_uring/**")
             }
             val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
             for (target in listOf("linuxX64", "linuxArm64")) {
@@ -429,8 +425,11 @@ val buildLiburing = tasks.register<Exec>("buildLiburing") {
 
 kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     if (name == "linuxX64" || name == "linuxArm64") {
+        compilations.getByName("main").cinterops.create("posixSpawn") {
+            defFile = project.file("src/posixMain/resources/META-INF/cinterop/posix_spawn.def")
+        }
         binaries.executable("uringBenchmark") {
-            entryPoint = "borg.trikeshed.userspace.benchmark.uringBenchmarkMain"
+            entryPoint = "borg.trikeshed.userspace.benchmark.main"
         }
         compilations.getByName("main").cinterops.create("zlinux_uring") {
             defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")

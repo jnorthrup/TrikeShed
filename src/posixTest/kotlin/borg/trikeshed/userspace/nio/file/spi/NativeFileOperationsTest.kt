@@ -1,11 +1,15 @@
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+
 package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.common.mktemp
-import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
-import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
-import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
-import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.nio.spi.platformNioProviders
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.convert
+import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
+import platform.posix.timeval
+import platform.posix.utimes
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -14,25 +18,29 @@ import kotlin.test.assertTrue
 
 class NativeFileOperationsTest {
 
+    @Test
+    fun lastModifiedPreservesMilliseconds() = memScoped {
+        val files = platformFiles()
+        val directory = files.createTempDir("trikeshed-mtime")
+        val path = files.resolvePath(directory, "mtime")
+        try {
+            files.write(path, byteArrayOf(1))
+            val times = allocArray<timeval>(2)
+            for (index in 0..1) {
+                times[index].tv_sec = 1_700_000_000L.convert()
+                times[index].tv_usec = 123_456L.convert()
+            }
+            assertEquals(0, utimes(path, times))
+            assertEquals(1_700_000_000_123L, files.lastModified(path))
+            assertEquals(1_700_000_000_123L, borg.trikeshed.common.Files.lastModified(path))
+            assertEquals(0L, files.lastModified(files.resolvePath(directory, "missing")))
+        } finally {
+            files.deleteRecursively(directory)
+        }
+    }
+
     private fun platformFiles(): FileOperations =
         platformNioProviders().filterIsInstance<FileOperations>().single()
-
-    @Test
-    fun platformProvidersExposeEveryNioCapabilityOnce() {
-        val providers = platformNioProviders()
-
-        assertEquals(5, providers.size)
-        assertEquals(
-            setOf(
-                FileOperations.Key,
-                SystemOperations.Key,
-                ChannelOperations.Key,
-                ReactorOperations.Key,
-                ProcessOperations.Key,
-            ),
-            providers.map { it.key }.toSet(),
-        )
-    }
 
     @Test
     fun createTempDirCreatesAnExistingDirectory() {

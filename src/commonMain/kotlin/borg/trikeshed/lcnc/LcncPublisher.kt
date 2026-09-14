@@ -108,7 +108,7 @@ class LcncPublisher(
         val compiled = LcncContracts.all().map { it.type }.toSet()
         val composites = vocabulary.filterKeys { it !in compiled }
         // ONE reflective act per runner: its class name is the provenance.
-        val bindings = LcncWrappers.bindings(vocabulary.values, runners(), { it.javaClass.name }, composites)
+        val bindings = LcncWrappers.bindings(vocabulary.values, runners(), { it::class.toString() }, composites)
         val facts = LcncFacts.of(vocabulary.values, corpus, into = kifBank ?: borg.trikeshed.kif.KifKnowledgeBase()).learn(bindings)
         return LateBound(corpus, vocabulary, bindings, facts)
     }

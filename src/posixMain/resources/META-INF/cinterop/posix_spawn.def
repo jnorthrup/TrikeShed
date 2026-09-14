@@ -1,0 +1,34 @@
+package = borg.trikeshed.userspace.nio.posix
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h
+
+---
+
+extern char **environ;
+
+// Keep the platform's opaque pointer/struct ABI inside the C boundary.
+static inline int trikeshed_spawn(pid_t *pid, const char *input,
+        const char *output, const char *error, char *const argv[]) {
+    posix_spawn_file_actions_t actions;
+    int status = posix_spawn_file_actions_init(&actions);
+    if (status != 0) return status;
+    if (input != NULL)
+        status = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, input, O_RDONLY, 0);
+    if (status == 0)
+        status = posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, output, O_WRONLY | O_TRUNC, 0600);
+    if (status == 0)
+        status = posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, error, O_WRONLY | O_TRUNC, 0600);
+    if (status == 0)
+        status = posix_spawnp(pid, argv[0], &actions, NULL, argv, environ);
+    posix_spawn_file_actions_destroy(&actions);
+    return status;
+}
+
+static inline long long trikeshed_last_modified(const char *path) {
+    struct stat value;
+    if (stat(path, &value) != 0) return 0;
+#ifdef __APPLE__
+    return (long long)value.st_mtimespec.tv_sec * 1000 + value.st_mtimespec.tv_nsec / 1000000;
+#else
+    return (long long)value.st_mtim.tv_sec * 1000 + value.st_mtim.tv_nsec / 1000000;
+#endif
+}

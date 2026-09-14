@@ -53,7 +53,10 @@ object InstantShim {
         val hh = sod / 3600
         val mm = (sod % 3600) / 60
         val ss = sod % 60
-        return "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ".format(year, m, d, hh, mm, ss, ms)
+        fun Number.decimal(width: Int): String = toString().let {
+            if (it.startsWith('-')) "-" + it.substring(1).padStart(width - 1, '0') else it.padStart(width, '0')
+        }
+        return "${year.decimal(4)}-${m.decimal(2)}-${d.decimal(2)}T${hh.decimal(2)}:${mm.decimal(2)}:${ss.decimal(2)}.${ms.decimal(3)}Z"
     }
 }
 

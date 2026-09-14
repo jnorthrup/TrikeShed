@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /** Runtime identity is independent of the operating system hosting it. */
 @Serializable
-enum class HostRuntime { JVM, NODE_JS, BROWSER_JS, HOSTED_JS, JS, UNKNOWN }
+enum class HostRuntime { JVM, NODE_JS, BROWSER_JS, HOSTED_JS, JS, UNKNOWN, NATIVE }
 
 /** Architecture describes the runtime ABI; translation may hide the physical CPU. */
 @Serializable

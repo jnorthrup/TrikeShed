@@ -3,6 +3,7 @@ package borg.trikeshed.jules
 import borg.trikeshed.common.File
 import borg.trikeshed.platform.HostSystem
 import modelmux.LedgerRow
+import kotlin.concurrent.Volatile
 
 /**
  * What Hermes ACTUALLY ran, from Hermes' own ledger (ported to commonMain).
