@@ -40,28 +40,17 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │  ConcreteElements      LiburingElement, FanoutDispatcherElement,     │
 │                        NioUserspaceElement                           │
 ├──────────────────────────────────────────────────────────────────────┤
-│  REACTOR  (userspace/ · ChannelRunner · FunctionalUringFacade)        │
+│  REACTOR  (userspace/ · FunctionalUringFacade)                       │
 │                                                                      │
-│  Multiple concurrent Jobs sharing one io_uring ring. Each Job is     │
-│  a coroutine with its own File handle. IO steps chain as FSM         │
-│  transitions via continuation — the RelaxFactory attachment model    │
-│  translated to coroutine suspension.                                 │
+│  The scoped facade owns bounded batch admission and CQE dispatch.    │
+│  Its worker runs under a SupervisorJob parented to the caller.       │
+│  batchEnqueue suspends until the admitted batch settles.             │
+│  userData correlates terminal completions with submitted requests.   │
+│  drain stops admission and awaits cleanup.                           │
 │                                                                      │
-│  Channel        operation queue (read/write/accept/connect/close,    │
-│                  submit/wait/peek)                                    │
-│  ChannelRunner  coroutine FSM: runOp → CompletableDeferred → resume  │
-│  File           handle lifecycle (open/close/isOpen/id)               │
-│                                                                      │
-│      io_uring ring (one CQE loop — LiburingImpl.publish)             │
-│         │                                                            │
-│         ├─ Job 1: htx-general-client (QUIC, TCP, ngSCTP)             │
-│         │    File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
-│         │                                                             │
-│         ├─ Job 2: couch (HTX over transport)                        │
-│         │    File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
-│         │                                                             │
-│         └─ Job 3: ipfs (DHT UDP, content routing)                   │
-│              File(fd) ─ Channel ─ submit ─ waitCqe ─ fanout          │
+│  Implemented callers include UringBenchmark, TorrentSocketRing       │
+│  and BtrfsUringFileVolume. Their ownership belongs in their code;    │
+│  a diagram does not establish a shared ring across protocols.        │
 ├──────────────────────────────────────────────────────────────────────┤
 │  HTX TOKENIZER  (tokenized in couch/htx/, wired through Channel)     │
 │                                                                      │
@@ -106,96 +95,30 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 
 ---
 
-## Reactor — Multiple Concurrent Jobs, One Uring Ring
+## Reactor — scoped submissions and terminal completions
 
-The reactor models RelaxFactory's single-threaded selector + attachment-chain pattern,
-translated to coroutines and io_uring. Every Job runs its own FSM but shares the same ring.
+[`FunctionalUringFacade`](commonMain/kotlin/borg/trikeshed/userspace/FunctionalUringFacade.kt)
+owns bounded submission and completion accounting. The scoped factory parents its
+worker to the caller's job through a `SupervisorJob`. Callers provide unique
+outstanding `userData` values and await `batchEnqueue`; the worker correlates
+terminal CQEs with their batches. Drain stops admission and waits for admitted
+work and cleanup.
 
-Each `Job` gets its own `File` handle (unique fd) but shares the `Channel` (and therefore
-the uring ring). The ring concurrently processes SQEs for all fds. The CQE loop fans
-completions back to the correct coroutine via `userData` token.
+The former `userspace.ChannelRunner` and `userspace.nio.channels.ChannelRunner`
+had no source callers and were removed. Earlier examples of `runOp`, a shared
+HTX/couch/IPFS ring, and fire-and-forget close were not implemented integrations.
 
-### Continuation Model (RelaxFactory `Helper.toRead` → `runOp`)
+The executable example is
+[`UringBenchmark.run`](commonMain/kotlin/borg/trikeshed/userspace/benchmark/UringBenchmark.kt):
+it creates a scoped facade, admits batches, checks completion identities and
+read-back bytes, submits CLOSE explicitly, and awaits drain in `finally`.
+[`TorrentSocketRing`](commonMain/kotlin/borg/trikeshed/torrent/TorrentTransport.kt)
+and [`BtrfsUringFileVolume`](commonMain/kotlin/borg/trikeshed/btrfs/BtrfsUringFileVolume.kt)
+are source callers of the same batch API.
 
-In RelaxFactory Java, an HTTP operation chains: `Helper.toRead(key, nextF)` attaches a
-new `AsioVisitor` to the `SelectionKey`, creating a linear FSM:
-
-```
-OP_CONNECT → OP_WRITE(request) → OP_READ(headers) → OP_READ(body) → deliver
-```
-
-In TrikeShed, the same chain is coroutine suspension via `ChannelRunner.runOp()`:
-
-```
-connect  → runOp(token1) → suspend  → CQE → resume
-write    → runOp(token2) → suspend  → CQE → resume
-read     → runOp(token3) → suspend  → CQE → resume
-close    → submit() (fire-and-forget)
-```
-
-```kotlin
-class HtxTransport(channel: Channel) : SelectableChannelOps {
-    suspend fun execute(request: HtxRequest): HtxResponse {
-        val runner = ChannelRunner(channel, coroutineScope)
-        val file = Channels.socket(AF_INET, SOCK_STREAM, 0)
-
-        // Step 1: connect
-        val connected = runner.runOp { token ->
-            channel.connect(file, host, port, token)
-        }
-
-        // Step 2: write request
-        val written = runner.runOp { token ->
-            channel.write(file, requestBuf, 0L, token)
-        }
-
-        // Step 3: read response
-        val result = runner.runOp { token ->
-            channel.read(file, responseBuf, 0L, token)
-        }
-
-        channel.close(file, nextToken)
-        channel.submit()
-        return parseResponse(result)
-    }
-}
-```
-
-### Concurrent Jobs over One Ring
-
-```kotlin
-val ch = Channels.open(256)
-val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-// 1,000 concurrent HTTP requests, one uring ring
-val results = (1..1000).map { i ->
-    scope.async {
-        HtxTransport(ch).execute(parseHtxRequest("https://host$i/api"))
-    }
-}.awaitAll()
-```
-
-| RelaxFactory | TrikeShed |
-|-------------|-----------|
-| `AsyncSingletonServer.innerloop()` | one `io_uring_wait_cqe` loop |
-| `SelectionKey.attach(AsioVisitor)` | `CompletableDeferred` map by `userData` |
-| `Helper.toRead(key, nextF)` | `runner.runOp { channel.read(...) }` (suspend) |
-| `Helper.finishRead(key, payload, success)` | `deferred.complete(SelectionResult)` |
-| `CouchConnectionFactory.createCouchConnection()` | `Channels.socket()` → `File` |
-| `Phaser.arrive()` (sync bridge) | `CompletableDeferred.await()` |
-| `RpcHelper.EXECUTOR_SERVICE` thread pool | `CoroutineScope(Dispatchers.Default)` |
-| `NAMESPACE` dispatch (`EnumMap<Method, Map<Pattern, Class>>`) | `AsyncContextKey` context lookup |
-
-### Cross-Module Context Access
-
-Protocol Elements share context via their `AsyncContextKey`. An IPFS DHT query can
-reach into couch to inspect collection state, and vice versa:
-
-```kotlin
-// Inside IpfsElement:
-val couchElement = currentCoroutineContext()[CouchElement.Key]
-val collections = couchElement?.activeCollections()
-```
+Typed context lookup uses each element's singleton `CoroutineContext.Key`.
+`FunctionalUringFacade` implements `CoroutineContext.Element` directly; its
+admission, completion and cleanup code supplies its lifecycle behavior.
 
 ---
 
@@ -371,43 +294,16 @@ ipfs?.dhtService?.store(key, value)
 
 ## Consuming the substrate
 
-The reactor, HTX tokenizer, and kernel algebra are the single IO path. New
-protocols extend `AsyncContextElement` and route through `userspace.Channel`
-+ `FunctionalUringFacade`. There is no `libs/` module layer anymore — the
-root `src/` tree is authoritative (see `README.md` §0 and the project's
-root-only-build rule). Composite builds that need the substrate consume it via
-`includeBuild("../..")`.
+Open a scoped facade through
+[`UringChannels.open(scope, entries)`](commonMain/kotlin/borg/trikeshed/userspace/nio/channels/UringChannels.kt),
+submit through `batchEnqueue`, and await `drain` during cleanup. Resolve required
+services through their existing context keys. The benchmark and transport callers
+linked above show the concrete token, buffer and descriptor ownership at each call
+site.
 
-```kotlin
-class MyProtocolElement : AsyncContextElement() {
-    companion object Key : AsyncContextKey<MyProtocolElement>()
-
-    private lateinit var channel: Channel
-    private lateinit var file: File
-
-    override suspend fun open() {
-        super.open()
-        channel = Channels.open(256)
-        file = Channels.socket(AF_INET, SOCK_STREAM, 0)
-        state = ElementState.ACTIVE
-    }
-
-    suspend fun sendRequest(msg: HtxMessage): HtxMessage {
-        val runner = ChannelRunner(channel, coroutineScope)
-
-        val writeOk = runner.runOp { token ->
-            channel.write(file, msg.toHttp1().asByteBuffer(), 0L, token)
-        }
-
-        val responseBuf = ByteBuffer.allocate(65536)
-        val readOk = runner.runOp { token ->
-            channel.read(file, responseBuf, 0L, token)
-        }
-
-        return parseHttp1(responseBuf.array())!!
-    }
-}
-```
+The root `src/` tree is authoritative. Composite builds consume it through
+`includeBuild("../..")`; no separate `ChannelRunner` or lifecycle superclass is
+required to call the scoped facade.
 
 ---
 
