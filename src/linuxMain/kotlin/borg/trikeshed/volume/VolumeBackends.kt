@@ -1,6 +1,8 @@
 package borg.trikeshed.volume
 
-import borg.trikeshed.volume.Volume
+import borg.trikeshed.userspace.volume.Volume
+import borg.trikeshed.userspace.volume.PosixVolume
+import borg.trikeshed.userspace.volume.LiburingVolume
 
 actual object VolumeBackends {
     actual fun openPosix(path: String, blockSize: Int, capacityBytes: Long): Volume =

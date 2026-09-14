@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
 package borg.trikeshed.userspace.nio.channels.spi
-import borg.trikeshed.userspace.nio.channels.spi.*
+import borg.trikeshed.userspace.nio.posix.trikeshed_spawn
 import kotlinx.cinterop.*
 import kotlinx.coroutines.*
 import platform.posix.*
@@ -13,95 +13,41 @@ class PosixProcessOperations : ProcessOperations {
         args: List<String>,
         stdin: ByteArray?,
         env: Map<String, String>,
-    ): ProcessResult = withContext(Dispatchers.IO) { // OPTIMIZATION: Moved blocking I/O to Dispatchers.IO to prevent thread starvation
-        val stdinPath = stdin?.let { createTempFile(it) }
-        val stdoutPath = createTempFile(byteArrayOf())
-        if (stdoutPath == null) {
-            withContext(Dispatchers.IO) {
-                stdinPath?.let(::unlink)
+    ): ProcessResult = withContext(Dispatchers.IO) {
+        val temporary = mutableListOf<String>()
+        fun capture(bytes: ByteArray): String =
+            checkNotNull(createTempFile(bytes)) { "mkstemp or stdin write failed" }.also(temporary::add)
+        try {
+            val stdinPath = stdin?.let(::capture)
+            val stdoutPath = capture(byteArrayOf())
+            val stderrPath = capture(byteArrayOf())
+            val exitCode = memScoped {
+                val pid = alloc<pid_tVar>()
+                // env applies overrides to the inherited environment without shell parsing.
+                val argv = allocArray<CPointerVar<ByteVar>>(env.size + args.size + 3)
+                var index = 0
+                argv[index++] = "env".cstr.ptr
+                env.forEach { (key, value) -> argv[index++] = "$key=$value".cstr.ptr }
+                argv[index++] = command.cstr.ptr
+                args.forEach { argv[index++] = it.cstr.ptr }
+                argv[index] = null
+                val spawned = trikeshed_spawn(pid.ptr, stdinPath, stdoutPath, stderrPath, argv)
+                check(spawned == 0) { "posix_spawnp failed: $spawned" }
+                val status = alloc<IntVar>()
+                var waited: pid_t
+                do { waited = waitpid(pid.value, status.ptr, 0) }
+                while (waited == -1 && errno == EINTR)
+                check(waited == pid.value) { "waitpid failed: $errno" }
+                if ((status.value and 0x7F) == 0) (status.value shr 8) and 0xFF else -1
             }
-            return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stdout) failed".encodeToByteArray())
+            ProcessResult(exitCode, borg.trikeshed.common.Files.readAllBytes(stdoutPath),
+                borg.trikeshed.common.Files.readAllBytes(stderrPath))
+        } finally {
+            temporary.forEach { unlink(it) }
         }
-        val stderrPath = createTempFile(byteArrayOf())
-        if (stderrPath == null) {
-            withContext(Dispatchers.IO) {
-                stdinPath?.let(::unlink)
-                unlink(stdoutPath)
-            }
-            return@withContext ProcessResult(-1, byteArrayOf(), "mkstemp(stderr) failed".encodeToByteArray())
-        }
-
-        val exitCode = memScoped {
-            val pid = alloc<pid_tVar>()
-            val actions = alloc<posix_spawn_file_actions_tVar>()
-            posix_spawn_file_actions_init(actions.ptr)
-
-            if (stdinPath != null) {
-                posix_spawn_file_actions_addopen(
-                    actions.ptr, STDIN_FILENO, stdinPath, O_RDONLY, 0u
-                )
-            }
-
-            // 0644 octal (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
-            val mode = (S_IRUSR or S_IWUSR or S_IRGRP or S_IROTH).toUShort()
-            posix_spawn_file_actions_addopen(
-                actions.ptr, STDOUT_FILENO, stdoutPath, O_WRONLY or O_CREAT or O_TRUNC, mode
-            )
-
-            posix_spawn_file_actions_addopen(
-                actions.ptr, STDERR_FILENO, stderrPath, O_WRONLY or O_CREAT or O_TRUNC, mode
-            )
-
-            // We use 'env' to set environment variables and inherit the rest, similar to the original behavior
-            val argv = allocArray<CPointerVar<ByteVar>>(env.size + args.size + 3)
-            var argIndex = 0
-
-            argv[argIndex++] = "env".cstr.ptr
-            env.forEach { (key, value) ->
-                argv[argIndex++] = "$key=$value".cstr.ptr
-            }
-            argv[argIndex++] = command.cstr.ptr
-            args.forEach { arg ->
-                argv[argIndex++] = arg.cstr.ptr
-            }
-            argv[argIndex] = null
-
-            // envp = null inherits the parent's environment, which 'env' then augments
-            val spawnResult = posix_spawnp(pid.ptr, "env", actions.ptr, null, argv, null)
-            posix_spawn_file_actions_destroy(actions.ptr)
-
-            if (spawnResult != 0) {
-                return@memScoped -1
-            }
-
-            val status = alloc<IntVar>()
-            var waitRes: Int
-            do {
-                waitRes = waitpid(pid.value, status.ptr, 0)
-            } while (waitRes == -1 && errno == EINTR)
-
-            if ((status.value and 0x7F) == 0) {
-                // WIFEXITED
-                (status.value shr 8) and 0xFF
-            } else {
-                -1
-            }
-        }
-
-        val stdout = readFile(stdoutPath)
-        val stderr = readFile(stderrPath)
-
-        withContext(Dispatchers.IO) {
-            stdinPath?.let(::unlink)
-            unlink(stdoutPath)
-            unlink(stderrPath)
-        }
-
-        ProcessResult(exitCode = exitCode, stdout = stdout, stderr = stderr)
     }
 
-    private suspend fun createTempFile(bytes: ByteArray): String? = withContext(Dispatchers.IO) {
-        memScoped {
+    private fun createTempFile(bytes: ByteArray): String? = memScoped {
             val template = "/tmp/trikeshed-process-XXXXXX".cstr.placeTo(this)
             val fd = mkstemp(template)
             if (fd < 0) {
@@ -112,6 +58,7 @@ class PosixProcessOperations : ProcessOperations {
                     var offset = 0
                     while (offset < bytes.size) {
                         val written = write(fd, pinned.addressOf(offset), (bytes.size - offset).convert())
+                        if (written < 0 && errno == EINTR) continue
                         if (written <= 0) {
                             close(fd)
                             unlink(template.toKString())
@@ -124,51 +71,4 @@ class PosixProcessOperations : ProcessOperations {
             close(fd)
             template.toKString()
         }
-    }
-
-    private suspend fun readFile(path: String): ByteArray = withContext(Dispatchers.IO) {
-        val fp = fopen(path, "rb") ?: return@withContext byteArrayOf()
-        try {
-            memScoped {
-                val out = ByteAccumulator()
-                val buf = allocArray<ByteVar>(4096)
-                while (true) {
-                    val read = fread(buf, 1.convert(), 4096.convert(), fp).toInt()
-                    if (read <= 0) {
-                        break
-                    }
-                    out.append(buf, read)
-                }
-                out.toByteArray()
-            }
-        } finally {
-            fclose(fp)
-        }
-    }
-}
-
-private class ByteAccumulator(initialCapacity: Int = 4096) {
-    private var storage = ByteArray(initialCapacity)
-    private var size = 0
-
-    fun append(bytes: CPointer<ByteVar>, count: Int) {
-        ensure(size + count)
-        for (index in 0 until count) {
-            storage[size + index] = bytes[index]
-        }
-        size += count
-    }
-
-    fun toByteArray(): ByteArray = storage.copyOf(size)
-
-    private fun ensure(required: Int) {
-        if (required <= storage.size) {
-            return
-        }
-        var next = storage.size
-        while (next < required) {
-            next *= 2
-        }
-        storage = storage.copyOf(next)
-    }
 }

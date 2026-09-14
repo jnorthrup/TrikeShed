@@ -5,6 +5,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 
 import borg.trikeshed.common.createTempDirectory
+import borg.trikeshed.userspace.nio.posix.trikeshed_last_modified
 import borg.trikeshed.lib.*
 import kotlinx.cinterop.*
 import platform.posix.*
@@ -49,6 +50,8 @@ class PosixFileOperations : FileOperations {
     }
 
     override fun exists(filename: String): Boolean = access(filename, F_OK) == 0
+
+    override fun lastModified(filename: String): Long = trikeshed_last_modified(filename)
 
     override fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> {
         val bytes = readAllBytes(fileName)

@@ -6,9 +6,8 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 
 /**
- * miniduck: DuckDB execution seams as pure Cursor transforms.
- * No 3rd party deps — direct JNI/FFI to DuckDB C API.
- * Each seam = a Cursor → Cursor projection preserving facet metadata.
+ * Proposed DuckDB execution contracts over Cursor projections.
+ * The DuckDB C API binding is not implemented.
  */
 
 // ==================== DUCKDB HANDLE TYPES ====================
@@ -94,10 +93,8 @@ object DuckDBTypes {
 
 // ==================== CURSOR TRANSFORMS (pure projections) ====================
 
-internal external fun duckdb_open(path: String?): Long
-
 /** Open/create database → SlabCursor of tables/views */
-fun openDatabase(path: String?): DuckDB = DuckDB(duckdb_open(path))
+fun openDatabase(path: String?): DuckDB = TODO("DuckDB C API binding is not implemented")
 
 /** Open with config (pragma) → DuckDB handle */
 fun openDatabaseConfig(path: String?, config: DuckDBConfig): DuckDB = TODO("duckdb_open_ext(path, config)")

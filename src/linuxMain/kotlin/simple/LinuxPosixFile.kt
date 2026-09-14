@@ -1,7 +1,9 @@
-```kotlin
+@file:OptIn(ExperimentalForeignApi::class)
+
 package simple
 
 import borg.trikeshed.native.HasPosixErr
+import borg.trikeshed.lib.CZero.z
 import platform.posix.*
 import kotlinx.cinterop.*
 
@@ -95,16 +97,15 @@ class LinuxPosixFile(
 
         fun readAllBytes(filename: String): ByteArray = memScoped {
             val file = LinuxPosixFile(filename)
-            val stat = statk(filename)
-            val len = stat.st_size.convert<Int>()
-            val buf = allocArray<ByteVar>(len)
-            val read = read(file.fd, buf, len.convert())
-            HasPosixErr.posixRequires(read == len.toLong()) { "readAllBytes $filename" }
-            file.close()
-            ByteArray(len) { buf[it] }
+            try {
+                val len = file.st.st_size.convert<Int>()
+                val buf = allocArray<ByteVar>(len)
+                val read = read(file.fd, buf, len.convert())
+                HasPosixErr.posixRequires(read == len.toLong()) { "readAllBytes $filename" }
+                ByteArray(len) { buf[it] }
+            } finally { file.close() }
         }
 
         fun readString(filename: String): String = readAllBytes(filename).decodeToString()
     }
 }
-```

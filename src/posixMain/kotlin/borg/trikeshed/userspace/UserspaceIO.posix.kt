@@ -21,7 +21,6 @@ import platform.posix.*
 private class PosixUserspaceChannelBackend(private val entries: Int) : UserspaceChannelBackend {
     private val lock = SynchronizedObject()
     private val native = NativeUringAdapter(entries)
-    private val descriptors = mutableSetOf<Int>()
     private val queued = ArrayDeque<UringSubmission>()
     private val pending = mutableMapOf<Long, UringSubmission>()
     private val completed = ArrayDeque<UringCompletion>()
@@ -253,8 +252,6 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
             check(completion.res <= sub.len) { "completion exceeds submitted buffer window" }
             sub.buffer!!.position(sub.buffer.position() + completion.res)
         }
-        if (sub.opcode == UringOp.OPENAT && completion.res >= 0) descriptors.add(completion.res)
-        if (sub.opcode == UringOp.CLOSE && completion.res != -125) descriptors.remove(sub.fd)
         publish(completion)
     }
 
@@ -329,8 +326,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         synchronized(lock) {
             if (closed) return
             native.close()
-            descriptors.forEach { platform.posix.close(it) }
-            descriptors.clear()
+            // Descriptors returned to callers are closed by their owners, independently of this ring.
             closed = true
         }
     }

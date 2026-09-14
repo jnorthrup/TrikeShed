@@ -8,6 +8,7 @@ import borg.trikeshed.lib.toSeries
 
 
 import borg.trikeshed.common.createTempDirectory
+import borg.trikeshed.userspace.nio.posix.trikeshed_last_modified
 import kotlinx.cinterop.*
 import platform.posix.*
 
@@ -74,6 +75,8 @@ actual object Files {
     }
 
     actual fun exists(filename: String): Boolean = access(filename, F_OK) == 0
+
+    actual fun lastModified(filename: String): Long = trikeshed_last_modified(filename)
 
     /** read offsets and lines accompanying*/
     actual fun streamLines(

@@ -38,6 +38,25 @@ import kotlin.test.assertTrue
 /** Runs the common assertions against the actual selected Linux adapter, when built on Linux. */
 class LinuxUringConformanceTest {
     @Test
+    fun returnedDescriptorSurvivesRingClose() = runBlocking {
+        val backend = openUserspaceChannelBackend(8)
+        var fd = -1
+        try {
+            assertTrue(backend.nativeCapabilities and UringOp.OPENAT.mask != 0L, backend.availability)
+            fd = backend.batchEnqueue(listOf(
+                Submissions.openat("/dev/null", flags = 0, userData = 1)
+            ).toSeries())[0].res
+            assertTrue(fd >= 0)
+            backend.close()
+            assertTrue(platform.posix.fcntl(fd, platform.posix.F_GETFD) >= 0,
+                "closing a submission ring must preserve the descriptor returned to its caller")
+        } finally {
+            backend.close()
+            if (fd >= 0) close(fd)
+        }
+    }
+
+    @Test
     fun close_preserves_unreaped_terminal_results() {
         val backend = openUserspaceChannelBackend(8)
         try {

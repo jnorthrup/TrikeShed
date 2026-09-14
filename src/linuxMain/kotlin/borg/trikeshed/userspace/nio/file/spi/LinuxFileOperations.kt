@@ -8,6 +8,7 @@ import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.openUserspaceChannelBackend
+import borg.trikeshed.userspace.nio.posix.trikeshed_last_modified
 import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -77,6 +78,8 @@ class LinuxFileOperations : FileOperations {
     }
 
     override fun exists(filename: String): Boolean = access(filename, F_OK) == 0
+
+    override fun lastModified(filename: String): Long = trikeshed_last_modified(filename)
 
     override fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> {
         val bytes = readAllBytes(fileName)
