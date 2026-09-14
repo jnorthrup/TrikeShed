@@ -209,7 +209,7 @@ ordered change facts, and peer-replicable state. See
 │  CHOREOGRAPHY / REACTOR   (structured async)                        │
 │  - AsyncContextElement (CREATED→OPEN→ACTIVE→DRAINING→CLOSED)        │
 │  - NioSupervisor / LiburingElement / FanoutDispatcherElement        │
-│  - ChannelRunner — RelaxFactory inner loop → coroutines             │
+│  - FunctionalUringFacade — bounded submissions and completions      │
 │  - MuxReactorElement — keymux/modelmux/taxonomy/kanban events       │
 │  - ProcessReactorEndpoint — NUID-authorized exec (Capability.Process)│
 ├──────────────────────────────────────────────────────────────────────┤
@@ -363,32 +363,33 @@ CouchStore (in-memory, pluggable CouchPersistence)
 CREATED → OPEN → ACTIVE → DRAINING → CLOSED
 ```
 
-Every IO component extends `AsyncContextElement` and installs its `CoroutineContext.Key`:
-
-```kotlin
-object NioUserspaceKey    : Key<NioUserspaceElement>
-object LiburingKey        : Key<LiburingElement>
-object FanoutDispatcherKey: Key<FanoutDispatcherElement>
-object BtrfsCodecKey      : Key<BtrfsCodecElement>
-```
+Typed `CoroutineContext.Key` identities resolve elements from the caller's
+context. Some elements still inherit `AsyncContextElement` and use the states
+above. `FunctionalUringFacade` and `NioSupervisor` implement
+`CoroutineContext.Element` directly. Admission and awaited completion are
+implementation obligations; the key and superclass do not establish them.
 
 ### 7.2 NioSupervisor (root registry)
 
-```kotlin
-open class NioSupervisor : AsyncContextElement() {
-  internal val services = mutableListOf<CoroutineContext.Element>()
-  fun <T: CoroutineContext.Element> service(): T?
-  // opens platform providers in CREATED→OPEN→ACTIVE
-}
-```
+`NioSupervisor` registers `platformNioProviders()` and resolves them through
+`service<T>()`. It opens providers with an async lifecycle and drains them in
+reverse registration order, retaining the cleanup outcome for concurrent callers.
 
-### 7.3 ChannelRunner (RelaxFactory → coroutines)
+### 7.3 Scoped submission and completion
 
-```kotlin
-suspend fun readAsync(fd: Int): Int { ... }      // CompletableDeferred per fd
-suspend fun writeAsync(fd: Int) { ... }          // FIFO queue per fd
-fun run(scope, pollTimeout, onSignal) { ... }    // CQE loop → dispatch
-```
+`UringChannels.open(scope, entries)` creates a `FunctionalUringFacade` whose
+bounded batch channel and completion worker belong to an owning `SupervisorJob`.
+Callers await `batchEnqueue` results, correlated by `userData`, and await `drain`
+before releasing the ring. `UringBenchmark.run` executes this path; the torrent
+transport and file-volume implementation also submit batches through the facade.
+
+`userspace.nio.channels.ChannelRunner` adapts socket and readiness SQEs into
+bounded polling and dispatch stages under a supervisor parented to the caller's
+job. `userspace.ChannelRunner` is a separate completion adapter over
+`FunctionalUringFacade`. Neither currently has source callers in this repository;
+their transport integration is unfinished. Concurrent drain can close the
+readiness runner's ring twice, and a failed socket close can skip remaining
+descriptors. `SplatChannelRunner` serves the separate motion-model API.
 
 ### 7.4 MuxReactorElement (keymux/modelmux/taxonomy/kanban events)
 
@@ -426,7 +427,7 @@ Current CCEK-role elements and their unfinished adaptation:
 │ MuxReactorElement        │ suspend open()/close(); open fan-out         │ Mostly correct; some sync ingest helpers.   │
 │ HtxReactorElement        │ suspend route/tls through NioSupervisor     │ Mostly correct; uses blocking waitFor().   │
 │ NioSupervisor            │ open providers as suspend async elements    │ ✅ landed (NioCapabilityReport + probe)   │
-│ ChannelRunner / CQE loop │ CompletableDeferred per fd, FIFO per fd    │ Mostly correct; no JVM-level timeout.      │
+│ FunctionalUringFacade    │ bounded batches and awaited terminal CQEs  │ Native benchmark exercises this path.      │
 │ JvmReactorOperations     │ suspend select/epoll via java.nio           │ Uses blocking select() in coroutine path.  │
 │ JvmFileOperations        │ suspend via NioSupervisor (io_uring/posix)  │ Mostly correct after NIO SPI cut.          │
 │ LinuxFileOperations      │ suspend via PosixUringIO.fallback           │ ✅ suspend when uring present.            │
@@ -670,7 +671,7 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 | COW B+Tree | `collections/btree/*`, `JobRepository.kt`, `JobCheckpoint.kt` |
 | MultiIndex | `collections/multiindex/*.kt`, `collections/associative/trie/RadixTree.kt` |
 | Forge surfaces | `forge/ForgeDoc.kt`, `forge/ForgeBoardFSM.kt`, `forge/ForgeKanbanIngest.kt`, `forge/ForgePersistenceScript.kt` |
-| Reactor / choreography | `userspace/reactor/MuxReactorElement.kt`, `context/AsyncContextElement.kt`, `userspace/nio/channels/ChannelRunner.kt` |
+| Reactor / choreography | `userspace/reactor/MuxReactorElement.kt`, `context/AsyncContextElement.kt`, `userspace/FunctionalUringFacade.kt` |
 | NUID / CCEK fanout | `context/nuid/Nuid.kt`, `context/nuid/NuidFanoutElement.kt` |
 | Litebike listener | `litebike/LitebikeListenerElement.kt`, `litebike/ProtocolDetector.kt`, `litebike/taxonomy/Taxonomy.kt`, `jvmMain/litebike/JvmLitebikeBindAdapter.kt`, `jvmMain/litebike/JvmMulticastAdapter.kt`, `jvmMain/litebike/JvmKanbanServer.kt` |
 | Blackboard-as-cursor | `blackboard/BlackboardSurface.kt`, `parse/confix/Confix.kt`, `parse/confix/ConfixKit.kt` |
