@@ -5,6 +5,7 @@ import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -16,6 +17,15 @@ class SumoClassifierCorpusTest {
     private val sumo get() = SumoCorpus.pinned
 
     @Test
+    fun defaultClasspathContainsOnlyMiddleCorpus() {
+        assertTrue(SumoCorpus.middle === SumoCorpus.pinned)
+        val loader = SumoCorpus::class.java.classLoader
+        assertNull(loader.getResource("sumo/full/corpus.pins"))
+        assertNull(loader.getResource("sumo/full/Merge.kif"))
+        assertFailsWith<IllegalStateException> { SumoCorpus.full(loader) }
+    }
+
+    @Test
     fun thePinnedCorpusIsReadAndSized() {
         assertTrue(SumoCorpus.text("sumo/Merge.kif").length > 600_000, "Merge.kif is on the classpath")
         val s = sumo.stats
@@ -25,7 +35,7 @@ class SumoClassifierCorpusTest {
         assertEquals(3685, sumo.termCount, "terms declared by subclass/instance/domain/range/disjoint")
         assertEquals(1469, s["domainSlots"]); assertEquals(179, s["rangeSlots"]); assertEquals(3077, s["rules"])
         val shapes = sumo.shapeHistogram()
-        assertEquals(0, shapes["bitmap"], "no set in a 2,558-bit universe should need a bitmap: $shapes")
+        assertEquals(0, shapes["bitmap"], "no set in a 2,504-bit universe should need a bitmap: $shapes")
         assertTrue(shapes.getValue("run") > 200, "DFS numbering puts descendant sets in runs: $shapes")
         println("[SumoClassifier] stats=$s shapes=$shapes")
     }

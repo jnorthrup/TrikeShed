@@ -13,6 +13,7 @@ import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 
 plugins {
@@ -243,8 +244,7 @@ kotlin {
 
         val jvmMain = getByName("jvmMain") {
             resources.srcDir("src/jvmMain/resources")
-            // SUMO SUO-KIF corpus, fetched + checksum-verified by `fetchSumoCorpus`.
-            // Classpath layout: sumo/Merge.kif, sumo/Mid-level-ontology.kif
+            // Default SUMO resources are Merge + Mid-level only.
             resources.srcDir(layout.buildDirectory.dir("generated/sumo/resources"))
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
@@ -1607,26 +1607,21 @@ tasks.register("scriptPolicy") {
 
 
 // ── SUMO corpus: inert data dependency ────────────────────────────────────
-// SUMO is data, not code: ~1.7MB of SUO-KIF that must never be vendored into
-// the tree and never re-downloaded on `clean`. Checksums are pinned in
-// gradle/sumo-corpus.pins; the payload caches in the Gradle user home keyed by
-// content hash and lands in generated jvmMain resources under `sumo/`.
-//
-// Offline-graceful by design: a missing network with a cold cache logs a
-// warning and produces an empty corpus dir so `jvmMainClasses` stays green.
-// SumoOntology's hardcoded upper spine is the fallback. Pass -PsumoStrict to
-// turn that warning into a build failure (use in release/bake pipelines).
+// Middle retains its two pins and resource paths. Full has a separate manifest
+// and preserves repository-relative paths under sumo/full. Both share the
+// content-addressed Gradle cache; clean never deletes downloaded payloads.
+// The middle fetch keeps its optional offline fallback (-PsumoStrict disables
+// it). Full is deferred/experimental and only fetched or packaged by explicit
+// tasks below. Its fetch always requires every pin. See doc/todo.md.
 val sumoPinFile = file("gradle/sumo-corpus.pins")
-val sumoResourcesRoot = layout.buildDirectory.dir("generated/sumo/resources")
 
-val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
+fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: Boolean = false) = tasks.register(taskName) {
     group = "data"
     description = "Fetch + checksum-verify the pinned SUMO SUO-KIF corpus (ontologyportal/sumo)."
 
-    val pinFile = sumoPinFile
-    val outDir = sumoResourcesRoot.map { it.dir("sumo") }
+    val outDir = layout.buildDirectory.dir(resourceDir)
     val cacheRoot = File(gradle.gradleUserHomeDir, "trikeshed/sumo")
-    val strict = providers.gradleProperty("sumoStrict").isPresent
+    val strict = full || providers.gradleProperty("sumoStrict").isPresent
 
     inputs.file(pinFile)
     // Strictness participates in up-to-date checking: flipping it must re-run the
@@ -1635,6 +1630,13 @@ val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
     outputs.dir(outDir)
 
     doLast {
+        val dest = outDir.get().asFile
+        dest.mkdirs()
+        val manifest = File(dest, "corpus.pins")
+        // Invalidate the completion marker before any validation or copying.
+        // A failed rerun cannot leave a stale manifest claiming completeness.
+        if (manifest.exists()) check(manifest.delete()) { "Cannot invalidate $manifest" }
+
         fun sha256(bytes: ByteArray): String =
             MessageDigest.getInstance("SHA-256")
                 .digest(bytes)
@@ -1643,19 +1645,28 @@ val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
         val lines = pinFile.readLines()
         val ref = lines.firstNotNullOfOrNull { line ->
             Regex("""^#\s*ref\s*=\s*([0-9a-f]{40})\s*$""").find(line.trim())?.groupValues?.get(1)
-        } ?: error("gradle/sumo-corpus.pins: no `# ref = <40-hex commit sha>` line")
+        } ?: error("$pinFile: no `# ref = <40-hex commit sha>` line")
 
         val pins = lines
             .map { it.substringBefore('#').trim() }
             .filter { it.isNotEmpty() }
             .map { row ->
                 val parts = row.split(Regex("""\s+"""), limit = 2)
-                require(parts.size == 2) { "gradle/sumo-corpus.pins: malformed row `$row`" }
+                require(parts.size == 2 && parts[0].matches(Regex("[0-9a-f]{64}"))) { "$pinFile: malformed row `$row`" }
+                require(parts[1].matches(Regex("[A-Za-z0-9_./-]+\\.kif")) &&
+                    parts[1].split('/').none { it.isEmpty() || it == "." || it == ".." }) {
+                    "$pinFile: invalid repository path `${parts[1]}`"
+                }
                 parts[0] to parts[1]
             }
-
-        val dest = outDir.get().asFile
-        dest.mkdirs()
+        require(pins.isNotEmpty() && pins.map { it.second }.distinct().size == pins.size) { "$pinFile: empty or duplicate pins" }
+        if (full) {
+            val count = lines.firstNotNullOfOrNull { Regex("""^#\s*files\s*=\s*(\d+)\s*$""").find(it)?.groupValues?.get(1)?.toInt() }
+            require(count == pins.size) { "$pinFile: expected $count files, found ${pins.size}" }
+        }
+        val paths = pins.map { it.second }.toSet()
+        dest.walkTopDown().filter { it.isFile && it.relativeTo(dest).invariantSeparatorsPath !in paths }
+            .forEach { check(it.delete()) { "Cannot remove stale SUMO resource $it" } }
 
         var fetched = 0
         var cached = 0
@@ -1664,11 +1675,11 @@ val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
         for ((expected, repoPath) in pins) {
             val name = repoPath.substringAfterLast('/')
             val cacheFile = File(cacheRoot, "$expected/$name")
-            val target = File(dest, name)
+            val target = File(dest, repoPath)
 
             if (!cacheFile.isFile) {
                 val url = "https://raw.githubusercontent.com/ontologyportal/sumo/$ref/$repoPath"
-                val body = runCatching { URI(url).toURL().readBytes() }.getOrNull()
+                val body = if (gradle.startParameter.isOffline) null else runCatching { URI(url).toURL().readBytes() }.getOrNull()
                 if (body == null) {
                     missing += "$repoPath (download failed, cold cache)"
                     continue
@@ -1679,27 +1690,31 @@ val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
                         "SUMO pin mismatch for $repoPath at ref $ref\n" +
                             "  expected $expected\n" +
                             "  actual   $actual\n" +
-                            "Upstream moved or the pin is stale. Update gradle/sumo-corpus.pins deliberately."
+                            "Upstream moved or the pin is stale. Update $pinFile deliberately."
                     )
                 }
                 cacheFile.parentFile.mkdirs()
                 cacheFile.writeBytes(body)
                 fetched++
             } else {
+                require(sha256(cacheFile.readBytes()) == expected) { "SUMO cache checksum mismatch: $cacheFile" }
                 cached++
             }
 
             if (target.exists() && sha256(target.readBytes()) == expected) continue
+            target.parentFile.mkdirs()
             cacheFile.copyTo(target, overwrite = true)
         }
 
         if (missing.isNotEmpty()) {
             val what = "SUMO corpus unavailable: ${missing.joinToString("; ")}."
             if (strict) {
-                error("$what -PsumoStrict is set, so this is fatal rather than a fallback.")
+                error("$what The requested corpus must be complete.")
             }
-            logger.warn("w: $what Falling back to SumoOntology's hardcoded upper spine.")
+            logger.warn("w: $what The middle classifier has only the available declarations.")
         }
+        // A full loader never mistakes a partial or stale directory for a complete corpus.
+        if (missing.isEmpty()) pinFile.copyTo(manifest, overwrite = true)
         logger.lifecycle(
             "SUMO corpus @ $ref -> ${dest.relativeTo(rootDir)} " +
                 "(${pins.size - missing.size}/${pins.size} files; $fetched fetched, $cached cached)"
@@ -1707,8 +1722,38 @@ val fetchSumoCorpus = tasks.register("fetchSumoCorpus") {
     }
 }
 
+val fetchSumoCorpus = sumoCorpusTask("fetchSumoCorpus", sumoPinFile, "generated/sumo/resources/sumo")
+val fetchSumoFullCorpus = sumoCorpusTask("fetchSumoFullCorpus", file("gradle/sumo-full-corpus.pins"), "generated/sumo-full/resources/sumo/full", full = true)
+
 tasks.matching { it.name == "jvmProcessResources" }.configureEach {
     dependsOn(fetchSumoCorpus)
+}
+
+// Optional data artifact: never attached to assemble, jvmJar, or a publication.
+val sumoFullResources = layout.buildDirectory.dir("generated/sumo-full/resources")
+tasks.register<Jar>("sumoFullCorpusJar") {
+    group = "data"
+    description = "Package the deferred full SUMO data for explicit experimental use."
+    dependsOn(fetchSumoFullCorpus)
+    from(sumoFullResources)
+    archiveClassifier.set("sumo-full")
+}
+
+// A separate opt-in corpus suite; ordinary tests neither download nor package full.
+val sumoJvm = kotlin.targets.getByName("jvm") as KotlinJvmTarget
+val sumoFullCompilation = sumoJvm.compilations.create("sumoFullTest") {
+    associateWith(sumoJvm.compilations.getByName("main"))
+    defaultSourceSet.dependencies {
+        implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+        implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+    }
+}
+tasks.register<Test>("sumoFullTest") {
+    group = "verification"
+    description = "Explicitly verify the deferred full SUMO corpus and its resource boundary."
+    dependsOn(fetchSumoFullCorpus)
+    testClassesDirs = sumoFullCompilation.output.classesDirs
+    classpath = files(sumoFullCompilation.output.allOutputs, sumoFullCompilation.runtimeDependencyFiles, sumoFullResources)
 }
 
 // Curator state model — read Hermes' .usage.json and report where the
