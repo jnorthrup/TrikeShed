@@ -420,7 +420,7 @@ object LeafDemo {
         val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
         val buf = ByteArrayOutputStream()
         val pump = Thread({ runCatching { p.inputStream.copyTo(buf) } }, "leaf-demo-exec").apply { isDaemon = true; start() }
-        if (!p.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) { p.destroyForcibly(); return@runCatching null }
+        if (!p.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) { p.destroyForcibly(); p.waitFor(); return@runCatching null }
         pump.join(1_000)
         if (p.exitValue() == 0) buf.toString(Charsets.UTF_8).trim() else null
     }.getOrNull()

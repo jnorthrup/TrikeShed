@@ -19,7 +19,7 @@ class JvmProcessPipe(command: List<String>) : ProcessPipe {
     override val isAlive: Boolean get() = process.isAlive
     override fun writeLine(line: String) { out.write(line); out.newLine(); out.flush() }
     override fun readLine(): String? = input.readLine()
-    override fun kill() { process.destroyForcibly() }
+    override fun kill() { process.destroyForcibly(); process.waitFor() }
 }
 
 /** Tier 2 standalone: a `java … SubVmMain` child per guest (a whole Graal DAG launched as a process). */

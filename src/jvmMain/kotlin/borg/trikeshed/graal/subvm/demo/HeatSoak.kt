@@ -214,6 +214,7 @@ object HeatSoak {
         val finished = p.waitFor(1, java.util.concurrent.TimeUnit.MINUTES)
         if (!finished) {
             p.destroyForcibly()
+            p.waitFor()
             throw RuntimeException("jcmd timed out")
         }
         val lines = future.get(30, java.util.concurrent.TimeUnit.SECONDS)

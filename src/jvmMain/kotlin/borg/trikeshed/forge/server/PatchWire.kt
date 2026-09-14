@@ -260,6 +260,7 @@ class ProjectScopes(
                 val finished = p.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
                 if (!finished) {
                     p.destroyForcibly()
+                    p.waitFor()
                     return@runCatching false
                 }
                 future.get(1, java.util.concurrent.TimeUnit.MINUTES)

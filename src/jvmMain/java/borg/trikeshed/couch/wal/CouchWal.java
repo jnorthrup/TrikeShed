@@ -59,6 +59,7 @@ public class CouchWal {
         boolean finished = process.waitFor(1, TimeUnit.HOURS);
         if (!finished) {
             process.destroyForcibly();
+            try { process.waitFor(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
             throw new RuntimeException("Gradle build timed out");
         }
 

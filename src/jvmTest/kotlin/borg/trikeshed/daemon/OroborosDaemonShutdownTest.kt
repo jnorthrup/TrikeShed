@@ -66,7 +66,7 @@ class OroborosDaemonShutdownTest {
             // Clean up
             if (process.isAlive) {
                 process.destroyForcibly()
-                process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
+                process.waitFor()
             }
             forgeHome.deleteRecursively()
             repoDir.deleteRecursively()
