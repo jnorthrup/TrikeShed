@@ -111,7 +111,7 @@ object LcncContracts {
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
-    fun all(): List<LcncPortContract> = listOf(
+    fun all(): List<LcncPortContract> = HeadhunterWorkflow.contracts() + listOf(
         // ── §4: concentric scope — the call, the binding, the return ──
         // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
         // names); the generic args?/returns pair is the declared wire spelling —
@@ -163,6 +163,12 @@ object LcncContracts {
         LcncPortContract("blackboard.board", "blackboard board view",
             listOf("trigger?"), listOf("board"),
             inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("board" to "json")),
+        LcncPortContract("blackboard.neighbors", "blackboard semantic neighbors",
+            listOf("key?"), listOf("neighbors", "projection"),
+            inputKinds = mapOf("key" to "text"), outputKinds = mapOf("neighbors" to "json", "projection" to "json"),
+            params = mapOf(
+                "key" to LcncPortContract.LcncParamSpec(ph = "blackboard node key"),
+            )),
         LcncPortContract("blackboard.sites", "blackboard sites",
             listOf("trigger?"), listOf("sites"),
             inputKinds = mapOf("trigger" to "trigger"), outputKinds = mapOf("sites" to "json")),

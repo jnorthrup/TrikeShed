@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#191d20">
+  <title>Job agent · TrikeShed</title>
+  <link rel="stylesheet" href="/application-nav.css">
+  <link rel="stylesheet" href="/headhunter.css">
+  <script src="/vendor/lucide-mux.js" defer></script>
+  <script src="/application-nav.js" defer></script>
+  <script src="/headhunter.js" defer></script>
+</head>
+<body data-app-page="headhunter">
+  <a class="skip-link" href="#content">Skip to content</a>
+  <main id="content" class="hh-shell">
+    <header class="hh-header">
+      <div><p class="eyebrow">Your working record</p><h1>Job agent</h1><p class="muted">Keep your experience, opportunities, and preparation together.</p></div>
+      <button id="refresh" type="button">Refresh records</button>
+    </header>
+    <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <nav class="hh-tabs" aria-label="Job agent sections">
+      <a href="#applications" data-section="applications" aria-current="page">Applications <span data-count="application">0</span></a>
+      <a href="#evidence" data-section="evidence">Your evidence <span data-count="evidence">0</span></a>
+      <a href="#records" data-section="records">Opportunities &amp; contacts</a>
+      <a href="#sources" data-section="sources">Sources &amp; access</a>
+      <a href="#program" data-section="program">Composition</a>
+    </nav>
+
+    <section id="applications" class="hh-section" aria-labelledby="applications-title">
+      <div class="section-heading"><div><h2 id="applications-title">Application preparation</h2><p class="muted">Choose the evidence for this opportunity, then review every prepared artifact.</p></div><button type="button" data-new="application" class="primary">New application</button></div>
+      <div id="welcome" class="empty welcome" hidden>
+        <h3>Start with your experience</h3><p>Add a resume, project notes, or a correction. Save a listing and create an application when you have an opportunity to work on.</p>
+        <div class="actions"><button type="button" data-go="evidence" class="primary">Add your evidence</button><button type="button" data-new="listing">Add a listing</button></div>
+      </div>
+      <label class="field application-picker">Application<select id="application-select"><option value="">Choose an application</option></select></label>
+      <div id="application-workspace" hidden>
+        <div class="workspace-grid">
+          <div class="stack">
+            <section class="panel" aria-labelledby="opportunity-title"><div class="panel-heading"><h3 id="opportunity-title">Opportunity</h3><button id="edit-application" type="button">Edit application</button></div><div id="application-summary"></div></section>
+            <section class="panel" aria-labelledby="selection-title">
+              <div class="panel-heading"><h3 id="selection-title">Evidence to use</h3><a href="#evidence">Add evidence</a></div>
+              <p class="muted small">Select the documents and notes that support this application. Include corrections that qualify older material.</p>
+              <div id="evidence-selection" class="selection-list"></div>
+              <label class="field">Model preparation instructions<textarea id="prepare-instructions" rows="4" placeholder="What should model preparation emphasize or avoid claiming?"></textarea><span class="small muted">Instructions steer model drafting. Evidence assembly preserves the selected source text.</span></label>
+              <button id="save-selection" type="button">Save preparation choices</button>
+            </section>
+            <section class="panel" aria-labelledby="prepare-title">
+              <h3 id="prepare-title">Prepare your materials</h3>
+              <p class="muted small">Evidence assembly arranges your selected material deterministically. Model preparation uses the configured model to draft from that evidence.</p>
+              <p id="model-status" class="small">Checking model configuration…</p>
+              <div class="actions"><button id="prepare-assemble" type="button" class="primary">Assemble evidence</button><button id="prepare-model" type="button" disabled>Prepare with model</button><a href="/modelmux">ModelMux</a><a href="/keymux">KeyMux</a></div>
+              <p class="small muted">Preparation creates drafts for your review. Sending or submitting is a separate action.</p>
+              <div id="run-summary" class="run-summary" hidden></div>
+            </section>
+          </div>
+          <aside class="stack">
+            <section class="panel" aria-labelledby="collision-title"><div class="panel-heading"><h3 id="collision-title">Representation &amp; contact review</h3><button id="refresh-collisions" type="button">Check again</button></div><div id="collisions"></div><p class="small muted">Review matching records before contacting an employer or recruiter.</p><button type="button" data-new="representation">Add representation</button></section>
+            <section class="panel" aria-labelledby="activity-title"><div class="panel-heading"><h3 id="activity-title">Action record</h3><button type="button" data-new="action">Record an action</button></div><p class="small muted">Record preparation or an action you have already taken, with supporting notes.</p><div id="application-actions"></div></section>
+          </aside>
+        </div>
+        <section class="artifacts-section" aria-labelledby="artifacts-title"><div class="section-heading"><div><h2 id="artifacts-title">Prepared artifacts</h2><p class="muted">Resume, email, phone preparation, and questions &amp; answers, with their evidence references.</p></div></div><div id="artifacts" class="artifact-grid"></div></section>
+      </div>
+    </section>
+
+    <section id="evidence" class="hh-section" aria-labelledby="evidence-title" hidden>
+      <div class="section-heading"><div><h2 id="evidence-title">Your professional evidence</h2><p class="muted">Import documents, add context, and keep corrections attached to the working record.</p></div><div class="actions"><button type="button" data-capture="evidence" class="primary">Import evidence</button><button type="button" data-new="evidence">Write a note or correction</button></div></div>
+      <div id="evidence-records" class="record-grid"></div>
+    </section>
+
+    <section id="records" class="hh-section" aria-labelledby="records-title" hidden>
+      <div class="section-heading"><div><h2 id="records-title">Opportunities &amp; contacts</h2><p class="muted">Keep employers, listings, contacts, and representation linked before preparation.</p></div><button type="button" data-capture="listing" class="primary">Import a listing</button></div>
+      <div class="record-toolbar"><label class="field">Show<select id="record-kind"><option value="listing">Listings</option><option value="employer">Employers</option><option value="contact">Contacts</option><option value="representation">Representation</option><option value="application">Applications</option><option value="action">Actions</option></select></label><label class="field grow">Find<input id="record-search" type="search" placeholder="Search saved records"></label><button id="new-record" type="button">New listing</button></div>
+      <div id="record-list" class="record-grid"></div>
+    </section>
+
+    <section id="sources" class="hh-section" aria-labelledby="sources-title" hidden>
+      <div class="section-heading"><div><h2 id="sources-title">Sources &amp; access</h2><p class="muted">Capture text from a URL, pasted material, or a file. Review imported material before treating its employer or listing identity as established.</p></div><button type="button" data-new="source">Add a source</button></div>
+      <div class="workspace-grid">
+        <form id="capture-form" class="panel stack">
+          <h3>Import material</h3>
+          <p id="extraction-status" class="small muted">Checking document extraction…</p>
+          <div class="fields"><label class="field">Save as<select name="kind" id="capture-kind"><option value="evidence">Professional evidence</option><option value="listing">Job listing</option></select></label><label class="field">Title<input name="title" placeholder="Optional title"></label></div>
+          <label id="capture-category-field" class="field">Evidence category<select name="category" id="capture-category"><option value="resume">Resume</option><option value="experience">Experience</option><option value="project">Project</option><option value="commentary">Commentary</option><option value="correction">Correction</option></select></label>
+          <label class="field">Saved source<select name="sourceId" id="capture-source"><option value="">No saved source</option></select></label>
+          <fieldset class="mode-choices"><legend>Input</legend><label><input type="radio" name="inputMode" value="text" checked> Paste text</label><label><input type="radio" name="inputMode" value="url"> URL</label><label><input type="radio" name="inputMode" value="file"> File</label><label><input type="radio" name="inputMode" value="saved"> Saved source</label></fieldset>
+          <p class="small muted" data-input="saved" hidden>Capture the selected source URL again, or re-extract its retained original with the source's current correction rules.</p>
+          <label class="field" data-input="text">Text<textarea name="text" rows="10" placeholder="Paste your experience, source text, or the complete listing."></textarea></label>
+          <label class="field" data-input="url" hidden>Source URL<input name="url" type="url" placeholder="https://" disabled></label>
+          <label class="field" data-input="file" hidden>Documents<input name="files" type="file" multiple accept=".txt,.md,.html,.htm,.pdf,.docx,.rtf,.csv,.tsv,.json" disabled><span class="small muted">Browser uploads: up to 2 MiB per file. PDF, DOCX, and HTML require the document extraction service. Image-only content needs readable text.</span></label>
+          <div id="capture-listing-fields" class="fields" hidden><label class="field">Employer<input name="employer"></label><label class="field">Requisition<input name="requisition"></label><label class="field">Contact<select name="contactId" id="capture-contact"><option value="">No contact</option></select></label></div>
+          <div class="actions"><button type="submit" class="primary">Import material</button><span id="capture-status" role="status" class="small"></span></div>
+          <div id="capture-results"></div>
+        </form>
+        <div class="stack">
+          <section class="panel"><div class="panel-heading"><h3>Saved sources</h3></div><div id="source-records"></div></section>
+          <form id="credential-form" class="panel stack" autocomplete="off">
+            <h3>Source access</h3><p class="small muted">Save a session cookie for a source that requires sign-in. Access is scoped to the source origin.</p>
+            <label class="field">Source<select name="sourceId" id="credential-source" required><option value="">Choose a source</option></select></label>
+            <label class="field">Origin<input name="origin" type="url" required placeholder="https://example.com" autocomplete="off"></label>
+            <label class="field">Session cookie<input name="cookie" type="password" required autocomplete="new-password" spellcheck="false"></label>
+            <button type="submit">Save source access</button><p id="credential-status" role="status" class="small muted">Credentials are kept separately from source records and preparation text.</p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <section id="program" class="hh-section" aria-labelledby="program-title" hidden>
+      <div class="section-heading"><div><h2 id="program-title">Executable composition</h2><p class="muted">Inspect the program and the saved record IDs used for preparation.</p></div><button id="open-program" type="button" disabled>Open in Panels</button></div>
+      <div class="workspace-grid">
+        <section class="panel"><h3 id="program-name">Loading composition…</h3><div id="program-nodes"></div><details><summary>Program document</summary><pre id="program-document" class="code"></pre></details></section>
+        <section class="panel stack"><h3>Run inputs</h3><label class="field">Previous run<select id="run-select"><option value="">Current application choices</option></select></label><p id="program-selection" class="small muted">Select an application in the Applications section.</p><pre id="program-inputs" class="code"></pre><div class="actions"><button id="rerun-assemble" type="button">Run evidence assembly</button><button id="rerun-model" type="button" disabled>Run with model</button></div><p class="small muted">Each run reads the persisted application and selected evidence records. Artifacts remain drafts until reviewed.</p><div id="program-run"></div></section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="record-dialog" aria-labelledby="record-dialog-title">
+    <form id="record-form" class="stack"><header class="panel-heading"><h2 id="record-dialog-title">Record</h2><button type="button" data-close-dialog aria-label="Close record editor">Close</button></header><div id="record-fields" class="fields"></div><p id="record-message" class="small" role="status"></p><div class="actions"><button type="submit" class="primary">Save record</button><button type="button" data-close-dialog>Cancel</button></div><fieldset id="record-review" class="stack review-form" hidden><legend>Review this saved record</legend><p class="small muted">Record your decision after checking the relationship or representation. Matching records remain visible for future decisions.</p><label class="field">Decision<select id="record-review-decision"><option value="approved">Reviewed and approved</option><option value="changes-requested">Changes requested</option><option value="rejected">Rejected</option></select></label><label class="field">Review notes<textarea id="record-review-notes" rows="3" placeholder="What was checked, and what should happen next?"></textarea></label><button id="save-record-review" type="button">Save review</button></fieldset><details id="record-neighbors"><summary>Related records and facts</summary><p class="small muted">Shared terms and concepts suggest associations. They do not confirm identity or representation.</p><div id="neighbor-records"></div></details><details id="record-history"><summary>Version history</summary><div id="history-list"></div></details></form>
+  </dialog>
+  <dialog id="artifact-dialog" aria-labelledby="artifact-dialog-title">
+    <header class="panel-heading"><h2 id="artifact-dialog-title">Prepared artifact</h2><button type="button" data-close-dialog aria-label="Close artifact editor">Close</button></header>
+    <div id="artifact-provenance"></div>
+    <form id="artifact-form" class="stack"><label class="field">Title<input name="title" required></label><label class="field">Markdown content<textarea name="content" rows="20" required class="artifact-editor"></textarea></label><div class="actions"><button type="submit" class="primary">Save revision</button><span id="artifact-message" role="status" class="small"></span></div></form>
+    <form id="review-form" class="stack review-form"><h3>Review this saved version</h3><p id="review-version" class="small muted"></p><label class="field">Decision<select name="decision"><option value="approved">Approved for use</option><option value="changes-requested">Changes requested</option><option value="rejected">Rejected</option></select></label><label class="field">Review notes<textarea name="notes" rows="3" placeholder="Evidence checked, corrections needed, or reasons for this decision."></textarea></label><button type="submit">Save review</button><p id="review-message" role="status" class="small"></p></form>
+  </dialog>
+  <noscript><p class="notice">Enable JavaScript to load and edit saved job-agent records.</p></noscript>
+</body>
+</html>

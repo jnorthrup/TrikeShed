@@ -83,7 +83,7 @@ class HtxReactorElement(
     ): HtxExchangeResult =
         try {
             val transportRequest = request.withTransportDefaults()
-            val response = kotlinx.coroutines.withTimeout(30_000L) {
+            val response = kotlinx.coroutines.withTimeout(transportRequest.timeoutMs) {
                 when (transportRequest.target.transportProtocol) {
                     HtxTransportProtocol.HTTP -> exchangePlain(transportRequest)
                     HtxTransportProtocol.HTTPS -> exchangeTls(transportRequest)
@@ -153,13 +153,13 @@ class HtxReactorElement(
     private suspend fun exchangePlain(request: HtxRequest): HtxResponse {
         val connection = openConnection(request)
         return try {
-            writeAll(connection.handle, connection.fd, ByteSeries(request.renderWireRequest()))
+            writeAll(connection.handle, connection.fd, ByteSeries(request.renderWireRequest()), request.timeoutMs)
             // renderWireRequest() is head-only — the body must follow on the wire
             // or a POST with Content-Length hangs the server (and our read) forever.
             if (request.body.rem > 0) {
-                writeAll(connection.handle, connection.fd, request.body)
+                writeAll(connection.handle, connection.fd, request.body, request.timeoutMs)
             }
-            parseHtxResponse(readAll(connection.handle, connection.fd))
+            parseHtxResponse(readAll(connection.handle, connection.fd, request.timeoutMs))
         } finally {
             closeConnection(connection)
         }
@@ -178,7 +178,7 @@ class HtxReactorElement(
             )
             val endpoint = tls.clientEndpoint(request.target.host, request.target.port)
             try {
-                performTlsHandshake(connection.handle, connection.fd, endpoint)
+                performTlsHandshake(connection.handle, connection.fd, endpoint, request.timeoutMs)
                 // renderWireRequest() is head-only — append the body bytes to
                 // the TLS plaintext or a POST with Content-Length hangs the
                 // server (and our read) forever.
@@ -192,12 +192,13 @@ class HtxReactorElement(
                     connection.handle,
                     connection.fd,
                     endpoint.upstream(ByteSeries(wireBytes)),
+                    request.timeoutMs,
                 )
                 parseHtxResponse(
-                    readTlsPlaintext(connection.handle, connection.fd, endpoint),
+                    readTlsPlaintext(connection.handle, connection.fd, endpoint, request.timeoutMs),
                 )
             } finally {
-                runCatching { flushTlsFrames(connection.handle, connection.fd, endpoint.close()) }
+                runCatching { flushTlsFrames(connection.handle, connection.fd, endpoint.close(), request.timeoutMs) }
                 tls.drain()
             }
         } finally {
@@ -256,13 +257,14 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         payload: ByteSeries,
+        timeoutMs: Long,
     ) {
         val buffer = ByteBuffer(payload.toArray())
-        val completed = kotlinx.coroutines.withTimeoutOrNull(30_000L) {
+        val completed = kotlinx.coroutines.withTimeoutOrNull(timeoutMs) {
             while (buffer.hasRemaining()) {
                 check(handle.writev(fd, buffer) >= 0) { "HTX WRITE SQE was rejected" }
                 check(handle.submit() == 1) { "HTX WRITE SQE was not submitted" }
-                val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
+                val result = waitFor(handle, fd, timeoutMs)
                 check(result > 0 || result == -11) { "HTX reactor write failed for fd=$fd: $result" }
                 if (result == -11) {
                     kotlinx.coroutines.delay(10)
@@ -278,10 +280,11 @@ class HtxReactorElement(
     private suspend fun readAll(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
+        timeoutMs: Long,
     ): ByteSeries {
         val response = ResponseAccumulator()
         while (true) {
-            val chunk = readChunk(handle, fd) ?: break
+            val chunk = readChunk(handle, fd, timeoutMs) ?: break
             response.append(chunk)
             if (response.isComplete()) break
         }
@@ -292,14 +295,15 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         endpoint: TlsEndpoint,
+        timeoutMs: Long,
     ) {
         val hello = endpoint.handshake()
-        flushTlsFrames(handle, fd, hello)
+        flushTlsFrames(handle, fd, hello, timeoutMs)
         while (!endpoint.isHandshakeComplete) {
-            val chunk = requireNotNull(readChunk(handle, fd)) {
+            val chunk = requireNotNull(readChunk(handle, fd, timeoutMs)) {
                 "TLS handshake failed for ${endpoint.remoteHost}:${endpoint.remotePort}: remote peer closed the channel."
             }
-            flushTlsFrames(handle, fd, endpoint.downstream(chunk))
+            flushTlsFrames(handle, fd, endpoint.downstream(chunk), timeoutMs)
         }
     }
 
@@ -307,13 +311,14 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         endpoint: TlsEndpoint,
+        timeoutMs: Long,
     ): ByteSeries {
         val plaintext = ResponseAccumulator()
         while (true) {
-            val chunk = readChunk(handle, fd) ?: break
+            val chunk = readChunk(handle, fd, timeoutMs) ?: break
             val frames = endpoint.downstream(chunk)
             plaintext.append(extractPlaintext(frames))
-            flushTlsFrames(handle, fd, frames)
+            flushTlsFrames(handle, fd, frames, timeoutMs)
             if (plaintext.isComplete()) break
         }
         return plaintext.toByteSeries()
@@ -424,6 +429,7 @@ class HtxReactorElement(
     private suspend fun readChunk(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
+        timeoutMs: Long,
         // 16 KiB chunks made every response pay one readv/submit/waitFor round trip per 16 KiB;
         // with the flat 10 ms EAGAIN sleep below that capped the client near 1.6 MB/s and turned
         // replication pages and _cas blob fetches into multi-second exchanges.
@@ -434,7 +440,7 @@ class HtxReactorElement(
         while (true) {
             check(handle.readv(fd, buffer) >= 0) { "HTX READ SQE was rejected" }
             check(handle.submit() == 1) { "HTX READ SQE was not submitted" }
-            val result = waitFor(handle, fd, 30, TimeUnit.SECONDS)
+            val result = waitFor(handle, fd, timeoutMs)
             check(result >= 0 || result == -11) { "HTX reactor read failed for fd=$fd: $result" }
             when {
                 result == 0 -> return null
@@ -458,13 +464,14 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         frames: TlsFrames,
+        timeoutMs: Long,
     ) {
         frames.forEach { frame ->
             when (frame.stage) {
                 TlsFlowStage.UPSTREAM_CIPHERTEXT,
                 TlsFlowStage.CLOSE_NOTIFY -> {
                     if (frame.payload.toArray().isNotEmpty()) {
-                        writeAll(handle, fd, frame.payload.clone())
+                        writeAll(handle, fd, frame.payload.clone(), timeoutMs)
                     }
                 }
                 else -> Unit
@@ -483,13 +490,8 @@ class HtxReactorElement(
     private suspend fun waitFor(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
-        timeout: Long,
-        unit: TimeUnit,
+        timeoutMs: Long,
     ): Int {
-        val timeoutMs = when (unit) {
-            TimeUnit.MILLISECONDS -> timeout
-            TimeUnit.SECONDS -> timeout * 1000
-        }
         return kotlinx.coroutines.withTimeout(timeoutMs) {
             while (true) {
                 val match = handle.wait(minComplete = 0).firstOrNull { it.fd == fd }

@@ -27,13 +27,11 @@ in the order they were passed in
 @param catn the Series of Series<A> to combine
  */
 fun <A> combine(catn: Series<Series<A>>): Series<A> { // combine
-
+    val captureSize = catn.size
+    if (captureSize == 0) return emptySeriesOf()
     val frst:Series<A>  = catn[0]
     val sz0 = frst.size
-    val captureSize = catn.size
-    @Suppress("UNCHECKED_CAST")
     return when (captureSize) {
-        0 ->EmptySeries as Series<A> // empty
         1 -> frst
         2 -> sz0 + catn[1].size j { i ->
             if (i < sz0) frst[i] else catn[1][i - sz0]
@@ -125,8 +123,15 @@ fun <A> combine(catn: Series<Series<A>>): Series<A> { // combine
                 offset += catn[i].size
             }
             offset j { i ->
-                val j = offsets.binarySearch(i)
-                if (j >= 0) catn[j][i - offsets[j]] else catn[-j - 2][i - offsets[-j - 2]]
+                // Choose the last start at or below i, past any empty components.
+                var low = 0
+                var high = captureSize
+                while (low < high) {
+                    val mid = low + (high - low) / 2
+                    if (offsets[mid] <= i) low = mid + 1 else high = mid
+                }
+                val segment = low - 1
+                catn[segment][i - offsets[segment]]
             }
         }
     }

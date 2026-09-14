@@ -3,6 +3,9 @@ package borg.trikeshed.dag
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.RdfVocab
@@ -63,10 +66,10 @@ class PlaneFactsTest {
         val f = cableFact()
         assertEquals(PlaneFacts.versionOf(f.fields), f.versionCid)
         assertEquals(PlaneFacts.PANELS, f.board.id)
-        assertEquals(PlaneFacts.PANELS to "demo panel", PlaneFacts.keyOf(f))
+        assertEquals(PlaneFacts.PANELS to "demo panel", PlaneFacts.keyOf(f).pair)
         // pre-plane facts (couch, board) have no `key`; identity is the localId
         val legacy = ReteStoredFact(FactId("trikeshed", "panels/x"), mapOf("_id" to "panels/x"), ContentId.of(byteArrayOf()), borg.trikeshed.cursor.BlackboardContext("trikeshed"))
-        assertEquals("trikeshed" to "panels/x", PlaneFacts.keyOf(legacy))
+        assertEquals("trikeshed" to "panels/x", PlaneFacts.keyOf(legacy).pair)
     }
 
     // ── projections ───────────────────────────────────────────────────────
@@ -77,8 +80,8 @@ class PlaneFactsTest {
     @Test
     fun tripleAndKifCountsAreScalarsPlusListFanOut() {
         val f = cableFact()
-        val triples = PlaneFacts.toTriples(f)
-        val kif = PlaneFacts.toKif(f)
+        val triples = PlaneFacts.toTriples(f).view
+        val kif = PlaneFacts.toKif(f).view
         assertEquals(expectedProjectionCount, triples.size, triples.joinToString("\n") { it.toTurtle() })
         assertEquals(expectedProjectionCount, kif.size, kif.joinToString("\n") { it.toKifString() })
 
@@ -99,7 +102,7 @@ class PlaneFactsTest {
     @Test
     fun everyKifTupleHasArityThreeKindComesFirstAndAllReparse() {
         val f = cableFact()
-        val kif = PlaneFacts.toKif(f)
+        val kif = PlaneFacts.toKif(f).view
         val subject = PlaneFacts.factIri(f.factId).iri
         for (e in kif) {
             val list = e as KifExpr.ListExpr
@@ -128,12 +131,12 @@ class PlaneFactsTest {
 
     @Test
     fun triplesRoundTripThroughTurtle() {
-        val facts = listOf(
+        val facts = s_[
             cableFact(),
             PlaneFacts.fact(PlaneFacts.BLACKBOARD, "lcnc/program/x <y>", mapOf(PlaneFacts.KIND to "blackboard", PlaneFacts.KEY to "lcnc/program/x <y>", "value" to "a\tb%c;d(e)'f?")),
             PlaneFacts.fact(PlaneFacts.GRAAL, "gc/G1 Young", mapOf(PlaneFacts.KIND to "gc", PlaneFacts.KEY to "gc/G1 Young", "collections" to 7, "pauseMsTotal" to 12.25, "lastCause" to "Allocation Failure")),
-        )
-        val expected = facts.flatMap(PlaneFacts::toTriples)
+        ]
+        val expected = facts.view.flatMap { PlaneFacts.toTriples(it).view }
         val turtle = PlaneFacts.toTurtle(facts)
         val parsed: RdfGraph = TurtleRdf.parse(turtle)
         assertEquals(expected.toSet(), parsed.triples.toSet(), turtle)

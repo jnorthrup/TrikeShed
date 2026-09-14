@@ -3,6 +3,13 @@ package borg.trikeshed.dag
 import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.contains
+import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.view
 
 /**
@@ -26,27 +33,20 @@ import borg.trikeshed.lib.view
  *
  * The observer runs under the network's write lock and only touches the bank
  * (its own lock, no rete write), so it is safe there — it never calls back
- * into the network. A reader querying the bank between the retract and the
- * re-assert of a MODIFY can see the fact's tuples momentarily absent; the
- * bank is the light solver, not the source of record, and the Rete fact is.
-
- *
- * Delta (2026-09-04): each fact's change is ONE [KifKnowledgeBase.replace]
- * (retract the tuples that left, assert the new set) under one take of the
- * bank's lock, so the momentary absence above no longer happens, and the bank
- * retracts by key, so the time spent inside the network's write lock is per
- * tuple, not per tuple times bank size (the graal tick was holding the lock
- * for seconds at ~200k tuples).
+ * into the network. Each change uses one [KifKnowledgeBase.replace] under
+ * the bank's lock, so readers cannot see a half-replaced projection. The
+ * bank retracts by its exact KIF string key; the Rete fact remains the source
+ * of record.
  */
 class KifTee(val bank: KifKnowledgeBase) {
     private val gate = Any()
-    private val told = HashMap<Pair<String, String>, List<KifExpr>>()
+    private val told = HashMap<Pair<String, String>, Series<KifExpr>>()
 
     /** Facts whose projection this tee currently holds in the bank. */
     fun trackedCount(): Int = synchronizedLock(gate) { told.size }
 
     /** Last applied projection for a fact; never recomputed from a reader's snapshot. */
-    fun projection(id: FactId): List<KifExpr>? = synchronizedLock(gate) { told[id.pair]?.toList() }
+    fun projection(id: FactId): Series<KifExpr>? = synchronizedLock(gate) { told[id.pair] }
 
     /** Register on [net]; the disposer detaches (the bank keeps what was told). */
     fun attach(net: ReteNetwork): AutoCloseable = net.observe { op, fact -> apply(op, fact) }
@@ -72,25 +72,25 @@ class KifTee(val bank: KifKnowledgeBase) {
         val next = PlaneFacts.toKif(fact)
         val id = fact.factId.pair
         val previous = told[id]
-        if (previous == next) return@synchronizedLock
-        val gone = if (previous == null) emptyList() else previous.filter { it !in next }
-        bank.replace(gone, next)
+        if (previous?.toList() == next.toList()) return@synchronizedLock
+        val gone = previous?.filter { it !in next } ?: emptySeriesOf()
+        bank.replace(gone.view, next.view)
         told[id] = next
     }
 
     private fun unproject(id: FactId) = synchronizedLock(gate) {
         val key = id.pair
         val previous = told[key] ?: return@synchronizedLock
-        bank.replace(previous, emptyList())
+        bank.replace(previous.view, emptySeriesOf<KifExpr>().view)
         told.remove(key)
         Unit
     }
 
     companion object {
         /** One call for the daemon wiring: `KifTee.attach(rete, kifBank)`. */
-        fun attach(net: ReteNetwork, bank: KifKnowledgeBase): Pair<KifTee, AutoCloseable> {
+        fun attach(net: ReteNetwork, bank: KifKnowledgeBase): Join<KifTee, AutoCloseable> {
             val tee = KifTee(bank)
-            return tee to tee.attach(net)
+            return tee j tee.attach(net)
         }
     }
 }

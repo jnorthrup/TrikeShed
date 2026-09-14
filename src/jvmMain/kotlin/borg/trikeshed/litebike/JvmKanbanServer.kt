@@ -476,6 +476,10 @@ class JvmKanbanServer(
 
     /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
+        "/headhunter" to ("web/headhunter.html" to "text/html; charset=utf-8"),
+        "/headhunter.html" to ("web/headhunter.html" to "text/html; charset=utf-8"),
+        "/headhunter.js" to ("web/headhunter.js" to "application/javascript; charset=utf-8"),
+        "/headhunter.css" to ("web/headhunter.css" to "text/css; charset=utf-8"),
         "/keymux" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/modelmux" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux/sessions" to ("web/mux.html" to "text/html; charset=utf-8"),

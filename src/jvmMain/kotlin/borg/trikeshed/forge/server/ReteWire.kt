@@ -104,7 +104,7 @@ class ReteWire(
 
             Route.RDF -> {
                 val selection = Selection.of(query(path))
-                turtle(PlaneFacts.toTurtle(selection.select(network.snapshot()).toList()))
+                turtle(PlaneFacts.toTurtle(selection.select(network.snapshot())))
             }
 
             Route.PRODUCTIONS -> {
@@ -199,13 +199,13 @@ class ReteWire(
                     "partition" to fact.factId.a, "id" to fact.factId.b,
                     "versionCid" to fact.versionCid.value,
                     "tracked" to (projection != null),
-                    "matchesFactSnapshot" to (projection?.let { it == PlaneFacts.toKif(fact) }),
-                    "tuples" to projection?.map { expr ->
+                    "matchesFactSnapshot" to (projection?.let { it.toList() == PlaneFacts.toKif(fact).toList() }),
+                    "tuples" to projection?.α { expr ->
                         linkedMapOf(
                             "kif" to expr.toKifString(), "held" to bank?.contains(expr),
                             "atoms" to ((expr as? KifExpr.ListExpr)?.elements?.mapNotNull { (it as? KifExpr.Atom)?.token } ?: emptyList<String>()),
                         )
-                    },
+                    }?.toList(),
                 )
             }.toList(),
             "ontology" to subclasses?.let { snap ->
@@ -274,7 +274,7 @@ class ReteWire(
 
         fun admits(f: ReteStoredFact): Boolean {
             if (partition != null && f.factId.a != partition) return false
-            if (key != null && PlaneFacts.keyOf(f).second != key) return false
+            if (key != null && PlaneFacts.keyOf(f).b != key) return false
             if (field != null) {
                 val v = f.fields[field] ?: return false
                 if (value != null && !matches(v, value)) return false

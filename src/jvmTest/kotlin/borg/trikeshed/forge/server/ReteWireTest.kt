@@ -12,6 +12,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.view
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.TurtleRdf
@@ -286,7 +287,7 @@ class ReteWireTest {
             val projection = objectRows(data["projections"]).single()
             assertEquals(true, projection["tracked"])
             assertEquals(true, projection["matchesFactSnapshot"])
-            assertEquals(PlaneFacts.toKif(cable1).map { it.toKifString() }, objectRows(projection["tuples"]).map { it["kif"] })
+            assertEquals(PlaneFacts.toKif(cable1).view.map { it.toKifString() }, objectRows(projection["tuples"]).map { it["kif"] })
             assertTrue(objectRows(projection["tuples"]).all { it["held"] == true })
             @Suppress("UNCHECKED_CAST")
             val ontology = data["ontology"] as Map<String, Any?>
@@ -294,7 +295,7 @@ class ReteWireTest {
 
             network.retract(cable1.factId)
             assertNull(tee.projection(cable1.factId))
-            assertTrue(PlaneFacts.toKif(cable1).none(bank::contains))
+            assertTrue(PlaneFacts.toKif(cable1).view.none(bank::contains))
         } finally { handle.close() }
     }
 

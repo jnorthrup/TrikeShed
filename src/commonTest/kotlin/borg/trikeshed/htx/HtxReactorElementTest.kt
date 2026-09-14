@@ -1,6 +1,8 @@
 package borg.trikeshed.htx
 
 import borg.trikeshed.lib.ByteSeries
+import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.jules.BrainNoRoute
 import borg.trikeshed.reactor.TlsChannelFrame
 import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.reactor.TlsCodecResult
@@ -19,14 +21,53 @@ import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun seatTimeoutReachesReadAndWriteCompletionsWithoutChangingTheDefault() = runTest {
+        val request = parseHtxRequest("http://example.com/v1/chat/completions")
+        for (invalid in listOf(0L, -1L, Long.MAX_VALUE)) {
+            assertFailsWith<IllegalArgumentException> { request.copy(timeoutMs = invalid) }
+        }
+        val body = """{"choices":[{"message":{"content":"draft ready"}}],"usage":{"prompt_tokens":4,"completion_tokens":2}}"""
+        val operations = FakeChannelOperations(
+            connectionReads = listOf(listOf(httpResponse(200, body)), listOf(httpResponse(200, body))),
+            completionDelayMs = 40_000L,
+            nowMs = { testScheduler.currentTime },
+        )
+        val reactor = openHtxReactorElement(channelOperations = operations)
+        val htx = openHtxElement(routeService = reactor)
+        val brain = BrainClient(apiKey = "timeout-fixture", base = "http://example.com/v1", model = "timeout-fixture")
+        try {
+            withContext(htx) {
+                val start = testScheduler.currentTime
+                val answer = brain.chatSeat(listOf("user" to "prepare"), timeoutMs = 90_000L)
+                assertEquals("draft ready", answer.first)
+                // Both the first WRITE and the READ wait beyond the former 30-second limit.
+                assertEquals(80_000L, testScheduler.currentTime - start)
+
+                val defaultStart = testScheduler.currentTime
+                assertFailsWith<BrainNoRoute> { brain.chatSeat(listOf("user" to "prepare again")) }
+                assertEquals(30_000L, testScheduler.currentTime - defaultStart)
+            }
+            assertEquals(2, operations.closedHandles)
+            assertEquals(2, operations.closedDescriptors.size)
+        } finally {
+            htx.close()
+            reactor.drain()
+        }
+    }
+
     @Test
     fun provider_failure_still_closes_every_resource_and_all_drain_callers_wait() = runTest {
         val entered = CompletableDeferred<Unit>()
@@ -244,6 +285,8 @@ private class FakeChannelOperations(
     val connectResult: Int = 0,
     private val address: ByteArray? = byteArrayOf(127, 0, 0, 1),
     val endOfStreamResult: Int = 0,
+    val completionDelayMs: Long = 0L,
+    val nowMs: () -> Long = { 0L },
 ) : ChannelOperations {
     val closedDescriptors = mutableListOf<Int>()
     var openedHandles = 0
@@ -302,12 +345,16 @@ private class FakeChannelOperations(
 
         private val pending = ArrayDeque<() -> ChannelResult>()
         private var completions: List<ChannelResult> = emptyList()
+        private var pendingDelayMs = 0L
+        private var availableAtMs = 0L
+        private var hasWritten = false
 
         override fun read(buffer: ByteBuffer, offset: Long): Int = -1
 
         override fun write(buffer: ByteBuffer, offset: Long): Int = -1
 
         override fun readv(fd: Int, buffer: ByteBuffer, userData: Long): Int {
+            pendingDelayMs = operations.completionDelayMs
             pending.addLast {
                 val chunk = operations.readChunk(fd)
                 if (chunk == null) ChannelResult(fd, operations.endOfStreamResult, userData)
@@ -320,6 +367,8 @@ private class FakeChannelOperations(
         }
 
         override fun writev(fd: Int, buffer: ByteBuffer, userData: Long): Int {
+            pendingDelayMs = if (hasWritten) 0L else operations.completionDelayMs
+            hasWritten = true
             pending.addLast {
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
@@ -361,10 +410,14 @@ private class FakeChannelOperations(
                 batch += pending.removeFirst().invoke()
             }
             completions = batch
+            availableAtMs = operations.nowMs() + pendingDelayMs
+            pendingDelayMs = 0L
             return batch.size
         }
 
-        override fun wait(minComplete: Int): List<ChannelResult> = completions.also { completions = emptyList() }
+        override fun wait(minComplete: Int): List<ChannelResult> =
+            if (operations.nowMs() < availableAtMs) emptyList()
+            else completions.also { completions = emptyList() }
     }
 }
 

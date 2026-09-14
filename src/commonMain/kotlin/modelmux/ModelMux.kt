@@ -269,6 +269,7 @@ class ModelMux internal constructor(
          * Receipt → frame reconciliation needs no second field.
          */
         contextId: String? = null,
+        timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
     ): Result<AcpResponse> {
         val attribution = currentCoroutineContext()[MuxCallContext]
         val callActivity = attribution?.activity ?: activity
@@ -279,7 +280,7 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
-            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId) { r, k ->
+            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId, timeoutMs) { r, k ->
                 receipt = r
                 keyId = k
             }
@@ -304,6 +305,7 @@ class ModelMux internal constructor(
         maxTokens: Int?,
         temperature: Double?,
         contextId: String?,
+        timeoutMs: Long,
         capture: (ModelResponseReceipt, String?) -> Unit,
     ): Result<AcpResponse> {
         val receiptAssessment = assessmentId ?: contextId
@@ -386,7 +388,7 @@ class ModelMux internal constructor(
                 url = url,
                 method = HtxMethod.POST,
                 body = ByteSeries(json.encodeToByteArray())
-            ).copy(headers = htxHeaders)
+            ).copy(headers = htxHeaders, timeoutMs = timeoutMs)
 
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()

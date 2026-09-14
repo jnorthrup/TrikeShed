@@ -1,6 +1,12 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.BlackboardNeighbors
+import borg.trikeshed.graal.NeighborK
+import borg.trikeshed.graal.get
+import borg.trikeshed.lib.*
+import borg.trikeshed.ontology.SumoClassifier
+import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.channels.Channel
@@ -9,11 +15,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.nio.charset.StandardCharsets
 
-class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
+class BlackboardWire(
+    val blackboard: ConfixBlackboard,
+    scope: CoroutineScope,
+    val corpus: () -> SumoClassifier = { SumoCorpus.pinned },
+) {
     companion object {
-        val ROUTES: List<Pair<String, String>> = listOf("GET" to "/blackboard", "GET" to "/blackboard/facts", "POST" to "/blackboard/assert", "GET" to "/blackboard/sites", "GET" to "/blackboard/board", "GET" to "/blackboard/sheet")
+        val ROUTES: List<Pair<String, String>> = listOf("GET" to "/blackboard", "GET" to "/blackboard/facts", "POST" to "/blackboard/assert", "GET" to "/blackboard/sites", "GET" to "/blackboard/board", "GET" to "/blackboard/sheet", "GET" to "/blackboard/neighbors")
         /** Paths the HTTP server must hand to [route] raw (SSE lives on them). */
         val STREAMING: Set<String> = setOf("/blackboard/facts")
     }
@@ -21,6 +33,8 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
     private val assertChannel = Channel<String>(64)
     internal val pointcutDefinitions = borg.trikeshed.cursor.PointcutDefinitionWriter(blackboard, scope)
     private val epoch = java.util.UUID.randomUUID().toString()
+    val neighborLock = Mutex()
+    var neighborIndex: BlackboardNeighbors? = null
 
     init {
         scope.launch {
@@ -90,6 +104,40 @@ class BlackboardWire(val blackboard: ConfixBlackboard, scope: CoroutineScope) {
                 "provenance" to snapshot.provenance.mapValues { (_, p) -> mapOf(
                     "actor" to p.language, "atMs" to p.timestamp, "revision" to p.revision,
                 ) },
+            )))
+        }
+
+        if (method == "GET" && path.substringBefore('?') == "/blackboard/neighbors") {
+            val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            val key = q["key"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"key_required"}""")
+            val variant = q["corpus"] ?: "middle"
+            if (variant != "middle")
+                return JvmKanbanServer.HttpResponse(400, """{"error":"unknown_corpus"}""")
+            val snapshot = blackboard.snapshot()
+            if (!snapshot.values.containsKey(key))
+                return JvmKanbanServer.HttpResponse(404, """{"error":"no_such_fact"}""")
+            if (q["revision"]?.toLongOrNull()?.let { it != snapshot.revision } == true)
+                return JvmKanbanServer.HttpResponse(409, """{"error":"snapshot_changed"}""")
+            val index = neighborLock.withLock {
+                neighborIndex?.takeIf { it.snapshot.revision == snapshot.revision }
+                    ?: BlackboardNeighbors(snapshot, corpus()).also { neighborIndex = it }
+            }
+            val neighbors = index.neighbors(key, q["limit"]?.toIntOrNull()?.coerceIn(1, 256) ?: 32)
+            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+                "key" to key, "revision" to snapshot.revision, "epoch" to epoch, "corpus" to variant,
+                "ontology" to index.sumo.stats, "indexedKeys" to snapshot.values.size,
+                "classifiedKeys" to index.concepts.count { !it.value.isEmpty() },
+                "opaqueKeys" to index.opaque.sorted(),
+                "neighbors" to (neighbors α { neighbor ->
+                    val row = neighbor.b
+                    val provenance = row[NeighborK.Provenance]
+                    mapOf(
+                        "key" to neighbor.a, "score" to row[NeighborK.Score],
+                        "concepts" to row[NeighborK.Concepts].toList(), "terms" to row[NeighborK.Terms].toList(),
+                        "references" to (row[NeighborK.References] α { mapOf("from" to it.a, "to" to it.b) }).toList(),
+                        "provenance" to provenance?.let { mapOf("actor" to it.language, "atMs" to it.timestamp, "revision" to it.revision) },
+                    )
+                }).toList(),
             )))
         }
 

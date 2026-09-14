@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.size
 
 /**
  * The KIF bank is a projection of working memory: a fact asserted, modified
@@ -56,11 +57,14 @@ class KifTeeTest {
     fun modifyReplacesTheOldProjectionWithTheNew() = runTest {
         val net = ReteNetwork()
         val bank = KifKnowledgeBase()
-        KifTee(bank).attach(net)
+        val tee = KifTee(bank)
+        tee.attach(net)
 
         val v1 = cable("json")
         net.assert(cableId, v1, PlaneFacts.versionOf(v1), panels)
         val sizeAfterAssert = bank.size()
+        val previous = requireNotNull(tee.projection(cableId))
+        val previousText = previous.view.joinToString("\n") { it.toKifString() }
 
         val v2 = cable("List<TurnFact>", toPort = "facts")
         net.modify(cableId, v2, PlaneFacts.versionOf(v2))
@@ -70,6 +74,7 @@ class KifTeeTest {
         assertEquals(listOf("facts"), rows(bank, "(toPort $iri ?p)", "?p"), "old toPort replaced, not accumulated")
         assertEquals(listOf(iri), rows(bank, "(kind ?f cable)", "?f"), "the unchanged kind tuple survives the swap once")
         assertEquals(sizeAfterAssert, bank.size(), "same shape, same tuple count")
+        assertEquals(previousText, previous.view.joinToString("\n") { it.toKifString() }, "earlier projection retains its values")
     }
 
     @Test

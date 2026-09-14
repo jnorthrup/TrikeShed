@@ -38,6 +38,7 @@ data object BlackboardNamespaces {
      * for anything a production's firing produces.
      */
     val known: List<Namespace> = listOf(
+        Namespace("headhunter/", "versioned professional evidence, sources, listings, relationships, artifacts and activity", "HeadhunterStore"),
         Namespace("narsese/curation/", "belief-bag curation receipts, one per (kind, angular) reviewed downstream of a rule firing", "BoardReviewBridge via the production sink", admitted = false),
         Namespace("narsese/rete/firing/", "NARS rete firing receipts keyed by firing cid", "OroborosDaemon narsese firing collector", admitted = false),
         Namespace("kanban/rule/", "production-sink activation receipts: bindings + salience per (ruleId, activationId)", "KanbanModule productionSink", admitted = false),

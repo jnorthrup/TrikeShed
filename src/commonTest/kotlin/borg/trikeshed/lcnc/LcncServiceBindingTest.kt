@@ -235,6 +235,7 @@ class LcncServiceBindingTest {
         for ((type, runner) in registry) {
             val node = LcncNode(type, type, params = mapOf("name" to "mounted"))
             val inputs = when (type) {
+                "blackboard.neighbors" -> mapOf("key" to "listing/a&b")
                 "job.command" -> mapOf("verb" to "cancel", "jobId" to "card", "expectedRevision" to 1L)
                 "job.batch" -> mapOf("commands" to listOf(mapOf("type" to "cancel", "jobId" to "card")))
                 "project.mount" -> mapOf("path" to "/mounted")

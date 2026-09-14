@@ -2,10 +2,11 @@
   'use strict';
   if (document.getElementById('application-nav')) return;
   const destinations = [
-    ['board', 'Board', '/harness', ['/blackboard', '/harness.html']],
+    ['board', 'Board', '/blackboard', ['/harness', '/harness.html']],
     ['graal', 'Graal', '/graal', []],
     ['panels', 'Panels', '/panels', ['/panels.html']],
     ['documents', 'Documents', '/documents', ['/documents.html']],
+    ['headhunter', 'Job agent', '/headhunter', ['/headhunter.html']],
     ['kanban', 'Kanban', '/kanban', ['/kanban.html']],
     ['hermes', 'Hermes', '/hermes', []],
     ['keymux', 'KeyMux', '/keymux', []],
@@ -25,15 +26,17 @@
   }
   let views = readViews();
   function remember() {
+    if(new URLSearchParams(location.search).has('example'))return;
     views = readViews();
     views[current[0]] = location.pathname + location.search + location.hash;
     try { sessionStorage.setItem(storageKey, JSON.stringify(views)); } catch (_) {}
   }
   function destinationHref([id, , href, aliases]) {
+    if(id==='board')return href;
     if (typeof views[id] === 'string') {
       try {
         const saved = new URL(views[id], location.origin);
-        if (saved.origin === location.origin && [href, ...aliases].includes(saved.pathname.replace(/\/$/, ''))) {
+        if (saved.origin === location.origin && !saved.searchParams.has('example') && [href, ...aliases].includes(saved.pathname.replace(/\/$/, ''))) {
           return saved.pathname + saved.search + saved.hash;
         }
       } catch (_) {}

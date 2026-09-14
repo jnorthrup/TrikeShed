@@ -249,10 +249,11 @@ class LcncPublisherFactsTest {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)!!
-        h.publisher.publishAll() // the whole corpus, once
+        h.publisher.publishAll()
         val before = h.ops.size
         val opsBefore = h.publisher.panelFacts!!.opsApplied
-        assertTrue(before > LcncPresets.all().size, "the corpus landed: $before ops")
+        assertTrue(before > 0, "the explicitly loaded program reached Rete")
+        assertNull(h.net.fact("preset-shake"), "catalog examples are not installed by publishAll")
 
         h.publisher.load(name)
         h.publisher.publishProgram(name, program)
@@ -372,7 +373,7 @@ class LcncPublisherFactsTest {
         assertTrue(a.view.all { it.factId.a == PlaneFacts.PANELS && it.board.id == PlaneFacts.PANELS })
         assertTrue(a.view.all { it.fields[PlaneFacts.KEY] == "preset-scope" && it.fields[PlaneFacts.KIND] != null })
         // KIF and RDF projections apply to every panels fact: arity-3 tuples, and a (kind <iri> cable) for each cable.
-        val kif = a.view.flatMap(PlaneFacts::toKif)
+        val kif = a.view.flatMap { PlaneFacts.toKif(it).view }
         assertTrue(kif.all { (it as borg.trikeshed.kif.KifExpr.ListExpr).elements.size == 3 })
         assertEquals(program.wires.size, kif.count { it.toKifString().startsWith("(kind ") && it.toKifString().endsWith(" cable)") })
     }

@@ -1087,6 +1087,12 @@ function mintId(){
 }
 function addNode(type,x,y,params){
   const t=CONTRACTS[type]; if(!t) return null;
+  if(typeof Harness!=="undefined"&&Harness.ready&&!Harness.selected){
+    const requested=$("#panelName").value.trim(),names=new Set(Harness.programs().map(k=>k.slice(13)));
+    let name=requested||"untitled",suffix=1;
+    while(names.has(name))name=(requested||"untitled")+"-"+(suffix++);
+    Harness.drafts.set(name,{nodes:[],wires:[],seq:1});Harness.select(name,false);
+  }
   const n={id:mintId(),type,x,y,params:nodeParams(type,params)};
   if(typeof Harness!=="undefined") n._program=Harness.selected;
   G.nodes.push(n); buildNode(n); redraw(); save(); return n;
@@ -2546,7 +2552,8 @@ async function buildPalette(){
       fetch("/api/panels/presets").then(r=>r.json()).catch(()=>({presets:[]})),
       fetch("/api/panels").then(r=>r.json()).catch(()=>({panels:[]})),
     ]);
-    progs=(pr.presets||[]).map(x=>x.name).concat((st.panels||[]).map(x=>x.name));
+    const saved=new Set((st.panels||[]).map(x=>x.name));
+    progs=(st.panels||[]).map(x=>({...x,example:false})).concat((pr.presets||[]).filter(x=>!saved.has(x.name)).map(x=>({...x,example:true})));
   }catch(_){}
   const render=f=>{
     body.innerHTML="";
@@ -2571,13 +2578,15 @@ async function buildPalette(){
       }
     }
     if(progs.length){
-      const h=document.createElement("h5"); h.textContent="gallery — programs"; body.appendChild(h);
-      for(const nm of progs){
+      const h=document.createElement("h5"); h.textContent="Programs and examples"; body.appendChild(h);
+      for(const program of progs){
+        const nm=program.name;
         if(f&&!nm.toLowerCase().includes(f))continue;
         const d=document.createElement("div"); d.className="pitem"; d.draggable=true;
-        d.innerHTML="▤ "+nm+"<i>drag → program.ref · click → open</i>";
+        d.textContent=(program.example?"Example: ":"Program: ")+nm;
+        const hint=document.createElement("i");hint.textContent="drag → program.ref · click → open";d.append(hint);
         d.addEventListener("dragstart",e=>{ e.dataTransfer.setData("text/x-lcnc-program",nm); e.dataTransfer.effectAllowed="copy"; });
-        d.addEventListener("click",()=>{ Harness.select(nm); });
+        d.addEventListener("click",()=>{ if(program.example)Harness.openExample(nm,program.document);else Harness.select(nm); });
         body.appendChild(d);
       }
     }
@@ -2756,6 +2765,12 @@ async function openGallery(){
     body.innerHTML=rows.join("");
     body.querySelectorAll(".galRow").forEach(el=>el.addEventListener("click",async()=>{
       const name=el.dataset.name;
+      if(typeof Harness!=="undefined"){
+        const example=(pr.presets||[]).find(x=>x.name===name);
+        if(el.dataset.kind==="preset"&&example)Harness.openExample(name,example.document);
+        else Harness.select(name);
+        g.remove();return;
+      }
       if(el.dataset.kind==="preset"){
         const hit=(pr.presets||[]).find(x=>x.name===name), doc=hit&&hit.document;
         if(doc){

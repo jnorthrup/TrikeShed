@@ -111,7 +111,7 @@ function applyView(){
   if(typeof Harness!=="undefined"){
     Harness.rememberView();
     const breakout=document.getElementById("panelsBreakout");
-    if(breakout)breakout.href="/panels"+(Harness.selected?"?load="+encodeURIComponent(Harness.selected):"");
+    if(breakout)breakout.href="/panels"+(Harness.selected?"?"+(Harness.previews.has(Harness.selected)?"example":"load")+"="+encodeURIComponent(Harness.selected):"");
   }
 }
 /* momentum — ported from graal.html's kinetic camera. Pan velocity in SCREEN

@@ -3,6 +3,8 @@ package keymux
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * CouchKeyStore — manual credentials persisted in CouchDB, resolved by KeyMux.
@@ -29,6 +31,7 @@ class CouchKeyStore(
     private val db: Couch,
 ) : KeySource() {
     override val name = "couch-credential"
+    private val sourceLock = Mutex()
 
     /**
      * Resolve `llm.<provider>.key` or `llm.<provider>.base_url` from CouchDB.
@@ -90,6 +93,29 @@ class CouchKeyStore(
             "base_url" to (doc["base_url"] as? String),
             "api_type" to (doc["api_type"] as? String),
         )
+    }
+
+    /** Source authentication is a separate namespace; it is never an LLM provider. */
+    suspend fun storeSourceCredential(ref: String, origin: String, path: String, header: String, value: String) = sourceLock.withLock {
+        require(ref.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid source credential reference" }
+        require(header == "Cookie" || header == "Authorization") { "Unsupported source credential header" }
+        require(value.isNotBlank() && value.none { it == '\r' || it == '\n' || it == '\u0000' }) {
+            "Source credential must be a single nonempty header value"
+        }
+        val id = "source-credential:$ref"
+        val previous = db.docJson(id)
+        val result = db.put(id, mapOf(
+            "origin" to origin, "path" to path, "header" to header, "value" to value,
+        ), previous?.get("_rev") as? String)
+        check(result["ok"] == true) { "Source credential was not stored" }
+    }
+
+    /** The host supplies a private database; callers expose only the opaque reference. */
+    suspend fun readSourceCredential(ref: String): Map<String, String?>? = sourceLock.withLock {
+        require(ref.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid source credential reference" }
+        val doc = db.docJson("source-credential:$ref") ?: return@withLock null
+        mapOf("origin" to doc["origin"] as? String, "path" to doc["path"] as? String,
+            "header" to doc["header"] as? String, "value" to doc["value"] as? String)
     }
 
     /** List all stored credential providers. */

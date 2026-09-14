@@ -85,5 +85,6 @@ class LiveBrainClient(
         temperature: Double,
         contextId: String?,
         preferredModel: String?,
-    ): Pair<String, String> = live().chatSeat(messages, maxTokens, temperature, contextId, preferredModel)
+        timeoutMs: Long,
+    ): Pair<String, String> = live().chatSeat(messages, maxTokens, temperature, contextId, preferredModel, timeoutMs)
 }

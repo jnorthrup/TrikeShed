@@ -15,8 +15,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
  * module against the late-bound vocabulary (composites included), the save
  * route against the compiled table — so the same `lcnc/program/<name>` entry
  * meant different things depending on who wrote it last. This is the one
- * computation, and the one precedence: a preset owns its name, the user's
- * `panels/<name>` attachments follow.
+ * computation. Saved attachments take precedence over offered examples.
  *
  * THE BOARD IS THE AUTHORITY. A source (preset, attachment) seeds an entry and
  * overwrites it only when the source itself changes (`sourceCid`); an entry
@@ -54,7 +53,7 @@ class LcncPublisher(
 
     fun isPreset(name: String): Boolean = name in LcncPresets.all()
 
-    /** The stored-program corpus: the offered presets, then the user's own `panels/<name>` constructions. */
+    /** Definitions available to the loader and vocabulary; examples are not installed programs. */
     fun storedCorpus(): Map<String, LcncProgram> {
         val out = LinkedHashMap<String, LcncProgram>()
         for ((name, doc) in LcncPresets.all()) {
@@ -63,7 +62,6 @@ class LcncPublisher(
         val att = attachments ?: return out
         for (ref in runCatching { att.listAttachments("panels/") }.getOrDefault(emptyList())) {
             val name = ref.path.removePrefix("panels/")
-            if (name in out) continue
             // Guarded like its two neighbours, and for the same reason they are: the read
             // goes through the CAS, and the CAS THROWS `digest mismatch` for a blob that is
             // present and no longer hashes to its own id (job/CasStore.kt:24,
@@ -86,9 +84,9 @@ class LcncPublisher(
         return runCatching { LcncProgramConfix.fromJson(name, bytes.decodeToString()) }.getOrNull()
     }
 
-    /** The SOURCE of a name — a preset first, then the user's attachment — or null. */
+    /** A saved source takes precedence over the example catalog. */
     fun source(name: String): LcncProgram? =
-        LcncPresets.all()[name]?.let { runCatching { LcncProgramConfix.fromJson(name, it) }.getOrNull() } ?: storedPanel(name)
+        storedPanel(name) ?: LcncPresets.all()[name]?.let { runCatching { LcncProgramConfix.fromJson(name, it) }.getOrNull() }
 
     /** The late-bound vocabulary: compiled contracts plus the corpus's composites. */
     fun vocabulary(corpus: Map<String, LcncProgram> = storedCorpus()): Map<String, LcncPortContract> =
@@ -172,7 +170,10 @@ class LcncPublisher(
         vocabulary: Map<String, LcncPortContract> = vocabulary(),
         sourceCid: String? = LcncBlackboard.cidOf(program),
     ): Map<String, Any?> {
-        val entry = LcncBlackboard.programEntry(name, program, vocabulary, sourceCid)
+        val preset = LcncPresets.all()[name]?.let { LcncProgramConfix.fromJson(name, it) }
+        val fromPreset = preset != null && sourceCid == LcncBlackboard.cidOf(preset) && storedPanel(name) == null
+        val entry = LcncBlackboard.programEntry(name, program, vocabulary, sourceCid) +
+            if (fromPreset) mapOf("sourceKind" to "preset") else emptyMap()
         putIfChanged(LcncBlackboard.programKey(name), entry, "lcnc")
         // The panels plane: the entry, exploded, on the production network. The
         // bridge is idempotent (same entry => no ops) and retracts what vanished,
@@ -196,11 +197,12 @@ class LcncPublisher(
     }
 
     /**
-     * Every program the corpus holds, on the blackboard — seeded or refreshed
-     * only where the SOURCE changed; a board-edited entry is left as edited.
+     * Publish saved programs. Examples enter the board only through an explicit load/run;
+     * refreshing the vocabulary or saving another program must not install the catalog.
      */
     suspend fun publishPrograms(lb: LateBound = lateBound()) {
         for ((name, program) in lb.corpus) {
+            if (isPreset(name) && storedPanel(name) == null) continue
             val cid = LcncBlackboard.cidOf(program)
             val entry = blackboard.get(LcncBlackboard.programKey(name))
             if (entry == null || LcncBlackboard.sourceCidOf(entry) != cid) publishProgram(name, program, lb.vocabulary, cid)
@@ -208,7 +210,7 @@ class LcncPublisher(
         }
     }
 
-    /** Vocabulary and every program, together — what open() and a panel save do. */
+    /** Vocabulary and saved programs, together — what open() and a panel save do. */
     suspend fun publishAll(): LateBound {
         val lb = lateBound()
         publishVocabulary(lb)

@@ -1,6 +1,11 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.couch.CouchStoreFactory
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -28,6 +33,42 @@ class LcncPublisherTest {
         listOf(LcncNode("t", "text.value", params = mapOf("value" to value)), LcncNode("d", "display")).toSeries(),
         listOf(LcncWire("t", "value", "d", "x")).toSeries(),
     )
+
+    @Test
+    fun publishingTheCatalogDoesNotInstallExamples(): Unit = runBlocking {
+        val board = ConfixBlackboard.empty()
+        val pub = publisher(board)
+        pub.publishAll()
+        for (name in LcncPresets.all().keys) assertNull(board.get(LcncBlackboard.programKey(name)))
+        assertNotNull(board.get("lcnc/vocabulary"))
+        pub.load("preset-scope-inner")
+        val entry = board.get(LcncBlackboard.programKey("preset-scope-inner")) as Map<*, *>
+        assertEquals("preset", entry["sourceKind"])
+        pub.publishAll()
+        assertEquals(entry, board.get(LcncBlackboard.programKey("preset-scope-inner")))
+        assertNull(board.get(LcncBlackboard.programKey("preset-shake")))
+    }
+
+    @Test
+    fun savedProgramsWinEvenWhenTheirNamesMatchExamples(): Unit = runBlocking {
+        val cas = CasStore.inMemory()
+        val attachments = CouchAttachmentGateway(CouchStoreFactory.casBacked(cas), cas)
+        val board = ConfixBlackboard.empty()
+        val pub = LcncPublisher(board, { emptyMap() }, attachments)
+        for (name in listOf("preset-scope-inner", "preset-user-work")) {
+            val bytes = LcncProgramConfix.toJson(program(name, "saved by user")).encodeToByteArray()
+            attachments.putAttachment(OroborosAttachmentRef(
+                "panels/$name", "application/json", bytes.size.toLong(), ContentId.of(bytes), "user", "one", 1L,
+            ), bytes)
+        }
+        pub.publishAll()
+        for (name in listOf("preset-scope-inner", "preset-user-work")) {
+            assertEquals("saved by user", pub.source(name)!!.nodes[0].params["value"])
+            assertEquals("saved by user", pub.load(name)!!.nodes[0].params["value"])
+            assertNull((board.get(LcncBlackboard.programKey(name)) as Map<*, *>)["sourceKind"])
+            assertNotNull(attachments.getAttachment("panels/$name"))
+        }
+    }
 
     @Test
     fun loadingAPresetSeedsItsEntryWithTypedCablesAndTheSourceCid(): Unit = runBlocking {

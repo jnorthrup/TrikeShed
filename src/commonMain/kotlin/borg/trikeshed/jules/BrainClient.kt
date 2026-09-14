@@ -1,5 +1,6 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -429,8 +430,9 @@ open class BrainClient(
         temperature: Double = 0.2,
         contextId: String? = null,
         preferredModel: String? = null,
+        timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
     ): Pair<String, String> = withTimeout(outerBudgetMs()) {
-        chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel)
+        chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel, timeoutMs)
     }
 
     /** Inner seat loop: called inside the outer timeout. */
@@ -440,6 +442,7 @@ open class BrainClient(
         temperature: Double,
         contextId: String?,
         preferredModel: String?,
+        timeoutMs: Long,
     ): Pair<String, String> {
         val trail = mutableListOf<String>()
         if (endpoints.isEmpty()) throw BrainNoRoute(trail + "no provider endpoints discovered")
@@ -465,6 +468,7 @@ open class BrainClient(
                         assessmentId = contextId,
                         maxTokens = maxTokens,
                         temperature = temperature,
+                        timeoutMs = timeoutMs,
                     ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse
                 }
             }

@@ -69,7 +69,19 @@ data class HtxRequest(
     val headers: HtxHeaders = emptyHtxHeaders(),
     val range: HtxRange? = null,
     val body: HtxBody = emptyHtxBody(),
-)
+    /** Whole transport exchange budget, including TLS and the response body. */
+    val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+) {
+    init {
+        require(timeoutMs in 1..Int.MAX_VALUE.toLong()) {
+            "HTX timeout must be between 1 and ${Int.MAX_VALUE} ms"
+        }
+    }
+
+    companion object {
+        const val DEFAULT_TIMEOUT_MS: Long = 30_000L
+    }
+}
 
 data class HtxResponse(
     val status: Int,

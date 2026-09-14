@@ -8,9 +8,11 @@ const Harness = {
   epoch: null, connectionGeneration: 0, viewHistory: [], focusKey: "", viewNode: null, terrainBookmark: null,
   board: Object.create(null), seq: 0, selected: null, applying: false, dirty: false,
   events: [], drafts: new Map(), actors: new Map(), positions: new Map(), flashes: new Map(), // Delta 2026-09-05 (fan-out): Map<key, expiresAt ms>; one Set with one timer collapsed a burst into one border
+  previews: new Map(),
   mounts: new Map(), baselines: new Map(), loadedCids: new Map(), nextY: 0, nextX:0, rowHeight:0,
   ready: false, live: false, running: false, frame: 0, activeBounds: {w:1600,h:900},
   connectionReport: null, shaking: false,
+  neighborKey: null, neighborData: null, neighborTicket: 0, neighborTimer: null,
   parentHandle: null, parentRevision: 0, dragMoved: false,
   el(tag, cls, value) {
     const el = document.createElement(tag);
@@ -20,9 +22,18 @@ const Harness = {
   },
   message(value) { $("#status").textContent = value; },
   connectionStatus(value) {const el=$("#connection");if(el.textContent!==value)el.textContent=value;el.title=value;},
-  inspectionOnly(name=this.selected) {return (this.drafts.get(name)||this.board["lcnc/program/"+name]?.document)?.controls?.inspectionOnly===true;},
+  inspectionOnly(name=this.selected) {return (this.drafts.get(name)||this.previews.get(name)?.document||this.board["lcnc/program/"+name]?.document)?.controls?.inspectionOnly===true;},
+  example(name) {
+    const entry=this.board["lcnc/program/"+name];
+    return this.previews.has(name)||(entry?.sourceKind==="preset"&&entry.programCid===entry.sourceCid);
+  },
   programs() {
-    return [...new Set([...Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document), ...[...this.drafts.keys()].map(n=>"lcnc/program/"+n)])].sort();
+    return [...new Set([...Object.keys(this.board).filter(k => k.startsWith("lcnc/program/") && this.board[k]?.document && !this.example(k.slice(13))), ...[...this.drafts.keys(),...this.previews.keys()].map(n=>"lcnc/program/"+n)])].sort();
+  },
+  openExample(name,document) {
+    if(this.board["lcnc/program/"+name]?.document&&!this.example(name))return this.select(name);
+    this.previews.set(name,{name,document,sourceKind:"preset"});
+    return this.select(name);
   },
   changed() {
     if (this.applying || !this.ready) return;
@@ -34,7 +45,7 @@ const Harness = {
     this.schedule();
   },
   document(name=this.selected) {
-    const entry = this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
+    const entry = this.previews.get(name) || this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
     const origin=this.mounts.get(name)||{x:0,y:0};
     const owned=G.nodes.filter(n=>n._program===name), ids=new Map(owned.map(n=>[n.id,n._localId||n.id]));
     const original=new Map();
@@ -47,7 +58,8 @@ const Harness = {
       wires:G.wires.filter(w=>ids.has(w.from[0])&&ids.has(w.to[0])).map(w=>({from:[ids.get(w.from[0]),w.from[1]],to:[ids.get(w.to[0]),w.to[1]]})),seq:Math.max(entry?.document?.seq||1,...[...ids.values()].map(id=>/^n\d+$/.test(id)?Number(id.slice(1))+1:1))};
   },
   select(name, focus = true, preserveParent = false) {
-    const entry = this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
+    if(this.example(name)&&!this.previews.has(name)&&!this.drafts.has(name)){this.message("Choose this example from the palette to open it");return false;}
+    const entry = this.previews.get(name) || this.board["lcnc/program/" + name] || {document:this.drafts.get(name)};
     if (!entry?.document) { this.message("Program is not on the board: " + name); return false; }
     if (this.selected && this.dirty) this.drafts.set(this.selected, this.document());
     const changedMain=this.selected!==name;
@@ -60,15 +72,16 @@ const Harness = {
     if(this.connectionReport?.program!==name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     if(!this.mounts.has(name))this.mount(name);
     if(changedMain){UNDO.length = 0; REDO.length = 0; lastDoc = JSON.stringify(this.document()); histButtons();}
-    $("#panelName").value = name.replace(/^preset-/, "");
+    $("#panelName").value = this.previews.has(name)?name.replace(/^preset-/, ""):name;
     $("#programSelect").value = name;
     this.dirty = this.drafts.has(name);
     $("#runBtn").disabled = this.dirty || this.running || this.inspectionOnly();
     $("#runBtn").title=this.inspectionOnly()?"Inspection-only wiring specimen":"Run selected program";
     this.render();
     if (focus) this.fit(false);
-    this.message(name + (this.dirty ? " has unpublished changes" : " on the blackboard"));
-    const url=new URL(location.href);url.pathname=this.surface==="board"?"/harness":"/"+this.surface;url.searchParams.set("load",name);history.replaceState(null,"",url);
+    this.message(this.previews.has(name)?"Example: "+name+" · not saved":name + (this.dirty ? " has unpublished changes" : " on the blackboard"));
+    const url=new URL(location.href);url.pathname=this.surface==="board"?"/harness":"/"+this.surface;
+    url.searchParams.delete("load");url.searchParams.delete("example");url.searchParams.set(this.previews.has(name)?"example":"load",name);history.replaceState(null,"",url);
     return true;
   },
   setParent(node) {
@@ -92,6 +105,7 @@ const Harness = {
     const target=this.parentTarget();
     if(!target){
       if(this.selected&&this.parentHandle?.nodeId!=null){this.message("Selected scope removed; parent is now "+this.selected);this.setParent(null);}
+      if(!this.selected){const grip=$("#parentHandle");grip.textContent="No program selected";grip.title="Select or create a program";grip.setAttribute("aria-label","No program selected");}
       return;
     }
     for(const n of G.nodes)n.el?.classList.toggle("selected-parent",n===target.node);
@@ -133,7 +147,8 @@ const Harness = {
   },
   mount(name,document) {
     if(this.surface==="panels"&&name!==this.selected)return;
-    const entry=this.board["lcnc/program/"+name]||{document:this.drafts.get(name)};if(!entry?.document)return;
+    if(this.example(name)&&!this.previews.has(name)&&!this.drafts.has(name))return;
+    const entry=this.previews.get(name)||this.board["lcnc/program/"+name]||{document:this.drafts.get(name)};if(!entry?.document)return;
     if(this.connectionReport?.program===name){this.connectionReport=null;$("#connections").hidden=true;clearVerdicts();}
     const previous=this.applying;this.applying=true;
     try {
@@ -214,6 +229,8 @@ const Harness = {
   },
   render() {
     if (!this.ready) return;
+    for(const id of ["runBtn","argumentsBtn","storeSaveBtn","fdBtn","shakeBtn","fitBtn"])$("#"+id).disabled=!this.selected;
+    $("#runBtn").disabled=!this.selected||this.dirty||this.running||this.inspectionOnly();
     this.refreshParent();
     $("#territories").replaceChildren();
     this.positions.clear();
@@ -227,6 +244,8 @@ const Harness = {
       territory.classList.add("active-program");if(name===this.selected)territory.classList.add("selected");
       territory.classList.toggle("selected-parent",name===this.selected&&!this.parentTarget()?.node);
       const head=territory.querySelector("header");
+      const neighbors=this.el("button","source-ref","↔");neighbors.title="Neighbors of "+name;neighbors.setAttribute("aria-label","Neighbors of "+name);
+      neighbors.addEventListener("click",e=>{e.stopPropagation();this.inspect("lcnc/program/"+name);});head.append(neighbors);
       head.addEventListener("pointerdown",e=>{if(e.target.closest("button")||e.button!==0)return;if(name!==this.selected)this.select(name,false);else this.setParent(null);this.dragParent(e);});
       head.addEventListener("dblclick",()=>this.fit(false));
       const cid=this.board["lcnc/program/"+name]?.programCid;
@@ -237,7 +256,7 @@ const Harness = {
     const groups = new Map();
     for (const [key,value] of Object.entries(this.board)) {
       const prefix = key.split("/")[0];
-      if (prefix !== "lcnc") {
+      if (!key.startsWith("lcnc/program/") || !this.mounts.has(key.slice(13))) {
         if (!groups.has(prefix)) groups.set(prefix, []);
         groups.get(prefix).push([key,value]);
       }
@@ -320,10 +339,11 @@ const Harness = {
       button.addEventListener("click", () => this.focus(box)); nav.append(button);
     }
     const select = $("#programSelect");
-    if (select.options.length !== programKeys.length || programKeys.some((k,i)=>select.options[i]?.value!==k.slice(13))) {
-      select.replaceChildren(...programKeys.map(key=> {const option=this.el("option","",key.slice(13));option.value=key.slice(13);return option;}));
+    if (select.options[0]?.value!=="" || select.options.length !== programKeys.length+1 || programKeys.some((k,i)=>select.options[i+1]?.value!==k.slice(13)||select.options[i+1]?.textContent!==(this.previews.has(k.slice(13))?"Example: ":"")+k.slice(13))) {
+      const empty=this.el("option","",programKeys.length?"Select a program":"No saved programs");empty.value="";
+      select.replaceChildren(empty,...programKeys.map(key=> {const name=key.slice(13),option=this.el("option","",this.previews.has(name)?"Example: "+name:name);option.value=name;return option;}));
     }
-    select.value = this.selected;
+    select.value = this.selected||"";
     Landscape.refreshActivity();this.renderEvents(); this.channels(runs[0]?.[1]);
     $("#boardCount").textContent = Object.keys(this.board).length + " entries";
     applyView(); redraw();Landscape.schedule();
@@ -411,6 +431,7 @@ const Harness = {
       path.dataset.relation="association";const title=document.createElementNS(svg.namespaceURI,"title");title.textContent="Term association, not causal support";path.append(title);
       LandscapeNavigation.wireCurve(path,{x:ax,y:ay},{x:bx,y:by},viewport,view,[{x:ax+70,y:ay},{x:bx+70,y:by}]);svg.append(path);
     }
+    this.neighborChannels(svg);
     if(!receipt)return;
     const a=this.positions.get(receipt.programKey),b=this.positions.get("receipts");if(!a||!b)return;
     const path=document.createElementNS(svg.namespaceURI,"path");path.dataset.relation="execution";LandscapeNavigation.wireCurve(path,{x:a.x+a.w,y:a.y+160},{x:b.x,y:b.y+160},viewport,view);svg.append(path);
@@ -426,6 +447,10 @@ const Harness = {
     this.inspectionController = new AbortController();
     this.sheetTicket = (this.sheetTicket || 0) + 1;
     this.sheetNode = null;
+    this.neighborKey = null; this.neighborData = null; this.neighborTicket++;
+    this.neighborController?.abort();
+    clearTimeout(this.neighborTimer); this.neighborTimer = null;
+    $("#factNeighbors").hidden = true; $("#neighborResults").replaceChildren();
     $("#factInspector").querySelectorAll(".terrain-ref").forEach(e=>e.remove());
     $("#factKey").textContent = key; $("#factActor").textContent = actor;
     $("#factValue").textContent = raw; $("#factSheet").replaceChildren(); $("#sheetRoots").replaceChildren();
@@ -436,6 +461,8 @@ const Harness = {
   inspect(key) {
     this.beginInspection(key, this.actors.get(key)||this.board[key]?.actor||"", JSON.stringify(this.board[key],null,2));
     this.loadSheets([{url:"/blackboard/sheet?key="+encodeURIComponent(key)}], key);
+    this.neighborKey = key; $("#factNeighbors").hidden = false; $("#neighborKey").value = key;
+    this.loadNeighbors();
     const receipt=this.board[key];
     for(const link of Landscape.activityLinks.filter(l=>l.from===key||l.to===key)){
       const target=link.from===key?link.to:link.from;
@@ -455,6 +482,71 @@ const Harness = {
     }
     if(key.startsWith("lcnc/snapshot/")&&receipt?.cid){const button=this.el("button","terrain-ref","Snapshot "+String(receipt.cid).slice(0,16));button.addEventListener("click",()=>Landscape.inspectCid(receipt.cid));$("#factInspector").append(button);}
     if(key.startsWith("lcnc/stale/")&&receipt?.runId){const button=this.el("button","terrain-ref","Rebuild");button.addEventListener("click",()=>this.rebuild(receipt).catch(e=>this.message(e.message)));$("#factInspector").append(button);}
+  },
+  openNeighbors() {
+    const key = this.neighborKey || this.programs().find(k=>k==="lcnc/program/"+this.selected) || Object.keys(this.board).sort()[0];
+    if (key) this.inspect(key); else this.message("The blackboard is empty");
+  },
+  queueNeighbors() {
+    if (!this.neighborKey || this.neighborTimer) return;
+    this.neighborTimer = setTimeout(()=>{this.neighborTimer=null;this.loadNeighbors();},150);
+  },
+  async loadNeighbors() {
+    const key=this.neighborKey,epoch=this.epoch;
+    if (!key) return;
+    this.neighborController?.abort();this.neighborController=new AbortController();
+    const signal=this.neighborController.signal;
+    const ticket=++this.neighborTicket,host=$("#neighborResults"),status=$("#neighborStatus");
+    const current=()=>ticket===this.neighborTicket&&key===this.neighborKey&&epoch===this.epoch&&!signal?.aborted;
+    this.neighborData=null;host.replaceChildren();status.textContent="Finding neighbors across the blackboard…";this.schedule();
+    const options=$("#neighborKeys");options.replaceChildren();
+    for(const node of Object.keys(this.board).sort()){const option=this.el("option");option.value=node;options.append(option);}
+    if (!Object.hasOwn(this.board,key)){status.textContent="This node was deleted.";this.schedule();return;}
+    try {
+      const response=await fetch("/blackboard/neighbors?key="+encodeURIComponent(key),{signal});
+      if(!response.ok)throw Error(response.status===404?"This node was deleted.":"Neighbors unavailable ("+response.status+")");
+      const data=await response.json();if(!current())return;
+      if(data.epoch!==epoch||data.revision<this.seq){this.queueNeighbors();return;}
+      this.neighborData=data;
+      status.textContent=data.indexedKeys+" nodes indexed · "+data.classifiedKeys+" with SUMO concepts · "+data.corpus+" corpus · revision "+data.revision+
+        (data.opaqueKeys.length?" · "+data.opaqueKeys.length+" nodes have opaque values":"");
+      if(!data.neighbors.length)host.append(this.el("p","sheet-note","No supported neighbors in this snapshot."));
+      for(const neighbor of data.neighbors){
+        const row=this.el("button","neighbor-row");row.dataset.key=neighbor.key;
+        row.append(this.el("b","",neighbor.key));
+        const evidence=[];
+        if(neighbor.concepts.length)evidence.push("SUMO: "+neighbor.concepts.join(", "));
+        if(neighbor.terms.length)evidence.push("Text: "+neighbor.terms.join(", "));
+        if(neighbor.references.length)evidence.push(...neighbor.references.map(r=>"Reference: "+r.from+" → "+r.to));
+        row.append(this.el("span","",evidence.join(" · ")));
+        row.append(this.el("span","",(neighbor.provenance?.actor||"unattributed")+" · similarity "+neighbor.score.toFixed(3)));
+        row.title="Shared concepts and text are associations; references retain their recorded direction.";
+        row.addEventListener("click",()=>{const position=this.positions.get(neighbor.key)||this.positions.get(neighbor.key.split("/")[0]);if(position)this.focus(position,neighbor.key);this.inspect(neighbor.key);});
+        host.append(row);
+      }
+      this.schedule();
+    } catch(error) { if(current()){status.textContent=error.message;this.schedule();} }
+  },
+  neighborChannels(svg) {
+    const data=this.neighborData;
+    const elements=new Map();
+    for(const element of $("#territories").querySelectorAll("[data-key]")){element.classList.remove("neighbor");elements.set(element.dataset.key,element);}
+    if(!data||data.epoch!==this.epoch||data.revision<this.seq||!Object.hasOwn(this.board,data.key))return;
+    const box=world.getBoundingClientRect();
+    const point=key=>{
+      const element=elements.get(key);
+      if(element){const r=element.getBoundingClientRect();return{x:(r.right-box.left)/view.z,y:(r.top+r.height/2-box.top)/view.z};}
+      const p=this.positions.get(key)||this.positions.get(key.split("/")[0]);return p?{x:p.x+p.w,y:p.y+70}:null;
+    };
+    const from=point(data.key);if(!from)return;
+    for(const neighbor of data.neighbors){
+      if(!Object.hasOwn(this.board,neighbor.key))continue;
+      const to=point(neighbor.key);if(!to)continue;
+      elements.get(neighbor.key)?.classList.add("neighbor");
+      const path=document.createElementNS(svg.namespaceURI,"path");path.setAttribute("class","neighbor-ref");path.dataset.relation="association";
+      const title=document.createElementNS(svg.namespaceURI,"title");title.textContent=data.key+" ↔ "+neighbor.key+": "+neighbor.concepts.concat(neighbor.terms).join(", ");path.append(title);
+      LandscapeNavigation.wireCurve(path,from,to,viewport,view);svg.append(path);
+    }
   },
   /* Sheets. A fact, a territory, or the whole board opens as the grid-in-cell family
      /blackboard/sheet projects (CursorSheet/confixSheets — the same projection /api/graal/sheet
@@ -702,6 +794,7 @@ const Harness = {
       const entryResponse=await fetch("/api/panels/"+encodeURIComponent(name)+"?entry=1");
       if(!entryResponse.ok)throw Error("Published entry unavailable");
       this.board["lcnc/program/"+name]=await entryResponse.json();
+      if(this.previews.has(this.selected)){this.previews.delete(this.selected);this.unmount(this.selected);}
       this.drafts.delete(this.selected);this.dirty=false;this.mount(name);this.select(name,false);
       this.message("Published "+name+(result.violations?.length?" with refused cables":""));
     }catch(e){this.message("Publish failed: "+e.message);}
@@ -759,6 +852,7 @@ const Harness = {
       else this.mount(name);
     }
     if(event.key.startsWith("lcnc/run/")&&!event.deleted){this.output(event.value);this.flash(event.value.programKey);this.flash("receipts");}
+    this.queueNeighbors();
     this.schedule();
   },
   // Delta 2026-09-05 (fan-out): each key keeps its own expiry (now + 1000 ms) so a burst of N kanban
@@ -807,14 +901,23 @@ const Harness = {
       await syncContracts(this.board["lcnc/vocabulary"]);await syncLanes();
       if(generation!==this.connectionGeneration)return;
       this.ready=true;
-      for(const name of this.mounts.keys())if(!this.board["lcnc/program/"+name]&&!this.drafts.has(name))this.unmount(name);
-      const requested=new URLSearchParams(location.search).get("load");
+      for(const name of this.mounts.keys())if(!this.board["lcnc/program/"+name]&&!this.drafts.has(name)&&!this.previews.has(name))this.unmount(name);
+      const query=new URLSearchParams(location.search),requested=query.get("load"),requestedExample=query.get("example");
       const names=this.programs().map(k=>k.slice(13));
-      const name=[this.selected,requested,requested?"preset-"+requested:null,"preset-curator",names[0]].find(n=>names.includes(n));
-      const first=this.board["lcnc/program/preset-curator"]?"preset-curator":names[0];
-      if(first)this.mount(first);
-      for(const n of names)if(n!==first)this.mount(n);
+      const name=[this.selected,requested].find(n=>n&&names.includes(n));
+      for(const n of names)this.mount(n);
       if(name)this.select(name,initial&&!bookmark,!initial);
+      else {
+        this.selected=null;this.dirty=false;this.setParent(null);$("#panelName").value="";
+        this.message(requested?"Program is not available: "+requested:"No program selected"+(names.length?"":" · no saved programs"));
+        if(requested){const url=new URL(location.href);url.searchParams.delete("load");url.hash="";history.replaceState(null,"",url);}
+      }
+      if(initial&&requestedExample){
+        const response=await fetch("/api/panels/presets");if(!response.ok)throw Error("Example catalog "+response.status);
+        const catalog=await response.json();if(generation!==this.connectionGeneration)return;
+        const example=(catalog.presets||[]).find(p=>p.name===requestedExample);
+        if(example)this.openExample(example.name,example.document);else this.message("Example is not available: "+requestedExample);
+      }
       for(const event of buffer) {
         if(generation!==this.connectionGeneration)return;
         await this.accept(event);
@@ -822,11 +925,12 @@ const Harness = {
       buffer=[];hydrating=false;this.render();buildPalette();
       await Landscape.refresh();
       if(generation!==this.connectionGeneration)return;
-      if(bookmark)this.restoreBookmark(bookmark);
+      if(bookmark&&(!requested||name||requestedExample))this.restoreBookmark(bookmark);
       else if(initial&&this.surface==="graal")this.focus(Landscape.objectBox,LandscapeNavigation.object(""));
-      else if(initial&&!requested)this.fit(this.surface!=="panels");
+      else if(initial&&!name&&!requestedExample)this.fit(this.surface!=="panels");
       this.connectionStatus("Live");$("#connection").classList.add("live");
       this.live=true;Landscape.refreshActivity();
+      this.queueNeighbors();
     }catch(e){if(generation===this.connectionGeneration){this.message("Blackboard unavailable: "+e.message);this.reconnect();}}
   },
 };
@@ -848,9 +952,12 @@ $("#cancelRun").addEventListener("click",()=>Harness.cancelRun().catch(e=>Harnes
 $("#parentHandle").addEventListener("pointerdown",e=>Harness.dragParent(e));
 $("#parentHandle").addEventListener("click",()=>{if(!Harness.dragMoved)Harness.fit(false);});
 $("#sheetsBtn").addEventListener("click",()=>Harness.openSheets([]));
+$("#neighborsBtn").addEventListener("click",()=>Harness.openNeighbors());
+$("#neighborKey").addEventListener("change",e=>{if(Object.hasOwn(Harness.board,e.target.value))Harness.inspect(e.target.value);});
 $("#sheetRawBtn").addEventListener("click",()=>Harness.rawSheets(!$("#factInspector").classList.contains("raw")));
 $("#factInspector").addEventListener("close",()=>{
   Harness.inspectionController?.abort(); Harness.sheetTicket = (Harness.sheetTicket || 0) + 1;
+  Harness.schedule();
 });
 $("#terrainLayer").addEventListener("change",e=>{Landscape.terrain?.setLayer(Number(e.target.value));Landscape.schedule();});
 let parentDragGesture=false;

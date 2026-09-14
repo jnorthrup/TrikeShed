@@ -51,6 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.withLock
 import borg.trikeshed.utils.kanban.JulesBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.jules.JulesCause
@@ -1356,6 +1357,7 @@ object OroborosDaemon {
             kifBank = kifBank,
         )
         lcncRunnersRef.set(moduleContext.lcncRunners)
+        val headhunterWire = borg.trikeshed.forge.server.HeadhunterWire.open(moduleContext, brainClient, patchWire)
         requestFactoryRpcTargets["session.info"] = borg.trikeshed.relaxfactory.RequestFactoryRpcTarget { args ->
             linkedMapOf<String, Any?>(
                 "db" to couchDb.info(),
@@ -1500,7 +1502,7 @@ object OroborosDaemon {
                 bag = bag,
                 kif = kifBank,
                 // The RDF projection of the whole fact plane at freeze time (was an empty graph).
-                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.view.flatMap(borg.trikeshed.dag.PlaneFacts::toTriples)) },
+                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view }) },
                 cas = casStore,
             )
             moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(
@@ -1598,10 +1600,11 @@ object OroborosDaemon {
         //    ($HERMES_HOME/.env, auth.json credential pool) → ModelMux →
         //    HtxReactor, so the tribunal's token spend lands on the daemon's
         //    quota/lease receipts exactly like every other model traffic.
-        //    The instance (schema → mutable, versionable state) opens from
-        //    the preset's pre-canned lanes; kg.ingest advances the judge's
+        //    The instance opens on the first kg.ingest, not at application boot.
+        //    Its lanes come from the preset; kg.ingest advances the judge's
         //    job (active → closed) when the verdict lands on the record.
         val tribunalHolder = borg.trikeshed.lcnc.TribunalInstanceHolder()
+        val tribunalLock = kotlinx.coroutines.sync.Mutex()
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.TribunalNodes.registry(
                 dialog = borg.trikeshed.lcnc.hermesEnvDialog(
@@ -1625,9 +1628,26 @@ object OroborosDaemon {
                     muxContext = htxElement + muxReactor,
                 ),
                 ingest = { verdict ->
-                    val t = tribunalHolder.instance
-                    val life = t?.lifecycle("deliberate")
-                    if (t == null || (life != "active" && life != "submitted")) verdict
+                    val t = tribunalLock.withLock {
+                        tribunalHolder.instance ?: borg.trikeshed.lcnc.TribunalInstance.open(
+                            scope = moduleScope,
+                            plan = borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+                            presetDocument = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-tribunal"),
+                        ).also { tribunal ->
+                            try {
+                                tribunal.awaitRootSeeds()
+                            } catch (failure: Throwable) {
+                                withContext(NonCancellable) {
+                                    try { tribunal.nexus.drain() }
+                                    catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+                                }
+                                throw failure
+                            }
+                            tribunalHolder.instance = tribunal
+                        }
+                    }
+                    val life = t.lifecycle("deliberate")
+                    if (life != "active" && life != "submitted") verdict
                     else {
                         t.advance("deliberate", "complete", "tribunal-verdict-${verdict.hashCode()}", t.revision("deliberate") ?: 1L)
                         t.snapshotCid("deliberate") ?: verdict
@@ -1761,20 +1781,6 @@ object OroborosDaemon {
                 credStore = couchKeyStore,
             ),
         )
-        launch(Dispatchers.Default) {
-            runCatching {
-                val tribunal = borg.trikeshed.lcnc.TribunalInstance.open(
-                    scope = moduleScope,
-                    plan = borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
-                    presetDocument = borg.trikeshed.lcnc.LcncPresets.all().getValue("preset-tribunal"),
-                )
-                tribunalHolder.instance = tribunal
-                tribunal.awaitRootSeeds()
-                HostSystem.err("[OROBOROS] tribunal instance live: ${tribunal.laneIds.size} lanes seeded at root (schema job-nexus)")
-            }.onFailure {
-                HostSystem.err("[OROBOROS] tribunal instance failed to open (non-fatal): ${it.message}")
-            }
-        }
         // ── Legal council (design/legal-council-3x5.md): the 3x5 preset's node
         //    family. Its OWN seam — CouncilDialog → BrainClient.chatSeat — so
         //    every seat carries its authored maxTokens/temperature/preferred
@@ -1889,7 +1895,7 @@ object OroborosDaemon {
                     borg.trikeshed.forge.server.WikiReadWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" } +
                     " root=${wikiRoot().absolutePath}"
         )
-        // Boot thaw (non-fatal, like the tribunal open): the kifBank and the
+        // Boot thaw (non-fatal): the kifBank and the
         // blackboard are in-memory — couch + FileCasStore are the durable
         // planes. Re-assert the kif-ledger/ facts and re-land the
         // council-case/ index facts so the bank and the GET read-back
@@ -2555,9 +2561,13 @@ object OroborosDaemon {
                 runCatching { graalFacts.close() }
                 runCatching { jvmVitals.stop() }
                 runCatching { kifTeeDisposer.close() }
+                // Stop job-agent admission and await accepted writes/model work before their stores close.
+                runCatching { headhunterWire.drain() }
                 runCatching { kanbanJob.cancel() }
                 runCatching { moduleSupervisor.drainAll() }
+                runCatching { tribunalHolder.instance?.nexus?.drain() }
                 runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
+                runCatching { headhunterWire.close() }
                 runCatching { turnReview?.close() }
                 runCatching { causalityRete?.close() }
                 runCatching { curatorImpulse?.close() }

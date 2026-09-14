@@ -52,6 +52,12 @@ object SurfaceNodes {
             val call = service.value
             mapOf("board" to call("GET", "/blackboard/board", null))
         },
+        "blackboard.neighbors" to boundLcnc(SurfaceCallKey(call)) { service, node, inputs ->
+            val key = (inputs["key"] as? String) ?: node.params["key"].orEmpty()
+            require(key.isNotBlank()) { "blackboard.neighbors requires a key" }
+            val projection = service.value("GET", "/blackboard/neighbors?key=${percentEncodePathSegment(key)}", null)
+            mapOf("neighbors" to field(projection, "neighbors"), "projection" to projection)
+        },
         "blackboard.sites" to boundLcnc(SurfaceCallKey(call)) { service, node, _ ->
             val call = service.value
             val owner = node.params["owner"].orEmpty()
@@ -151,7 +157,7 @@ object SurfaceNodes {
     /** The types this family serves — the gate compares this against the contracts. */
     fun servedTypes(): Set<String> = setOf(
         "http.get", "http.post",
-        "blackboard.facts", "blackboard.board", "blackboard.sites",
+        "blackboard.facts", "blackboard.board", "blackboard.sites", "blackboard.neighbors",
         "graal.vitals", "graal.heap", "vms.list", "pointcut.routes",
         "panels.list", "mux.standings",
         "job.command", "job.batch", "project.mount", "project.kill",

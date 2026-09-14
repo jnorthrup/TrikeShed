@@ -6,7 +6,7 @@ function fixture(responses){
   const calls={inspected:[],mounted:[],selected:[],unmounted:[]};
   const harness={
     selected:"a",board:{"lcnc/program/a":{programCid:"cid-a",document:{nodes:[]}}},drafts:new Map([["a",{nodes:[]}]]),dirty:true,
-    loadedCids:new Map([["a","cid-a"]]),document(){return {nodes:[],wires:[]};},
+    loadedCids:new Map([["a","cid-a"]]),previews:new Map(),document(){return {nodes:[],wires:[]};},
     inspect(key){calls.inspected.push(key);},mount(name){calls.mounted.push(name);},select(name){calls.selected.push(name);},unmount(name){calls.unmounted.push(name);},
     message(text){harness.messageText=text;},
   };
@@ -49,4 +49,13 @@ test("Overwrite passes the board's current cid as the base; a new name sends no 
   other.harness.selected="preset-corpus";
   await other.harness.publish();
   assert.equal(other.requests[0].url,"/api/panels/a","publishing a preset under a new name names no base");
+});
+
+test("publishing an example replaces only its preview with the saved program",async()=>{
+  const {harness,calls}=fixture([{status:200,body:{verdict:"ok",cid:"saved"}},{status:200,body:{programCid:"saved",document:{nodes:[]}}}]);
+  harness.selected="preset-example";harness.previews.set(harness.selected,{document:{nodes:[]}});
+  harness.previews.set("another-example",{document:{nodes:[]}});
+  await harness.publish();
+  assert.equal(harness.previews.has("preset-example"),false);assert.equal(harness.previews.has("another-example"),true);
+  assert.deepEqual(calls.unmounted,["preset-example"]);assert.deepEqual(calls.selected,["a"]);
 });

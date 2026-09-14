@@ -64,6 +64,7 @@ body.zoomed-out .territory.active-program>.activity-lamp{visibility:visible}
 .fact-row[data-activity]{border-left:3px solid var(--activity-color);padding-left:6px}
 .fact-cell[data-activity]{box-shadow:inset 0 0 0 1px var(--activity-color)}
 .activity-ref{stroke:#7bb7c8;stroke-width:1.5;fill:none;stroke-dasharray:3 5}
+.neighbor-ref{stroke:#c4adf2;stroke-width:1.5;fill:none;stroke-dasharray:7 4}
 @media(prefers-reduced-motion:no-preference){[data-activity=operational]>.activity-lamp{animation:activity-pulse 1.8s ease-in-out infinite}@keyframes activity-pulse{50%{box-shadow:0 0 0 3px #69cd9233}}}
 #topologyLegend footer{display:flex;gap:8px;padding:8px;border-top:1px solid var(--line);align-items:flex-start}
 #topologyLegend footer button{flex:none;width:28px;height:28px;padding:0;font-size:18px}
@@ -162,6 +163,17 @@ dialog::backdrop{background:#0008}dialog form{float:right}dialog h2{font:14px va
 #sheetRawBtn[aria-pressed="true"]{border-color:var(--graal);color:var(--graal)}
 #factInspector.raw #factSheet,#factInspector.raw #sheetRoots{display:none}
 #factInspector:not(.raw) #factValue{display:none}
+#factNeighbors{border-block:1px solid var(--line);padding:12px 0;margin-bottom:14px}
+#factNeighbors[hidden]{display:none}
+#factNeighbors header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+#factNeighbors label{font:12px var(--mono);color:var(--dim)}
+#neighborKey{display:block;width:100%;box-sizing:border-box;margin-top:5px}
+#neighborStatus{font:12px var(--mono);color:var(--dim)}
+#neighborResults{max-height:32vh;overflow:auto;display:grid;gap:8px}
+.neighbor-row{text-align:left;padding:10px;overflow-wrap:anywhere}
+.neighbor-row b,.neighbor-row span{display:block}
+.neighbor-row span{font:12px var(--mono);color:var(--dim);margin-top:5px}
+.fact-row.neighbor,.fact-cell.neighbor{outline:1px solid #c4adf2}
 #factSheet .csheet{margin:0;font-size:12px;min-width:0;max-width:100%;overflow-wrap:anywhere}
 #factSheet .csheet .tablewrap{max-height:58vh}
 #factSheet .csheet td{max-width:420px;padding:4px 8px}

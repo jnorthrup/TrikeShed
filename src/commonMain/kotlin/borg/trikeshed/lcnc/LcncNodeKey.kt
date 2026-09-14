@@ -7,6 +7,7 @@ import kotlin.coroutines.CoroutineContext
 enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement> {
     BLACKBOARD_FACTS("blackboard.facts"),
     BLACKBOARD_BOARD("blackboard.board"),
+    BLACKBOARD_NEIGHBORS("blackboard.neighbors"),
     BLACKBOARD_SITES("blackboard.sites"),
     CCEK_INCARNATE("ccek.incarnate"),
     CCEK_SIGNAL("ccek.signal"),
@@ -78,6 +79,9 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     BELIEFS_RESONATE("beliefs.resonate"),
     JOB_COMMAND("job.command"),
     JOB_BATCH("job.batch"),
+    HEADHUNTER_CONTEXT("headhunter.context"),
+    HEADHUNTER_DRAFT("headhunter.draft"),
+    HEADHUNTER_SAVE("headhunter.save"),
     VM_CALL("vm.call"),
     VM_STATS("vm.stats"),
     VM_TIERS("vm.tiers"),

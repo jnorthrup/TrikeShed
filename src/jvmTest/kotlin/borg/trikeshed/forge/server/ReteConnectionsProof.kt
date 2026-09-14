@@ -6,6 +6,7 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.toList
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.parse.json.JsonSupport
@@ -31,7 +32,7 @@ object ReteConnectionsProof {
             check(receipt.productionId == "job-dependency" && receipt.activation.ruleId == "start-job")
             check(receipt.delivery == "agenda-enqueued")
             check(receipt.activation.supportCids == listOf(fixture.versionCid))
-            check(tee.projection(fixture.factId) == PlaneFacts.toKif(fixture))
+            check(tee.projection(fixture.factId)?.toList() == PlaneFacts.toKif(fixture).toList())
             val wire = ReteWire(network, tee)
             val server = JvmKanbanServer(extraRoutes = listOf(wire::route))
             val response = server.routeHttp("GET /api/rete/connections HTTP/1.1\r\nHost: proof\r\n\r\n".encodeToByteArray())

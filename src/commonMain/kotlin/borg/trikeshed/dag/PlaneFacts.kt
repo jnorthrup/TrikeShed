@@ -3,6 +3,11 @@ package borg.trikeshed.dag
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.view
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfTerm
@@ -109,8 +114,8 @@ object PlaneFacts {
     }
 
     /** Identity: fact -> (partition, key). A fact without a [KEY] field answers with its localId (couch/board facts predate the reserved fields). */
-    fun keyOf(f: ReteStoredFact): Pair<String, String> =
-        f.factId.a to ((f.fields[KEY] as? String) ?: f.factId.b)
+    fun keyOf(f: ReteStoredFact): Twin<String> =
+        f.factId.a j ((f.fields[KEY] as? String) ?: f.factId.b)
 
     /** `<fact:partition/localId>`; the localId is percent-encoded so nothing in it can end the IRI or split a KIF token. */
     fun factIri(factId: FactId): RdfTerm.Iri = RdfTerm.Iri(FACT_NS + encodeIriPart(factId.a) + "/" + encodeIriPart(factId.b))
@@ -186,19 +191,19 @@ object PlaneFacts {
      * per element (see the class doc for the full table). Every triple this
      * returns survives `TurtleRdf.emit` → `TurtleRdf.parse` unchanged.
      */
-    fun toTriples(f: ReteStoredFact): List<RdfTriple> {
+    fun toTriples(f: ReteStoredFact): Series<RdfTriple> {
         val subject = factIri(f.factId)
-        val out = ArrayList<RdfTriple>(f.fields.size)
+        val out = SeriesBuffer<RdfTriple>(f.fields.size)
         for ((name, value) in f.fields.entries.sortedBy { it.key }) {
             val predicate = fieldIri(name)
             forEachProjectedValue(value) { out.add(RdfTriple(subject, predicate, literalOf(it))) }
         }
-        return out
+        return out.drain()
     }
 
     /** Turtle of the projections of many facts, with [PREFIXES]. */
-    fun toTurtle(facts: List<ReteStoredFact>): String =
-        TurtleRdf.emit(RdfGraph(facts.flatMap(::toTriples)), PREFIXES)
+    fun toTurtle(facts: Series<ReteStoredFact>): String =
+        TurtleRdf.emit(RdfGraph(facts.view.flatMap { toTriples(it).view }), PREFIXES)
 
     private fun literalOf(v: Any): RdfTerm.Literal = when (v) {
         is String -> RdfTerm.Literal(v)
@@ -220,16 +225,16 @@ object PlaneFacts {
      * so `KifKnowledgeBase.assert(expr)` and `assertKif(expr.toKifString())`
      * land the same string in the bank.
      */
-    fun toKif(f: ReteStoredFact): List<KifExpr> {
+    fun toKif(f: ReteStoredFact): Series<KifExpr> {
         val subject = KifExpr.Atom(factIri(f.factId).iri)
-        val out = ArrayList<KifExpr>(f.fields.size)
+        val out = SeriesBuffer<KifExpr>(f.fields.size)
         val kind = f.fields[KIND]
         if (kind != null) forEachProjectedValue(kind) { out.add(tuple(KIND, subject, it)) }
         for ((name, value) in f.fields.entries.sortedBy { it.key }) {
             if (name == KIND) continue
             forEachProjectedValue(value) { out.add(tuple(name, subject, it)) }
         }
-        return out
+        return out.drain()
     }
 
     private fun tuple(field: String, subject: KifExpr.Atom, value: Any): KifExpr.ListExpr =

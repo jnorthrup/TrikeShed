@@ -69,7 +69,7 @@ const labels = ['Board', 'Graal', 'Panels', 'Documents', 'Kanban', 'Hermes', 'Ke
       await page.locator('#application-links [data-destination=graal]').click();
       await page.waitForURL('**/graal');
       assert.equal(context.pages().length, 1);
-      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), saved);
+      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), '/blackboard');
       await page.goBack({waitUntil: 'domcontentloaded'});
       assert.equal(new URL(page.url()).pathname, '/harness');
       await page.goto(base + '/graal', {waitUntil: 'domcontentloaded'});
@@ -78,15 +78,15 @@ const labels = ['Board', 'Graal', 'Panels', 'Documents', 'Kanban', 'Hermes', 'Ke
         sessionStorage.setItem('trikeshed.application.views.v1', '42');
         window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
       });
-      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), '/harness');
+      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), '/blackboard');
       await page.evaluate(() => {
         sessionStorage.setItem('trikeshed.application.views.v1', JSON.stringify({board: '/harness?load=preset-shake#x=1&y=2&z=0.5', panels: 'https://example.com/panels'}));
         window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true}));
       });
-      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), '/harness?load=preset-shake#x=1&y=2&z=0.5');
-      assert.equal(await page.locator('#application-nav .application-brand').getAttribute('href'), '/harness?load=preset-shake#x=1&y=2&z=0.5');
+      assert.equal(await page.locator('#application-links [data-destination=board]').getAttribute('href'), '/blackboard');
+      assert.equal(await page.locator('#application-nav .application-brand').getAttribute('href'), '/blackboard');
       assert.equal(await page.locator('#application-links [data-destination=panels]').getAttribute('href'), '/panels');
-      await page.goto(base + '/harness?load=preset-curator', {waitUntil: 'domcontentloaded'});
+      await page.goto(base + '/harness?example=preset-curator', {waitUntil: 'domcontentloaded'});
       await page.waitForFunction(() => typeof Harness !== 'undefined' && Harness.ready && Harness.selected === 'preset-curator');
       await page.evaluate(() => {
         const node = G.nodes.find(node => node._program === Harness.selected);
