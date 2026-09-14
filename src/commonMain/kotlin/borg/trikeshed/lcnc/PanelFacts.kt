@@ -8,6 +8,15 @@ import borg.trikeshed.dag.ReteStoredFact
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.emptySeriesOf
+import kotlin.concurrent.atomics.AtomicLong
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * THE PANELS PLANE — one LCNC program exploded into Rete facts.
@@ -75,12 +84,12 @@ object PanelFacts {
         entry: Map<String, Any?>,
         versionCid: ContentId = versionOf(program, entry["sourceCid"]?.toString()),
         actor: String = ACTOR_LCNC,
-    ): List<ReteStoredFact> {
+    ): Series<ReteStoredFact> {
         val board = BlackboardContext(PlaneFacts.PANELS)
         fun fact(localId: String, fields: Map<String, Any?>): ReteStoredFact =
             ReteStoredFact(FactId(PlaneFacts.PANELS, localId), fields, versionCid, board)
 
-        val nodes = ArrayList<ReteStoredFact>()
+        val nodes = SeriesBuffer<ReteStoredFact>()
         fun walk(series: borg.trikeshed.lib.Series<LcncNode>, parent: String?) {
             for (i in 0 until series.size) {
                 val n = series[i]
@@ -98,7 +107,8 @@ object PanelFacts {
         walk(program.nodes, null)
 
         val cableRows = entry["cables"] as? List<*> ?: emptyList<Any?>()
-        val cables = cableRows.mapIndexed { i, row ->
+        val cables = cableRows.size j { i: Int ->
+            val row = cableRows[i]
             val m = row as? Map<*, *> ?: emptyMap<Any?, Any?>()
             val from = m["from"] as? List<*> ?: emptyList<Any?>()
             val to = m["to"] as? List<*> ?: emptyList<Any?>()
@@ -116,7 +126,8 @@ object PanelFacts {
         }
 
         val violationRows = entry["violations"] as? List<*> ?: emptyList<Any?>()
-        val violations = violationRows.mapIndexed { i, row ->
+        val violations = violationRows.size j { i: Int ->
+            val row = violationRows[i]
             val m = row as? Map<*, *> ?: emptyMap<Any?, Any?>()
             val fields = LinkedHashMap<String, Any?>()
             fields[PlaneFacts.KIND] = KIND_VIOLATION
@@ -145,12 +156,7 @@ object PanelFacts {
             "violations" to violations.size,
         ))
 
-        val out = ArrayList<ReteStoredFact>(1 + nodes.size + cables.size + violations.size)
-        out.add(programFact)
-        out.addAll(nodes)
-        out.addAll(cables)
-        out.addAll(violations)
-        return out
+        return s_[programFact] + nodes.drain() + cables + violations
     }
 
     private val RESERVED_ON_VIOLATION = setOf(PlaneFacts.KIND, PlaneFacts.KEY, PlaneFacts.ACTOR, "violation")
@@ -170,74 +176,31 @@ object PanelFacts {
 }
 
 /**
- * The store side of the panels plane: lands [PanelFacts.explode] output in a
- * [ReteNetwork] and keeps, per program, the set of localIds it currently holds
- * so a republish retracts what vanished (a dropped wire, a deleted node, a
- * violation that was fixed) — the `known`-set discipline of
- * `CouchChangesFactElement`.
- *
- * Idempotent by construction: a fact whose current version and fields already
- * match is skipped, so a board-identical republish is silent to the network's
- * observers; a fact that exists with other content is [ReteNetwork.modify]'d,
- * never re-asserted (working memory refuses a re-assert with different
- * content). The known set is seeded from the network's current `key == name`
- * facts the first time a name is seen, so a second bridge over the same
- * network (two [LcncPublisher]s exist over one board in the daemon) or a
- * bridge created after facts already landed still retracts correctly.
- *
- * Never called from inside a network observer (the write lock is not
- * reentrant); the publisher calls it after its own blackboard put.
+ * Projects a program through the network's existing write lock. Each update
+ * derives its prior facts from the network, including partial earlier writes
+ * and changes made by another publisher. There is no per-bridge identity cache.
+ * Network observers must not re-enter this bridge.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class PanelFactBridge(val network: ReteNetwork) {
+    private val applied = AtomicLong(0L)
 
-    private val known = LinkedHashMap<String, Set<String>>()
+    /** Changed facts in completed publications; interrupted publications are not counted. */
+    val opsApplied: Long get() = applied.load()
 
-    /** Ops this bridge applied (asserts + modifies + retracts); a silent republish leaves it unchanged. */
-    var opsApplied: Long = 0L
-        private set
+    suspend fun knownLocalIds(name: String): Set<String> =
+        network.query(BlackboardContext(PlaneFacts.PANELS), PlaneFacts.KEY j name)
+            .view.mapTo(LinkedHashSet()) { it.factId.b }
 
-    /** The localIds this bridge believes the network holds for [name]. */
-    fun knownLocalIds(name: String): Set<String> = known[name] ?: emptySet()
+    suspend fun publish(name: String, facts: Series<ReteStoredFact>) = publish(name) { facts }
 
-    /** Land [facts] (all of one program, [name]) and retract the localIds of [name] that are no longer among them. */
-    suspend fun publish(name: String, facts: List<ReteStoredFact>) {
-        val previous = known[name] ?: seedKnown(name)
-        val next = LinkedHashSet<String>(facts.size)
-        for (f in facts) {
-            require(f.factId.partitionId == PlaneFacts.PANELS) { "panels bridge given a ${f.factId.partitionId} fact" }
-            next.add(f.factId.localId)
-            val existing = network.workingMemory.facts(f.factId).firstOrNull()
-            when {
-                existing == null -> { network.assert(f.factId, f.fields, f.versionCid, f.board); opsApplied++ }
-                existing.versionCid == f.versionCid && existing.fields == f.fields -> Unit
-                else -> { network.modify(f.factId, f.fields, f.versionCid); opsApplied++ }
-            }
-        }
-        for (gone in previous) if (gone !in next) {
-            network.retract(FactId(PlaneFacts.PANELS, gone))
-            opsApplied++
-        }
-        known[name] = next
+    internal suspend fun publish(name: String, facts: () -> Series<ReteStoredFact>) {
+        val count = network.replace(BlackboardContext(PlaneFacts.PANELS), PlaneFacts.KEY j name, facts)
+        applied.fetchAndAdd(count.toLong())
     }
 
-    /** Explode and land one program: [entry] is [LcncBlackboard.programEntry]'s output for it. */
     suspend fun publish(name: String, program: LcncProgram, entry: Map<String, Any?>, actor: String = PanelFacts.ACTOR_LCNC) =
-        publish(name, PanelFacts.explode(name, program, entry, actor = actor))
+        publish(name) { PanelFacts.explode(name, program, entry, actor = actor) }
 
-    /** Retract every fact of [name] — a program removed from the board. */
-    suspend fun retract(name: String) {
-        val previous = known[name] ?: seedKnown(name)
-        for (gone in previous) {
-            network.retract(FactId(PlaneFacts.PANELS, gone))
-            opsApplied++
-        }
-        known.remove(name)
-    }
-
-    private fun seedKnown(name: String): Set<String> {
-        val current = network.workingMemory.query(BlackboardContext(PlaneFacts.PANELS), PlaneFacts.KEY to name)
-        val ids = LinkedHashSet<String>(current.size)
-        for (f in current) ids.add(f.factId.localId)
-        return ids
-    }
+    suspend fun retract(name: String) = publish(name, emptySeriesOf())
 }

@@ -150,13 +150,13 @@ class PlaneFactsTest {
         )
         for (id in ids) {
             val iri = PlaneFacts.factIri(id)
-            assertTrue(iri.iri.startsWith(PlaneFacts.FACT_NS + id.partitionId + "/"), iri.iri)
+            assertTrue(iri.iri.startsWith(PlaneFacts.FACT_NS + id.a + "/"), iri.iri)
             for (c in "<>\" \t\n;()'?%{}|\\^`") {
                 if (c == '%') continue // the escape itself
                 assertTrue(c !in iri.iri.removePrefix(PlaneFacts.FACT_NS), "'$c' leaked into ${iri.iri}")
             }
             assertTrue(iri.iri.all { it.code < 128 }, iri.iri)
-            assertEquals(id, PlaneFacts.factIdOf(iri))
+            assertEquals(id.pair, PlaneFacts.factIdOf(iri)?.pair)
         }
         assertNull(PlaneFacts.factIdOf(RdfTerm.Iri("https://elsewhere/x")))
         assertEquals("lcnc/program/x <y>", PlaneFacts.decodeIriPart(PlaneFacts.encodeIriPart("lcnc/program/x <y>")))

@@ -4,6 +4,15 @@ import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.emptySeriesOf
 
 /**
  * JobDependencyProduction — behavior-preserving extraction of the network's
@@ -25,8 +34,8 @@ class JobDependencyProduction : ReteProduction {
     override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "lifecycle" j ("submitted" as Any?) }
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val jobs = net.workingMemory.query(BlackboardContext(partitionId), "lifecycle" to "submitted")
-        val tokens = net.betaMemory.tokens().filter { it.left.factId.partitionId == partitionId }
+        val jobs = net.workingMemory.query(BlackboardContext(partitionId), "lifecycle" j "submitted")
+        val tokens = net.betaMemory.tokens().filter { it.a.factId.a == partitionId }
 
         for (jobFact in jobs) {
             @Suppress("UNUSED_VARIABLE")
@@ -35,43 +44,43 @@ class JobDependencyProduction : ReteProduction {
             val deps = jobFact.fields["dependencies"] as? List<String> ?: emptyList()
 
             if (deps.isEmpty()) {
-                fire(start(jobFact, emptyList()))
+                fire(start(jobFact, emptySeriesOf()))
                 continue
             }
 
-            val jobTokens = tokens.filter { it.left.factId == jobFact.factId }
+            val jobTokens = tokens.filter { it.a.factId.a == jobFact.factId.a && it.a.factId.b == jobFact.factId.b }
             if (jobTokens.size < deps.size) continue // Wait until all dependencies are available in tokens
 
-            val anyFailed = jobTokens.firstOrNull { it.right.fields["lifecycle"] == "failed" }
+            val anyFailed = jobTokens.view.firstOrNull { it.b.fields["lifecycle"] == "failed" }
             if (anyFailed != null) {
-                fire(block(jobFact, listOf(anyFailed.right)))
+                fire(block(jobFact, s_[anyFailed.b]))
                 continue
             }
 
-            val allClosed = jobTokens.all { it.right.fields["lifecycle"] == "closed" }
+            val allClosed = jobTokens.view.all { it.b.fields["lifecycle"] == "closed" }
             if (allClosed && jobTokens.size == deps.size) {
-                fire(start(jobFact, jobTokens.map { it.right }))
+                fire(start(jobFact, jobTokens.α { it.b }))
             }
         }
     }
 
-    private fun start(jobFact: ReteStoredFact, supportFacts: List<ReteStoredFact>): Activation = Activation(
-        activationId = "start-${jobFact.factId.localId}",
+    private fun start(jobFact: ReteStoredFact, supportFacts: Series<ReteStoredFact>): Activation = Activation(
+        activationId = "start-${jobFact.factId.b}",
         ruleId = START_RULE,
         ruleVersionCid = borg.trikeshed.job.ContentId.of("rule-start-v1".encodeToByteArray()),
         salience = 100,
         sequence = (jobFact.fields["revision"] as? Long) ?: 0L,
-        supportCids = listOf(jobFact.versionCid) + supportFacts.map { it.versionCid },
+        supportCids = (s_[jobFact.versionCid] + supportFacts.α { it.versionCid }).toList(),
         bindings = mapOf("jobId" to (jobFact.fields["jobId"] as String)),
     )
 
-    private fun block(jobFact: ReteStoredFact, supportFacts: List<ReteStoredFact>): Activation = Activation(
-        activationId = "block-${jobFact.factId.localId}",
+    private fun block(jobFact: ReteStoredFact, supportFacts: Series<ReteStoredFact>): Activation = Activation(
+        activationId = "block-${jobFact.factId.b}",
         ruleId = BLOCK_RULE,
         ruleVersionCid = borg.trikeshed.job.ContentId.of("rule-block-v1".encodeToByteArray()),
         salience = 100,
         sequence = (jobFact.fields["revision"] as? Long) ?: 0L,
-        supportCids = listOf(jobFact.versionCid) + supportFacts.map { it.versionCid },
+        supportCids = (s_[jobFact.versionCid] + supportFacts.α { it.versionCid }).toList(),
         bindings = mapOf("jobId" to (jobFact.fields["jobId"] as String), "reason" to "dependency failed"),
     )
 }

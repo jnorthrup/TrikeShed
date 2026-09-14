@@ -5,8 +5,12 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProduction
 import borg.trikeshed.dag.ReteStoredFact
 import borg.trikeshed.lcnc.PanelFacts
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.take
+import borg.trikeshed.lib.isNotEmpty
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.json.JsonSupport
 
@@ -53,7 +57,7 @@ class LcncBlipWire(
         if (node.isEmpty() && type.isEmpty()) return json(mapOf("error" to "node or type required"), 400)
 
         val snapshot = network.snapshot()
-        val panels = snapshot.filter { it.factId.partitionId == PlaneFacts.PANELS && it.fields[PlaneFacts.KEY] == program }
+        val panels = snapshot.filter { it.factId.a == PlaneFacts.PANELS && it.fields[PlaneFacts.KEY] == program }
         val nodeFacts = panels.filter { f ->
             when (f.fields[PlaneFacts.KIND]) {
                 PanelFacts.KIND_NODE -> f.fields["node"] == node
@@ -64,7 +68,7 @@ class LcncBlipWire(
         val violations = panels.filter { f ->
             f.fields[PlaneFacts.KIND] == PanelFacts.KIND_VIOLATION && (f.fields["fromNode"] == node || f.fields["toNode"] == node)
         }
-        val nodeType = type.ifEmpty { nodeFacts.firstOrNull { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_NODE }?.fields?.get("type")?.toString().orEmpty() }
+        val nodeType = type.ifEmpty { nodeFacts.view.firstOrNull { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_NODE }?.fields?.get("type")?.toString().orEmpty() }
 
         val vocabulary = if (nodeType.isEmpty()) emptyList() else listOf(
             "(inKind $nodeType ?port ?kind)", "(outKind $nodeType ?port ?kind)", "(cardinality $nodeType ?port ?card)",
@@ -75,16 +79,16 @@ class LcncBlipWire(
         }
 
         val prods = productions().map { pr ->
-            val interests = (0 until pr.interests.size).map { pr.interests[it] }
-            val matched = nodeFacts.any { f -> interests.any { (field, value) -> f.fields[field] == value } }
+            val interests = pr.interests
+            val matched = nodeFacts.view.any { f -> interests.view.any { (field, value) -> f.fields[field] == value } }
             linkedMapOf(
                 "ruleId" to pr.ruleId, "salience" to pr.salience,
-                "interests" to interests.map { "${it.a}=${it.b}" }, "matched" to matched,
+                "interests" to interests.α { "${it.a}=${it.b}" }.toList(), "matched" to matched,
             )
         }
 
         val needles = listOf(program, node, nodeType).filter { it.isNotEmpty() }
-        val graal = snapshot.filter { it.factId.partitionId == PlaneFacts.GRAAL }
+        val graal = snapshot.filter { it.factId.a == PlaneFacts.GRAAL }
         val keyed = graal.filter { f ->
             f.fields.values.any { v -> v is String && needles.any { n -> v == n || v.contains("/$n") || v.contains("$n/") || v.contains("#$n") } }
         }.take(24)
@@ -96,15 +100,15 @@ class LcncBlipWire(
         return json(
             linkedMapOf(
                 "program" to program, "node" to node, "type" to nodeType,
-                "asserted" to linkedMapOf("onPlane" to nodeFacts.isNotEmpty(), "facts" to nodeFacts.map(::row)),
-                "inferred" to linkedMapOf("violations" to violations.map(::row), "vocabulary" to vocabulary, "productions" to prods),
-                "graal" to linkedMapOf("keyed" to keyed.map(::row), "jvm" to jvm.map(::row)),
+                "asserted" to linkedMapOf("onPlane" to nodeFacts.isNotEmpty(), "facts" to nodeFacts.α(::row).toList()),
+                "inferred" to linkedMapOf("violations" to violations.α(::row).toList(), "vocabulary" to vocabulary, "productions" to prods),
+                "graal" to linkedMapOf("keyed" to keyed.α(::row).toList(), "jvm" to jvm.α(::row).toList()),
             ),
         )
     }
 
     private fun row(f: ReteStoredFact): Map<String, Any?> = linkedMapOf(
-        "id" to f.factId.localId,
+        "id" to f.factId.b,
         "fields" to f.fields.mapValues { (_, v) -> if (v == null || v is String || v is Number || v is Boolean) v else v.toString() },
     )
 

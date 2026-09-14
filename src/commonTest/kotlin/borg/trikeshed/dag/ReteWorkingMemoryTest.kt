@@ -6,6 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
 
 class ReteWorkingMemoryTest {
 
@@ -23,17 +29,17 @@ class ReteWorkingMemoryTest {
             board,
         )
         assertTrue(asserted.isNew)
-        assertEquals("ready", memory.facts(factId).single().fields["status"])
-        assertEquals(firstCid, memory.facts(factId).single().versionCid)
+        assertEquals("ready", memory.facts(factId).view.single().fields["status"])
+        assertEquals(firstCid, memory.facts(factId).view.single().versionCid)
 
         val secondCid = ContentId.of("v2".encodeToByteArray())
-        memory.modify(factId, mapOf("status" to "active"), secondCid)
+        memory.modify(FactId("board-a", "node-1"), mapOf("status" to "active"), secondCid)
         assertEquals(1, memory.facts(factId).size, "modify replaces the current version")
-        assertEquals("active", memory.facts(factId).single().fields["status"])
-        assertEquals(secondCid, memory.facts(factId).single().versionCid)
+        assertEquals("active", memory.facts(factId).view.single().fields["status"])
+        assertEquals(secondCid, memory.facts(factId).view.single().versionCid)
 
-        assertTrue(memory.retract(factId))
-        assertEquals(emptyList(), memory.facts(factId))
+        assertTrue(memory.retract(FactId("board-a", "node-1")))
+        assertEquals(0, memory.facts(factId).size)
     }
 
     @Test
@@ -44,7 +50,7 @@ class ReteWorkingMemoryTest {
         val cid = ContentId.of("v1".encodeToByteArray())
 
         assertTrue(memory.assert(factId, mapOf("status" to "ready"), cid, board).isNew)
-        assertFalse(memory.assert(factId, mapOf("status" to "ready"), cid, board).isNew)
+        assertFalse(memory.assert(FactId("board-a", "node-1"), mapOf("status" to "ready"), cid, board).isNew)
         assertEquals(1, memory.facts(factId).size)
     }
 
@@ -67,9 +73,9 @@ class ReteWorkingMemoryTest {
             boardB,
         )
 
-        assertEquals(listOf(FactId("board-a", "node-1")),
-            memory.query(boardA, "status" to "ready").map { it.factId })
-        assertEquals(listOf(FactId("board-b", "node-2")),
-            memory.query(boardB, "status" to "ready").map { it.factId })
+        assertEquals(listOf("board-a" to "node-1"),
+            memory.query(boardA, "status" j "ready").map { it.factId.pair })
+        assertEquals(listOf("board-b" to "node-2"),
+            memory.query(boardB, "status" j "ready").map { it.factId.pair })
     }
 }

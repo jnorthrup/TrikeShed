@@ -41,6 +41,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.first
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
 
 /**
  * The corpus story, end to end on the module rig (Forge genesis, Cut S): Corpus digest runs over a
@@ -121,7 +128,7 @@ class CorpusStaleRebuildRouteTest {
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
 
-    private fun consumedFacts(rig: Rig) = rig.ctx.rete.workingMemory.query(BlackboardContext(rig.project), "kind" to LcncRunFacts.KIND)
+    private fun consumedFacts(rig: Rig) = rig.ctx.rete.workingMemory.query(BlackboardContext(rig.project), "kind" j LcncRunFacts.KIND)
 
     private fun awaitMarker(rig: Rig, runId: String, count: Int): Map<*, *> {
         val deadline = System.currentTimeMillis() + 10_000
@@ -175,7 +182,7 @@ class CorpusStaleRebuildRouteTest {
             assertNull(rig.ctx.blackboard.get(LcncStaleMarker.key(runId)), "the old marker is gone")
             val facts = consumedFacts(rig)
             assertEquals(3, facts.size, "only the new run's facts remain: $facts")
-            assertTrue(facts.all { it.fields["runId"] == fresh["runId"] })
+            assertTrue(facts.view.all { it.fields["runId"] == fresh["runId"] })
             assertEquals(2, rig.ctx.blackboard.keys().count { it.startsWith("lcnc/run/") })
 
             assertEquals(404, post(rig.server, "/api/lcnc/run/rebuild", """{"runId":"nope"}""").status)

@@ -15,7 +15,7 @@ import borg.trikeshed.job.ContentId
  * with a document id; the assert-once, modify-after discipline is the tendon's.
  */
 class LcncRunFacts(private val rete: ReteNetwork) {
-    private val known = HashMap<String, LinkedHashSet<FactId>>()
+    private val known = HashMap<String, LinkedHashSet<Pair<String, String>>>()
 
     companion object {
         const val KIND = "lcnc-consumed"
@@ -51,8 +51,8 @@ class LcncRunFacts(private val rete: ReteNetwork) {
                 "programKey" to programKey, "programCid" to programCid, "project" to project, "docId" to docId, "cid" to cid,
                 "sequence" to (m["sequence"] as? Number)?.toLong(), "prefix" to m["prefix"]?.toString().orEmpty(), "glob" to m["glob"]?.toString().orEmpty(),
             )
-            val version = ContentId.of((receiptCid + "|" + factId.localId + "|" + cid).encodeToByteArray())
-            if (ids.add(factId)) rete.assert(factId, fields, version, BlackboardContext(project)) else rete.modify(factId, fields, version)
+            val version = ContentId.of((receiptCid + "|" + factId.b + "|" + cid).encodeToByteArray())
+            if (ids.add(factId.pair)) rete.assert(factId, fields, version, BlackboardContext(project)) else rete.modify(factId, fields, version)
             n++
         }
         return n
@@ -61,7 +61,7 @@ class LcncRunFacts(private val rete: ReteNetwork) {
     /** A rebuilt (or forgotten) run takes its facts out of working memory with proper retraction. */
     suspend fun retractRun(runId: String): Int {
         val ids = known.remove(runId) ?: return 0
-        for (id in ids) rete.retract(id)
+        for ((partition, localId) in ids) rete.retract(FactId(partition, localId))
         return ids.size
     }
 

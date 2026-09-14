@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.isEmpty
 
 /** The board claims its own READY work — oldest first, under the RUNNING WIP limit, once per revision. */
 class ClaimProductionTest {

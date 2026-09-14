@@ -40,13 +40,13 @@ import borg.trikeshed.lib.view
  */
 class KifTee(val bank: KifKnowledgeBase) {
     private val gate = Any()
-    private val told = HashMap<FactId, List<KifExpr>>()
+    private val told = HashMap<Pair<String, String>, List<KifExpr>>()
 
     /** Facts whose projection this tee currently holds in the bank. */
     fun trackedCount(): Int = synchronizedLock(gate) { told.size }
 
     /** Last applied projection for a fact; never recomputed from a reader's snapshot. */
-    fun projection(id: FactId): List<KifExpr>? = synchronizedLock(gate) { told[id]?.toList() }
+    fun projection(id: FactId): List<KifExpr>? = synchronizedLock(gate) { told[id.pair]?.toList() }
 
     /** Register on [net]; the disposer detaches (the bank keeps what was told). */
     fun attach(net: ReteNetwork): AutoCloseable = net.observe { op, fact -> apply(op, fact) }
@@ -70,17 +70,19 @@ class KifTee(val bank: KifKnowledgeBase) {
 
     private fun project(fact: ReteStoredFact) = synchronizedLock(gate) {
         val next = PlaneFacts.toKif(fact)
-        val previous = told[fact.factId]
+        val id = fact.factId.pair
+        val previous = told[id]
         if (previous == next) return@synchronizedLock
         val gone = if (previous == null) emptyList() else previous.filter { it !in next }
         bank.replace(gone, next)
-        told[fact.factId] = next
+        told[id] = next
     }
 
     private fun unproject(id: FactId) = synchronizedLock(gate) {
-        val previous = told[id] ?: return@synchronizedLock
+        val key = id.pair
+        val previous = told[key] ?: return@synchronizedLock
         bank.replace(previous, emptyList())
-        told.remove(id)
+        told.remove(key)
         Unit
     }
 

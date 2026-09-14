@@ -14,6 +14,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
 
 /** Stanford typed-dependency LABEL SCHEMA only — no CoreNLP dependency. */
 object StanfordDependency {
@@ -184,7 +185,7 @@ class ConstructionReteProduction(private val aggregate: ConstructionAggregate) :
     override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "concept" j aggregate.subject }
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val facts = net.workingMemory.query(BlackboardContext(partitionId), "concept" to aggregate.subject)
+        val facts = net.workingMemory.query(BlackboardContext(partitionId), "concept" j aggregate.subject)
         for (fact in facts) {
             fire(Activation(
                 activationId = "$ruleId:${fact.versionCid.hex}",

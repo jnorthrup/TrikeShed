@@ -5,6 +5,8 @@ import borg.trikeshed.job.ContentId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.map
 
 class ReteAlphaMemoryTest {
 
@@ -30,8 +32,8 @@ class ReteAlphaMemoryTest {
 
         assertEquals(1L, firstRuleNode.evaluationCount,
             "shared predicate must be evaluated once per asserted fact")
-        assertEquals(listOf(FactId("board-a", "job-1")),
-            firstRuleNode.facts().map { it.factId })
+        assertEquals(listOf("board-a" to "job-1"),
+            firstRuleNode.facts().map { it.factId.pair })
     }
 
     @Test
@@ -43,8 +45,8 @@ class ReteAlphaMemoryTest {
         alpha.accept(fact("ready", "v1"))
         alpha.accept(fact("active", "v2"))
 
-        assertEquals(emptyList(), ready.facts())
-        assertEquals(listOf(FactId("board-a", "job-1")), active.facts().map { it.factId })
+        assertEquals(0, ready.facts().size)
+        assertEquals(listOf("board-a" to "job-1"), active.facts().map { it.factId.pair })
     }
 
     @Test
@@ -55,9 +57,9 @@ class ReteAlphaMemoryTest {
         val asserted = fact("ready")
         alpha.accept(asserted)
 
-        alpha.retract(asserted.factId)
+        alpha.retract(FactId("board-a", "job-1"))
 
-        assertEquals(emptyList(), status.facts())
-        assertEquals(emptyList(), kind.facts())
+        assertEquals(0, status.facts().size)
+        assertEquals(0, kind.facts().size)
     }
 }

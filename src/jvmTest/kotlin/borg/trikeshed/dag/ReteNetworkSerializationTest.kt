@@ -5,6 +5,11 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.first
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -71,11 +76,11 @@ class ReteNetworkSerializationTest {
         val total = perSide * 2
         val afterAsserts = net.snapshot()
         assertEquals(total, afterAsserts.size, "no assert lost")
-        assertEquals(total, afterAsserts.map { it.factId.localId }.toSet().size)
-        assertEquals(total, net.workingMemory.query(board, "kind" to "probe").size)
+        assertEquals(total, afterAsserts.map { it.factId.b }.toSet().size)
+        assertEquals(total, net.workingMemory.query(board, "kind" j "probe").size)
         assertEquals(total, observed.size, "one observation per assert")
         assertTrue(observed.all { it.first == ReteOp.ASSERT })
-        assertEquals((0 until total).map { "f-$it" }.toSet(), observed.map { it.second.localId }.toSet())
+        assertEquals((0 until total).map { "f-$it" }.toSet(), observed.map { it.second.b }.toSet())
         assertEquals(total, recorder.evaluatedPartitions.size, "every new fact evaluated the interested production once")
 
         // Phase 2: every fact modified from BOTH dispatchers concurrently (400 modifies).
@@ -90,7 +95,7 @@ class ReteNetworkSerializationTest {
         assertEquals(total * 2, observed.size, "every modify observed")
         assertTrue(observed.all { it.first == ReteOp.MODIFY })
         assertEquals(total, net.snapshot().size, "modify never duplicates a fact")
-        assertEquals(total, net.workingMemory.query(board, "kind" to "probe").size)
+        assertEquals(total, net.workingMemory.query(board, "kind" j "probe").size)
         // each fact ends in one of the two versions, never a torn one
         for (f in net.snapshot()) {
             val side = f.fields["side"]
@@ -130,7 +135,7 @@ class ReteNetworkSerializationTest {
         recorder.evaluatedPartitions.clear()
         net.assert(FactId(partition, "other"), mapOf("kind" to "other"), cidOf("other"), board)
         assertTrue(recorder.evaluatedPartitions.isEmpty(), "interest counter drifted: ${recorder.evaluatedPartitions}")
-        assertEquals(listOf(ReteOp.ASSERT to FactId(partition, "other")), observed)
+        assertEquals(listOf(ReteOp.ASSERT to (partition to "other")), observed.map { it.first to it.second.pair })
     }
 
     @Test
@@ -140,8 +145,8 @@ class ReteNetworkSerializationTest {
         net.assert(FactId("a", "9"), mapOf("x" to 2), cidOf("a9"), BlackboardContext("a"))
         net.assert(FactId("b", "1"), mapOf("x" to 3), cidOf("b1"), BlackboardContext("b"))
         assertEquals(
-            listOf(FactId("a", "9"), FactId("b", "1"), FactId("b", "2")),
-            net.snapshot().map { it.factId },
+            listOf("a" to "9", "b" to "1", "b" to "2"),
+            net.snapshot().map { it.factId.pair },
         )
     }
 
@@ -174,7 +179,7 @@ class ReteNetworkSerializationTest {
         net.retract(id)
         assertEquals(mapOf("k" to "w"), retracted?.fields)
         assertEquals(cidOf(2), retracted?.versionCid)
-        assertFalse(net.snapshot().any { it.factId == id })
+        assertFalse(net.snapshot().view.any { it.factId.pair == id.pair })
     }
 
     @Test

@@ -7,6 +7,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.isNotEmpty
+import borg.trikeshed.lib.first
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
 
 class ForgeKanbanIngestTest {
     private val markdown = """
@@ -77,13 +86,26 @@ class ForgeKanbanIngestTest {
         val reduction = ForgeKanbanIngest.reduce(source, workingMemory)
 
         // reduce == the pure projection plus an assertion pass; the reduction is unchanged.
-        assertEquals(ForgeKanbanIngest.project(source), reduction)
+        val projected = ForgeKanbanIngest.project(source)
+        assertEquals(projected.source, reduction.source)
+        assertEquals(projected.board, reduction.board)
+        assertEquals(projected.causalNodes, reduction.causalNodes)
+        assertEquals(projected.correlations, reduction.correlations)
+        assertEquals(projected.reteFacts.size, reduction.reteFacts.size)
+        for (i in projected.reteFacts.indices) {
+            val expected = projected.reteFacts[i]
+            val actual = reduction.reteFacts[i]
+            assertEquals(expected.factId.pair, actual.factId.pair)
+            assertEquals(expected.fields, actual.fields)
+            assertEquals(expected.versionCid, actual.versionCid)
+            assertEquals(expected.board, actual.board)
+        }
 
         val board = reduction.reteFacts.first().board
-        assertEquals(3, workingMemory.query(board, "kind" to "task").size)
-        assertEquals(2, workingMemory.query(board, "kind" to "link").size)
+        assertEquals(3, workingMemory.query(board, "kind" j "task").size)
+        assertEquals(2, workingMemory.query(board, "kind" j "link").size)
         reduction.reteFacts.forEach { fact ->
-            assertEquals(listOf(fact), workingMemory.facts(fact.factId))
+            assertEquals(fact, workingMemory.facts(fact.factId).view.single())
         }
     }
 

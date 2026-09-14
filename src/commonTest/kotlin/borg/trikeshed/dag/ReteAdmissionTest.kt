@@ -5,21 +5,63 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.view
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
 class ReteAdmissionTest {
+    private fun ReteNetwork.trackInterest(id: String, value: Any?, evaluated: MutableList<String>) {
+        register(object : ReteProduction {
+            override val ruleId = id
+            override val salience = 1
+            override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "mark" j value }
+            override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
+                evaluated.add(ruleId)
+            }
+        })
+    }
+
+    @Test
+    fun interestsPreserveDistinctValuesWithTheSameText() = runTest {
+        val net = ReteNetwork()
+        val evaluated = mutableListOf<String>()
+        net.trackInterest("numeric", 1, evaluated)
+        net.trackInterest("text", "1", evaluated)
+        val fact = PlaneFacts.fact("probe", "typed", mapOf("mark" to "1"))
+        net.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
+        assertEquals(listOf("text"), evaluated)
+    }
+
+    @Test
+    fun nullInterestsCountFactInsertionModificationAndRetraction() = runTest {
+        val net = ReteNetwork()
+        val evaluated = mutableListOf<String>()
+        net.trackInterest("nullable", null, evaluated)
+        val fact = PlaneFacts.fact("probe", "nullable", mapOf("mark" to null))
+        net.assert(fact.factId, fact.fields, fact.versionCid, fact.board)
+        assertEquals(listOf("nullable"), evaluated)
+        val fields = mapOf("mark" to "present")
+        net.modify(fact.factId, fields, PlaneFacts.versionOf(fields))
+        assertEquals(listOf("nullable"), evaluated)
+        net.modify(fact.factId, fact.fields, fact.versionCid)
+        assertEquals(listOf("nullable", "nullable"), evaluated)
+        net.retract(fact.factId)
+        net.evaluateRules("probe")
+        assertEquals(listOf("nullable", "nullable"), evaluated)
+    }
+
     private fun network(capacity: Int = 256): ReteNetwork = ReteNetwork(traceCapacity = capacity).also { net ->
         net.register(object : ReteProduction {
             override val ruleId = "evidence-probe"
             override val salience = 1
             override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("probe" as Any?) }
             override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-                for (fact in net.workingMemory.query(BlackboardContext(partitionId), "kind" to "probe")) {
+                for (fact in net.workingMemory.query(BlackboardContext(partitionId), "kind" j "probe")) {
                     fire(Activation(fact.versionCid.value, "probe-match", ContentId.of("rule".encodeToByteArray()),
-                        1, 1, listOf(fact.versionCid), mapOf("id" to fact.factId.localId)))
+                        1, 1, listOf(fact.versionCid), mapOf("id" to fact.factId.b)))
                 }
             }
         })
@@ -43,7 +85,7 @@ class ReteAdmissionTest {
         assertEquals("probe-match", r.activation.ruleId)
         assertEquals("probe", r.partitionId)
         assertEquals("no-sink", r.delivery)
-        assertEquals(net.snapshot().single().versionCid, r.activation.supportCids.single())
+        assertEquals(net.snapshot().view.single().versionCid, r.activation.supportCids.single())
     }
 
     @Test

@@ -21,6 +21,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.firstOrNull
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.toList
 
 /**
  * The graal partition without JFR: synthetic [JvmVitals.VitalEvent]s and a synthetic
@@ -36,7 +40,7 @@ class GraalFactElementTest {
         net.workingMemory.facts(FactId(PlaneFacts.GRAAL, localId)).firstOrNull()
 
     private fun kind(net: ReteNetwork, kind: String): List<ReteStoredFact> =
-        net.workingMemory.query(graal, PlaneFacts.KIND to kind)
+        net.workingMemory.query(graal, PlaneFacts.KIND j kind).toList()
 
     private fun element(
         net: ReteNetwork,
@@ -85,7 +89,7 @@ class GraalFactElementTest {
     fun gcEventsFoldIntoOneStateFactPerCollector() = runBlocking {
         val net = ReteNetwork()
         val ops = ArrayList<Pair<ReteOp, String>>()
-        net.observe { op, f -> ops.add(op to f.factId.localId) }
+        net.observe { op, f -> ops.add(op to f.factId.b) }
         val el = element(net)
 
         el.onEvent(gcEvent("G1 Young", pauseMs = 4, cause = "G1 Evacuation Pause", atMs = 100))
@@ -180,7 +184,7 @@ class GraalFactElementTest {
     fun sameLandingTwiceIsOneFactAndOneOp() = runBlocking {
         val net = ReteNetwork()
         val ops = ArrayList<ReteOp>()
-        net.observe { op, f -> if (f.factId.localId.startsWith("pointcut/")) ops.add(op) }
+        net.observe { op, f -> if (f.factId.b.startsWith("pointcut/")) ops.add(op) }
         val el = element(net)
 
         val key = PointcutBlackboardAdapter.keyOf("Probe", "run", 17)
@@ -255,7 +259,7 @@ class GraalFactElementTest {
         assertEquals(10L, mem.fields[PlaneFacts.AT_MS])
 
         val alloc = kind(net, "alloc")
-        assertEquals(listOf("alloc/byte[]", "alloc/java.lang.String"), alloc.map { it.factId.localId }, "top 2 by bytes, ordered by localId")
+        assertEquals(listOf("alloc/byte[]", "alloc/java.lang.String"), alloc.map { it.factId.b }, "top 2 by bytes, ordered by localId")
         assertEquals(900L, fact(net, "alloc/java.lang.String")!!.fields["bytes"])
         assertEquals("java.lang.String", fact(net, "alloc/java.lang.String")!!.fields["class"])
         assertEquals(3L, el.factsApplied, "memory + 2 alloc")
@@ -324,6 +328,6 @@ class GraalFactElementTest {
         assertEquals(1L, fact(net, "gc/G1 Young")!!.fields["collections"])
 
         el.retractAll()
-        assertEquals(0, net.workingMemory.all().count { it.factId.partitionId == PlaneFacts.GRAAL }, "detach hygiene")
+        assertEquals(0, net.workingMemory.all().view.count { it.factId.a == PlaneFacts.GRAAL }, "detach hygiene")
     }
 }

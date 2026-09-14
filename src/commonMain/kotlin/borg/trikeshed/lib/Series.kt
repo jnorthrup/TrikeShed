@@ -634,7 +634,7 @@ fun <T : Comparable<T>> Series<T>.shortestLength(other: Series<T>): Int {
 fun <T : Comparable<T>> Series<T>.commonPrefixWith(other: Series<T>): Series<T> =
     if (size == 0) this else this[0 until shortestLength(other)]
 
-fun <T> Series<T>.firstOrNull(): T? = takeUnless({ a>0 } )?.b(0)
+fun <T> Series<T>.firstOrNull(): T? = if (size == 0) null else this[0]
 
 
 fun Series<Char>.parseLongOrNull(): Long? {
@@ -679,4 +679,12 @@ fun <T> Series<T>.filter(pred: (T) -> Boolean): Series<T> {
         override val a: Int get() = matches.value.size
         override val b: (Int) -> T get() = { i: Int -> this@filter[matches.value[i]] }
     }
+}
+
+/** Fill and sort one buffer, then transfer it to the result. */
+fun <T> Series<T>.sortedWith(comparator: Comparator<in T>): Series<T> {
+    val result = SeriesBuffer<T>(size)
+    for (value in this) result.add(value)
+    result.sortWith(comparator)
+    return result.drain()
 }

@@ -10,6 +10,12 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.take
+import borg.trikeshed.lib.drop
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.ontology.SumoClassifier
 import borg.trikeshed.ontology.SumoMask
@@ -91,14 +97,14 @@ class ReteWire(
                     linkedMapOf(
                         "count" to facts.size,
                         "partition" to selection.partition,
-                        "facts" to facts.map(::factRow),
+                        "facts" to facts.α(::factRow).toList(),
                     ),
                 )
             }
 
             Route.RDF -> {
                 val selection = Selection.of(query(path))
-                turtle(PlaneFacts.toTurtle(selection.select(network.snapshot())))
+                turtle(PlaneFacts.toTurtle(selection.select(network.snapshot()).toList()))
             }
 
             Route.PRODUCTIONS -> {
@@ -151,7 +157,8 @@ class ReteWire(
         val page = selected.drop(offset).take(limit)
         val trace = network.admissionSnapshot()
         val receipts = trace.receipts.filter { selection.partition == null || it.partitionId == selection.partition }
-        val bank = kifTee?.bank
+        val tee = kifTee
+        val bank = tee?.bank
         val subclasses = bank?.subclassSnapshot()
         val semantic = causality?.snapshot()
         return linkedMapOf(
@@ -168,7 +175,7 @@ class ReteWire(
             "facts" to linkedMapOf(
                 "matched" to selected.size, "offset" to offset, "limit" to limit,
                 "nextOffset" to (offset + page.size).takeIf { it < selected.size },
-                "rows" to page.map(::factRow),
+                "rows" to page.α(::factRow).toList(),
             ),
             "productions" to network.productions.all().map(::productionRow),
             "trace" to linkedMapOf(
@@ -186,10 +193,10 @@ class ReteWire(
                     )
                 },
             ),
-            "projections" to page.map { fact ->
-                val projection = kifTee?.projection(fact.factId)
+            "projections" to page.α { fact ->
+                val projection = tee?.projection(fact.factId)
                 linkedMapOf(
-                    "partition" to fact.factId.partitionId, "id" to fact.factId.localId,
+                    "partition" to fact.factId.a, "id" to fact.factId.b,
                     "versionCid" to fact.versionCid.value,
                     "tracked" to (projection != null),
                     "matchesFactSnapshot" to (projection?.let { it == PlaneFacts.toKif(fact) }),
@@ -200,7 +207,7 @@ class ReteWire(
                         )
                     },
                 )
-            },
+            }.toList(),
             "ontology" to subclasses?.let { snap ->
                 linkedMapOf(
                     "revision" to snap.revision, "byteSize" to snap.byteSize, "containers" to snap.containers,
@@ -263,10 +270,10 @@ class ReteWire(
      */
     data class Selection(val partition: String?, val field: String?, val value: String?, val key: String?) {
 
-        fun select(all: List<ReteStoredFact>): List<ReteStoredFact> = all.filter(::admits)
+        fun select(all: Series<ReteStoredFact>): Series<ReteStoredFact> = all.filter(::admits)
 
         fun admits(f: ReteStoredFact): Boolean {
-            if (partition != null && f.factId.partitionId != partition) return false
+            if (partition != null && f.factId.a != partition) return false
             if (key != null && PlaneFacts.keyOf(f).second != key) return false
             if (field != null) {
                 val v = f.fields[field] ?: return false
@@ -300,8 +307,8 @@ class ReteWire(
 
         /** One fact as the JSON row `/api/rete/facts` answers with. */
         fun factRow(f: ReteStoredFact): Map<String, Any?> = linkedMapOf(
-            "partition" to f.factId.partitionId,
-            "id" to f.factId.localId,
+            "partition" to f.factId.a,
+            "id" to f.factId.b,
             "versionCid" to f.versionCid.value,
             "fields" to jsonable(f.fields),
         )

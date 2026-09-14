@@ -11,6 +11,15 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.firstOrNull
+import borg.trikeshed.lib.map
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.toList
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -48,7 +57,7 @@ class LcncPublisherFactsTest {
         fun opsOf(op: ReteOp) = ops.filter { it.first == op }
     }
 
-    private fun ReteNetwork.facts(kind: String) = workingMemory.query(BlackboardContext(PlaneFacts.PANELS), PlaneFacts.KIND to kind)
+    private fun ReteNetwork.facts(kind: String) = workingMemory.query(BlackboardContext(PlaneFacts.PANELS), PlaneFacts.KIND j kind)
     private fun ReteNetwork.fact(localId: String) = workingMemory.facts(FactId(PlaneFacts.PANELS, localId)).firstOrNull()
 
     private fun preset(name: String): LcncProgram = LcncProgramConfix.fromJson(name, LcncPresets.all().getValue(name))
@@ -85,6 +94,40 @@ class LcncPublisherFactsTest {
             release.countDown()
             holder.join()
         }
+        h.publisher.load("preset-scope-inner")
+        assertNotNull(h.net.fact(PanelFacts.programLocalId("preset-scope-inner")), "Load must repair an interrupted projection")
+    }
+
+    @Test
+    fun concurrentPublishersLeaveTheLatestBoardVersionInTheNetwork(): Unit = runBlocking {
+        val h = Harness()
+        val name = "preset-scope-inner"
+        val first = preset(name)
+        val latest = first.dropLastWire()
+        val locked = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val holder = launch(Dispatchers.IO) {
+            h.net.snapshot {
+                locked.complete(Unit)
+                check(release.await(10, TimeUnit.SECONDS)) { "Network reader was not released" }
+            }
+        }
+        try {
+            withTimeout(5_000) { locked.await() }
+            supervisorScope {
+                val a = async(start = CoroutineStart.UNDISPATCHED) { h.publisher.publishProgram(name, first) }
+                val b = async(start = CoroutineStart.UNDISPATCHED) { h.another().publishProgram(name, latest) }
+                release.countDown()
+                withTimeout(5_000) { a.await(); b.await() }
+            }
+            assertEquals(LcncBlackboard.cidOf(latest), h.publisher.boardProgramCid(name))
+            val facts = h.net.workingMemory.query(panels, PlaneFacts.KEY j name)
+            assertTrue(facts.view.all { it.versionCid.value == LcncBlackboard.cidOf(latest) })
+            assertTrue(h.net.facts(PanelFacts.KIND_CABLE).isEmpty(), "The removed cable must not survive either publisher")
+        } finally {
+            release.countDown()
+            holder.join()
+        }
     }
 
     @Test
@@ -117,7 +160,7 @@ class LcncPublisherFactsTest {
         }
         // scope-inner is a ring BODY published on its own: its scope.in -> scope.out cable has no enclosing
         // ring to resolve against, so the checker's exact answer is null and the fact carries exactly that.
-        assertNull(cables.single().fields["type"], "an unresolved ring port is null on the entry and null on the fact")
+        assertNull(cables.view.single().fields["type"], "an unresolved ring port is null on the entry and null on the fact")
 
         // The program fact counts what it fanned out to and points back at the source.
         val programFact = h.net.fact(PanelFacts.programLocalId(name))!!
@@ -128,9 +171,9 @@ class LcncPublisherFactsTest {
 
         // One version for the whole program: the source's cid.
         val version = ContentId(LcncBlackboard.sourceCidOf(entry)!!)
-        val all = h.net.workingMemory.query(panels, PlaneFacts.KEY to name)
+        val all = h.net.workingMemory.query(panels, PlaneFacts.KEY j name)
         assertEquals(1 + nodes.size + cables.size, all.size)
-        assertTrue(all.all { it.versionCid == version }, "every fact of the program carries the document's cid")
+        assertTrue(all.view.all { it.versionCid == version }, "every fact of the program carries the document's cid")
 
         // Only asserts happened, exactly one per fact.
         assertEquals(all.size, h.ops.size)
@@ -145,9 +188,9 @@ class LcncPublisherFactsTest {
         for ((name, _) in LcncPresets.all()) {
             val program = preset(name)
             val entry = h.publisher.publishProgram(name, program, vocabulary)
-            val cables = h.net.workingMemory.query(panels, PlaneFacts.KEY to name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_CABLE }
-            val nodes = h.net.workingMemory.query(panels, PlaneFacts.KEY to name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_NODE }
-            val violations = h.net.workingMemory.query(panels, PlaneFacts.KEY to name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_VIOLATION }
+            val cables = h.net.workingMemory.query(panels, PlaneFacts.KEY j name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_CABLE }
+            val nodes = h.net.workingMemory.query(panels, PlaneFacts.KEY j name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_NODE }
+            val violations = h.net.workingMemory.query(panels, PlaneFacts.KEY j name).filter { it.fields[PlaneFacts.KIND] == PanelFacts.KIND_VIOLATION }
             assertEquals(program.wires.size, cables.size, "$name cables")
             assertEquals(PanelFacts.flattenedNodeCount(program), nodes.size, "$name nodes")
             assertEquals((entry["violations"] as List<*>).size, violations.size, "$name violations")
@@ -159,7 +202,7 @@ class LcncPublisherFactsTest {
             assertEquals(violations.size, programFact.fields["violations"], "$name program fact counts its violations")
         }
         // Across the corpus the exact-type rule is watchable: resolved cables carry a real CCEK type, `type=<kind>`.
-        val typed = h.net.facts(PanelFacts.KIND_CABLE).mapNotNull { it.fields["type"] as? String }
+        val typed = h.net.facts(PanelFacts.KIND_CABLE).view.mapNotNull { it.fields["type"] as? String }
         assertTrue(typed.isNotEmpty(), "no cable in the whole corpus resolved to a type")
         assertTrue(typed.all { it.isNotBlank() }, "$typed")
         // No program's facts leaked into another's: every fact's key is a preset name and every preset has a program fact.
@@ -239,15 +282,15 @@ class LcncPublisherFactsTest {
         assertNull(h.net.fact(lastCableId), "the dropped wire's cable fact is gone")
         assertEquals(program.wires.size - 1, h.net.facts(PanelFacts.KIND_CABLE).size)
         val retracted = h.opsOf(ReteOp.RETRACT)
-        assertEquals(listOf(FactId(PlaneFacts.PANELS, lastCableId)), retracted.map { it.second.factId })
+        assertEquals(listOf(PlaneFacts.PANELS to lastCableId), retracted.map { it.second.factId.pair })
         assertEquals(program.wires.size - 1, h.net.fact(name)!!.fields["cables"], "the program fact counts one cable fewer")
-        assertTrue(h.opsOf(ReteOp.MODIFY).any { it.second.factId.localId == name }, "the program fact was modified, not re-asserted")
+        assertTrue(h.opsOf(ReteOp.MODIFY).any { it.second.factId.b == name }, "the program fact was modified, not re-asserted")
         assertTrue(h.opsOf(ReteOp.ASSERT).isEmpty(), "no fact was asserted anew: ${h.opsOf(ReteOp.ASSERT)}")
         // Nodes did not change, so no node fact was touched.
         assertTrue(h.ops.none { it.second.fields[PlaneFacts.KIND] == PanelFacts.KIND_NODE }, "${h.ops}")
         // Same sourceCid => same version on the modified fact (the entry's cid is the version by owner decision).
         assertEquals(programVersionBefore, h.net.fact(name)!!.versionCid)
-        assertEquals(h.net.workingMemory.query(panels, PlaneFacts.KEY to name).map { it.factId.localId }.toSet(), h.publisher.panelFacts!!.knownLocalIds(name))
+        assertEquals(h.net.workingMemory.query(panels, PlaneFacts.KEY j name).map { it.factId.b }.toSet(), h.publisher.panelFacts!!.knownLocalIds(name))
     }
 
     @Test
@@ -263,8 +306,8 @@ class LcncPublisherFactsTest {
         h.publisher.publishProgram(name, edited)
 
         val version = ContentId(LcncBlackboard.cidOf(edited))
-        val all = h.net.workingMemory.query(panels, PlaneFacts.KEY to name)
-        assertTrue(all.all { it.versionCid == version }, "every fact re-versioned: ${all.map { it.versionCid }}")
+        val all = h.net.workingMemory.query(panels, PlaneFacts.KEY j name)
+        assertTrue(all.view.all { it.versionCid == version }, "every fact re-versioned: ${all.map { it.versionCid }}")
         assertEquals(all.size, h.opsOf(ReteOp.MODIFY).size, "each fact modified once")
         assertTrue(h.opsOf(ReteOp.ASSERT).isEmpty() && h.opsOf(ReteOp.RETRACT).isEmpty())
         assertEquals(version.value, h.net.fact(name)!!.fields["sourceCid"])
@@ -286,7 +329,7 @@ class LcncPublisherFactsTest {
         // ...and it retracts what the FIRST publisher asserted, because it seeds its known set from the network.
         second.publishProgram(name, program.dropLastWire(), sourceCid = sourceCid)
         val lastCableId = PanelFacts.cableLocalId(name, program.wires.size - 1)
-        assertEquals(listOf(lastCableId), h.opsOf(ReteOp.RETRACT).map { it.second.factId.localId })
+        assertEquals(listOf(lastCableId), h.opsOf(ReteOp.RETRACT).map { it.second.factId.b })
         assertNull(h.net.fact(lastCableId))
     }
 
@@ -295,11 +338,11 @@ class LcncPublisherFactsTest {
         val h = Harness()
         h.publisher.load("preset-scope-inner")
         h.publisher.load("preset-scope")
-        val before = h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope").size
+        val before = h.net.workingMemory.query(panels, PlaneFacts.KEY j "preset-scope").size
         assertTrue(before > 0)
         h.publisher.panelFacts!!.retract("preset-scope-inner")
-        assertTrue(h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope-inner").isEmpty())
-        assertEquals(before, h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope").size)
+        assertTrue(h.net.workingMemory.query(panels, PlaneFacts.KEY j "preset-scope-inner").isEmpty())
+        assertEquals(before, h.net.workingMemory.query(panels, PlaneFacts.KEY j "preset-scope").size)
         assertTrue(h.publisher.panelFacts!!.knownLocalIds("preset-scope-inner").isEmpty())
     }
 
@@ -318,12 +361,18 @@ class LcncPublisherFactsTest {
         val entry = LcncBlackboard.programEntry("preset-scope", program, LcncContracts.all().associateBy { it.type })
         val a = PanelFacts.explode("preset-scope", program, entry)
         val b = PanelFacts.explode("preset-scope", program, entry)
-        assertEquals(a, b)
-        assertEquals(a.map { it.factId.localId }.toSet().size, a.size, "localIds are unique")
-        assertTrue(a.all { it.factId.partitionId == PlaneFacts.PANELS && it.board.id == PlaneFacts.PANELS })
-        assertTrue(a.all { it.fields[PlaneFacts.KEY] == "preset-scope" && it.fields[PlaneFacts.KIND] != null })
+        assertEquals(a.size, b.size)
+        for (i in 0 until a.size) {
+            assertEquals(a[i].factId.pair, b[i].factId.pair)
+            assertEquals(a[i].fields, b[i].fields)
+            assertEquals(a[i].versionCid, b[i].versionCid)
+            assertEquals(a[i].board, b[i].board)
+        }
+        assertEquals(a.map { it.factId.b }.toSet().size, a.size, "localIds are unique")
+        assertTrue(a.view.all { it.factId.a == PlaneFacts.PANELS && it.board.id == PlaneFacts.PANELS })
+        assertTrue(a.view.all { it.fields[PlaneFacts.KEY] == "preset-scope" && it.fields[PlaneFacts.KIND] != null })
         // KIF and RDF projections apply to every panels fact: arity-3 tuples, and a (kind <iri> cable) for each cable.
-        val kif = a.flatMap(PlaneFacts::toKif)
+        val kif = a.view.flatMap(PlaneFacts::toKif)
         assertTrue(kif.all { (it as borg.trikeshed.kif.KifExpr.ListExpr).elements.size == 3 })
         assertEquals(program.wires.size, kif.count { it.toKifString().startsWith("(kind ") && it.toKifString().endsWith(" cable)") })
     }

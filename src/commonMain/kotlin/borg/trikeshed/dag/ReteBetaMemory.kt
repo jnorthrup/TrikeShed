@@ -1,120 +1,97 @@
 package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.Join
+import borg.trikeshed.lib.Twin
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.right
 
-data class BetaJoin(
-    val leftFacetId: String,
-    val rightFacetId: String,
-)
+typealias BetaJoin = Twin<String>
 
-data class BetaToken(
-    val left: ReteStoredFact,
-    val right: ReteStoredFact,
-    val joinValue: Any?,
-)
+fun BetaJoin(a: String, b: String): BetaJoin = a j b
 
-private data class BetaJoinKey(
-    val partitionId: String,
-    val value: Any?,
-)
+typealias BetaToken = Twin<ReteStoredFact>
 
-private data class BetaTokenId(
-    val leftFactId: FactId,
-    val rightFactId: FactId,
-)
-
-private class BetaBucket {
-    val facts = LinearHashMap<FactId, ReteStoredFact>()
-}
+private typealias BetaJoinKey = Join<String, Any?>
+private typealias BetaBucket = LinearHashMap<Pair<String, String>, ReteStoredFact>
 
 /**
- * Partitioned equality-join memory. Both inputs are indexed by join facet, and
- * token memory contains only current matching fact-version pairs.
+ * Partitioned equality-join memory. Tokens project the current matching
+ * fact versions from the two input indexes.
  */
 class ReteBetaMemory(
     private val join: BetaJoin,
 ) {
-    private val leftIndex = LinearHashMap<BetaJoinKey, BetaBucket>()
-    private val rightIndex = LinearHashMap<BetaJoinKey, BetaBucket>()
-    private val leftKeys = LinearHashMap<FactId, BetaJoinKey>()
-    private val rightKeys = LinearHashMap<FactId, BetaJoinKey>()
-    private val tokenMemory = LinearHashMap<BetaTokenId, BetaToken>()
+    private val leftIndex = LinearHashMap<Pair<String, Any?>, BetaBucket>()
+    private val rightIndex = LinearHashMap<Pair<String, Any?>, BetaBucket>()
+    private val leftKeys = LinearHashMap<Pair<String, String>, BetaJoinKey>()
+    private val rightKeys = LinearHashMap<Pair<String, String>, BetaJoinKey>()
 
     fun acceptLeft(fact: ReteStoredFact) {
         retractLeft(fact.factId)
-        if (!fact.fields.containsKey(join.leftFacetId)) return
+        if (!fact.fields.containsKey(join.a)) return
 
-        val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.leftFacetId])
-        bucket(leftIndex, key).facts.set(fact.factId, fact)
-        leftKeys.set(fact.factId, key)
-        rightIndex.get(key)?.facts?.entries()?.view?.forEach { (_, right) ->
-            tokenMemory.set(
-                BetaTokenId(fact.factId, right.factId),
-                BetaToken(fact, right, key.value),
-            )
-        }
+        val id = fact.factId.pair
+        val key = fact.factId.a j fact.fields[join.a]
+        bucket(leftIndex, key).set(id, fact)
+        leftKeys.set(id, key)
     }
 
     fun acceptRight(fact: ReteStoredFact) {
         retractRight(fact.factId)
-        if (!fact.fields.containsKey(join.rightFacetId)) return
+        if (!fact.fields.containsKey(join.b)) return
 
-        val key = BetaJoinKey(fact.factId.partitionId, fact.fields[join.rightFacetId])
-        bucket(rightIndex, key).facts.set(fact.factId, fact)
-        rightKeys.set(fact.factId, key)
-        leftIndex.get(key)?.facts?.entries()?.view?.forEach { (_, left) ->
-            tokenMemory.set(
-                BetaTokenId(left.factId, fact.factId),
-                BetaToken(left, fact, key.value),
-            )
-        }
+        val id = fact.factId.pair
+        val key = fact.factId.a j fact.fields[join.b]
+        bucket(rightIndex, key).set(id, fact)
+        rightKeys.set(id, key)
     }
 
     fun retractLeft(factId: FactId): Boolean {
-        val key = leftKeys.remove(factId) ?: return false
-        val bucket = leftIndex.get(key)
-        val removed = bucket?.facts?.remove(factId) != null
-        if (bucket != null && bucket.facts.count == 0) leftIndex.remove(key)
-        removeTokens { it.leftFactId == factId }
+        val id = factId.pair
+        val key = leftKeys.remove(id) ?: return false
+        val bucket = leftIndex.get(key.pair)
+        val removed = bucket?.remove(id) != null
+        if (bucket != null && bucket.count == 0) leftIndex.remove(key.pair)
         return removed
     }
 
     fun retractRight(factId: FactId): Boolean {
-        val key = rightKeys.remove(factId) ?: return false
-        val bucket = rightIndex.get(key)
-        val removed = bucket?.facts?.remove(factId) != null
-        if (bucket != null && bucket.facts.count == 0) rightIndex.remove(key)
-        removeTokens { it.rightFactId == factId }
+        val id = factId.pair
+        val key = rightKeys.remove(id) ?: return false
+        val bucket = rightIndex.get(key.pair)
+        val removed = bucket?.remove(id) != null
+        if (bucket != null && bucket.count == 0) rightIndex.remove(key.pair)
         return removed
     }
 
-    fun tokens(): List<BetaToken> = tokenMemory.entries()
-        .view.map { it.b }
-        .sortedWith(compareBy(
-            { it.left.factId.partitionId },
-            { it.left.factId.localId },
-            { it.right.factId.localId },
-        ))
-
-    private fun bucket(
-        index: borg.trikeshed.collections.associative.LinearHashMap<BetaJoinKey, BetaBucket>,
-        key: BetaJoinKey,
-    ): BetaBucket {
-        val existing = index.get(key)
-        if (existing != null) return existing
-        val created = BetaBucket()
-        index.set(key, created)
-        return created
-    }
-
-    private fun removeTokens(predicate: (BetaTokenId) -> Boolean) {
-        val toRemove = mutableListOf<BetaTokenId>()
-        tokenMemory.entries().view.forEach {
-            if (predicate(it.a)) {
-                toRemove.add(it.a)
+    fun tokens(): Series<BetaToken> {
+        val result = SeriesBuffer<BetaToken>()
+        for ((key, left) in leftIndex.entries()) {
+            val right = rightIndex.get(key)?.entries()?.right ?: continue
+            for (l in left.entries().right) {
+                for (r in right) result.add(l j r)
             }
         }
-        toRemove.forEach { tokenMemory.remove(it) }
+        result.sortWith(compareBy(
+            { it.a.factId.a },
+            { it.a.factId.b },
+            { it.b.factId.b },
+        ))
+        return result.drain()
+    }
+
+    private fun bucket(
+        index: LinearHashMap<Pair<String, Any?>, BetaBucket>,
+        key: BetaJoinKey,
+    ): BetaBucket {
+        val existing = index.get(key.pair)
+        if (existing != null) return existing
+        val created = BetaBucket()
+        index.set(key.pair, created)
+        return created
     }
 }

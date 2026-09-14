@@ -3,8 +3,44 @@ package borg.trikeshed.lib
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class SeriesFilterTest {
+
+    @Test
+    fun orderingPreservesTiesAndMetadataOracles() {
+        var reads = 0
+        val a = 2 j { reads++; "a" }
+        val b = 1 j { reads++; "b" }
+        val c = 2 j { reads++; "c" }
+        val ordered = s_[a, b, c].sortedWith(compareBy { it.a })
+        assertSame(b, ordered[0])
+        assertSame(a, ordered[1])
+        assertSame(c, ordered[2])
+        assertEquals(0, reads)
+        assertEquals("b", ordered[0].b())
+        assertEquals(1, reads)
+    }
+
+    @Test
+    fun drainingTransfersStorageBeforeTheNextFill() {
+        val buffer = SeriesBuffer<Any>(1)
+        val item = Any()
+        buffer.add(item)
+        val drained = buffer.drain()
+        assertEquals(0, buffer.size)
+        buffer.add(Any())
+        buffer.clear()
+        assertEquals(1, drained.size)
+        assertSame(item, drained[0])
+    }
+
+    @Test
+    fun firstOrNullRespectsTheSeriesBound() {
+        assertNull(emptySeriesOf<String>().firstOrNull())
+        assertEquals("first", s_["first", "second"].firstOrNull())
+    }
 
     @Test
     fun filterEmpty() {

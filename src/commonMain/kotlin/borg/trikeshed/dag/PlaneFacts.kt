@@ -18,7 +18,7 @@ import borg.trikeshed.rdf.TurtleRdf
  * and RDF ([toTriples]) and KIF ([toKif]) are PROJECTIONS computed from it by
  * one function each, never authored.
  *
- * Partition = [BlackboardContext.id] = [FactId.partitionId] (enforced by
+ * Partition = [BlackboardContext.id] = [FactId.a] (enforced by
  * [ReteWorkingMemory.assert]). Four reserved fields sit on every plane fact:
  * [KIND] is the interest handle, [KEY] the inverse pointer back to the thing
  * (blackboard key, panel name, graal accumulator id), [ACTOR] the provenance,
@@ -39,7 +39,7 @@ import borg.trikeshed.rdf.TurtleRdf
  * (so `(kind ?f cable)` unifies on the daemon bank), and quoted otherwise.
  */
 object PlaneFacts {
-    // partitions (BlackboardContext.id == FactId.partitionId)
+    // partitions (BlackboardContext.id == FactId.a)
     /** daemonBlackboard keys, one fact per admitted key. */
     const val BLACKBOARD = "blackboard"
     /** LCNC canvases, exploded to program / node / cable / violation facts. */
@@ -110,10 +110,10 @@ object PlaneFacts {
 
     /** Identity: fact -> (partition, key). A fact without a [KEY] field answers with its localId (couch/board facts predate the reserved fields). */
     fun keyOf(f: ReteStoredFact): Pair<String, String> =
-        f.factId.partitionId to ((f.fields[KEY] as? String) ?: f.factId.localId)
+        f.factId.a to ((f.fields[KEY] as? String) ?: f.factId.b)
 
     /** `<fact:partition/localId>`; the localId is percent-encoded so nothing in it can end the IRI or split a KIF token. */
-    fun factIri(factId: FactId): RdfTerm.Iri = RdfTerm.Iri(FACT_NS + encodeIriPart(factId.partitionId) + "/" + encodeIriPart(factId.localId))
+    fun factIri(factId: FactId): RdfTerm.Iri = RdfTerm.Iri(FACT_NS + encodeIriPart(factId.a) + "/" + encodeIriPart(factId.b))
 
     fun factIri(f: ReteStoredFact): RdfTerm.Iri = factIri(f.factId)
 

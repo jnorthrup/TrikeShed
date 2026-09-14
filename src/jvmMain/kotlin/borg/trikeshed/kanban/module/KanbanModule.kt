@@ -2,20 +2,15 @@ package borg.trikeshed.kanban.module
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardApply
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.kanban.BoardCursor
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
 import borg.trikeshed.kanban.BoardIntake
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.JvmBoardWal
-import borg.trikeshed.kanban.toBoardMap
 import borg.trikeshed.lcnc.LcncKanbanExperience
 import borg.trikeshed.lcnc.LcncNode
-import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.lcnc.LcncNodeRunner
-import borg.trikeshed.lcnc.LcncRunner
 import borg.trikeshed.lcnc.boundLcnc
-import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ForgeModule
 import borg.trikeshed.module.ModuleContext
@@ -25,7 +20,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.io.File
-import kotlin.concurrent.Volatile
 
 /**
  * KanbanModule — THE dynamic module (D3): kanban end to end, assembled from
@@ -176,7 +170,7 @@ class KanbanModule : ForgeModule {
             runner = { ctx.lcncRunners[it] },
             clock = ctx.clock,
             // The brief is grounded in the plane: one snapshot per claim, selected by the card's terms.
-            plane = { ctx.rete.snapshot().map { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.partitionId, f.factId.localId, f.fields) } },
+            plane = { ctx.rete.snapshot().α { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.a, f.factId.b, f.fields) }.toList() },
             // The coding-agent lane: the daemon fills ctx.agentRuns after attach, like the runners.
             agents = { ctx.agentRuns },
             mintRunId = { java.util.UUID.randomUUID().toString() },

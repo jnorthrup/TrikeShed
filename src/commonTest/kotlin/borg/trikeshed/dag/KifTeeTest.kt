@@ -7,6 +7,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.view
 
 /**
  * The KIF bank is a projection of working memory: a fact asserted, modified
@@ -46,7 +47,7 @@ class KifTeeTest {
         assertEquals(listOf(iri), rows(bank, "(kind ?f cable)", "?f"))
         assertEquals(listOf(iri), rows(bank, "(type ?f json)", "?f"))
         assertEquals(listOf("demo"), rows(bank, "(key $iri ?k)", "?k"))
-        assertEquals(PlaneFacts.toKif(net.snapshot().single()).size, bank.size(), "exactly the projection, nothing else")
+        assertEquals(PlaneFacts.toKif(net.snapshot().view.single()).size, bank.size(), "exactly the projection, nothing else")
         assertEquals(1, tee.trackedCount())
         assertEquals(0L, net.observerFailures)
     }
@@ -89,7 +90,7 @@ class KifTeeTest {
         net.retract(cableId)
 
         assertEquals(listOf(PlaneFacts.factIri(other).iri), rows(bank, "(kind ?f cable)", "?f"), "the sibling fact keeps its tuples")
-        assertEquals(1 + PlaneFacts.toKif(net.snapshot().single()).size, bank.size())
+        assertEquals(1 + PlaneFacts.toKif(net.snapshot().view.single()).size, bank.size())
         assertEquals(1, tee.trackedCount())
         // a subclass pattern answers once directly and once from the closure — pre-existing query behaviour, hence the set
         assertEquals(setOf("Mammal"), rows(bank, "(subclass Dog ?p)", "?p").toSet(), "foreign tuples untouched")
@@ -113,7 +114,7 @@ class KifTeeTest {
         val file = bank.toKifFile()
 
         net.assert(cableId, fields, cid, panels) // the network reports nothing
-        tee.apply(ReteOp.ASSERT, net.snapshot().single()) // and a replay is skipped by the tee itself
+        tee.apply(ReteOp.ASSERT, net.snapshot().view.single()) // and a replay is skipped by the tee itself
         net.modify(cableId, fields, cid) // a modify to the same content is observed, still no growth
 
         assertEquals(size, bank.size())

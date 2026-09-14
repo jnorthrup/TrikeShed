@@ -3,6 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 
@@ -178,8 +179,20 @@ class LcncPublisher(
         // so it runs on every publish, not only on a board delta — a network handed
         // over after the board was seeded still ends up holding every program.
         // Await the network's mutex and publication in the caller's coroutine.
-        panelFacts?.publish(name, program, entry, actor = "lcnc")
+        reconcileProgram(name)
         return entry
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun reconcileProgram(name: String) {
+        panelFacts?.publish(name) {
+            // Read after acquiring the network's write lock: an older caller
+            // must not project its captured entry over a newer board version.
+            val entry = blackboard.get(LcncBlackboard.programKey(name)) as? Map<String, Any?>
+            val program = LcncBlackboard.programOf(entry)
+            if (entry == null || program == null) emptySeriesOf()
+            else PanelFacts.explode(name, program, entry, actor = "lcnc")
+        }
     }
 
     /**
@@ -191,6 +204,7 @@ class LcncPublisher(
             val cid = LcncBlackboard.cidOf(program)
             val entry = blackboard.get(LcncBlackboard.programKey(name))
             if (entry == null || LcncBlackboard.sourceCidOf(entry) != cid) publishProgram(name, program, lb.vocabulary, cid)
+            else reconcileProgram(name)
         }
     }
 
@@ -241,13 +255,16 @@ class LcncPublisher(
         if (source != null) {
             val cid = LcncBlackboard.cidOf(source)
             val entry = blackboard.get(key)
-            if (entry == null || LcncBlackboard.sourceCidOf(entry) != cid) publishProgram(name, source, sourceCid = cid)
+            if (entry == null || LcncBlackboard.sourceCidOf(entry) != cid) {
+                publishProgram(name, source, sourceCid = cid)
+                return LcncBlackboard.programOf(blackboard.get(key))
+            }
         }
         val entry = blackboard.get(key) ?: return null
         if (!LcncBlackboard.isReconciled(entry)) {
             val edited = LcncBlackboard.programOf(entry) ?: return null
             publishProgram(name, edited, sourceCid = LcncBlackboard.sourceCidOf(entry))
-        }
+        } else reconcileProgram(name)
         return LcncBlackboard.programOf(blackboard.get(key))
     }
 

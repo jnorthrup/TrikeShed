@@ -4,6 +4,8 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.lib.right
 
 /**
  * Base class for open-addressing hash maps with triangular probing.
@@ -145,7 +147,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
      *  build buffer; no mutable surface leaves the map. Destructure with
      *  `val (k, v) = entry` or `.a`/`.b`. */
     fun entries(): Series2<K, V> {
-        val result = ArrayList<Join<K, V>>(size)
+        val result = SeriesBuffer<Join<K, V>>(size)
         for (s in 0 until capacity) {
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
@@ -153,7 +155,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
                 result += (extractUserKey(k as IK)) j (values[s] as V)
             }
         }
-        return result.size j result::get
+        return result.drain()
     }
 
     protected abstract fun extractUserKey(internalKey: IK): K
@@ -236,7 +238,7 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
     /** Iterate entries in insertion order (ascending counter) — frozen Series2. */
     fun entriesInOrder(): Series2<K, V> {
         // Collect live entries with their sequence counter, sort by counter
-        val live = ArrayList<Join<ULong, Join<K, V>>>(size)
+        val live = SeriesBuffer<Join<ULong, Join<K, V>>>(size)
         for (s in 0 until capacity) {
             val k = keys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
@@ -246,7 +248,7 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
                 live += ik.b j (ik.a j (values[s] as V))
             }
         }
-        live.sortBy { it.a }
-        return live.size j { i: Int -> live[i].b }
+        live.sortWith(compareBy { it.a })
+        return live.drain().right
     }
 }

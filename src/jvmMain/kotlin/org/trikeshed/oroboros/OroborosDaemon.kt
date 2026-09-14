@@ -13,6 +13,7 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.userspace.nio.channels.SocketDomain
 import borg.trikeshed.userspace.nio.channels.SocketType
 import borg.trikeshed.userspace.nio.ByteBuffer
@@ -1499,7 +1500,7 @@ object OroborosDaemon {
                 bag = bag,
                 kif = kifBank,
                 // The RDF projection of the whole fact plane at freeze time (was an empty graph).
-                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.flatMap(borg.trikeshed.dag.PlaneFacts::toTriples)) },
+                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.view.flatMap(borg.trikeshed.dag.PlaneFacts::toTriples)) },
                 cas = casStore,
             )
             moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(

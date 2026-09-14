@@ -15,7 +15,7 @@ actual class FileWatchReactorElement actual constructor(
     excludeGlobs: List<String>,
     walkerBlockedSegments: Set<String>,
     walkerBlockedRelativePrefixes: Set<String>,
-) : AsyncContextElement(parentJob = parentJob) {
+) : AsyncContextElement(parentJob = TODO("FileWatchReactorElement: no watching mechanism at this target's gate level")) {
     actual companion object Key : AsyncContextKey<FileWatchReactorElement>()
     actual override val key: CoroutineContext.Key<*> get() = Key
     actual val events: ReceiveChannel<FileEvent>

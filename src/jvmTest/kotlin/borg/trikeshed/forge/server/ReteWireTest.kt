@@ -188,13 +188,13 @@ class ReteWireTest {
         assertEquals(panelsTriples, graph.triples.size, "one triple per scalar field, list elements fanned out")
         val subjects = graph.triples.map { (it.s as RdfTerm.Iri).iri }.toSet()
         assertEquals(setOf(cable1, cable2, node).map { PlaneFacts.factIri(it.factId).iri }.toSet(), subjects)
-        assertTrue(graph.triples.none { PlaneFacts.factIdOf(it.s as RdfTerm.Iri)?.partitionId == PlaneFacts.GRAAL }, "the partition filter holds in Turtle too")
+        assertTrue(graph.triples.none { PlaneFacts.factIdOf(it.s as RdfTerm.Iri)?.a == PlaneFacts.GRAAL }, "the partition filter holds in Turtle too")
     }
 
     @Test
     fun turtleWithoutPartitionIsEveryPartitionAndTheSelectionFiltersApply() {
         val all = TurtleRdf.parse(get("/api/facts/rdf")!!.body)
-        val partitions = all.triples.mapNotNull { PlaneFacts.factIdOf(it.s as RdfTerm.Iri)?.partitionId }.toSet()
+        val partitions = all.triples.mapNotNull { PlaneFacts.factIdOf(it.s as RdfTerm.Iri)?.a }.toSet()
         assertEquals(setOf(PlaneFacts.PANELS, PlaneFacts.GRAAL), partitions)
 
         val one = TurtleRdf.parse(get("/api/facts/rdf?partition=graal&key=pointcut/T/m/3")!!.body)

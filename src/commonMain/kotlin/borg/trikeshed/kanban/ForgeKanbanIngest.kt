@@ -16,6 +16,7 @@ import borg.trikeshed.lib.cascade.key
 import borg.trikeshed.lib.cascade.shape
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.view
 
 data class ForgeKanbanCorrelation(
     val taskId: String,
@@ -273,13 +274,13 @@ object ForgeKanbanIngest {
     }
 
     private fun computeParentIdsByTask(parents: ReteBetaMemory): Map<String, List<String>> {
-        return parents.tokens().groupBy { it.left.fields["taskId"] as String }
-            .mapValues { (_, tokens) -> tokens.map { it.right.fields["parentId"] as String }.sorted() }
+        return parents.tokens().view.groupBy { it.a.fields["taskId"] as String }
+            .mapValues { (_, tokens) -> tokens.map { it.b.fields["parentId"] as String }.sorted() }
     }
 
     private fun computeChildIdsByTask(children: ReteBetaMemory): Map<String, List<String>> {
-        return children.tokens().groupBy { it.left.fields["taskId"] as String }
-            .mapValues { (_, tokens) -> tokens.map { it.right.fields["childId"] as String }.sorted() }
+        return children.tokens().view.groupBy { it.a.fields["taskId"] as String }
+            .mapValues { (_, tokens) -> tokens.map { it.b.fields["childId"] as String }.sorted() }
     }
 
     private fun buildCards(tasks: List<SourceTask>, parentIdsByTask: Map<String, List<String>>, source: ForgeKanbanSource): List<KanbanCard> {

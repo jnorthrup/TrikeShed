@@ -5,14 +5,15 @@ import borg.trikeshed.platform.HostSystem
 
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.userspace.nio.IOException
 import kotlin.random.Random
 
 @OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
-@JsFun("(key, value) => { try { if (globalThis.mockStorageThrow) { throw new Error('Mock Storage Error'); } if (typeof localStorage !== 'undefined') { localStorage.setItem(key, value); return true; } } catch (e) {} return false; }")
+@JsFun("(key, value) => { try { if (typeof localStorage !== 'undefined') { localStorage.setItem(key, value); return true; } } catch (e) {} return false; }")
 private external fun jsStorageSet(key: String, value: String): Boolean
 
 @OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
-@JsFun("(key) => { try { if (typeof localStorage !== 'undefined') { return localStorage.getItem(key); } } catch (e) {} return null; }")
+@JsFun("(key) => typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null")
 private external fun jsStorageGet(key: String): String?
 
 @OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
@@ -20,17 +21,24 @@ private external fun jsStorageGet(key: String): String?
 private external fun jsStorageRemove(key: String): Boolean
 
 @OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
-@JsFun("() => { try { if (typeof localStorage !== 'undefined') { return localStorage.length; } } catch (e) {} return 0; }")
+@JsFun("() => typeof localStorage !== 'undefined' ? localStorage.length : 0")
 private external fun jsStorageLength(): Int
 
 @OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
-@JsFun("(index) => { try { if (typeof localStorage !== 'undefined') { return localStorage.key(index); } } catch (e) {} return null; }")
+@JsFun("(index) => typeof localStorage !== 'undefined' ? localStorage.key(index) : null")
 private external fun jsStorageKey(index: Int): String?
+
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("() => typeof localStorage !== 'undefined'")
+private external fun jsStorageAvailable(): Boolean
+
+private inline fun <T> storageRead(read: () -> T): T = try { read() } catch (failure: Throwable) {
+    throw IOException("Browser storage read failed", failure)
+}
 
 const val FILE_PREFIX = "trikeshed:browser:file:"
 const val DIR_PREFIX = "trikeshed:browser:dir:"
 val blobFallback = linkedMapOf<String, String>()
-private val modifiedFallback = linkedMapOf<String, String>()
 val dirFallback = linkedSetOf<String>()
 val envFallback = linkedMapOf<String, String>()
 
@@ -54,61 +62,62 @@ fun parentPath(path: String): String? {
 }
 fun fileKey(path: String): String = FILE_PREFIX + normalizePath(path)
 fun dirKey(path: String): String = DIR_PREFIX + normalizePath(path)
-fun storageGet(key: String): String? = jsStorageGet(key)
+fun storageGet(key: String): String? = storageRead { jsStorageGet(key) }
 fun storageSet(key: String, value: String): Boolean = jsStorageSet(key, value)
 fun storageRemove(key: String): Boolean = jsStorageRemove(key)
 fun storageKeys(prefix: String): List<String> {
-    val len = jsStorageLength()
+    val len = storageRead { jsStorageLength() }
     val keys = mutableListOf<String>()
     for (index in 0 until len) {
-        val key = jsStorageKey(index)
+        val key = storageRead { jsStorageKey(index) }
         if (key != null && key.startsWith(prefix)) keys += key
     }
     return keys
 }
-fun readBlob(path: String): String? {
+private fun blobValue(path: String): String? {
     val key = fileKey(path)
     return storageGet(key) ?: blobFallback[key]
 }
+fun readBlob(path: String): String? = blobValue(path)?.substringAfter(':')
 private fun modifiedKey(path: String): String = "trikeshed:browser:mtime:" + normalizePath(path)
 
 fun blobModified(path: String): Long {
-    if (readBlob(path) == null) return 0L
-    val key = modifiedKey(path)
-    return (modifiedFallback[key] ?: storageGet(key))?.toLongOrNull() ?: 0L
+    val value = blobValue(path) ?: return 0L
+    return if (':' in value) value.substringBefore(':').toLongOrNull() ?: 0L
+    else storageGet(modifiedKey(path))?.toLongOrNull() ?: 0L
 }
 
 fun writeBlob(path: String, hex: String) {
     val key = fileKey(path)
-    if (!storageSet(key, hex)) {
-        blobFallback[key] = hex
-    } else {
+    // Hex contains no colon. One value replaces bytes and time together;
+    // older raw-hex records remain readable with their separate timestamp.
+    val value = "${HostSystem.currentTimeMillis()}:$hex"
+    if (storageRead { jsStorageAvailable() }) {
+        if (!storageSet(key, value)) throw IOException("Browser storage write failed: $path")
         blobFallback.remove(key)
-    }
-    val modified = modifiedKey(path)
-    val time = HostSystem.currentTimeMillis().toString()
-    if (storageSet(modified, time)) modifiedFallback.remove(modified)
-    else modifiedFallback[modified] = time
+    } else blobFallback[key] = value
 }
 fun removeBlob(path: String): Boolean {
     val key = fileKey(path)
-    val removedStorage = storageRemove(key)
+    val removedStorage = storageGet(key) != null
+    if (removedStorage && !storageRemove(key)) throw IOException("Browser storage removal failed: $path")
     val removedFallback = blobFallback.remove(key) != null
-    storageRemove(modifiedKey(path))
-    modifiedFallback.remove(modifiedKey(path))
+    val modified = modifiedKey(path)
+    if (storageGet(modified) != null && !storageRemove(modified)) throw IOException("Browser timestamp removal failed: $path")
     return removedStorage || removedFallback
 }
 fun markDirectory(path: String) {
     val normalized = normalizePath(path)
-    if (!storageSet(dirKey(normalized), "1")) {
-        dirFallback += normalized
-    } else {
+    if (storageGet(dirKey(normalized)) != null) return
+    if (storageRead { jsStorageAvailable() }) {
+        if (!storageSet(dirKey(normalized), "1")) throw IOException("Browser directory write failed: $path")
         dirFallback.remove(normalized)
-    }
+    } else dirFallback += normalized
 }
 fun unmarkDirectory(path: String): Boolean {
     val normalized = normalizePath(path)
-    val removedStorage = storageRemove(dirKey(normalized))
+    val removedStorage = storageGet(dirKey(normalized)) != null
+    if (removedStorage && !storageRemove(dirKey(normalized))) throw IOException("Browser directory removal failed: $path")
     val removedFallback = dirFallback.remove(normalized)
     return removedStorage || removedFallback
 }
@@ -179,8 +188,7 @@ fun rm(path: String): Boolean {
         removeBlob(key.removePrefix(FILE_PREFIX))
     }
     nestedDirKeys.forEach { key ->
-        storageRemove(key)
-        dirFallback.remove(key.removePrefix(DIR_PREFIX))
+        unmarkDirectory(key.removePrefix(DIR_PREFIX))
     }
 
     val dirRemoved = unmarkDirectory(normalized)

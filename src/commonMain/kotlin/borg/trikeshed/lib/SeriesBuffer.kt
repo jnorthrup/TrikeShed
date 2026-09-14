@@ -94,4 +94,20 @@ class SeriesBuffer<T>(
     }
 
     fun snapshot(): Series<T> = count j { index -> buf[index] as T }
+
+    fun sortWith(comparator: Comparator<in T>) {
+        buf.sortWith(Comparator { left, right -> comparator.compare(left as T, right as T) }, 0, count)
+    }
+
+    /** Transfer the filled buffer to a Series; subsequent fills use separate storage. */
+    fun drain(): Series<T> {
+        val items = buf
+        val size = count
+        buf = emptyArray()
+        count = 0
+        return size j { index ->
+            require(index in 0 until size) { "Index out of bounds" }
+            items[index] as T
+        }
+    }
 }

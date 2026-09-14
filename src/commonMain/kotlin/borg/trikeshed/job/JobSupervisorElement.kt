@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
+import borg.trikeshed.lib.isEmpty
 
 /**
  * JobSupervisorElement — composition root for the Job Nexus.

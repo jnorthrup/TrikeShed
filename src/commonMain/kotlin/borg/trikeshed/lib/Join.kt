@@ -4,7 +4,6 @@ package borg.trikeshed.lib
 
 /**
  * The base binary composition — a product type with two properties and nothing else.
- * Lower memory footprint and better cache working set than any JVM data class.
  */
 interface Join<out A, out B> {
     val a: A
@@ -69,7 +68,7 @@ val <I>  MetaSeries<I, *>.domain get() = a
 /** Integer-indexed MetaSeries — the default Series. */
 typealias Series<T> = MetaSeries<Int, T>
 
-/** Series of Joins — the split-storage specialization. */
+/** Integer-indexed Series of binary products. */
 typealias Series2<A, B> = Series<Join<A, B>>
 
 /** Project the A-side of a Series2. */

@@ -13,6 +13,12 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.isNotEmpty
+import borg.trikeshed.lib.firstOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -110,7 +116,7 @@ class BlackboardChangesFactElementTest {
         val nullFact = rig.fact("hermes/console/signal/1")!!
         assertTrue("value" in nullFact.fields && nullFact.fields["value"] == null, "a null value is a fact with a null value field")
         assertEquals(5L, rig.element.factsApplied)
-        assertEquals(5, rig.rete.workingMemory.query(partition, PlaneFacts.KIND to "blackboard").size)
+        assertEquals(5, rig.rete.workingMemory.query(partition, PlaneFacts.KIND j "blackboard").size)
     }
 
     // ── idempotency ──────────────────────────────────────────────────────
@@ -226,7 +232,7 @@ class BlackboardChangesFactElementTest {
         assertNull(rig.fact("narsese/rete/firing/abc"))
         assertEquals("doing", rig.fact("kanban/committed/job-1/7")!!.fields["column"], "kanban/committed is admitted; only kanban/rule is a firing output")
         assertEquals(1L, rig.element.factsApplied)
-        assertEquals(1, rig.rete.workingMemory.query(partition, PlaneFacts.KIND to "blackboard").size)
+        assertEquals(1, rig.rete.workingMemory.query(partition, PlaneFacts.KIND j "blackboard").size)
         assertEquals(4, rig.board.keys().size, "the receipts stay on the board")
     }
 
@@ -265,10 +271,10 @@ class BlackboardChangesFactElementTest {
 
         override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
             evaluations++
-            for (f in net.workingMemory.query(BlackboardContext(partitionId), PlaneFacts.KIND to PlaneFacts.BLACKBOARD)) {
+            for (f in net.workingMemory.query(BlackboardContext(partitionId), PlaneFacts.KIND j PlaneFacts.BLACKBOARD)) {
                 fire(
                     Activation(
-                        activationId = "act-${f.factId.localId}-$evaluations",
+                        activationId = "act-${f.factId.b}-$evaluations",
                         ruleId = ruleId,
                         ruleVersionCid = version,
                         salience = salience,
@@ -299,11 +305,11 @@ class BlackboardChangesFactElementTest {
 
         assertEquals(1, production.evaluations, "one admitted key → one evaluation; the receipts it writes never re-enter")
         assertTrue(rig.board.keys().any { it.startsWith("kanban/rule/echo-blackboard/") }, "the sink did write its receipt onto the board")
-        val ruleFacts = rig.rete.workingMemory.query(partition, PlaneFacts.KIND to "blackboard")
-            .filter { it.factId.localId.startsWith("kanban/rule/") }
+        val ruleFacts = rig.rete.workingMemory.query(partition, PlaneFacts.KIND j "blackboard")
+            .filter { it.factId.b.startsWith("kanban/rule/") }
         assertTrue(ruleFacts.isEmpty(), "no kanban/rule fact exists: $ruleFacts")
         assertEquals(1L, rig.element.factsApplied)
-        assertEquals(1, rig.rete.workingMemory.query(partition, PlaneFacts.KIND to "blackboard").size)
+        assertEquals(1, rig.rete.workingMemory.query(partition, PlaneFacts.KIND j "blackboard").size)
     }
 
     @Test
@@ -320,8 +326,8 @@ class BlackboardChangesFactElementTest {
         repeat(6) { rig.element.drainKeys() }
 
         assertEquals(6, production.evaluations, "one evaluation per drain, forever")
-        val ruleFacts = rig.rete.workingMemory.query(partition, PlaneFacts.KIND to "blackboard")
-            .filter { it.factId.localId.startsWith("kanban/rule/") }
+        val ruleFacts = rig.rete.workingMemory.query(partition, PlaneFacts.KIND j "blackboard")
+            .filter { it.factId.b.startsWith("kanban/rule/") }
         assertTrue(ruleFacts.size >= 5, "receipts became facts: ${ruleFacts.size}")
     }
 

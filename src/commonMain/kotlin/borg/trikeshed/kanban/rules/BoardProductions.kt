@@ -11,6 +11,16 @@ import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.sortedWith
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.firstOrNull
 
 /**
  * The four board productions — all SHALLOW (≤2 hops), all receipted, all
@@ -65,8 +75,8 @@ object BoardRules {
 
     internal fun cardInterest(): Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("card" as Any?) }
 
-    internal fun cards(net: ReteNetwork, partitionId: String): List<ReteStoredFact> =
-        net.workingMemory.query(BlackboardContext(partitionId), "kind" to "card")
+    internal fun cards(net: ReteNetwork, partitionId: String): Series<ReteStoredFact> =
+        net.workingMemory.query(BlackboardContext(partitionId), "kind" j "card")
 
     @Suppress("UNCHECKED_CAST")
     internal fun deps(fact: ReteStoredFact): List<String> =
@@ -99,7 +109,7 @@ object BoardRules {
     }
 
     /** The minted children of [jobId] on the fact plane: card facts whose `parent` names it and whose id the worker minted. */
-    internal fun children(jobId: String, cards: List<ReteStoredFact>): List<ReteStoredFact> =
+    internal fun children(jobId: String, cards: Series<ReteStoredFact>): Series<ReteStoredFact> =
         cards.filter { it.fields["parent"] == jobId && isMintedChild(jobId, it.fields["jobId"] as? String ?: "") }
 
     /** The join has landed: the card's own dependencies name at least one minted child. */
@@ -123,10 +133,10 @@ object BoardRules {
      * nothing pending once the join has landed. The worker reads the same predicate
      * over the store's rows ([borg.trikeshed.kanban.BoardFanOutWorker]).
      */
-    fun fanOutPending(card: ReteStoredFact, cards: List<ReteStoredFact>): Boolean {
+    fun fanOutPending(card: ReteStoredFact, cards: Series<ReteStoredFact>): Boolean {
         if (models(card).size < 2 && fanout(card) < 2) return false
         val jobId = card.fields["jobId"] as? String ?: return false
-        return fanOutPending(jobId, deps(card), children(jobId, cards).mapNotNull { it.fields["jobId"] as? String })
+        return fanOutPending(jobId, deps(card), children(jobId, cards).view.mapNotNull { it.fields["jobId"] as? String })
     }
 
     /** The predicate itself, over ids: [dependencies] of the parent and the ids of its minted [children] as some reader sees them. */
@@ -179,7 +189,7 @@ class FanOutProduction : ReteProduction {
                     salience = salience,
                     sequence = revision,
                     // The children ARE support: a child landing (or leaving) re-evaluates the split.
-                    supportCids = listOf(card.versionCid) + kids.map { it.versionCid },
+                    supportCids = (s_[card.versionCid] + kids.α { it.versionCid }).toList(),
                     bindings = mapOf(
                         "jobId" to jobId,
                         "expectedRevision" to "$revision",
@@ -253,7 +263,7 @@ class WipBreachProduction : ReteProduction {
     override val interests: Series<Join<String, Any?>> = BoardRules.cardInterest()
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val byCol = BoardRules.cards(net, partitionId).groupBy { it.fields["column"] }
+        val byCol = BoardRules.cards(net, partitionId).view.groupBy { it.fields["column"] }
         for (col in BoardCol.entries) {
             val limit = col.wipLimit ?: continue
             val inCol = byCol[col.wire] ?: continue
@@ -360,7 +370,7 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
                     ruleVersionCid = BoardRules.cid("rule-claim-v1"),
                     salience = salience,
                     sequence = revision,
-                    supportCids = listOf(card.versionCid) + running.map { it.versionCid },
+                    supportCids = (s_[card.versionCid] + running.α { it.versionCid }).toList(),
                     bindings = mapOf(
                         "jobId" to jobId,
                         "toColumn" to BoardCol.RUNNING.wire,
@@ -386,7 +396,7 @@ class StallProduction(private val thresholdMs: Long = 30 * 60 * 1000L) : RetePro
     override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j ("now" as Any?) }
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val now = net.workingMemory.query(BlackboardContext(partitionId), "kind" to "now").firstOrNull() ?: return
+        val now = net.workingMemory.query(BlackboardContext(partitionId), "kind" j "now").firstOrNull() ?: return
         val nowMs = (now.fields["ms"] as? Long) ?: return
         for (card in BoardRules.cards(net, partitionId)) {
             if (card.fields["column"] != BoardCol.RUNNING.wire) continue
@@ -452,7 +462,7 @@ class ReaperProduction(
     }
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val now = net.workingMemory.query(BlackboardContext(partitionId), "kind" to "now").firstOrNull() ?: return
+        val now = net.workingMemory.query(BlackboardContext(partitionId), "kind" j "now").firstOrNull() ?: return
         val nowMs = (now.fields["ms"] as? Long) ?: return
         for (card in BoardRules.cards(net, partitionId)) {
             if (card.fields["column"] != BoardCol.RUNNING.wire) continue

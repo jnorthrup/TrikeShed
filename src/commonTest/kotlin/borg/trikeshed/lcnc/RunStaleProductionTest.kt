@@ -12,6 +12,12 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.isEmpty
 
 /**
  * run-stale on the in-memory changes rig: a consumed document whose cid moved fires once, a
@@ -51,7 +57,7 @@ class RunStaleProductionTest {
         rig.tendon.drainFrames()
         val index = LcncConsumedLedger.indexFingerprintOf(listOf("a.md", "b.md"))
         assertEquals(3, rig.facts.assertRun(receipt("r1", index, "sha256:a1", "sha256:b1")), "the prompt entry is not a project fact")
-        assertEquals(3, rig.rete.workingMemory.query(BlackboardContext("notes"), "kind" to LcncRunFacts.KIND).size)
+        assertEquals(3, rig.rete.workingMemory.query(BlackboardContext("notes"), "kind" j LcncRunFacts.KIND).size)
         assertTrue(rig.fired.isEmpty(), "nothing moved: ${rig.fired}")
 
         // a.md edited: one document firing, no listing firing; re-evaluation is refracted.
@@ -82,7 +88,7 @@ class RunStaleProductionTest {
         assertEquals(3, rig.facts.retractRun("r1"))
         rig.doc("a.md", "sha256:a3"); rig.tendon.drainFrames()
         assertEquals(before, rig.fired.size, "a retracted run fires nothing")
-        assertEquals(0, rig.rete.workingMemory.query(BlackboardContext("notes"), "kind" to LcncRunFacts.KIND).size)
+        assertEquals(0, rig.rete.workingMemory.query(BlackboardContext("notes"), "kind" j LcncRunFacts.KIND).size)
     }
 
     @Test

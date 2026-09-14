@@ -13,6 +13,16 @@ import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.filter
+import borg.trikeshed.lib.sortedWith
+import borg.trikeshed.lib.iterator
+import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.α
+import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.s_
+import borg.trikeshed.lib.plus
+import borg.trikeshed.lib.take
 
 /**
  * RUN-STALE (Forge genesis, Cut S): in a project's partition, a consumed-document fact whose
@@ -35,12 +45,12 @@ class RunStaleProduction : ReteProduction {
     override val interests: Series<Join<String, Any?>> = 1 j { _: Int -> "kind" j (LcncRunFacts.KIND as Any?) }
 
     override fun evaluate(net: ReteNetwork, partitionId: String, fire: (Activation) -> Unit) {
-        val consumed = net.workingMemory.query(BlackboardContext(partitionId), "kind" to LcncRunFacts.KIND)
+        val consumed = net.workingMemory.query(BlackboardContext(partitionId), "kind" j LcncRunFacts.KIND)
         if (consumed.isEmpty()) return
         // The partition's documents: the tendon's facts carry `_id`; ours never do.
-        val docs = net.workingMemory.all().filter { it.factId.partitionId == partitionId && it.fields.containsKey("_id") && !it.factId.localId.startsWith(LcncRunFacts.LOCAL_PREFIX) }
+        val docs = net.workingMemory.all().filter { it.factId.a == partitionId && it.fields.containsKey("_id") && !it.factId.b.startsWith(LcncRunFacts.LOCAL_PREFIX) }
         val byId = HashMap<String, ReteStoredFact>(docs.size)
-        for (d in docs) byId[d.factId.localId] = d
+        for (d in docs) byId[d.factId.b] = d
         for (c in consumed) {
             val runId = c.fields["runId"] as? String ?: continue
             val common = mapOf(
@@ -77,10 +87,10 @@ class RunStaleProduction : ReteProduction {
                     val prefix = c.fields["prefix"]?.toString().orEmpty()
                     val glob = c.fields["glob"]?.toString().orEmpty()
                     val listing = docs.filter { d ->
-                        val id = d.factId.localId
+                        val id = d.factId.b
                         d.fields["contentId"] != null && !id.endsWith(ProjectNodes.EXTRACT_SUFFIX) && id.startsWith(prefix) && ProjectGlob.matches(glob, id)
-                    }.sortedBy { it.factId.localId }
-                    val fingerprint = LcncConsumedLedger.indexFingerprintOf(listing.map { it.factId.localId })
+                    }.sortedWith(compareBy { it.factId.b })
+                    val fingerprint = LcncConsumedLedger.indexFingerprintOf(listing.α { it.factId.b }.toList())
                     if (fingerprint == oldCid) continue
                     fire(
                         Activation(
@@ -89,7 +99,7 @@ class RunStaleProduction : ReteProduction {
                             ruleVersionCid = VERSION,
                             salience = salience,
                             sequence = listing.size.toLong(),
-                            supportCids = listOf(c.versionCid) + listing.take(MAX_SUPPORT).map { it.versionCid },
+                            supportCids = (s_[c.versionCid] + listing.take(MAX_SUPPORT).α { it.versionCid }).toList(),
                             bindings = common + mapOf(
                                 "kind" to LcncConsumedLedger.PROJECT_INDEX, "id" to "", "oldCid" to oldCid, "newCid" to fingerprint,
                                 "sequence" to "", "deleted" to "false", "files" to listing.size.toString(),
