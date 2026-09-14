@@ -96,10 +96,30 @@ class JvmChannelHandleConformanceTest {
                             assertEquals(ChannelResult(fd, 0, 92), readWhenReady(handle, fd, buffer, 92))
                             assertEquals(2, buffer.position(), "EOF must retain the buffer position")
                             handle.close()
-                            assertFalse(FileImpl(fd).isOpen(), "closing the ring closes its owned socket")
+                            assertTrue(FileImpl(fd).isOpen(), "a returned socket outlives its submission ring")
                         } finally { handle.close() }
                     }
-                } finally { handle.close() }
+                } finally { operations.close(fd); handle.close() }
+        }
+    }
+
+    @Test
+    fun socket_bind_listen_and_close_survive_temporary_submission_rings() {
+        val operations = JvmChannelOperations()
+        val directory = Files.createTempDirectory(java.nio.file.Path.of("/tmp"), "ts-channel-")
+        val path = directory.resolve("health.sock")
+        val fd = operations.socket(1, 1, 0)
+        try {
+            assertTrue(fd >= 0, "SOCKET failed: $fd")
+            assertEquals(0, operations.bindUnix(fd, path.toString()))
+            assertEquals(0, operations.listen(fd))
+            assertTrue(FileImpl(fd).isOpen())
+            assertEquals(0, operations.close(fd))
+            assertFalse(FileImpl(fd).isOpen())
+        } finally {
+            if (fd >= 0 && FileImpl(fd).isOpen()) operations.close(fd)
+            Files.deleteIfExists(path)
+            Files.deleteIfExists(directory)
         }
     }
 
