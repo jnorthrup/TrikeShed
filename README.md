@@ -383,10 +383,13 @@ Callers await `batchEnqueue` results, correlated by `userData`, and await `drain
 before releasing the ring. `UringBenchmark.run` executes this path; the torrent
 transport and file-volume implementation also submit batches through the facade.
 
-The `userspace.ChannelRunner` and `userspace.nio.channels.ChannelRunner`
-wrappers had no source callers and have been removed. They had separate polling
-loops and completion maps. `SplatChannelRunner` is a
-separate motion-model adapter; its presence does not establish a transport path.
+`userspace.nio.channels.ChannelRunner` adapts socket and readiness SQEs into
+bounded polling and dispatch stages under a supervisor parented to the caller's
+job. `userspace.ChannelRunner` is a separate completion adapter over
+`FunctionalUringFacade`. Neither currently has source callers in this repository;
+their transport integration is unfinished. Concurrent drain can close the
+readiness runner's ring twice, and a failed socket close can skip remaining
+descriptors. `SplatChannelRunner` serves the separate motion-model API.
 
 ### 7.4 MuxReactorElement (keymux/modelmux/taxonomy/kanban events)
 

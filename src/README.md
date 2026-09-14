@@ -49,8 +49,7 @@ Kernel algebra (`Join`, `Series<T>`, `Twin`, `α`, `j`) is defined in `lib/` and
 │  drain stops admission and awaits cleanup.                           │
 │                                                                      │
 │  Implemented callers include UringBenchmark, TorrentSocketRing       │
-│  and BtrfsUringFileVolume. Their ownership belongs in their code;    │
-│  a diagram does not establish a shared ring across protocols.        │
+│  and BtrfsUringFileVolume. They submit through the batch API.         │
 ├──────────────────────────────────────────────────────────────────────┤
 │  HTX TOKENIZER  (tokenized in couch/htx/, wired through Channel)     │
 │                                                                      │
@@ -104,9 +103,12 @@ outstanding `userData` values and await `batchEnqueue`; the worker correlates
 terminal CQEs with their batches. Drain stops admission and waits for admitted
 work and cleanup.
 
-The former `userspace.ChannelRunner` and `userspace.nio.channels.ChannelRunner`
-had no source callers and were removed. Earlier examples of `runOp`, a shared
-HTX/couch/IPFS ring, and fire-and-forget close were not implemented integrations.
+`userspace.nio.channels.ChannelRunner` adapts socket and readiness SQEs through a
+bounded channel connecting polling to dispatch. `userspace.ChannelRunner` is a
+separate completion adapter over the facade. Repository source currently has no
+callers of either adapter; their transport integration is unfinished. Concurrent
+drain can close the readiness runner's ring twice, and a failed socket close can
+skip remaining descriptors.
 
 The executable example is
 [`UringBenchmark.run`](commonMain/kotlin/borg/trikeshed/userspace/benchmark/UringBenchmark.kt):
@@ -302,8 +304,8 @@ linked above show the concrete token, buffer and descriptor ownership at each ca
 site.
 
 The root `src/` tree is authoritative. Composite builds consume it through
-`includeBuild("../..")`; no separate `ChannelRunner` or lifecycle superclass is
-required to call the scoped facade.
+`includeBuild("../..")`. The scoped facade is directly callable; the existing
+runner adapters serve their distinct completion and readiness API shapes.
 
 ---
 
