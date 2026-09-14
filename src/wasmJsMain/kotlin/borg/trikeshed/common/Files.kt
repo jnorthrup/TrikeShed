@@ -10,6 +10,7 @@ import borg.trikeshed.lib.encodeHex
 import borg.trikeshed.lib.ensureParentDirectories
 import borg.trikeshed.lib.normalizePath
 import borg.trikeshed.lib.readBlob
+import borg.trikeshed.lib.blobModified
 import borg.trikeshed.lib.rm
 import borg.trikeshed.lib.streamByteLines
 import borg.trikeshed.lib.writeBlob
@@ -63,6 +64,8 @@ actual object Files {
 
     actual fun exists(filename: String): Boolean =
         readBlob(filename) != null || directoryExists(filename)
+
+    actual fun lastModified(filename: String): Long = blobModified(filename)
 
     actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
         streamByteLines(readAllBytes(fileName))

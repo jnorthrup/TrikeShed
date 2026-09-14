@@ -4,6 +4,9 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import kotlin.coroutines.CoroutineContext
 
+/** Execution context for synchronous file adapters; preserves the caller's Job. */
+internal expect val fileIoContext: CoroutineContext
+
 /**
  * Platform filesystem operations — replaces [borg.trikeshed.lib.Files] expect object.
  *

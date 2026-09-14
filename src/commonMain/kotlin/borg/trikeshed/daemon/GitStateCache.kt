@@ -1,7 +1,6 @@
 package borg.trikeshed.daemon
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlin.concurrent.Volatile
 import borg.trikeshed.common.File
 import kotlinx.coroutines.channels.Channel
@@ -106,7 +105,7 @@ class GitStateCache(private val repoDir: File) {
      * Handles: symbolic refs (`ref: refs/heads/master`), detached HEAD
      * (direct SHA), and packed-refs fallback.
      */
-    private suspend fun resolveHead(): String = withContext(context = Dispatchers.IO) {
+    private suspend fun resolveHead(): String = withContext(context = fileIoContext) {
         val headFile = repoDir.resolve(".git/HEAD")
         if (!headFile.exists()) return@withContext ""
         val headContent = headFile.readText().trim()

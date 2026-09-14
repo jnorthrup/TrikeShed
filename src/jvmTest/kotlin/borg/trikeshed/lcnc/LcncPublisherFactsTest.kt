@@ -11,6 +11,15 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -48,7 +57,38 @@ class LcncPublisherFactsTest {
         copy(wires = (0 until wires.size - 1).map { wires[it] }.toSeries())
 
     @Test
-    fun loadingAPresetLandsOneFactPerNodeAndCableWithTheExactType() {
+    fun cancelledPublicationStopsWaitingForTheNetwork(): Unit = runBlocking {
+        val h = Harness()
+        val locked = CompletableDeferred<Unit>()
+        val release = CountDownLatch(1)
+        val holder = launch(Dispatchers.IO) {
+            h.net.snapshot {
+                locked.complete(Unit)
+                check(release.await(10, TimeUnit.SECONDS)) { "Network reader was not released" }
+            }
+        }
+        try {
+            withTimeout(5_000) { locked.await() }
+            val boardWritten = CompletableDeferred<Unit>()
+            val unsubscribe = h.board.subscribe { boardWritten.complete(Unit) }
+            val publication = async(Dispatchers.Default) {
+                h.publisher.publishProgram("preset-scope-inner", preset("preset-scope-inner"))
+            }
+            try {
+                withTimeout(5_000) {
+                    boardWritten.await()
+                    publication.cancelAndJoin()
+                }
+                assertTrue(h.net.facts(PanelFacts.KIND_PROGRAM).isEmpty())
+            } finally { unsubscribe() }
+        } finally {
+            release.countDown()
+            holder.join()
+        }
+    }
+
+    @Test
+    fun loadingAPresetLandsOneFactPerNodeAndCableWithTheExactType(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)
@@ -99,7 +139,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun everyPresetExplodesToItsOwnCountsWithTheCheckersTypes() {
+    fun everyPresetExplodesToItsOwnCountsWithTheCheckersTypes(): Unit = runBlocking {
         val h = Harness()
         val vocabulary = h.publisher.vocabulary()
         for ((name, _) in LcncPresets.all()) {
@@ -128,7 +168,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun nodesInsideRingsCarryTheirEnclosingRingAsParent() {
+    fun nodesInsideRingsCarryTheirEnclosingRingAsParent(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope"
         val program = preset(name)
@@ -143,7 +183,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun aViolationIsAFactWithTheCheckersColumns() {
+    fun aViolationIsAFactWithTheCheckersColumns(): Unit = runBlocking {
         val h = Harness()
         val bad = LcncProgram(
             "bad",
@@ -162,7 +202,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun republishingTheSameProgramIsSilent() {
+    fun republishingTheSameProgramIsSilent(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)!!
@@ -181,7 +221,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun droppingAWireRetractsItsCableAndModifiesTheProgramFact() {
+    fun droppingAWireRetractsItsCableAndModifiesTheProgramFact(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)!!
@@ -211,7 +251,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun aDifferentDocumentMovesEveryFactsVersionToTheNewCid() {
+    fun aDifferentDocumentMovesEveryFactsVersionToTheNewCid(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)!!
@@ -231,7 +271,7 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun aSecondPublisherOverTheSameNetworkIsSilentOnTheSameEntryAndStillRetracts() {
+    fun aSecondPublisherOverTheSameNetworkIsSilentOnTheSameEntryAndStillRetracts(): Unit = runBlocking {
         val h = Harness()
         val name = "preset-scope-inner"
         val program = h.publisher.load(name)!!
@@ -251,20 +291,20 @@ class LcncPublisherFactsTest {
     }
 
     @Test
-    fun retractingAProgramRemovesEveryOneOfItsFactsAndNothingElse() {
+    fun retractingAProgramRemovesEveryOneOfItsFactsAndNothingElse(): Unit = runBlocking {
         val h = Harness()
         h.publisher.load("preset-scope-inner")
         h.publisher.load("preset-scope")
         val before = h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope").size
         assertTrue(before > 0)
-        kotlinx.coroutines.runBlocking { h.publisher.panelFacts!!.retract("preset-scope-inner") }
+        h.publisher.panelFacts!!.retract("preset-scope-inner")
         assertTrue(h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope-inner").isEmpty())
         assertEquals(before, h.net.workingMemory.query(panels, PlaneFacts.KEY to "preset-scope").size)
         assertTrue(h.publisher.panelFacts!!.knownLocalIds("preset-scope-inner").isEmpty())
     }
 
     @Test
-    fun aPublisherWithoutANetworkPublishesToTheBoardOnly() {
+    fun aPublisherWithoutANetworkPublishesToTheBoardOnly(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         val pub = LcncPublisher(board, { emptyMap() }, null)
         assertNull(pub.panelFacts)

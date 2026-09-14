@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace.nio.file.spi
 
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+
 import borg.trikeshed.common.Files
 
 class WasmFileOperations : FileOperations {
@@ -16,6 +19,7 @@ class WasmFileOperations : FileOperations {
     override fun write(f: String, string: String) { Files.write(f, string) }
     override fun cwd() = Files.cwd()
     override fun exists(f: String) = Files.exists(f)
+    override fun lastModified(filename: String): Long = Files.lastModified(filename)
     override fun streamLines(f: String, bs: Int) = Files.streamLines(f, bs)
     override fun iterateLines(f: String, bs: Int) = Files.iterateLines(f, bs)
     override fun listDir(p: String) = Files.listDir(p)
@@ -27,3 +31,5 @@ class WasmFileOperations : FileOperations {
     override fun readZip(p: String) = Files.readZip(p)
     override fun createTempDir(p: String) = Files.createTempDir(p)
 }
+
+internal actual val fileIoContext: CoroutineContext get() = EmptyCoroutineContext

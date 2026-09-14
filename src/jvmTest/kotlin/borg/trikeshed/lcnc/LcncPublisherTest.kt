@@ -5,6 +5,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonSupport
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -29,7 +30,7 @@ class LcncPublisherTest {
     )
 
     @Test
-    fun loadingAPresetSeedsItsEntryWithTypedCablesAndTheSourceCid() {
+    fun loadingAPresetSeedsItsEntryWithTypedCablesAndTheSourceCid(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         val loaded = publisher(board).load("preset-scope-inner")
         assertNotNull(loaded)
@@ -40,7 +41,7 @@ class LcncPublisherTest {
     }
 
     @Test
-    fun aBoardEditToASourcedProgramIsObeyedNotClobbered() {
+    fun aBoardEditToASourcedProgramIsObeyedNotClobbered(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         val pub = publisher(board)
         pub.load("preset-scope-inner")
@@ -57,7 +58,7 @@ class LcncPublisherTest {
     }
 
     @Test
-    fun aRawAssertedEntryIsReconciledSoTheBoardNeverHoldsAnUntypedCable() {
+    fun aRawAssertedEntryIsReconciledSoTheBoardNeverHoldsAnUntypedCable(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         val raw = mapOf(
             "name" to "asserted",
@@ -75,7 +76,7 @@ class LcncPublisherTest {
     }
 
     @Test
-    fun anEntryWithViolationsIsWhatTheRunSeamObeys() {
+    fun anEntryWithViolationsIsWhatTheRunSeamObeys(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         val bad = LcncProgram(
             "bad",
@@ -89,7 +90,7 @@ class LcncPublisherTest {
     }
 
     @Test
-    fun anUnchangedPublishWritesNothingAndAChangedOneWritesOnce() {
+    fun anUnchangedPublishWritesNothingAndAChangedOneWritesOnce(): Unit = runBlocking {
         val board = ConfixBlackboard.empty()
         var puts = 0
         val unsubscribe = board.subscribe { puts++ }

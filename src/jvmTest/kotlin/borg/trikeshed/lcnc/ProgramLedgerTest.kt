@@ -304,7 +304,7 @@ class ProgramLedgerTest {
     private fun bindingHow(bank: KifKnowledgeBase, type: String): String? =
         bank.query(KifExpr.parse("(binding $type ?how ?by)")).singleOrNull()?.getValue("?how")
 
-    private fun noteOf(rig: Rig, name: String): String? =
+    private suspend fun noteOf(rig: Rig, name: String): String? =
         rig.gateway.getAttachment("panels/$name")?.second?.decodeToString()?.let { textOf(it) }
 
     @Suppress("UNCHECKED_CAST")

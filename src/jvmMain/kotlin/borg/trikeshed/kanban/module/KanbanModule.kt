@@ -522,7 +522,10 @@ class KanbanModule : ForgeModule {
         ctx.routes.claim(id, "/api/archives/content") { method, path, text, _ -> archives.route(method, path, rawBody(text)) }
         runs.recover()
         runCatching { publisher.publishAll() }
-            .onFailure { System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}") }
+            .onFailure {
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                System.err.println("[KanbanModule] lcnc → blackboard publish failed: ${it.message}")
+            }
 
         ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")

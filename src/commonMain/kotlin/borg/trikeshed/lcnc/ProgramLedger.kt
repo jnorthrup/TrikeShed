@@ -8,8 +8,7 @@ import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -82,7 +81,7 @@ class ProgramLedger(
         if (heads[name]?.cid == cid) return@withLock null
         val line = LedgerLine(name, cid, previousCid, atMs, actor)
         ledger?.let { file ->
-            withContext(Dispatchers.IO) {
+            withContext(fileIoContext) {
                 file.parentFile?.mkdirs()
                 file.appendText(JsonSupport.stringify(line.toMap()) + "\n")
             }
@@ -118,7 +117,7 @@ class ProgramLedger(
         for ((name, line) in last) {
             // TOTAL per-head guard, not one guard per known hazard. Every skip [restoreHead]
             // decides for itself is logged and returns false; this catches what it did NOT
-            // foresee (a store that refuses a write, an IO fault under Dispatchers.IO) so
+            // foresee (a store that refuses a write, an IO fault under fileIoContext) so
             // that the next head — and the boot — still happen. Cancellation is rethrown:
             // a cancelled boot must stop replaying the ledger, not log its way through it.
             val head = runCatching { restoreHead(name, line) }.getOrElse { why ->
@@ -165,7 +164,7 @@ class ProgramLedger(
         // <forgeHome>/cas would throw out of the thaw, out of mainImpl and past the
         // daemon's only catch (CancellationException) — no HTTP surface at all, for a
         // fault whose honest cost is one program.
-        val read = withContext(Dispatchers.IO) { runCatching { cas.get(id) } }
+        val read = withContext(fileIoContext) { runCatching { cas.get(id) } }
         val bytes = read.getOrNull()
         if (bytes == null) {
             val why = read.exceptionOrNull()?.let { "unreadable in the CAS (${it.message})" } ?: "not in the CAS"
@@ -183,7 +182,7 @@ class ProgramLedger(
         // must cost this one program, not the surface. (`putAttachment`'s own
         // `require(cid == ref.contentId)` cannot fire here — these bytes are what the
         // CAS just verified against `id` — so what is caught is the write itself.)
-        val filed = withContext(Dispatchers.IO) { runCatching { refile(name, line, id, bytes) } }
+        val filed = withContext(fileIoContext) { runCatching { refile(name, line, id, bytes) } }
         filed.exceptionOrNull()?.let { why ->
             HostSystem.errLine("[OROBOROS] programs: '$name' head $short could not be re-filed (${why.message}); it is not restored")
             return false
@@ -224,7 +223,7 @@ class ProgramLedger(
         // An unreadable ledger file is a boot with no restored heads, never a boot that
         // dies: `isFile` and `readLines` are two syscalls apart, and the file lives in a
         // home an operator may have copied, chmod'ed or replaced under the daemon.
-        val lines = withContext(Dispatchers.IO) {
+        val lines = withContext(fileIoContext) {
             runCatching { if (file.isFile()) file.readLines().filter { it.isNotBlank() } else emptyList() }
                 .getOrElse { why ->
                     HostSystem.errLine("[OROBOROS] programs: the ledger at ${file.path} could not be read (${why.message}); no head is restored")

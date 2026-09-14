@@ -5,8 +5,7 @@ import borg.trikeshed.common.File
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.parse.json.JsonSupport
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.IO
+import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
 
 /**
@@ -122,7 +121,7 @@ object WikiNodes {
         clock: () -> Long = { borg.trikeshed.platform.HostSystem.currentTimeMillis() },
     ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val home = WikiHome(wikiRoot())
-        withContext(Dispatchers.IO) { home.ensure() }
+        withContext(fileIoContext) { home.ensure() }
 
         val cids = cidList(inputs["cids"] ?: inputs["cids?"] ?: node.params["cids"])
         require(cids.isNotEmpty()) { "$CONSOLIDATE: no transcript cids (wire `cids` or set the param)" }
@@ -134,11 +133,11 @@ object WikiNodes {
             ?: "wiki.consolidate/iter$iteration/${clock()}"
 
         // ── W(k-1): the FULL prior wiki, per the paper ──
-        val priorPatterns = withContext(Dispatchers.IO) {
+        val priorPatterns = withContext(fileIoContext) {
             home.patternFiles().map { it.name to it.readText() }
         }
-        val priorIndex = withContext(Dispatchers.IO) { if (home.index.isFile()) home.index.readText() else "" }
-        val priorLogs = withContext(Dispatchers.IO) { if (home.logs.isFile()) home.logs.readText() else "" }
+        val priorIndex = withContext(fileIoContext) { if (home.index.isFile()) home.index.readText() else "" }
+        val priorLogs = withContext(fileIoContext) { if (home.logs.isFile()) home.logs.readText() else "" }
 
         // ── the sampled traces ──
         val loaded = ArrayList<WikiTrace>()
@@ -183,14 +182,14 @@ object WikiNodes {
             "response" to reply.content,
         )
         val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
-        withContext(Dispatchers.IO) { captureFile.writeText(JsonSupport.stringify(capture)) }
+        withContext(fileIoContext) { captureFile.writeText(JsonSupport.stringify(capture)) }
 
         // ── parse the edit script; a non-JSON reply is a LOUD no-op ──
         val script = lastBalancedObject(reply.content)
         if (script == null || script["edits"] !is List<*>) {
             val line = "- iteration $iteration | ${isoish(clock())} | contextId=$contextId | model=${reply.model} " +
                 "| responseCid=$responseCid | REFUSED: no parsable {\"edits\":[...]} object in the response\n"
-            withContext(Dispatchers.IO) { home.logs.appendText(line) }
+            withContext(fileIoContext) { home.logs.appendText(line) }
             return@LcncNodeRunner mapOf(
                 "report" to linkedMapOf<String, Any?>(
                     "ok" to false,
@@ -211,7 +210,7 @@ object WikiNodes {
         val resolvedCids = loaded.map { it.cid }
 
         suspend fun current(rel: String): String? = staged[rel]
-            ?: withContext(Dispatchers.IO) { home.resolve(rel)?.takeIf { it.isFile() }?.readText() }
+            ?: withContext(fileIoContext) { home.resolve(rel)?.takeIf { it.isFile() }?.readText() }
 
         for (raw in (script["edits"] as List<*>)) {
             val edit = (raw as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: continue
@@ -296,7 +295,7 @@ object WikiNodes {
         }
 
         // ── commit ──
-        withContext(Dispatchers.IO) {
+        withContext(fileIoContext) {
             for ((rel, content) in staged) {
                 val f = home.resolve(rel) ?: continue
                 f.parentFile?.mkdirs()
@@ -318,7 +317,7 @@ object WikiNodes {
             append(" files=").append(staged.keys.joinToString(","))
             append('\n')
         }
-        withContext(Dispatchers.IO) { home.logs.appendText(logLine) }
+        withContext(fileIoContext) { home.logs.appendText(logLine) }
 
         mapOf(
             "report" to linkedMapOf<String, Any?>(
@@ -336,7 +335,7 @@ object WikiNodes {
                 "applied" to applied,
                 "refused" to refused,
                 "files" to staged.keys.toList(),
-                "patterns" to withContext(Dispatchers.IO) { home.patternFiles().map { it.name } },
+                "patterns" to withContext(fileIoContext) { home.patternFiles().map { it.name } },
             ),
         )
     }
@@ -360,7 +359,7 @@ object WikiNodes {
         clock: () -> Long = { borg.trikeshed.platform.HostSystem.currentTimeMillis() },
     ): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val home = WikiHome(wikiRoot())
-        withContext(Dispatchers.IO) { home.ensure() }
+        withContext(fileIoContext) { home.ensure() }
 
         val summary = ((inputs["summary"] ?: inputs["summary?"]) as? String)?.takeIf { it.isNotBlank() }
             ?: node.params["summary"]?.takeIf { it.isNotBlank() }
@@ -372,9 +371,9 @@ object WikiNodes {
         val baseContextId = node.params["contextId"]?.takeIf { it.isNotBlank() }
             ?: "wiki.propose/${clock()}"
 
-        val index = withContext(Dispatchers.IO) { if (home.index.isFile()) home.index.readText() else "(index.md is empty)" }
-        val impact = withContext(Dispatchers.IO) { if (home.skillImpact.isFile()) home.skillImpact.readText() else "(no prior proposals)" }
-        val existingSkills = withContext(Dispatchers.IO) {
+        val index = withContext(fileIoContext) { if (home.index.isFile()) home.index.readText() else "(index.md is empty)" }
+        val impact = withContext(fileIoContext) { if (home.skillImpact.isFile()) home.skillImpact.readText() else "(no prior proposals)" }
+        val existingSkills = withContext(fileIoContext) {
             home.skills.listFiles()?.filter { it.isDirectory() }?.map { it.name }?.sorted() ?: emptyList()
         }
 
@@ -403,7 +402,7 @@ object WikiNodes {
             lastModel = reply.model
             val responseCid = casPut(reply.content.encodeToByteArray())
             val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
-            withContext(Dispatchers.IO) {
+            withContext(fileIoContext) {
                 captureFile.writeText(JsonSupport.stringify(linkedMapOf<String, Any?>(
                     "pass" to "wiki.propose",
                     "turn" to turn,
@@ -448,7 +447,7 @@ object WikiNodes {
                     "found" to (source != "not_found"),
                 )
                 readOrder.add(record)
-                withContext(Dispatchers.IO) { readLog.appendText(JsonSupport.stringify(record) + "\n") }
+                withContext(fileIoContext) { readLog.appendText(JsonSupport.stringify(record) + "\n") }
                 transcript.append("\n<<< ").append(t).append(" (").append(source).append(") >>>\n")
                 transcript.append(body).append("\n")
             }
@@ -480,7 +479,7 @@ object WikiNodes {
         val skillMd = (proposal["skillMd"] as? String).orEmpty()
         val purposeMd = (proposal["purposeMd"] as? String).orEmpty()
         val diff = (proposal["diff"] as? String).orEmpty()
-        val patternNames = withContext(Dispatchers.IO) { home.patternFiles().map { it.name } }
+        val patternNames = withContext(fileIoContext) { home.patternFiles().map { it.name } }
         if (kind == "new" && (skillMd.isBlank() || purposeMd.isBlank())) {
             refusals.add("a new skill needs BOTH skillMd and purposeMd")
         }
@@ -508,7 +507,7 @@ object WikiNodes {
 
         val skillDir = home.skills.resolve(skill)
         val written = ArrayList<String>()
-        withContext(Dispatchers.IO) {
+        withContext(fileIoContext) {
             skillDir.mkdirs()
             if (kind == "new") {
                 skillDir.resolve("SKILL.md").writeText(skillMd)
@@ -541,7 +540,7 @@ object WikiNodes {
             append(" | validationScore=pending | acceptance=pending")
             append('\n')
         }
-        withContext(Dispatchers.IO) { home.skillImpact.appendText(impactLine) }
+        withContext(fileIoContext) { home.skillImpact.appendText(impactLine) }
 
         mapOf("report" to linkedMapOf<String, Any?>(
             "ok" to true,
@@ -576,7 +575,7 @@ object WikiNodes {
             return window(t.text, limit) to "trace:${t.source}"
         }
         val f = home.resolve(target) ?: return "(path outside the wiki: $target)" to "not_found"
-        return withContext(Dispatchers.IO) {
+        return withContext(fileIoContext) {
             if (f.isFile()) f.readText().take(limit) to "wiki" else "(no such wiki file: $target)" to "not_found"
         }
     }

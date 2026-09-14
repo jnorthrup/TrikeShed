@@ -63,6 +63,9 @@ actual object Files {
 
     actual fun exists(filename: String): Boolean = jsExists(filename)
 
+    actual fun lastModified(filename: String): Long =
+        runCatching { (fs.statSync(filename).mtimeMs as Double).toLong() }.getOrDefault(0L)
+
     actual fun streamLines(fileName: String, bufsize: Int): Sequence<Join<Long, ByteArray>> =
         streamByteLines(readAllBytes(fileName))
 

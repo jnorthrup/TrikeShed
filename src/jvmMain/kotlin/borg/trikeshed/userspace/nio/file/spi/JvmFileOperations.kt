@@ -1,5 +1,8 @@
 package borg.trikeshed.userspace.nio.file.spi
 
+import kotlinx.coroutines.Dispatchers
+import kotlin.coroutines.CoroutineContext
+
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -261,3 +264,5 @@ class JvmFileOperations : FileOperations {
         private const val MAX_UNDECODABLE_ENTRIES = 64
     }
 }
+
+internal actual val fileIoContext: CoroutineContext get() = Dispatchers.IO

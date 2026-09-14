@@ -5,7 +5,6 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.view
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import kotlinx.coroutines.runBlocking
 
 /**
  * ONE writer for everything LCNC on the blackboard ([LcncBlackboard]).
@@ -166,7 +165,7 @@ class LcncPublisher(
      * One program on the blackboard: document, cables typed against the
      * late-bound vocabulary, violations, and the cid of the source it came from.
      */
-    fun publishProgram(
+    suspend fun publishProgram(
         name: String,
         program: LcncProgram,
         vocabulary: Map<String, LcncPortContract> = vocabulary(),
@@ -178,9 +177,8 @@ class LcncPublisher(
         // bridge is idempotent (same entry => no ops) and retracts what vanished,
         // so it runs on every publish, not only on a board delta — a network handed
         // over after the board was seeded still ends up holding every program.
-        // runBlocking: the network's ops are suspend behind its own mutex; the
-        // hold is short and no observer may write back into it (ReteObserver doc).
-        panelFacts?.let { bridge -> runBlocking { bridge.publish(name, program, entry, actor = "lcnc") } }
+        // Await the network's mutex and publication in the caller's coroutine.
+        panelFacts?.publish(name, program, entry, actor = "lcnc")
         return entry
     }
 
@@ -188,7 +186,7 @@ class LcncPublisher(
      * Every program the corpus holds, on the blackboard — seeded or refreshed
      * only where the SOURCE changed; a board-edited entry is left as edited.
      */
-    fun publishPrograms(lb: LateBound = lateBound()) {
+    suspend fun publishPrograms(lb: LateBound = lateBound()) {
         for ((name, program) in lb.corpus) {
             val cid = LcncBlackboard.cidOf(program)
             val entry = blackboard.get(LcncBlackboard.programKey(name))
@@ -197,7 +195,7 @@ class LcncPublisher(
     }
 
     /** Vocabulary and every program, together — what open() and a panel save do. */
-    fun publishAll(): LateBound {
+    suspend fun publishAll(): LateBound {
         val lb = lateBound()
         publishVocabulary(lb)
         publishPrograms(lb)
@@ -237,7 +235,7 @@ class LcncPublisher(
      *  - An entry with no source is obeyed as is; if it arrived raw (no typed
      *    cables), it is reconciled first so the board never holds an untyped cable.
      */
-    fun load(name: String): LcncProgram? {
+    suspend fun load(name: String): LcncProgram? {
         val key = LcncBlackboard.programKey(name)
         val source = source(name)
         if (source != null) {

@@ -1,6 +1,7 @@
 package borg.trikeshed.lib
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
+import borg.trikeshed.platform.HostSystem
 
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.lib.long.LongSeries
@@ -29,6 +30,7 @@ private external fun jsStorageKey(index: Int): String?
 const val FILE_PREFIX = "trikeshed:browser:file:"
 const val DIR_PREFIX = "trikeshed:browser:dir:"
 val blobFallback = linkedMapOf<String, String>()
+private val modifiedFallback = linkedMapOf<String, String>()
 val dirFallback = linkedSetOf<String>()
 val envFallback = linkedMapOf<String, String>()
 
@@ -68,6 +70,14 @@ fun readBlob(path: String): String? {
     val key = fileKey(path)
     return storageGet(key) ?: blobFallback[key]
 }
+private fun modifiedKey(path: String): String = "trikeshed:browser:mtime:" + normalizePath(path)
+
+fun blobModified(path: String): Long {
+    if (readBlob(path) == null) return 0L
+    val key = modifiedKey(path)
+    return (modifiedFallback[key] ?: storageGet(key))?.toLongOrNull() ?: 0L
+}
+
 fun writeBlob(path: String, hex: String) {
     val key = fileKey(path)
     if (!storageSet(key, hex)) {
@@ -75,11 +85,17 @@ fun writeBlob(path: String, hex: String) {
     } else {
         blobFallback.remove(key)
     }
+    val modified = modifiedKey(path)
+    val time = HostSystem.currentTimeMillis().toString()
+    if (storageSet(modified, time)) modifiedFallback.remove(modified)
+    else modifiedFallback[modified] = time
 }
 fun removeBlob(path: String): Boolean {
     val key = fileKey(path)
     val removedStorage = storageRemove(key)
     val removedFallback = blobFallback.remove(key) != null
+    storageRemove(modifiedKey(path))
+    modifiedFallback.remove(modifiedKey(path))
     return removedStorage || removedFallback
 }
 fun markDirectory(path: String) {
@@ -160,8 +176,7 @@ fun rm(path: String): Boolean {
         storageKeys(nestedDirPrefix) + dirFallback.map(::dirKey).filter { it.startsWith(nestedDirPrefix) }
 
     nestedFileKeys.forEach { key ->
-        storageRemove(key)
-        blobFallback.remove(key)
+        removeBlob(key.removePrefix(FILE_PREFIX))
     }
     nestedDirKeys.forEach { key ->
         storageRemove(key)
