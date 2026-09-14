@@ -98,7 +98,8 @@ object PromptTemplate {
     val VARIABLE: Regex = Regex("""\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}""")
 
     fun variables(text: String): List<String> =
-        VARIABLE.findAll(text).map { it.groupValues[1] }.distinct().toList()
+        // Bolt: replace distinct().toList() with mapTo(LinkedHashSet()) to avoid intermediate allocation
+        VARIABLE.findAll(text).mapTo(LinkedHashSet()) { it.groupValues[1] }.toList()
 
     fun render(text: String, args: Map<String, Any?>): String {
         val unbound = variables(text).filter { !args.containsKey(it) }
