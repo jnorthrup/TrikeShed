@@ -104,7 +104,8 @@ class JvmAgentRunner(
             // `diff --git a/<path> b/<path>` — take the b-side, which is the path after the change.
             val files = patch.decodeToString().lineSequence().filter { it.startsWith("diff --git ") }
                 .mapNotNull { line -> line.substringAfterLast(" b/", "").takeIf { it.isNotBlank() } }
-                .distinct().toList()
+                // Bolt: replace distinct().toList() with toCollection(LinkedHashSet()) to avoid intermediate allocation
+                .toCollection(LinkedHashSet()).toList()
             val filesChanged = files.size
 
             val transcript = capture.bytes() + (if (capture.dropped > 0) "\n[truncated: ${capture.dropped} bytes over the ${request.maxBytes} byte cap were dropped]\n".toByteArray() else ByteArray(0))
