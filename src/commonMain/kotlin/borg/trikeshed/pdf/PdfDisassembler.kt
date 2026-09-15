@@ -34,7 +34,9 @@ class PdfDisassembler(private val inflate: (ByteArray) -> ByteArray?) {
 
         // ObjStm expansion: compressed bodies become first-class objects.
         var expanded = 0
-        for (o in objects.values.toList()) {
+        // Bolt: defer new insertions into a temporary collection instead of using .toList() to avoid O(N) allocation
+        val deferredObjects = LinkedHashMap<ObjId, PdfObject>()
+        for (o in objects.values) {
             if (o !is PdfObject.PStream) continue
             val type = (o.dict["Type"] as? PdfObject.PName)?.value
             if (type != "ObjStm") continue
@@ -53,9 +55,10 @@ class PdfDisassembler(private val inflate: (ByteArray) -> ByteArray?) {
                 val lx = PdfLexer(data, first + off)
                 val obj = lx.parseObject() ?: continue
                 val id = ObjId(num, 0)
-                if (id !in objects) { objects[id] = obj; expanded++ }
+                if (id !in objects && id !in deferredObjects) { deferredObjects[id] = obj; expanded++ }
             }
         }
+        objects.putAll(deferredObjects)
         if (expanded > 0) notes.add("ObjStm expanded: $expanded objects")
 
         val catalog = objects.values.firstNotNullOfOrNull { o ->
