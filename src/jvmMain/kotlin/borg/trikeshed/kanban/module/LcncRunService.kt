@@ -11,7 +11,9 @@ import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.parse.json.ValueBudget
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -25,6 +27,9 @@ internal class LcncRunService(
 ) {
     private val active = ConcurrentHashMap<String, Job>()
     private val slots = Semaphore(3)
+    private val admission = Mutex()
+    private val drained = CompletableDeferred<Unit>()
+    private var admittedRuns = 0
     private var draining = false
 
     private fun response(status: Int, body: Map<String, Any?>) = HttpResponse(status, JsonSupport.stringify(body))
@@ -152,17 +157,23 @@ internal class LcncRunService(
 
     fun cancel(runId: String): Boolean = active[runId]?.let { it.cancel(CancellationException("cancelled by user")); true } ?: false
 
-    suspend fun drain() {
-        draining = true
-        val jobs = active.values.toList()
-        jobs.forEach { it.cancel(CancellationException("module draining")) }
-        withTimeoutOrNull(5000) { jobs.joinAll() }
+    suspend fun drain() = withContext(NonCancellable) {
+        admission.withLock {
+            draining = true
+            if (admittedRuns == 0) drained.complete(Unit)
+        }
+        drained.await()
     }
 
     suspend fun execute(name: String, program: LcncProgram, named: Boolean, inputs: Map<String, Any?>, request: Map<*, *>): HttpResponse {
-        if (draining || !slots.tryAcquire()) return response(429, mapOf("ok" to false, "error" to "execution_capacity"))
         val runId = UUID.randomUUID().toString()
         val jobId = "lcnc/run/$runId"
+        // Admission covers the interval before the cancellable execution Job is registered.
+        val admitted = admission.withLock {
+            if (draining || !slots.tryAcquire()) false
+            else { admittedRuns++; true }
+        }
+        if (!admitted) return response(429, mapOf("ok" to false, "error" to "execution_capacity"))
         try {
             return coroutineScope {
                 active[runId] = currentCoroutineContext().job
@@ -286,8 +297,14 @@ internal class LcncRunService(
         } catch (e: Exception) {
             return response(503, mapOf("ok" to false, "runId" to runId, "error" to "receipt_commit_failed", "detail" to (e.message ?: "unavailable").take(2048)))
         } finally {
-            active.remove(runId)
-            slots.release()
+            withContext(NonCancellable) {
+                admission.withLock {
+                    active.remove(runId)
+                    slots.release()
+                    admittedRuns--
+                    if (draining && admittedRuns == 0) drained.complete(Unit)
+                }
+            }
         }
     }
 }

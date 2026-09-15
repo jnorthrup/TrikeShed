@@ -59,7 +59,7 @@ class PwaGallery(val items: Series<GalleryItem>, val id: String = "gallery") {
             sb.append("<div class=\"pwa-gallery-grid\">")
             for (i in 0 until items.size) {
                 val item = items[i]
-                sb.append("<div class=\"pwa-gallery-item\" onclick=\"window.pwaGallerySetActive('${id}', '${item.id}')\">")
+                sb.append("<div class=\"pwa-gallery-item\">")
                 sb.append("<img src=\"${item.url}\" alt=\"${item.title}\" />")
                 sb.append("<div class=\"pwa-gallery-item-title\">${item.title}</div>")
                 sb.append("</div>")
@@ -68,12 +68,12 @@ class PwaGallery(val items: Series<GalleryItem>, val id: String = "gallery") {
         } else {
             // Render viewer
             sb.append("<div class=\"pwa-gallery-viewer\">")
-            sb.append("<button class=\"pwa-gallery-close\" onclick=\"window.pwaGalleryClose('${id}')\" aria-label=\"Close viewer\" title=\"Close viewer\">Close</button>")
+            sb.append("<button class=\"pwa-gallery-close\" aria-label=\"Close viewer\" title=\"Close viewer\">Close</button>")
             sb.append("<img src=\"${activeItem.url}\" alt=\"${activeItem.title}\" class=\"pwa-gallery-viewer-img\" />")
             sb.append("<div class=\"pwa-gallery-viewer-title\">${activeItem.title}</div>")
             sb.append("<div class=\"pwa-gallery-viewer-controls\">")
-            sb.append("<button class=\"pwa-gallery-prev\" onclick=\"window.pwaGalleryPrev('${id}')\" aria-label=\"Previous image\" title=\"Previous image\">Prev</button>")
-            sb.append("<button class=\"pwa-gallery-next\" onclick=\"window.pwaGalleryNext('${id}')\" aria-label=\"Next image\" title=\"Next image\">Next</button>")
+            sb.append("<button class=\"pwa-gallery-prev\" aria-label=\"Previous image\" title=\"Previous image\">Prev</button>")
+            sb.append("<button class=\"pwa-gallery-next\" aria-label=\"Next image\" title=\"Next image\">Next</button>")
             sb.append("</div>")
             sb.append("</div>")
         }

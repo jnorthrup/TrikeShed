@@ -469,7 +469,7 @@ class JvmKanbanServer(
 
     /** The seed-baked shell: ForgeApp renders the web template from commonMain; we only serve it. */
     private fun forgeShellHtml(): String = runCatching {
-        borg.trikeshed.forge.ForgeApp.renderHtml(userId = "jim")
+        borg.trikeshed.forge.ForgeApp.renderHtml(userId = "jim", bundles = listOf("./kotlin/forge/forge.js"))
     }.getOrElse { ex ->
         "<html><body><h1>Forge shell failed to render</h1><pre>${ex.message}</pre><p>see /api/health</p></body></html>"
     }
@@ -478,17 +478,13 @@ class JvmKanbanServer(
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
         "/headhunter" to ("web/headhunter.html" to "text/html; charset=utf-8"),
         "/headhunter.html" to ("web/headhunter.html" to "text/html; charset=utf-8"),
-        "/headhunter.js" to ("web/headhunter.js" to "application/javascript; charset=utf-8"),
         "/headhunter.css" to ("web/headhunter.css" to "text/css; charset=utf-8"),
         "/keymux" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/modelmux" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux/sessions" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux/stats" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux.html" to ("web/mux.html" to "text/html; charset=utf-8"),
-        "/mux.js" to ("web/mux.js" to "application/javascript; charset=utf-8"),
-        "/mux-core.js" to ("web/mux-core.js" to "application/javascript; charset=utf-8"),
         "/mux.css" to ("web/mux.css" to "text/css; charset=utf-8"),
-        "/vendor/lucide-mux.js" to ("web/vendor/lucide-mux.js" to "application/javascript; charset=utf-8"),
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
         "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
@@ -501,36 +497,14 @@ class JvmKanbanServer(
         // (Forge genesis, Cut D); the bundle is staged by ./gradlew stageKotlinJs
         "/documents.html" to ("web/documents.html" to "text/html; charset=utf-8"),
         "/documents" to ("web/documents.html" to "text/html; charset=utf-8"),
-        "/kotlin/TrikeShed.js" to ("web/kotlin/TrikeShed.js" to "application/javascript; charset=utf-8"),
-        "/patch.js" to ("web/patch.js" to "application/javascript; charset=utf-8"),
-        "/patch-shake.js" to ("web/patch-shake.js" to "application/javascript; charset=utf-8"),
-        "/patch-camera.js" to ("web/patch-camera.js" to "application/javascript; charset=utf-8"),
         "/patch-camera.css" to ("web/patch-camera.css" to "text/css; charset=utf-8"),
-        "/allocation-inspector.js" to ("web/allocation-inspector.js" to "application/javascript; charset=utf-8"),
         "/allocation-inspector.css" to ("web/allocation-inspector.css" to "text/css; charset=utf-8"),
-        "/patch-layout.js" to ("web/patch-layout.js" to "application/javascript; charset=utf-8"),
-        "/vendor/d3-force-3.0.0.js" to ("web/vendor/d3-force-3.0.0.js" to "application/javascript; charset=utf-8"),
         "/patch.css" to ("web/patch.css" to "text/css; charset=utf-8"),
-        "/harness.js" to ("web/harness.js" to "application/javascript; charset=utf-8"),
-        "/harness-arguments.js" to ("web/harness-arguments.js" to "application/javascript; charset=utf-8"),
-        "/archive-core.js" to ("web/archive-core.js" to "application/javascript; charset=utf-8"),
-        "/archive-ui.js" to ("web/archive-ui.js" to "application/javascript; charset=utf-8"),
-        "/archive-worker.js" to ("web/archive-worker.js" to "application/javascript; charset=utf-8"),
         "/archive.css" to ("web/archive.css" to "text/css; charset=utf-8"),
-        "/vendor/fflate-0.8.2.js" to ("web/vendor/fflate-0.8.2.js" to "application/javascript; charset=utf-8"),
-        "/graal-file-viewer.js" to ("web/graal-file-viewer.js" to "application/javascript; charset=utf-8"),
         "/harness.css" to ("web/harness.css" to "text/css; charset=utf-8"),
-        "/graal-terrain.js" to ("web/graal-terrain.js" to "application/javascript; charset=utf-8"),
-        "/landscape.js" to ("web/landscape.js" to "application/javascript; charset=utf-8"),
-        "/landscape-navigation.js" to ("web/landscape-navigation.js" to "application/javascript; charset=utf-8"),
         // the operator-facing board page — /api/board rendered for humans
         "/kanban.html" to ("web/kanban.html" to "text/html; charset=utf-8"),
         "/kanban" to ("web/kanban.html" to "text/html; charset=utf-8"),
-        "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
-        // On the APP port the service worker is a self-destructor: any browser that
-        // ever registered the PWA's cache-first SW here gets unregistered and its
-        // caches wiped on next visit. The real sw.js ships with the gh-pages build.
-        "/sw.js" to ("web/sw-kill.js" to "application/javascript; charset=utf-8"),
         "/manifest.webmanifest" to ("web/manifest.webmanifest" to "application/manifest+json; charset=utf-8"),
         "/icons/forge-icon.svg" to ("web/icons/forge-icon.svg" to "image/svg+xml"),
         "/icons/forge-icon-maskable.svg" to ("web/icons/forge-icon-maskable.svg" to "image/svg+xml"),
@@ -538,10 +512,24 @@ class JvmKanbanServer(
 
     private fun staticAsset(path: String): HttpResponse? {
         // Method dispatch lets new presentation assets land without recreating the reactor hub.
-        val (resource, contentType) = when (val assetPath = path.substringBefore('?')) {
-            "/application-nav.js" -> "web/application-nav.js" to "application/javascript; charset=utf-8"
+        val assetPath = path.substringBefore('?')
+        if (assetPath.startsWith("/kotlin/")) {
+            if (!assetPath.all { it.isLetterOrDigit() || it in "/._-" }) return null
+            if (assetPath.removePrefix("/").split('/').any { it.isEmpty() || it == "." || it == ".." }) return null
+            val contentType = when (assetPath.substringAfterLast('.')) {
+                "js", "mjs" -> "application/javascript; charset=utf-8"
+                "map" -> "application/json; charset=utf-8"
+                "css" -> "text/css; charset=utf-8"
+                "txt" -> "text/plain; charset=utf-8"
+                "wasm" -> "application/wasm"
+                else -> return null
+            }
+            val bytes = JvmKanbanServer::class.java.classLoader.getResourceAsStream("web$assetPath")?.use { it.readBytes() }
+                ?: return HttpResponse(404, """{"error":"asset_missing"}""")
+            return HttpResponse(200, "", contentType, bytes = bytes)
+        }
+        val (resource, contentType) = when (assetPath) {
             "/application-nav.css" -> "web/application-nav.css" to "text/css; charset=utf-8"
-            "/spacegraph-shadow.js" -> "web/spacegraph-shadow.js" to "application/javascript; charset=utf-8"
             "/spacegraph-shadow.css" -> "web/spacegraph-shadow.css" to "text/css; charset=utf-8"
             else -> staticAssets[assetPath]
         } ?: return null

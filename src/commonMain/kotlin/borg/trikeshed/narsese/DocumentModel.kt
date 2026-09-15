@@ -1,10 +1,12 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.htx.HtxRequest
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.BrainClient
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.modelmux.Prompt
@@ -14,30 +16,45 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
-/** Production binding to the existing model/key mux and its reactor transport. */
-fun documentModel(brain: BrainClient, muxContext: CoroutineContext): suspend (Prompt) -> ModelResponse = { prompt ->
-    val messages = List(prompt.messages.size) { i ->
-        val message = prompt.messages[i]
+/** Invoke the named model through the existing key mux/HTX path; an expected base pins its destination. */
+fun documentModel(
+    brain: BrainClient,
+    muxContext: CoroutineContext,
+    timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
+    expectedBaseUrl: String? = null,
+): suspend (Prompt) -> ModelResponse = { prompt ->
+    val glm = expectedBaseUrl?.startsWith("https://api.z.ai/") == true && prompt.modelId.startsWith("glm-")
+    val messages = prompt.messages α { message ->
         val role = when (message) {
             is PromptMessage.System -> "system"
             is PromptMessage.User -> "user"
             is PromptMessage.Assistant -> "assistant"
         }
-        role to message.content
+        role j message.content
     }
     val requestCid = ContentId.of(CanonicalCbor.encodeMap(mapOf(
-        "messages" to messages.map { mapOf("role" to it.first, "content" to it.second) },
+        "messages" to messages.view.map { mapOf("role" to it.a, "content" to it.b) },
         "model" to prompt.modelId, "maxTokens" to prompt.maxTokens, "temperature" to prompt.temperature,
+        "jsonOutput" to glm, "thinking" to if (glm) false else null,
     )))
-    val (content, modelId) = withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
-        brain.chatSeat(messages, prompt.maxTokens, prompt.temperature, requestCid.value, prompt.modelId)
+    val response = withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
+        brain.modelMux().chat(
+            modelId = prompt.modelId,
+            messages = messages,
+            assessmentId = requestCid.value,
+            maxTokens = prompt.maxTokens,
+            temperature = prompt.temperature,
+            timeoutMs = timeoutMs,
+            expectedBaseUrl = expectedBaseUrl,
+            jsonOutput = glm,
+            thinking = if (glm) false else null,
+        ).getOrThrow()
     }
-    val endpoint = brain.endpointSummaries().firstOrNull { it.model == modelId }
+    val endpoint = brain.endpointSummaries().firstOrNull { it.model == prompt.modelId }
     ModelResponse(
-        content,
-        // chatSeat exposes content/model only. -1 is unavailable, not zero billed tokens.
-        ModelUsage(-1, -1, -1),
+        response.a,
+        ModelUsage(response.b.a, response.b.b, response.b.a + response.b.b),
         endpoint?.provider ?: endpoint?.name ?: "unknown",
-        modelId,
+        prompt.modelId,
     )
 }

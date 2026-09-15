@@ -5,7 +5,7 @@ import borg.trikeshed.module.ModuleContext
 
 /**
  * JVM wiring for the daemon's LCNC store legos (PromptNodes/PromptStore/
- * WorkspaceSnapshotService/ProjectNodes/PureNodes/CanvasJsPureNodes). The
+ * WorkspaceSnapshotService/ProjectNodes/PureNodes). The
  * bodies are JVM bootstrap glue: the node runners themselves are already
  * common or jvm-actual — this object only sequences their registration.
  * Called from the daemon with resolved jvm values.
@@ -26,6 +26,5 @@ object OroborosLcncWiring {
         }
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.ProjectNodes.registry(projectCorpus))
         moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.PureNodes.registry { borg.trikeshed.platform.HostSystem.currentTimeMillis() })
-        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.CanvasJsPureNodes.registry())
     }
 }

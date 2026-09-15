@@ -270,6 +270,9 @@ class ModelMux internal constructor(
          */
         contextId: String? = null,
         timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
+        expectedBaseUrl: String? = null,
+        jsonOutput: Boolean = false,
+        thinking: Boolean? = null,
     ): Result<AcpResponse> {
         val attribution = currentCoroutineContext()[MuxCallContext]
         val callActivity = attribution?.activity ?: activity
@@ -280,7 +283,7 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
-            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId, timeoutMs) { r, k ->
+            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId, timeoutMs, expectedBaseUrl, jsonOutput, thinking) { r, k ->
                 receipt = r
                 keyId = k
             }
@@ -306,6 +309,9 @@ class ModelMux internal constructor(
         temperature: Double?,
         contextId: String?,
         timeoutMs: Long,
+        expectedBaseUrl: String?,
+        jsonOutput: Boolean,
+        thinking: Boolean?,
         capture: (ModelResponseReceipt, String?) -> Unit,
     ): Result<AcpResponse> {
         val receiptAssessment = assessmentId ?: contextId
@@ -313,6 +319,10 @@ class ModelMux internal constructor(
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) return Result.failure(sessionResult.exceptionOrNull()!!)
         val session = sessionResult.getOrThrow()
+        if (expectedBaseUrl != null && session.baseUrl.trimEnd('/') != expectedBaseUrl.trimEnd('/')) {
+            session.close()
+            return Result.failure(IllegalStateException("Model destination changed; review the current destination before sending source material"))
+        }
         session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         // Meter under the resolved key ID (the binding path), not the key VALUE
@@ -338,7 +348,7 @@ class ModelMux internal constructor(
             val body: AcpRequestBody = messages j tools
             val req: AcpRequest = meta j body
 
-            val json = AcpCodec.encodeRequest(req, maxTokens = maxTokens, temperature = temperature)
+            val json = AcpCodec.encodeRequest(req, maxTokens = maxTokens, temperature = temperature, jsonOutput = jsonOutput, thinking = thinking)
             // Content-address the canonical request bytes. String.hashCode() is a
             // 32-bit truncation: two distinct requests colliding on it returned each
             // other's cached payload verbatim.

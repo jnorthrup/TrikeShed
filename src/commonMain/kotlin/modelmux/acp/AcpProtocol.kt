@@ -138,6 +138,8 @@ object AcpCodec {
         req: AcpRequest,
         maxTokens: Int? = null,
         temperature: Double? = null,
+        jsonOutput: Boolean = false,
+        thinking: Boolean? = null,
     ): String = buildString {
         val (meta, body) = req
         val (msgs, tools) = body
@@ -159,6 +161,8 @@ object AcpCodec {
         }
         if (maxTokens != null) append(",\"max_tokens\":$maxTokens")
         if (temperature != null) append(",\"temperature\":$temperature")
+        if (jsonOutput) append(",\"response_format\":{\"type\":\"json_object\"}")
+        if (thinking != null) append(",\"thinking\":{\"type\":\"${if (thinking) "enabled" else "disabled"}\"}")
         // stream flag
         if (meta.b.a == "stream") append(",\"stream\":true")
         append("}")

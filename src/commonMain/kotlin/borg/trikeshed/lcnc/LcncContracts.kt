@@ -998,10 +998,26 @@ object LcncContracts {
             )),
 
         LcncPortContract("document.curate", "document curation (managed NLP, source-linked cursor)",
-            listOf("extent?", "source?"), listOf("receiptCid", "record", "nlpStatus", "sheet", "sheets"),
-            inputKinds = mapOf("extent" to "json", "source" to "json"),
+            listOf("extent?", "source?", "instructions?"), listOf("receiptCid", "record", "nlpStatus", "sheet", "sheets"),
+            inputKinds = mapOf("extent" to "json", "source" to "json", "instructions" to "text"),
             outputKinds = mapOf("receiptCid" to "id", "record" to "json", "nlpStatus" to "text",
                 "sheet" to "json", "sheets" to "json"), isEffect = true),
+
+        LcncPortContract(DocumentCurationTasks.TASKS, "document issues (retained result to Kanban)",
+            listOf("receiptCid"), listOf("tasks", "completed", "reopened", "unchanged", "ignored"),
+            inputKinds = mapOf("receiptCid" to "id"),
+            outputKinds = mapOf("tasks" to "json", "completed" to "json", "reopened" to "json",
+                "unchanged" to "json", "ignored" to "json"), isEffect = true),
+        LcncPortContract(DocumentCurationTasks.CORRECT, "document correction (retained source lineage)",
+            listOf("source", "taskId?", "expectedRevision?", "priorReceiptCid?"),
+            listOf("source", "taskId", "revision", "priorReceiptCid", "instructions"),
+            inputKinds = mapOf("source" to "json", "taskId" to "id", "expectedRevision" to "num", "priorReceiptCid" to "id"),
+            outputKinds = mapOf("source" to "json", "taskId" to "id", "revision" to "num",
+                "priorReceiptCid" to "id", "instructions" to "text"),
+            params = mapOf(
+                "taskId" to LcncPortContract.LcncParamSpec(ph = "existing document task"),
+                "expectedRevision" to LcncPortContract.LcncParamSpec(ph = "current task revision"),
+                "priorReceiptCid" to LcncPortContract.LcncParamSpec(ph = "task's retained curation receipt")), isEffect = true),
 
         // ── CoreNLP extract (NER + deps) ──────────────────────────
         LcncPortContract(SubVm.LEGO_PREFIX + "corenlp.extract", "corenlp extract (NER, deps)",

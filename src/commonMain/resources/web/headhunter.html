@@ -7,9 +7,7 @@
   <title>Job agent · TrikeShed</title>
   <link rel="stylesheet" href="/application-nav.css">
   <link rel="stylesheet" href="/headhunter.css">
-  <script src="/vendor/lucide-mux.js" defer></script>
-  <script src="/application-nav.js" defer></script>
-  <script src="/headhunter.js" defer></script>
+
 </head>
 <body data-app-page="headhunter">
   <a class="skip-link" href="#content">Skip to content</a>
@@ -19,19 +17,48 @@
       <button id="refresh" type="button">Refresh records</button>
     </header>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+    <section id="drop-zone" class="drop-zone" tabindex="0" aria-labelledby="drop-title" aria-describedby="drop-help">
+      <div><h2 id="drop-title">Drop folders, files, or links to read</h2><p id="drop-help" class="muted">Resumes, notes, documents, and job pages. Drop them anywhere on this page, or paste a copied link here.</p></div>
+      <div class="actions"><button id="choose-files" type="button" class="primary">Browse files</button><input id="drop-files" type="file" multiple hidden><button id="choose-folder" type="button">Browse folder</button><input id="drop-folder" type="file" webkitdirectory multiple hidden><label class="field">Add to<select id="drop-kind"><option value="auto">Files → evidence · links → listings</option><option value="evidence">Your evidence</option><option value="listing">Job listings</option></select></label></div>
+      <p id="extraction-status" class="small muted">Checking document extraction…</p>
+      <p class="small muted">Folders include nested files and keep their paths. Up to 2 MiB per file. Browse first; correct details afterward.</p>
+      <p id="capture-status" class="small" role="status" aria-live="polite"></p>
+    </section>
+    <div id="capture-results" class="record-grid import-results" aria-label="Import results"></div>
+    <section class="profile-overview" aria-labelledby="profile-overview-title">
+      <div><h2 id="profile-overview-title">Your reusable profile</h2><p id="profile-status" class="small muted" role="status">Reading saved profile…</p></div>
+      <div id="profile-counts" class="profile-counts"></div>
+      <a href="#skills">Review skills &amp; experience</a>
+    </section>
     <nav class="hh-tabs" aria-label="Job agent sections">
-      <a href="#applications" data-section="applications" aria-current="page">Applications <span data-count="application">0</span></a>
+      <a href="#skills" data-section="skills" aria-current="page">Skills &amp; experience</a>
+      <a href="#applications" data-section="applications">Applications <span data-count="application">0</span></a>
       <a href="#evidence" data-section="evidence">Your evidence <span data-count="evidence">0</span></a>
       <a href="#records" data-section="records">Opportunities &amp; contacts</a>
       <a href="#sources" data-section="sources">Sources &amp; access</a>
       <a href="#program" data-section="program">Composition</a>
     </nav>
 
-    <section id="applications" class="hh-section" aria-labelledby="applications-title">
-      <div class="section-heading"><div><h2 id="applications-title">Application preparation</h2><p class="muted">Choose the evidence for this opportunity, then review every prepared artifact.</p></div><button type="button" data-new="application" class="primary">New application</button></div>
+    <section id="skills" class="hh-section" aria-labelledby="skills-title">
+      <div class="section-heading"><div><h2 id="skills-title">Skills &amp; experience</h2><p class="muted">A shared profile drawn from your documents, with each proposal linked to its source and your review.</p></div><a href="#evidence">Read your documents</a></div>
+      <section id="curation-plan" class="panel curation-plan" aria-labelledby="curation-title">
+        <div class="panel-heading"><h3 id="curation-title">Curate your documents</h3><a id="open-curation-program" class="button primary" hidden>Open curation composition</a></div>
+        <p class="small muted">Review the destination and material below. Choosing Curate these documents sends their extracted text and CoreNLP annotations to this model for profile proposals.</p>
+        <dl id="curation-destination"></dl>
+        <p id="curation-detail" class="small muted"></p>
+        <div class="curation-columns"><div><h4>Documents in this request</h4><ul id="curation-documents" class="curation-documents"></ul></div><div><h4>Shared curation outputs</h4><ul id="curation-shared" class="small muted"></ul></div></div>
+        <div class="actions"><button id="curate-documents" type="button" class="primary" disabled>Curate these documents</button><span id="curation-status" class="small" role="status" aria-live="polite"></span></div>
+        <div id="curation-result" hidden></div>
+      </section>
+      <p class="small muted profile-guidance">Source quotes show what a document says. Model proposals and human review decisions are shown separately; neither establishes acceptance by the reasoning engine.</p>
+      <div id="profile-claims" class="stack"></div>
+      <details id="profile-rejected" class="panel" hidden><summary id="profile-rejected-title">Rejected proposals</summary><div id="profile-rejected-claims" class="stack"></div></details>
+    </section>
+
+    <section id="applications" class="hh-section" aria-labelledby="applications-title" hidden>
+      <div class="section-heading"><div><h2 id="applications-title">Application preparation</h2><p class="muted">Choose the evidence for this opportunity, then review every prepared artifact.</p></div><button type="button" data-go="records">Browse listings</button></div>
       <div id="welcome" class="empty welcome" hidden>
-        <h3>Start with your experience</h3><p>Add a resume, project notes, or a correction. Save a listing and create an application when you have an opportunity to work on.</p>
-        <div class="actions"><button type="button" data-go="evidence" class="primary">Add your evidence</button><button type="button" data-new="listing">Add a listing</button></div>
+        <h3>Start with a file or a job link</h3><p>Drop your material above and browse what was captured. Choose Prepare on a listing when you want to work on an application.</p>
       </div>
       <label class="field application-picker">Application<select id="application-select"><option value="">Choose an application</option></select></label>
       <div id="application-workspace" hidden>
@@ -64,44 +91,29 @@
     </section>
 
     <section id="evidence" class="hh-section" aria-labelledby="evidence-title" hidden>
-      <div class="section-heading"><div><h2 id="evidence-title">Your professional evidence</h2><p class="muted">Import documents, add context, and keep corrections attached to the working record.</p></div><div class="actions"><button type="button" data-capture="evidence" class="primary">Import evidence</button><button type="button" data-new="evidence">Write a note or correction</button></div></div>
+      <div class="section-heading"><div><h2 id="evidence-title">Your professional evidence</h2><p class="muted">Browse your imported documents and keep corrections attached to the original material.</p></div><button type="button" data-capture="evidence">Add files or links</button></div>
       <div id="evidence-records" class="record-grid"></div>
     </section>
 
     <section id="records" class="hh-section" aria-labelledby="records-title" hidden>
-      <div class="section-heading"><div><h2 id="records-title">Opportunities &amp; contacts</h2><p class="muted">Keep employers, listings, contacts, and representation linked before preparation.</p></div><button type="button" data-capture="listing" class="primary">Import a listing</button></div>
+      <div class="section-heading"><div><h2 id="records-title">Opportunities &amp; contacts</h2><p class="muted">Browse captured listings and their related records.</p></div><button type="button" data-capture="listing">Add files or links</button></div>
       <div class="record-toolbar"><label class="field">Show<select id="record-kind"><option value="listing">Listings</option><option value="employer">Employers</option><option value="contact">Contacts</option><option value="representation">Representation</option><option value="application">Applications</option><option value="action">Actions</option></select></label><label class="field grow">Find<input id="record-search" type="search" placeholder="Search saved records"></label><button id="new-record" type="button">New listing</button></div>
       <div id="record-list" class="record-grid"></div>
     </section>
 
     <section id="sources" class="hh-section" aria-labelledby="sources-title" hidden>
-      <div class="section-heading"><div><h2 id="sources-title">Sources &amp; access</h2><p class="muted">Capture text from a URL, pasted material, or a file. Review imported material before treating its employer or listing identity as established.</p></div><button type="button" data-new="source">Add a source</button></div>
+      <div class="section-heading"><div><h2 id="sources-title">Sources &amp; access</h2><p class="muted">Sources are saved when you drop files or links. Browse the captured material, fetch it again, or correct its extraction rules.</p></div></div>
       <div class="workspace-grid">
-        <form id="capture-form" class="panel stack">
-          <h3>Import material</h3>
-          <p id="extraction-status" class="small muted">Checking document extraction…</p>
-          <div class="fields"><label class="field">Save as<select name="kind" id="capture-kind"><option value="evidence">Professional evidence</option><option value="listing">Job listing</option></select></label><label class="field">Title<input name="title" placeholder="Optional title"></label></div>
-          <label id="capture-category-field" class="field">Evidence category<select name="category" id="capture-category"><option value="resume">Resume</option><option value="experience">Experience</option><option value="project">Project</option><option value="commentary">Commentary</option><option value="correction">Correction</option></select></label>
-          <label class="field">Saved source<select name="sourceId" id="capture-source"><option value="">No saved source</option></select></label>
-          <fieldset class="mode-choices"><legend>Input</legend><label><input type="radio" name="inputMode" value="text" checked> Paste text</label><label><input type="radio" name="inputMode" value="url"> URL</label><label><input type="radio" name="inputMode" value="file"> File</label><label><input type="radio" name="inputMode" value="saved"> Saved source</label></fieldset>
-          <p class="small muted" data-input="saved" hidden>Capture the selected source URL again, or re-extract its retained original with the source's current correction rules.</p>
-          <label class="field" data-input="text">Text<textarea name="text" rows="10" placeholder="Paste your experience, source text, or the complete listing."></textarea></label>
-          <label class="field" data-input="url" hidden>Source URL<input name="url" type="url" placeholder="https://" disabled></label>
-          <label class="field" data-input="file" hidden>Documents<input name="files" type="file" multiple accept=".txt,.md,.html,.htm,.pdf,.docx,.rtf,.csv,.tsv,.json" disabled><span class="small muted">Browser uploads: up to 2 MiB per file. PDF, DOCX, and HTML require the document extraction service. Image-only content needs readable text.</span></label>
-          <div id="capture-listing-fields" class="fields" hidden><label class="field">Employer<input name="employer"></label><label class="field">Requisition<input name="requisition"></label><label class="field">Contact<select name="contactId" id="capture-contact"><option value="">No contact</option></select></label></div>
-          <div class="actions"><button type="submit" class="primary">Import material</button><span id="capture-status" role="status" class="small"></span></div>
-          <div id="capture-results"></div>
-        </form>
-        <div class="stack">
-          <section class="panel"><div class="panel-heading"><h3>Saved sources</h3></div><div id="source-records"></div></section>
-          <form id="credential-form" class="panel stack" autocomplete="off">
+        <section class="panel"><div class="panel-heading"><h3>Saved sources</h3></div><div id="source-records"></div></section>
+        <details class="panel source-access"><summary>Access for sources that require sign-in</summary>
+          <form id="credential-form" class="stack" autocomplete="off">
             <h3>Source access</h3><p class="small muted">Save a session cookie for a source that requires sign-in. Access is scoped to the source origin.</p>
             <label class="field">Source<select name="sourceId" id="credential-source" required><option value="">Choose a source</option></select></label>
             <label class="field">Origin<input name="origin" type="url" required placeholder="https://example.com" autocomplete="off"></label>
             <label class="field">Session cookie<input name="cookie" type="password" required autocomplete="new-password" spellcheck="false"></label>
             <button type="submit">Save source access</button><p id="credential-status" role="status" class="small muted">Credentials are kept separately from source records and preparation text.</p>
           </form>
-        </div>
+        </details>
       </div>
     </section>
 
@@ -114,6 +126,12 @@
     </section>
   </main>
 
+  <dialog id="material-dialog" aria-labelledby="material-title">
+    <header class="panel-heading"><h2 id="material-title">Imported material</h2><button type="button" data-close-dialog aria-label="Close material">Close</button></header>
+    <p id="material-meta" class="small muted"></p>
+    <div id="material-actions" class="actions"></div>
+    <pre id="material-text" class="material-text"></pre>
+  </dialog>
   <dialog id="record-dialog" aria-labelledby="record-dialog-title">
     <form id="record-form" class="stack"><header class="panel-heading"><h2 id="record-dialog-title">Record</h2><button type="button" data-close-dialog aria-label="Close record editor">Close</button></header><div id="record-fields" class="fields"></div><p id="record-message" class="small" role="status"></p><div class="actions"><button type="submit" class="primary">Save record</button><button type="button" data-close-dialog>Cancel</button></div><fieldset id="record-review" class="stack review-form" hidden><legend>Review this saved record</legend><p class="small muted">Record your decision after checking the relationship or representation. Matching records remain visible for future decisions.</p><label class="field">Decision<select id="record-review-decision"><option value="approved">Reviewed and approved</option><option value="changes-requested">Changes requested</option><option value="rejected">Rejected</option></select></label><label class="field">Review notes<textarea id="record-review-notes" rows="3" placeholder="What was checked, and what should happen next?"></textarea></label><button id="save-record-review" type="button">Save review</button></fieldset><details id="record-neighbors"><summary>Related records and facts</summary><p class="small muted">Shared terms and concepts suggest associations. They do not confirm identity or representation.</p><div id="neighbor-records"></div></details><details id="record-history"><summary>Version history</summary><div id="history-list"></div></details></form>
   </dialog>

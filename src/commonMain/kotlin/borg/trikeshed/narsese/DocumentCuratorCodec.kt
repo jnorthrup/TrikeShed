@@ -36,6 +36,8 @@ internal object DocumentCuratorCodec {
         "confidence" to p.confidence, "quote" to p.quote, "begin" to p.begin, "end" to p.end,
         "polarity" to p.polarity, "modality" to p.modality,
         "reasons" to p.reasons.values(), "receiptCid" to p.receiptCid?.value,
+        "quotationReceiptCid" to p.quotationReceiptCid?.value,
+        "quotationBegin" to p.quotationBegin, "quotationEnd" to p.quotationEnd,
     )
 
     fun identity(source: DocumentSource, p: DocumentProposal): ByteArray = CanonicalCbor.encodeMap(mapOf(
@@ -49,6 +51,7 @@ internal object DocumentCuratorCodec {
 
     fun record(record: DocumentCurationRecord): Map<String, Any?> = mapOf(
         "version" to 1, "source" to source(record.source), "modelId" to record.modelId,
+        "instructions" to record.instructions,
         "model" to record.model?.let { mapOf("content" to it.content, "providerId" to it.providerId, "modelId" to it.modelId,
             "promptTokens" to it.usage.promptTokens, "completionTokens" to it.usage.completionTokens,
             "totalTokens" to it.usage.totalTokens) },
@@ -57,6 +60,9 @@ internal object DocumentCuratorCodec {
         "reserved" to record.reservedReceiptCids.values { it.value },
         "submitted" to record.submittedReceiptCids.values { it.value },
         "duplicates" to record.duplicateReceiptCids.values { it.value },
+        "quotationReserved" to record.quotationReservedReceiptCids.values { it.value },
+        "quotationSubmitted" to record.quotationSubmittedReceiptCids.values { it.value },
+        "quotationDuplicates" to record.quotationDuplicateReceiptCids.values { it.value },
         "observerFailures" to record.observerFailures.values(),
     )
 
@@ -86,11 +92,16 @@ internal object DocumentCuratorCodec {
             end = (p["end"] as? Number)?.toInt(), polarity = p["polarity"] as? Boolean,
             modality = p["modality"] as? String, reasons = p.array("reasons").map { it as String }.toSeries(),
             receiptCid = (p["receiptCid"] as? String)?.let(::ContentId),
+            quotationReceiptCid = (p["quotationReceiptCid"] as? String)?.let(::ContentId),
+            quotationBegin = (p["quotationBegin"] as? Number)?.toInt(),
+            quotationEnd = (p["quotationEnd"] as? Number)?.toInt(),
         ) } }.toSeries()
         return DocumentCurationRecord(source, nlp, model, m.str("modelId"), proposals,
             m.array("reasons").map { it as String }.toSeries(),
             m.cids("reserved"), m.cids("submitted"), m.cids("duplicates"),
-            m.array("observerFailures").map { it as String }.toSeries())
+            m.array("observerFailures").map { it as String }.toSeries(),
+            if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
+            m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"))
     }
 
     /** Validate syntax strictly before crossing the existing JSON-shaped value boundary. */
@@ -101,6 +112,8 @@ internal object DocumentCuratorCodec {
     private fun Map<*, *>.array(key: String) = this[key] as List<*>
     private fun Map<*, *>.obj(key: String) = (this[key] as Map<*, *>).entries.associate { it.key as String to it.value }
     private fun Map<*, *>.cids(key: String) = array(key).map { ContentId(it as String) }.toSeries()
+    private fun Map<*, *>.optionalCids(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
+        .map { ContentId(it as String) }.toSeries()
 }
 
 internal fun <T, R> Series<T>.values(f: (T) -> R): List<R> = List(size) { f(this[it]) }

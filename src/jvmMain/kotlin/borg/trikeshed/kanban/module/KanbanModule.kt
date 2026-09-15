@@ -76,6 +76,15 @@ class KanbanModule : ForgeModule {
         )
         val lcncRegistry = lcnc.registry()
         ctx.lcncRunners.putAll(lcncRegistry)
+        ctx.lcncRunners.putAll(borg.trikeshed.lcnc.DocumentCurationTasks(ctx.casStore) { source ->
+            val sourceId = source.metadata["evidenceId"]?.singleOrNull()
+            if (sourceId == null) true else {
+                val head = ctx.blackboard.snapshot().values["headhunter/$sourceId"] as? Map<*, *>
+                val fields = head?.get("fields") as? Map<*, *>
+                head?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() && fields?.get("deleted") != true &&
+                    (fields?.get("text") as? String)?.let { ContentId.of(it.encodeToByteArray()) == source.extractedTextCid } == true
+            }
+        }.registry(store))
 
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
         //    Bag OFF ⇒ board JSON byte-identical minus the attention/contested fields.

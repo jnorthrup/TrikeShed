@@ -339,7 +339,7 @@ header span { color:#4d6070 }
 <div id="drawer"><span class="ttl">module drawer — sub-vm legos</span>""")
         for (lego in legos) {
             val t = (lego as? Map<*, *>)?.get("type")?.toString() ?: continue
-            sb.append("""<span class="lego" onclick="run('$t')">$t ▸</span> """)
+            sb.append("""<span class="lego">$t ▸</span> """)
         }
         sb.append("""</div><div id="spine">""")
         val cols = COLUMN_RINGS.entries.toList()
@@ -358,9 +358,7 @@ header span { color:#4d6070 }
             renderBoxes(sb, boxes, 1, items, wire)
             sb.append("""<div class="io"><span class="sout">emit: ${esc(colEmit)}</span></div></div></div>""")
         }
-        sb.append("""</div><script>
-function run(t){ fetch('/api/lcnc/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:t,params:{}})}).then(r=>r.json()).then(j=>alert(JSON.stringify(j))).catch(e=>alert('run failed: '+e)) }
-</script></body></html>""")
+        sb.append("""</div></body></html>""")
         return sb.toString()
     }
 
@@ -397,7 +395,7 @@ function run(t){ fetch('/api/lcnc/run',{method:'POST',headers:{'content-type':'a
             val pri = when (item["priority"]?.toString()?.toIntOrNull() ?: 2) { 0 -> "p0"; 1 -> "p1"; else -> "p2" }
             val rev = item["revision"]?.toString() ?: "-"
             val chain = boxes.joinToString(" ▸ ") { it.element }
-            sb.append("""<div class="card" onclick="this.classList.toggle('open')">
+            sb.append("""<div class="card">
 <span class="pri $pri"></span><b>${esc(title)}</b><span class="rev">job $id · rev $rev · $label</span>
 <div class="chain">assemblage: $chain<br>seed: ${esc(b.seedIn)}<br>state: ${esc(b.state.substringBefore(" —"))}</div>
 </div>""")

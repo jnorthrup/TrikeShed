@@ -157,7 +157,7 @@ object LcncRdf {
 
     /**
      * The BINDING edges — the late-bound join between a wrapper and what runs
-     * it, one triple pair per type. `:type/pick lcnc:boundBy "…CanvasJsPureNodes…"`
+     * it, one triple pair per type. `:type/pick lcnc:boundBy "…PureNodes…"`
      * is provenance a query can ask for ("which file binds this?") and blame
      * can walk, without reflecting on anything twice.
      */

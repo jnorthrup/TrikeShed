@@ -22,12 +22,29 @@ class HeadhunterWire private constructor(
     private val store: HeadhunterStore,
     private val sources: HeadhunterSources,
     private val workflow: HeadhunterWorkflow,
+    private val curation: HeadhunterCuration,
+    private val documents: DocumentCurationWire?,
     private val brain: BrainClient,
     private val panels: PatchWire,
     private val credentials: HeadhunterCredentials,
     private val log: borg.trikeshed.narsese.DocumentAppendLog,
 ) {
     companion object {
+        const val INTAKE_PROGRAM = "headhunter.intake"
+
+        fun intakeProgram(): LcncProgram {
+            val outputs = borg.trikeshed.lib.s_["record", "source", "extraction", "curation"]
+            val nodes = borg.trikeshed.lib.SeriesBuffer<LcncNode>()
+            val wires = borg.trikeshed.lib.SeriesBuffer<LcncWire>()
+            nodes.add(LcncNode("input", LcncContracts.SCOPE_IN, mapOf("name" to "source", "kind" to "json"), 40.0, 80.0))
+            nodes.add(LcncNode("capture", "headhunter.capture", x = 350.0, y = 80.0))
+            wires.add(LcncWire("input", "value", "capture", "source"))
+            for ((index, port) in outputs.view.withIndex()) {
+                nodes.add(LcncNode(port, LcncContracts.SCOPE_OUT, mapOf("name" to port, "kind" to "json"), 660.0, 80.0 + index * 160))
+                wires.add(LcncWire("capture", port, port, "value"))
+            }
+            return LcncProgram(INTAKE_PROGRAM, nodes.drain(), wires.drain())
+        }
         suspend fun open(ctx: ModuleContext, brain: BrainClient, panels: PatchWire): HeadhunterWire =
             withContext(borg.trikeshed.userspace.nio.file.spi.fileIoContext) {
                 val files = checkNotNull(ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations]) {
@@ -38,10 +55,15 @@ class HeadhunterWire private constructor(
                 files.mkdirs(privatePath)
                 val log = borg.trikeshed.narsese.DocumentAppendLog.open(files.resolvePath(path, "records.wal"), path)
                 var credentials: HeadhunterCredentials? = null
+                var documentOwner: DocumentCurationWire? = null
                 try {
                     val keys = HeadhunterCredentials.open(privatePath).also { credentials = it }
                     val store = HeadhunterStore(ctx.blackboard, ctx.casStore, log, ctx.clock)
                     store.restore()
+                    val documents = DocumentCurationWire.open(ctx, brain, panels).also { documentOwner = it }
+                    val curation = HeadhunterCuration(store, documents?.destination.orEmpty(), { documents?.available == true }) { source, instructions ->
+                        checkNotNull(documents) { "Shared document curator is unavailable" }.curate(source, instructions)
+                    }
                     val workflow = HeadhunterWorkflow(store) { prompt ->
                         val answer = brain.chatSeat(listOf(
                             "system" to "Prepare private job-application drafts grounded in selected evidence. Never execute external actions.",
@@ -49,9 +71,16 @@ class HeadhunterWire private constructor(
                         ), maxTokens = 6000, temperature = 0.2, contextId = "headhunter.prepare", preferredModel = null, timeoutMs = 90_000L)
                         answer.first j answer.second
                     }
-                    HeadhunterWire(ctx, store, HeadhunterSources(ctx.casStore, keys.keys), workflow, brain, panels, keys, log)
-                        .also { it.attach() }
+                    HeadhunterWire(ctx, store, HeadhunterSources(ctx.casStore, keys.keys), workflow, curation, documents, brain, panels, keys, log)
+                        .also {
+                            it.attach(); it.ensureIntakeProgram()
+                            for (record in store.records().view) if (record["kind"] == "evidence") documents?.sourceChanged(record["id"] as String)
+                        }
                 } catch (failure: Throwable) {
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        try { documentOwner?.drain() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+                        try { documentOwner?.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+                    }
                     try { credentials?.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                     try { log.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                     throw failure
@@ -65,23 +94,37 @@ class HeadhunterWire private constructor(
 
     fun attach() {
         ctx.lcncRunners.putAll(workflow.registry())
+        ctx.lcncRunners.putAll(curation.registry())
+        ctx.lcncRunners["headhunter.capture"] = LcncNodeRunner { _, inputs ->
+            val output = capture(objectOf(inputs["source"], "source"))
+            val record = output["record"] as? Map<*, *>
+            output + ("record" to record?.let { mapOf("id" to it["id"], "cid" to it["cid"], "kind" to it["kind"]) })
+        }
         ctx.routes.claim("headhunter", "/api/headhunter", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/record", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/history", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/collisions", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/capture", route = ::route)
+        ctx.routes.claim("headhunter", "/api/headhunter/curation", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/credential", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/prepare", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/program", route = ::route)
         ctx.routes.claim("headhunter", "/api/headhunter/artifact", route = ::route)
     }
 
-    suspend fun drain() { ctx.routes.release("headhunter"); requests.drain() }
+    suspend fun drain() {
+        ctx.routes.release("headhunter")
+        try { requests.drain() } finally { documents?.stopAdmission() }
+    }
+
+    /** The host calls this after the LCNC producers have drained. */
+    suspend fun drainCuration() { documents?.drain() }
 
     /** Called after HTTP admission and the host's LCNC runs have drained. */
     suspend fun close() = withContext(borg.trikeshed.userspace.nio.file.spi.fileIoContext) {
         var failure: Throwable? = null
-        try { credentials.close() } catch (caught: Throwable) { failure = caught }
+        try { documents?.close() } catch (caught: Throwable) { failure = caught }
+        try { credentials.close() } catch (caught: Throwable) { failure?.addSuppressed(caught) ?: run { failure = caught } }
         try { log.close() } catch (caught: Throwable) { failure?.addSuppressed(caught) ?: run { failure = caught } }
         failure?.let { throw it }
         Unit
@@ -102,6 +145,7 @@ class HeadhunterWire private constructor(
                             .filter { it["program"] == HeadhunterWorkflow.PROGRAM }
                             .sortedByDescending { (it["startedAtMs"] as? Number)?.toLong() ?: 0L }.take(50).toList()
                         json(mapOf("records" to store.records().toList(), "runs" to runs,
+                            "profile" to curation.profile(), "curation" to curationPlan(),
                             "model" to mapOf("configured" to brain.hasEndpoints(),
                                 "detail" to if (brain.hasEndpoints()) "Configured KeyMux/ModelMux endpoints; availability is checked when invoked"
                                     else "No model endpoint is configured. Configure a provider in ModelMux; evidence assembly remains available.",
@@ -114,13 +158,21 @@ class HeadhunterWire private constructor(
                     "/api/headhunter/collisions" -> json(mapOf("collisions" to store.collisions(required(query, "applicationId")).toList()))
                     "/api/headhunter/artifact" -> download(required(query, "id"), query["format"] ?: "markdown")
                     else -> json(mapOf("error" to "method_not_allowed"), 405)
+                } else if (method == "DELETE" && target == "/api/headhunter/record") {
+                    val current = store.record(required(query, "id")) ?: error("Source record is unavailable")
+                    require(current["kind"] in setOf("evidence", "source")) { "Only source and evidence records can be removed here" }
+                    val deleted = store.save(current["kind"] as String, current["id"] as String, required(query, "baseCid"),
+                        fields(current) + ("deleted" to true))
+                    if (current["kind"] == "evidence") documents?.sourceChanged(current["id"] as String)
+                    json(deleted)
                 } else if (method == "POST") {
                     require(text.length <= 4 * 1024 * 1024) { "Request exceeds the 4 MiB request limit; upload files up to 2 MiB" }
                     val input = objectOf(JsonSupport.parseStrict(text.substringAfter("\r\n\r\n", text)), "request")
                     when (target) {
                         "/api/headhunter/record" -> json(save(input))
+                        "/api/headhunter/curation" -> json(curation.run(required(input, "planCid")) + ("curation" to curationPlan()))
                         "/api/headhunter/capture" -> {
-                            val result = capture(input)
+                            val result = intake(input)
                             val ready = (result["extraction"] as? Map<*, *>)?.get("status") == "ready"
                             json(result, if (ready) 200 else 422)
                         }
@@ -137,7 +189,7 @@ class HeadhunterWire private constructor(
             // Acquisition sanitizes transport exceptions. Credentials are never included in this text.
             val message = failure.message.orEmpty().take(2048)
             return json(mapOf("error" to (message.ifBlank { "Job agent operation failed" })),
-                if (message.contains("Stale baseCid")) 409 else if (failure is IllegalArgumentException) 400 else 503)
+                if (message.contains("Stale baseCid") || message.contains("Curation plan changed")) 409 else if (failure is IllegalArgumentException) 400 else 503)
         }
     }
 
@@ -145,7 +197,9 @@ class HeadhunterWire private constructor(
         val kind = required(input, "kind")
         val fields = objectOf(input["fields"], "fields")
         if (kind == "source") sources.configuration(sourceConfig(fields))
-        return store.save(kind, input["id"] as? String, input["baseCid"] as? String, fields)
+        return store.save(kind, input["id"] as? String, input["baseCid"] as? String, fields).also {
+            if (kind == "evidence") documents?.sourceChanged(it["id"] as String)
+        }
     }
 
     private suspend fun credential(input: Map<String, Any?>): Map<String, Any?> {
@@ -187,13 +241,11 @@ class HeadhunterWire private constructor(
             "url" to (url ?: previous["url"]), "originalCid" to acquired["originalCid"],
             "captureKind" to kind, "category" to (input["category"] ?: previous["category"] ?: "resume"),
             "filename" to acquired["filename"], "mediaType" to acquired["mediaType"],
+            "relativePath" to input["relativePath"],
             "lastCapture" to acquired.filterKeys { it != "text" && it != "configuration" },
         )
-        val source = store.save("source", old?.get("id") as? String, old?.get("cid") as? String, sourceFields)
-        if (acquired["status"] != "ready") return mapOf("source" to source, "record" to null,
-            "extraction" to acquired, "error" to (acquired["error"] ?: "Source extraction is unavailable"))
         val fields = linkedMapOf<String, Any?>("title" to title, "text" to acquired["text"],
-            "sourceId" to source["id"], "sourceCid" to source["cid"], "originalCid" to acquired["originalCid"],
+            "originalCid" to acquired["originalCid"], "relativePath" to input["relativePath"],
             "filename" to acquired["filename"], "mediaType" to acquired["mediaType"],
             "provenance" to acquired.filterKeys { it !in setOf("text", "configuration") }, "reviewStatus" to "proposed")
         if (kind == "evidence") fields["category"] = input["category"] as? String ?: previous["category"] ?: "resume"
@@ -201,8 +253,37 @@ class HeadhunterWire private constructor(
             for (key in listOf("employerId", "employer", "requisition", "contactId")) input[key]?.let { fields[key] = it }
             url?.let { fields["url"] = it }
         }
-        val record = store.save(kind, input["id"] as? String, input["baseCid"] as? String, fields)
-        return mapOf("record" to record, "source" to source, "extraction" to acquired.filterKeys { it != "text" })
+        val captured = store.capture(kind, sourceFields, fields.takeIf { acquired["status"] == "ready" },
+            old?.get("id") as? String, old?.get("cid") as? String, input["id"] as? String, input["baseCid"] as? String)
+        return mapOf("record" to captured.b, "source" to captured.a, "extraction" to acquired.filterKeys { it != "text" },
+            "error" to acquired["error"], "curation" to curationPlan())
+    }
+
+    private suspend fun curationPlan(): Map<String, Any?> = curation.plan() + ("program" to DocumentCurationWire.PROFILE_PROGRAM)
+
+    private suspend fun ensureIntakeProgram() = programLock.withLock {
+        val path = "/api/panels/$INTAKE_PROGRAM"
+        if (panels.route("GET", path, "", null)?.status != 200)
+            check(panels.route("POST", path, LcncProgramConfix.toJson(intakeProgram()), null)?.status == 200) { "The intake composition could not be saved" }
+    }
+
+    private suspend fun intake(input: Map<String, Any?>): Map<String, Any?> {
+        val source = input.toMutableMap()
+        (source.remove("base64") as? String)?.let { encoded ->
+            val bytes = java.util.Base64.getDecoder().decode(encoded)
+            require(bytes.size <= 2 * 1024 * 1024) { "File exceeds 2 MiB" }
+            source["originalCid"] = ctx.casStore.put(bytes).value
+        }
+        val route = ctx.routes.match("/api/lcnc/run") ?: error("LCNC execution is unavailable")
+        val response = route.route("POST", "/api/lcnc/run", JsonSupport.stringify(mapOf(
+            "program" to INTAKE_PROGRAM, "inputs" to mapOf("source" to source), "timeoutMs" to 120_000)), null)
+            ?: error("LCNC returned no intake run")
+        val run = JsonSupport.parseMap(response.body)
+        check(response.status == 200 && run["error"] == null) { run["error"]?.toString() ?: "Source intake failed" }
+        val returned = objectOf(run["returns"], "intake results")
+        val reference = returned["record"] as? Map<*, *>
+        val record = reference?.let { store.version(it["id"] as String, it["cid"] as String) }
+        return returned + mapOf("record" to record, "run" to run)
     }
 
     private suspend fun programView(): Map<String, Any?> {

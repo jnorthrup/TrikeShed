@@ -15,7 +15,10 @@ import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.DocumentCurationIndexK
+import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
+import borg.trikeshed.narsese.DocumentCuratorElement
+import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
@@ -24,7 +27,7 @@ import borg.trikeshed.userspace.nio.DocumentContent
 import borg.trikeshed.userspace.nio.Volume
 import kotlinx.coroutines.CoroutineScope
 
-/** LCNC admission into the existing managed feed. The supplying host owns [DocumentFeed.drain]. */
+/** LCNC admission into the host-owned feed or its existing curator; the host owns their drain. */
 object DocumentCurationLegos {
     const val CURATE = "document.curate"
 
@@ -56,11 +59,16 @@ object DocumentCurationLegos {
     }
 
     /** [boundLcnc] resolves the caller's [DocumentFeed.Key] before borrowing this host default. */
-    fun curate(feed: DocumentFeed): LcncNodeRunner = boundLcnc(feed) { owner, _, inputs ->
-        require((inputs["extent"] != null) != (inputs["source"] != null)) {
+    fun curate(feed: DocumentFeed): LcncNodeRunner = boundLcnc(feed) { owner, node, inputs ->
+        require("instructions" !in inputs && "instructions?" !in inputs && node.params["instructions"] == null) {
+            "$CURATE.instructions is unsupported on the DocumentFeed path; use retained-source curation"
+        }
+        val extentInput = inputs["extent"] ?: inputs["extent?"]
+        val sourceInput = inputs["source"] ?: inputs["source?"]
+        require((extentInput != null) != (sourceInput != null)) {
             "$CURATE requires exactly one of extent or source"
         }
-        val receipt = inputs["source"]?.let { value ->
+        val receipt = sourceInput?.let { value ->
             val fields = value as? Map<*, *>
             if (fields?.get("originalCid") != null) {
                 require(fields["text"] == null && fields["base64"] == null) {
@@ -73,9 +81,49 @@ object DocumentCurationLegos {
                 val source = content(value)
                 owner.submit(source.bytes, source.name, source.mediaType)
             }
-        } ?: owner.submit(extent(inputs["extent"]))
-        val index = receipt.record.curationIndex()
-        val rootId = "document/${receipt.cid.value}"
+        } ?: owner.submit(extent(extentInput))
+        output(receipt.cid, receipt.record)
+    }
+
+    /** Corrected text already retained in CAS enters the same owned NLP/model/ledger pipeline. */
+    fun curate(
+        curator: DocumentCuratorElement,
+        projection: (ContentId, DocumentCurationRecord) -> Map<String, Any?> = ::output,
+    ): LcncNodeRunner = boundLcnc(curator) { owner, node, inputs ->
+        val extentInput = inputs["extent"] ?: inputs["extent?"]
+        val sourceInput = inputs["source"] ?: inputs["source?"]
+        require(extentInput == null && sourceInput != null) {
+            "$CURATE requires a retained source with its exact extracted text"
+        }
+        val source = source(sourceInput)
+        val instructionInput = if ("instructions" in inputs) inputs["instructions"] else inputs["instructions?"]
+        val instructions = if ("instructions" in inputs || "instructions?" in inputs)
+            requireNotNull(instructionInput as? String) { "$CURATE.instructions must be a string" }
+        else node.params["instructions"]
+        val receipt = instructions?.let { owner.curate(source, it) } ?: owner.curate(source)
+        projection(receipt.recordCid, receipt.record)
+    }
+
+    /** LCNC carries immutable identities; the explicit document read projects the retained contents. */
+    fun reference(cid: ContentId, record: DocumentCurationRecord): Map<String, Any?> {
+        val href = "/api/documents?cid=${cid.value}"
+        val sheet = mapOf("sheet" to "document/${cid.value}", "href" to "$href&view=sheet")
+        return mapOf(
+            "receiptCid" to cid.value,
+            "record" to mapOf("cid" to cid.value, "href" to href,
+                "originalCid" to record.source.originalCid.value,
+                "extractedTextCid" to record.source.extractedTextCid.value,
+                "proposals" to record.proposals.size, "submitted" to record.submittedReceiptCids.size,
+                "quotationsSubmitted" to record.quotationSubmittedReceiptCids.size),
+            "nlpStatus" to record.curationIndex().facet(DocumentCurationIndexK.NlpStatus).name,
+            "sheet" to sheet, "sheets" to listOf(sheet),
+        )
+    }
+
+    /** Shared projection for feed results, corrected-text results and retained receipt reads. */
+    fun output(cid: ContentId, record: DocumentCurationRecord): Map<String, Any?> {
+        val index = record.curationIndex()
+        val rootId = "document/${cid.value}"
         val sentences = index.facet(DocumentCurationIndexK.SentenceCursor)
         // Nested Cursor facets become ordinary grid-in-cell references at the existing UI boundary.
         val references: Cursor = sentences.size j { ordinal -> sentences[ordinal] α { cell ->
@@ -85,7 +133,7 @@ object DocumentCurationLegos {
                 else -> cell
             }
         } }
-        val root = sheetSeed(rootId, receipt.record.source.name, references).toMap()
+        val root = sheetSeed(rootId, record.source.name, references).toMap()
         val sheets = buildList {
             add(root)
             for (ordinal in 0 until sentences.size) {
@@ -95,13 +143,31 @@ object DocumentCurationLegos {
                     index.facet(DocumentCurationIndexK.DependencyCursor)(ordinal), rootId).toMap())
             }
         }
-        mapOf(
-            "receiptCid" to receipt.cid.value,
-            "record" to DocumentCuratorCodec.record(receipt.record),
+        return mapOf(
+            "receiptCid" to cid.value,
+            "record" to DocumentCuratorCodec.record(record),
             "nlpStatus" to index.facet(DocumentCurationIndexK.NlpStatus).name,
             "sheet" to root,
             "sheets" to sheets,
         )
+    }
+
+    internal fun source(value: Any?): DocumentSource {
+        if (value is DocumentSource) return value
+        val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+        require(fields["base64"] == null) { "$CURATE requires retained extracted text, not file bytes" }
+        fun string(name: String): String = requireNotNull(fields[name] as? String) {
+            "$CURATE.source.$name must be a string"
+        }
+        val metadata = fields["metadata"]?.let { raw ->
+            requireNotNull(raw as? Map<*, *>) { "$CURATE.source.metadata must be an object" }.entries.associate { (key, values) ->
+                val name = requireNotNull(key as? String) { "Document metadata names must be strings" }
+                val items = requireNotNull(values as? List<*>) { "Document metadata values must be string arrays" }
+                name to items.map { requireNotNull(it as? String) { "Document metadata values must be strings" } }
+            }
+        }.orEmpty()
+        return DocumentSource(ContentId(string("originalCid")), ContentId(string("extractedTextCid")),
+            string("text"), sourceName(fields), string("mediaType"), string("correlation"), metadata)
     }
 
     internal fun content(value: Any?): DocumentContent {

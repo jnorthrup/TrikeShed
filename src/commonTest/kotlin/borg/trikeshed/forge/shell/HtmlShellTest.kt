@@ -15,19 +15,13 @@ class HtmlShellTest {
     @Test
     fun loadContainsScriptTagVerbatim() {
         val html = HtmlShell.load()
-        assertTrue(html.contains("<script src=\"./TrikeShed.js\"></script>"), "Expected <script src=\"./TrikeShed.js\"></script>")
+        assertTrue(html.contains("<script src=\"./kotlin/forge/forge.js\" defer></script>"))
     }
 
     @Test
     fun cssAssetReturnsAppCss() {
         val css = HtmlShell.cssAsset("app")
         assertTrue(css.contains("#forge-root"), "Expected #forge-root")
-    }
-
-    @Test
-    fun jsAssetReturnsAppJs() {
-        val js = HtmlShell.jsAsset("app")
-        assertTrue(js.contains("window.trikeshed.shellVersion = \"1.0.0\""), "Expected window.trikeshed.shellVersion = \"1.0.0\"")
     }
 
     @Test
@@ -53,7 +47,7 @@ class HtmlShellTest {
         val assets = registry.requiredAssets()
         assertTrue(assets.contains("index.html"))
         assertTrue(assets.contains("app.css"))
-        assertTrue(assets.contains("app.js"))
+        assertTrue(assets.contains("kotlin/forge/forge.js"))
     }
 
     @Test

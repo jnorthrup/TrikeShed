@@ -15,6 +15,67 @@ import kotlin.coroutines.coroutineContext
 
 class ModelMuxTest {
 
+    @Test fun chatOptionsReachTransportOnlyWhenSelectedAndHaveDistinctCacheIdentities() = runTest {
+        val bodies = SeriesBuffer<String>()
+        val htx = openHtxElement(routeService = FakeHtxRouteService { request ->
+            bodies.add(request.body.toArray().decodeToString())
+            HtxResponse(status = 200, body = ByteSeries(
+                """{"choices":[{"message":{"content":"response-${bodies.size}"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}""".encodeToByteArray()))
+        })
+        val reactor = MuxReactorElement()
+        val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
+            model("fixture", caps = setOf("chat"))
+        }
+        try {
+            withContext(coroutineContext + htx + reactor) {
+                suspend fun chat(jsonOutput: Boolean = false, thinking: Boolean? = null) = mux.chat(
+                    "fixture", s_["user" j "Synthetic request"], maxTokens = 64, temperature = 0.0,
+                    jsonOutput = jsonOutput, thinking = thinking,
+                ).getOrThrow().a
+                assertEquals("response-1", chat())
+                val baselineHash = mux.lastReceipt!!.requestHash
+                val baseline = """{"model":"fixture","messages":[{"role":"user","content":"Synthetic request"}],"max_tokens":64,"temperature":0.0}"""
+                assertEquals(baseline, bodies[0], "Unset options preserve the previous request bytes")
+
+                assertEquals("response-2", chat(jsonOutput = true, thinking = false))
+                assertEquals(baseline.dropLast(1) + ",\"response_format\":{\"type\":\"json_object\"},\"thinking\":{\"type\":\"disabled\"}}", bodies[1])
+                assertTrue(baselineHash != mux.lastReceipt!!.requestHash)
+                assertEquals("response-2", chat(jsonOutput = true, thinking = false))
+                assertEquals(2, bodies.size, "Identical selected options reuse only their own cached response")
+
+                assertEquals("response-3", chat(thinking = true))
+                assertEquals(baseline.dropLast(1) + ",\"thinking\":{\"type\":\"enabled\"}}", bodies[2])
+                assertEquals("response-4", chat(jsonOutput = true))
+                assertEquals(baseline.dropLast(1) + ",\"response_format\":{\"type\":\"json_object\"}}", bodies[3])
+                assertEquals("response-1", chat(jsonOutput = false, thinking = null))
+                assertEquals(baselineHash, mux.lastReceipt!!.requestHash)
+                assertEquals(4, bodies.size)
+                assertEquals(4, reactor.cache.apiCallCount())
+            }
+        } finally {
+            try { reactor.close() } finally { htx.close() }
+        }
+    }
+
+    @Test fun reviewedDestinationRejectsKeyMuxOverrideBeforeTransport() = runTest {
+        var sent = false
+        val htx = openHtxElement(routeService = FakeHtxRouteService {
+            sent = true
+            error("Source material must not reach a changed destination")
+        })
+        val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
+            model("fixture", caps = setOf("chat"), baseUrl = "https://changed.invalid/v1")
+        }
+        try {
+            val result = withContext(coroutineContext + htx) {
+                mux.chat("fixture", s_["user" j "Synthetic source"], expectedBaseUrl = "https://reviewed.invalid/v1")
+            }
+            assertTrue(result.isFailure)
+            assertTrue(result.exceptionOrNull()?.message?.contains("destination changed") == true)
+            assertTrue(!sent)
+        } finally { htx.close() }
+    }
+
     class FakeHtxRouteService(val handler: (HtxRequest) -> HtxResponse) : HtxRouteService {
         override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
             val response = handler(request)

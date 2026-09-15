@@ -8,11 +8,31 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /** Page identity gate: blackboard, Graal, and panels are distinct surfaces with shared wires. */
 class BlackboardPageTest {
+    @Test
+    fun compiledKotlinBundlesAreServedFromTheirAppDirectories() = runTest {
+        val server = borg.trikeshed.litebike.JvmKanbanServer()
+        for (app in listOf("forge", "documents", "spacegraph")) {
+            val path = "/kotlin/$app/$app.js"
+            val expected = javaClass.getResourceAsStream("/web$path")?.use { it.readBytes() }
+            val response = server.routeHttp("GET $path HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray())
+            if (expected == null) {
+                assertEquals(404, response.status)
+            } else {
+                assertEquals(200, response.status)
+                assertEquals("application/javascript; charset=utf-8", response.contentType)
+                assertContentEquals(expected, response.payloadBytes)
+            }
+        }
+        val traversal = server.routeHttp("GET /kotlin/../styles.css HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray())
+        assertEquals(404, traversal.status)
+    }
+
     @Test
     fun blackboardGraalAndPanelsServeTheirOwnCanvases() = runTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -23,14 +43,8 @@ class BlackboardPageTest {
             assertEquals("text/html; charset=utf-8", response?.contentType)
             val html = response!!.body
             assertTrue("id=\"landscape\"" in html)
-            assertTrue("/graal-terrain.js" in html && "/patch.js" in html)
-            assertTrue("/landscape-navigation.js" in html)
-            assertTrue("/patch-camera.js" in html && "/patch-camera.css" in html)
-            assertTrue("/patch-shake.js" in html)
+            assertTrue("/patch-camera.css" in html)
             assertTrue("id=\"cancelRun\"" in html)
-            val script = javaClass.classLoader.getResource("web/harness.js")!!.readText()
-            assertEquals(1, Regex("new EventSource\\(").findAll(script).count())
-            assertTrue("/blackboard/board" in script && "stream.addEventListener(\"reset\"" in script)
 
             val graal = GraalWire(JvmVitals(), null, null, scope)
                 .route("GET", "/graal", "", null)
@@ -38,7 +52,6 @@ class BlackboardPageTest {
             val graalHtml = graal!!.payloadBytes.decodeToString()
             assertTrue("<title>Graal Console</title>" in graalHtml)
             assertTrue("id=\"map\"" in graalHtml, "/graal needs its own terrain canvas")
-            assertTrue("/api/graal/vitals" in graalHtml && "/api/graal/events" in graalHtml)
             assertTrue("BLACKBOARD" !in graalHtml, "/graal must not serve the blackboard harness")
 
             val server = borg.trikeshed.litebike.JvmKanbanServer()
@@ -49,14 +62,12 @@ class BlackboardPageTest {
                 assertEquals(200, panels.status)
                 assertTrue("<title>Construction Panels</title>" in panels.body)
                 assertTrue("id=\"viewport\"" in panels.body && "id=\"world\"" in panels.body)
-                assertTrue("/api/panels" in panels.body && "/patch-shake.js" in panels.body)
+                assertTrue("./kotlin/spacegraph/spacegraph.js" in panels.body)
                 assertTrue("localTreeshake" !in panels.body && "program:G" !in panels.body)
                 assertTrue(panels.body != html, "$path must not serve the blackboard harness")
-                assertTrue("/patch-camera.js" in panels.body && "/patch-camera.css" in panels.body)
+                assertTrue("/patch-camera.css" in panels.body)
             }
-            for (path in listOf("/patch-camera.js", "/patch-camera.css", "/patch-shake.js")) {
-                assertEquals(200, server.routeHttp("GET $path HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray()).status)
-            }
+            assertEquals(200, server.routeHttp("GET /patch-camera.css HTTP/1.1\r\nHost: t\r\n\r\n".toByteArray()).status)
         } finally {
             scope.cancel()
         }

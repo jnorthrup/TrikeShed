@@ -244,34 +244,29 @@ object ForgeApp {
         "nio" to nioSeed(),
     )
 
-    /** Placeholders in `src/commonMain/resources/web/index.html`; the shell and `script.js` share one DOM. */
+    /** Placeholders in `src/commonMain/resources/web/index.html`. */
     const val SEED_SLOT = "{{SEED}}"
     const val STYLES_SLOT = "{{STYLES}}"
-    const val SCRIPT_SLOT = "{{SCRIPT}}"
     const val GALLERY_SLOT = "{{GALLERY}}"
     /** Kotlin/JS / wasmJs bundle `<script>` tags published by `generateForgePages` stages; empty for the pure static shell. */
     const val BUNDLES_SLOT = "{{BUNDLES}}"
 
     /**
-     * The one shell: the web template with its slots filled. Relative asset paths (`./sw.js`,
-     * `./manifest.webmanifest`, `./icons/…`) keep the PWA scope at wherever the page is served —
-     * a sub-path on GitHub Pages, `/` on the JVM server — never a root-scoped service worker by accident.
+     * The web template with its slots filled. Relative asset paths support both
+     * a sub-path on GitHub Pages and `/` on the JVM server.
      */
     private fun htmlShell(seed: String, bundles: List<String>): String =
         borg.trikeshed.forge.generated.ForgeAssets.indexHtml
             .replace(STYLES_SLOT, forgeAppStyles())
             .replace(GALLERY_SLOT, galleryHtml())
-            .replace(SCRIPT_SLOT, forgeAppScript())
             .replace(BUNDLES_SLOT, bundleTags(bundles))
             .replace(SEED_SLOT, seed)
 
-    /** Relative `src` + `defer`: the bundle runs after script.js has hydrated and the PWA scope stays wherever the page is served. */
+    /** Relative `src` + `defer`: compiled Kotlin bundles run after the seed is in the DOM. */
     private fun bundleTags(bundles: List<String>): String =
         bundles.joinToString("\n") { "  <script src=\"$it\" defer></script>" }
 
     private fun forgeAppStyles(): String = borg.trikeshed.forge.generated.ForgeAssets.stylesCss
-
-    private fun forgeAppScript(): String = forgePersistenceScript()
 
     /** Server-rendered gallery HTML for the sidebar. No client-side hydration needed. */
     private fun galleryHtml(): String = runCatching { ForgeGalleryRenderer.renderHtml() }.getOrElse { "" }

@@ -35,6 +35,74 @@ class HeadhunterStore(
     /** A stale writer cannot replace a newer head. Repeated artifact creation retains saved corrections. */
     suspend fun save(kind: String, id: String?, baseCid: String?, fields: Map<String, Any?>): HeadhunterRecord = lock.withLock {
         ready()
+        saveLocked(kind, id, baseCid, fields)
+    }
+
+    /** Local originals reuse their retained evidence. Source paths do not revise that evidence. */
+    suspend fun capture(
+        kind: String,
+        sourceFields: HeadhunterRecord,
+        recordFields: HeadhunterRecord?,
+        sourceId: String? = null,
+        sourceBaseCid: String? = null,
+        id: String? = null,
+        baseCid: String? = null,
+    ): Join<HeadhunterRecord, HeadhunterRecord?> = lock.withLock {
+        ready()
+        require(kind == "evidence" || kind == "listing") { "Capture requires evidence or a listing" }
+        var source = sourceId?.let { requireRecord(it, "source") }
+        val originalCid = (sourceFields["originalCid"] as? String)?.takeIf { original ->
+            original.isNotBlank() && kind == "evidence" && sourceFields["origin"] == "upload" &&
+                source?.let { localSource(it, original) } != false
+        }
+        var retained: HeadhunterRecord? = null
+        if (originalCid != null) {
+            require(recordFields == null || recordFields["originalCid"] == originalCid) { "Evidence must refer to its captured original" }
+            // Ledger insertion order keeps existing identities stable, including after replay.
+            for (record in heads.values) {
+                if (record["kind"] != "evidence" || fieldsOf(record)["originalCid"] != originalCid) continue
+                val owner = (fieldsOf(record)["sourceId"] as? String)?.let { heads[it] } ?: continue
+                if (!localSource(owner, originalCid)) continue
+                if (sourceId != null && owner["id"] != sourceId) continue
+                if (id != null && record["id"] != id) continue
+                source = owner
+                retained = record
+                break
+            }
+            if (source == null) source = heads.values.firstOrNull { localSource(it, originalCid) }
+        }
+        val existingSource = source
+        val savedSource = if (originalCid != null && existingSource != null) {
+            saveLocked("source", existingSource["id"] as String, sourceBaseCid ?: existingSource["cid"] as String,
+                sourcePaths(fieldsOf(existingSource), sourceFields))
+        } else saveLocked("source", sourceId, sourceBaseCid, sourcePaths(sourceFields, emptyMap()))
+        val record = when {
+            recordFields == null -> null
+            retained != null && id == null && baseCid == null -> retained
+            else -> saveLocked(kind, id, baseCid, recordFields + mapOf("sourceId" to savedSource["id"], "sourceCid" to savedSource["cid"]))
+        }
+        savedSource j record
+    }
+
+    private fun localSource(record: HeadhunterRecord, originalCid: String): Boolean =
+        record["kind"] == "source" && fieldsOf(record)["origin"] == "upload" && fieldsOf(record)["originalCid"] == originalCid
+
+    private fun sourcePaths(previous: HeadhunterRecord, incoming: HeadhunterRecord): HeadhunterRecord {
+        val paths = SeriesBuffer<String>()
+        fun add(value: Any?) {
+            if (value is String && value.isNotBlank() && value !in paths.snapshot()) paths.add(value)
+        }
+        fun append(fields: HeadhunterRecord) {
+            add(fields["relativePath"])
+            for (path in (fields["relativePaths"] as? Iterable<*>) ?: emptyList<Any?>()) add(path)
+        }
+        append(previous)
+        val count = paths.size
+        append(incoming)
+        return if (paths.size == count) previous else previous + mapOf("relativePath" to paths[0], "relativePaths" to paths.drain())
+    }
+
+    private suspend fun saveLocked(kind: String, id: String?, baseCid: String?, fields: HeadhunterRecord): HeadhunterRecord {
         require(kind in KINDS) { "Unknown headhunter record kind: $kind" }
         val encoded = canonical(if (kind == "action") actionFields(id, fields) else fields)
         val nextFields = JsonSupport.parseMap(encoded)
@@ -42,18 +110,18 @@ class HeadhunterStore(
         require(ID.matches(key) && key.substringBefore('/') == kind) { "Record id must belong to $kind" }
         val old = heads[key]
         require(old != null || baseCid == null) { "No version to update for $key" }
-        if (kind == "artifact" && id == null && baseCid == null && old != null) {
+        if ((kind == "artifact" || kind == "profile") && id == null && baseCid == null && old != null) {
             publish(old)
-            return@withLock old
+            return old
         }
         if (old != null && canonical(fieldsOf(old)) == encoded) {
             require(baseCid == null || baseCid == old["cid"] || versions[baseCid]?.get("id") == key) { "Unrelated baseCid for $key" }
             publish(old)
-            return@withLock old
+            return old
         }
         require(old == null || old["cid"] == baseCid) { "Stale baseCid for $key; read its current version" }
         withContext(fileIoContext) { validate(kind, key, nextFields, old) }
-        withContext(fileIoContext + NonCancellable) {
+        return withContext(fileIoContext + NonCancellable) {
             val body = linkedMapOf<String, Any?>(
                 "id" to key, "kind" to kind, "previousCid" to old?.get("cid"),
                 // Confix's JSON number representation is Double, including replayed timestamps.
@@ -275,10 +343,32 @@ class HeadhunterStore(
                     require((fields - REVIEW_FIELDS) == (previous - REVIEW_FIELDS)) { "Edited artifacts require a new review" }
                 }
             }
+            "profile" -> {
+                required(fields, "title"); required(fields, "receiptCid"); required(fields, "model")
+                val sources = references(fields)
+                require(sources.size > 0) { "Profile requires exact source versions" }
+                for (ref in sources.view) requireVersion(ref)
+                require(fields["claims"] is Iterable<*>) { "Profile claims must be an array" }
+                require(fields["reviewStatus"] == null || fields["reviewStatus"] == "proposed") {
+                    "Profile approval requires a review of its exact version"
+                }
+            }
             "review" -> {
                 val subject = requireVersion(required(fields, "subjectId") j required(fields, "subjectCid"))
                 require(heads[subject["id"] as String]?.get("cid") == subject["cid"]) { "Stale subjectCid; review the current version" }
                 require(fields["decision"] in setOf("approved", "changes-requested", "rejected")) { "Unknown review decision" }
+                fields["claimId"]?.let { claimId ->
+                    val claim = (fieldsOf(subject)["claims"] as? Iterable<*>)?.firstOrNull { (it as? Map<*, *>)?.get("id") == claimId } as? Map<*, *>
+                    require(claimId is String && claimId.isNotBlank() && subject["kind"] == "profile" && claim != null) {
+                        "Review claimId must belong to the referenced profile version"
+                    }
+                    if (fields["decision"] == "approved") {
+                        require(claim["grounded"] == true) { "Claim approval requires grounded source evidence" }
+                        for (ref in references(fieldsOf(subject)).view) require(heads[ref.a]?.get("cid") == ref.b) {
+                            "Profile sources changed; curate their current versions before approval"
+                        }
+                    }
+                }
             }
             "action" -> {
                 val application = requireVersion(required(fields, "applicationId") j required(fields, "applicationCid"))
@@ -333,7 +423,7 @@ class HeadhunterStore(
     }
 
     companion object {
-        val KINDS = setOf("evidence", "source", "employer", "listing", "contact", "representation", "application", "artifact", "review", "action")
+        val KINDS = setOf("evidence", "source", "employer", "listing", "contact", "representation", "application", "artifact", "profile", "review", "action")
         val EVIDENCE = setOf("resume", "experience", "project", "commentary", "correction")
         val DELIVERED = setOf("sent", "submitted", "applied", "contacted", "confirmed", "delivered", "completed")
         val REVIEW_FIELDS = setOf("reviewStatus", "reviewId")

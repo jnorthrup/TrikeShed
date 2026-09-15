@@ -36,7 +36,7 @@ class LcncVisualEditorTest {
     }
 
     @Test
-    fun `BlockEditor handles drag-and-drop of blocks in canvas`() = runTest {
+    fun `BlockEditor renders block ordering controls`() = runTest {
         val child1 = LcncBlock(id = "c1", type = "paragraph", parentId = "p1", content = "Child 1")
         val child2 = LcncBlock(id = "c2", type = "paragraph", parentId = "p1", content = "Child 2")
         val parent = LcncBlock(
@@ -51,9 +51,8 @@ class LcncVisualEditorTest {
         val editor = BlockEditor(parent, ingestState)
         val html = editor.renderHtml()
         
-        // ensure attributes needed for drag/drop or ordering exist
-        assertTrue(html.contains("lcncMoveBlockUp"))
-        assertTrue(html.contains("lcncMoveBlockDown"))
+        assertTrue(html.contains("aria-label=\"Move block up\""))
+        assertTrue(html.contains("aria-label=\"Move block down\""))
     }
 
     @Test

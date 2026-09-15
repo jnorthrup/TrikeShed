@@ -14,6 +14,10 @@ import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
+import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
+import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinBrowserJsIr
+import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
+import org.jetbrains.kotlin.gradle.targets.js.ir.WebpackConfigurator
 
 plugins {
     kotlin("multiplatform") version "2.4.20"
@@ -36,6 +40,11 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
+val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph")
+// Select the browser apps packaged with the daemon: -PkotlinJsApps=documents,spacegraph.
+val kotlinJsApps = providers.gradleProperty("kotlinJsApps").orElse(kotlinJsBrowserApps.joinToString(",")).get()
+    .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
+require(kotlinJsApps.all { it in kotlinJsBrowserApps }) { "kotlinJsApps must name apps in $kotlinJsBrowserApps" }
 val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
 val viewServerNodeSlice = false
 val linuxHost = System.getProperty("os.name").lowercase().contains("linux")
@@ -108,13 +117,23 @@ kotlin {
             testTask {
                 enabled = enableBrowserTests
                 useKarma {
-                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
                     useChromeHeadless()
                 }
             }
         }
-        binaries.executable()
         val jsMainCompilation = compilations.getByName("main")
+        // KGP creates webpack tasks automatically only for main; app compilations use the same configurator.
+        val webpack = WebpackConfigurator((this as KotlinJsIrTarget).browser as KotlinBrowserJsIr)
+        webpack.configureBuild {
+            mainOutputFileName.set("${compilation.name}.js")
+        }
+        for (app in kotlinJsBrowserApps + "viewserver") {
+            val application = compilations.create(app) {
+                associateWith(jsMainCompilation)
+            }
+            binaries.executable(application)
+            if (app in kotlinJsBrowserApps) webpack.setupBuild(application)
+        }
         val uringBenchmark = compilations.create("uringBenchmark") {
             associateWith(jsMainCompilation)
             defaultSourceSet.kotlin.srcDir("src/jsBenchmark/kotlin")
@@ -129,7 +148,6 @@ kotlin {
             testTask {
                 enabled = enableBrowserTests
                 useKarma {
-                    useConfigDirectory(project.layout.projectDirectory.dir("karma.config.d").asFile)
                     useChromeHeadless()
                 }
             }
@@ -371,6 +389,22 @@ kotlin {
     // here cannot resolve at configuration time.
 }
 
+// Shared Kotlin -> app compilation -> webpack -> staging -> JVM resources.
+val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
+    group = "forge"
+    description = "Package the Kotlin/JS browser apps selected by kotlinJsApps."
+    for (app in kotlinJsApps) {
+        val bundle = tasks.named<KotlinWebpack>("jsBrowser${app.replaceFirstChar(Char::uppercase)}ProductionWebpack")
+        from(bundle.flatMap { it.outputDirectory }) { into("web/kotlin/$app") }
+    }
+    into(layout.buildDirectory.dir("generated/kotlinJs/resources"))
+}
+
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
+    from(stageKotlinJs)
+    doFirst { project.delete(destinationDir.resolve("web/kotlin")) }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // Gradle Configuration Cache / Deprecation Suppression Hooks
 // ─────────────────────────────────────────────────────────────────
@@ -546,7 +580,7 @@ tasks.withType<JavaCompile>().configureEach {
     )
 }
 
-// Explicit test configuration to force Karma Electron usage
+// Include the configured browser tests for both Kotlin browser targets.
 tasks.named("jsTest") {
     dependsOn("jsBrowserTest")
 }
@@ -1106,7 +1140,7 @@ require(forgePagesStages.all { it in setOf("jvm", "js", "wasm") }) { "forgePages
 require("jvm" in forgePagesStages) { "forgePagesStages must include jvm (the baker)" }
 
 val forgeBundleScripts: List<String> = buildList {
-    if ("js" in forgePagesStages) add("./js/TrikeShed.js")
+    if ("js" in forgePagesStages) add("./kotlin/forge/forge.js")
     if ("wasm" in forgePagesStages) add("./wasm/TrikeShed.js")
 }
 
@@ -1132,12 +1166,12 @@ tasks.register<Sync>("generateForgePages") {
     from(project.layout.projectDirectory.dir("src/commonMain/resources/web")) {
         exclude("index.html")
     }
+    from(stageKotlinJs.map { it.destinationDir.resolve("web") })
     // Only the compiled bundle files: the distribution also carries every processed resource
     // (web/, confix/, openapi/, …) and, if a webpack SW plugin were present, its own sw.js.
     val bundleFiles = listOf("*.js", "*.mjs", "*.wasm", "*.LICENSE.txt")
     if ("js" in forgePagesStages) {
-        dependsOn("jsBrowserDistribution")
-        from(project.layout.buildDirectory.dir("dist/js/productionExecutable")) { into("js"); include(bundleFiles); exclude("sw.js", "workbox-*.js") }
+        require("forge" in kotlinJsApps) { "forgePagesStages=js requires forge in kotlinJsApps" }
     }
     if ("wasm" in forgePagesStages) {
         dependsOn("wasmJsBrowserDistribution")
@@ -1160,7 +1194,6 @@ tasks.register<Sync>("generateForgePages") {
         include("surfaces.html")        // the operator-surface index the bake writes
         include(".nojekyll")
         include("*.md")                 // top level only; subtrees below are named explicitly
-        include("*.mjs")                // build-graph, check-graph, render-rete-evidence, the model + its test
         include("*.png")                // the rendered graphs
         include("connections.json")
         include("graph-template.html")
@@ -1170,16 +1203,8 @@ tasks.register<Sync>("generateForgePages") {
         include("subvm/**")
     }
 
-    // Hand-written sw.js: expand the precache token with the selected bundles; stamp the cache name per stage set.
-    val precacheExtra = forgeBundleScripts.joinToString("") { ",\n        '$it'" }
     val stageStamp = forgePagesStages.sorted().joinToString("-")
     inputs.property("forgePagesStages", forgePagesStages.sorted())
-    filesMatching("sw.js") {
-        filter { line ->
-            line.replace("/*FORGE_PRECACHE_EXTRA*/", precacheExtra)
-                .replace("forge-cache-v3'", "forge-cache-v3-$stageStamp'")
-        }
-    }
 
     doLast {
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
@@ -1266,7 +1291,6 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
     val webDir = file("src/commonMain/resources/web")
     val htmlFile = File(webDir, "index.html")
     val cssFile = File(webDir, "styles.css")
-    val jsFile = File(webDir, "script.js")
 
     val outputDir = layout.buildDirectory.dir("generated/source/forgeAssets/kotlin/borg/trikeshed/forge/generated")
 
@@ -1299,13 +1323,13 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
     val resourcesDir = file("src/commonMain/resources")
     inputs.file(htmlFile)
     inputs.file(cssFile)
-    inputs.file(jsFile)
     inputs.files(bundleAllowlist.map { File(resourcesDir, it) }.filter { it.isFile })
     inputs.property("bundleAllowlist", bundleAllowlist)
     outputs.dir(outputDir)
 
     doLast {
         val outDirFile = outputDir.get().asFile
+        project.delete(outDirFile)
         outDirFile.mkdirs()
 
         fun createByteArray(name: String, bytes: ByteArray): String {
@@ -1335,13 +1359,11 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
 
         createByteArray("ForgeAssetsHtml", htmlFile.readBytes())
         createByteArray("ForgeAssetsCss", cssFile.readBytes())
-        createByteArray("ForgeAssetsJs", jsFile.readBytes())
 
         File(outDirFile, "ForgeAssets.kt").writeText(
             "package borg.trikeshed.forge.generated\n\ninternal object ForgeAssets {\n" +
             "    val indexHtml: String by lazy { ForgeAssetsHtml.data.decodeToString() }\n" +
             "    val stylesCss: String by lazy { ForgeAssetsCss.data.decodeToString() }\n" +
-            "    val scriptJs: String by lazy { ForgeAssetsJs.data.decodeToString() }\n" +
             "}\n"
         )
 
@@ -1595,7 +1617,7 @@ tasks.register("scriptPolicy") {
     description = "Report remaining non-Gradle operator scripts as policy violations."
     doLast {
         val violations = fileTree("scripts").files + fileTree("bin") {
-            include("*.sh", "*.cjs", "oroboros-*", "mux", "modelmux-cli", "trikeshed-btrfs")
+            include("*.sh", "oroboros-*", "mux", "modelmux-cli", "trikeshed-btrfs")
         }.files
         val shells = file("build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
             if (Regex("commandLine\\(\"(bash|sh|zsh)\"").containsMatchIn(line)) "build.gradle.kts:${index + 1}: ${line.trim()}" else null
@@ -1722,62 +1744,6 @@ tasks.register<JavaExec>("curatorStateModel") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
     providers.gradleProperty("profileDir").orNull?.let { args(it) }
     providers.gradleProperty("daysAhead").orNull?.let { args(it) }
-}
-
-// ── The document surface's bundle (Forge genesis, Cut D) ────────────────────
-// GWT-style: page logic is commonMain Kotlin compiled to the browser bundle. This stages that
-// bundle beside the JVM resources so the daemon serves it at /kotlin/TrikeShed.js for
-// /documents. It is not part of hotswapFeed (webpack is a separate step); run it when the
-// bundle's sources change: ./gradlew stageKotlinJs
-tasks.register<Copy>("stageKotlinJs") {
-    group = "forge"
-    description = "Stage build/kotlin-webpack/js/productionExecutable/TrikeShed.js as web/kotlin/TrikeShed.js under the JVM resources."
-    dependsOn("jsBrowserProductionWebpack")
-    from(project.layout.buildDirectory.dir("kotlin-webpack/js/productionExecutable")) { include("TrikeShed.js") }
-    into(project.layout.buildDirectory.dir("processedResources/jvm/main/web/kotlin"))
-}
-// The staged bundle lands in a directory other JVM tasks read; Gradle wants that ordering said.
-tasks.matching { it.name == "jvmJar" || it.name == "jvmTest" || it.name == "stageDaemonLib" }.configureEach { mustRunAfter("stageKotlinJs") }
-
-tasks.register<Exec>("spacegraphBrowserCheck") {
-    group = "verification"
-    description = "Isolated SpaceGraph provider, interaction and screenshot checks against the local server."
-    timeout.set(Duration.ofSeconds(180))
-    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "src/jvmTest/js/spacegraph-browser.check.cjs")
-    providers.gradleProperty("browserModules").orNull?.let { environment("NODE_PATH", it) }
-    environment("SPACEGRAPH_BASE_URL", providers.gradleProperty("spacegraphBaseUrl").orElse("http://127.0.0.1:8888").get())
-    environment("SPACEGRAPH_LOCAL_ASSETS", providers.gradleProperty("spacegraphLocalAssets").orElse("false").get())
-    environment("SPACEGRAPH_OFFLINE", providers.gradleProperty("spacegraphOffline").orElse("false").get())
-    environment("SPACEGRAPH_LIVE", providers.gradleProperty("spacegraphLive").orElse("false").get())
-}
-
-tasks.register<Exec>("landscapeCheck") {
-    group = "verification"
-    description = "Check shared landscape selection, layout, and Shake contracts."
-    timeout.set(Duration.ofSeconds(180))
-    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "--test", "src/jvmTest/js/landscape.test.cjs")
-}
-
-tasks.register<Exec>("installSpacegraphDependencies") {
-    group = "forge"
-    workingDir("design/spacegraph7-port")
-    commandLine(providers.gradleProperty("browserNpm").orElse("npm").get(), "ci", "--ignore-scripts", "--no-audit", "--no-fund")
-    inputs.files("design/spacegraph7-port/package.json", "design/spacegraph7-port/package-lock.json")
-    outputs.dir("design/spacegraph7-port/node_modules")
-    timeout.set(Duration.ofSeconds(180))
-}
-tasks.register<Exec>("bundleSpacegraph") {
-    group = "forge"
-    dependsOn("installSpacegraphDependencies")
-    commandLine(providers.gradleProperty("browserNode").orElse("node").get(), "design/spacegraph7-port/node_modules/esbuild/bin/esbuild",
-        "src/commonMain/resources/web/narchy/spacegraph/SpatialWorkspace.mjs", "--bundle", "--format=iife", "--minify",
-        "--supported:template-literal=false", "--legal-comments=inline", "--outfile=src/commonMain/resources/web/spacegraph-shadow.js")
-    inputs.dir("src/commonMain/resources/web/narchy/spacegraph")
-    outputs.file("src/commonMain/resources/web/spacegraph-shadow.js")
-    timeout.set(Duration.ofSeconds(180))
-}
-tasks.matching { it.name.endsWith("ProcessResources") || it.name == "generateForgeAssets" }.configureEach {
-    mustRunAfter("bundleSpacegraph")
 }
 
 // Native IPNS client; its transport and durable state use the common uring facade.

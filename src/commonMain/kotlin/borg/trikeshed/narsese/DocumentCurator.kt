@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
+import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
@@ -34,6 +35,10 @@ data class DocumentProposal(
     val modality: String? = null,
     val reasons: Series<String> = emptySeriesOf(),
     val receiptCid: ContentId? = null,
+    /** Source quotation only; [begin]/[end] retain the model's unmodified offsets. */
+    val quotationReceiptCid: ContentId? = null,
+    val quotationBegin: Int? = null,
+    val quotationEnd: Int? = null,
 )
 
 /** Only [expression]'s outer source attribution is submitted, never its quoted proposition. */
@@ -61,7 +66,14 @@ data class DocumentCurationRecord(
     val submittedReceiptCids: Series<ContentId> = emptySeriesOf(),
     val duplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
     val observerFailures: Series<String> = emptySeriesOf(),
+    val instructions: String = DocumentCuratorGrounding.instructions,
+    /** Quotation occurrence is separate from admission of the model's semantic interpretation. */
+    val quotationReservedReceiptCids: Series<ContentId> = emptySeriesOf(),
+    val quotationSubmittedReceiptCids: Series<ContentId> = emptySeriesOf(),
+    val quotationDuplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
 )
+
+typealias DocumentCurationReceipt = Join<ContentId, DocumentCurationRecord>
 
 data class DocumentCurationResult(
     val recordCid: ContentId,

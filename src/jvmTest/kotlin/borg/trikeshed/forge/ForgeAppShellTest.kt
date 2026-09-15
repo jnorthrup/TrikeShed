@@ -8,8 +8,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The shell ForgeApp renders must be the one `web/script.js` drives: same template, every slot
- * filled, the seed parseable and shaped the way the script reads it.
+ * ForgeApp fills every template slot and supplies a parseable seed for compiled Kotlin bundles.
  */
 class ForgeAppShellTest {
 
@@ -17,15 +16,14 @@ class ForgeAppShellTest {
 
     @Test
     fun everyTemplateSlotIsFilled() {
-        for (slot in listOf(ForgeApp.SEED_SLOT, ForgeApp.STYLES_SLOT, ForgeApp.SCRIPT_SLOT, ForgeApp.GALLERY_SLOT, ForgeApp.BUNDLES_SLOT)) {
+        for (slot in listOf(ForgeApp.SEED_SLOT, ForgeApp.STYLES_SLOT, ForgeApp.GALLERY_SLOT, ForgeApp.BUNDLES_SLOT)) {
             assertFalse(html.contains(slot), "unfilled slot $slot")
         }
         assertFalse(html.contains("{{"), "stray mustache in rendered shell")
     }
 
     @Test
-    fun shellIsTheWebTemplateScriptJsExpects() {
-        // ids script.js resolves at load; a missing one is a null-deref on first paint
+    fun shellContainsTemplateElements() {
         for (id in listOf(
             "forge-seed", "page-tree", "breadcrumb", "doc-title", "doc-icon", "doc-blocks", "doc-scroll",
             "board-scroll", "board-canvas", "slash-menu", "seed-note", "sync-note",
@@ -39,7 +37,6 @@ class ForgeAppShellTest {
     @Test
     fun pwaWiringIsRelativeNotRootScoped() {
         assertTrue(html.contains("href=\"./manifest.webmanifest\""))
-        assertTrue(html.contains("register('./sw.js')"))
         assertFalse(html.contains("href=\"/manifest.webmanifest\""), "root-absolute manifest would pin the PWA to the origin root")
         assertTrue(html.contains("./icons/forge-icon.svg"))
     }
@@ -72,12 +69,12 @@ class ForgeAppShellTest {
     @Test
     fun bundlesAreRelativeDeferredScriptsAfterTheSeed() {
         assertFalse(html.contains("<script src="), "stage jvm ships no bundle tags")
-        val withBundle = ForgeApp.renderHtml(userId = "forge-shell-test", bundles = listOf("./js/TrikeShed.js"))
-        val tag = "<script src=\"./js/TrikeShed.js\" defer></script>"
+        val withBundle = ForgeApp.renderHtml(userId = "forge-shell-test", bundles = listOf("./kotlin/forge/forge.js"))
+        val tag = "<script src=\"./kotlin/forge/forge.js\" defer></script>"
         val tagAt = withBundle.indexOf(tag)
         assertTrue(tagAt >= 0, "bundle tag present, relative, deferred")
         assertTrue(withBundle.indexOf("id=\"forge-seed\"") < tagAt, "bundle runs after the seed is in the DOM")
-        assertTrue(tagAt < withBundle.indexOf("register('./sw.js')"), "bundle tag precedes SW registration")
+        assertFalse(withBundle.contains("<script>"), "page logic comes from compiled Kotlin bundles")
     }
 
     @Test

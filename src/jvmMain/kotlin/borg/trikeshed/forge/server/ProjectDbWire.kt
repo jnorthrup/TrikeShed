@@ -41,7 +41,7 @@ class ProjectDbRegistry(private val primaryDbName: String) {
 
     private val reserved = setOf(
         "api", "graal", "futon", "blackboard", "icons", "index.html",
-        "styles.css", "script.js", "sw.js", "manifest.webmanifest", "_replicate", "_project",
+        "styles.css", "manifest.webmanifest", "_replicate", "_project",
     )
 
     fun refusalFor(name: String): String? = when {

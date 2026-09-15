@@ -45,9 +45,9 @@ class PwaGalleryTest {
         assertTrue(html.contains("url2.jpg"))
 
         // Next/Prev buttons
-        assertTrue(html.contains("pwaGalleryNext"))
-        assertTrue(html.contains("pwaGalleryPrev"))
-        assertTrue(html.contains("pwaGalleryClose"))
+        assertTrue(html.contains("pwa-gallery-next"))
+        assertTrue(html.contains("pwa-gallery-prev"))
+        assertTrue(html.contains("pwa-gallery-close"))
     }
 
     @Test

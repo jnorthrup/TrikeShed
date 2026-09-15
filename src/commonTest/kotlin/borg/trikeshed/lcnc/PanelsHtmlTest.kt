@@ -102,10 +102,9 @@ class PanelsHtmlTest {
     }
 
     @Test
-    fun moduleDrawerRenderSubVmLegosWithRunFeint() {
+    fun moduleDrawerRendersSubVmLegos() {
         val html = ConcentricSurface.panelsHtml(board(), modules())
         assertTrue(html.contains("vm.tika"), "tika lego in the drawer")
-        assertTrue(html.contains("/api/lcnc/run"), "drawer click lowers to the generic runner dispatch")
     }
 
     @Test
@@ -119,8 +118,6 @@ class PanelsHtmlTest {
             )),
         )
         val html = ConcentricSurface.panelsHtml(hostile, modules())
-        // The card TITLE must be escaped; the page's own run-feint <script> block is
-        // legitimate, so assert on the escaped card body only.
         assertTrue(html.contains("&lt;script&gt;alert(1)&lt;/script&gt;"), "card titles are escaped")
     }
 }

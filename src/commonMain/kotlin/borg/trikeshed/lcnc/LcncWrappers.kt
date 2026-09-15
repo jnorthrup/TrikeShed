@@ -37,8 +37,6 @@ import borg.trikeshed.lib.size
 enum class LcncBindingKind {
     /** A Kotlin lambda in the registry — provenance is the class that made it. */
     KOTLIN,
-    /** The canvas's own JavaScript method, run in a HostAccess.NONE GraalJS context. */
-    CANVAS_JS,
     /** A stored program with formal ports, loaded by name when the walk reaches it. */
     COMPOSITE,
     /** A contract with no runner — `js`, `display`: the canvas renders it, the daemon skips it. */
@@ -48,9 +46,6 @@ enum class LcncBindingKind {
 data class LcncBinding(val type: String, val kind: LcncBindingKind, val provenance: String)
 
 object LcncWrappers {
-
-    /** The single class that binds canvas JavaScript; its name is the lane's signature. */
-    const val CANVAS_JS_BINDER = "CanvasJsPureNodes"
 
     /**
      * ONE pass over [registry] — every type in [contracts] gets a binding,
@@ -73,8 +68,7 @@ object LcncWrappers {
             when {
                 runner != null -> {
                     val by = provenance(runner)
-                    val kind = if (by.contains(CANVAS_JS_BINDER)) LcncBindingKind.CANVAS_JS else LcncBindingKind.KOTLIN
-                    out.add(LcncBinding(type, kind, by))
+                    out.add(LcncBinding(type, LcncBindingKind.KOTLIN, by))
                 }
                 type in composites -> out.add(LcncBinding(type, LcncBindingKind.COMPOSITE, "program:$type"))
                 else -> out.add(LcncBinding(type, LcncBindingKind.UNBOUND, ""))

@@ -12,7 +12,7 @@ import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 @Serializable
 enum class ForgeGallerySection {
     LAYOUT, INPUT, DISPLAY, FEEDBACK, DATA, CANVAS,
-    FORGE, KANBAN, CONFIX, COUCH, CAS, HOST,
+    FORGE, CONFIX, COUCH, CAS, HOST,
 }
 
 /**
@@ -160,23 +160,6 @@ object ForgeGalleryCatalog {
         forge("forge.graph", "Causal Graph",
             synopsis = "Force-directed causal DAG; drag, zoom, click-to-inspect.",
             previewToken = "forge-causal-graph",
-            supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "WASM_JS_BROWSER"),
-        ),
-
-        // ── KANBAN — the typed card / column / WIP primitives ──
-        kanban("kanban.card", "Card",
-            synopsis = "Card with priority, status, checklist, attachments.",
-            previewToken = "kanban-card",
-            supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE"),
-        ),
-        kanban("kanban.column", "Column",
-            synopsis = "Ordered lane with WIP limit and ordered card placement.",
-            previewToken = "kanban-column",
-            supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE"),
-        ),
-        kanban("kanban.wip", "WIP Limit",
-            synopsis = "Visual + state enforcement when lane exceeds capacity.",
-            previewToken = "kanban-wip",
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "WASM_JS_BROWSER"),
         ),
 
@@ -422,23 +405,6 @@ object ForgeGalleryCatalog {
     ): ForgeGalleryWidget = ForgeGalleryWidget(
         id = id,
         section = ForgeGallerySection.FORGE,
-        name = name,
-        synopsis = synopsis,
-        supportTargets = supportTargets,
-        previewToken = previewToken,
-        apiSignature = apiSignature,
-    )
-
-    private fun kanban(
-        id: String,
-        name: String,
-        synopsis: String,
-        previewToken: String,
-        supportTargets: Set<String>,
-        apiSignature: String? = null,
-    ): ForgeGalleryWidget = ForgeGalleryWidget(
-        id = id,
-        section = ForgeGallerySection.KANBAN,
         name = name,
         synopsis = synopsis,
         supportTargets = supportTargets,

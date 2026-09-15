@@ -2566,6 +2566,7 @@ object OroborosDaemon {
                 runCatching { kanbanJob.cancel() }
                 runCatching { moduleSupervisor.drainAll() }
                 runCatching { tribunalHolder.instance?.nexus?.drain() }
+                runCatching { headhunterWire.drainCuration() }
                 runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
                 runCatching { headhunterWire.close() }
                 runCatching { turnReview?.close() }

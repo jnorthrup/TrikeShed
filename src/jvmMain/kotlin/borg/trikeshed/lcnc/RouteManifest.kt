@@ -249,7 +249,7 @@ object RouteManifest {
             RouteEntry("GET", "/harness", "blackboard harness surface"),
             RouteEntry("GET", "/documents", "document surface: the first page drawn by commonMain through the Kotlin/JS bundle"),
             RouteEntry("GET", "/documents.html", "document surface (file name form)"),
-            RouteEntry("GET", "/kotlin/TrikeShed.js", "the browser bundle compiled from commonMain (staged by ./gradlew stageKotlinJs)"),
+            RouteEntry("GET", "/kotlin/{app}/…", "compiled Kotlin browser app bundles and chunks"),
         ),
     )
 

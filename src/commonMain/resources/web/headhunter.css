@@ -7,8 +7,8 @@ button,input,select,textarea{font:inherit}
 button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:7px 13px;border:1px solid #59665f;border-radius:6px;background:#2b3434;color:var(--ink);text-decoration:none;cursor:pointer;line-height:1.4;font-size:13px;font-weight:550}
 button:hover:not(:disabled),.button:hover{background:#354440;border-color:var(--accent)}
 button:disabled{opacity:.45;cursor:not-allowed}
-button.primary{background:#95dfcd;border-color:#95dfcd;color:#132723}
-button.primary:hover:not(:disabled){background:#b3ecde}
+button.primary,.button.primary{background:#95dfcd;border-color:#95dfcd;color:#132723}
+button.primary:hover:not(:disabled),.button.primary:hover{background:#b3ecde}
 button.quiet{background:transparent;border-color:var(--line);padding:5px 10px;min-height:32px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 input,select,textarea{width:100%;min-width:0;padding:9px 10px;color:var(--ink);background:#191e21;border:1px solid #53605f;border-radius:5px;font-size:14px}
@@ -26,6 +26,14 @@ p+p{margin-top:8px}
 .hh-header,.section-heading,.panel-heading{display:flex;align-items:center;justify-content:space-between;gap:18px}
 .hh-header{padding-bottom:28px;align-items:flex-start}
 .hh-header .muted{margin-top:8px}
+.drop-zone{display:flex;flex-direction:column;gap:14px;padding:26px 28px;border:2px dashed #617d73;border-radius:10px;background:#1c2926;margin-bottom:18px;transition:background .12s,border-color .12s}
+.drop-zone.dragging{background:#29463d;border-color:var(--accent)}
+.drop-zone .actions{align-items:flex-end}.drop-zone .field{max-width:310px}
+.import-results{margin-bottom:26px}.import-results:empty{display:none}
+.import-pending{border-style:dashed}.import-pending p{margin-top:10px}
+.source-access{margin-top:0}.source-access>summary{font-size:15px}.source-access form{margin-top:18px}
+.material-text{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;margin:22px 0 0;color:var(--ink)}
+#material-actions{margin-top:16px}
 .eyebrow{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--accent);margin-bottom:9px;font-weight:600}
 .muted{color:var(--dim)}
 .small{font-size:13px}
@@ -106,5 +114,17 @@ dialog .panel-heading{position:sticky;top:-25px;padding-top:5px;padding-bottom:1
 .skip-link:focus{top:48px}
 .program-node{border-bottom:1px solid var(--line);padding:10px 0;font-size:13px}
 .program-node strong{display:block}
+.profile-overview{display:flex;flex-wrap:wrap;align-items:center;gap:18px 28px;padding:20px 0 24px;border-bottom:1px solid var(--line)}
+.profile-overview h2{font-size:18px}.profile-overview>div:first-child{flex:1;min-width:240px}.profile-overview>a{font-size:13px}
+.profile-counts{display:flex;gap:22px}.profile-count{display:flex;flex-direction:column;font-size:12px;color:var(--dim)}.profile-count strong{font-size:23px;color:var(--ink);line-height:1.25}
+.curation-plan{margin-bottom:20px}.curation-plan>p{max-width:850px}.curation-plan .actions{margin-top:20px}
+.curation-columns{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:24px;margin-top:18px}
+.curation-documents{list-style:none;margin:8px 0 0;padding:0;max-height:300px;overflow:auto}.curation-documents li{padding:9px 0;border-bottom:1px solid var(--line)}
+.curation-documents button{max-width:100%;text-align:left;overflow-wrap:anywhere}.curation-documents p{margin-top:4px;overflow-wrap:anywhere}
+.profile-guidance{margin:20px 0}.claim-group>h3{margin-bottom:12px}.claim-card{padding:20px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+.claim-card h4{font-size:16px;margin:12px 0 5px;overflow-wrap:anywhere}.claim-card blockquote{margin:14px 0;padding:10px 15px;border-left:3px solid #668c7d;background:#1b2423;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px}
+.claim-source{margin-top:12px}.claim-source button{max-width:100%;text-align:left;overflow-wrap:anywhere}.claim-review form{display:flex;flex-direction:column;gap:12px;padding-top:10px}.claim-review .field{font-size:12px}
+#profile-rejected-claims{margin-top:16px}
 @media(max-width:1050px){.hh-shell{padding:28px 24px 60px}.workspace-grid{grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr)}.hh-tabs{gap:20px}}
+@media(max-width:760px){.curation-columns{grid-template-columns:1fr;gap:16px}.profile-overview{gap:16px}.profile-counts{gap:20px}.claim-card{padding:16px}}
 @media(max-width:760px){.hh-shell{padding:24px 16px 50px}.hh-header{gap:12px}.hh-header>button{padding:7px 10px;font-size:12px}h1{font-size:29px}.hh-header .muted{font-size:13px}.workspace-grid,.record-grid,.artifact-grid{grid-template-columns:1fr}.section-heading{flex-direction:column;gap:12px}.panel{padding:18px}.record-toolbar{flex-wrap:wrap}.record-toolbar .field:first-child{width:140px}.record-toolbar .grow{min-width:140px}.fields{grid-template-columns:1fr}.selection{padding:10px}.panel-heading{gap:10px}.hh-tabs{margin-bottom:24px}.hh-tabs a{font-size:13px}dialog{padding:20px}.hh-header{align-items:center}.welcome{padding:22px}.mode-choices{gap:14px}}

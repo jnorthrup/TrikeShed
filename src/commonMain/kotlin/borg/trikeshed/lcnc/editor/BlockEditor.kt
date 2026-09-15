@@ -54,15 +54,15 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
             
             // Block Controls (Move up, move down, insert, delete, indent, outdent)
             div(classes = "lcnc-block-controls") {
-                text("<button onclick=\"window.lcncMoveBlockUp('${block.id}')\" aria-label=\"Move block up\" title=\"Move block up\"><span aria-hidden=\"true\">↑</span></button>")
-                text("<button onclick=\"window.lcncMoveBlockDown('${block.id}')\" aria-label=\"Move block down\" title=\"Move block down\"><span aria-hidden=\"true\">↓</span></button>")
-                text("<button onclick=\"window.lcncIndentBlock('${block.id}')\" aria-label=\"Indent block\" title=\"Indent block\"><span aria-hidden=\"true\">→</span></button>")
-                text("<button onclick=\"window.lcncOutdentBlock('${block.id}')\" aria-label=\"Outdent block\" title=\"Outdent block\"><span aria-hidden=\"true\">←</span></button>")
+                text("<button aria-label=\"Move block up\" title=\"Move block up\"><span aria-hidden=\"true\">↑</span></button>")
+                text("<button aria-label=\"Move block down\" title=\"Move block down\"><span aria-hidden=\"true\">↓</span></button>")
+                text("<button aria-label=\"Indent block\" title=\"Indent block\"><span aria-hidden=\"true\">→</span></button>")
+                text("<button aria-label=\"Outdent block\" title=\"Outdent block\"><span aria-hidden=\"true\">←</span></button>")
                 
                 // Block creation menu
                 text("<div class=\"lcnc-block-menu\">")
-                text("<button onclick=\"window.lcncInsertBlock('${block.id}')\" aria-label=\"Insert new block\" title=\"Insert new block\"><span aria-hidden=\"true\">+</span></button>")
-                text("<select onchange=\"window.lcncChangeBlockType('${block.id}', this.value)\" aria-label=\"Change block type\">")
+                text("<button aria-label=\"Insert new block\" title=\"Insert new block\"><span aria-hidden=\"true\">+</span></button>")
+                text("<select aria-label=\"Change block type\">")
                 text("<option value=\"paragraph\"${if(block.type=="paragraph") " selected" else ""}>Text</option>")
                 text("<option value=\"heading_1\"${if(block.type=="heading_1") " selected" else ""}>Heading 1</option>")
                 text("<option value=\"heading_2\"${if(block.type=="heading_2") " selected" else ""}>Heading 2</option>")
@@ -74,7 +74,7 @@ class BlockEditor(var block: LcncBlock, val ingestState: IngestStateElement) {
                 text("</select>")
                 text("</div>")
 
-                text("<button onclick=\"window.lcncDeleteBlock('${block.id}')\" aria-label=\"Delete block\" title=\"Delete block\"><span aria-hidden=\"true\">x</span></button>")
+                text("<button aria-label=\"Delete block\" title=\"Delete block\"><span aria-hidden=\"true\">x</span></button>")
             }
 
             // Block Content editable area

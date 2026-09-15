@@ -37,19 +37,20 @@ class LcncWrappersTest {
         val registry = PureNodes.registry { 0L }
         val b = LcncWrappers.bindings(LcncContracts.all(), registry, { it.javaClass.name }).associateBy { it.type }
         assertEquals(LcncBindingKind.KOTLIN, b.getValue("timer").kind)
-        assertTrue("PureNodes" in b.getValue("timer").provenance, b.getValue("timer").provenance)
+        assertEquals(registry.getValue("timer").javaClass.name, b.getValue("timer").provenance)
         // Rendered by the canvas, never run by the daemon: unbound, and SAID so.
         assertEquals(LcncBindingKind.UNBOUND, b.getValue("display").kind)
         assertEquals(LcncBindingKind.UNBOUND, b.getValue("js").kind)
     }
 
     @Test
-    fun theCanvasJsLaneIsRecognisedByItsOneBinder() {
-        val registry = mapOf("pick" to LcncNodeRunner { _, _ -> emptyMap() })
+    fun pickUsesTheKotlinBinding() {
+        val registry = PureNodes.registry { 0L }
         val b = LcncWrappers.bindings(
-            LcncContracts.all(), registry, { "borg.trikeshed.lcnc.CanvasJsPureNodes\$pickRunner\$1" },
+            LcncContracts.all(), registry, { it.javaClass.name },
         ).associateBy { it.type }
-        assertEquals(LcncBindingKind.CANVAS_JS, b.getValue("pick").kind)
+        assertEquals(LcncBindingKind.KOTLIN, b.getValue("pick").kind)
+        assertTrue("PureNodes" in b.getValue("pick").provenance)
     }
 
     @Test

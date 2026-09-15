@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
 <link rel="stylesheet" href="/application-nav.css">
-<script src="/vendor/lucide-mux.js" defer></script>
-<script src="/application-nav.js" defer></script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Futon · trikeshed</title>
@@ -49,118 +48,28 @@ td.rev{color:var(--dim);max-width:130px}
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
-  <button onclick="firstPage()" title="Apply filter">go</button>
-  <button onclick="newDoc()">new document</button>
+  <button title="Apply filter">go</button>
+  <button>new document</button>
   <span id="info">…</span>
-  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button onclick="qsInstall()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button onclick="qsFeedback()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
+  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
 </div>
 <div id="wrap">
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="pager"><button id="prevB"><span aria-hidden="true">‹</span> prev</button><button id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
   </div>
   <div id="edit">
     <div class="head">
       <input id="docid" placeholder="_id" >
-      <button class="primary" onclick="saveDoc()">save</button>
-      <button onclick="deleteDoc()">delete</button>
-      <button onclick="loadDoc(document.getElementById('docid').value)">reload</button>
+      <button class="primary">save</button>
+      <button>delete</button>
+      <button>reload</button>
     </div>
     <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
     <div class="att" id="att"></div>
     <div id="status">select a document, or create one</div>
   </div>
 </div>
-<script>
-'use strict';
-const DB='trikeshed';const $=id=>document.getElementById(id);
-let pageStack=[null];let curStart=null;const LIMIT=100;let currentRev=null;
-const enc=id=>id.split('/').map(encodeURIComponent).join('/');
-function status(msg,cls){const s=$('status');s.textContent=msg;s.className=cls||'';}
-async function refreshInfo(){try{const i=await (await fetch('/'+DB)).json();
-  $('info').textContent=i.doc_count.toLocaleString()+' docs · seq '+i.update_seq;}catch(e){}}
-async function loadPage(startkey){
-  const p=$('prefix').value;
-  let url='/'+DB+'/_all_docs?limit='+(LIMIT+1);
-  const sk=startkey??(p||null);
-  if(sk)url+='&startkey='+encodeURIComponent('"'+sk+'"');
-  if(p)url+='&endkey='+encodeURIComponent('"'+p+'￰"');
-  const d=await (await fetch(url)).json();
-  const rows=d.rows||[];
-  const t=$('docs');t.innerHTML='<tr><th style="width:66%">_id</th><th>_rev</th></tr>';
-  rows.slice(0,LIMIT).forEach(r=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML='<td>'+r.id.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td><td class="rev">'+((r.value&&r.value.rev)||'').slice(0,18)+'…</td>';
-    tr.onclick=()=>loadDoc(r.id);
-    t.appendChild(tr);});
-  $('nextB').disabled=rows.length<=LIMIT;
-  $('prevB').disabled=pageStack.length<=1;
-  $('pageinfo').textContent=rows.length?rows[0].id.slice(0,46)+' …':'no documents';
-  window._nextKey=rows.length>LIMIT?rows[LIMIT].id:null;
-  refreshInfo();
-}
-function firstPage(){pageStack=[null];curStart=null;loadPage(null);}
-function nextPage(){if(!window._nextKey)return;pageStack.push(window._nextKey);loadPage(window._nextKey);}
-function prevPage(){if(pageStack.length<=1)return;pageStack.pop();loadPage(pageStack[pageStack.length-1]);}
-async function loadDoc(id){
-  $('docid').value=id;$('att').innerHTML='';currentRev=null;
-  try{
-    const r=await fetch('/'+DB+'/'+enc(id));
-    if(!r.ok){status('load failed: '+r.status,'err');return;}
-    const d=await r.json();currentRev=d._rev;
-    const body={};for(const [k,v] of Object.entries(d))if(k!=='_attachments')body[k]=v;
-    $('docbody').value=JSON.stringify(body,null,2);
-    if(d._attachments&&d._attachments.content){
-      const a=d._attachments.content;
-      $('att').innerHTML='attachment: <a href="/'+DB+'/'+enc(id)+'/content" target="_blank">content</a> · '+
-        (a.content_type||'')+' · '+(a.length||0).toLocaleString()+' bytes · <span style="font-family:monospace">'+(a.digest||'').slice(0,22)+'…</span>';
-    }
-    status('loaded '+(d._rev||'').slice(0,28)+'…','ok');
-  }catch(e){status('load failed: '+e,'err');}
-}
-async function saveDoc(){
-  const id=$('docid').value.trim();if(!id)return status('an _id is required','err');
-  let body;try{body=JSON.parse($('docbody').value||'{}');}catch(e){return status('not JSON: '+e.message,'err');}
-  delete body._id;if(currentRev&&!body._rev)body._rev=currentRev;
-  try{
-    const r=await fetch('/'+DB+'/'+enc(id),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const d=await r.json();
-    if(d.ok){currentRev=d.rev;status('saved · '+d.rev.slice(0,28)+'…','ok');loadPage(pageStack[pageStack.length-1]);}
-    else status((d.error||'error')+': '+(d.reason||''),'err');
-  }catch(e){status('save failed: '+e,'err');}
-}
-async function deleteDoc(){
-  const id=$('docid').value.trim();if(!id||!currentRev)return status('load the doc first (need its _rev)','err');
-  if(!confirm('delete '+id+' ?'))return;
-  try{
-    const r=await fetch('/'+DB+'/'+enc(id)+'?rev='+encodeURIComponent(currentRev),{method:'DELETE'});
-    const d=await r.json();
-    if(d.ok){status('deleted','ok');$('docbody').value='';currentRev=null;loadPage(pageStack[pageStack.length-1]);}
-    else status((d.error||'error')+': '+(d.reason||''),'err');
-  }catch(e){status('delete failed: '+e,'err');}
-}
-function newDoc(){$('docid').value='';$('docbody').value='{\n  \n}';currentRev=null;$('att').innerHTML='';status('new document — set an _id and save');}
-firstPage();
-</script>
-<script>
-function qsInstall(){
- var d=document.createElement('div');d.dataset.qs='1';
- d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center';
- d.innerHTML='<div style="background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace">'
-  +'<b style="color:#f29111">Run TrikeShed in anger &mdash; five minutes, one port</b>'
-  +'<pre id="qsCmds" style="background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git &amp;&amp; cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>'
-  +'<div style="color:#7b8496;margin-bottom:10px">then open http://localhost:8888 &mdash; drop a REAL folder on /graal, run a stored program via POST /api/lcnc/run, abuse the board. Every stumble is a bug we want.</div>'
-  +'<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit">copy commands</button> '
-  +'<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="color:#3fd0ff;margin-left:10px">README &#8599;</a>'
-  +'<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:#7b8496;margin-left:14px;cursor:pointer">close</button></div>';
- d.onclick=function(e){if(e.target===d)d.remove()};
- document.body.appendChild(d);
-}
-function qsFeedback(){
- var coords={prefix:(document.getElementById('prefix')||{}).value||'',doc:(document.getElementById('docid')||{}).value||''};
- var b='**Surface:** futon\n**URL:** '+location.href+'\n**Coordinates:**\n```json\n'+JSON.stringify(coords,null,1)+'\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n';
- window.open('https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback&title='+encodeURIComponent('[futon] ')+'&body='+encodeURIComponent(b),'_blank');
-}
-</script>
+
 </body>
 </html>

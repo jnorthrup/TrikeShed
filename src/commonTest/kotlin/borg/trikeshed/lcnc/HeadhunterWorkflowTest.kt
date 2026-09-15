@@ -35,6 +35,127 @@ class HeadhunterWorkflowTest {
             listing["id"] as String to listing["cid"] as String,
             application["id"] as String to application["cid"] as String,
         )
+
+        suspend fun profile(claims: Series<HeadhunterRecord>, source: HeadhunterRecord = evidence): HeadhunterRecord =
+            rig.save("profile", mapOf("title" to "Retained applicant profile", "model" to "curation-fixture",
+                "receiptCid" to rig.cas.put("Synthetic retained curation receipt".encodeToByteArray()).value,
+                "sources" to listOf(HeadhunterStore.reference(source)), "claims" to claims.toList(), "reviewStatus" to "proposed"))
+
+        fun claim(id: String, text: String, quote: String = fields(evidence)["text"] as String): HeadhunterRecord = mapOf(
+            "id" to id, "kind" to "experience", "subject" to "applicant", "text" to text, "quote" to quote,
+            "begin" to 0, "end" to quote.length, "grounded" to true, "polarity" to true, "modality" to "asserted",
+        )
+
+        suspend fun review(profile: HeadhunterRecord, claimId: String, decision: String): HeadhunterRecord =
+            rig.save("review", mapOf("subjectId" to profile["id"], "subjectCid" to profile["cid"], "claimId" to claimId, "decision" to decision))
+    }
+
+    @Test fun retainedProfilesAndReviewsEnterTheCompositionWithoutPromotingRejectedOrUnsupportedClaims() = runTest {
+        val fixture = Fixture().apply { open() }
+        val profile = fixture.profile(s_[
+            fixture.claim("approved", "Approved channel experience"),
+            fixture.claim("proposed", "Proposed Kotlin interpretation") + ("modality" to "reported"),
+            fixture.claim("rejected", "REJECTED INTERPRETATION"),
+            fixture.claim("unsupported", "UNSUPPORTED INTERPRETATION") + ("grounded" to false),
+            fixture.claim("false-quote", "FALSELY GROUNDED INTERPRETATION", "This quote is absent from the evidence"),
+        ])
+        val approved = fixture.review(profile, "approved", "approved")
+        val rejected = fixture.review(profile, "rejected", "rejected")
+        val listingProfile = fixture.profile(s_[fixture.claim("vacancy", "LISTING REQUIREMENTS ARE NOT EXPERIENCE", fields(fixture.listing)["text"] as String)], fixture.listing)
+        var prompt = ""
+        var calls = 0
+        val workflow = HeadhunterWorkflow(fixture.rig.store) {
+            calls++
+            prompt = it
+            JsonSupport.stringify(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q")) j "draft-fixture"
+        }
+        val pinned = workflow.pin(fixture.request("model"))
+        val result = fixture.run(workflow, pinned)
+        val context = context(result)
+        val claims = objects(context["claims"])
+        assertEquals(setOf("approved", "proposed"), claims.view.map { it["id"] }.toSet())
+        assertEquals("user-approved", claims.view.single { it["id"] == "approved" }["reviewStatus"])
+        assertEquals("proposed", claims.view.single { it["id"] == "proposed" }["reviewStatus"])
+        assertEquals("reported", claims.view.single { it["id"] == "proposed" }["modality"])
+        assertEquals(setOf(approved["id"], rejected["id"]), objects(context["reviews"]).view.map { it["id"] }.toSet())
+        assertEquals("grounded-profile-quotes", objects(context["evidence"])[0]["selection"])
+        assertTrue("Approved channel experience" in prompt)
+        assertTrue("Proposed Kotlin interpretation" in prompt)
+        for (excluded in s_["REJECTED INTERPRETATION", "UNSUPPORTED INTERPRETATION", "FALSELY GROUNDED INTERPRETATION", "LISTING REQUIREMENTS ARE NOT EXPERIENCE"].view)
+            assertFalse(excluded in prompt)
+        assertFalse(listingProfile["id"].toString() in prompt)
+        assertTrue("Listing requirements describe the vacancy, never the applicant's experience" in prompt)
+        assertEquals(1, calls, "Preparation reads retained curation and calls only its own drafting seam")
+        val expected = fixture.versions() + mapOf(profile["id"] as String to profile["cid"] as String,
+            approved["id"] as String to approved["cid"] as String, rejected["id"] as String to rejected["cid"] as String)
+        assertEquals(expected, result.consumed.associate { it["id"] as String to it["cid"] as String })
+        for (artifact in artifacts(result).view) assertEquals(expected, HeadhunterStore.references(fields(artifact)).view.associate { it.pair })
+    }
+
+    @Test fun revisedReviewsAndEvidenceAffectFreshPreparationWhilePinnedProfileReplayRemainsExact() = runTest {
+        val fixture = Fixture().apply { open() }
+        val profile = fixture.profile(s_[fixture.claim("channels", "Retained channel experience")])
+        val approved = fixture.review(profile, "channels", "approved")
+        val workflow = HeadhunterWorkflow(fixture.rig.store) { error("Assembly must reuse retained curation") }
+        val pinned = workflow.pin(fixture.request())
+        val first = fixture.run(workflow, pinned)
+        assertTrue(artifacts(first).view.all { "User-approved experience" in fields(it)["content"].toString() })
+        fixture.rig.save("review", fields(approved) + ("decision" to "rejected"), approved)
+        val rejected = fixture.run(workflow, fixture.request())
+        assertEquals(0, objects(context(rejected)["claims"]).size)
+        assertTrue(artifacts(rejected).view.none { "Retained channel experience" in fields(it)["content"].toString() })
+        val corrected = fixture.rig.save("evidence", fields(fixture.evidence) + ("text" to "Corrected source with a different professional scope."), fixture.evidence)
+        val fresh = fixture.run(workflow, fixture.request())
+        assertEquals(0, objects(context(fresh)["profiles"]).size)
+        assertEquals(0, objects(context(fresh)["reviews"]).size)
+        assertEquals(corrected["cid"], objects(context(fresh)["evidence"])[0]["cid"])
+        val replay = fixture.run(workflow, pinned)
+        assertEquals(first.inputFingerprint, replay.inputFingerprint)
+        assertEquals(artifacts(first).view.associate { it["id"] to it["cid"] }, artifacts(replay).view.associate { it["id"] to it["cid"] })
+        assertEquals(approved["cid"], objects(context(replay)["reviews"])[0]["cid"])
+        fixture.rig.save("evidence", fields(corrected) + ("deleted" to true), corrected)
+        assertFailsWith<IllegalArgumentException> { workflow.pin(fixture.request()) }
+        assertEquals(artifacts(first).view.associate { it["id"] to it["cid"] }, artifacts(fixture.run(workflow, pinned)).view.associate { it["id"] to it["cid"] })
+    }
+
+    @Test fun completeResumeVersionsAboveTheOldLimitRemainIntactAndOversizedInputIsRejectedExplicitly() = runTest {
+        val fixture = Fixture().apply { open() }
+        val first = fixture.rig.evidence("A".repeat(8688))
+        val second = fixture.rig.evidence("B".repeat(8688))
+        val workflow = HeadhunterWorkflow(fixture.rig.store) { error("Assembly does not need a model") }
+        val request = fixture.request() + ("evidenceIds" to listOf(first["id"], second["id"]))
+        val result = fixture.run(workflow, request)
+        val selected = objects(context(result)["evidence"])
+        assertEquals(17376, selected.view.sumOf { it["text"].toString().length })
+        assertTrue(selected.view.all { it["selection"] == "full-text" })
+        val resume = artifacts(result).view.single { fields(it)["type"] == "resume" }
+        assertTrue(fields(first)["text"].toString() in fields(resume)["content"].toString())
+        assertTrue(fields(second)["text"].toString() in fields(resume)["content"].toString())
+        val oversized = fixture.rig.evidence("X".repeat(HeadhunterWorkflow.MAX_APPLICANT_CHARACTERS + 1))
+        val committed = fixture.rig.log.committed
+        val failure = assertFails { fixture.run(workflow, fixture.request() + ("evidenceIds" to listOf(oversized["id"]))) }
+        assertTrue(failure.toString().contains("${HeadhunterWorkflow.MAX_APPLICANT_CHARACTERS}"))
+        assertEquals(committed, fixture.rig.log.committed)
+    }
+
+    @Test fun retainedGroundedQuotesAutomaticallyProjectALargerOriginalWithoutTruncatingIt() = runTest {
+        val fixture = Fixture().apply { open() }
+        val quote = "Built Kotlin channel compositions."
+        val original = fixture.rig.evidence(quote + " Further professional history.".repeat(3000))
+        val profile = fixture.profile(s_[fixture.claim("channels", "Channel composition", quote)], original)
+        val workflow = HeadhunterWorkflow(fixture.rig.store) { error("Retained profile reuse must not invoke curation") }
+        val result = fixture.run(workflow, fixture.request() + ("evidenceIds" to listOf(original["id"])))
+        val excerpt = objects(context(result)["evidence"])[0]
+        assertEquals("grounded-profile-quotes", excerpt["selection"])
+        assertEquals(quote, excerpt["text"])
+        assertEquals(fields(original)["text"].toString().length, (excerpt["originalCharacters"] as Number).toInt())
+        assertEquals(original, fixture.rig.store.version(original["id"] as String, original["cid"] as String))
+        for (artifact in artifacts(result).view) {
+            val refs = HeadhunterStore.references(fields(artifact))
+            assertTrue(refs.view.any { it.a == original["id"] && it.b == original["cid"] })
+            assertTrue(refs.view.any { it.a == profile["id"] && it.b == profile["cid"] })
+            assertTrue("Proposed experience" in fields(artifact)["content"].toString())
+        }
     }
 
     @Test fun actualCompositionProducesFourProposalsAndRepeatingAssemblyAddsNoVersions() = runTest {
@@ -209,6 +330,7 @@ class HeadhunterWorkflowTest {
     }
 
     companion object {
+        fun context(result: LcncRunner.ScopeResult) = objectOf(result.nodeOutputs.getValue("context")["context"], "context")
         fun objects(value: Any?): Series<HeadhunterRecord> =
             (value as List<*>).toSeries() α { objectOf(it, "record") }
         fun artifacts(result: LcncRunner.ScopeResult) = objects(result.returns["artifacts"])

@@ -12,9 +12,7 @@ object LcncClockKey : LcncServiceKey<() -> Long>("LcncClockKey")
  *
  * Semantics under a headless run:
  *  - `timer` emits ONE tick per run — a server run is one pulse, no interval.
- *  - data nodes (`list.groupBy`, `list.format`) compute exactly as the canvas
- *    does. JVM `pick` deliberately lives in CanvasJsPureNodes: the daemon
- *    executes the canvas's own JavaScript method through sandboxed GraalJS.
+ *  - data nodes (`pick`, `list.groupBy`, `list.format`) run in common Kotlin.
  *    `list.format` is the declarative reshaper — the
  *    eval-free lane from map-shaped outputs (kanban.attention `cards`/
  *    `ordered`) to the `lines` port `read.construct`/`nal.mint` take, where

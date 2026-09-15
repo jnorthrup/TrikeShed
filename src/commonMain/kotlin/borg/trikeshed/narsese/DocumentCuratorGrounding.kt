@@ -12,14 +12,9 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.parse.json.JsonSupport
 
-/** Deliberately only positive, unmodified, active, single-token noun/verb/noun assertions. */
+/** Semantic admission stays NNV-only; a verified quotation admits only occurrence in source text. */
 internal object DocumentCuratorGrounding {
-    const val instructions = """The input contains source and nlp objects. source holds the full extracted text,
-original and extracted-text CIDs, route correlation and metadata. nlp may be null: the host parser runs
-as a peer branch and its sentences, UTF-16 spans, indexed tokens, and dependencies are joined after the
-model response to admit or refuse proposals. Use the full source when proposing assertions; do not
-substitute filename, link or adjacency heuristics.
-Return only a JSON object with format "TRIPLET_JSON" and a triplets array.
+    private const val proposalInstructions = """Return only a JSON object with format "TRIPLET_JSON" and a triplets array.
 Each entry requires subject, predicate, object, confidence (number 0..1), quote, begin, end,
 polarity (boolean), modality (string). begin/end are exact UTF-16 offsets in text; end is exclusive.
 quote must be the entire sentence including terminal punctuation. Subject/object are exact surface
@@ -33,11 +28,30 @@ Parser output can be wrong. Model confidence and agreement with the parser are n
 evidence, and neither establishes external factual truth. Extraction is source attribution only.
 Return an empty array when no assertion is proposed."""
 
+    const val instructions = """The input contains source and nlp objects. source holds the full extracted text,
+original and extracted-text CIDs, route correlation and metadata. nlp holds the validated host parser's
+sentences, UTF-16 spans, indexed tokens, and dependencies for that exact text. Use both the source and
+these annotations when proposing assertions; the host reconciles your response against them.
+Do not substitute filename, link or adjacency heuristics.
+""" + proposalInstructions
+
+    /** Version-1 records written before instructions were retained used this exact prompt. */
+    const val previousInstructions = """The input contains source and nlp objects. source holds the full extracted text,
+original and extracted-text CIDs, route correlation and metadata. nlp may be null: the host parser runs
+as a peer branch and its sentences, UTF-16 spans, indexed tokens, and dependencies are joined after the
+model response to admit or refuse proposals. Use the full source when proposing assertions; do not
+substitute filename, link or adjacency heuristics.
+""" + proposalInstructions
+
     fun parse(content: String): Series<DocumentProposal> {
         return try {
             val envelope = DocumentCuratorCodec.strictJson(content) as? Map<*, *> ?: error("expected object")
-            require(envelope.keys == setOf("format", "triplets")) { "unsupported envelope fields" }
-            require(envelope["format"] == KgFormat.TRIPLET_JSON.name) { "expected TRIPLET_JSON format" }
+            require(envelope.keys == setOf("triplets") || envelope.keys == setOf("format", "triplets")) {
+                "unsupported envelope fields"
+            }
+            require(!envelope.containsKey("format") || envelope["format"] == KgFormat.TRIPLET_JSON.name) {
+                "expected TRIPLET_JSON format"
+            }
             val entries = envelope["triplets"] as? List<*> ?: error("expected triplets array")
             entries.map { value ->
                 val raw = JsonSupport.stringify(value)
@@ -135,8 +149,14 @@ Return an empty array when no assertion is proposed."""
         val inner = (expression.elements[2] as KifExpr.Quoted).expr
         val statementCid = putVerified(cas, CanonicalCbor.encodeMap(mapOf("expression" to inner.toKifString(),
             "polarity" to p.polarity, "modality" to p.modality)))
-        val receiptCid = p.receiptCid!!
-        val mapped = KgNalBridge.map(KgTriplet(source.originalCid.value, "states", KifExpr.Quoted(inner).toKifString(),
+        return attribution(source, p.receiptCid!!, expression, statementCid)
+    }
+
+    private fun attribution(source: DocumentSource, receiptCid: ContentId, expression: KifExpr.ListExpr,
+        statementCid: ContentId): DocumentAttribution {
+        val inner = expression.elements[2] as KifExpr.Quoted
+        val predicate = (expression.elements[0] as KifExpr.Atom).token
+        val mapped = KgNalBridge.map(KgTriplet(source.originalCid.value, predicate, inner.toKifString(),
             subjectCid = source.originalCid.value, objectCid = statementCid.value))
         val basis = EvidenceBasis.of(source.originalCid)
         // Coordinate is only a projection. Receipt identity and exact structure remain in CAS/WAL.
@@ -144,6 +164,48 @@ Return an empty array when no assertion is proposed."""
             evidence = Nal.observe(true), basisBloom = basis.bloom,
         )
         return DocumentAttribution(receiptCid, expression, mapped, signal, basis)
+    }
+
+    /** Keep model offsets unchanged; only a unique occurrence can repair an incorrect span. */
+    fun quotation(source: DocumentSource, p: DocumentProposal): DocumentProposal {
+        if (p.subject == null || p.quote.isNullOrEmpty()) return p
+        val quote = p.quote
+        val matches = p.begin != null && p.end != null && p.begin >= 0 && p.end > p.begin &&
+            p.end <= source.text.length && source.text.substring(p.begin, p.end) == quote
+        val begin = if (matches) p.begin!! else {
+            val found = source.text.indexOf(quote)
+            if (found < 0 || source.text.indexOf(quote, found + 1) >= 0) return p
+            found
+        }
+        return p.copy(quotationBegin = begin, quotationEnd = begin + quote.length)
+    }
+
+    /** This receipt names exact source text, independently of the model's interpretation. */
+    fun quotationReceipt(source: DocumentSource, p: DocumentProposal): ByteArray = CanonicalCbor.encodeMap(mapOf(
+        "kind" to "quotation", "originalCid" to source.originalCid.value,
+        "extractedTextCid" to source.extractedTextCid.value, "begin" to p.quotationBegin,
+        "end" to p.quotationEnd, "quote" to p.quote,
+        "expression" to quotationExpression(source, p).toKifString(),
+        "positiveEvidence" to Nal.UNIT, "negativeEvidence" to 0L,
+        "basisLeafCids" to listOf(source.originalCid.value),
+        "copula" to NalCopula.PRODUCT.name, "relation" to RelationKind.MATCH.name,
+    ))
+
+    fun quotationAttribution(source: DocumentSource, p: DocumentProposal, cas: CasStore): DocumentAttribution {
+        val expression = quotationExpression(source, p)
+        val statement = putVerified(cas, CanonicalCbor.encodeMap(mapOf("expression" to
+            (expression.elements[2] as KifExpr.Quoted).expr.toKifString())))
+        return attribution(source, checkNotNull(p.quotationReceiptCid), expression, statement)
+    }
+
+    private fun quotationExpression(source: DocumentSource, p: DocumentProposal): KifExpr.ListExpr {
+        val begin = checkNotNull(p.quotationBegin)
+        val end = checkNotNull(p.quotationEnd)
+        require(p.subject != null && begin >= 0 && end > begin && end <= source.text.length &&
+            source.text.substring(begin, end) == p.quote) { "Quotation is not a verified source span" }
+        val span = kif("span", KifExpr.Atom(source.extractedTextCid.value), KifExpr.Atom(begin.toString()),
+            KifExpr.Atom(end.toString()), KifExpr.Atom(JsonSupport.stringify(p.quote)))
+        return kif("quotes", KifExpr.Atom(source.originalCid.value), KifExpr.Quoted(span))
     }
 
     fun receipt(source: DocumentSource, p: DocumentProposal): ByteArray = CanonicalCbor.encodeMap(mapOf(

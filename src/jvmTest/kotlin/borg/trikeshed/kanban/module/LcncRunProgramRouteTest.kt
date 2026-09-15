@@ -19,6 +19,8 @@ import borg.trikeshed.module.ModuleSupervisor
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
@@ -29,6 +31,7 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -316,6 +319,60 @@ class LcncRunProgramRouteTest {
             val raw = JsonSupport.parse(ctx.casStore.get(borg.trikeshed.job.ContentId(body["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
             assertEquals("cancelled", (raw["lcncRun"] as Map<*, *>)["status"])
         } finally { supervisor.detach("kanban") }
+    }
+
+    @Test fun drainWaitsForEveryAdmittedRunAndEveryDrainCaller() = runBlocking {
+        val dir = tempDir("drain")
+        val cas = CasStore.inMemory()
+        val ctx = newContext(ModuleRouteRegistry(), dir, cas)
+        val entered = List(3) { CompletableDeferred<Unit>() }
+        val released = List(3) { CompletableDeferred<Unit>() }
+        ctx.lcncRunners["test.held"] = LcncNodeRunner { node, _ ->
+            val slot = node.params.getValue("slot").toInt()
+            entered[slot].complete(Unit)
+            released[slot].await()
+            mapOf("finished" to slot)
+        }
+        val programs = List(3) { slot -> program("held-$slot", listOf(
+            LcncNode("work", "test.held", mapOf("slot" to slot.toString())),
+        ), emptyList()) }
+        val store = borg.trikeshed.kanban.BoardStoreElement(borg.trikeshed.kanban.JvmBoardWal(dir), cas)
+        store.open()
+        val service = LcncRunService(ctx, store) { emptyMap() }
+        try {
+            val runs = programs.map { p -> async { service.execute(p.name, p, false, emptyMap(), emptyMap<String, Any?>()) } }
+            withTimeout(5000) { entered.forEach { it.await() } }
+            assertEquals(429, service.execute("full", programs[0], false, emptyMap(), emptyMap<String, Any?>()).status)
+            val firstDrain = async(start = CoroutineStart.UNDISPATCHED) { service.drain() }
+            val secondDrain = async(start = CoroutineStart.UNDISPATCHED) { service.drain() }
+            assertFalse(firstDrain.isCompleted)
+            assertFalse(secondDrain.isCompleted)
+            assertEquals(429, service.execute("late", programs[0], false, emptyMap(), emptyMap<String, Any?>()).status)
+            firstDrain.cancel()
+            released[0].complete(Unit)
+            val first = withTimeout(5000) { runs[0].await() }
+            assertEquals(200, first.status, first.body)
+            assertEquals("completed", json(first)["status"])
+            assertFalse(firstDrain.isCompleted)
+            assertFalse(secondDrain.isCompleted)
+            released.drop(1).forEach { it.complete(Unit) }
+            withTimeout(5000) {
+                for (run in runs.drop(1)) {
+                    val result = run.await()
+                    assertEquals(200, result.status, result.body)
+                    assertEquals("completed", json(result)["status"])
+                }
+                firstDrain.join()
+                secondDrain.await()
+                service.drain()
+            }
+            assertEquals(429, service.execute("closed", programs[0], false, emptyMap(), emptyMap<String, Any?>()).status)
+        } finally {
+            released.forEach { it.complete(Unit) }
+            service.drain()
+            store.drain()
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        }
     }
 
     @Test fun receiptsRebuildFromTheExistingWalAfterModuleRestart() = runBlocking {
