@@ -209,7 +209,7 @@ class PdfDisassembler(private val inflate: (ByteArray) -> ByteArray?) {
                     else -> cur
                 }.toByte()
             }
-            out.addAll(row.toList())
+            for (b in row) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
             row.copyInto(prev)
         }
         return out.toByteArray()
