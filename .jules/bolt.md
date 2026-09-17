@@ -4,3 +4,6 @@
 ## 2024-09-12 - Series Iteration Allocations
 **Learning:** In TrikeShed, calling .toList() on collections (like maps/collections) or custom Series before operations like map or sortedBy causes unnecessary O(N) intermediate List allocations.
 **Action:** For map on standard collections, avoid toList(); for operations like sortedBy on Series, use .view instead of .toList().
+## 2026-09-17 - Prevent toList toSeries Allocations
+**Learning:** Calling .toList().toSeries() on collections or arrays creates unnecessary intermediate ArrayList allocations.
+**Action:** Use the native .toSeries() extensions directly on Collection, Array, or vararg to avoid the intermediate List creation.

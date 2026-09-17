@@ -36,6 +36,6 @@ object DocumentCurationToolset {
             val value = entry.trim()
             if (value.isNotEmpty()) entries += value
         }
-        return entries.toList().toSeries()
+        return entries.toSeries() // Bolt: Use .toSeries() directly to avoid intermediate List allocation
     }
 }
