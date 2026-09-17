@@ -7,8 +7,6 @@ import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
-import borg.trikeshed.modelmux.ModelResponse
-import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
@@ -18,7 +16,7 @@ import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentCuratorObserver
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.DocumentCurationToolset
-import borg.trikeshed.narsese.documentModel
+import borg.trikeshed.narsese.DocumentModel
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.pointcut.PointcutEvent
@@ -62,7 +60,7 @@ class DocumentFeed private constructor(
             log: DurableAppendLog,
             bag: BeliefBagElement,
             points: PointcutBlackboardAdapter,
-            model: suspend (Prompt) -> ModelResponse,
+            model: DocumentModel,
             modelId: String,
             routeId: String = "document-${UUID.randomUUID()}",
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
@@ -122,7 +120,7 @@ class DocumentFeed private constructor(
                         "available:${DocumentCurationToolset.MODEL_BASE}.provider=${it.provider ?: it.name};model=${it.model}"
                     })
                 }),
-        ): DocumentFeed = create(scope, volume, cas, log, bag, points, documentModel(brain, muxContext), modelId,
+        ): DocumentFeed = create(scope, volume, cas, log, bag, points, DocumentModel.through(muxContext), modelId,
             tikaOptions = tikaOptions, stagingLba = stagingLba, rete = rete, toolOntology = toolOntology)
 
         private fun land(

@@ -84,7 +84,7 @@ class DocumentCurationWire private constructor(
                 var curator: DocumentCuratorElement? = null
                 try {
                     curator = DocumentCuratorElement.create(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext),
-                        nlp, documentModel(brain, ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
+                        nlp, DocumentModel.through(ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
                         model, ctx.casStore, log, bag,
                         rete = ctx.narsRete,
                         toolOntology = toolOntology,

@@ -8,6 +8,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.modelmux.ModelResponse
+import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.nlp.NlpDocument
 
 /** CIDs identify original bytes and exact UTF-8 extracted text; offsets below are UTF-16. */
@@ -78,6 +79,8 @@ data class DocumentCurationRecord(
     val quotationDuplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
     /** Capability description used for this model proposal, never executable tool state. */
     val toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf(),
+    /** The EXACT per-call receipt ModelMux minted for [model] — success or failure. Null on records from before this field existed. */
+    val receipt: ModelResponseReceipt? = null,
 )
 
 /**

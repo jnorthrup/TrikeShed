@@ -7,6 +7,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.modelmux.ModelResponse
+import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.nlp.NlpDependency
 import borg.trikeshed.nlp.NlpDocument
@@ -65,6 +66,14 @@ internal object DocumentCuratorCodec {
         "quotationDuplicates" to record.quotationDuplicateReceiptCids.values { it.value },
         "toolOntology" to record.toolOntology.values(),
         "observerFailures" to record.observerFailures.values(),
+        "receipt" to record.receipt?.let { r -> mapOf(
+            "receiptId" to r.receiptId, "modelId" to r.modelId, "providerId" to r.providerId,
+            "requestHash" to r.requestHash, "assessmentId" to r.assessmentId, "sessionId" to r.sessionId,
+            "action" to r.action, "httpStatus" to r.httpStatus, "latencyMs" to r.latencyMs,
+            "inputTokens" to r.inputTokens, "outputTokens" to r.outputTokens, "cachedHit" to r.cachedHit,
+            "cacheReadTokens" to r.cacheReadTokens, "cacheWriteTokens" to r.cacheWriteTokens,
+            "errorClass" to r.errorClass, "errorMessage" to r.errorMessage, "capturedAt" to r.capturedAt,
+        ) },
     )
 
     fun decode(bytes: ByteArray): DocumentCurationRecord {
@@ -97,13 +106,22 @@ internal object DocumentCuratorCodec {
             quotationBegin = (p["quotationBegin"] as? Number)?.toInt(),
             quotationEnd = (p["quotationEnd"] as? Number)?.toInt(),
         ) } }.toSeries()
+        val receipt = (m["receipt"] as? Map<*, *>)?.let { r -> ModelResponseReceipt(
+            receiptId = r.str("receiptId"), modelId = r.str("modelId"), providerId = r.str("providerId"),
+            requestHash = r.str("requestHash"), assessmentId = r["assessmentId"] as? String, sessionId = r["sessionId"] as? String,
+            action = r.str("action"), httpStatus = r.int("httpStatus"), latencyMs = (r["latencyMs"] as Number).toLong(),
+            inputTokens = r.int("inputTokens"), outputTokens = r.int("outputTokens"), cachedHit = r["cachedHit"] as Boolean,
+            cacheReadTokens = (r["cacheReadTokens"] as? Number)?.toInt() ?: 0, cacheWriteTokens = (r["cacheWriteTokens"] as? Number)?.toInt() ?: 0,
+            errorClass = r["errorClass"] as? String, errorMessage = r["errorMessage"] as? String,
+            capturedAt = (r["capturedAt"] as Number).toLong(),
+        ) }
         return DocumentCurationRecord(source, nlp, model, m.str("modelId"), proposals,
             m.array("reasons").map { it as String }.toSeries(),
             m.cids("reserved"), m.cids("submitted"), m.cids("duplicates"),
             m.array("observerFailures").map { it as String }.toSeries(),
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
             m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
-            m.optionalStrings("toolOntology").toSeries())
+            m.optionalStrings("toolOntology").toSeries(), receipt = receipt)
     }
 
     /** Validate syntax strictly before crossing the existing JSON-shaped value boundary. */

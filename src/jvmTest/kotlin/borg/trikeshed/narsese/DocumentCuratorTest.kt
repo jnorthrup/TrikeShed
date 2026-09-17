@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.couch.isam.DurableAppendLog
+import borg.trikeshed.graal.subvm.harness.DocumentModelFixture
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
@@ -91,12 +92,12 @@ class DocumentCuratorTest {
                     assertNull(refused.subject)
                     assertTrue(refused.reasons.size > 0)
                 }
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 val beliefs = f.bag.snapshot().values
                 assertEquals(2, beliefs.size)
                 assertTrue(beliefs.any { it.provenanceCid == p.receiptCid!!.value })
                 assertTrue(beliefs.any { it.provenanceCid == p.quotationReceiptCid!!.value })
-            } finally { curator.drain(); f.bag.drain() }
+            } finally { curator.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -158,13 +159,13 @@ class DocumentCuratorTest {
                 assertEquals(0, repeated.acceptedReceiptCids.size)
                 assertEquals(0, repeated.record.quotationSubmittedReceiptCids.size)
                 assertEquals(stored.quotationReceiptCid, repeated.record.quotationDuplicateReceiptCids[0])
-                restored.drain(); f.bag.drain()
+                restored.drain(); f.bag.drain(); f.closeSessions()
                 val belief = f.bag.snapshot().values.single()
                 assertEquals(stored.quotationReceiptCid!!.value, belief.provenanceCid)
                 assertEquals(Nal.UNIT, belief.evidence.positive)
                 assertEquals(0L, belief.evidence.negative)
                 assertTrue(f.bag.glossOf(belief.angular)!!.startsWith("(quotes "))
-            } finally { restored.drain(); f.bag.drain() }
+            } finally { restored.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -178,7 +179,7 @@ class DocumentCuratorTest {
             try {
                 for (selected in listOf(quote, "Rust async services")) {
                     raw = envelope(proposal(quote = selected, begin = 0, end = selected.length, predicate = "skill"))
-                    val result = curator.curate(f.source)
+                    val result = curator.curate(f.source.copy(correlation = "quotation-$selected"))
                     val p = result.record.proposals[0]
                     assertNull(p.quotationReceiptCid)
                     assertNull(p.quotationBegin)
@@ -188,9 +189,9 @@ class DocumentCuratorTest {
                     assertEquals(0, result.acceptedReceiptCids.size)
                     assertTrue(p.reasons.size > 0)
                 }
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(0, f.bag.size)
-            } finally { curator.drain(); f.bag.drain() }
+            } finally { curator.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -210,9 +211,9 @@ class DocumentCuratorTest {
                 assertEquals(0, retry.record.quotationSubmittedReceiptCids.size)
                 assertEquals(1, retry.record.quotationDuplicateReceiptCids.size)
                 assertTrue(retry.unresolvedReasons.values().any { "quotation submission unconfirmed" in it })
-                restored.drain(); f.bag.drain()
+                restored.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(Nal.UNIT, f.bag.snapshot().values.single().evidence.positive)
-            } finally { restored.drain(); f.bag.drain() }
+            } finally { restored.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -292,7 +293,7 @@ class DocumentCuratorTest {
                     assertEquals(0, legacy.quotationSubmittedReceiptCids.size)
                     assertEquals(0, legacy.quotationDuplicateReceiptCids.size)
                 } finally { restored.drain() }
-            } finally { curator.drain(); f.bag.drain() }
+            } finally { curator.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -320,14 +321,14 @@ class DocumentCuratorTest {
                 assertEquals(attribution.expression.toKifString(), receipt["expression"])
                 assertEquals(Nal.UNIT, (receipt["positiveEvidence"] as Number).toLong())
                 assertEquals(listOf(f.source.originalCid.value), receipt["basisLeafCids"])
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(2, f.bag.size)
                 val signal = f.bag.snapshot().values.single { it.provenanceCid == attribution.receiptCid.value }
                 assertEquals(Nal.UNIT, signal.evidence.positive)
                 assertEquals(0L, signal.evidence.negative)
                 assertEquals(attribution.expression.toKifString(), f.bag.glossOf(signal.angular))
                 assertFalse(f.bag.snapshot().values.any { it.relation == RelationKind.CAUSALITY })
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -344,18 +345,18 @@ class DocumentCuratorTest {
             val curator = f.curator(this, model = { response(replies[index++]) })
             try {
                 for (raw in replies) {
-                    val result = curator.curate(f.source)
+                    val result = curator.curate(f.source.copy(correlation = "variant-$index"))
                     assertEquals(0, result.acceptedReceiptCids.size)
                     assertTrue(result.pendingReceiptCids.size > 0)
                     assertTrue(result.unresolvedReasons.size > 0)
                     assertEquals(raw, result.record.model!!.content)
                     assertNotNull(f.cas.get(result.recordCid))
                 }
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(1, f.bag.size)
                 assertTrue(f.bag.glossOf(f.bag.snapshot().values.single().angular)!!.startsWith("(quotes "))
                 assertEquals(replies.size + 1, curator.records().size) // One quotation reservation and completion.
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -369,12 +370,12 @@ class DocumentCuratorTest {
                 assertEquals(2, result.pendingReceiptCids.size)
                 assertTrue(result.record.proposals.values().all { p -> p.reasons.values().any { "conflicting" in it } })
                 assertEquals(0, result.acceptedReceiptCids.size)
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(1, f.bag.size)
                 assertEquals(1, result.record.quotationSubmittedReceiptCids.size)
                 assertEquals(result.record.quotationSubmittedReceiptCids[0], result.record.proposals[0].quotationReceiptCid)
                 assertEquals(result.record.proposals[0].quotationReceiptCid, result.record.proposals[1].quotationReceiptCid)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -392,7 +393,7 @@ class DocumentCuratorTest {
                 val result = curator.curate(f.source)
                 assertEquals(0, result.acceptedReceiptCids.size)
                 assertTrue(result.unresolvedReasons.values().any { "dependency" in it })
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -415,10 +416,10 @@ class DocumentCuratorTest {
                 failNlp = false
                 assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
                 assertEquals(0, curator.curate(f.source).acceptedReceiptCids.size)
-                curator.drain(); f.bag.drain()
+                curator.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(2, f.bag.size)
                 assertTrue(f.bag.snapshot().values.all { it.evidence.positive == Nal.UNIT })
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -438,12 +439,12 @@ class DocumentCuratorTest {
                 assertEquals(3, replayed.nlp!!.sentences[1].begin)
                 assertEquals("\uD83D\uDE00", replayed.nlp.sentences[0].tokens[0].word)
                 assertEquals("requested-model", replayed.modelId)
-                assertEquals("answering-model", replayed.model!!.modelId)
-                assertEquals("actual-provider", replayed.model.providerId)
+                assertEquals("requested-model", replayed.model!!.modelId)
+                assertEquals("requested-model", replayed.model.providerId)
                 assertEquals(-1, replayed.model.usage.promptTokens)
                 assertEquals(0, restored.curate(f.source).acceptedReceiptCids.size)
                 assertEquals(result.acceptedReceiptCids[0], replayed.submittedReceiptCids[0])
-            } finally { restored.drain(); f.bag.drain() }
+            } finally { restored.drain(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -460,7 +461,7 @@ class DocumentCuratorTest {
                 val duplicate = curator.curate(f.source)
                 assertEquals(0, duplicate.acceptedReceiptCids.size)
                 assertEquals(5, duplicate.observerFailures.size)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -491,9 +492,9 @@ class DocumentCuratorTest {
                     assertEquals(0, replayed.submittedReceiptCids.size)
                     assertTrue(replayed.proposals[0].reasons.size > 0)
                 } finally { restored.drain() }
-                f.bag.drain()
+                f.bag.drain(); f.closeSessions()
                 assertEquals(1, f.bag.size)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -535,7 +536,7 @@ class DocumentCuratorTest {
                 assertEquals(6, nlpCalls); assertEquals(6, modelCalls)
                 assertEquals(1, results.sumOf { it.acceptedReceiptCids.size })
                 assertFailsWith<Exception> { curator.curate(f.source) }
-            } finally { release.complete(Unit); curator.close(); f.bag.drain() }
+            } finally { release.complete(Unit); curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -554,10 +555,10 @@ class DocumentCuratorTest {
                 val retry = restored.curate(f.source)
                 assertEquals(0, retry.acceptedReceiptCids.size)
                 assertTrue(retry.pendingReceiptCids.size > 0)
-                restored.drain(); f.bag.drain()
+                restored.drain(); f.bag.drain(); f.closeSessions()
                 assertEquals(2, f.bag.size)
                 assertTrue(f.bag.snapshot().values.all { it.evidence.positive == Nal.UNIT })
-            } finally { restored.close(); f.bag.drain() }
+            } finally { restored.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -570,7 +571,7 @@ class DocumentCuratorTest {
                 assertEquals(0, invalid.acceptedReceiptCids.size)
                 assertTrue(invalid.pendingReceiptCids.size > 0)
                 assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -592,7 +593,7 @@ class DocumentCuratorTest {
                 assertEquals(0, f.bag.size)
                 cas.reject = false
                 assertEquals(1, curator.curate(f.source).acceptedReceiptCids.size)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -611,7 +612,7 @@ class DocumentCuratorTest {
                 assertEquals(0, malformed.acceptedReceiptCids.size)
                 assertTrue(malformed.pendingReceiptCids.size > 0)
                 assertEquals(raw, malformed.record.model!!.content)
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -642,7 +643,7 @@ class DocumentCuratorTest {
                 val requests = (0..1).map { i -> async { curator.curate(f.source.copy(correlation = "overlap-$i")) } }
                 assertEquals(1, requests.awaitAll().sumOf { it.acceptedReceiptCids.size })
                 assertEquals(2, modelCalls)
-            } finally { release.countDown(); curator.close(); f.bag.drain() }
+            } finally { release.countDown(); curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -660,7 +661,7 @@ class DocumentCuratorTest {
                 assertEquals(DocumentNlpStatus.INVALID, result.record.curationIndex().facet(DocumentCurationIndexK.NlpStatus))
                 assertEquals(0, result.acceptedReceiptCids.size)
                 assertTrue(result.unresolvedReasons.values().any { "skipped: NLP" in it })
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -688,7 +689,7 @@ class DocumentCuratorTest {
                 assertEquals(ontology.values(), DocumentCuratorCodec.decode(
                     assertNotNull(f.cas.get(result.recordCid))).toolOntology.values())
                 assertTrue(result.attributions.values().any { !it.isSemantic })
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -790,7 +791,7 @@ class DocumentCuratorTest {
                 assertEquals("hand-admitted", rete.rules[0].provenanceCid)
                 assertNull(rete.termsOf(angular))
                 assertEquals(0, rete.fireLive().size)
-            } finally { restored.drain(); f.bag.drain() }
+            } finally { restored.drain(); f.bag.drain(); f.closeSessions() }
             assertEquals(0, rete.fireLive().size)
             assertEquals(0L, rete.snapshot().offered)
             assertTrue(f.bag.snapshot().values.any { it.angular == angular })
@@ -808,7 +809,7 @@ class DocumentCuratorTest {
                 assertEquals(0, result.nlpAxioms.size)
                 assertNotNull(result.record.nlp)
                 assertEquals(DocumentNlpStatus.INVALID, result.record.curationIndex().facet(DocumentCurationIndexK.NlpStatus))
-            } finally { curator.close(); f.bag.drain() }
+            } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
 
@@ -833,14 +834,26 @@ class DocumentCuratorTest {
         override fun injectCorruptionAfter(sequence: Long) = error("not used")
     }
 
-    private data class Fixture(val cas: CasStore, val log: Log, val bag: BeliefBagElement, val source: DocumentSource) {
+    private data class Fixture(val cas: CasStore, val log: Log, val bag: BeliefBagElement, val source: DocumentSource,
+        val sessions: MutableList<DocumentModelFixture.Session> = mutableListOf()) {
         suspend fun curator(scope: CoroutineScope, nlp: NlpReader = NlpReader(::svo),
             model: suspend (Prompt) -> ModelResponse = { response(envelope(proposal())) },
             observer: DocumentCuratorObserver? = null, capacity: Int = 2,
             rete: CausalityReteElement? = null,
-            toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf()): DocumentCuratorElement =
-            DocumentCuratorElement.create(scope, nlp, model, "requested-model", cas, log, bag, observer, capacity,
+            toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf()): DocumentCuratorElement {
+            val session = DocumentModelFixture.open(modelId = "requested-model", responder = model)
+            sessions.add(session)
+            return DocumentCuratorElement.create(CoroutineScope(scope.coroutineContext + session.htx + session.reactor),
+                nlp, session.model, "requested-model", cas, log, bag, observer, capacity,
                 rete = rete, toolOntology = toolOntology)
+        }
+
+        /** Closes every fixture transport opened by [curator]; safe to call more than once. */
+        suspend fun closeSessions() {
+            val opened = sessions.toList()
+            sessions.clear()
+            for (session in opened) session.close()
+        }
     }
 
     private suspend fun fixture(scope: CoroutineScope, text: String = "Rain causes floods.", cas: CasStore = CasStore.inMemory()): Fixture {

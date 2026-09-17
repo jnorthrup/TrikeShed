@@ -13,6 +13,8 @@ class MuxCallContext(
     val conversationId: Long? = null,
     val turnId: Long? = null,
     val activity: MuxActivity? = null,
+    /** Receives this call's receipt in finally, independent of shared lastReceipt. */
+    val onReceipt: ((ModelResponseReceipt) -> Unit)? = null,
     val onFinished: ((MuxCallRecord) -> Unit)? = null,
 ) :
     AbstractCoroutineContextElement(Key) {

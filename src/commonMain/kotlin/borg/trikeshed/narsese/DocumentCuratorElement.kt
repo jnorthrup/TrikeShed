@@ -48,7 +48,7 @@ import kotlin.coroutines.CoroutineContext
 class DocumentCuratorElement private constructor(
     scope: CoroutineScope,
     private val nlp: NlpReader,
-    private val model: suspend (Prompt) -> ModelResponse,
+    private val model: DocumentModel,
     private val cas: CasStore,
     private val log: DurableAppendLog,
     private val intake: SendChannel<BeliefIntake>,
@@ -62,7 +62,7 @@ class DocumentCuratorElement private constructor(
         const val MAX_INSTRUCTIONS_CHARS = 16 * 1024
 
         suspend fun create(
-            scope: CoroutineScope, nlp: NlpReader, model: suspend (Prompt) -> ModelResponse, modelId: String,
+            scope: CoroutineScope, nlp: NlpReader, model: DocumentModel, modelId: String,
             cas: CasStore, log: DurableAppendLog, bag: BeliefBagElement,
             observer: DocumentCuratorObserver? = null, capacity: Int = 8,
             rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
@@ -107,7 +107,7 @@ class DocumentCuratorElement private constructor(
         val nlp: Outcome<NlpDocument>,
         val notices: List<String>,
     )
-    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>, val notices: List<String>)
+    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<DocumentModelAnswer>, val notices: List<String>)
     private data class Completion(val work: Work, val result: Result<DocumentCurationResult>)
 
     suspend fun curate(
@@ -212,7 +212,7 @@ class DocumentCuratorElement private constructor(
                                 modelId,
                                 temperature = 0.0,
                                 maxTokens = read.work.source.text.length.coerceIn(4096, 16384),
-                            ))
+                            ), contextId = read.work.source.correlation)
                         }
                     }
                     val notices = read.notices.toMutableList()
@@ -241,7 +241,9 @@ class DocumentCuratorElement private constructor(
         val sourceValid = sourceValid(source)
         if (!sourceValid) reasons.add("source CID absent or extracted text CID mismatch")
         else putVerified(cas, source.text.encodeToByteArray())
-        val response = join.model.result.getOrNull()
+        val answer = join.model.result.getOrNull()
+        val response = answer?.response
+        val receipt = answer?.receipt ?: (join.model.result.exceptionOrNull() as? DocumentModelFailure)?.receipt
         val parsed = response?.let { DocumentCuratorGrounding.parse(it.content) } ?: emptySeriesOf()
         if (response != null && parsed.size == 0) reasons.add("model proposed no assertions")
         val grounded = DocumentCuratorGrounding.reconcile(source, join.nlp.result.getOrNull(), parsed)
@@ -311,7 +313,7 @@ class DocumentCuratorElement private constructor(
             observerFailures = observerFailures.toSeries(), instructions = join.work.instructions,
             quotationReservedReceiptCids = quotationReservations.toSeries(),
             quotationDuplicateReceiptCids = quotationDuplicates.distinct().toSeries(),
-            toolOntology = toolOntology)
+            toolOntology = toolOntology, receipt = receipt)
         var recordCid = append(record)
         observe("curator.record", source, listOf(recordCid).toSeries())?.let(observerFailures::add)
         val sent = mutableListOf<ContentId>()

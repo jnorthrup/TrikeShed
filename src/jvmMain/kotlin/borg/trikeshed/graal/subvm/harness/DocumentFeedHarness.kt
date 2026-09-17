@@ -81,11 +81,13 @@ object DocumentFeedHarness {
         val bag = BeliefBagElement(parentJob = scope.coroutineContext[Job])
         val points = PointcutBlackboardAdapter(ConfixBlackboard())
         val model = FixtureModel()
+        val fixture = DocumentModelFixture.open(responder = model::invoke)
+        val docScope = CoroutineScope(scope.coroutineContext + fixture.htx + fixture.reactor)
         val receipts = ArrayList<DocumentFeed.Receipt>()
         bag.open()
         var feed: DocumentFeed? = null
         try {
-            feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model::invoke, "fixture")
+            feed = DocumentFeed.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture")
             val supported = feed.submit(pdf).also(receipts::add)
             check(supported.record.submittedReceiptCids.size == 1) { describe(supported) }
             val duplicate = feed.submit(pdf).also(receipts::add)
@@ -111,7 +113,7 @@ object DocumentFeedHarness {
             feed = null
 
             // Recreate the curator over the same stored frames and CAS, not its old in-memory sets.
-            feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model::invoke, "fixture")
+            feed = DocumentFeed.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture")
             val replayed = feed.submit(pdf).also(receipts::add)
             check(replayed.record.submittedReceiptCids.size == 0 && replayed.record.duplicateReceiptCids.size == 1)
             feed.drain()
@@ -119,7 +121,7 @@ object DocumentFeedHarness {
             feed = null
 
             if (raster != null) {
-                feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model::invoke, "fixture",
+                feed = DocumentFeed.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture",
                     tikaOptions = TikaRuntime.TikaOptions(ocr = TikaRuntime.OcrOptions(
                         preprocessImages = true, requireTesseract = true)))
                 val recognized = feed.submit(raster).also(receipts::add)
@@ -133,7 +135,7 @@ object DocumentFeedHarness {
                 feed = null
             }
         } finally {
-            try { feed?.drain() } finally { bag.drain() }
+            try { feed?.drain() } finally { try { bag.drain() } finally { fixture.close() } }
         }
         val expectedAttributions = if (ocr) 4 else 3
         check(bag.size == expectedAttributions) { "Expected $expectedAttributions source attributions, found ${bag.size}" }

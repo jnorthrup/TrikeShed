@@ -92,9 +92,11 @@ object DocumentCurationIndexHarness {
             return record to result.returns
         }
         bag.open()
+        val fixture = DocumentModelFixture.open(responder = model::invoke)
+        val docScope = CoroutineScope(scope.coroutineContext + fixture.htx + fixture.reactor)
         var feed: DocumentFeed? = null
         try {
-            feed = DocumentCurationLegos.create(scope, volume, cas, log, bag, points, model::invoke, "fixture", runners)
+            feed = DocumentCurationLegos.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture", runners)
             val (real, realOutput) = submit("PRELOAD.md:identified-passage", passage)
             check(real.nlp != null && real.nlp.sentences.size == 1)
             val index = real.curationIndex()
@@ -185,7 +187,7 @@ object DocumentCurationIndexHarness {
                 "recovery" to true, "modelCalls" to model.calls, "drained" to true,
             )
         } finally {
-            try { feed?.drain() } finally { bag.drain() }
+            try { feed?.drain() } finally { try { bag.drain() } finally { fixture.close() } }
         }
     }
 

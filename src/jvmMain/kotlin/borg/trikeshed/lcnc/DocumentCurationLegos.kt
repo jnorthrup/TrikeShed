@@ -13,8 +13,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.α
-import borg.trikeshed.modelmux.ModelResponse
-import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
@@ -23,6 +21,7 @@ import borg.trikeshed.narsese.DocumentCurationIndexK
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCuratorElement
+import borg.trikeshed.narsese.DocumentModel
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
@@ -48,7 +47,7 @@ object DocumentCurationLegos {
         log: DurableAppendLog,
         bag: BeliefBagElement,
         points: PointcutBlackboardAdapter,
-        model: suspend (Prompt) -> ModelResponse,
+        model: DocumentModel,
         modelId: String,
         runners: MutableMap<String, LcncNodeRunner>,
         stagingLba: Long? = null,
