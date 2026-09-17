@@ -64,7 +64,7 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         private val index = tokenClass.getMethod("index")
         private val begin = tokenClass.getMethod("beginPosition")
         private val end = tokenClass.getMethod("endPosition")
-        private val word = tokenClass.getMethod("word")
+        private val originalText = tokenClass.getMethod("originalText")
         private val lemma = tokenClass.getMethod("lemma")
         private val tag = tokenClass.getMethod("tag")
         private val ner = tokenClass.getMethod("ner")
@@ -82,13 +82,16 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
                         index.invoke(token) as Int,
                         begin.invoke(token) as Int,
                         end.invoke(token) as Int,
-                        word.invoke(token) as String,
+                        originalText.invoke(token) as String,
                         lemma.invoke(token) as? String ?: "",
                         tag.invoke(token) as? String ?: "",
                         ner.invoke(token) as? String ?: "O",
                     ).also {
                         check(it.begin >= 0 && it.end >= it.begin && it.end <= text.length) {
                             "CoreNLP returned an out-of-range text span"
+                        }
+                        check(it.word == text.substring(it.begin, it.end)) {
+                            "CoreNLP originalText \"${it.word}\" does not match source span \"${text.substring(it.begin, it.end)}\""
                         }
                     }
                 }

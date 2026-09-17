@@ -2,6 +2,7 @@ package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -10,11 +11,11 @@ import kotlin.test.assertTrue
 class CoreNlpRuntimeTest {
     @Test
     fun managedReaderPreservesOriginalTextSpansAndDependencyEndpoints() {
-        val text = "Acme pays Beta. Caf\u00e9 holds the \"account\"."
+        val text = "Acme pays Beta. Caf\u00e9 holds the \"account\". Use \u00bd cup and mix &amp; well."
         CoreNlpRuntime().use { reader ->
             val parsed = reader.analyze(text)
             assertEquals(text, parsed.text)
-            assertEquals(2, parsed.sentences.size)
+            assertEquals(3, parsed.sentences.size)
             for (i in 0 until parsed.sentences.size) {
                 val sentence = parsed.sentences[i]
                 assertEquals(i, sentence.index)
@@ -24,7 +25,7 @@ class CoreNlpRuntimeTest {
                     val token = sentence.tokens[k]
                     assertTrue(indices.add(token.index))
                     assertTrue(token.begin >= sentence.begin && token.end <= sentence.end)
-                    assertTrue(text.substring(token.begin, token.end).isNotEmpty())
+                    assertEquals(token.word, text.substring(token.begin, token.end))
                 }
                 assertTrue(sentence.dependencies.size > 0)
                 for (k in 0 until sentence.dependencies.size) {
@@ -36,6 +37,9 @@ class CoreNlpRuntimeTest {
             }
             val cafe = parsed.sentences[1].tokens[0]
             assertEquals("Caf\u00e9", text.substring(cafe.begin, cafe.end))
+            val normalizedTokens = parsed.sentences[2].tokens.view
+            assertTrue(normalizedTokens.any { it.word == "\u00bd" })
+            assertTrue(normalizedTokens.any { it.word == "&amp;" })
         }
     }
 

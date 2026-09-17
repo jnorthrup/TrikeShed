@@ -8,10 +8,11 @@ import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.lcnc.DocumentCurationLegos
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
-import borg.trikeshed.modelmux.ModelResponse
+import borg.trikeshed.modelmux.*
 import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.nlp.NlpDependency
@@ -434,7 +435,8 @@ class DocumentCuratorTest {
                 val replayed = records.last()
                 assertEquals(f.source, replayed.source)
                 assertEquals(listOf("one", "two"), replayed.source.metadata["authors"])
-                assertEquals(3, replayed.nlp!!.sentences[0].begin)
+                assertEquals(3, replayed.nlp!!.sentences[1].begin)
+                assertEquals("\uD83D\uDE00", replayed.nlp.sentences[0].tokens[0].word)
                 assertEquals("requested-model", replayed.modelId)
                 assertEquals("answering-model", replayed.model!!.modelId)
                 assertEquals("actual-provider", replayed.model.providerId)
@@ -662,6 +664,154 @@ class DocumentCuratorTest {
         }
     }
 
+    @Test fun toolOntologyReachesPromptAndPersistedRecord(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            val ontology = DocumentCurationToolset.all(listOf(
+                "available:forge.document.curate=/api/documents",
+                "available:camel.endpoint=timer:lcnc?period=1000",
+            ))
+            assertTrue(ontology.values().any { it.startsWith("llm-model-base:") })
+            assertTrue(ontology.values().any { it.startsWith("lcnc:kg.ingest") })
+            assertTrue(ontology.values().any { it.startsWith("lcnc:nal.rule.admit") })
+            assertTrue(ontology.values().any { it.startsWith("acp.memory.") })
+            var sentPrompt: Prompt? = null
+            val curator = f.curator(this, toolOntology = ontology, model = { prompt ->
+                sentPrompt = prompt
+                response(envelope(proposal()))
+            })
+            try {
+                val result = curator.curate(f.source)
+                val payload = JsonSupport.parseMap(assertNotNull(sentPrompt).messages[1].content)
+                assertEquals(ontology.values(), payload["toolOntology"])
+                assertEquals(ontology.values(), result.record.toolOntology.values())
+                assertEquals(ontology.values(), DocumentCuratorCodec.decode(
+                    assertNotNull(f.cas.get(result.recordCid))).toolOntology.values())
+                assertTrue(result.attributions.values().any { !it.isSemantic })
+            } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
+    /**
+     * Deterministic fixtures (`svo`, hand-authored [NlpDependency] lists) isolate the seam
+     * elsewhere in this file; they say nothing about what the real host parser actually
+     * emits. These cases run the real installed CoreNLP 4.5.10 guest module (no
+     * skip-on-missing-module — the module is expected present) so NlpcoreAxiomatics'
+     * negative/modal/passive/reported-speech exclusions are proven against real parses,
+     * not a canned model answer.
+     */
+    @Test fun nlpcoreRecognitionFailsClosedOnRealCoreNlpParses() {
+        borg.trikeshed.graal.subvm.CoreNlpRuntime().use { reader ->
+            val cases = listOf(
+                "Rain causes floods." to 1,
+                "Rain does not cause floods." to 0,
+                "Rain may cause floods." to 0,
+                "Floods are caused by rain." to 0,
+                // CoreNLP tags "stops" as a noun and roots this sentence at "If".
+                "If rain stops, floods recede." to 0,
+                "If Acme pays Beta, Gamma ships Delta." to 0,
+                "If customers pay invoices, suppliers deliver goods." to 1,
+                "If rain does not fall, crops die." to 0,
+                "Heavy rain causes floods." to 0,
+                "Rain sometimes causes floods." to 0,
+                "Rain caused floods." to 0,
+                "Rain and wind cause floods." to 0,
+                "Rain causes floods?" to 0,
+                "When customers pay invoices, suppliers deliver goods." to 0,
+                "Reports say rain causes floods." to 0,
+                "\"Rain causes floods,\" the report claimed." to 0,
+            )
+            for ((text, expected) in cases) {
+                val axioms = NlpcoreAxiomatics.recognize(reader.analyze(text), "case-cid")
+                assertEquals(expected, axioms.size, "unexpected candidate count for: $text")
+                for (i in 0 until axioms.size) {
+                    assertEquals("case-cid", axioms[i].rule.provenanceCid, "source provenance retained: $text")
+                    assertTrue(axioms[i].rule.isEternal)
+                }
+            }
+
+            // The causal verb itself carries the relation; a bare-noun rule is faithful.
+            val simple = NlpcoreAxiomatics.recognize(reader.analyze("Rain causes floods."), "src")
+            assertEquals("Rain", simple[0].rule.antecedent)
+            assertEquals("floods", simple[0].rule.consequent)
+            assertEquals(900L, simple[0].rule.evidence.positive)
+
+            // A conditional retains BOTH clause predicates — never collapsed to bare
+            // "rain ==> floods", which would silently generalize past what the source said.
+            val conditional = NlpcoreAxiomatics.recognize(
+                reader.analyze("If customers pay invoices, suppliers deliver goods."), "src")
+            assertEquals("customers pay invoices", conditional[0].rule.antecedent)
+            assertEquals("suppliers deliver goods", conditional[0].rule.consequent)
+            assertEquals(800L, conditional[0].rule.evidence.positive)
+        }
+    }
+
+    @Test fun curationRetainsNlpcoreCandidatesWithoutAutoAdmittingOrRegisteringRawTerms(): Unit = runBlocking {
+        borg.trikeshed.graal.subvm.CoreNlpRuntime().use { reader ->
+        withTimeout(60000) {
+            val f = fixture(this, "Rain causes floods.")
+            // A rule an operator already admitted by hand via the separate nal.rule.admit
+            // operation — curating a document whose own parser reading would match it must
+            // neither duplicate it nor otherwise disturb the live rete.
+            val preexisting = EternalRule("Rain", "floods", NalCopula.IMPLICATION,
+                EvidenceCoord(Nal.UNIT, 0L), provenanceCid = "hand-admitted")
+            val rete = CausalityReteElement(f.bag, listOf(preexisting).toSeries())
+            rete.open()
+            assertEquals(1, rete.rules.size)
+            val curator = f.curator(this, nlp = reader, rete = rete, model = { response(envelope(proposal())) })
+            val recordCid: ContentId
+            val angular: Long
+            try {
+                val result = curator.curate(f.source)
+                assertEquals(1, result.nlpAxioms.size)
+                assertEquals("Rain", result.nlpAxioms[0].rule.antecedent)
+                assertEquals("floods", result.nlpAxioms[0].rule.consequent)
+                assertEquals(f.source.originalCid.value, result.nlpAxioms[0].rule.provenanceCid)
+                // Curation never auto-admits: the live rete is exactly what it was before.
+                assertEquals(1, rete.rules.size)
+                assertEquals("hand-admitted", rete.rules[0].provenanceCid)
+                // The model's (states SOURCE '(PREDICATE SUBJECT OBJECT)) attribution is
+                // source-attributed text, not a raw subject/object term pair — it must never
+                // land in the rete's term registry.
+                val semantic = result.attributions.values().single { it.isSemantic }
+                assertNull(rete.termsOf(semantic.signal.angular))
+                angular = semantic.signal.angular
+                assertEquals(0, rete.fireLive().size)
+                recordCid = result.recordCid
+            } finally { curator.drain() }
+            val restored = f.curator(this, nlp = reader, rete = rete)
+            try {
+                val replayed = assertNotNull(restored.record(recordCid))
+                // Candidates recompute on demand from the retained parse; replay does not
+                // invent a global law or re-register raw terms either.
+                assertEquals(1, replayed.nlpAxioms.size)
+                assertEquals(f.source.originalCid.value, replayed.nlpAxioms[0].rule.provenanceCid)
+                assertEquals(1, rete.rules.size)
+                assertEquals("hand-admitted", rete.rules[0].provenanceCid)
+                assertNull(rete.termsOf(angular))
+                assertEquals(0, rete.fireLive().size)
+            } finally { restored.drain(); f.bag.drain() }
+            assertEquals(0, rete.fireLive().size)
+            assertEquals(0L, rete.snapshot().offered)
+            assertTrue(f.bag.snapshot().values.any { it.angular == angular })
+            rete.drain()
+        }
+        }
+    }
+
+    @Test fun invalidNlpExcludesNlpcoreCandidatesButRetainsTheRawParse(): Unit = runBlocking {
+        withTimeout(10000) {
+            val f = fixture(this)
+            val curator = f.curator(this, nlp = NlpReader { svo(it).copy(text = "wrong source") })
+            try {
+                val result = curator.curate(f.source)
+                assertEquals(0, result.nlpAxioms.size)
+                assertNotNull(result.record.nlp)
+                assertEquals(DocumentNlpStatus.INVALID, result.record.curationIndex().facet(DocumentCurationIndexK.NlpStatus))
+            } finally { curator.close(); f.bag.drain() }
+        }
+    }
+
     private class Log : DurableAppendLog {
         private val frames = mutableListOf<Pair<Long, ByteArray>>()
         private var committed = 0
@@ -686,8 +836,11 @@ class DocumentCuratorTest {
     private data class Fixture(val cas: CasStore, val log: Log, val bag: BeliefBagElement, val source: DocumentSource) {
         suspend fun curator(scope: CoroutineScope, nlp: NlpReader = NlpReader(::svo),
             model: suspend (Prompt) -> ModelResponse = { response(envelope(proposal())) },
-            observer: DocumentCuratorObserver? = null, capacity: Int = 2): DocumentCuratorElement =
-            DocumentCuratorElement.create(scope, nlp, model, "requested-model", cas, log, bag, observer, capacity)
+            observer: DocumentCuratorObserver? = null, capacity: Int = 2,
+            rete: CausalityReteElement? = null,
+            toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf()): DocumentCuratorElement =
+            DocumentCuratorElement.create(scope, nlp, model, "requested-model", cas, log, bag, observer, capacity,
+                rete = rete, toolOntology = toolOntology)
     }
 
     private suspend fun fixture(scope: CoroutineScope, text: String = "Rain causes floods.", cas: CasStore = CasStore.inMemory()): Fixture {
@@ -715,7 +868,14 @@ class DocumentCuratorTest {
                 NlpToken(4, begin + 18, begin + 19, ".", ".", ".", "O"))
             val deps = listOf(NlpDependency(0, 2, "root"), NlpDependency(2, 1, "nsubj"),
                 NlpDependency(2, 3, "obj"), NlpDependency(2, 4, "punct"))
-            return NlpDocument(text, listOf(NlpSentence(0, begin, begin + 19, tokens.toSeries(), deps.toSeries())).toSeries())
+            val prefix = text.substring(0, begin).trimEnd()
+            val sentence = NlpSentence(if (prefix.isEmpty()) 0 else 1, begin, begin + 19,
+                tokens.toSeries(), deps.toSeries())
+            val sentences = if (prefix.isEmpty()) listOf(sentence) else listOf(
+                NlpSentence(0, 0, prefix.length,
+                    listOf(NlpToken(1, 0, prefix.length, prefix, prefix, "SYM", "O")).toSeries(),
+                    listOf(NlpDependency(0, 1, "root")).toSeries()), sentence)
+            return NlpDocument(text, sentences.toSeries())
         }
 
         private fun documentTokens(text: String): NlpDocument {

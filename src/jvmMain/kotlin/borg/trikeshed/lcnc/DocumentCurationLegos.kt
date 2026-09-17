@@ -5,15 +5,20 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.forge.sheet.SheetRef
 import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.graal.subvm.DocumentFeed
+import borg.trikeshed.graal.subvm.CamelCatalog
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.α
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
+import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
+import borg.trikeshed.narsese.CausalityReteElement
+import borg.trikeshed.narsese.DocumentCurationToolset
 import borg.trikeshed.narsese.DocumentCurationIndexK
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
@@ -21,6 +26,7 @@ import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
+import borg.trikeshed.narsese.nlpAxioms
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.userspace.nio.DocumentExtent
 import borg.trikeshed.userspace.nio.DocumentContent
@@ -46,9 +52,13 @@ object DocumentCurationLegos {
         modelId: String,
         runners: MutableMap<String, LcncNodeRunner>,
         stagingLba: Long? = null,
+        rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
+        toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+            CamelCatalog.endpoints().map { "available:camel.endpoint=$it" }),
     ): DocumentFeed {
         require(CURATE !in runners) { "$CURATE is already registered" }
-        val feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model, modelId, stagingLba = stagingLba)
+        val feed = DocumentFeed.create(scope, volume, cas, log, bag, points, model, modelId,
+            stagingLba = stagingLba, rete = rete, toolOntology = toolOntology)
         try {
             runners[CURATE] = curate(feed)
             return feed
@@ -147,10 +157,28 @@ object DocumentCurationLegos {
             "receiptCid" to cid.value,
             "record" to DocumentCuratorCodec.record(record),
             "nlpStatus" to index.facet(DocumentCurationIndexK.NlpStatus).name,
+            "nlpAxioms" to nlpAxiomsProjection(record),
             "sheet" to root,
             "sheets" to sheets,
         )
     }
+
+    /** Source-attributed candidates; extraction weights are not parser confidence. */
+    private fun nlpAxiomsProjection(record: DocumentCurationRecord): List<Map<String, Any?>> =
+        (record.nlpAxioms α { axiom ->
+            mapOf(
+                "originalCid" to record.source.originalCid.value,
+                "extractedTextCid" to record.source.extractedTextCid.value,
+                "sentenceIndex" to axiom.sentenceIndex,
+                "begin" to axiom.begin,
+                "end" to axiom.end,
+                "quote" to record.source.text.substring(axiom.begin, axiom.end),
+                "antecedent" to axiom.antecedent,
+                "predicate" to axiom.predicate,
+                "consequent" to axiom.consequent,
+                "label" to "admission candidate",
+            )
+        }).toList()
 
     internal fun source(value: Any?): DocumentSource {
         if (value is DocumentSource) return value

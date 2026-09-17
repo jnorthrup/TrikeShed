@@ -8,12 +8,14 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.emptySeriesOf
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
+import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
 import borg.trikeshed.parse.json.JsonSupport
@@ -53,6 +55,8 @@ class DocumentCuratorElement private constructor(
     private val modelId: String,
     private val capacity: Int,
     private val observer: DocumentCuratorObserver,
+    private val rete: CausalityReteElement?,
+    private val toolOntology: ToolOntologyScaffold,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<DocumentCuratorElement> {
         const val MAX_INSTRUCTIONS_CHARS = 16 * 1024
@@ -61,11 +65,13 @@ class DocumentCuratorElement private constructor(
             scope: CoroutineScope, nlp: NlpReader, model: suspend (Prompt) -> ModelResponse, modelId: String,
             cas: CasStore, log: DurableAppendLog, bag: BeliefBagElement,
             observer: DocumentCuratorObserver? = null, capacity: Int = 8,
+            rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
+            toolOntology: ToolOntologyScaffold = emptySeriesOf(),
         ): DocumentCuratorElement {
             require(capacity > 0) { "capacity must be positive" }
             require(modelId.isNotBlank()) { "modelId is required" }
             val curator = DocumentCuratorElement(scope, nlp, model, cas, log, bag.intake, modelId, capacity,
-                observer ?: DocumentCuratorObserver { _, _, _ -> })
+                observer ?: DocumentCuratorObserver { _, _, _ -> }, rete, toolOntology)
             try {
                 curator.replay()
                 curator.start()
@@ -96,7 +102,11 @@ class DocumentCuratorElement private constructor(
 
     private data class Work(val source: DocumentSource, val instructions: String, val reply: CompletableDeferred<Result<DocumentCurationResult>>)
     private data class Outcome<T>(val result: Result<T>, val observerError: String?)
-    private data class Parsed(val work: Work, val nlp: Outcome<NlpDocument>, val notices: List<String>)
+    private data class Parsed(
+        val work: Work,
+        val nlp: Outcome<NlpDocument>,
+        val notices: List<String>,
+    )
     private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>, val notices: List<String>)
     private data class Completion(val work: Work, val result: Result<DocumentCurationResult>)
 
@@ -188,13 +198,16 @@ class DocumentCuratorElement private constructor(
                     val model = if (issue != null) Result.failure(IllegalStateException("skipped: NLP $issue"))
                     else attempt {
                         withContext(Dispatchers.Default) {
+                            val payload = linkedMapOf<String, Any?>(
+                                "source" to DocumentCuratorCodec.source(read.work.source),
+                                "nlp" to DocumentCuratorCodec.nlp(checkNotNull(document)),
+                            )
+                            if (toolOntology.size > 0) payload["toolOntology"] =
+                                List(toolOntology.size) { index -> toolOntology[index] }
                             this@DocumentCuratorElement.model(Prompt(
                                 listOf(
                                     PromptMessage.System(read.work.instructions),
-                                    PromptMessage.User(JsonSupport.stringify(mapOf(
-                                        "source" to DocumentCuratorCodec.source(read.work.source),
-                                        "nlp" to DocumentCuratorCodec.nlp(checkNotNull(document)),
-                                    ))),
+                                    PromptMessage.User(JsonSupport.stringify(payload)),
                                 ).toSeries(),
                                 modelId,
                                 temperature = 0.0,
@@ -297,7 +310,8 @@ class DocumentCuratorElement private constructor(
             candidates.toSeries(), reasons.toSeries(), reservations.toSeries(), duplicateReceiptCids = duplicates.distinct().toSeries(),
             observerFailures = observerFailures.toSeries(), instructions = join.work.instructions,
             quotationReservedReceiptCids = quotationReservations.toSeries(),
-            quotationDuplicateReceiptCids = quotationDuplicates.distinct().toSeries())
+            quotationDuplicateReceiptCids = quotationDuplicates.distinct().toSeries(),
+            toolOntology = toolOntology)
         var recordCid = append(record)
         observe("curator.record", source, listOf(recordCid).toSeries())?.let(observerFailures::add)
         val sent = mutableListOf<ContentId>()
@@ -358,6 +372,9 @@ class DocumentCuratorElement private constructor(
                     angularReceipts[a.signal.angular] = a.receiptCid
                 }
             }
+            // Parser-derived candidates (record.nlpAxioms) are recomputed on demand for
+            // inspection; replay never re-admits them as global law or re-registers raw
+            // subject/object terms — that would invent an eternal rule from stored text.
             sequence = seq
         }
     }

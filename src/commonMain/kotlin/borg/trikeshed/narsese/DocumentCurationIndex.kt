@@ -177,6 +177,9 @@ private fun DocumentSource.nlpErrors(nlp: NlpDocument?): Series<String> {
             errors.add("nlp sentence ${sentence.index} span invalid: ${sentence.begin}..${sentence.end}")
         if (sentence.begin < previousSentenceEnd)
             errors.add("nlp sentence ${sentence.index} span overlaps preceding sentence")
+        else if (previousSentenceEnd >= 0 && sentence.begin <= text.length &&
+            text.substring(previousSentenceEnd, sentence.begin).any { !it.isWhitespace() })
+            errors.add("nlp sentence ${sentence.index} leaves preceding text uncovered")
         previousSentenceEnd = sentence.end
         if (sentence.tokens.size == 0) errors.add("nlp sentence ${sentence.index} tokens unavailable")
         if (sentence.dependencies.size == 0) errors.add("nlp sentence ${sentence.index} dependencies unavailable")
@@ -185,18 +188,30 @@ private fun DocumentSource.nlpErrors(nlp: NlpDocument?): Series<String> {
         for (token in sentence.tokens.view) {
             if (token.index <= 0 || !tokenIndices.add(token.index))
                 errors.add("nlp sentence ${sentence.index} token index invalid: ${token.index}")
-            if (token.begin < sentence.begin || token.end <= token.begin || token.end > sentence.end)
+            val spanValid = token.begin >= 0 && token.end > token.begin && token.end <= text.length &&
+                token.begin >= sentence.begin && token.end <= sentence.end
+            if (!spanValid)
                 errors.add("nlp sentence ${sentence.index} token ${token.index} span invalid: ${token.begin}..${token.end}")
+            else if (text.substring(token.begin, token.end) != token.word)
+                errors.add("nlp sentence ${sentence.index} token ${token.index} word does not match its span: ${token.word}")
             if (token.begin < previousTokenEnd)
                 errors.add("nlp sentence ${sentence.index} token ${token.index} span overlaps preceding token")
+            else if (previousTokenEnd >= 0 && token.begin <= text.length &&
+                text.substring(previousTokenEnd, token.begin).any { !it.isWhitespace() })
+                errors.add("nlp sentence ${sentence.index} token ${token.index} leaves preceding text uncovered")
             previousTokenEnd = token.end
         }
+        if (previousTokenEnd >= 0 && sentence.end in previousTokenEnd..text.length &&
+            text.substring(previousTokenEnd, sentence.end).any { !it.isWhitespace() })
+            errors.add("nlp sentence ${sentence.index} leaves trailing text uncovered")
         for (dependency in sentence.dependencies.view) {
             if ((dependency.governor != 0 && dependency.governor !in tokenIndices) ||
                 dependency.dependent !in tokenIndices)
                 errors.add("nlp sentence ${sentence.index} dependency endpoint invalid: ${dependency.governor}->${dependency.dependent}")
         }
     }
+    if (previousSentenceEnd in 0..text.length && text.substring(previousSentenceEnd).any { !it.isWhitespace() })
+        errors.add("nlp sentences leave trailing text uncovered")
     return errors.toSeries()
 }
 

@@ -63,6 +63,7 @@ internal object DocumentCuratorCodec {
         "quotationReserved" to record.quotationReservedReceiptCids.values { it.value },
         "quotationSubmitted" to record.quotationSubmittedReceiptCids.values { it.value },
         "quotationDuplicates" to record.quotationDuplicateReceiptCids.values { it.value },
+        "toolOntology" to record.toolOntology.values(),
         "observerFailures" to record.observerFailures.values(),
     )
 
@@ -101,7 +102,8 @@ internal object DocumentCuratorCodec {
             m.cids("reserved"), m.cids("submitted"), m.cids("duplicates"),
             m.array("observerFailures").map { it as String }.toSeries(),
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
-            m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"))
+            m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
+            m.optionalStrings("toolOntology").toSeries())
     }
 
     /** Validate syntax strictly before crossing the existing JSON-shaped value boundary. */
@@ -114,6 +116,8 @@ internal object DocumentCuratorCodec {
     private fun Map<*, *>.cids(key: String) = array(key).map { ContentId(it as String) }.toSeries()
     private fun Map<*, *>.optionalCids(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
         .map { ContentId(it as String) }.toSeries()
+    private fun Map<*, *>.optionalStrings(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
+        .map { it as String }
 }
 
 internal fun <T, R> Series<T>.values(f: (T) -> R): List<R> = List(size) { f(this[it]) }

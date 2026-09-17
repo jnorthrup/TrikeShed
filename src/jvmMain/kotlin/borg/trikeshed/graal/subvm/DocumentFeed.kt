@@ -6,14 +6,18 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
+import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
+import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentCuratorObserver
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentCurationToolset
 import borg.trikeshed.narsese.documentModel
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
@@ -63,6 +67,9 @@ class DocumentFeed private constructor(
             routeId: String = "document-${UUID.randomUUID()}",
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
             stagingLba: Long? = null,
+            rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
+            toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+                CamelCatalog.endpoints().map { "available:camel.endpoint=$it" }),
         ): DocumentFeed {
             require(stagingLba == null || stagingLba in 0..volume.capacity) { "Invalid document staging region" }
             val job = SupervisorJob(scope.coroutineContext[Job])
@@ -72,6 +79,8 @@ class DocumentFeed private constructor(
             var curator: DocumentCuratorElement? = null
             try {
                 curator = DocumentCuratorElement.create(owner, nlp, model, modelId, cas, log, bag,
+                    rete = rete,
+                    toolOntology = toolOntology,
                     observer = DocumentCuratorObserver { name, correlation, refs ->
                         land(points, name, correlation, mapOf("receipts" to List(refs.size) { refs[it].value }))
                     })
@@ -102,8 +111,19 @@ class DocumentFeed private constructor(
             modelId: String,
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
             stagingLba: Long? = null,
+            rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
+            toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+                buildList {
+                    addAll(CamelCatalog.endpoints().map { "available:camel.endpoint=$it" })
+                    addAll(brain.modelMux().listModels("chat").view.map {
+                        "available:${DocumentCurationToolset.MODEL_BASE}.model=${it.a}"
+                    })
+                    addAll(brain.providerRoster().map {
+                        "available:${DocumentCurationToolset.MODEL_BASE}.provider=${it.provider ?: it.name};model=${it.model}"
+                    })
+                }),
         ): DocumentFeed = create(scope, volume, cas, log, bag, points, documentModel(brain, muxContext), modelId,
-            tikaOptions = tikaOptions, stagingLba = stagingLba)
+            tikaOptions = tikaOptions, stagingLba = stagingLba, rete = rete, toolOntology = toolOntology)
 
         private fun land(
             points: PointcutBlackboardAdapter,

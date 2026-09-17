@@ -250,7 +250,10 @@ object SubVmLegos {
             appendLine("  var n = sent.tokens().size()")
             appendLine("  for (var i = 0; i < n; i++) {")
             appendLine("    var t = sent.tokens().get(i)")
-            appendLine("    var tok = { word: t.word(), tag: t.tag(), lemma: t.lemma(), index: t.index() }")
+            // charBegin/charEnd are UTF-16 char offsets into the source text
+            // (CoreLabel.beginPosition/endPosition), distinct from and additive
+            // to the existing 1-based token `index`.
+            appendLine("    var tok = { word: t.word(), tag: t.tag(), lemma: t.lemma(), index: t.index(), charBegin: t.beginPosition(), charEnd: t.endPosition() }")
             appendLine("    var ner = t.ner()")
             appendLine("    if (ner !== null && ner !== 'O') tok.ner = ner")
             appendLine("    tokens.push(tok)")
@@ -258,10 +261,23 @@ object SubVmLegos {
             appendLine("  var deps = []")
             appendLine("  try {")
             appendLine("    var graph = sent.dependencyParse()")
+            // Root edges are synthetic in CoreNLP's own typed-dependency notation:
+            // govIndex 0 stands for the sentence root, mirroring CoreNlpRuntime's
+            // NlpDependency(0, rootIndex, "root").
+            appendLine("    var rootIter = graph.getRoots().iterator()")
+            appendLine("    var roots = []")
+            appendLine("    while (rootIter.hasNext()) { roots.push(rootIter.next()) }")
+            appendLine("    roots.sort(function (a, b) { return a.index() - b.index() })")
+            appendLine("    for (var ri = 0; ri < roots.length; ri++) {")
+            appendLine("      deps.push({ gov: 'ROOT', dep: roots[ri].word(), rel: 'root', govIndex: 0, depIndex: roots[ri].index() })")
+            appendLine("    }")
             appendLine("    var edges = graph.edgeListSorted()")
             appendLine("    for (var e = 0; e < edges.size(); e++) {")
             appendLine("      var edge = edges.get(e)")
-            appendLine("      deps.push({ gov: edge.getGovernor().word(), dep: edge.getDependent().word(), rel: String(edge.getRelation()) })")
+            // govIndex/depIndex are the same 1-based sentence-token indices as
+            // tokens[].index — indexed endpoints alongside the existing gov/dep
+            // word strings, not a replacement for them.
+            appendLine("      deps.push({ gov: edge.getGovernor().word(), dep: edge.getDependent().word(), rel: String(edge.getRelation()), govIndex: edge.getGovernor().index(), depIndex: edge.getDependent().index() })")
             appendLine("    }")
             appendLine("  } catch (depEx) { /* depparse not in the annotator set */ }")
             appendLine("  var sentObj = { text: String(sent.text()), tokens: tokens, deps: deps }")
@@ -282,6 +298,11 @@ object SubVmLegos {
             appendLine("    var words = []")
             appendLine("    for (var w = entities[r].begin - 1; w < entities[r].end; w++) words.push(tokens[w].word)")
             appendLine("    entities[r].text = words.join(' ')")
+            // Entity spans are token-indexed (begin/end, 1-based inclusive,
+            // unchanged); charBegin/charEnd add the UTF-16 offsets of the same
+            // span, recovered from the run's first/last token like `text` is.
+            appendLine("    entities[r].charBegin = tokens[entities[r].begin - 1].charBegin")
+            appendLine("    entities[r].charEnd = tokens[entities[r].end - 1].charEnd")
             appendLine("  }")
             appendLine("  if (entities.length > 0) sentObj.entities = entities")
             appendLine("  results.push(sentObj)")
@@ -290,7 +311,17 @@ object SubVmLegos {
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(service.value, node, facet, script, text, inputs, defaultModule = "corenlp")
+        val result = evalInVmText(service.value, node, facet, script, text, inputs, defaultModule = "corenlp")
+        // LcncContracts declares `sentences` (json) as this lego's output; the
+        // guest eval only hands back the joined text/metadata (evalInVmText's
+        // shared shape), so the promised port has to be parsed out of it here
+        // rather than silently staying absent from scope.out wiring. A parse
+        // failure is a real fault, not an empty/omitted `sentences` value.
+        val raw = result["text"] as? String
+            ?: throw IllegalStateException("vm lego '${node.id}': corenlp.extract produced no text output to parse 'sentences' from")
+        val sentences = runCatching { borg.trikeshed.parse.json.JsonSupport.parse(raw) }.getOrNull() as? List<*>
+            ?: throw IllegalStateException("vm lego '${node.id}': corenlp.extract output was not a JSON array of sentences: $raw")
+        result + ("sentences" to sentences)
     }
 
     // ── camel: route DSL over the lego's params ─────────────────────────

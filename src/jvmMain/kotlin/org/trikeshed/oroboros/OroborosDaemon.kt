@@ -1355,6 +1355,7 @@ object OroborosDaemon {
             ccekBinding = ccekBinding,
             programLoader = storedProgramLoader,
             kifBank = kifBank,
+            narsRete = causalityRete,
         )
         lcncRunnersRef.set(moduleContext.lcncRunners)
         val headhunterWire = borg.trikeshed.forge.server.HeadhunterWire.open(moduleContext, brainClient, patchWire)

@@ -454,9 +454,11 @@ class JvmKanbanServer(
             "/api/submit" -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/donor"  -> if (method == "POST") submit(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
             "/api/invoke" -> if (method == "POST") invoke(text) else HttpResponse(405, """{"error":"method_not_allowed"}""")
-            // The PWA shell is the gh-pages PUBLIC offering (docs/) — it does not ride
-            // the app port. Root lands on the operator board; forgeShellHtml stays
-            // for the public build lineage only.
+            "/forge" -> {
+                val shell = ForgeRoutes.shellHtml()
+                HttpResponse(shell.status, shell.body.decodeToString(), shell.headers["Content-Type"] ?: "text/html; charset=utf-8", shell.body)
+            }
+            // Root remains the operator board; the editable Forge shell is available at /forge.
             "/", "/index.html" -> staticAsset("/kanban.html")
                 ?: HttpResponse(404, """{"error":"asset_missing","resource":"web/kanban.html"}""")
             else -> staticAsset(path)
@@ -466,13 +468,6 @@ class JvmKanbanServer(
     }
 
     // ── Forge PWA: the shell and its static assets ───────────────────────
-
-    /** The seed-baked shell: ForgeApp renders the web template from commonMain; we only serve it. */
-    private fun forgeShellHtml(): String = runCatching {
-        borg.trikeshed.forge.ForgeApp.renderHtml(userId = "jim", bundles = listOf("./kotlin/forge/forge.js"))
-    }.getOrElse { ex ->
-        "<html><body><h1>Forge shell failed to render</h1><pre>${ex.message}</pre><p>see /api/health</p></body></html>"
-    }
 
     /** Static PWA assets straight from `src/commonMain/resources/web/` on the classpath. Paths are fixed — no traversal. */
     private val staticAssets: Map<String, Pair<String, String>> = mapOf(
@@ -486,6 +481,7 @@ class JvmKanbanServer(
         "/mux.html" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux.css" to ("web/mux.css" to "text/css; charset=utf-8"),
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
+        "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
         "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline

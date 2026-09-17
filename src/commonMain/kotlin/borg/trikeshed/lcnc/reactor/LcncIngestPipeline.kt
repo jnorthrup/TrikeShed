@@ -5,12 +5,8 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.lcnc.ccek.IngestStateElement
 import borg.trikeshed.lcnc.isam.LcncEntity
-import borg.trikeshed.lcnc.isam.LcncPage
-import borg.trikeshed.lcnc.isam.LcncBlock
-import borg.trikeshed.lcnc.isam.LcncDatabase
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.j
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -94,6 +90,7 @@ class LcncIngestPipeline(
     
 
     override suspend fun decode(source: IngestSource, format: IngestFormat): Series<LcncEntity> {
+        if (format !in supportedFormats) return emptySeriesOf()
         val stateElement = currentCoroutineContext()[IngestStateElement]
         val mockNuid = nuid(Capability.Custom("lcnc", "ingest"), Nonce.RandomBytes(), Subnet.core)
 
@@ -142,38 +139,10 @@ class LcncIngestPipeline(
         return when (format) {
             IngestFormat.MARKDOWN -> markdownCodec.decodeText(text, format)
             IngestFormat.CSV, IngestFormat.TSV -> csvCodec.decodeText(text, format)
-            IngestFormat.JSON -> parseJson(text)
-            IngestFormat.HTML -> parseHtml(text)
-            IngestFormat.LCNC_NATIVE -> parseLcncNative(text)
-            else -> emptySeriesOf()
+            IngestFormat.JSON -> LcncTaxonomyCodec.json(text)
+            IngestFormat.HTML -> LcncTaxonomyCodec.html(text)
+            IngestFormat.LCNC_NATIVE -> LcncTaxonomyCodec.native(text)
         }
-    }
-
-    private fun parseJson(text: String): Series<LcncEntity> {
-        return 1 j { LcncPage(
-            id = "json-import",
-            title = "JSON Import",
-            parentId = null,
-            contentBlocks = emptySeriesOf<LcncBlock>()
-        ) }
-    }
-
-    private fun parseHtml(text: String): Series<LcncEntity> {
-        return 1 j { LcncPage(
-            id = "html-import",
-            title = "HTML Import",
-            parentId = null,
-            contentBlocks = emptySeriesOf<LcncBlock>()
-        ) }
-    }
-
-    private fun parseLcncNative(text: String): Series<LcncEntity> {
-        return 1 j { LcncPage(
-            id = "lcnc-native",
-            title = "LCNC Native Import",
-            parentId = null,
-            contentBlocks = emptySeriesOf<LcncBlock>()
-        ) }
     }
     
     suspend fun getMetrics(): IngestMetrics = currentMetrics

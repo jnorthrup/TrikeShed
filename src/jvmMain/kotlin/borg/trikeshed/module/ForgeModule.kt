@@ -84,6 +84,8 @@ class ModuleContext(
     val kifBank: borg.trikeshed.kif.KifKnowledgeBase? = null,
     /** The coding-agent lane (Forge genesis, Cut A): filled by the daemon after attach, read by the claim worker at claim time. */
     @Volatile var agentRuns: borg.trikeshed.lcnc.AgentRuns? = null,
+    /** The daemon's live NARS Rete; document ingest registers parser/model terms here when present. */
+    val narsRete: borg.trikeshed.narsese.CausalityReteElement? = null,
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

@@ -5,6 +5,10 @@ package borg.trikeshed.parse.confix
 import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.`▶`
+import borg.trikeshed.parse.kursive.legacy.JursiveCharSeries
+import borg.trikeshed.parse.kursive.legacy.KursiveParser
+import borg.trikeshed.parse.kursive.legacy.parser
+import borg.trikeshed.parse.kursive.std
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPEDEF ORACLE — typedef collection + lattice build
@@ -52,14 +56,113 @@ class TypeDefOracle {
     // ── parseTypeDefs — scan .x source for typedef declarations ─────────────
 
     companion object {
-        private val typedefPattern = Regex(
-            """^\s*typedef\s+(.+?)\s+as\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*;""",
-            setOf(RegexOption.MULTILINE)
+        private data class ParsedDeclaration(
+            val name: String,
+            val referredTo: String,
+            val params: String?,
         )
-        private val typealiasPattern = Regex(
-            """^\s*typealias\s+([A-Za-z_]\w*)(?:<([^>]+)>)?\s*=\s*(.+?)$""",
-            setOf(RegexOption.MULTILINE)
-        )
+
+        private val requiredWhitespace: KursiveParser<CharSeries> =
+            std.takeWhile("declarationWhitespace", min = 1) { it.isWhitespace() }
+        private val typedefKeyword = std.lit("typedef")
+        private val typealiasKeyword = std.lit("typealias")
+        private val asKeyword = std.lit("as")
+        private val openTypeParameters = std.ch('<')
+        private val closeTypeParameters = std.ch('>')
+        private val semicolon = std.ch(';')
+        private val equals = std.ch('=')
+        private val typeParameterBody = std.takeUntil("typeParameterBody", min = 1) { it == '>' }
+        private val typealiasRhs = std.takeWhile("typealiasRhs", min = 1) { true }
+
+        private val identifier: KursiveParser<CharSeries> = parser("identifier") { input ->
+            val start = input.pos
+            val first = input.peek() ?: return@parser null
+            if (!isIdentifierStart(first)) return@parser null
+            input.advance()
+            while (input.peek()?.let(::isIdentifierPart) == true) input.advance()
+            input.slice(start)
+        }
+
+        private val typeParameters: KursiveParser<CharSeries> = parser("typeParameters") { input ->
+            if (openTypeParameters(input) == null) return@parser null
+            val body = typeParameterBody(input)
+                ?: return@parser null
+            if (closeTypeParameters(input) == null) return@parser null
+            body
+        }
+
+        private val referredType: KursiveParser<CharSeries> = parser("referredType") { input ->
+            val start = input.pos
+            val source = input.source
+            var cursor = start
+            while (cursor < source.limit) {
+                if (source[cursor].isWhitespace()) {
+                    var keyword = cursor
+                    while (keyword < source.limit && source[keyword].isWhitespace()) keyword++
+                    val after = keyword + 2
+                    if (matchesAt(source, keyword, "as") &&
+                        after < source.limit && source[after].isWhitespace()
+                    ) {
+                        if (cursor > start) {
+                            source.pos = cursor
+                            return@parser input.slice(start)
+                        }
+                    }
+                }
+                cursor++
+            }
+            null
+        }
+
+        private val typedefDeclaration: KursiveParser<ParsedDeclaration> = parser("typedefDeclaration") { input ->
+            std.ws(input)
+            if (typedefKeyword(input) == null) return@parser null
+            requiredWhitespace(input) ?: return@parser null
+            val referred = referredType(input) ?: return@parser null
+            requiredWhitespace(input) ?: return@parser null
+            if (asKeyword(input) == null) return@parser null
+            requiredWhitespace(input) ?: return@parser null
+            val name = identifier(input) ?: return@parser null
+            val params = if (input.peek() == '<') {
+                typeParameters(input) ?: return@parser null
+            } else {
+                null
+            }
+            std.ws(input)
+            if (semicolon(input) == null) return@parser null
+            ParsedDeclaration(name.asString(), referred.asString(), params?.asString())
+        }
+
+        private val typealiasDeclaration: KursiveParser<ParsedDeclaration> = parser("typealiasDeclaration") { input ->
+            std.ws(input)
+            if (typealiasKeyword(input) == null) return@parser null
+            requiredWhitespace(input) ?: return@parser null
+            val name = identifier(input) ?: return@parser null
+            val params = if (input.peek() == '<') {
+                typeParameters(input) ?: return@parser null
+            } else {
+                null
+            }
+            std.ws(input)
+            if (equals(input) == null) return@parser null
+            std.ws(input)
+            val referred = typealiasRhs(input) ?: return@parser null
+            ParsedDeclaration(name.asString(), referred.trim.asString(), params?.asString())
+        }
+
+        private val sourceLine: KursiveParser<CharSeries> = std.restOfLine("sourceLine")
+
+        private fun isIdentifierStart(char: Char): Boolean =
+            char == '_' || char in 'A'..'Z' || char in 'a'..'z'
+
+        private fun isIdentifierPart(char: Char): Boolean =
+            isIdentifierStart(char) || char in '0'..'9'
+
+        private fun matchesAt(source: CharSeries, offset: Int, literal: String): Boolean {
+            if (offset < 0 || offset + literal.length > source.limit) return false
+            for (index in literal.indices) if (source[offset + index] != literal[index]) return false
+            return true
+        }
 
         private val topicPattern = Regex("""^topic:(\w+)\s+as\s+(\w+)""")
         private val typeParamPattern = Regex("<[^>]*>")
@@ -68,18 +171,23 @@ class TypeDefOracle {
     }
 
     fun parseTypeDefs(text: String, source: String = "<unknown>") {
-        for (m in typedefPattern.findAll(text)) {
-            val referredTo = m.groupValues[1].trim()
-            val name = m.groupValues[2].trim()
-            val paramsStr = m.groupValues[3]
-            addEntry(name, referredTo, paramsStr, source)
-        }
-
-        for (m in typealiasPattern.findAll(text)) {
-            val name = m.groupValues[1].trim()
-            val paramsStr = m.groupValues[2]
-            val referredTo = m.groupValues[3].trim()
-            addEntry(name, referredTo, paramsStr, source)
+        val input = JursiveCharSeries(text.toSeries())
+        while (input.hasRemaining) {
+            val line = sourceLine(input)
+            if (line != null) {
+                val declarationInput = JursiveCharSeries(line as Series<Char>)
+                val declaration = typedefDeclaration(declarationInput)
+                    ?: typealiasDeclaration(declarationInput)
+                if (declaration != null) addEntry(
+                    declaration.name,
+                    declaration.referredTo,
+                    declaration.params,
+                    source,
+                )
+            }
+            if (input.hasRemaining) {
+                check(std.lineBreak(input) != null) { "Expected a source line break" }
+            }
         }
     }
 

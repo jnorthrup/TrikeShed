@@ -33,6 +33,27 @@ data class DocView(
 /** Page reads one document; Table reads the whole project as rows. Both are the same data. */
 enum class SurfaceView { PAGE, TABLE }
 
+// ── curation: the reader's own text, sent through the same curator the projects use ──────
+
+data class CurationDestination(val model: String, val provider: String, val url: String)
+
+data class CurationRecordRow(val receiptCid: String, val name: String)
+
+data class CurationProposal(
+    val subject: String?, val predicate: String?, val obj: String?,
+    val quote: String?, val reasons: List<String>, val submitted: Boolean, val duplicate: Boolean,
+)
+
+data class CurationAxiom(
+    val antecedent: String?, val predicate: String?, val consequent: String?,
+    val quote: String?, val label: String?,
+)
+
+data class CurationResult(
+    val receiptCid: String, val name: String, val text: String,
+    val proposals: List<CurationProposal>, val reasons: List<String>, val axioms: List<CurationAxiom>,
+)
+
 /** The table's sortable columns, each with the header a reader sees. */
 enum class DocColumn(val key: String, val label: String) {
     NAME("name", "Name"), TYPE("type", "Type"), SIZE("size", "Size"), SEQ("seq", "Sequence");
@@ -48,6 +69,7 @@ object DocumentSurface {
     const val CRUMB_ID = "ds-crumb"
     const val CONTENT_ID = "ds-content"
     const val DIGEST_HREF = "/harness?load=preset-corpus"
+    const val CURATION_HASH = "curation"
 
     // ── parsing the routes' JSON ────────────────────────────────────────────
 
@@ -94,6 +116,173 @@ object DocumentSurface {
         )
     }
 
+    // ── curation: /api/documents and /api/documents/curate ─────────────────
+
+    fun curationAvailable(json: Any?): Boolean = (json as? Map<*, *>)?.get("available") as? Boolean ?: false
+
+    fun curationDestination(json: Any?): CurationDestination? {
+        val m = (json as? Map<*, *>)?.get("destination") as? Map<*, *> ?: return null
+        val model = m["model"]?.toString() ?: return null
+        return CurationDestination(model, m["provider"]?.toString().orEmpty(), m["url"]?.toString().orEmpty())
+    }
+
+    fun curationList(json: Any?): List<CurationRecordRow> {
+        val records = (json as? Map<*, *>)?.get("records") as? List<*> ?: return emptyList()
+        return records.mapNotNull { row ->
+            val m = row as? Map<*, *> ?: return@mapNotNull null
+            CurationRecordRow(
+                receiptCid = m["receiptCid"]?.toString() ?: return@mapNotNull null,
+                name = m["name"]?.toString().orEmpty(),
+            )
+        }
+    }
+
+    /** [json] is a full `/api/documents?cid=` (or curate) response: `record` plus top-level `nlpAxioms`. */
+    fun curationResult(json: Any?): CurationResult? {
+        val m = json as? Map<*, *> ?: return null
+        val receiptCid = m["receiptCid"]?.toString() ?: return null
+        val record = m["record"] as? Map<*, *> ?: return null
+        val source = record["source"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        val submittedCids = (record["submitted"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
+        val duplicateCids = (record["duplicates"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
+        val proposals = (record["proposals"] as? List<*> ?: emptyList<Any?>()).mapNotNull { row ->
+            val p = row as? Map<*, *> ?: return@mapNotNull null
+            CurationProposal(
+                subject = p["subject"]?.toString(), predicate = p["predicate"]?.toString(), obj = p["object"]?.toString(),
+                quote = p["quote"]?.toString(),
+                reasons = (p["reasons"] as? List<*>)?.map { it.toString() }.orEmpty(),
+                submitted = p["receiptCid"]?.toString()?.let { it in submittedCids } ?: false,
+                duplicate = p["receiptCid"]?.toString()?.let { it in duplicateCids } ?: false,
+            )
+        }
+        val axioms = (m["nlpAxioms"] as? List<*> ?: emptyList<Any?>()).mapNotNull { row ->
+            val a = row as? Map<*, *> ?: return@mapNotNull null
+            CurationAxiom(
+                antecedent = a["antecedent"]?.toString(), predicate = a["predicate"]?.toString(),
+                consequent = a["consequent"]?.toString(), quote = a["quote"]?.toString(), label = a["label"]?.toString(),
+            )
+        }
+        return CurationResult(
+            receiptCid = receiptCid, name = source["name"]?.toString().orEmpty(), text = source["text"]?.toString().orEmpty(),
+            proposals = proposals, reasons = (record["reasons"] as? List<*>)?.map { it.toString() }.orEmpty(),
+            axioms = axioms,
+        )
+    }
+
+    /** Both the list read (`error` at the top) and the curate write (`error` on a 503) land the same way. */
+    fun curationError(json: Any?): String? = (json as? Map<*, *>)?.get("error")?.toString()
+
+    // ── curation: the form, the saved list, and a result ───────────────────
+
+    fun curationHtml(
+        available: Boolean,
+        destination: CurationDestination?,
+        records: List<CurationRecordRow>,
+        pendingName: String,
+        pendingText: String,
+        formError: String?,
+        listError: String?,
+        busy: Boolean,
+        result: CurationResult?,
+        resultError: String?,
+    ): String = buildString {
+        append("<div class=\"ds-page ds-page-wide\">")
+        append("<h1 class=\"ds-title\">Curate</h1>")
+        append("<p class=\"ds-sub\">Paste text in and the curator reads out statements and conditional readings, ")
+            .append("each tied to the quote it came from.</p>")
+        if (!available) append("<p class=\"ds-curate-warn\">The curation engine is not available right now.</p>")
+        if (listError != null) append("<p class=\"ds-curate-error\">").append(esc(listError)).append("</p>")
+        append("<form class=\"ds-curate-form\" data-curate-form=\"1\">")
+        append("<label class=\"ds-curate-label\" for=\"ds-curate-name\">Document name (optional)</label>")
+        append("<input class=\"ds-curate-name\" id=\"ds-curate-name\" type=\"text\" value=\"")
+            .append(esc(pendingName)).append("\" placeholder=\"Untitled\">")
+        append("<label class=\"ds-curate-label\" for=\"ds-curate-text\">Text</label>")
+        append("<textarea class=\"ds-curate-text\" id=\"ds-curate-text\" rows=\"10\" placeholder=\"Paste or write the text to curate…\">")
+            .append(esc(pendingText)).append("</textarea>")
+        append("<div class=\"ds-curate-dest\">")
+        if (destination != null) append("Destination model: <strong>").append(esc(destination.model)).append("</strong>")
+            .append(" <span class=\"ds-dim\">(").append(esc(destination.provider)).append(")</span>")
+        else append("<span class=\"ds-dim\">No curation model is configured.</span>")
+        append("</div>")
+        if (formError != null) append("<p class=\"ds-curate-error\">").append(esc(formError)).append("</p>")
+        append("<button type=\"submit\" class=\"ds-curate-submit\" data-curate-submit=\"1\"")
+        if (busy || destination == null || !available) append(" disabled")
+        append(">").append(if (busy) "Curating…" else "Curate").append("</button>")
+        append("</form>")
+        if (records.isNotEmpty()) {
+            append("<h2 class=\"ds-curate-h2\">Saved results</h2><ul class=\"ds-curate-list\">")
+            for (r in records) {
+                val open = r.receiptCid == result?.receiptCid
+                append("<li><a class=\"ds-curate-item").append(if (open) " ds-selected" else "").append('"')
+                append(" href=\"#").append(CURATION_HASH).append('/').append(esc(r.receiptCid))
+                    .append("\" data-curate-open=\"").append(esc(r.receiptCid)).append("\">")
+                append(esc(r.name.ifBlank { "Untitled" })).append(" <span class=\"ds-dim\">")
+                    .append(esc(shortCid(r.receiptCid))).append("</span></a></li>")
+            }
+            append("</ul>")
+        }
+        if (resultError != null) append("<p class=\"ds-curate-error\">").append(esc(resultError)).append("</p>")
+        if (result != null) append(curationResultHtml(result))
+        append("</div>")
+    }
+
+    fun curationResultHtml(result: CurationResult): String = buildString {
+        append("<section class=\"ds-curate-result\">")
+        append("<h2 class=\"ds-curate-h2\">").append(esc(result.name.ifBlank { "Untitled" })).append("</h2>")
+        append("<p class=\"ds-sub\">saved result · <code class=\"ds-cid\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
+        append("<details class=\"ds-curate-source\"><summary>Source text</summary><pre>")
+            .append(esc(result.text)).append("</pre></details>")
+        val statements = result.proposals.filter { it.subject != null && it.predicate != null && it.obj != null }
+        if (statements.isNotEmpty()) {
+            append("<h3 class=\"ds-curate-h3\">Proposed statements</h3><ul class=\"ds-curate-proposals\">")
+            for (p in statements) {
+                append("<li class=\"ds-curate-proposal").append(if (p.submitted) " ds-curate-admitted" else " ds-curate-review").append("\">")
+                append("<div class=\"ds-curate-triple\">").append(esc(p.subject!!)).append(" <span class=\"ds-dim\">")
+                    .append(esc(p.predicate!!)).append("</span> ").append(esc(p.obj!!)).append("</div>")
+                if (!p.quote.isNullOrBlank()) append("<blockquote class=\"ds-curate-quote\">“").append(esc(p.quote)).append("”</blockquote>")
+                append("<div class=\"ds-curate-status\">")
+                    .append(when {
+                        p.submitted -> "Submitted as source attribution"
+                        p.duplicate -> "Previously recorded source attribution"
+                        else -> "Needs review"
+                    }).append("</div>")
+                if (p.reasons.isNotEmpty()) append("<div class=\"ds-curate-reasons\">").append(esc(p.reasons.joinToString("; "))).append("</div>")
+                append("</li>")
+            }
+            append("</ul>")
+        }
+        if (result.axioms.isNotEmpty()) {
+            append("<h3 class=\"ds-curate-h3\">Conditional / causal readings</h3><ul class=\"ds-curate-axioms\">")
+            for (a in result.axioms) {
+                append("<li class=\"ds-curate-axiom\">")
+                append("<div class=\"ds-curate-triple\">")
+                if (a.predicate == "implies") append("If ").append(esc(a.antecedent.orEmpty()))
+                    .append(" then ").append(esc(a.consequent.orEmpty()))
+                else append(esc(a.antecedent.orEmpty())).append(" <span class=\"ds-dim\">")
+                    .append(esc(a.predicate.orEmpty())).append("</span> ").append(esc(a.consequent.orEmpty()))
+                append("</div>")
+                if (!a.quote.isNullOrBlank()) append("<blockquote class=\"ds-curate-quote\">“").append(esc(a.quote)).append("”</blockquote>")
+                append("<div class=\"ds-curate-status\">").append(esc(a.label ?: "admission candidate")).append("</div>")
+                append("</li>")
+            }
+            append("</ul>")
+        }
+        val unparsed = result.proposals.filter { it.subject == null || it.predicate == null || it.obj == null }
+        for (p in unparsed) {
+            append("<p class=\"ds-curate-error\">Needs review: ")
+                .append(esc(p.reasons.joinToString("; ").ifBlank { "The model response could not be read as a statement." }))
+                .append("</p>")
+        }
+        if (result.proposals.isEmpty() && result.axioms.isEmpty())
+            append("<p class=\"ds-empty\">No statements were proposed for this text.</p>")
+        if (result.reasons.isNotEmpty()) {
+            append("<h3 class=\"ds-curate-h3\">Notes on this document</h3><ul class=\"ds-curate-notes\">")
+            for (r in result.reasons) append("<li>").append(esc(r)).append("</li>")
+            append("</ul>")
+        }
+        append("</section>")
+    }
+
     // ── the shell ───────────────────────────────────────────────────────────
 
     /** Sidebar and a main column of breadcrumb over content; the page fills the three by id. */
@@ -116,8 +305,12 @@ object DocumentSurface {
         selected: String?,
         docs: List<DocRow> = emptyList(),
         selectedDoc: String? = null,
+        curationActive: Boolean = false,
     ): String = buildString {
         append("<div class=\"ds-brand\">Forge</div>")
+        append("<a class=\"ds-curate-link").append(if (curationActive) " ds-selected" else "").append('"')
+        if (curationActive) append(" aria-current=\"true\"")
+        append(" href=\"#").append(CURATION_HASH).append("\" data-curate=\"1\">Curate</a>")
         append("<div class=\"ds-side-label\">Workspaces</div>")
         if (projects.isEmpty()) {
             append("<p class=\"ds-empty\">No project is mounted. Drop a folder on the harness, or POST its path to /api/projects.</p>")
@@ -154,6 +347,13 @@ object DocumentSurface {
     }
 
     // ── the breadcrumb and the view switch ──────────────────────────────────
+
+    fun curationCrumbHtml(result: CurationResult?): String = buildString {
+        append("<div class=\"ds-crumbs\"><span class=\"ds-here\">Curate</span>")
+        if (result != null) append("<span class=\"ds-sep\">/</span><span class=\"ds-here\">")
+            .append(esc(result.name.ifBlank { "Untitled" })).append("</span>")
+        append("</div>")
+    }
 
     fun crumbHtml(project: String?, docId: String?, view: SurfaceView): String = buildString {
         append("<div class=\"ds-crumbs\">")

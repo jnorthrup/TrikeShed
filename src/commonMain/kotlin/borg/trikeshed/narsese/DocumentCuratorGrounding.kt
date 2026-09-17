@@ -32,6 +32,8 @@ Return an empty array when no assertion is proposed."""
 original and extracted-text CIDs, route correlation and metadata. nlp holds the validated host parser's
 sentences, UTF-16 spans, indexed tokens, and dependencies for that exact text. Use both the source and
 these annotations when proposing assertions; the host reconciles your response against them.
+When toolOntology is present, it is a read-only capability description, not source evidence; do not invoke
+tools or copy capability names into triplets.
 Do not substitute filename, link or adjacency heuristics.
 """ + proposalInstructions
 

@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.get
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -72,12 +73,24 @@ class CoreNlpLegoExecutionTest {
         // CoreNLP lowercases proper-noun lemmas; assert the lemma is the
         // case-folded word, not the word itself.
         assertEquals("barack", first["lemma"]?.toString()?.lowercase())
+        // UTF-16 char offsets ride alongside the existing 1-based token index,
+        // recovered from CoreLabel.beginPosition/endPosition (actual parser values).
+        assertEquals(0.0, (first["charBegin"] as Number).toDouble(), "'Barack' starts the text")
+        assertEquals(6.0, (first["charEnd"] as Number).toDouble(), "'Barack' is 6 UTF-16 chars")
 
         // Dependency edges are present with governor/dependent/relation.
         val deps = s1["deps"] as? List<*> ?: error("sentence must carry deps")
         assertTrue(deps.isNotEmpty(), "depparse must yield edges")
         val anyEdge = deps[0] as Map<*, *>
         assertTrue(anyEdge.containsKey("gov") && anyEdge.containsKey("dep") && anyEdge.containsKey("rel"))
+        // Indexed endpoints ride alongside the existing gov/dep word strings —
+        // same 1-based indices as tokens[].index, not a unit change.
+        assertTrue(anyEdge.containsKey("govIndex") && anyEdge.containsKey("depIndex"), "edges must carry indexed endpoints: $anyEdge")
+        val rootEdge = deps.mapNotNull { it as? Map<*, *> }.firstOrNull { it["rel"] == "root" }
+        assertTrue(rootEdge != null, "dependency graph must surface its root edge: $deps")
+        assertEquals("ROOT", rootEdge!!["gov"], "root edge's synthetic governor is 'ROOT', not a real token")
+        assertEquals(0.0, (rootEdge["govIndex"] as Number).toDouble(), "root edge's governor index is the sentence-root sentinel 0")
+        assertTrue((rootEdge["depIndex"] as Number).toInt() > 0, "root edge's dependent must be a real token index")
 
         // NER fires: Barack Obama is a contiguous PERSON run with recovered text.
         val entities = s1["entities"] as? List<*> ?: error("NER must find entities in sentence 1")
@@ -88,7 +101,45 @@ class CoreNlpLegoExecutionTest {
         assertEquals("Barack Obama", person["text"])
         assertEquals(1.0, (person!!["begin"] as Number).toDouble(), "PERSON run starts at token 1")
         assertEquals(2.0, (person["end"] as Number).toDouble(), "PERSON run ends at token 2")
+        // Char offsets for the same span, distinctly named from the token-index begin/end above.
+        val expectedCharBegin = text.indexOf("Barack Obama")
+        val expectedCharEnd = expectedCharBegin + "Barack Obama".length
+        assertEquals(expectedCharBegin.toDouble(), (person["charBegin"] as Number).toDouble())
+        assertEquals(expectedCharEnd.toDouble(), (person["charEnd"] as Number).toDouble())
         host.close()
+    }
+
+    @Test
+    fun corenlpExtractSentencesFlowThroughRealScopeOutWiring() = runTest {
+        // Direct out["text"] checks (above) previously missed that `sentences` —
+        // the port LcncContracts.kt actually declares and LcncPresets.kt actually
+        // wires — never reached the runner's output map at all. Only a real
+        // LcncRunner walk over a wired scope.out proves the fix: it fails the
+        // same way a live canvas would if the declared port stayed unfed.
+        val host = borg.trikeshed.vm.HypervisorVmHost()
+        try {
+            val program = LcncProgram(
+                "canvas-corenlp-extract",
+                listOf(
+                    LcncNode("extract", SubVmLegos.CORENLP_EXTRACT, mapOf("text" to text)),
+                    LcncNode("facts", LcncContracts.SCOPE_OUT, mapOf("name" to "extracted")),
+                ).toSeries(),
+                listOf(
+                    LcncWire("extract", "sentences", "facts", "value"),
+                ).toSeries(),
+            )
+            val runner = LcncRunner(mapOf(SubVmLegos.CORENLP_EXTRACT to SubVmLegos.corenlpExtract(host)))
+            val result = runner.runProcedure(program)
+            val sentences = result.returns["extracted"] as? List<*>
+                ?: error("scope.out 'extracted' must carry the wired 'sentences' port: ${result.returns}")
+            assertEquals(2, sentences.size, "two input sentences must flow through the wire: $sentences")
+            val s1 = sentences[0] as Map<*, *>
+            val tokens = s1["tokens"] as? List<*> ?: error("structured sentence must carry tokens: $s1")
+            assertTrue(tokens.isNotEmpty())
+            assertEquals("Barack", (tokens[0] as Map<*, *>)["word"])
+        } finally {
+            host.close()
+        }
     }
 
     @Test

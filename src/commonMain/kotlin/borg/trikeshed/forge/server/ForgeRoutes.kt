@@ -38,7 +38,9 @@ object ForgeRoutes {
         // ── Shell + PWA assets (PORTABLE, baked in docs/) ──
         RouteMeta("GET", "/", Tier.PORTABLE, "Forge shell → ForgeApp.renderHtml + {{SEED}}"),
         RouteMeta("GET", "/index.html", Tier.PORTABLE, "alias of /"),
+        RouteMeta("GET", "/forge", Tier.PORTABLE, "Forge shell alias for the operator board port"),
         RouteMeta("GET", "/styles.css", Tier.PORTABLE, "PWA asset web/styles.css"),
+        RouteMeta("GET", "/script.js", Tier.PORTABLE, "PWA asset web/script.js"),
         RouteMeta("GET", "/kotlin/*", Tier.PORTABLE, "Compiled Kotlin browser app bundles"),
         RouteMeta("GET", "/manifest.webmanifest", Tier.PORTABLE, "PWA manifest"),
         RouteMeta("GET", "/icons/*", Tier.PORTABLE, "PWA icons"),

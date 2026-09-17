@@ -9,6 +9,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.w3c.dom.Element
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.dom.events.Event
 import org.w3c.fetch.Headers
 import org.w3c.fetch.RequestInit
@@ -53,10 +55,25 @@ object DocumentSurfacePage {
     /** Bumped on every navigation; a poll whose generation has moved on stops. */
     private var generation = 0
 
+    // ── curation state: reachable from the sidebar and #curation, independent of a project ──
+    private var curationMode = false
+    private var curationAvailable = false
+    private var curationDestination: CurationDestination? = null
+    private var curationRecords: List<CurationRecordRow> = emptyList()
+    private var curationResult: CurationResult? = null
+    private var curationPendingName = ""
+    private var curationPendingText = ""
+    private var curationFormError: String? = null
+    private var curationListError: String? = null
+    private var curationResultError: String? = null
+    private var curationBusy = false
+
     suspend fun mount() {
         val root = document.getElementById(DocumentSurface.ROOT_ID) as HTMLElement
         root.innerHTML = DocumentSurface.layout()
         root.addEventListener("click", { e -> onClick(e) })
+        root.addEventListener("submit", { e -> onSubmit(e) })
+        root.addEventListener("input", { e -> onInput(e) })
         projects = DocumentSurface.projects(getJson("/api/projects"))
         // Deep link: #project or #project/doc, the hrefs the panes render. READ BEFORE the first
         // render: nothing is open yet, so that render writes `window.location.hash = ""` and would
@@ -64,7 +81,10 @@ object DocumentSurfacePage {
         // /documents#genesis-notes/digest.md landed on "Pick a document").
         val hash = decode(window.location.hash.removePrefix("#"))
         render()
-        if (hash.isNotEmpty()) {
+        if (hash == DocumentSurface.CURATION_HASH || hash.startsWith("${DocumentSurface.CURATION_HASH}/")) {
+            val cid = hash.substringAfter('/', "")
+            openCuration(cid.ifEmpty { null })
+        } else if (hash.isNotEmpty()) {
             openProject(hash.substringBefore('/'))
             val id = hash.substringAfter('/', "")
             if (id.isNotEmpty()) openDoc(id)
@@ -74,7 +94,8 @@ object DocumentSurfacePage {
 
     private fun onClick(e: Event) {
         val target = (e.target as? Element)
-            ?.closest("[data-project],[data-doc],[data-run-build],[data-run-rebuild],[data-view],[data-sort]") ?: return
+            ?.closest("[data-project],[data-doc],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
+            ?: return
         e.preventDefault()
         val p = target.getAttribute("data-project")
         val d = target.getAttribute("data-doc")
@@ -82,6 +103,8 @@ object DocumentSurfacePage {
         val rebuild = target.getAttribute("data-run-rebuild")
         val wantView = target.getAttribute("data-view")
         val sort = target.getAttribute("data-sort")
+        val curate = target.getAttribute("data-curate")
+        val curateOpen = target.getAttribute("data-curate-open")
         // A view switch and a sort are projections of what is already loaded: they repaint from
         // the rows in hand and never re-read the daemon.
         if (wantView != null) {
@@ -94,6 +117,8 @@ object DocumentSurfacePage {
             column = next
             render(); return
         }
+        if (curate != null) { MainScope().launch { openCuration(null) }; return }
+        if (curateOpen != null) { MainScope().launch { openCuration(curateOpen) }; return }
         MainScope().launch {
             when {
                 p != null -> openProject(p)
@@ -106,8 +131,75 @@ object DocumentSurfacePage {
         }
     }
 
+    /** Keeps the draft alive across a repaint (a saved-result open, a poll) that replaces the DOM. */
+    private fun onInput(e: Event) {
+        when ((e.target as? Element)?.getAttribute("id")) {
+            "ds-curate-name" -> curationPendingName = (e.target as HTMLInputElement).value
+            "ds-curate-text" -> curationPendingText = (e.target as HTMLTextAreaElement).value
+        }
+    }
+
+    private fun onSubmit(e: Event) {
+        (e.target as? Element)?.closest("[data-curate-form]") ?: return
+        e.preventDefault()
+        if (curationBusy) return
+        MainScope().launch { submitCuration() }
+    }
+
+    /** Independent of project browsing: leaving it and returning finds the workspace unchanged. */
+    suspend fun openCuration(cid: String?) {
+        generation++
+        curationMode = true
+        curationFormError = null
+        curationListError = null
+        curationResultError = null
+        val listJson = requestJson("/api/documents")
+        curationListError = DocumentSurface.curationError(listJson)
+        curationAvailable = DocumentSurface.curationAvailable(listJson)
+        curationDestination = DocumentSurface.curationDestination(listJson)
+        curationRecords = DocumentSurface.curationList(listJson)
+        if (cid == null) {
+            curationResult = null
+        } else {
+            val resultJson = requestJson("/api/documents?cid=" + encode(cid))
+            val err = DocumentSurface.curationError(resultJson)
+            curationResult = if (err == null) DocumentSurface.curationResult(resultJson) else null
+            curationResultError = err ?: if (curationResult == null) "That saved result could not be read." else null
+        }
+        render()
+    }
+
+    private suspend fun submitCuration() {
+        if (curationBusy) return
+        val text = curationPendingText
+        if (text.isBlank()) { curationFormError = "Enter some text to curate."; render(); return }
+        curationBusy = true; curationFormError = null
+        render()
+        val source = mapOf(
+            "text" to text, "mediaType" to "text/plain",
+            "name" to curationPendingName.ifBlank { "Untitled" },
+        )
+        val json = requestJson("/api/documents/curate", "POST", JsonSupport.stringify(mapOf("source" to source)))
+        curationBusy = false
+        val err = DocumentSurface.curationError(json)
+        val result = if (err == null) DocumentSurface.curationResult(json) else null
+        when {
+            json == null -> curationFormError = "Could not reach the curation service."
+            err != null -> curationFormError = err
+            result == null -> curationFormError = "The curation service returned an unexpected response."
+            else -> {
+                curationResult = result
+                curationRecords = (listOf(CurationRecordRow(result.receiptCid, result.name)) + curationRecords)
+                    .distinctBy { it.receiptCid }
+                curationPendingName = ""; curationPendingText = ""
+            }
+        }
+        render()
+    }
+
     suspend fun openProject(name: String) {
         generation++
+        curationMode = false
         project = name; doc = null
         view = SurfaceView.TABLE
         blocks = emptyList(); runStates.clear()
@@ -117,6 +209,7 @@ object DocumentSurfacePage {
 
     suspend fun openDoc(id: String) {
         val p = project ?: return
+        curationMode = false
         val generationHere = ++generation
         doc = DocumentSurface.document(getJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
@@ -177,7 +270,19 @@ object DocumentSurfacePage {
     }
 
     private fun render() {
-        setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, doc?.id))
+        setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, doc?.id, curationMode))
+        if (curationMode) {
+            setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
+            setHtml(DocumentSurface.CONTENT_ID, DocumentSurface.curationHtml(
+                curationAvailable, curationDestination, curationRecords,
+                curationPendingName, curationPendingText, curationFormError, curationListError, curationBusy,
+                curationResult, curationResultError,
+            ))
+            val wanted = "#" + DocumentSurface.CURATION_HASH + (curationResult?.let { "/" + encode(it.receiptCid) } ?: "")
+            if (window.location.hash != wanted) window.location.hash = wanted
+            document.title = listOfNotNull(curationResult?.name?.ifBlank { null }, "Curate", "Documents").joinToString(" · ")
+            return
+        }
         setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.crumbHtml(project, doc?.id, view))
         setHtml(
             DocumentSurface.CONTENT_ID,
@@ -193,6 +298,23 @@ object DocumentSurfacePage {
     private fun setHtml(id: String, html: String) {
         (document.getElementById(id) as? HTMLElement)?.innerHTML = html
     }
+
+    /**
+     * Curation reads its own `error` field from the body, but a non-2xx with no body-level error
+     * (a proxy timeout, a 404) still must not read as quiet success: the HTTP status becomes the
+     * error in that case.
+     */
+    private suspend fun requestJson(url: String, method: String = "GET", body: String? = null): Any? = runCatching {
+        val response = if (method == "GET") window.fetch(url).await() else window.fetch(url, RequestInit(
+            method = method, headers = Headers().apply { append("Content-Type", "application/json") }, body = body,
+        )).await()
+        val parsed = JsonSupport.parse(response.text().await())
+        if (response.ok) parsed else {
+            val fields = (parsed as? Map<*, *>)?.toMutableMap() ?: mutableMapOf<Any?, Any?>()
+            if (fields["error"] == null) fields["error"] = "Request failed (HTTP ${response.status})"
+            fields
+        }
+    }.getOrNull()
 
     private suspend fun getJson(url: String): Any? = runCatching {
         val response = window.fetch(url).await()

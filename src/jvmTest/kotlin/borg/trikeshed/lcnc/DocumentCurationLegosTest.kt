@@ -61,6 +61,46 @@ class DocumentCurationLegosTest {
     }
 
     @Test
+    fun documentOutputProjectsNlpAxiomsAsLabeledAdmissionCandidates() {
+        // This fixture exercises the JSON projection; parser behavior has separate coverage.
+        val text = "Rain causes floods"
+        val original = ContentId.of("axiom original bytes".encodeToByteArray())
+        val extracted = ContentId.of(text.encodeToByteArray())
+        val source = DocumentSource(original, extracted, text, "axiom.txt", "text/plain", "axiom-fixture")
+        val tokens = listOf(
+            NlpToken(1, 0, 4, "Rain", "Rain", "NN", "O"),
+            NlpToken(2, 5, 11, "causes", "cause", "VBZ", "O"),
+            NlpToken(3, 12, 18, "floods", "flood", "NNS", "O"),
+        ).toSeries()
+        val dependencies = listOf(
+            NlpDependency(0, 2, "root"),
+            NlpDependency(2, 1, "nsubj"),
+            NlpDependency(2, 3, "obj"),
+        ).toSeries()
+        val nlp = NlpDocument(text, listOf(NlpSentence(0, 0, text.length, tokens, dependencies)).toSeries())
+        val record = DocumentCurationRecord(source, nlp, null, "fixture", emptySeriesOf(), emptySeriesOf())
+        val cid = ContentId.of(DocumentCuratorCodec.encode(record))
+
+        val axioms = DocumentCurationLegos.output(cid, record)["nlpAxioms"] as List<*>
+        assertEquals(1, axioms.size)
+        val row = axioms[0] as Map<*, *>
+        assertEquals(original.value, row["originalCid"])
+        assertEquals(extracted.value, row["extractedTextCid"])
+        assertEquals(0, row["sentenceIndex"])
+        assertEquals(0, row["begin"])
+        assertEquals(text.length, row["end"])
+        assertEquals(text, row["quote"])
+        assertEquals("Rain", row["antecedent"])
+        assertEquals("cause", row["predicate"])
+        assertEquals("floods", row["consequent"])
+        assertEquals("admission candidate", row["label"])
+
+        // Empty case: no retained NLP means no recomputable candidates, not a missing key.
+        val unparsed = record.copy(nlp = null)
+        assertEquals(emptyList<Any?>(), DocumentCurationLegos.output(cid, unparsed)["nlpAxioms"])
+    }
+
+    @Test
     fun canvasOptionalSourcePortRunsReadyTextThroughSharedCurator(): Unit = runBlocking {
         withTimeout(10_000) {
             val cas = CasStore.inMemory()

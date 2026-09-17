@@ -57,8 +57,8 @@
         <div class="sidebar-section-label">Ingest</div>
         <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="Drop files or click to upload">
           <span class="drop-zone-icon" aria-hidden="true">⬇</span>
-          <span class="drop-zone-text">Drop .md / .pdf / .docx / scans / .mp4 — shape, gate, ingest</span>
-          <input type="file" id="file-input" multiple accept=".md,.txt,.pdf,.docx,.doc,.pptx,.xlsx,.png,.jpg,.jpeg,.tif,.tiff,.mp4,.m4a,.mov,.heic" hidden />
+          <span class="drop-zone-text">Drop documents, sheets, PDFs, scans, or media — edit, calculate, export</span>
+          <input type="file" id="file-input" multiple accept=".md,.markdown,.txt,.html,.pdf,.docx,.doc,.pptx,.xlsx,.xls,.csv,.tsv,.pages,.numbers,.key,.ods,.png,.jpg,.jpeg,.tif,.tiff,.mp4,.m4a,.mov,.heic" hidden />
         </div>
       </div>
       <details class="sidebar-section sidebar-gallery">
@@ -91,6 +91,7 @@
             <div class="doc-icon" id="doc-icon" aria-hidden="true">▤</div>
             <h1 class="doc-title" id="doc-title" contenteditable="true" spellcheck="false" aria-label="Document title" data-placeholder="Untitled"></h1>
           </div>
+          <div class="doc-tools" id="doc-tools" aria-label="Document tools"></div>
           <div class="doc-blocks" id="doc-blocks"></div>
           <div class="doc-hint" id="doc-hint">Type <span class="doc-hint-key">/</span> for commands</div>
         </div>
@@ -113,6 +114,7 @@
         <div class="graph-empty" id="graph-empty" hidden>No causal nodes in the seed yet — ingest a donor to populate the graph.</div>
       </div>
       <div class="sheet-scroll" id="sheet-scroll" hidden>
+        <div class="sheet-toolbar" id="sheet-toolbar" aria-label="Workbook tools"></div>
         <div class="sheet-tabs" id="sheet-tabs" role="tablist" aria-label="Sheets"></div>
         <div class="sheet-crumbs" id="sheet-crumbs"></div>
         <div class="sheet-grid-wrap" id="sheet-grid-wrap"></div>
@@ -140,6 +142,7 @@
   <div class="slash-menu" id="slash-menu" hidden></div>
 
   <script id="forge-seed" type="application/json">{{SEED}}</script>
+  <script defer src="./script.js"></script>
 
 {{BUNDLES}}
 

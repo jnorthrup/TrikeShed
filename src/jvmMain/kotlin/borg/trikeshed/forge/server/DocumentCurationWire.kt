@@ -3,6 +3,7 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
+import borg.trikeshed.graal.subvm.CamelCatalog
 import borg.trikeshed.graal.subvm.GuestModules
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.BrainClient
@@ -64,6 +65,17 @@ class DocumentCurationWire private constructor(
                 val destination = mapOf("provider" to (session.model.b.providerTag ?: model),
                     "model" to model, "url" to "$base/chat/completions")
                 session.close()
+                val toolOntology = DocumentCurationToolset.all(
+                    buildList {
+                        add("available:forge.document.curate=/api/documents")
+                        add("available:forge.document.curate=/api/documents/curate")
+                        add("available:forge.lcnc.run=/api/lcnc/run")
+                        addAll(CamelCatalog.endpoints().map { "available:camel.endpoint=$it" })
+                        addAll(mux.listModels("chat").view.map { "available:${DocumentCurationToolset.MODEL_BASE}.model=${it.a}" })
+                        addAll(brain.providerRoster().map {
+                            "available:${DocumentCurationToolset.MODEL_BASE}.provider=${it.provider ?: it.name};model=${it.model}"
+                        })
+                    })
                 val files = checkNotNull(ctx.scope.coroutineContext[FileOperations])
                 val path = files.resolvePath(ctx.stateDir.absolutePath, "documents")
                 files.mkdirs(path)
@@ -74,6 +86,8 @@ class DocumentCurationWire private constructor(
                     curator = DocumentCuratorElement.create(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext),
                         nlp, documentModel(brain, ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
                         model, ctx.casStore, log, bag,
+                        rete = ctx.narsRete,
+                        toolOntology = toolOntology,
                         observer = DocumentCuratorObserver { stage, correlation, refs ->
                             ctx.blackboard.put("document/stage/$correlation/$stage", mapOf(
                                 "stage" to stage, "correlation" to correlation, "atMs" to ctx.clock(),

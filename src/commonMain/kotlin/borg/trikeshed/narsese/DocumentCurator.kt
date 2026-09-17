@@ -48,7 +48,12 @@ data class DocumentAttribution(
     val mapped: KgNalBridge.NalMapped,
     val signal: SemanticSignal,
     val evidenceBasis: EvidenceBasis,
-)
+) {
+    /** Quotation occurrences are evidence, but are not term-bearing assertions for Rete. */
+    val isSemantic: Boolean
+        get() = (expression as? KifExpr.ListExpr)?.elements?.firstOrNull()
+            ?.let { (it as? KifExpr.Atom)?.token == "states" } == true
+}
 
 /**
  * An immutable attempt, retained by CAS and a separate DurableAppendLog.
@@ -71,7 +76,26 @@ data class DocumentCurationRecord(
     val quotationReservedReceiptCids: Series<ContentId> = emptySeriesOf(),
     val quotationSubmittedReceiptCids: Series<ContentId> = emptySeriesOf(),
     val quotationDuplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
+    /** Capability description used for this model proposal, never executable tool state. */
+    val toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf(),
 )
+
+/**
+ * Parser-derived causal/conditional candidates recomputed on demand from the
+ * retained [DocumentCurationRecord.nlp] — never persisted separately, never
+ * auto-admitted into a live rete. Gated the same way [DocumentCurationIndexK.NlpStatus]
+ * gates every other derived view: an invalid parse (or a source that never
+ * verified against CAS) yields no candidates, though the raw NLP stays
+ * inspectable on the record itself. Promoting one of these into an admitted
+ * [EternalRule] is the separate, explicit `nal.rule.admit` operation.
+ */
+val DocumentCurationRecord.nlpAxioms: Series<NlpcoreAxiom>
+    get() {
+        val document = nlp ?: return emptySeriesOf()
+        if (reasons.values().any { "source CID" in it }) return emptySeriesOf()
+        if (curationIndex().facet(DocumentCurationIndexK.NlpStatus) != DocumentNlpStatus.AVAILABLE) return emptySeriesOf()
+        return NlpcoreAxiomatics.recognize(document, source.originalCid.value)
+    }
 
 typealias DocumentCurationReceipt = Join<ContentId, DocumentCurationRecord>
 
@@ -90,6 +114,8 @@ data class DocumentCurationResult(
     }
     val unresolvedReasons: Series<String> get() = (record.reasons.values() +
         record.proposals.values().flatMap { it.reasons.values() }).distinct().toSeries()
+    /** See [DocumentCurationRecord.nlpAxioms] — retained candidates, never auto-admitted. */
+    val nlpAxioms: Series<NlpcoreAxiom> get() = record.nlpAxioms
 }
 
 fun interface DocumentCuratorObserver {

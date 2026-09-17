@@ -23,6 +23,10 @@ html,body{margin:0;background:var(--bg);color:var(--ink);
 /* sidebar */
 .ds-side{background:var(--side);border-right:1px solid var(--rule);overflow:auto;padding:10px 8px 24px}
 .ds-brand{font-weight:600;font-size:14px;padding:6px 8px 2px;letter-spacing:.01em}
+.ds-curate-link{display:block;margin:2px 8px 10px;padding:5px 8px;border-radius:4px;
+  color:var(--dim);text-decoration:none;font-size:13px;font-weight:500}
+.ds-curate-link:hover{background:var(--hover);color:var(--ink)}
+.ds-curate-link.ds-selected{background:var(--hover);color:var(--ink)}
 .ds-side-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--faint);padding:12px 8px 4px}
 .ds-tree,.ds-pages{list-style:none;margin:0;padding:0}
 .ds-tree a{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:4px;
@@ -128,6 +132,43 @@ td.ds-cid{color:var(--faint)}
 .ds-run-cid{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .ds-run-output{margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
 .ds-run-output pre{background:var(--panel2)}
+
+/* the curation surface: an honest form and a plain reading of its own results */
+.ds-curate-warn{color:#d9a066;margin:0 0 16px}
+.ds-curate-form{display:flex;flex-direction:column;gap:6px;max-width:640px;margin:0 0 28px}
+.ds-curate-label{font-size:12px;color:var(--dim);margin-top:6px}
+.ds-curate-name,.ds-curate-text{background:var(--side);border:1px solid var(--rule);border-radius:5px;
+  color:var(--ink);font:inherit;font-size:14px;padding:8px 10px;resize:vertical}
+.ds-curate-text{line-height:1.5}
+.ds-curate-dest{font-size:13px;color:var(--dim);margin-top:4px}
+.ds-curate-error{color:#ee8884;margin:6px 0 0;font-size:13px}
+.ds-curate-submit{align-self:flex-start;margin-top:6px;background:var(--hover);color:var(--ink);
+  border:1px solid var(--line);border-radius:5px;padding:6px 16px;font:inherit;font-size:13.5px;cursor:pointer}
+.ds-curate-submit:hover:enabled{border-color:var(--accent);color:var(--accent)}
+.ds-curate-submit:disabled{opacity:.5;cursor:default}
+.ds-curate-h2{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:var(--faint);
+  margin:32px 0 10px}
+.ds-curate-h3{font-size:16px;font-weight:600;margin:24px 0 10px}
+.ds-curate-list{list-style:none;margin:0 0 20px;padding:0;max-width:640px}
+.ds-curate-item{display:flex;justify-content:space-between;gap:10px;padding:6px 8px;border-radius:4px;
+  color:var(--ink);text-decoration:none;font-size:14px}
+.ds-curate-item:hover,.ds-curate-item.ds-selected{background:var(--hover)}
+.ds-curate-result{max-width:720px;margin-top:24px;padding-top:16px;border-top:1px solid var(--rule)}
+.ds-curate-source{margin:10px 0 20px;font-size:13px;color:var(--dim)}
+.ds-curate-source summary{cursor:pointer;color:var(--dim)}
+.ds-curate-source pre{white-space:pre-wrap;background:var(--side);border:1px solid var(--rule);
+  border-radius:4px;padding:10px 12px;margin-top:8px;color:var(--ink);font-size:13.5px}
+.ds-curate-proposals,.ds-curate-axioms,.ds-curate-notes{list-style:none;margin:0 0 16px;padding:0}
+.ds-curate-proposal,.ds-curate-axiom{border:1px solid var(--line);border-radius:6px;
+  padding:10px 12px;margin:0 0 10px}
+.ds-curate-triple{font-size:14.5px}
+.ds-curate-quote{margin:8px 0 6px;padding:2px 12px;border-left:3px solid var(--line);
+  color:var(--dim);font-style:italic}
+.ds-curate-status{font-size:12px;color:var(--dim)}
+.ds-curate-admitted .ds-curate-status{color:var(--accent)}
+.ds-curate-review .ds-curate-status{color:#d9a066}
+.ds-curate-reasons{font-size:12px;color:var(--faint);margin-top:4px}
+.ds-curate-notes li{font-size:13.5px;color:var(--dim);margin:3px 0}
 </style>
 </head>
 <body data-app-page="documents">
