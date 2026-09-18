@@ -90,7 +90,8 @@ object DocsGraph {
 
     /** Every `.md` this document links to, as node ids, in first-seen order and deduplicated. */
     fun linksOf(source: DocSource): List<String> =
-        LINK.findAll(source.text).map { idOf(it.groupValues[1]) }.distinct().toList()
+        // Bolt: replace distinct().toList() with mapTo(LinkedHashSet()) to avoid intermediate allocation
+        LINK.findAll(source.text).mapTo(LinkedHashSet()) { idOf(it.groupValues[1]) }.toList()
 
     /** The nodes for a corpus, in layer order then title order, so the picture is stable. */
     fun nodesOf(sources: List<DocSource>): List<LayeredNode> =
