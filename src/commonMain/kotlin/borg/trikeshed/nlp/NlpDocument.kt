@@ -24,7 +24,21 @@ data class NlpSentence(
     val dependencies: Series<NlpDependency>,
 )
 
-data class NlpDocument(val text: String, val sentences: Series<NlpSentence>)
+/**
+ * Identity of the reader that produced a document, as observed at read time: the actual
+ * [processor] class, the host [implementation] class, the [runtime] package/module/manifest
+ * identity that was available, and the annotator [configuration] applied. Nothing here is
+ * guessed: a version the runtime does not report is absent, not defaulted.
+ */
+data class NlpMetadata(
+    val processor: String,
+    val implementation: String,
+    val runtime: Map<String, String> = emptyMap(),
+    val configuration: Map<String, String> = emptyMap(),
+)
+
+/** [metadata] is null when the reader reports none: fixtures and records from before it existed. */
+data class NlpDocument(val text: String, val sentences: Series<NlpSentence>, val metadata: NlpMetadata? = null)
 
 fun interface NlpReader {
     suspend fun read(text: String): NlpDocument
