@@ -284,12 +284,11 @@ class ModelMux internal constructor(
                 keyId = k
             }
             failure = result.exceptionOrNull()
-            // Transport timeouts cancel their own scope, not the caller's work queue.
-            if (failure is CancellationException) currentCoroutineContext().ensureActive()
+            if (failure is CancellationException) throw failure as CancellationException
             return result
         } catch (t: Throwable) {
             failure = t
-            if (t is CancellationException) currentCoroutineContext().ensureActive()
+            if (t is CancellationException) throw t
             return Result.failure(t)
         } finally {
             withContext(NonCancellable) {

@@ -6,7 +6,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.kif
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -31,15 +30,11 @@ Return an empty array when no assertion is proposed."""
 
     const val instructions = """The input contains source and nlp objects. source holds the full extracted text,
 original and extracted-text CIDs, route correlation and metadata. nlp holds the validated host parser's
-sentences, UTF-16 spans, indexed tokens, and dependencies for that exact text, given as compact rows with
-an nlp.columns header naming each row's fields; consult nlp.columns when reading nlp rows. Use both the
-source and these annotations when proposing assertions; the host reconciles your response against them.
+sentences, UTF-16 spans, indexed tokens, and dependencies for that exact text. Use both the source and
+these annotations when proposing assertions; the host reconciles your response against them.
 When toolOntology is present, it is a read-only capability description, not source evidence; do not invoke
 tools or copy capability names into triplets.
 Do not substitute filename, link or adjacency heuristics.
-Also propose requirements and prohibitions: use modality "required" or "prohibited", and set polarity
-false for an explicit negation. Preserve the exact full quote of the requirement or prohibition and never
-present it as a fulfilled fact.
 """ + proposalInstructions
 
     /** Version-1 records written before instructions were retained used this exact prompt. */
@@ -150,30 +145,22 @@ substitute filename, link or adjacency heuristics.
         return emptyList()
     }
 
-    /**
-     * [stageReceipts] are the retained [DocumentToolReceipt] cids of the stages that produced this
-     * reading (NLP, model, grounding, in that order); they join the source cid as evidence leaves,
-     * so a belief's basis names the tools that read the text, not only the text. Records written
-     * before stage receipts existed pass none and keep the basis they always had.
-     */
-    fun attribution(
-        source: DocumentSource, p: DocumentProposal, cas: CasStore, stageReceipts: Series<ContentId> = emptySeriesOf(),
-    ): DocumentAttribution {
+    fun attribution(source: DocumentSource, p: DocumentProposal, cas: CasStore): DocumentAttribution {
         require(p.reasons.size == 0 && p.polarity == true && p.modality == "asserted")
         val expression = expression(source, p)
         val inner = (expression.elements[2] as KifExpr.Quoted).expr
         val statementCid = putVerified(cas, CanonicalCbor.encodeMap(mapOf("expression" to inner.toKifString(),
             "polarity" to p.polarity, "modality" to p.modality)))
-        return attribution(source, p.receiptCid!!, expression, statementCid, stageReceipts)
+        return attribution(source, p.receiptCid!!, expression, statementCid)
     }
 
     private fun attribution(source: DocumentSource, receiptCid: ContentId, expression: KifExpr.ListExpr,
-        statementCid: ContentId, stageReceipts: Series<ContentId>): DocumentAttribution {
+        statementCid: ContentId): DocumentAttribution {
         val inner = expression.elements[2] as KifExpr.Quoted
         val predicate = (expression.elements[0] as KifExpr.Atom).token
         val mapped = KgNalBridge.map(KgTriplet(source.originalCid.value, predicate, inner.toKifString(),
             subjectCid = source.originalCid.value, objectCid = statementCid.value))
-        val basis = EvidenceBasis.of(source.originalCid, *stageReceipts.values().toTypedArray())
+        val basis = EvidenceBasis.of(source.originalCid)
         // Coordinate is only a projection. Receipt identity and exact structure remain in CAS/WAL.
         val signal = mapped.signal(source.originalCid.value, receiptCid.value).copy(
             evidence = Nal.observe(true), basisBloom = basis.bloom,
@@ -206,13 +193,11 @@ substitute filename, link or adjacency heuristics.
         "copula" to NalCopula.PRODUCT.name, "relation" to RelationKind.MATCH.name,
     ))
 
-    fun quotationAttribution(
-        source: DocumentSource, p: DocumentProposal, cas: CasStore, stageReceipts: Series<ContentId> = emptySeriesOf(),
-    ): DocumentAttribution {
+    fun quotationAttribution(source: DocumentSource, p: DocumentProposal, cas: CasStore): DocumentAttribution {
         val expression = quotationExpression(source, p)
         val statement = putVerified(cas, CanonicalCbor.encodeMap(mapOf("expression" to
             (expression.elements[2] as KifExpr.Quoted).expr.toKifString())))
-        return attribution(source, checkNotNull(p.quotationReceiptCid), expression, statement, stageReceipts)
+        return attribution(source, checkNotNull(p.quotationReceiptCid), expression, statement)
     }
 
     private fun quotationExpression(source: DocumentSource, p: DocumentProposal): KifExpr.ListExpr {
