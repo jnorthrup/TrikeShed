@@ -160,7 +160,8 @@ object BoardPage {
         if (d.key.startsWith(BoardSurface.DOCUMENT + "/") || d.key.startsWith(BoardSurface.RUN_PREFIX)) { affected.add(BoardSurface.DOCUMENT); lit(BoardSurface.DOCUMENT) }
         affected.add(BoardSurface.ACTORS)
         for (id in affected) renderTerritory(id)
-        el("events")?.innerHTML = BoardSurface.eventsHtml(events.toList().toSeries())
+        // Bolt: Prevent O(N) allocation by converting ArrayDeque to Series directly
+        el("events")?.innerHTML = BoardSurface.eventsHtml(events.toSeries())
         el("boardCount")?.textContent = BoardSurface.boardCount(facts.size)
         if (selected == d.key) scope.launch { inspect(d.key) }
     }
@@ -186,7 +187,8 @@ object BoardPage {
         val lit = flash.keys
         el("territories")?.innerHTML = territories.view.joinToString("") { BoardSurface.territoryHtml(it, facts, program, lit) }
         el("boardnav")?.innerHTML = BoardSurface.navHtml(territories)
-        el("events")?.innerHTML = BoardSurface.eventsHtml(events.toList().toSeries())
+        // Bolt: Prevent O(N) allocation by converting ArrayDeque to Series directly
+        el("events")?.innerHTML = BoardSurface.eventsHtml(events.toSeries())
         el("boardCount")?.textContent = BoardSurface.boardCount(facts.size)
         message(territories.size.toString() + " territories · " + BoardSurface.boardCount(facts.size))
         (el("programSelect") as? HTMLSelectElement)?.innerHTML = BoardSurface.programOptionsHtml(BoardSurface.programs(facts), program)
