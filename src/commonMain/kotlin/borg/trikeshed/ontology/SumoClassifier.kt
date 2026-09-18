@@ -18,8 +18,12 @@ enum class SumoMask { ANCESTORS, DESCENDANTS, INSTANCES, DISJOINT }
 /**
  * SUMO as a classifier that is bitset in shape.
  *
- * Built from SUO-KIF forms — the pinned Merge + Mid-level corpus (5,279 terms,
- * 2,558 classes on 2026-09-04) or any subset. Everything the classifier
+ * Built from SUO-KIF forms — the pinned Merge + Mid-level corpus (15,551 forms,
+ * 3,685 indexed taxonomy terms, 2,504 classes), the separate full corpus, or any subset.
+ * Only top-level atomic taxonomy declarations enter the index. Rules, other
+ * predicates, and taxonomy forms with functional expressions are counted in
+ * [stats] but are not inferred or flattened into subclass/instance edges.
+ * Everything the classifier
  * answers is a bit test over Roaring sets keyed by DFS-preorder class ids
  * ([ClosureIndex]):
  *
@@ -79,10 +83,20 @@ class SumoClassifier private constructor(
     }
 
     val domainSlots: Series2<String, String>
-        get() = domains.entries() α { it.a j names[termOfClass[it.b]] }
+        get() {
+            // Capture array references locally: the inlined projection's JVM class
+            // must not reach through to private fields on SumoClassifier.
+            val names = names
+            val termOfClass = termOfClass
+            return domains.entries() α { it.a j names[termOfClass[it.b]] }
+        }
 
     val rangeSlots: Series2<String, String>
-        get() = ranges.entries() α { it.a j names[termOfClass[it.b]] }
+        get() {
+            val names = names
+            val termOfClass = termOfClass
+            return ranges.entries() α { it.a j names[termOfClass[it.b]] }
+        }
 
     fun domainIsSubclass(predicate: String, argIdx: Int): Boolean = domainSubclass["$predicate/$argIdx"] == true
 
@@ -232,7 +246,10 @@ class SumoClassifier private constructor(
 
         fun parse(kif: String): SumoClassifier = of(KifExpr.parseAll(kif))
 
-        fun of(forms: List<KifExpr>): SumoClassifier {
+        fun of(forms: List<KifExpr>): SumoClassifier = of(forms as Iterable<KifExpr>)
+
+        /** Consumes forms once, allowing independently parsed corpus files to be released in order. */
+        fun of(forms: Iterable<KifExpr>): SumoClassifier {
             val names = ArrayList<String>()
             val termIndex = LinearHashMap<String, Int>(8192)
             fun term(name: String): Int = termIndex[name] ?: names.size.also { names.add(name); termIndex[name] = it }
@@ -244,13 +261,26 @@ class SumoClassifier private constructor(
             val domainSlots = ArrayList<Slot>()
             val rangeSlots = ArrayList<Slot>()
             var rules = 0
+            var formCount = 0
+            var taxonomyForms = 0
+            var unprojectedTaxonomyForms = 0
 
             fun atom(e: KifExpr): String? = (e as? KifExpr.Atom)?.token?.takeIf { !it.startsWith("?") && !it.startsWith("\"") }
 
             for (f in forms) {
+                formCount++
                 val list = f as? KifExpr.ListExpr ?: continue
                 val head = atom(list.elements.firstOrNull() ?: continue) ?: continue
                 val args = list.elements.drop(1)
+                if (head in CLASS_SLOTS) {
+                    val arity = when (head) {
+                        "domain", "domainSubclass" -> args.size == 3 && atom(args[1])?.toIntOrNull() != null
+                        "partition", "disjointDecomposition", "exhaustiveDecomposition" -> args.size >= 3
+                        else -> args.size == 2
+                    }
+                    if (!arity || args.any { atom(it) == null }) { unprojectedTaxonomyForms++; continue }
+                    taxonomyForms++
+                }
                 when (head) {
                     "=>", "<=>" -> rules++
                     "subclass" -> if (args.size == 2) {
@@ -314,6 +344,9 @@ class SumoClassifier private constructor(
             for (s in rangeSlots) { ranges[s.key] = classOfTerm[s.cls]; rangeSubclass[s.key] = s.subclass }
 
             val stats = linkedMapOf(
+                "forms" to formCount, "taxonomyForms" to taxonomyForms,
+                "unprojectedTaxonomyForms" to unprojectedTaxonomyForms,
+                "otherForms" to formCount - taxonomyForms - unprojectedTaxonomyForms - rules,
                 "terms" to names.size, "classes" to termOfClass.size,
                 "subclassEdges" to subclassEdges.size, "instanceEdges" to instanceEdges.size,
                 "domainSlots" to domainSlots.size, "rangeSlots" to rangeSlots.size,

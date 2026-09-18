@@ -34,14 +34,17 @@ sealed class KifExpr {
             return expr
         }
 
-        /** Parse all top-level forms in a .kif file string. */
-        fun parseAll(kifFile: String): List<KifExpr> {
-            val tokens = tokenize(kifFile)
+        /** Preserve the original permissive parser entry point. */
+        fun parseAll(kifFile: String): List<KifExpr> = parseAll(kifFile, strict = false)
+
+        /** Parse every top-level form; strict mode rejects truncated strings/lists and stray closing parentheses. */
+        fun parseAll(kifFile: String, strict: Boolean): List<KifExpr> {
+            val tokens = tokenize(kifFile, strict)
             val out = mutableListOf<KifExpr>()
             var idx = 0
             while (idx < tokens.size) {
                 if (tokens[idx].isBlank()) { idx++; continue }
-                val (expr, next) = parseTokens(tokens, idx)
+                val (expr, next) = parseTokens(tokens, idx, strict)
                 out.add(expr)
                 idx = next
             }
@@ -50,7 +53,7 @@ sealed class KifExpr {
 
         private fun isDelimiter(c: Char): Boolean = when (c) { ' ', '\n', '\r', '\t', '(', ')', '"', ';' -> true; else -> false }
 
-        private fun tokenize(s: String): List<String> {
+        private fun tokenize(s: String, strict: Boolean = false): List<String> {
             val out = mutableListOf<String>()
             var i = 0
             while (i < s.length) {
@@ -58,15 +61,18 @@ sealed class KifExpr {
                     ' ', '\n', '\r', '\t' -> i++
                     '(' , ')' -> { out.add(c.toString()); i++ }
                     '"' -> {
+                        val start = i
+                        var closed = false
                         val sb = StringBuilder("\"")
                         i++
                         while (i < s.length) {
                             val ch = s[i]
                             sb.append(ch)
                             if (ch == '\\') { if (i + 1 < s.length) sb.append(s[i + 1]); i += 2; continue }
-                            if (ch == '"') { i++; break }
+                            if (ch == '"') { i++; closed = true; break }
                             i++
                         }
+                        require(!strict || closed) { "Unterminated KIF string at character $start" }
                         out.add(sb.toString())
                     }
                     ';' -> { while (i < s.length && s[i] != '\n') i++ } // comment to EOL
@@ -80,25 +86,31 @@ sealed class KifExpr {
             return out
         }
 
-        private fun parseTokens(tokens: List<String>, start: Int): Pair<KifExpr, Int> {
-            if (start >= tokens.size) return Atom("") to start
+        private fun parseTokens(tokens: List<String>, start: Int, strict: Boolean = false): Pair<KifExpr, Int> {
+            if (start >= tokens.size) {
+                require(!strict) { "Expected KIF expression at token $start" }
+                return Atom("") to start
+            }
             val t = tokens[start]
+            require(!strict || t != ")") { "Unexpected KIF closing parenthesis at token $start" }
             return when {
                 t == "(" -> {
                     val elems = mutableListOf<KifExpr>()
                     var idx = start + 1
                     while (idx < tokens.size && tokens[idx] != ")") {
-                        val (e, n) = parseTokens(tokens, idx)
+                        val (e, n) = parseTokens(tokens, idx, strict)
                         elems.add(e)
                         idx = n
                     }
+                    require(!strict || idx < tokens.size) { "Unterminated KIF list at token $start" }
                     ListExpr(elems) to (idx + 1) // skip )
                 }
                 t.startsWith("?") -> Var(t) to (start + 1)
                 t.startsWith("'") -> {
                     val inner = t.removePrefix("'")
+                    require(!strict || inner.isNotEmpty() || start + 1 < tokens.size) { "Expected quoted KIF expression at token $start" }
                     val atom = if (inner.isEmpty() && start + 1 < tokens.size) {
-                        val (e, n) = parseTokens(tokens, start + 1)
+                        val (e, n) = parseTokens(tokens, start + 1, strict)
                         return Quoted(e) to n
                     } else Atom(inner)
                     Quoted(atom) to (start + 1)

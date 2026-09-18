@@ -1,11 +1,16 @@
 package borg.trikeshed.ontology
 
+import borg.trikeshed.lib.*
+import borg.trikeshed.kif.KifExpr
+import java.security.MessageDigest
+
 /**
  * The pinned SUMO corpus as a classifier. `fetchSumoCorpus` (build.gradle.kts)
  * lands `sumo/Merge.kif` and `sumo/Mid-level-ontology.kif` on the jvmMain
  * classpath, checksum-verified against gradle/sumo-corpus.pins; this is the
- * first reader of those bytes. Absent files (offline cold cache) yield an
- * empty text, so [pinned] degrades to the empty classifier rather than throwing.
+ * first reader of those bytes. Missing middle resources retain their empty-text
+ * fallback. [full] requires the complete separate manifest and verifies every
+ * payload again at runtime. See docs/ontology/sumo-corpus.md for scope and counts.
  */
 object SumoCorpus {
     val FILES = listOf("sumo/Merge.kif", "sumo/Mid-level-ontology.kif")
@@ -16,4 +21,59 @@ object SumoCorpus {
     fun text(): String = FILES.joinToString("\n") { text(it) }
 
     val pinned: SumoClassifier by lazy { SumoClassifier.parse(text()) }
+
+    /** The original Merge + Mid-level classifier keeps its identity and term IDs. */
+    val middle: SumoClassifier get() = pinned
+
+    val fullFiles: Series<String> by lazy { fullManifest(SumoCorpus::class.java.classLoader) α { it.b } }
+
+    /** Deferred/experimental: independent IDs; requires the optional full resource artifact. */
+    val full: SumoClassifier by lazy { full(SumoCorpus::class.java.classLoader) }
+
+    /** Explicit resource boundary, also usable by isolated classloaders. Files parse independently. */
+    fun full(classLoader: ClassLoader): SumoClassifier = SumoClassifier.of(
+        fullManifest(classLoader).view.asSequence().flatMap { (sha256, resource) ->
+            val bytes = checkNotNull(classLoader.getResourceAsStream(resource)) {
+                "Full SUMO corpus is incomplete: $resource"
+            }.use { it.readBytes() }
+            val actual = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+            check(actual == sha256) { "Full SUMO checksum mismatch: $resource (expected $sha256, actual $actual)" }
+            val forms = try {
+                KifExpr.parseAll(bytes.decodeToString(throwOnInvalidSequence = true), strict = true)
+            } catch (e: IllegalArgumentException) {
+                throw IllegalStateException("Invalid full SUMO KIF in $resource: ${e.message}", e)
+            }
+            check(forms.isNotEmpty() && forms.all {
+                it is KifExpr.ListExpr && it.elements.firstOrNull() is KifExpr.Atom
+            }) { "Invalid full SUMO top-level form in $resource" }
+            forms.asSequence()
+        }.asIterable()
+    )
+
+    /** SHA-256 joined to the complete classpath resource path, in manifest order. */
+    fun fullManifest(classLoader: ClassLoader): Series2<String, String> {
+        val manifest = checkNotNull(classLoader.getResourceAsStream("sumo/full/corpus.pins")) {
+            "Full SUMO corpus unavailable: add the optional sumoFullCorpusJar to this classpath"
+        }.use { it.readBytes().decodeToString(throwOnInvalidSequence = true) }
+        check(Regex("(?m)^#\\s*ref\\s*=\\s*[0-9a-f]{40}\\s*$").findAll(manifest).count() == 1) {
+            "Full SUMO manifest requires one pinned revision"
+        }
+        val count = Regex("(?m)^#\\s*files\\s*=\\s*(\\d+)\\s*$").findAll(manifest).singleOrNull()?.groupValues?.get(1)?.toIntOrNull()
+        val pins = SeriesBuffer<Twin<String>>()
+        val paths = HashSet<String>()
+        for (line in manifest.lineSequence()) {
+            val row = line.substringBefore('#').trim()
+            if (row.isEmpty()) continue
+            val parts = row.split(Regex("\\s+"), limit = 2)
+            check(parts.size == 2 && parts[0].matches(Regex("[0-9a-f]{64}"))) { "Invalid full SUMO pin: $row" }
+            val path = parts[1]
+            check(path.matches(Regex("[A-Za-z0-9_./-]+\\.kif")) && path.split('/').none { it.isEmpty() || it == "." || it == ".." }) {
+                "Invalid full SUMO resource path: $path"
+            }
+            check(paths.add(path)) { "Duplicate full SUMO resource: $path" }
+            pins.add(parts[0] j "sumo/full/$path")
+        }
+        check(count != null && count > 0 && count == pins.size) { "Full SUMO manifest expected $count files, found ${pins.size}" }
+        return pins.drain()
+    }
 }
