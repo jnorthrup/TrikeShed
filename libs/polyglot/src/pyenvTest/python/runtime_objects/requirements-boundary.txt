@@ -1,0 +1,13 @@
+# pyenv boundary contract tests
+# ============================
+# These define the interface contract between pyenv Python runtime
+# and GraalPy pointcut emission. They MUST pass before integration.
+
+pytest
+pytest-cov
+hypothesis
+graalpy~=24.1
+
+# For CPython runtime testing (the "peripheral")
+numpy
+pyarrow

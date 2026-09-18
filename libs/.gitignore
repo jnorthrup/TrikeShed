@@ -1,0 +1,17 @@
+gradle
+.idea/
+.gradle/
+.kotlin/
+build/
+**/build/
+tmp/
+.vscode/
+.aider*
+.env
+target/
+**/target/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.kotlincache
