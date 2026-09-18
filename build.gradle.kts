@@ -40,7 +40,7 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
-val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph")
+val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph", "board")
 // Select the browser apps packaged with the daemon: -PkotlinJsApps=documents,spacegraph.
 val kotlinJsApps = providers.gradleProperty("kotlinJsApps").orElse(kotlinJsBrowserApps.joinToString(",")).get()
     .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
