@@ -32,6 +32,9 @@ typealias KeyResult = Join<String?, String>   // value j sourceName
 /** A binding: path joined to a lazy source */
 typealias KeyBinding = Join<KeyPath, KeySource>
 
+/** One consistent key/base_url answer from [KeyMux.resolveLlm] — never a mix of two different snapshots. */
+internal class LlmResolution(val keyId: String, val authKey: String, val baseUrl: String)
+
 /** The mux itself: ordered bindings + resolver strategy */
 typealias KeyMuxCore = Join<Series<KeyBinding>, KeyResolver>
 
@@ -227,6 +230,80 @@ class FixedKeySource(
     override suspend fun read(path: KeyPath): String? = fixedValue
     override suspend fun write(path: KeyPath, value: String) {
         throw UnsupportedOperationException("fixed source is read-only")
+    }
+}
+
+// ── PIN OVERLAY source — atomically-swappable pin layer, one binding, one identity ──
+
+/**
+ * A pin's provider/base_url plus WHERE to resolve its secret — never the
+ * secret itself. [keyDelegate] must not be the [KeyMux] this overlay is
+ * bound into (would recurse through [PinOverlaySource.read]).
+ */
+data class PinBinding(
+    val provider: String,
+    val baseUrl: String,
+    val keyDelegate: KeyMux,
+    val keyId: String,
+)
+
+private class PinSnapshotSource(
+    private val pin: PinBinding?,
+    override val name: String,
+) : KeySource() {
+    override suspend fun read(path: KeyPath): String? {
+        val binding = pin ?: return null
+        return when (path.asString()) {
+            "llm.${binding.provider}.key" -> binding.keyDelegate.get(binding.keyId)
+            "llm.${binding.provider}.base_url" -> binding.baseUrl
+            else -> null
+        }
+    }
+
+    override suspend fun write(path: KeyPath, value: String) =
+        throw UnsupportedOperationException("session binding is read-only")
+}
+
+/**
+ * Holds one atomically-replaceable [PinBinding] (e.g. the Hermes default
+ * provider) so it can be refreshed without ever constructing a new [KeyMux]
+ * — [KeyMux.withBinding] returns a new instance, which breaks the
+ * `mux.keyMux === element.keyMux()` identity [MuxReactorElement.modelMux]
+ * requires. The secret is resolved lazily in [read], from [keyDelegate]; no
+ * caller ever holds the raw value. [setPin] replaces the whole binding, so
+ * switching the pinned provider cannot leave a stale entry behind.
+ */
+class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
+    private val lock = kotlinx.coroutines.sync.Mutex()
+    private var binding: PinBinding? = null
+
+    suspend fun setPin(binding: PinBinding) {
+        lock.withLock { this.binding = binding }
+    }
+
+    suspend fun clearPin() {
+        lock.withLock { binding = null }
+    }
+
+    /** One atomic read of the current binding — the caller must reuse it for every field it needs. */
+    suspend fun snapshotPin(): PinBinding? = lock.withLock { binding }
+
+    override suspend fun read(path: KeyPath): String? {
+        val b = lock.withLock { binding } ?: return null
+        return when (path.asString()) {
+            "llm.${b.provider}.key" -> b.keyDelegate.get(b.keyId)
+            "llm.${b.provider}.base_url" -> b.baseUrl
+            else -> null
+        }
+    }
+
+    override suspend fun write(path: KeyPath, value: String) {
+        throw UnsupportedOperationException("pin overlay source is read-only")
+    }
+
+    /** Refreshes the delegate's cache only — the pin binding itself survives a watcher tick with no config change. */
+    override suspend fun invalidate() {
+        lock.withLock { binding }?.keyDelegate?.invalidate()
     }
 }
 
@@ -452,6 +529,32 @@ class KeyMux constructor(
     suspend fun get(key: String): String? = resolver.resolve(bindings, key.toKeyPath()).a
 
     suspend fun getWithSource(key: String): KeyResult = resolver.resolve(bindings, key.toKeyPath())
+
+    /**
+     * One chat call's key + base_url, resolved from a SINGLE immutable pin
+     * snapshot — [PinOverlaySource.read] answers key and base_url as two
+     * independent calls, and a [PinOverlaySource.setPin] racing between them
+     * can pair an old secret with a new destination. [resolveLlm] takes the
+     * overlay's binding once via [PinOverlaySource.snapshotPin] and reuses it
+     * for both fields; everything else falls through the ordinary
+     * first-wins precedence [get] uses. Returns null when no auth key resolves.
+     */
+    internal suspend fun resolveLlm(modelId: String, providerTag: String?, fallbackBaseUrl: String): LlmResolution? {
+        val pins = mutableMapOf<PinOverlaySource, PinBinding?>()
+        val snapshot = bindings.view.map { binding ->
+            val source = binding.b
+            if (source !is PinOverlaySource) binding else {
+                if (!pins.containsKey(source)) pins[source] = source.snapshotPin()
+                binding.a j PinSnapshotSource(pins[source], source.name)
+            }
+        }.toSeries()
+        suspend fun read(path: String): String? = resolver.resolve(snapshot, path.toKeyPath()).a
+        val prefixes = listOfNotNull(providerTag?.let { "llm.$it" }, "llm.$modelId", "llm.default")
+        val key = prefixes.firstNotNullOfOrNull { prefix -> read("$prefix.key")?.let { "$prefix.key" j it } }
+            ?: return null
+        val base = prefixes.firstNotNullOfOrNull { read("$it.base_url") } ?: fallbackBaseUrl
+        return LlmResolution(keyId = key.a, authKey = key.b, baseUrl = base)
+    }
 
     /** Prepend one binding without copying or mutating the inherited source chain. */
     fun withBinding(path: String, source: KeySource): KeyMux {

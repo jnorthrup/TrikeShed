@@ -13,16 +13,17 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.α
-import borg.trikeshed.modelmux.ModelResponse
-import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
+import borg.trikeshed.narsese.DocumentCurationFacts
 import borg.trikeshed.narsese.DocumentCurationToolset
 import borg.trikeshed.narsese.DocumentCurationIndexK
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCuratorElement
+import borg.trikeshed.narsese.DocumentCuratorGrounding
+import borg.trikeshed.narsese.DocumentModel
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
@@ -32,6 +33,7 @@ import borg.trikeshed.userspace.nio.DocumentExtent
 import borg.trikeshed.userspace.nio.DocumentContent
 import borg.trikeshed.userspace.nio.Volume
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 
 /** LCNC admission into the host-owned feed or its existing curator; the host owns their drain. */
 object DocumentCurationLegos {
@@ -48,7 +50,7 @@ object DocumentCurationLegos {
         log: DurableAppendLog,
         bag: BeliefBagElement,
         points: PointcutBlackboardAdapter,
-        model: suspend (Prompt) -> ModelResponse,
+        model: DocumentModel,
         modelId: String,
         runners: MutableMap<String, LcncNodeRunner>,
         stagingLba: Long? = null,
@@ -110,9 +112,19 @@ object DocumentCurationLegos {
         val instructions = if ("instructions" in inputs || "instructions?" in inputs)
             requireNotNull(instructionInput as? String) { "$CURATE.instructions must be a string" }
         else node.params["instructions"]
+        // The run receipt cites what this node read: the exact text cid and the instructions in effect
+        // (the node's own, or the curator's default when none were given).
+        currentCoroutineContext()[LcncConsumedLedger]?.let { ledger ->
+            ledger.consumed(CONSUMED_DOCUMENT, source.name, source.extractedTextCid.value)
+            val effective = instructions ?: DocumentCuratorGrounding.instructions
+            ledger.consumed(LcncConsumedLedger.PROMPT, "$CURATE.instructions", ContentId.of(effective.encodeToByteArray()).value)
+        }
         val receipt = instructions?.let { owner.curate(source, it) } ?: owner.curate(source)
         projection(receipt.recordCid, receipt.record)
     }
+
+    /** Consumed-ledger kind for the retained text a curate run read; not a project document, so no staleness fact. */
+    const val CONSUMED_DOCUMENT = "document"
 
     /** LCNC carries immutable identities; the explicit document read projects the retained contents. */
     fun reference(cid: ContentId, record: DocumentCurationRecord): Map<String, Any?> {
@@ -127,6 +139,7 @@ object DocumentCurationLegos {
                 "quotationsSubmitted" to record.quotationSubmittedReceiptCids.size),
             "nlpStatus" to record.curationIndex().facet(DocumentCurationIndexK.NlpStatus).name,
             "sheet" to sheet, "sheets" to listOf(sheet),
+            "ruleCandidates" to DocumentCurationFacts.ruleCandidates(record).toList(),
         )
     }
 
@@ -158,12 +171,14 @@ object DocumentCurationLegos {
             "record" to DocumentCuratorCodec.record(record),
             "nlpStatus" to index.facet(DocumentCurationIndexK.NlpStatus).name,
             "nlpAxioms" to nlpAxiomsProjection(record),
+            // The same rows the canvas port yields; the whole provenance lives on the documents plane.
+            "ruleCandidates" to DocumentCurationFacts.ruleCandidates(record).toList(),
             "sheet" to root,
             "sheets" to sheets,
         )
     }
 
-    /** Source-attributed candidates; extraction weights are not parser confidence. */
+    /** Source-attributed candidates with the identity of the rule each would become; extraction weights are not parser confidence. */
     private fun nlpAxiomsProjection(record: DocumentCurationRecord): List<Map<String, Any?>> =
         (record.nlpAxioms α { axiom ->
             mapOf(
@@ -176,6 +191,9 @@ object DocumentCurationLegos {
                 "antecedent" to axiom.antecedent,
                 "predicate" to axiom.predicate,
                 "consequent" to axiom.consequent,
+                "copula" to axiom.rule.copula.symbol,
+                "ruleCid" to axiom.rule.ruleCid.value,
+                "provenanceCid" to axiom.rule.provenanceCid,
                 "label" to "admission candidate",
             )
         }).toList()

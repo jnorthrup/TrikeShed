@@ -5,6 +5,7 @@ import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.emptySeriesOf
@@ -12,7 +13,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.modelmux.ToolOntologyScaffold
@@ -48,7 +48,7 @@ import kotlin.coroutines.CoroutineContext
 class DocumentCuratorElement private constructor(
     scope: CoroutineScope,
     private val nlp: NlpReader,
-    private val model: suspend (Prompt) -> ModelResponse,
+    private val model: DocumentModel,
     private val cas: CasStore,
     private val log: DurableAppendLog,
     private val intake: SendChannel<BeliefIntake>,
@@ -62,7 +62,7 @@ class DocumentCuratorElement private constructor(
         const val MAX_INSTRUCTIONS_CHARS = 16 * 1024
 
         suspend fun create(
-            scope: CoroutineScope, nlp: NlpReader, model: suspend (Prompt) -> ModelResponse, modelId: String,
+            scope: CoroutineScope, nlp: NlpReader, model: DocumentModel, modelId: String,
             cas: CasStore, log: DurableAppendLog, bag: BeliefBagElement,
             observer: DocumentCuratorObserver? = null, capacity: Int = 8,
             rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
@@ -99,15 +99,40 @@ class DocumentCuratorElement private constructor(
     private val reserved = mutableSetOf<ContentId>()
     private val submitted = mutableSetOf<ContentId>()
     private val angularReceipts = mutableMapOf<Long, ContentId>()
+    /** Stage identities. The reader's own metadata wins when it reports one; the model call always routes through ModelMux. */
+    private val readerName = nlp::class.simpleName ?: "NlpReader"
+    private val modelTool = "modelmux.ModelMux"
+    private val modelImplementation = DocumentToolReceipt.host("borg.trikeshed.narsese.DocumentModel")
+    private val groundingImplementation = DocumentToolReceipt.host("borg.trikeshed.narsese.DocumentCuratorGrounding")
+    private val axiomaticsImplementation = DocumentToolReceipt.host("borg.trikeshed.narsese.NlpcoreAxiomatics")
+
+    /**
+     * CAS retention at a stage boundary belongs to the stage: a read-back failure is recorded on the
+     * receipt as the stage's failure and the receipt stays unretained, never the worker's death.
+     * Reconcile's own CAS verification then refuses the record, so nothing is appended or minted
+     * from a store that lies, and the curator keeps accepting work. [artifact] and [receipt] run
+     * synchronously, so no cancellation can surface as the IllegalStateException caught here.
+     */
+    private inline fun retained(
+        artifact: () -> ContentId?, receipt: (ContentId?) -> DocumentToolReceipt,
+    ): Join<DocumentToolReceipt, ContentId?> = try {
+        val a = artifact()
+        receipt(a).retain(cas) j a
+    } catch (e: IllegalStateException) {
+        val failed = receipt(null)
+        failed.copy(status = DocumentToolStatus.FAILURE,
+            error = listOfNotNull(failed.error, "retention: ${e.message}").joinToString("; ")) j null
+    }
 
     private data class Work(val source: DocumentSource, val instructions: String, val reply: CompletableDeferred<Result<DocumentCurationResult>>)
-    private data class Outcome<T>(val result: Result<T>, val observerError: String?)
+    /** [receipt] is retained in CAS at the stage boundary; [artifact] is the stage's exact canonical output when it produced one. */
+    private data class Outcome<T>(val result: Result<T>, val observerError: String?, val receipt: DocumentToolReceipt, val artifact: ContentId?)
     private data class Parsed(
         val work: Work,
         val nlp: Outcome<NlpDocument>,
         val notices: List<String>,
     )
-    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<ModelResponse>, val notices: List<String>)
+    private data class Joined(val work: Work, val nlp: Outcome<NlpDocument>, val model: Outcome<DocumentModelAnswer>, val notices: List<String>)
     private data class Completion(val work: Work, val result: Result<DocumentCurationResult>)
 
     suspend fun curate(
@@ -179,13 +204,30 @@ class DocumentCuratorElement private constructor(
                     val work = input.recv().getOrNull() ?: break
                     val notices = mutableListOf<String>()
                     observe("curator.input", work.source)?.let(notices::add)
+                    val startedAt = epochMillis()
                     val nlp = attempt {
                         withContext(Dispatchers.Default) {
                             require(sourceValid(work.source)) { "source CID absent or extracted text CID mismatch" }
                             this@DocumentCuratorElement.nlp.read(work.source.text)
                         }
                     }
-                    parsed.send(Parsed(work, Outcome(nlp, observe("curator.nlp", work.source)), notices)).getOrThrow()
+                    val completedAt = epochMillis()
+                    val document = nlp.getOrNull()
+                    val metadata = document?.metadata
+                    val (receipt, artifact) = retained({ document?.let { stageArtifact(cas, DocumentCuratorCodec.nlp(it)) } }) { artifact ->
+                        DocumentToolReceipt(
+                            stage = DocumentToolStage.NLP,
+                            tool = metadata?.processor ?: readerName,
+                            implementation = metadata?.implementation ?: readerName,
+                            status = if (nlp.isSuccess) DocumentToolStatus.SUCCESS else DocumentToolStatus.FAILURE,
+                            configuration = metadata?.let { it.runtime + it.configuration } ?: emptyMap(),
+                            inputCids = listOf(work.source.extractedTextCid).toSeries(),
+                            outputCids = listOfNotNull(artifact).toSeries(),
+                            startedAt = startedAt, completedAt = completedAt,
+                            error = nlp.exceptionOrNull()?.message,
+                        )
+                    }
+                    parsed.send(Parsed(work, Outcome(nlp, observe("curator.nlp", work.source), receipt, artifact), notices)).getOrThrow()
                 }
             } finally { parsed.close() }
         }
@@ -195,28 +237,81 @@ class DocumentCuratorElement private constructor(
                     val read = parsed.recv().getOrNull() ?: break
                     val document = read.nlp.result.getOrNull()
                     val issue = read.nlp.result.exceptionOrNull()?.message ?: nlpIssue(read.work.source, document)
-                    val model = if (issue != null) Result.failure(IllegalStateException("skipped: NLP $issue"))
-                    else attempt {
-                        withContext(Dispatchers.Default) {
-                            val payload = linkedMapOf<String, Any?>(
-                                "source" to DocumentCuratorCodec.source(read.work.source),
-                                "nlp" to DocumentCuratorCodec.nlp(checkNotNull(document)),
+                    val configuration = linkedMapOf(
+                        "modelId" to modelId, "temperature" to "0.0",
+                        "maxTokens" to read.work.source.text.length.coerceIn(4096, 16384).toString(),
+                    )
+                    val modelOutcome = if (issue != null) {
+                        val skipped = IllegalStateException("skipped: NLP $issue")
+                        val (receipt, _) = retained({ null }) {
+                            DocumentToolReceipt(
+                                stage = DocumentToolStage.MODEL, tool = modelTool, implementation = modelImplementation,
+                                status = DocumentToolStatus.SKIPPED, configuration = configuration,
+                                inputCids = listOfNotNull(read.nlp.artifact).toSeries(), error = skipped.message,
                             )
-                            if (toolOntology.size > 0) payload["toolOntology"] =
-                                List(toolOntology.size) { index -> toolOntology[index] }
-                            this@DocumentCuratorElement.model(Prompt(
-                                listOf(
-                                    PromptMessage.System(read.work.instructions),
-                                    PromptMessage.User(JsonSupport.stringify(payload)),
-                                ).toSeries(),
-                                modelId,
-                                temperature = 0.0,
-                                maxTokens = read.work.source.text.length.coerceIn(4096, 16384),
-                            ))
                         }
+                        Outcome(Result.failure<DocumentModelAnswer>(skipped), null, receipt, null)
+                    } else {
+                        val payload = linkedMapOf<String, Any?>(
+                            "source" to DocumentCuratorCodec.source(read.work.source),
+                            "nlp" to DocumentCuratorCodec.nlpPrompt(checkNotNull(document)),
+                        )
+                        if (toolOntology.size > 0) payload["toolOntology"] =
+                            List(toolOntology.size) { index -> toolOntology[index] }
+                        val prompt = Prompt(
+                            listOf(
+                                PromptMessage.System(read.work.instructions),
+                                PromptMessage.User(JsonSupport.stringify(payload)),
+                            ).toSeries(),
+                            modelId,
+                            temperature = 0.0,
+                            maxTokens = read.work.source.text.length.coerceIn(4096, 16384),
+                        )
+                        // The logical prompt is retained as its own artifact; ModelMux's requestHash names the outbound body.
+                        // A store that fails read-back does not stop the call: the receipt records the retention failure.
+                        var retention: String? = null
+                        val promptCid = try {
+                            stageArtifact(cas, mapOf(
+                                "modelId" to prompt.modelId, "temperature" to prompt.temperature, "maxTokens" to prompt.maxTokens,
+                                "messages" to prompt.messages.values { mapOf("role" to when (it) {
+                                    is PromptMessage.System -> "system"
+                                    is PromptMessage.User -> "user"
+                                    is PromptMessage.Assistant -> "assistant"
+                                }, "content" to it.content) },
+                                "contextId" to read.work.source.correlation,
+                            ))
+                        } catch (e: IllegalStateException) { retention = "prompt retention: ${e.message}"; null }
+                        val startedAt = epochMillis()
+                        val model = attempt {
+                            withContext(Dispatchers.Default) {
+                                this@DocumentCuratorElement.model(prompt, contextId = read.work.source.correlation)
+                            }
+                        }
+                        val completedAt = epochMillis()
+                        val answer = model.getOrNull()
+                        val muxReceipt = answer?.receipt ?: (model.exceptionOrNull() as? DocumentModelFailure)?.receipt
+                        muxReceipt?.let {
+                            configuration["requestHash"] = it.requestHash; configuration["receiptId"] = it.receiptId
+                            configuration["providerId"] = it.providerId; configuration["routedModelId"] = it.modelId
+                        }
+                        var muxReceiptCid: ContentId? = null
+                        val (receipt, responseCid) = retained({
+                            muxReceiptCid = muxReceipt?.let { stageArtifact(cas, DocumentCuratorCodec.modelReceipt(it)) }
+                            answer?.let { stageArtifact(cas, DocumentCuratorCodec.model(it.response)) }
+                        }) { responseCid ->
+                            DocumentToolReceipt(
+                                stage = DocumentToolStage.MODEL, tool = modelTool, implementation = modelImplementation,
+                                status = if (model.isSuccess) DocumentToolStatus.SUCCESS else DocumentToolStatus.FAILURE,
+                                configuration = configuration,
+                                inputCids = listOfNotNull(promptCid, read.nlp.artifact).toSeries(),
+                                outputCids = listOfNotNull(responseCid, muxReceiptCid).toSeries(),
+                                startedAt = startedAt, completedAt = completedAt,
+                                error = listOfNotNull(model.exceptionOrNull()?.message, retention).joinToString("; ").ifEmpty { null },
+                            )
+                        }
+                        Outcome(model, observe("curator.model", read.work.source), receipt, responseCid)
                     }
                     val notices = read.notices.toMutableList()
-                    val modelOutcome = Outcome(model, if (issue == null) observe("curator.model", read.work.source) else null)
                     observe("curator.join", read.work.source)?.let(notices::add)
                     val joined = Joined(read.work, read.nlp, modelOutcome, notices)
                     output.send(Completion(read.work, attempt { reconcile(joined) })).getOrThrow()
@@ -241,10 +336,46 @@ class DocumentCuratorElement private constructor(
         val sourceValid = sourceValid(source)
         if (!sourceValid) reasons.add("source CID absent or extracted text CID mismatch")
         else putVerified(cas, source.text.encodeToByteArray())
-        val response = join.model.result.getOrNull()
+        val answer = join.model.result.getOrNull()
+        val response = answer?.response
+        val receipt = answer?.receipt ?: (join.model.result.exceptionOrNull() as? DocumentModelFailure)?.receipt
+        val document = join.nlp.result.getOrNull()
+        val groundingStarted = epochMillis()
         val parsed = response?.let { DocumentCuratorGrounding.parse(it.content) } ?: emptySeriesOf()
         if (response != null && parsed.size == 0) reasons.add("model proposed no assertions")
-        val grounded = DocumentCuratorGrounding.reconcile(source, join.nlp.result.getOrNull(), parsed)
+        val grounded = DocumentCuratorGrounding.reconcile(source, document, parsed)
+        val groundingCompleted = epochMillis()
+        val groundingReceipt = if (response == null) DocumentToolReceipt(
+            stage = DocumentToolStage.GROUNDING, tool = "DocumentCuratorGrounding", implementation = groundingImplementation,
+            status = DocumentToolStatus.SKIPPED, inputCids = listOfNotNull(join.nlp.artifact).toSeries(),
+            error = "skipped: no model response",
+        ).retain(cas) else DocumentToolReceipt(
+            stage = DocumentToolStage.GROUNDING, tool = "DocumentCuratorGrounding", implementation = groundingImplementation,
+            status = DocumentToolStatus.SUCCESS, configuration = mapOf("format" to KgFormat.TRIPLET_JSON.name),
+            inputCids = listOfNotNull(join.model.artifact, join.nlp.artifact).toSeries(),
+            outputCids = listOf(stageArtifact(cas, mapOf("proposals" to grounded.values { DocumentCuratorCodec.proposal(it) }))).toSeries(),
+            startedAt = groundingStarted, completedAt = groundingCompleted,
+        ).retain(cas)
+        // Same gate as the legacy on-read derivation; the outcome is persisted so later reads cannot drift.
+        val axiomIssue = if (!sourceValid) "source CID absent or extracted text CID mismatch" else nlpIssue(source, document)
+        val axiomaticsStarted = epochMillis()
+        val axioms: Series<NlpcoreAxiom> = if (axiomIssue == null) NlpcoreAxiomatics.recognize(checkNotNull(document), source.originalCid.value)
+            else emptySeriesOf()
+        val axiomaticsCompleted = epochMillis()
+        val axiomaticsReceipt = if (axiomIssue != null) DocumentToolReceipt(
+            stage = DocumentToolStage.AXIOMATICS, tool = "NlpcoreAxiomatics", implementation = axiomaticsImplementation,
+            status = DocumentToolStatus.SKIPPED, inputCids = listOfNotNull(join.nlp.artifact).toSeries(),
+            error = "skipped: NLP $axiomIssue",
+        ).retain(cas) else DocumentToolReceipt(
+            stage = DocumentToolStage.AXIOMATICS, tool = "NlpcoreAxiomatics", implementation = axiomaticsImplementation,
+            status = DocumentToolStatus.SUCCESS, configuration = mapOf("sourceCid" to source.originalCid.value),
+            inputCids = listOfNotNull(join.nlp.artifact).toSeries(),
+            outputCids = listOf(stageArtifact(cas, mapOf("axioms" to axioms.values { DocumentCuratorCodec.axiom(it) }))).toSeries(),
+            startedAt = axiomaticsStarted, completedAt = axiomaticsCompleted,
+        ).retain(cas)
+        val toolReceipts = listOf(join.nlp.receipt, join.model.receipt, groundingReceipt, axiomaticsReceipt).toSeries()
+        // The reading stages, in order, as evidence leaves for every belief this record mints.
+        val readingReceipts = listOfNotNull(join.nlp.receipt.receiptCid, join.model.receipt.receiptCid, groundingReceipt.receiptCid).toSeries()
         val candidates = mutableListOf<DocumentProposal>()
         val attributions = mutableListOf<DocumentAttribution>()
         val reservations = mutableListOf<ContentId>()
@@ -269,7 +400,7 @@ class DocumentCuratorElement private constructor(
                         }
                     }
                     else -> {
-                        val attribution = DocumentCuratorGrounding.attribution(source, p, cas)
+                        val attribution = DocumentCuratorGrounding.attribution(source, p, cas, readingReceipts)
                         val existing = angularReceipts[attribution.signal.angular]
                         if (existing != null && existing != cid) {
                             p = p.copy(reasons = listOf("angular collision; exact structures differ").toSeries())
@@ -292,7 +423,7 @@ class DocumentCuratorElement private constructor(
                                 reasons.add("quotation submission unconfirmed; automatic retry suppressed: ${quotationCid.value}")
                         }
                         else -> {
-                            val attribution = DocumentCuratorGrounding.quotationAttribution(source, p, cas)
+                            val attribution = DocumentCuratorGrounding.quotationAttribution(source, p, cas, readingReceipts)
                             val existing = angularReceipts[attribution.signal.angular]
                             if (existing != null && existing != quotationCid)
                                 reasons.add("quotation angular collision; exact structures differ: ${quotationCid.value}")
@@ -306,12 +437,12 @@ class DocumentCuratorElement private constructor(
             }
             candidates.add(p)
         }
-        var record = DocumentCurationRecord(source, join.nlp.result.getOrNull(), response, modelId,
+        var record = DocumentCurationRecord(source, document, response, modelId,
             candidates.toSeries(), reasons.toSeries(), reservations.toSeries(), duplicateReceiptCids = duplicates.distinct().toSeries(),
             observerFailures = observerFailures.toSeries(), instructions = join.work.instructions,
             quotationReservedReceiptCids = quotationReservations.toSeries(),
             quotationDuplicateReceiptCids = quotationDuplicates.distinct().toSeries(),
-            toolOntology = toolOntology)
+            toolOntology = toolOntology, receipt = receipt, toolReceipts = toolReceipts, axioms = axioms)
         var recordCid = append(record)
         observe("curator.record", source, listOf(recordCid).toSeries())?.let(observerFailures::add)
         val sent = mutableListOf<ContentId>()
@@ -362,19 +493,21 @@ class DocumentCuratorElement private constructor(
             submitted.addAll(record.submittedReceiptCids.values())
             reserved.addAll(record.quotationReservedReceiptCids.values())
             submitted.addAll(record.quotationSubmittedReceiptCids.values())
+            val readingReceipts = record.readingReceiptCids
             for (p in record.proposals.values()) {
                 if (p.receiptCid in record.reservedReceiptCids.values() && p.reasons.size == 0) {
-                    val a = DocumentCuratorGrounding.attribution(record.source, p, cas)
+                    val a = DocumentCuratorGrounding.attribution(record.source, p, cas, readingReceipts)
                     angularReceipts[a.signal.angular] = a.receiptCid
                 }
                 if (p.quotationReceiptCid in record.quotationReservedReceiptCids.values()) {
-                    val a = DocumentCuratorGrounding.quotationAttribution(record.source, p, cas)
+                    val a = DocumentCuratorGrounding.quotationAttribution(record.source, p, cas, readingReceipts)
                     angularReceipts[a.signal.angular] = a.receiptCid
                 }
             }
-            // Parser-derived candidates (record.nlpAxioms) are recomputed on demand for
-            // inspection; replay never re-admits them as global law or re-registers raw
-            // subject/object terms — that would invent an eternal rule from stored text.
+            // Parser-derived candidates (record.nlpAxioms) are read back as persisted, or
+            // recomputed on demand for older records; replay never re-admits them as global
+            // law or re-registers raw subject/object terms — that would invent an eternal
+            // rule from stored text. Stage receipts replay as retained; none are minted here.
             sequence = seq
         }
     }

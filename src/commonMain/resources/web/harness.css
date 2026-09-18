@@ -191,3 +191,11 @@ dialog::backdrop{background:#0008}dialog form{float:right}dialog h2{font:14px va
 #bar,#boardnav,#topologyLegend,#activity{background:rgba(24,28,30,.9);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 #bar a{color:var(--graal);text-decoration:none;flex-shrink:0}
 #bar a:hover{text-decoration:underline}
+/* board renderer (Kotlin/JS): territories stack as a scrolling grid, no pan/zoom camera */
+#viewport.board-scroll{overflow:auto}
+#viewport.board-scroll #world{position:static}
+#territories.board-stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(460px,1fr));gap:24px;padding:24px}
+#territories.board-stack .territory{position:relative;max-height:560px;overflow:auto}
+#factSheet .plane-facts{margin-top:12px}
+.stage-row b{padding-left:14px}
+.leafcell.copied{outline:1px solid #e0c26d}

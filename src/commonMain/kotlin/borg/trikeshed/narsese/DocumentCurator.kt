@@ -8,6 +8,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.modelmux.ModelResponse
+import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.nlp.NlpDocument
 
 /** CIDs identify original bytes and exact UTF-8 extracted text; offsets below are UTF-16. */
@@ -78,15 +79,21 @@ data class DocumentCurationRecord(
     val quotationDuplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
     /** Capability description used for this model proposal, never executable tool state. */
     val toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf(),
+    /** The EXACT per-call receipt ModelMux minted for [model] — success or failure. Null on records from before this field existed. */
+    val receipt: ModelResponseReceipt? = null,
+    /** One receipt per executed pipeline stage, in execution order. Empty on records from before receipts existed. */
+    val toolReceipts: Series<DocumentToolReceipt> = emptySeriesOf(),
+    /** Candidates exactly as [NlpcoreAxiomatics] produced them for this record. Null on records that predate persistence. */
+    val axioms: Series<NlpcoreAxiom>? = null,
 )
 
 /**
- * Parser-derived causal/conditional candidates recomputed on demand from the
- * retained [DocumentCurationRecord.nlp] — never persisted separately, never
- * auto-admitted into a live rete. Gated the same way [DocumentCurationIndexK.NlpStatus]
- * gates every other derived view: an invalid parse (or a source that never
- * verified against CAS) yields no candidates, though the raw NLP stays
- * inspectable on the record itself. Promoting one of these into an admitted
+ * Parser-derived causal/conditional candidates — never auto-admitted into a live rete.
+ * Records that persist [DocumentCurationRecord.axioms] read them back exactly; older
+ * records recompute from the retained [DocumentCurationRecord.nlp] under the same gate
+ * [DocumentCurationIndexK.NlpStatus] applies to every other derived view: an invalid
+ * parse (or a source that never verified against CAS) yields no candidates, though the
+ * raw NLP stays inspectable on the record itself. Promoting one of these into an admitted
  * [EternalRule] is the separate, explicit `nal.rule.admit` operation.
  */
 val DocumentCurationRecord.nlpAxioms: Series<NlpcoreAxiom>
@@ -94,8 +101,21 @@ val DocumentCurationRecord.nlpAxioms: Series<NlpcoreAxiom>
         val document = nlp ?: return emptySeriesOf()
         if (reasons.values().any { "source CID" in it }) return emptySeriesOf()
         if (curationIndex().facet(DocumentCurationIndexK.NlpStatus) != DocumentNlpStatus.AVAILABLE) return emptySeriesOf()
+        // The gate above applies to persisted candidates exactly as to recomputed ones.
+        axioms?.let { return it }
         return NlpcoreAxiomatics.recognize(document, source.originalCid.value)
     }
+
+/**
+ * The retained receipt cids of the stages that read the text (NLP, model, grounding), in stage
+ * order: the evidence leaves every belief of this record cites beside the source cid. Empty on
+ * records from before stage receipts existed, so their basis is unchanged on replay.
+ */
+val DocumentCurationRecord.readingReceiptCids: Series<ContentId>
+    get() = toolReceipts.values()
+        .filter { it.stage != DocumentToolStage.AXIOMATICS }
+        .mapNotNull { it.receiptCid }
+        .toSeries()
 
 typealias DocumentCurationReceipt = Join<ContentId, DocumentCurationRecord>
 

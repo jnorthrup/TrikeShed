@@ -68,6 +68,8 @@ class LlmSession(
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
     val sessionId: String = defaultSecureIdGenerator.generateHexId("sess", 16),
+    /** The binding path resolved with this session's credential and destination. */
+    val keyId: String? = null,
 ) {
     private var _state = SessionState.CREATED
     val state: SessionState get() = _state
@@ -180,22 +182,15 @@ class ModelMux internal constructor(
     /** Create a session for a specific model by ID */
     suspend fun session(modelId: String): Result<LlmSession> {
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
-            ?: return Result.failure(NoSuchElementException("Model not found: $modelId"))
+            ?: return Result.failure(NoSuchElementException("need(model): model not found: $modelId"))
         val card = entry.b
         // A provider-tagged card resolves against the provider's pooled
         // credential (one key serves every model that provider hosts) before
         // falling to the per-model lookup untagged cards have always used.
-        val providerTag = card.providerTag
-        val authKey = providerTag?.let { keyMux.get("llm.$it.key") }
-            ?: keyMux.get("llm.${card.id}.key")
-            ?: keyMux.get("llm.default.key")
-            ?: return Result.failure(IllegalStateException("no auth key for model: $modelId"))
-        val baseUrl = providerTag?.let { keyMux.get("llm.$it.base_url") }
-            ?: keyMux.get("llm.${card.id}.base_url")
-            ?: keyMux.get("llm.default.base_url")
-            ?: configuredBaseUrls[modelId]
-            ?: "https://api.openai.com/v1"
-        val session = LlmSession(entry, authKey, baseUrl)
+        val binding = keyMux.resolveLlm(card.id, card.providerTag,
+            configuredBaseUrls[modelId] ?: "https://api.openai.com/v1")
+            ?: return Result.failure(IllegalStateException("need(key): no auth key for model: $modelId"))
+        val session = LlmSession(entry, binding.authKey, binding.baseUrl, keyId = binding.keyId)
         session.open()
         return Result.success(session)
     }
@@ -278,6 +273,7 @@ class ModelMux internal constructor(
         val callActivity = attribution?.activity ?: activity
         val provider = models.view.firstOrNull { it.a == modelId }?.b?.providerTag ?: modelId
         val callId = callActivity.start(modelId, provider, attribution, assessmentId ?: contextId)
+        val startedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         var receipt: ModelResponseReceipt? = null
         var keyId: String? = null
         var failure: Throwable? = null
@@ -288,14 +284,35 @@ class ModelMux internal constructor(
                 keyId = k
             }
             failure = result.exceptionOrNull()
-            if (failure is CancellationException) throw failure as CancellationException
+            // Transport timeouts cancel their own scope, not the caller's work queue.
+            if (failure is CancellationException) currentCoroutineContext().ensureActive()
             return result
         } catch (t: Throwable) {
             failure = t
-            throw t
+            if (t is CancellationException) currentCoroutineContext().ensureActive()
+            return Result.failure(t)
         } finally {
             withContext(NonCancellable) {
-                callActivity.finish(callId, receipt, keyId, failure)?.let { attribution?.onFinished?.invoke(it) }
+                // Admission failures have no session or HTTP status, but still
+                // retain the exact proposed request and its failure provenance.
+                val completed = receipt ?: run {
+                    val wireModel = models.view.firstOrNull { it.a == modelId }?.b?.wireName ?: modelId
+                    val meta: AcpMeta = wireModel j ("chat" j emptySeriesOf())
+                    val json = AcpCodec.encodeRequest(meta j (messages j tools), maxTokens, temperature, jsonOutput, thinking)
+                    ModelResponseReceipt.mint(
+                        modelId = modelId, providerId = modelId,
+                        requestHash = cacheCascade.primary(json), action = "chat", httpStatus = 0,
+                        latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - startedAt,
+                        assessmentId = assessmentId ?: contextId, error = failure,
+                    )
+                }
+                receipt = completed
+                lastReceipt = completed
+                // Receipt delivery is observational; it cannot suppress activity completion.
+                runCatching { attribution?.onReceipt?.invoke(completed) }
+                callActivity.finish(callId, receipt, keyId, failure)?.let { finished ->
+                    runCatching { attribution?.onFinished?.invoke(finished) }
+                }
             }
         }
     }
@@ -315,7 +332,7 @@ class ModelMux internal constructor(
         capture: (ModelResponseReceipt, String?) -> Unit,
     ): Result<AcpResponse> {
         val receiptAssessment = assessmentId ?: contextId
-        if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("modelId must be non-empty"))
+        if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("need(model): modelId must be non-empty"))
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) return Result.failure(sessionResult.exceptionOrNull()!!)
         val session = sessionResult.getOrThrow()
@@ -328,7 +345,7 @@ class ModelMux internal constructor(
         // Meter under the resolved key ID (the binding path), not the key VALUE
         // — the value is the secret, and it bypassed the providerTag chain
         // session() honours, so tagged providers metered under null.
-        val keyId = resolveKeyId(session.model.b)
+        val keyId = session.keyId
         // The reactor's roster is the keys this process actually used: record the
         // resolved key on dispatch so the quota legion's standings can project it
         // (delta 2026-09-04 — before this only the daemon's boot-time
@@ -342,6 +359,7 @@ class ModelMux internal constructor(
         var cachedHit = false
         var inputTokens = 0
         var outputTokens = 0
+        var requestHash = ""
         try {
             val card = session.model.b
             val meta: AcpMeta = card.wireName j ("chat" j session.authHeaders())
@@ -356,7 +374,7 @@ class ModelMux internal constructor(
             // The receipt is ALWAYS attributed to the exact identity, whichever
             // strategy produced the hit: a ledger keyed by a relaxed bucket could
             // not be reconciled against the bytes actually sent.
-            val requestHash = cacheCascade.primary(json)
+            requestHash = cacheCascade.primary(json)
             // Every identity this mux is willing to answer from, exact first.
             // EXACT_ONLY (the default) makes this a one-element list and the
             // behaviour byte-identical to before strategies existed.
@@ -464,7 +482,7 @@ class ModelMux internal constructor(
         } catch (t: Throwable) {
             session.recordReceipt(
                 ModelResponseReceipt.mint(
-                    modelId = modelId, providerId = modelId, requestHash = "0",
+                    modelId = modelId, providerId = session.model.b.id, requestHash = requestHash,
                     action = "chat", httpStatus = httpStatus,
                     latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                     assessmentId = receiptAssessment, sessionId = session.sessionId,
@@ -509,7 +527,7 @@ class ModelMux internal constructor(
         // Lease identity is the binding PATH (llm.<provider>.key), never the secret
         // value — keyMux.get(...) returns the credential, which matched no lease and
         // leaked it. Same providerTag fallback chain session()/chat() honour.
-        val keyId = resolveKeyId(session.model.b)
+        val keyId = session.keyId
         // The reactor's roster is the keys this process actually used: record the
         // resolved key on dispatch so the quota legion's standings can project it
         // (delta 2026-09-04 — before this only the daemon's boot-time
@@ -567,7 +585,7 @@ class ModelMux internal constructor(
         // Lease identity is the binding PATH, never the secret value (stream() fix,
         // same defect class): keyMux.get returns the credential, which matched no
         // lease. providerTag fallback chain via resolveKeyId.
-        val keyId = resolveKeyId(session.model.b)
+        val keyId = session.keyId
         // The reactor's roster is the keys this process actually used: record the
         // resolved key on dispatch so the quota legion's standings can project it
         // (delta 2026-09-04 — before this only the daemon's boot-time

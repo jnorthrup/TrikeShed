@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.couch.isam.DurableAppendLog
+import borg.trikeshed.graal.subvm.harness.DocumentModelFixture
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
@@ -22,8 +23,10 @@ import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.parse.json.ValueBudget
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.coroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
@@ -125,12 +128,7 @@ class DocumentCurationLegosTest {
             val bag = BeliefBagElement(capacity = 8, cas = cas)
             bag.open()
             var modelCalls = 0
-            val curator = DocumentCuratorElement.create(this, NlpReader {
-                assertEquals(text, it)
-                NlpDocument(it, listOf(NlpSentence(0, 0, it.length,
-                    listOf(NlpToken(1, 0, it.length, it, it, "NN", "O")).toSeries(),
-                    listOf(NlpDependency(0, 1, "root")).toSeries())).toSeries())
-            }, { prompt ->
+            val session = DocumentModelFixture.open(modelId = "fixture") { prompt ->
                 modelCalls++
                 assertEquals(instructions, prompt.messages[0].content)
                 val sent = JsonSupport.parseMap(prompt.messages[1].content)
@@ -138,7 +136,15 @@ class DocumentCurationLegosTest {
                 assertNotNull(sent["nlp"])
                 ModelResponse("""{"format":"TRIPLET_JSON","triplets":[{"subject":"Synthetic applicant","predicate":"skill","object":"Kotlin","confidence":0.9,"quote":"Kotlin","begin":0,"end":6,"polarity":true,"modality":"asserted"}]}""",
                     ModelUsage(0, 0, 0), "fixture", "fixture")
-            }, "fixture", cas, log, bag)
+            }
+            val curator = DocumentCuratorElement.create(
+                CoroutineScope(coroutineContext + session.htx + session.reactor),
+                NlpReader {
+                    assertEquals(text, it)
+                    NlpDocument(it, listOf(NlpSentence(0, 0, it.length,
+                        listOf(NlpToken(1, 0, it.length, it, it, "NN", "O")).toSeries(),
+                        listOf(NlpDependency(0, 1, "root")).toSeries())).toSeries())
+                }, session.model, "fixture", cas, log, bag)
             try {
                 val program = LcncProgram("canvas-document", listOf(
                     LcncNode("source", "scope.in", mapOf("name" to "source", "kind" to "json")),
@@ -172,7 +178,7 @@ class DocumentCurationLegosTest {
                 assertEquals(1, record.quotationSubmittedReceiptCids.size)
                 curator.drain(); bag.drain()
                 assertEquals(record.quotationSubmittedReceiptCids[0].value, bag.snapshot().values.single().provenanceCid)
-            } finally { curator.drain(); bag.drain() }
+            } finally { curator.drain(); bag.drain(); session.close() }
         }
     }
 

@@ -369,7 +369,18 @@ object OroborosDaemon {
         // built this inline, the diagnostic that told the operator whether a key
         // was visible resolved through a different chain than the daemon did,
         // so it could only ever confirm its own wiring.
-        val keyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = hermesHome)
+        // Bound ONCE into keyMux below so the reactor-owned KeyMux identity never
+        // changes: MuxReactorElement.modelMux() requires `mux.keyMux === keyMux()`,
+        // and KeyMux.withBinding() returns a NEW instance. The Hermes default-model
+        // pin is therefore refreshed by mutating this overlay's snapshot
+        // (PinOverlaySource.setPin/clearPin), not by rebinding the mux.
+        val hermesPinOverlay = keymux.PinOverlaySource()
+        // baseKeyMux excludes the overlay — buildBrain's own pin resolution
+        // reads THIS, not keyMux, so a repin never resolves through its own
+        // previous pin (self-referential freeze). keyMux (reactor/catalog
+        // identity) is the one wrapper, built once, on top of it.
+        val baseKeyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = hermesHome)
+        val keyMux = baseKeyMux.withBinding("*", hermesPinOverlay)
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
         if (apiKeyPresent.isNullOrBlank()) {
@@ -1186,9 +1197,11 @@ object OroborosDaemon {
             refreshQuotaLegion()
             val hermesSession = borg.trikeshed.jules.legacy.HermesActiveSession.current()
             val hermesProvider = hermesSession?.runtime?.provider
+            // baseKeyMux, not keyMux: this resolves the NEXT pin, so it must not
+            // read back through the overlay this same refresh set last time.
             suspend fun hermesLane(field: String): String? = hermesProvider?.let { provider ->
                 kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    runCatching { keyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+                    runCatching { baseKeyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
                 }
             }
             val hermesKey = hermesLane("key")
@@ -1216,7 +1229,7 @@ object OroborosDaemon {
                 if (hermesPinReason.isEmpty()) null
                 else borg.trikeshed.jules.HermesConfigDefault.resolve(hermesHome, keyLane = { provider, field ->
                     kotlinx.coroutines.withContext(Dispatchers.IO) {
-                        runCatching { keyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+                        runCatching { baseKeyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
                     }
                 })
             val configLaunch = (configOutcome as? borg.trikeshed.jules.HermesConfigDefault.Outcome.Pinned)?.launch
@@ -1702,20 +1715,52 @@ object OroborosDaemon {
             val pinnedModel = pin?.get("model") as? String
             val pinnedProvider = pin?.get("provider") as? String
             val pinnedBase = pin?.get("baseUrl") as? String
-            var catalogKeys = keyMux
+            // catalogKeys stays IDENTICAL to the reactor-owned keyMux — the Hermes
+            // pin rides hermesPinOverlay (bound once at boot) instead of a fresh
+            // withBinding() chain, so MuxReactorElement.modelMux()'s `mux.keyMux
+            // === keyMux()` identity check holds. setPin()/clearPin() replace the
+            // whole overlay snapshot, so a provider switch cannot leave the old
+            // provider's key/base_url bound alongside the new one.
+            val catalogKeys = keyMux
+            // Presence-only: modelKeyId is a binding path, not a secret. The
+            // secret is resolved inside PinOverlaySource.read, from pinMux's
+            // OWN keyMux — never fetched here.
             val pinnedSpec = if (pinnedModel != null && pinnedProvider != null && pinnedBase != null) {
-                // Reuse the resolved launch's credential; custom profiles do not have a HarnessRegistry row.
-                val pinMux = liveBrain.modelMux()
-                val pinKeyId = requireNotNull(pinMux.modelKeyId(pinnedModel)) { "Configured model has no key binding" }
-                val pinKey = requireNotNull(pinMux.keyMux.get(pinKeyId)) { "Configured model key is unavailable" }
-                catalogKeys = catalogKeys
-                    .withBinding("llm.$pinnedProvider.key", keymux.FixedKeySource(pinKey, "hermes-pin"))
-                    .withBinding("llm.$pinnedProvider.base_url", keymux.FixedKeySource(pinnedBase, "hermes-pin"))
-                borg.trikeshed.jules.BrainClient.EndpointSpec(
-                    name = "hermes:$pinnedProvider", envVar = "", base = pinnedBase,
-                    model = pinnedModel, provider = pinnedProvider,
-                )
-            } else null
+                val pinLookup: Pair<keymux.KeyMux, String>? = runCatching {
+                    val pinMux = liveBrain.modelMux()
+                    val pinKeyId = requireNotNull(pinMux.modelKeyId(pinnedModel)) { "Configured model has no key binding" }
+                    pinMux.keyMux to pinKeyId
+                }.onFailure {
+                    // Explicit need, not a catalog-wide exception: the pin is one
+                    // optional preference over the full provider catalog below.
+                    HostSystem.err("[OROBOROS] hermes pin unavailable, catalog continues without it: ${it.message}")
+                }.getOrNull()
+                val pinKeyMux = pinLookup?.first
+                val pinKeyId = pinLookup?.second
+                if (pinKeyMux != null && pinKeyId != null && pinKeyMux !== keyMux) {
+                    hermesPinOverlay.setPin(
+                        keymux.PinBinding(
+                            provider = pinnedProvider,
+                            baseUrl = pinnedBase,
+                            keyDelegate = pinKeyMux,
+                            keyId = pinKeyId,
+                        ),
+                    )
+                    borg.trikeshed.jules.BrainClient.EndpointSpec(
+                        name = "hermes:$pinnedProvider", envVar = "", base = pinnedBase,
+                        model = pinnedModel, provider = pinnedProvider,
+                    )
+                } else {
+                    if (pinKeyMux === keyMux) {
+                        HostSystem.err("[OROBOROS] hermes pin resolves through the operator mux itself; skipping to avoid a recursive lookup")
+                    }
+                    hermesPinOverlay.clearPin()
+                    null
+                }
+            } else {
+                hermesPinOverlay.clearPin()
+                null
+            }
             // Cards come from Hermes FIRST — the model instances it has run on and
             // been answered by ($HERMES_HOME/state.db: sessions + session_model_usage,
             // HermesInstances) — then the static roster for whatever Hermes has not

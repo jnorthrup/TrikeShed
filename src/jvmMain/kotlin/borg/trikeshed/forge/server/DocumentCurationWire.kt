@@ -47,7 +47,8 @@ class DocumentCurationWire private constructor(
                 wires.add(LcncWire("curate", "receiptCid", "profile", "receiptCid"))
                 wires.add(LcncWire("profile", "profile", "knowledge", "value"))
             }
-            for ((index, port) in s_["receiptCid", "record", "sheet", "sheets"].view.withIndex()) {
+            // ruleCandidates is a typed yield shaped for nal.rule.admit; admission is a cable an operator adds.
+            for ((index, port) in s_["receiptCid", "record", "sheet", "sheets", "ruleCandidates"].view.withIndex()) {
                 nodes.add(LcncNode(port, LcncContracts.SCOPE_OUT, mapOf("name" to port, "kind" to if (port == "receiptCid") "id" else "json"), 970.0, 240.0 + index * 160))
                 wires.add(LcncWire("curate", port, port, "value"))
             }
@@ -84,7 +85,7 @@ class DocumentCurationWire private constructor(
                 var curator: DocumentCuratorElement? = null
                 try {
                     curator = DocumentCuratorElement.create(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext),
-                        nlp, documentModel(brain, ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
+                        nlp, DocumentModel.through(ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
                         model, ctx.casStore, log, bag,
                         rete = ctx.narsRete,
                         toolOntology = toolOntology,
@@ -163,35 +164,26 @@ class DocumentCurationWire private constructor(
         return run
     }
 
-    /** Tuple projection and belief intake are siblings after grounding, not a fictitious serial edge. */
+    /**
+     * Tuple projection and belief intake are siblings after grounding, not a fictitious serial edge.
+     * The whole provenance of the record (proposals, stage receipts, rule candidates, the model
+     * receipt) is one [DocumentCurationFacts.facts] series swapped under `curationCid`; RDF and
+     * KIF follow from the plane. The board gets the summary key and one key per stage receipt.
+     */
     private suspend fun publish(cid: ContentId, record: DocumentCurationRecord) {
-        val tuples = record.proposals.filter { it.subject != null && it.predicate != null && it.obj != null }
         val sourceId = record.source.metadata["evidenceId"]?.singleOrNull()
         val sourceCid = record.source.metadata["evidenceCid"]?.singleOrNull()
-        val facts = tuples.size j { ordinal: Int ->
-            val proposal = tuples[ordinal]
-            val tuple: Join<String, Twin<String>> = proposal.predicate!! j (proposal.subject!! j proposal.obj!!)
-            val values = mapOf("kind" to "document-proposal", "curationCid" to cid.value,
-                "originalCid" to record.source.originalCid.value, "textCid" to record.source.extractedTextCid.value,
-                "sourceRecordId" to sourceId, "sourceRecordCid" to sourceCid,
-                "sourceCurrent" to sourceCurrent(sourceId, sourceCid),
-                "proposalCid" to proposal.receiptCid?.value, "predicate" to tuple.a,
-                "subject" to tuple.b.a, "object" to tuple.b.b, "quote" to proposal.quote,
-                "begin" to proposal.begin, "end" to proposal.end,
-                "quotationReceiptCid" to proposal.quotationReceiptCid?.value,
-                "quotationBegin" to proposal.quotationBegin, "quotationEnd" to proposal.quotationEnd,
-                "groundingReasons" to proposal.reasons.toList(),
-                "submitted" to (proposal.receiptCid in record.submittedReceiptCids.view),
-                "quotationSubmitted" to (proposal.quotationReceiptCid in record.quotationSubmittedReceiptCids.view))
-            PlaneFacts.fact("documents", "${cid.hex}/$ordinal", values)
+        val head = DocumentCurationFacts.SourceHead(sourceId, sourceCid, sourceCurrent(sourceId, sourceCid))
+        val facts = DocumentCurationFacts.facts(cid, record, head)
+        ctx.rete.replace(BlackboardContext(DocumentCurationFacts.PARTITION), "curationCid" j cid.value) { facts }
+        ctx.blackboard.putIf(DocumentCurationFacts.summaryKey(cid), DocumentCurationFacts.summary(cid, record),
+            DocumentCurationFacts.ACTOR) { old -> old == null }
+        for (receipt in record.toolReceipts.view) {
+            val value = DocumentCurationFacts.stageValue(cid, record, receipt)
+            ctx.blackboard.putIf(DocumentCurationFacts.stageKey(record, receipt), value, DocumentCurationFacts.ACTOR) { old ->
+                (old as? Map<*, *>)?.get("receiptCid") != value["receiptCid"]
+            }
         }
-        ctx.rete.replace(BlackboardContext("documents"), "curationCid" j cid.value) { facts }
-        ctx.blackboard.putIf("document/curation/${cid.hex}", mapOf("receiptCid" to cid.value,
-            "name" to record.source.name, "originalCid" to record.source.originalCid.value,
-            "textCid" to record.source.extractedTextCid.value, "model" to record.model?.modelId,
-            "proposals" to record.proposals.size, "submitted" to record.submittedReceiptCids.size,
-            "quotationsSubmitted" to record.quotationSubmittedReceiptCids.size,
-            "reasons" to record.reasons.toList()), "document") { old -> old == null }
     }
 
     private fun sourceCurrent(id: String?, cid: String?): Boolean? {

@@ -62,28 +62,30 @@ object DocumentCurationStorageHarness {
         var feed: DocumentFeed? = null
         var modelCalls = 0
         bag.open()
+        val fixture = DocumentModelFixture.open { prompt ->
+            modelCalls++
+            val source = JsonSupport.parse(prompt.messages[1].content) as Map<*, *>
+            check((source["linguistics"] as Map<*, *>)["status"] == "AVAILABLE")
+            val extracted = source["text"] as String
+            val proposals = if (source["name"] == "fixture:positive") {
+                val quote = "Acme pays Beta."
+                val start = extracted.indexOf(quote)
+                check(start >= 0)
+                listOf(mapOf("subject" to "Acme", "predicate" to "pay", "object" to "Beta",
+                    "confidence" to 0.73, "quote" to quote, "begin" to start, "end" to start + quote.length,
+                    "polarity" to true, "modality" to "asserted"))
+            } else emptyList()
+            ModelResponse(JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
+                ModelUsage(-1, -1, -1), "fixture", "fixture")
+        }
+        val docScope = CoroutineScope(scope.coroutineContext + fixture.htx + fixture.reactor)
         try {
             modules.attach(KanbanModule())
             val initialBagSize = bag.size
             if (args[0] == "write") check(initialBagSize == 0) { "write phase requires a fresh verification directory" }
             else check(initialBagSize == 1) { "Belief WAL did not reopen its signal" }
-            feed = DocumentCurationLegos.create(scope, storage.volume, storage.cas, storage.log, bag, pointcuts,
-                model = { prompt ->
-                    modelCalls++
-                    val source = JsonSupport.parse(prompt.messages[1].content) as Map<*, *>
-                    check((source["linguistics"] as Map<*, *>)["status"] == "AVAILABLE")
-                    val extracted = source["text"] as String
-                    val proposals = if (source["name"] == "fixture:positive") {
-                        val quote = "Acme pays Beta."
-                        val start = extracted.indexOf(quote)
-                        check(start >= 0)
-                        listOf(mapOf("subject" to "Acme", "predicate" to "pay", "object" to "Beta",
-                            "confidence" to 0.73, "quote" to quote, "begin" to start, "end" to start + quote.length,
-                            "polarity" to true, "modality" to "asserted"))
-                    } else emptyList()
-                    ModelResponse(JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
-                        ModelUsage(-1, -1, -1), "fixture", "fixture")
-                }, modelId = "fixture", runners = runners, stagingLba = 0)
+            feed = DocumentCurationLegos.create(docScope, storage.volume, storage.cas, storage.log, bag, pointcuts,
+                model = fixture.model, modelId = "fixture", runners = runners, stagingLba = 0)
             var replayed = 0
             storage.log.replay { _, _ -> replayed++ }
             if (args[0] == "reopen") check(replayed > 0)
@@ -137,7 +139,9 @@ object DocumentCurationStorageHarness {
             try { feed?.drain() } finally {
                 try { modules.drainAll() } finally {
                   try { bag.drain() } finally {
-                    try { bagLog.close() } finally { storage.drain() }
+                    try { bagLog.close() } finally {
+                      try { storage.drain() } finally { fixture.close() }
+                    }
                   }
                 }
             }
