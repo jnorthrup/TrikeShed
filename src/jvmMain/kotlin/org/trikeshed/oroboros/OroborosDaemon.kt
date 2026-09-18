@@ -1534,6 +1534,10 @@ object OroborosDaemon {
             }
             moduleContext.lcncRunners["nal.attend"] = borg.trikeshed.narsese.BeliefsNodes.attendRunner(bag)
             moduleContext.lcncRunners["nal.reinforce"] = borg.trikeshed.narsese.BeliefsNodes.reinforceRunner(bag)
+            // The council's non-model seat: NARS reviews choices over the same bag.
+            moduleContext.lcncRunners["nars.seat"] = borg.trikeshed.narsese.NarsSeatNode.seatRunner(bag) { angular ->
+                hermesMemoryFiles?.glossOf(angular)
+            }
         }
         turnReview?.let { review ->
             moduleContext.lcncRunners["beliefs.review"] = borg.trikeshed.narsese.BeliefsNodes.reviewRunner(review) { angular, gloss ->
@@ -1580,7 +1584,7 @@ object OroborosDaemon {
             val bagGated = listOf(
                 "read.construct", "nal.mint", "nal.decay", "nal.recall", "skill.decay",
                 "nal.attend", "nal.reinforce", "nal.rule.admit", "nal.rules.fromKg",
-                "beliefs.introspect", "beliefs.resonate", "beliefs.review",
+                "beliefs.introspect", "beliefs.resonate", "beliefs.review", "nars.seat",
                 "state.freeze", "state.thaw", "kanban.attention", "kanban.drift", "kanban.review",
             )
             val bagOff = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
