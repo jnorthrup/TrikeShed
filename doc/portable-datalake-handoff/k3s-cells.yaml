@@ -1,0 +1,55 @@
+# k3s cell template for the portable-datalake swarm.
+# Contract per cell: doctrine mounted, branch isolated, compile gate, canonical commit messages.
+# Replace image/command with your swarm runner; do not remove the gates.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: trikeshed-datalake
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: doctrine
+  namespace: trikeshed-datalake
+data:
+  SKILL.md: |
+    # mounted from doc/portable-datalake-handoff/SKILL.md at release cut;
+    # the file in-repo is canonical. Agents: read it before any edit.
+  gaps-ledger.md: |
+    # mounted from doc/portable-datalake-handoff/gaps-ledger.md
+  HANDOFF.md: |
+    # mounted from doc/portable-datalake-handoff/HANDOFF.md
+---
+# One Job per cell. cells: board, lcnc, curation, graalvm, portable, durable.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cell-board
+  namespace: trikeshed-datalake
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      containers:
+        - name: agent
+          image: REPLACE-WITH-SWARM-RUNNER
+          command: ["REPLACE-WITH-RUNNER-INVOCATION"]
+          args:
+            - "--skill=/doctrine/SKILL.md"
+            - "--repo=https://github.com/jnorthrup/TrikeShed"
+            - "--branch=cell/board"
+            - "--base=codex/portable-datalake"
+            - "--gate=./gradlew compileKotlinJvm compileTestKotlinJvm"
+          volumeMounts:
+            - { name: doctrine, mountPath: /doctrine }
+            - { name: work, mountPath: /work }
+      volumes:
+        - name: doctrine
+          configMap: { name: doctrine }
+        - name: work
+          emptyDir: {}
+      restartPolicy: Never
+# ---
+# Repeat the Job block for cell-lcnc, cell-curation, cell-graalvm,
+# cell-portable, cell-durable with their --branch values. Schedule board and
+# lcnc first (priority order 1), then curation+graalvm, then portable+durable.
