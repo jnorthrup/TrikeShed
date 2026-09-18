@@ -43,14 +43,14 @@ private fun teleportOf(v: Value?, depth: Int): Teleported = when {
     // string-keyed lookup is the real shape.
     v.hasHashEntries() -> runCatching {
         Teleported.Obj(
-            buildMap {
+            ArrayList<Pair<String, Teleported>>().apply {
                 val entries = v.hashEntriesIterator
                 while (entries.hasIteratorNextElement() && size < TELEPORT_MAX_ELEMENTS) {
                     val e = entries.iteratorNextElement
                     val k = e.getArrayElement(0)
-                    put(if (k.isString) k.asString() else k.toString(), teleportOf(e.getArrayElement(1), depth + 1))
+                    add((if (k.isString) k.asString() else k.toString()) to teleportOf(e.getArrayElement(1), depth + 1))
                 }
-            }.toList().sortedBy { it.first }.toMap(),
+            }.sortedBy { it.first }.toMap() // ⚡ Bolt: Prevent intermediate Map and List allocations during Graal dictionary teleportation
         )
     }.getOrElse { Teleported.Opaque(v.toString()) }
     v.hasArrayElements() -> runCatching {
@@ -67,7 +67,7 @@ private fun teleportOf(v: Value?, depth: Int): Teleported = when {
 fun Teleported.Companion.ofGuestOrHost(o: Any?): Teleported = when (o) {
     is Value -> of(o)
     is List<*> -> Teleported.Arr(o.map { ofGuestOrHost(it) })
-    is Map<*, *> -> Teleported.Obj(o.entries.associate { it.key.toString() to ofGuestOrHost(it.value) }.toList().sortedBy { it.first }.toMap())
+    is Map<*, *> -> Teleported.Obj(o.entries.map { it.key.toString() to ofGuestOrHost(it.value) }.sortedBy { it.first }.toMap()) // ⚡ Bolt: Prevent intermediate List allocations by using map directly instead of associate.toList()
     else -> ofHost(o)
 }
 
