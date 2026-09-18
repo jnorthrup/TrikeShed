@@ -16,7 +16,7 @@ class TorrentMetadataTest {
     private fun bin(value: ByteArray) = BencodeValue.Bytes(value)
     private fun int(value: Long) = BencodeValue.Integer(value)
     private fun dict(vararg entries: Pair<String, BencodeValue>) = TorrentBencode.dictionary(*entries)
-    private fun list(vararg values: BencodeValue) = BencodeValue.ListValue(values.toList().toSeries())
+    private fun list(vararg values: BencodeValue) = BencodeValue.ListValue(values.toSeries()) // Bolt: Use .toSeries() directly to avoid intermediate List allocation
     private fun encode(value: BencodeValue) = TorrentBencode.encode(value)
     private fun metainfo(info: BencodeValue, layers: BencodeValue? = null): ByteArray = encode(
         if (layers == null) dict("info" to info) else dict("info" to info, "piece layers" to layers))

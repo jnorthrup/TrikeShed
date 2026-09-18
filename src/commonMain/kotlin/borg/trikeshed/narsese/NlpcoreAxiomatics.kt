@@ -195,7 +195,7 @@ object NlpcoreAxiomatics {
                 )
             }
         }
-        return found.values.toList().toSeries()
+        return found.values.toSeries() // Bolt: Use native Collection.toSeries() instead of intermediate list copy
     }
 
     fun rules(document: NlpDocument, sourceCid: String? = null): Series<EternalRule> =
