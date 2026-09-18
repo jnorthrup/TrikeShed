@@ -671,6 +671,30 @@ object LcncContracts {
                 "mode" to LcncPortContract.LcncParamSpec(v = "whitened", opts = listOf("whitened", "hamming")),
                 "k" to LcncPortContract.LcncParamSpec(v = "4"),
             )),
+        // The non-model council seat: NARS reviews the wired choices against the
+        // curated belief bag and ranks them by revised-evidence expectation.
+        // Outputs mirror council.seat exactly (content/labeled are Strings,
+        // record is the turn-record map) so the council's folds, ruling.parse,
+        // and council.record compose unchanged; `model` is the constant
+        // "nars:belief-bag" — the provenance that no model spoke.
+        LcncPortContract("nars.seat", "NARS seat (belief-bag review of choices, no model call)",
+            listOf("charge", "choices"), listOf("content", "labeled", "model", "record"),
+            mapOf("choices" to LcncCardinality.MANY),
+            inputKinds = mapOf("charge" to "text", "choices" to "text"),
+            outputKinds = mapOf("content" to "text", "labeled" to "text", "model" to "id", "record" to "json"),
+            params = mapOf(
+                "panel" to LcncPortContract.LcncParamSpec(ph = "panel token (p1…)"),
+                "seat" to LcncPortContract.LcncParamSpec(ph = "seat name"),
+                "role" to LcncPortContract.LcncParamSpec(v = "review"),
+                "round" to LcncPortContract.LcncParamSpec(v = "1"),
+                "charge" to LcncPortContract.LcncParamSpec(ph = "panel charge"),
+                "taxonomy" to LcncPortContract.LcncParamSpec(),
+                "k" to LcncPortContract.LcncParamSpec(v = "8"),
+                "maxDistance" to LcncPortContract.LcncParamSpec(v = "16"),
+                "minEvidence" to LcncPortContract.LcncParamSpec(v = "1"),
+                "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> receipt"),
+                "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
+            )),
 
         // ── navigation / UI ──────────────────────────────────────────
         LcncPortContract("program.ref", "program (dive in)",

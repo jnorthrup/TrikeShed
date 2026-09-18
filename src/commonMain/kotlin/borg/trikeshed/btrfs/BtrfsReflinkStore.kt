@@ -61,6 +61,8 @@ class BtrfsReflinkStore(
     private val topicRoot: String = rootDir.trimEnd('/').substringBeforeLast('/', rootDir),
 ) : CasStore() {
 
+    override val durability get() = fileOps.durability
+
     init {
         // The btrfs guard runs BEFORE the mkdirs below. Without it this init block
         // would happily manufacture a CAS root on whatever filesystem happened to be

@@ -31,6 +31,27 @@ import java.util.zip.ZipFile
  */
 class JvmFileOperations : FileOperations {
 
+    override val durability: StorageDurability get() = StorageDurability.DURABLE
+
+    override fun acquireExclusiveLease(path: String): FileLease {
+        val channel = FileChannel.open(pathOf(path), StandardOpenOption.CREATE, StandardOpenOption.WRITE)
+        try {
+            val lock = channel.tryLock() ?: error("Filesystem lease is already held: $path")
+            return object : FileLease {
+                private var closed = false
+                override fun close() = synchronized(this) {
+                    if (!closed) {
+                        closed = true
+                        try { lock.release() } finally { channel.close() }
+                    }
+                }
+            }
+        } catch (failure: Throwable) {
+            try { channel.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
+    }
+
     private val nextFd = AtomicInteger(1)
     private val channels = ConcurrentHashMap<Int, SeekableByteChannel>()
 

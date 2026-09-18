@@ -149,6 +149,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     VM_CAMEL_ROUTES("vm.camel.routes"),
     VM_GRAALCE("vm.graalce"),
     COUNCIL_SEAT("council.seat"),
+    NARS_SEAT("nars.seat"),
     TEXT_FOLD("text.fold"),
     RECORD_FOLD("record.fold"),
     RULING_PARSE("ruling.parse"),

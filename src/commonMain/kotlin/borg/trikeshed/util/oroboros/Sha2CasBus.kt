@@ -16,6 +16,8 @@ class FileCasStore(
     private val casRoot: String
 ) : CasStore() {
 
+    override val durability get() = fileOps.durability
+
     private fun getShardedPath(cid: ContentId): String =
         fileOps.resolvePath(casRoot, CasPaths.blob(cid))
 

@@ -17,9 +17,10 @@ fun revWins(candidate: String, incumbent: String): Boolean {
 class ProductionCouchIngress(
     private val head: CouchHeadProjection,
     private val commitBoundary: (CouchCommittedFrame) -> Unit,
-    private val contentIdFn: (Document) -> ContentId
+    private val contentIdFn: (Document) -> ContentId,
+    initialSequence: Long = 0,
 ) : CouchIngress {
-    private var sequence: Long = 0
+    private var sequence: Long = initialSequence
 
     // The ingress IS the single-writer boundary — but the daemon has many writing
     // coroutines (boot reconcile, worktree-quake reconcile, panels, replication),

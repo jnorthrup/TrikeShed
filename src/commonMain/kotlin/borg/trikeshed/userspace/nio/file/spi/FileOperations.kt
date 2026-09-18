@@ -17,6 +17,13 @@ interface FileOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<FileOperations>
     override val key: CoroutineContext.Key<*> get() = Key
 
+    /** Durability of [writeAtomically]; adapters must opt in to durable publication. */
+    val durability: StorageDurability get() = StorageDurability.VOLATILE
+
+    /** Acquire without waiting; the caller owns the returned lease and its descriptor. */
+    fun acquireExclusiveLease(path: String): FileLease =
+        throw UnsupportedOperationException("Exclusive filesystem leases are unavailable")
+
     /** Open a file and return a raw file descriptor (fd integer). */
     fun open(path: String, readOnly: Boolean = true): Int
 
