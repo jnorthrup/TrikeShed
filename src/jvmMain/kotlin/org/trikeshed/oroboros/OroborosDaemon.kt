@@ -645,7 +645,12 @@ object OroborosDaemon {
                 )
             }
         }
-        val couchStore = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+        // Durable heads: when the CAS backend is durable, the couch store files every
+        // committed frame into a CouchCommitStore (immutable CAS event chain + atomic
+        // HEAD root under <forgeHome>/couch) and recovers heads/revisions/deletions/
+        // checkpoints on boot. A volatile CAS keeps the old in-memory projection —
+        // blobs alone never recovered heads (funding-pack E02 boundary).
+        val (couchStore, couchCommits) = openCouchStore(casStore, fileOps, forgeHome)
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
         val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
@@ -1198,19 +1203,7 @@ object OroborosDaemon {
         // (keys by fingerprint, never keyId — see MuxBlackboardProjection) on
         // every reactor state publication. The board, not hermes' state.db,
         // is the open inspectable answer to "what is the daemon running on".
-        launch {
-            muxReactor.flowState.collect { state ->
-                val entries = borg.trikeshed.userspace.reactor.MuxBlackboardProjection.entries(
-                    state,
-                    quotaLegion.standings(state, HostSystem.currentTimeMillis()),
-                    muxReactor.providerHealth,
-                )
-                for (i in 0 until entries.size) {
-                    val (key, value) = entries[i]
-                    daemonBlackboard.put(key, value, borg.trikeshed.userspace.reactor.MuxBlackboardProjection.SOURCE)
-                }
-            }
-        }
+        launchMuxBlackboardHome(muxReactor, quotaLegion, daemonBlackboard)
 
         suspend fun buildBrain(): Pair<borg.trikeshed.jules.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
@@ -2654,7 +2647,48 @@ object OroborosDaemon {
                 try { htxElement.close() } catch (_: Exception) {}
                 try { torrentElement.close() } catch (_: Exception) {}
                 try { muxReactor.close() } catch (_: Exception) {}
+                runCatching { couchCommits?.close() }
                 try { nioSupervisor.close() } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */
+    private fun openCouchStore(
+        casStore: borg.trikeshed.job.CasStore,
+        fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
+        forgeHome: File,
+    ): borg.trikeshed.lib.Join<borg.trikeshed.couch.CouchStore, borg.trikeshed.couch.persistence.CouchCommitStore?> {
+        if (casStore.durability != borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
+            HostSystem.err("[OROBOROS] couch store: volatile head projection (CAS durability ${casStore.durability})")
+            return borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore) j null
+        }
+        val commits = borg.trikeshed.couch.persistence.CouchCommitStore(
+            cas = casStore,
+            durability = borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE,
+            fileOps = fileOps,
+            directory = fileOps.resolvePath(forgeHome.absolutePath, "couch"),
+        )
+        val store = borg.trikeshed.couch.CouchStoreFactory.durableCasBacked(casStore, commits)
+        HostSystem.err("[OROBOROS] couch store: DURABLE heads via CouchCommitStore (${store.size} docs recovered)")
+        return store j commits
+    }
+
+    /** The redacted mux working set, published to the board on every reactor state publication. */
+    private fun kotlinx.coroutines.CoroutineScope.launchMuxBlackboardHome(
+        muxReactor: borg.trikeshed.userspace.reactor.MuxReactorElement,
+        quotaLegion: modelmux.QuotaLegion,
+        daemonBlackboard: borg.trikeshed.graal.ConfixBlackboard,
+    ) = launch {
+        muxReactor.flowState.collect { state ->
+            val entries = borg.trikeshed.userspace.reactor.MuxBlackboardProjection.entries(
+                state,
+                quotaLegion.standings(state, HostSystem.currentTimeMillis()),
+                muxReactor.providerHealth,
+            )
+            for (i in 0 until entries.size) {
+                val (key, value) = entries[i]
+                daemonBlackboard.put(key, value, borg.trikeshed.userspace.reactor.MuxBlackboardProjection.SOURCE)
             }
         }
     }

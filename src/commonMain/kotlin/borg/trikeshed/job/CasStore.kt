@@ -9,6 +9,10 @@ import borg.trikeshed.collections.associative.LinearHashMap as CasHashMap
 open class CasStore protected constructor(
     private val blobs: CasHashMap<ContentId, ByteArray> = CasHashMap(),
 ) {
+    /** Whether acknowledged publication survives a process restart; durable backends opt in. */
+    open val durability: borg.trikeshed.userspace.nio.file.spi.StorageDurability
+        get() = borg.trikeshed.userspace.nio.file.spi.StorageDurability.VOLATILE
+
     open fun put(bytes: ByteArray): ContentId {
         val cid = ContentId.of(bytes)
         blobs[cid] = bytes.copyOf()

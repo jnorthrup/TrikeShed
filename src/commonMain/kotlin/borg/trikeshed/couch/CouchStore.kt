@@ -303,6 +303,45 @@ object CouchStoreFactory {
         return CouchStore(ingress, head, changes)
     }
 
+    /**
+     * Durable CAS-collapsed store: [casBacked] semantics plus recovery of heads,
+     * revisions, deletions, and local checkpoint documents across restarts.
+     * Every committed frame is filed into [commits] (an immutable CAS event
+     * chain with an atomically published HEAD root and an exclusive writer
+     * lease); at construction the recovered frames replay into the head and
+     * changes projections and the ingress resumes after the last sequence.
+     *
+     * [commits] must be DURABLE-mode (its own constructor enforces a durable
+     * CAS and durable filesystem) — a VOLATILE commit store here would be the
+     * memory projection this factory exists to replace.
+     */
+    fun durableCasBacked(cas: borg.trikeshed.job.CasStore, commits: borg.trikeshed.couch.persistence.CouchCommitStore): CouchStore {
+        require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
+            "durableCasBacked requires a DURABLE commit store"
+        }
+        val head = CouchHeadProjection()
+        val changes = CouchChangesProjection()
+        var maxSequence = -1L
+        val recovered = commits.recoveredFrames
+        for (i in 0 until recovered.size) {
+            val frame = recovered[i]
+            head.applyCommit(frame)
+            changes.applyCommit(frame)
+            if (frame.sequence > maxSequence) maxSequence = frame.sequence
+        }
+        val ingress = ProductionCouchIngress(
+            head,
+            { frame ->
+                commits.commit(frame)
+                head.applyCommit(frame)
+                changes.applyCommit(frame)
+            },
+            { doc -> cas.put(canonicalBody(doc)) },
+            initialSequence = maxSequence + 1,
+        )
+        return CouchStore(ingress, head, changes)
+    }
+
     /** Canonical body bytes: CBOR, `_id` plus fields, sorted keys — stable across nodes. */
     fun canonicalBody(doc: Document): ByteArray {
         val m = linkedMapOf<String, Any?>("_id" to doc.id)
