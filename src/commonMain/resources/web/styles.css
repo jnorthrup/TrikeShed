@@ -206,16 +206,6 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   color: var(--text-faint);
   pointer-events: none;
 }
-.doc-tools {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 14px 0 4px;
-  min-height: 28px;
-}
-.doc-format { color: var(--text-faint); font-size: 12px; margin-right: auto; }
-.doc-tools .topbar-btn { border: 1px solid var(--border); }
 .doc-blocks { margin-top: 8px; }
 .doc-hint {
   margin-top: 12px;
@@ -497,11 +487,6 @@ button:focus-visible,
 
 /* ── Sheet view (TreeSheets idiom: grid-in-cell) ────────────── */
 .sheet-scroll { flex: 1; overflow: auto; padding: 16px 24px; display: flex; flex-direction: column; gap: 10px; }
-.sheet-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; min-height: 28px; }
-.sheet-toolbar .topbar-btn { border: 1px solid var(--border); }
-.sheet-name { font-size: 14px; font-weight: 600; margin-right: auto; }
-.sheet-status { color: var(--text-faint); font-size: 12px; font-family: var(--mono); }
-.sheet-formula { flex: 1 1 280px; min-width: 180px; border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 8px; font: 13px var(--mono); background: var(--bg); }
 .sheet-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .sheet-tab { padding: 4px 10px; border-radius: var(--radius); font-size: 13px; color: var(--text-secondary); }
 .sheet-tab:hover { background: var(--hover); }
@@ -516,16 +501,8 @@ table.sheet th { background: var(--sidebar-bg); font-weight: 500; color: var(--t
 table.sheet th .sheet-type { font-family: var(--mono); font-size: 10px; color: var(--text-faint); margin-left: 6px; }
 table.sheet th.sorted-asc::after { content: ' ↑'; } table.sheet th.sorted-desc::after { content: ' ↓'; }
 table.sheet td { font-family: var(--mono); font-size: 12px; max-width: 520px; overflow-wrap: anywhere; }
-table.sheet td:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
-table.workbook-sheet { min-width: 640px; }
-table.workbook-sheet th:first-child { width: 44px; text-align: center; }
-table.workbook-sheet td:first-child { background: var(--sidebar-bg); color: var(--text-faint); text-align: center; user-select: none; }
-table.workbook-sheet td.workbook-cell { padding: 0; min-width: 120px; max-width: 360px; }
-table.workbook-sheet td.workbook-cell input { width: 100%; min-width: 116px; border: 0; outline: 0; background: transparent; padding: 6px 8px; font: 12px var(--mono); color: inherit; }
-table.workbook-sheet td.workbook-cell input:focus { box-shadow: inset 0 0 0 2px var(--accent); }
-table.workbook-sheet td.workbook-cell.formula { background: rgba(35, 131, 226, .045); }
-table.workbook-sheet td.workbook-cell.error input { color: #b54848; }
-.sheet-help { color: var(--text-faint); font-size: 12px; }
+table.sheet td:focus { outline: none; }
+table.sheet td:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 table.sheet td.sheet-ref-cell { padding: 0; }
 .sheet-ref { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; color: var(--accent); font-family: var(--font); font-size: 12px; }
 .sheet-ref:hover { background: var(--accent-soft); }
