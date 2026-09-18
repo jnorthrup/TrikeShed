@@ -1,0 +1,113 @@
+openapi: 3.1.0
+info:
+  title: Kraken Embed v1 API
+  version: current
+  description: Conservative OpenAPI 3.1 spec built from Kraken API Center Embed v1 endpoint pages. This captures documented endpoint surfaces, summaries, and response descriptions from the live docs.
+servers:
+- url: https://api.kraken.com
+  description: Kraken API host
+tags:
+- name: Users
+  description: Users endpoints.
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: API-Key
+    apiSignAuth:
+      type: apiKey
+      in: header
+      name: API-Sign
+  schemas:
+    GenericObject:
+      type: object
+      additionalProperties: true
+    GenericArray:
+      type: array
+      items: {}
+paths:
+  /0/private/CreateUser:
+    post:
+      tags:
+      - Users
+      operationId: createUser
+      summary: Create User
+      description: Create a new user in the Payward system.
+      x-kraken-source: https://docs.kraken.com/api/docs/embed-v1-api/create-user
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+  /0/private/GetUser:
+    get:
+      tags:
+      - Users
+      operationId: getUser
+      summary: Get User
+      description: Get a previously created user.
+      x-kraken-source: https://docs.kraken.com/api/docs/embed-v1-api/get-user
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+  /0/private/UpdateUser:
+    post:
+      tags:
+      - Users
+      operationId: updateUser
+      summary: Update User
+      description: Update an existing user's profile.
+      x-kraken-source: https://docs.kraken.com/api/docs/embed-v1-api/update-user
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GenericObject'
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
+  /0/private/VerifyUser:
+    get:
+      tags:
+      - Users
+      operationId: verifyUser
+      summary: Verify User
+      description: Submit a verification for a user with documents and details. A verification is defined as a check that has been performed on a user to verify information provided by the user. This is typically done by a third party, such as a company that specializes in identity verification. Checks are most commonly performed on documents provided by the user, such as a passport or driver's license, but can also include other types of checks such as a sanctions check or a Politically Exposed Person (PEP) check.
+      x-kraken-source: https://docs.kraken.com/api/docs/embed-v1-api/verify-user
+      responses:
+        '200':
+          description: See Kraken docs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericObject'
+      security:
+      - apiKeyAuth: []
+        apiSignAuth: []
