@@ -48,14 +48,14 @@ object JobCheckpointCodec {
 
     fun encode(checkpoint: JobCheckpoint): ByteArray {
         val out = mutableListOf<Byte>()
-        out.addAll(MAGIC.toList())
-        out.addAll(intToBytes(VERSION).toList())
+        for (b in MAGIC) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
+        for (b in intToBytes(VERSION)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
 
-        out.addAll(longToBytes(checkpoint.committedSequence).toList())
+        for (b in longToBytes(checkpoint.committedSequence)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
         encodeString(checkpoint.rootCid.value, out)
         encodeString(checkpoint.schemaCid.value, out)
 
-        out.addAll(intToBytes(checkpoint.metadata.size).toList())
+        for (b in intToBytes(checkpoint.metadata.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
         for ((key, cid) in checkpoint.metadata) {
             encodeString(key, out)
             encodeString(cid.value, out)
@@ -115,8 +115,8 @@ object JobCheckpointCodec {
 
     private fun encodeString(str: String, out: MutableList<Byte>) {
         val bytes = str.encodeToByteArray()
-        out.addAll(intToBytes(bytes.size).toList())
-        out.addAll(bytes.toList())
+        for (b in intToBytes(bytes.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
+        for (b in bytes) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
     }
 
     private fun intToBytes(value: Int): ByteArray {

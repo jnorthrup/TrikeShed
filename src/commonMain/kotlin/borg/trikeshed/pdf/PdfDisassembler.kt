@@ -209,8 +209,7 @@ class PdfDisassembler(private val inflate: (ByteArray) -> ByteArray?) {
                     else -> cur
                 }.toByte()
             }
-            // Bolt: use addAll(Array/ByteArray) extensions or loop to prevent intermediate ArrayList allocation
-            for (k in 0 until rowLen) out.add(row[k])
+            for (b in row) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
             row.copyInto(prev)
         }
         return out.toByteArray()

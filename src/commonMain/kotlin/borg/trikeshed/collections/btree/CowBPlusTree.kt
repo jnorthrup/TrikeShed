@@ -94,13 +94,13 @@ object CowBPlusTreeCodec {
 
     fun encode(node: BTreeNode): ByteArray {
         val out = mutableListOf<Byte>()
-        out.addAll(MAGIC.toList())
-        out.addAll(intToBytes(VERSION).toList())
+        for (b in MAGIC) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
+        for (b in intToBytes(VERSION)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
 
         when (node) {
             is BTreeNode.Leaf -> {
                 out.add(1) // Leaf marker
-                out.addAll(intToBytes(node.keys.size).toList())
+                for (b in intToBytes(node.keys.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
                 for (i in node.keys.indices) {
                     encodeKey(node.keys[i], out)
                     encodeValue(node.values[i], out)
@@ -108,11 +108,11 @@ object CowBPlusTreeCodec {
             }
             is BTreeNode.Internal -> {
                 out.add(0) // Internal marker
-                out.addAll(intToBytes(node.keys.size).toList())
+                for (b in intToBytes(node.keys.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
                 for (key in node.keys) {
                     encodeKey(key, out)
                 }
-                out.addAll(intToBytes(node.children.size).toList())
+                for (b in intToBytes(node.children.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
                 for (child in node.children) {
                     encodeString(child.value, out)
                 }
@@ -202,23 +202,23 @@ object CowBPlusTreeCodec {
         encodeString(key.facetId, out)
         encodeByteArray(key.facetValue, out)
         encodeString(key.jobId.value, out)
-        out.addAll(longToBytes(key.revision).toList())
+        for (b in longToBytes(key.revision)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
     }
 
     private fun encodeValue(value: BTreeValue, out: MutableList<Byte>) {
         encodeString(value.cid.value, out)
-        out.addAll(longToBytes(value.sequence).toList())
+        for (b in longToBytes(value.sequence)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
     }
 
     private fun encodeString(str: String, out: MutableList<Byte>) {
         val bytes = str.encodeToByteArray()
-        out.addAll(intToBytes(bytes.size).toList())
-        out.addAll(bytes.toList())
+        for (b in intToBytes(bytes.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
+        for (b in bytes) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
     }
 
     private fun encodeByteArray(bytes: ByteArray, out: MutableList<Byte>) {
-        out.addAll(intToBytes(bytes.size).toList())
-        out.addAll(bytes.toList())
+        for (b in intToBytes(bytes.size)) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
+        for (b in bytes) out.add(b) // Bolt: Iterate directly over primitive array to avoid boxed List allocation
     }
 
     private fun intToBytes(value: Int): ByteArray {
