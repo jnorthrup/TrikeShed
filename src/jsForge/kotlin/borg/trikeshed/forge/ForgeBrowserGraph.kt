@@ -38,6 +38,12 @@ fun svgEl(tag: String, attrs: Map<String, String> = emptyMap()): Element {
     return e
 }
 
+/**
+ * `#graph-canvas` is an `<svg>` element: `SVGElement` is not an `HTMLElement`, so the generic
+ * [ForgeBrowser.el] cast misses it and every graph render/wire path would no-op.
+ */
+fun graphCanvas(): Element? = document.getElementById("graph-canvas")
+
 fun ForgeBrowser.resetCam() {
     cam = graphLayout.camera
 }
@@ -70,7 +76,7 @@ fun ForgeBrowser.setGraphMode(mode: ForgeGraphMode) {
 
 fun ForgeBrowser.inspectNode(nodeId: String?) {
     val inspector = el("graph-inspector") ?: return
-    val graphSvg = el("graph-canvas") ?: return
+    val graphSvg = graphCanvas() ?: return
     if (nodeId == null) {
         inspector.hidden = true
         return
@@ -95,12 +101,14 @@ fun ForgeBrowser.inspectNode(nodeId: String?) {
 
 fun ForgeBrowser.buildGraph() {
     if (graphBuilt) return
-    graphBuilt = true
-    val graphSvg = el("graph-canvas") ?: return
+    // Latch only after a successful build: an early return or throw here must not
+    // permanently silence the graph (the boot coroutine swallows exceptions).
+    val graphSvg = graphCanvas() ?: return
     val graphEmptyEl = el("graph-empty")
     graphSvg.innerHTML = ""
     if (graphLayout.nodes.isEmpty()) {
         graphEmptyEl?.hidden = false
+        graphBuilt = true
         return
     }
     graphEmptyEl?.hidden = true
@@ -170,15 +178,16 @@ fun ForgeBrowser.buildGraph() {
         viewport.appendChild(labelsG)
     }
     applyCamera()
+    graphBuilt = true
 }
 
 fun ForgeBrowser.wireGraph() {
     el("graph-mode-causal")?.addEventListener("click", { setGraphMode(ForgeGraphMode.Causal) })
     el("graph-mode-concept")?.addEventListener("click", { setGraphMode(ForgeGraphMode.Concept) })
     el("graph-mode-docs")?.addEventListener("click", { setGraphMode(ForgeGraphMode.Docs) })
-    el("graph-canvas")?.addEventListener("click", { inspectNode(null) })
+    graphCanvas()?.addEventListener("click", { inspectNode(null) })
 
-    val graphSvg = el("graph-canvas") ?: return
+    val graphSvg = graphCanvas() ?: return
     var dragging = false
     var lastX = 0.0
     var lastY = 0.0
