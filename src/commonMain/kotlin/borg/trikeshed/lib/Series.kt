@@ -384,6 +384,9 @@ fun <T> Collection<T>.toSeries(): Series<T> = toList().let { list -> list.size j
 /** Materialize a Set into a Series. Order preserved for LinkedHashSet; arbitrary for HashSet. */
 fun <T> Set<T>.toSeries(): Series<T> = toList().let { list -> list.size j list::get }
 
+// Bolt: Prevent O(N) intermediate allocation by implementing direct ArrayDeque to Series mapping
+fun <T> ArrayDeque<T>.toSeries(): Series<T> = size j ::get
+
 fun <T> Series<T>.last(): T {
     require(size > 0) { "last() on empty Series" }
     return this[size.dec()]
