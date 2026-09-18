@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.persistence
 
 import borg.trikeshed.cas.FileTreeManifest
+import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchCommittedFrame
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.Document
@@ -295,4 +296,11 @@ class CouchCommitStore(
         private val LOCAL_PUT_KEYS = BASE_KEYS + setOf("sequence", "body")
         private val LOCAL_DELETE_KEYS = BASE_KEYS
     }
+}
+
+/** The commit store as a [Couch] `_local` backing: checkpoints recover with the chain. */
+fun CouchCommitStore.asLocalBacking(): Couch.LocalBacking = object : Couch.LocalBacking {
+    override fun get(id: String): Map<String, Any?>? = localGet(id)
+    override fun put(id: String, body: Map<String, Any?>): Map<String, Any?> = localPut(id, body)
+    override fun delete(id: String): Boolean = localDelete(id)
 }

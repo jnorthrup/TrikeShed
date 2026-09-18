@@ -74,6 +74,37 @@ class DurableCouchStoreRecoveryTest {
     }
 
     @Test
+    fun checkpointsSurviveReopen() {
+        val fileOps = JvmFileOperations()
+        val root = Files.createTempDirectory("couch-checkpoint-test").toString()
+        val casRoot = fileOps.resolvePath(root, "cas")
+        val couchDir = fileOps.resolvePath(root, "couch")
+
+        run {
+            val cas = FileCasStore(fileOps, casRoot)
+            val commits = CouchCommitStore(cas, StorageDurability.DURABLE, fileOps, couchDir)
+            val store = CouchStoreFactory.durableCasBacked(cas, commits)
+            val couch = borg.trikeshed.couch.Couch("t", store, cas, localBacking = commits.asLocalBacking())
+            couch.localPut("pull-peer-t", mapOf("last_seq" to 341L, "peer" to "http://peer"))
+            commits.close()
+        }
+
+        val cas2 = FileCasStore(fileOps, casRoot)
+        val commits2 = CouchCommitStore(cas2, StorageDurability.DURABLE, fileOps, couchDir)
+        val store2 = CouchStoreFactory.durableCasBacked(cas2, commits2)
+        val couch2 = borg.trikeshed.couch.Couch("t", store2, cas2, localBacking = commits2.asLocalBacking())
+        val checkpoint = couch2.localGet("pull-peer-t")
+        assertNotNull(checkpoint, "replication checkpoint recovers with the commit chain")
+        assertEquals(341L, (checkpoint["last_seq"] as Number).toLong())
+
+        // In-memory default stays exactly that: no backing, no recovery.
+        val volatileCouch = borg.trikeshed.couch.Couch("v", CouchStoreFactory.inMemory(), cas2)
+        assertNull(volatileCouch.localGet("pull-peer-t"))
+        commits2.close()
+        fileOps.deleteRecursively(root)
+    }
+
+    @Test
     fun exclusiveLeaseRefusesASecondWriter() {
         val fileOps = JvmFileOperations()
         val root = Files.createTempDirectory("couch-lease-test").toString()

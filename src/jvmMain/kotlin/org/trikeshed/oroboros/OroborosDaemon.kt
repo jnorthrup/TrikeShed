@@ -1,6 +1,7 @@
 package borg.trikeshed.daemon
 
 import borg.trikeshed.couch.CouchReportReactorElement
+import borg.trikeshed.couch.persistence.asLocalBacking
 import kotlinx.coroutines.channels.Channel
 import kotlin.collections.set
 import kotlin.jvm.JvmStatic
@@ -702,7 +703,10 @@ object OroborosDaemon {
                 "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
             ),
         )
-        val couchDb = borg.trikeshed.couch.Couch(COUCH_DB_NAME, couchStore, casStore)
+        val couchDb = borg.trikeshed.couch.Couch(
+            COUCH_DB_NAME, couchStore, casStore,
+            localBacking = couchCommits?.asLocalBacking(),
+        )
         couchDb.ensureDesignDoc(vhostRoot = "docs/")
         // Declare the heading the worktree gateway has always been minting documents under. Until
         // now `projects/<repo>/…` was an id prefix nobody had declared, so the store could not say

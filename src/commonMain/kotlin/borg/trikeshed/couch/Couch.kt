@@ -29,7 +29,21 @@ class Couch(
     val name: String,
     val store: CouchStore,
     val cas: CasStore,
+    /**
+     * Durable backing for `_local` documents (replication checkpoints). Null =
+     * the in-memory map below; a [borg.trikeshed.couch.persistence.CouchCommitStore]
+     * adapter makes checkpoints survive restart, closing the E02 "checkpoints"
+     * boundary alongside heads/revisions/deletions.
+     */
+    private val localBacking: LocalBacking? = null,
 ) {
+    /** Per-node `_local` persistence seam; the in-memory default lives in [locals]. */
+    interface LocalBacking {
+        fun get(id: String): Map<String, Any?>?
+        fun put(id: String, body: Map<String, Any?>): Map<String, Any?>
+        fun delete(id: String): Boolean
+    }
+
     // ── _local documents (checkpoints): per-node, never in _changes ──
     private val locals = mutableMapOf<String, Map<String, Any?>>()
     private var localSeq = 0L
@@ -199,16 +213,25 @@ class Couch(
 
     // ── _local ────────────────────────────────────────────────────
 
-    fun localGet(id: String): Map<String, Any?>? = locals[id]
+    fun localGet(id: String): Map<String, Any?>? = localBacking?.get(id) ?: locals[id]
 
     fun localPut(id: String, body: Map<String, Any?>): Map<String, Any?> {
+        localBacking?.let { backing ->
+            val stored = backing.put(id, body)
+            return mapOf("ok" to true, "id" to "_local/$id", "rev" to (stored["_rev"] ?: ""))
+        }
         val rev = "0-${++localSeq}"
         locals[id] = linkedMapOf<String, Any?>("_id" to "_local/$id", "_rev" to rev) + body.filterKeys { it != "_id" && it != "_rev" }
         return mapOf("ok" to true, "id" to "_local/$id", "rev" to rev)
     }
 
-    fun localDelete(id: String): Map<String, Any?> =
-        if (locals.remove(id) != null) mapOf("ok" to true, "id" to "_local/$id") else mapOf("error" to "not_found", "reason" to "missing")
+    fun localDelete(id: String): Map<String, Any?> {
+        localBacking?.let { backing ->
+            return if (backing.delete(id)) mapOf("ok" to true, "id" to "_local/$id")
+            else mapOf("error" to "not_found", "reason" to "missing")
+        }
+        return if (locals.remove(id) != null) mapOf("ok" to true, "id" to "_local/$id") else mapOf("error" to "not_found", "reason" to "missing")
+    }
 
     // ── blobs: attachments, bodies, raw blocks ────────────────────
 
