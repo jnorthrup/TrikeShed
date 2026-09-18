@@ -84,11 +84,21 @@ private suspend fun forgeNodeMain() {
         val office: (ByteArray) -> Promise<String> = { b -> GlobalScope.promise { b.officeText(::inflateRaw) } }
         val prepass: (ByteArray) -> ByteArray = { it.ocrPrepassRgba() }
         js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { loaded: true, runs: runs, isPlan: isPlan, fib: fib, boxes: boxes, office: office, prepass: prepass })")
+        // The retired script.js consumed these with a JSON.parse/stringify fallback; keep the globals.
+        val parse: (String) -> dynamic = { parseForge(it) }
+        val stringify: (dynamic) -> String = { stringifyForge(it) }
+        js("window.parseForge = parse; window.stringifyForge = stringify")
+        // The whole browser behavior of the retired web/script.js boots here — DOM/SVG adapter over
+        // the commonMain decisions (ForgeBrowser + forge/doc|sheet|board|graph|shape packages).
+        ForgeBrowser.boot()
         return
     }
     val html = ForgeApp.renderHtml()
     if (inBrowser) {
+        // Bare webpack dev bundle: no seed in the document — render the shell, then boot the
+        // adapter on the written DOM (this JS context survives document.open/write/close).
         renderBrowser(html)
+        ForgeBrowser.boot()
     } else {
         println(html)
     }

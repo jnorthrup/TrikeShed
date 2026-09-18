@@ -40,7 +40,6 @@ object ForgeRoutes {
         RouteMeta("GET", "/index.html", Tier.PORTABLE, "alias of /"),
         RouteMeta("GET", "/forge", Tier.PORTABLE, "Forge shell alias for the operator board port"),
         RouteMeta("GET", "/styles.css", Tier.PORTABLE, "PWA asset web/styles.css"),
-        RouteMeta("GET", "/script.js", Tier.PORTABLE, "PWA asset web/script.js"),
         RouteMeta("GET", "/kotlin/*", Tier.PORTABLE, "Compiled Kotlin browser app bundles"),
         RouteMeta("GET", "/manifest.webmanifest", Tier.PORTABLE, "PWA manifest"),
         RouteMeta("GET", "/icons/*", Tier.PORTABLE, "PWA icons"),
@@ -151,12 +150,15 @@ object ForgeRoutes {
     }
 
     // The shell render re-parses the sheet seed via Confix on every call — ~45s of
-    // CPU once the store holds a full worktree. The shell is a SEED page (script.js
-    // hydrates live state over the APIs), so a short-TTL memo is semantically free
-    // and turns / from a 46-second request into a byte-copy.
+    // CPU once the store holds a full worktree. The shell is a SEED page (the forge
+    // Kotlin/JS bundle hydrates live state over the APIs), so a short-TTL memo is
+    // semantically free and turns / from a 46-second request into a byte-copy.
     @kotlin.concurrent.Volatile
     private var shellCache: Pair<Long, ByteArray>? = null
     private const val SHELL_TTL_MS = 60_000L
+
+    /** The staged forge assembly — the page's only behavior source since the script.js excision. */
+    val SHELL_BUNDLES: List<String> = listOf("./kotlin/forge/forge.js")
 
     fun shellHtml(userId: String = "jim"): HttpForwarderResponse {
         val now = Clock.System.now().toEpochMilliseconds()
@@ -165,7 +167,7 @@ object ForgeRoutes {
                 return HttpForwarderResponse(200, headers = mapOf("Content-Type" to "text/html; charset=utf-8"), body = bytes)
             }
         }
-        val html = runCatching { ForgeApp.renderHtml(userId = userId) }
+        val html = runCatching { ForgeApp.renderHtml(userId = userId, bundles = SHELL_BUNDLES) }
             .getOrElse { ex -> "<html><body><h1>Forge shell failed</h1><pre>${ex.message}</pre></body></html>" }
         val bytes = html.encodeToByteArray()
         shellCache = now to bytes

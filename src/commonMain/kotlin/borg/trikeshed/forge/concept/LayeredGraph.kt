@@ -9,7 +9,8 @@ package borg.trikeshed.forge.concept
  * per layer, nodes stacked in declaration order, each column centred against the tallest.
  * Deterministic and overlap-free — a lattice needs no force simulation.
  *
- * The seed shape is fixed by `script.js`, which draws every graph mode with one renderer:
+ * The seed shape is fixed by the forge bundle's graph renderer (commonMain `graph/ForgeGraphView.kt`),
+ * which draws every graph mode with one renderer:
  * `{nodes:[{id,title,layer,symbol,file,x,y,topo}], edges:[{from,to,rel}], layers, camera}`.
  * A third mindmap is therefore a third corpus, not a third renderer.
  */
