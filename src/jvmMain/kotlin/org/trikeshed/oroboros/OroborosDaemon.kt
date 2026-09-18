@@ -1193,6 +1193,25 @@ object OroborosDaemon {
             )
         }
         refreshQuotaLegion()
+
+        // ── mux/* blackboard home: the working models/keys land here REDACTED
+        // (keys by fingerprint, never keyId — see MuxBlackboardProjection) on
+        // every reactor state publication. The board, not hermes' state.db,
+        // is the open inspectable answer to "what is the daemon running on".
+        launch {
+            muxReactor.flowState.collect { state ->
+                val entries = borg.trikeshed.userspace.reactor.MuxBlackboardProjection.entries(
+                    state,
+                    quotaLegion.standings(state, HostSystem.currentTimeMillis()),
+                    muxReactor.providerHealth,
+                )
+                for (i in 0 until entries.size) {
+                    val (key, value) = entries[i]
+                    daemonBlackboard.put(key, value, borg.trikeshed.userspace.reactor.MuxBlackboardProjection.SOURCE)
+                }
+            }
+        }
+
         suspend fun buildBrain(): Pair<borg.trikeshed.jules.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
             val hermesSession = borg.trikeshed.jules.legacy.HermesActiveSession.current()
