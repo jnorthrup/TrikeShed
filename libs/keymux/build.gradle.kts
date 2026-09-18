@@ -36,7 +36,7 @@ kotlin {
     sourceSets {
         val commonMain = getByName("commonMain") {
             dependencies {
-                api(project(":libs:lib"))
+                api(project(":lib"))
                 api("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3")
