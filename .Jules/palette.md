@@ -1,6 +1,3 @@
-## 2024-05-15 - [Keyboard Accessibility for Actions]
-**Learning:** In script.js, 'a' tags without 'href' were being used for JS click actions in the mountCta function, making them inaccessible to keyboard users because they lack default focusability and keyboard event handlers.
-**Action:** Use 'button' elements for custom JS actions instead of 'a' tags without hrefs, ensuring default keyboard accessibility.
-## 2024-05-15 - [Keyboard Accessibility Focus Rings]
-**Learning:** Standard `:focus` outlines on `tabindex="0"` elements like table cells cause jarring visual rings during standard mouse clicks.
-**Action:** Use `:focus-visible` for keyboard navigation styles and explicitly set `outline: none;` on `:focus` to suppress the browser default ring for mouse interactions.
+## 2023-10-25 - Prevent jarring focus rings on interactive table cells
+**Learning:** Adding `tabindex="0"` to `td` elements makes them focusable for keyboard navigation, but using the standard `:focus` pseudo-class causes jarring focus rings when mouse users click on them.
+**Action:** Use `:focus-visible` instead of `:focus` for `td` focus states, and explicitly set `outline: none;` on the base element to override browser defaults, ensuring clean mouse interactions and accessible keyboard navigation.
