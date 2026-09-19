@@ -32,6 +32,10 @@ public class CouchWal {
     public void runGradleBuild() throws IOException, InterruptedException {
         ProcessBuilder builder = new ProcessBuilder();
         builder.directory(new File(projectRoot));
+        builder.environment().clear();
+        for (java.util.Map.Entry<String, String> entry : borg.trikeshed.graal.subvm.GuestEnvironment.INSTANCE.curated().entrySet()) {
+            builder.environment().put(entry.getKey(), entry.getValue());
+        }
 
         // Use the gradle wrapper from the project root
         String gradlewCommand = "./gradlew";
