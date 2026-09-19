@@ -1,0 +1,3 @@
+## 2026-09-19 - Suppress Mouse Focus Rings on Focusable Elements
+**Learning:** When styling elements made focusable via `tabindex="0"` (such as `td` cells or custom buttons), avoid using the standard `:focus` pseudo-class for outlines without `:focus-visible` suppression. It creates jarring visual rings during mouse clicks.
+**Action:** Use `:focus-visible` to style keyboard navigation focus, and explicitly use `:focus:not(:focus-visible) { outline: none; }` to suppress default browser outlines for mouse interactions, preventing CSS cascade bugs where `:focus` accidentally overrides `:focus-visible`.
