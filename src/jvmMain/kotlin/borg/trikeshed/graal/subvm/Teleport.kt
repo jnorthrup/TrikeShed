@@ -67,7 +67,8 @@ private fun teleportOf(v: Value?, depth: Int): Teleported = when {
 fun Teleported.Companion.ofGuestOrHost(o: Any?): Teleported = when (o) {
     is Value -> of(o)
     is List<*> -> Teleported.Arr(o.map { ofGuestOrHost(it) })
-    is Map<*, *> -> Teleported.Obj(o.entries.associate { it.key.toString() to ofGuestOrHost(it.value) }.toList().sortedBy { it.first }.toMap())
+    // ⚡ Bolt: Prevent intermediate List allocations with associate { ... }.toList()
+    is Map<*, *> -> Teleported.Obj(o.entries.map { it.key.toString() to ofGuestOrHost(it.value) }.sortedBy { it.first }.toMap())
     else -> ofHost(o)
 }
 
