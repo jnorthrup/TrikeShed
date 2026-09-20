@@ -1,0 +1,3 @@
+## 2026-09-20 - Focus vs Focus-Visible CSS outline
+**Learning:** When styling elements made focusable via `tabindex=0`, avoiding the standard `:focus` pseudo-class and using `:focus-visible` is better for outline styles. Using `:focus:not(:focus-visible) { outline: none; }` prevents CSS cascade bugs where `:focus` accidentally overrides `:focus-visible` and ensures older browsers safely drop the rule to preserve default accessibility outlines.
+**Action:** Use `:focus-visible` for keyboard focus styles, and explicitly use `:focus:not(:focus-visible) { outline: none; }` to suppress default browser outlines for mouse interactions.
