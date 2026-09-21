@@ -103,8 +103,8 @@
         <div class="graph-hud" id="graph-hud">
           <span class="graph-mode" role="group" aria-label="Graph source">
             <button class="topbar-btn" id="graph-mode-causal" aria-label="Causal">Causal</button>
-            <button class="topbar-btn" id="graph-mode-concept" title="Concept lattice: lib → cursor → confix → facets → surface → widgets">Concepts</button>
-            <button class="topbar-btn" id="graph-mode-docs" title="Docs mindmap: index → guide → spec → contract → plan → analysis → note, edges are the corpus's own cross-references">Docs</button>
+            <button class="topbar-btn" id="graph-mode-concept" title="Concept lattice: lib → cursor → confix → facets → surface → widgets" aria-label="Concepts">Concepts</button>
+            <button class="topbar-btn" id="graph-mode-docs" title="Docs mindmap: index → guide → spec → contract → plan → analysis → note, edges are the corpus's own cross-references" aria-label="Docs">Docs</button>
           </span>
           <button class="topbar-btn" id="graph-fit" title="Fit (f)" aria-label="Fit graph">Fit</button>
           <span class="graph-zoom-pill" id="graph-zoom-pill" aria-live="polite">100%</span>
@@ -130,7 +130,7 @@
           <select id="host-vm-facet" aria-label="Language facet"></select>
           <select id="host-vm-trust" aria-label="Trust"><option value="OWN">OWN · in-process</option><option value="UNTRUSTED">UNTRUSTED · fenced process</option></select>
           <textarea id="host-vm-src" placeholder="source, e.g. 1+1" aria-label="Source"></textarea>
-          <button type="submit" class="topbar-btn" id="host-vm-run" title="Spawn and evaluate">Spawn + eval</button>
+          <button type="submit" class="topbar-btn" id="host-vm-run" title="Spawn and evaluate" aria-label="Spawn and evaluate">Spawn + eval</button>
           <span class="host-live-note" id="host-live-note"></span>
         </form>
         <h3 class="host-h">Events</h3>

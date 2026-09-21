@@ -1439,7 +1439,7 @@
 
   function workbookButton(label, title, action) {
     const button = document.createElement('button');
-    button.className = 'topbar-btn'; button.type = 'button'; button.textContent = label; button.title = title;
+    button.className = 'topbar-btn'; button.type = 'button'; button.textContent = label; button.title = title; button.setAttribute('aria-label', title);
     button.addEventListener('click', action);
     return button;
   }
@@ -2088,6 +2088,7 @@
       const a = document.createElement('button');
       a.textContent = text;
       a.title = title;
+      a.setAttribute('aria-label', title);
       a.style.cssText = 'color:var(--text-faint);cursor:pointer;text-decoration:none;border-bottom:1px dotted var(--text-faint);background:none;border:none;padding:0;font:inherit;';
       a.addEventListener('click', onClick);
       host.appendChild(a);
@@ -2100,9 +2101,9 @@
       d.innerHTML = '<div style="background:var(--bg,#fff);border:1px solid var(--border,#ccc);border-radius:8px;padding:18px 22px;max-width:580px;color:var(--text,#222);font:13px monospace;box-shadow:0 8px 30px rgba(0,0,0,.25)">' +
         '<b>Run TrikeShed in anger \u2014 five minutes, one port</b>' +
         '<pre id="qsCmds" style="background:rgba(127,127,127,.12);padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>' +
-        '<button onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="font:inherit;padding:4px 12px;cursor:pointer">copy commands</button>' +
+        '<button aria-label="Copy installation commands" onclick="navigator.clipboard.writeText(document.getElementById(\'qsCmds\').textContent)" style="font:inherit;padding:4px 12px;cursor:pointer">copy commands</button>' +
         '<a href="https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please" target="_blank" style="margin-left:10px">README \u2197</a>' +
-        '<button onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;margin-left:14px;cursor:pointer">close</button></div>';
+        '<button aria-label="Close installation instructions" onclick="document.querySelector(\'div[data-qs]\').remove()" style="background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;margin-left:14px;cursor:pointer">close</button></div>';
       d.addEventListener('click', (e) => { if (e.target === d) d.remove(); });
       document.body.appendChild(d);
     });

@@ -70,9 +70,9 @@
     <label>Model<input name="model" required maxlength="200" placeholder="vendor/model"></label>
     <label>Credential environment variable<input name="envVar" pattern="[A-Z_][A-Z0-9_]*" required placeholder="PROVIDER_API_KEY" autocomplete="off"></label>
     <div class="toolbar flags"><label><input type="checkbox" name="enabled" checked>Registry enabled</label><label><input type="checkbox" name="preferred">Preferred</label></div>
-    <p id="endpointError" role="alert"></p><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button type="submit" class="primary"><i data-lucide="check"></i>Save endpoint</button></div>
+    <p id="endpointError" role="alert"></p><div class="dialog-actions"><button type="button" data-action="close-dialog" aria-label="Cancel">Cancel</button><button type="submit" class="primary" aria-label="Save endpoint"><i data-lucide="check"></i>Save endpoint</button></div>
   </form></dialog>
-  <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle">Rename session</h2><label>Title<input name="title" required maxlength="100"></label><div class="dialog-actions"><button type="button" data-action="close-rename">Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>
+  <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle">Rename session</h2><label>Title<input name="title" required maxlength="100"></label><div class="dialog-actions"><button type="button" data-action="close-rename" aria-label="Cancel rename">Cancel</button><button type="submit" class="primary" aria-label="Save rename">Save</button></div></form></dialog>
   <div id="toast" role="status" hidden></div>
 </body>
 </html>

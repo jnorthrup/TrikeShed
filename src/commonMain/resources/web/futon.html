@@ -48,22 +48,22 @@ td.rev{color:var(--dim);max-width:130px}
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
-  <button title="Apply filter">go</button>
-  <button>new document</button>
+  <button title="Apply filter" aria-label="Apply filter">go</button>
+  <button aria-label="New document">new document</button>
   <span id="info">…</span>
-  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
+  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger" aria-label="Install quickstart">&#9889; install</button><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here" aria-label="Provide feedback">&#9873; feedback</button></span>
 </div>
 <div id="wrap">
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button id="prevB"><span aria-hidden="true">‹</span> prev</button><button id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="pager"><button id="prevB" aria-label="Previous page"><span aria-hidden="true">‹</span> prev</button><button id="nextB" aria-label="Next page">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
   </div>
   <div id="edit">
     <div class="head">
       <input id="docid" placeholder="_id" >
-      <button class="primary">save</button>
-      <button>delete</button>
-      <button>reload</button>
+      <button class="primary" aria-label="Save document">save</button>
+      <button aria-label="Delete document">delete</button>
+      <button aria-label="Reload document">reload</button>
     </div>
     <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
     <div class="att" id="att"></div>
