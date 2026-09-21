@@ -20,14 +20,44 @@ class MutableObservable<T>(initial: T) {
     var value: T = initial
         private set
 
+    // ⚡ Bolt: Fully implement deferred modification pattern to prevent O(N) allocation trap in notification loops
+    private var updateDepth = 0
+    private var deferredRemovals: ArrayList<Int>? = null
+    private var deferredAdds: ArrayList<Pair<Int, (T) -> Unit>>? = null
+
     fun update(next: T) {
         value = next
-        observers.values.toList().forEach { it(next) }
+        updateDepth++
+        try {
+            for (observer in observers.values) {
+                observer(next)
+            }
+        } finally {
+            updateDepth--
+            if (updateDepth == 0) {
+                deferredAdds?.let {
+                    for (i in 0 until it.size) {
+                        val pair = it[i]
+                        observers[pair.first] = pair.second
+                    }
+                    it.clear()
+                }
+                deferredRemovals?.let {
+                    for (i in 0 until it.size) observers.remove(it[i])
+                    it.clear()
+                }
+            }
+        }
     }
 
     fun observe(callback: (T) -> Unit): CancelToken {
         val id = nextObserverId++
-        observers[id] = callback
+        if (updateDepth > 0) {
+            if (deferredAdds == null) deferredAdds = ArrayList()
+            deferredAdds!!.add(id to callback)
+        } else {
+            observers[id] = callback
+        }
         callback(value)
         return object : CancelToken {
             private var cancelled = false
@@ -35,7 +65,12 @@ class MutableObservable<T>(initial: T) {
             override fun cancel() {
                 if (cancelled) return
                 cancelled = true
-                observers.remove(id)
+                if (updateDepth > 0) {
+                    if (deferredRemovals == null) deferredRemovals = ArrayList()
+                    deferredRemovals!!.add(id)
+                } else {
+                    observers.remove(id)
+                }
             }
         }
     }
