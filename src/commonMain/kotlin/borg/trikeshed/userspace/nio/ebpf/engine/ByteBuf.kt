@@ -4,7 +4,8 @@ package borg.trikeshed.userspace.nio.ebpf.engine
 class ByteBuf {
     private val buffer = mutableListOf<Byte>()
     fun data(): ByteArray = ByteArray(buffer.size) { buffer[it] }
-    fun push(vararg bytes: Byte) { buffer += bytes.toList() }
+    // ⚡ Bolt: Use for loop to prevent boxed List allocation from ByteArray via .toList()
+    fun push(vararg bytes: Byte) { for (b in bytes) buffer += b }
     fun pushByte(value: Byte) { buffer += value }
     fun pushInt32(value: Int) {
         buffer += value.toByte(); buffer += (value shr 8).toByte()
