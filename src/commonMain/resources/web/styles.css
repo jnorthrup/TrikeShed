@@ -443,6 +443,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .block.focused { background: var(--accent-soft); }
 ::selection { background: rgba(35, 131, 226, 0.25); }
 
+a:focus-visible,
 .topbar-btn:focus-visible,
 button:focus-visible,
 .page-tree-item:focus-visible,
