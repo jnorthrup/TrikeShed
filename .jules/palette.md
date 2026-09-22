@@ -1,0 +1,3 @@
+## 2024-05-19 - Keyboard Navigation and Focus Styles
+**Learning:** When styling elements made focusable via `tabindex="0"` (such as `td` cells, `.drop-zone`, etc.), using the standard `:focus` pseudo-class for outlines creates jarring visual rings during mouse clicks.
+**Action:** Use `:focus-visible` to style keyboard navigation focus, and explicitly use `:focus:not(:focus-visible) { outline: none; }` to suppress default browser outlines for mouse interactions. This prevents CSS cascade bugs where `:focus` accidentally overrides `:focus-visible`, and ensures older browsers that don't support `:focus-visible` safely drop the rule to preserve default accessibility outlines.
