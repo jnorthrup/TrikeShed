@@ -62,7 +62,8 @@ sealed class Teleported {
             is ByteArray -> Bytes(o)
             is List<*> -> Arr(o.map { ofHost(it) })
             is Array<*> -> Arr(o.map { ofHost(it) })
-            is Map<*, *> -> Obj(o.entries.associate { it.key.toString() to ofHost(it.value) }.toList().sortedBy { it.first }.toMap())
+            // ⚡ Bolt: Prevent intermediate Map and List allocations when sorting mapped collections
+            is Map<*, *> -> Obj(o.entries.map { it.key.toString() to ofHost(it.value) }.sortedBy { it.first }.toMap())
             else -> Opaque(o.toString())
         }
 
