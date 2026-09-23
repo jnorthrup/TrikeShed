@@ -21,6 +21,7 @@ input,textarea,select,button{font:inherit;color:var(--ink)}
 input,textarea{background:#fff;border:1px solid var(--line);border-radius:3px;padding:4px 8px}
 button{background:linear-gradient(#fff,#e4e4de);border:1px solid var(--line);border-radius:3px;padding:4px 12px;cursor:pointer}
 button:hover{border-color:var(--red);color:var(--red)}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--red);outline-offset:1px}
 button.primary{background:linear-gradient(#c9503f,#a53326);color:#fff;border-color:#8a1f14}
 button.primary:hover{color:#fff;filter:brightness(1.06)}
 #wrap{display:flex;min-height:calc(100vh - 96px)}
@@ -47,25 +48,28 @@ td.rev{color:var(--dim);max-width:130px}
 <body data-app-page="futon">
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
-  <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
-  <button title="Apply filter">go</button>
-  <button>new document</button>
+  <label for="prefix" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;">ID Prefix Filter</label>
+  <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42" aria-label="ID Prefix Filter">
+  <button aria-label="Apply prefix filter" title="Apply filter">go</button>
+  <button aria-label="Create new document">new document</button>
   <span id="info">…</span>
   <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
 </div>
 <div id="wrap">
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button id="prevB"><span aria-hidden="true">‹</span> prev</button><button id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="pager"><button id="prevB" aria-label="Previous page"><span aria-hidden="true">‹</span> prev</button><button id="nextB" aria-label="Next page">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
   </div>
   <div id="edit">
     <div class="head">
-      <input id="docid" placeholder="_id" >
-      <button class="primary">save</button>
-      <button>delete</button>
-      <button>reload</button>
+      <label for="docid" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;">Document ID</label>
+      <input id="docid" placeholder="_id" aria-label="Document ID">
+      <button class="primary" aria-label="Save document">save</button>
+      <button aria-label="Delete document">delete</button>
+      <button aria-label="Reload document">reload</button>
     </div>
-    <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
+    <label for="docbody" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border-width:0;">Document Body</label>
+    <textarea id="docbody" spellcheck="false" aria-label="Document Body" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
     <div class="att" id="att"></div>
     <div id="status">select a document, or create one</div>
   </div>
