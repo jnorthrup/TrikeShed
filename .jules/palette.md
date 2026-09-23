@@ -1,0 +1,3 @@
+## 2025-02-28 - Avoid :focus outline flash on mouse clicks
+**Learning:** When styling elements made focusable via tabindex="0" (such as td cells), avoid using the standard :focus pseudo-class for outlines, as it creates jarring visual rings during mouse clicks. This prevents CSS cascade bugs where :focus accidentally overrides :focus-visible, and ensures older browsers that don't support :focus-visible safely drop the rule to preserve default accessibility outlines.
+**Action:** Instead, use :focus-visible to style keyboard navigation focus, and explicitly use :focus:not(:focus-visible) { outline: none; } to suppress default browser outlines for mouse interactions.
