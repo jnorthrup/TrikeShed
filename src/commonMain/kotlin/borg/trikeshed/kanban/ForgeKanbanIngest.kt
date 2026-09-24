@@ -173,7 +173,8 @@ object ForgeKanbanIngest {
 
     /** Pure deterministic projection — no suspension and no working-memory writes. */
     fun project(source: ForgeKanbanSource): ForgeKanbanReduction {
-        require(!Regex("(?i)ignore all previous instructions").containsMatchIn(source.description)) { "Prompt injection detected" }
+        // Kotlin/JS RegExp has no inline (?i) under the 'u' flag; the option form is portable.
+        require(!Regex("ignore all previous instructions", RegexOption.IGNORE_CASE).containsMatchIn(source.description)) { "Prompt injection detected" }
         val tasks = parseWorkPackages(source.description)
         validateTasks(tasks)
 

@@ -47,13 +47,13 @@ object ConceptGraph {
         ConceptNode("surface.databaseView", "DatabaseView", "surface", "borg.trikeshed.lcnc.editor.DatabaseView", "borg/trikeshed/lcnc/editor/DatabaseView.kt"),
         ConceptNode("surface.cursorSheet", "sheetSeed / confixSheets", "surface", "borg.trikeshed.forge.sheet.sheetSeed", "borg/trikeshed/forge/sheet/CursorSheet.kt"),
         ConceptNode("surface.forceLayout", "forceLayout", "surface", "borg.trikeshed.forge.blackboard.forceLayout", "borg/trikeshed/forge/blackboard/ForceLayout.kt"),
-        // widgets — what the browser actually draws (gallery ids / script.js views)
+        // widgets — what the browser actually draws (gallery ids / forge bundle views)
         ConceptNode("widgets.confixDoc", "confix.doc", "widgets", "ForgeGalleryCatalog confix.doc", "borg/trikeshed/forge/gallery/ForgeGalleryCatalog.kt"),
         ConceptNode("widgets.confixCursor", "confix.cursor", "widgets", "ForgeGalleryCatalog confix.cursor", "borg/trikeshed/forge/gallery/ForgeGalleryCatalog.kt"),
         ConceptNode("widgets.confixFacet", "confix.facet", "widgets", "ForgeGalleryCatalog confix.facet", "borg/trikeshed/forge/gallery/ForgeGalleryCatalog.kt"),
-        ConceptNode("widgets.sheetView", "Sheet view", "widgets", "script.js setView('sheet')", "borg/trikeshed/forge/ForgeApp.kt"),
-        ConceptNode("widgets.graphView", "Graph view", "widgets", "script.js setView('graph')", "borg/trikeshed/forge/ForgeApp.kt"),
-        ConceptNode("widgets.boardView", "Board view", "widgets", "script.js setView('board')", "borg/trikeshed/forge/ForgeApp.kt"),
+        ConceptNode("widgets.sheetView", "Sheet view", "widgets", "forge bundle setView('sheet')", "borg/trikeshed/forge/sheet/ForgeWorkbook.kt"),
+        ConceptNode("widgets.graphView", "Graph view", "widgets", "forge bundle setView('graph')", "borg/trikeshed/forge/graph/ForgeGraphView.kt"),
+        ConceptNode("widgets.boardView", "Board view", "widgets", "forge bundle setView('board')", "borg/trikeshed/forge/board/ForgeCommands.kt"),
     )
 
     val edges: List<ConceptEdge> = listOf(

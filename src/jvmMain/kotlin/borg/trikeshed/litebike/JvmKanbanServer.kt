@@ -481,7 +481,6 @@ class JvmKanbanServer(
         "/mux.html" to ("web/mux.html" to "text/html; charset=utf-8"),
         "/mux.css" to ("web/mux.css" to "text/css; charset=utf-8"),
         "/styles.css" to ("web/styles.css" to "text/css; charset=utf-8"),
-        "/script.js" to ("web/script.js" to "application/javascript; charset=utf-8"),
         "/panels.html" to ("web/panels.html" to "text/html; charset=utf-8"),
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline

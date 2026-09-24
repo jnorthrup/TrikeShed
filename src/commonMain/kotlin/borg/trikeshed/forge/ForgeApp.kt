@@ -117,7 +117,7 @@ object ForgeApp {
             },
             "graphLayout" to forgeGraphLayoutSeed(reduction),
             "conceptGraph" to ConceptGraph.layoutSeed(),
-            // The third mindmap: the same {nodes,edges,layers,camera} shape, so script.js draws it
+            // The third mindmap: the same {nodes,edges,layers,camera} shape, so the forge bundle draws it
             // with the renderer it already has. Absent when nothing handed us a corpus.
             "docsGraph" to (if (docs.isEmpty()) null else borg.trikeshed.forge.concept.DocsGraph.layoutSeed(docs)),
             "sheets" to forgeSheetsSeed(reduction),
