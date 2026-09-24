@@ -52,6 +52,7 @@
 #detailControl label{display:block;min-height:20px;cursor:default}
 #detailLevel{grid-column:1 / -1;width:100%;height:32px;cursor:ew-resize}
 #detailLevel:focus-visible{outline:2px solid var(--graal);outline-offset:2px}
+#detailLevel:focus:not(:focus-visible){outline:none}
 #viewability{grid-column:1 / -1;width:100%;height:16px}
 .legend-section{border-top:1px solid var(--line)}
 #activitySelection{display:block;width:calc(100% - 16px);margin:0 8px 6px;text-align:left;white-space:normal;overflow-wrap:anywhere;font:11px var(--sans);padding:6px}

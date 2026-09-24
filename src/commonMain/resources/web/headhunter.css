@@ -11,6 +11,7 @@ button.primary,.button.primary{background:#95dfcd;border-color:#95dfcd;color:#13
 button.primary:hover:not(:disabled),.button.primary:hover{background:#b3ecde}
 button.quiet{background:transparent;border-color:var(--line);padding:5px 10px;min-height:32px}
 :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+:focus:not(:focus-visible){outline:none}
 input,select,textarea{width:100%;min-width:0;padding:9px 10px;color:var(--ink);background:#191e21;border:1px solid #53605f;border-radius:5px;font-size:14px}
 textarea{resize:vertical;line-height:1.55}
 input::placeholder,textarea::placeholder{color:#8d9c98}

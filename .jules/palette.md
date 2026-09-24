@@ -1,0 +1,3 @@
+## 2024-09-24 - Suppress default focus outlines on click for focus-visible styles
+**Learning:** Browsers sometimes apply the default `:focus` outline to elements that are clicked (especially if they only have `:focus-visible` styles defined to override focus behavior, or if they are custom focusable elements like `div`s with `tabindex="0"`). This leads to jarring visual rings during mouse interactions.
+**Action:** Always pair `:focus-visible` styles with a `:focus:not(:focus-visible) { outline: none; }` rule for the same elements to ensure mouse clicks don't trigger unwanted outlines, while preserving accessibility for keyboard users and falling back safely on older browsers.
