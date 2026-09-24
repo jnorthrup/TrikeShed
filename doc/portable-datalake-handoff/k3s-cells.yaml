@@ -53,3 +53,8 @@ spec:
 # Repeat the Job block for cell-lcnc, cell-curation, cell-graalvm,
 # cell-portable, cell-durable with their --branch values. Schedule board and
 # lcnc first (priority order 1), then curation+graalvm, then portable+durable.
+#
+# All cell/<name> branches and codex/portable-datalake exist on origin as of
+# 2026-09-24; each is cut from the current integration tip. Jobs must rebase
+# their cell branch on codex/portable-datalake at start and at least daily —
+# the branch is a busy multi-session place.
