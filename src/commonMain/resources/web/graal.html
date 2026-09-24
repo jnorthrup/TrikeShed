@@ -94,7 +94,7 @@ canvas.spark{display:block;margin-top:3px}
 #notion{position:absolute;left:10px;right:320px;top:78px;bottom:36px;background:var(--panel);border:1px solid var(--line);border-radius:6px;z-index:4;display:none;flex-direction:column}
 #notion .nhead{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
 #notion input{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--ink);padding:4px 10px;font:inherit;width:260px}
-#notion input:focus{outline:1px solid var(--commit)}
+#notion input:focus:not(:focus-visible){outline:none}#notion input:focus{outline:1px solid var(--commit)}
 #notion .nbody{overflow:auto;flex:1;padding:0 12px 10px}
 #notion th{cursor:pointer;position:sticky;top:0;background:var(--panel);user-select:none}
 #notion th:hover{color:var(--ink)}
