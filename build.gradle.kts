@@ -1825,6 +1825,11 @@ tasks.register<JavaExec>("nlRules") {
     classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
 }
 
+tasks.register("printJvmRuntimeClasspath") {
+    val cp = configurations.getByName("jvmRuntimeClasspath")
+    doLast { File(project.findProperty("cpOut") as String).writeText(cp.asPath) }
+}
+
 // preset-describe headless: parse, type-check and run the stored program with the real runners.
 tasks.register<JavaExec>("describePreset") {
     group = "narsese"
