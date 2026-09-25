@@ -1,5 +1,6 @@
 package borg.trikeshed.ontology
 
+import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.collections.associative.LinearHashMap
 import borg.trikeshed.collections.bits.ClosureIndex
 import borg.trikeshed.collections.bits.IntAccumulator
@@ -8,10 +9,32 @@ import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
 import kotlin.jvm.JvmInline
 
 enum class SumoMask { ANCESTORS, DESCENDANTS, INSTANCES, DISJOINT }
+
+/**
+ * The projected taxonomy of a SUO-KIF corpus, int-coded: term names in first-seen order,
+ * flat `(a, b)` term id pairs for subclass, instance and disjoint edges, domain and range
+ * slots as parallel columns, and `counts` = forms, taxonomyForms, unprojectedTaxonomyForms, rules.
+ * [SumoClassifier.of] builds the same classifier from it as from the forms it was projected from.
+ */
+class SumoTaxonomy(
+    val names: Array<String>,
+    val isClass: BooleanArray,
+    val subclassEdges: IntArray,
+    val instanceEdges: IntArray,
+    val disjointPairs: IntArray,
+    val domainKeys: Array<String>,
+    val domainClass: IntArray,
+    val domainSubclass: BooleanArray,
+    val rangeKeys: Array<String>,
+    val rangeClass: IntArray,
+    val rangeSubclass: BooleanArray,
+    val counts: IntArray,
+)
 
 @JvmInline value class SumoClassId(val value: Int)
 
@@ -45,7 +68,8 @@ enum class SumoMask { ANCESTORS, DESCENDANTS, INSTANCES, DISJOINT }
  */
 class SumoClassifier private constructor(
     private val names: Array<String>,
-    private val termIndex: LinearHashMap<String, Int>,
+    /** Frozen term name → term id (its index in [names]). */
+    private val termIndex: FunnelHashIndex<String>,
     /** term → class index, or -1 when the term is not a class */
     private val classOfTerm: IntArray,
     /** class index → term */
@@ -103,7 +127,7 @@ class SumoClassifier private constructor(
     /** Every term in pool order. */
     val terms: Series<String> get() = names.size j { i: Int -> names[i] }
 
-    fun termId(name: String): Int = termIndex[name] ?: -1
+    fun termId(name: String): Int = termIndex.get(name) ?: -1
     fun isClass(name: String): Boolean = termId(name).let { it >= 0 && classOfTerm[it] >= 0 }
 
     private fun classIndex(name: String): Int = termId(name).let { if (it < 0) -1 else classOfTerm[it] }
@@ -242,6 +266,7 @@ class SumoClassifier private constructor(
     fun shapeHistogram(): Map<String, Int> = closure.shapeHistogram()
 
     companion object {
+        private const val TERM_SEED = 0x5355_4D4FL
         private val CLASS_SLOTS = setOf("subclass", "instance", "domain", "domainSubclass", "range", "rangeSubclass", "disjoint", "partition", "disjointDecomposition", "exhaustiveDecomposition")
 
         fun parse(kif: String): SumoClassifier = of(KifExpr.parseAll(kif))
@@ -249,23 +274,26 @@ class SumoClassifier private constructor(
         fun of(forms: List<KifExpr>): SumoClassifier = of(forms as Iterable<KifExpr>)
 
         /** Consumes forms once, allowing independently parsed corpus files to be released in order. */
-        fun of(forms: Iterable<KifExpr>): SumoClassifier {
+        fun of(forms: Iterable<KifExpr>): SumoClassifier = of(taxonomy(forms))
+
+        /** Project the atomic taxonomy declarations of [forms] into a [SumoTaxonomy]. */
+        fun taxonomy(forms: Iterable<KifExpr>): SumoTaxonomy {
             val names = ArrayList<String>()
             val termIndex = LinearHashMap<String, Int>(8192)
             fun term(name: String): Int = termIndex[name] ?: names.size.also { names.add(name); termIndex[name] = it }
             val isClass = HashSet<Int>()
-            val subclassEdges = ArrayList<IntArray>() // (sub, sup) term ids
-            val instanceEdges = ArrayList<IntArray>()
-            val disjointPairs = ArrayList<IntArray>()
-            data class Slot(val key: String, val cls: Int, val subclass: Boolean)
-            val domainSlots = ArrayList<Slot>()
-            val rangeSlots = ArrayList<Slot>()
+            val subclassEdges = IntAccumulator(8192) // (sub, sup) term ids, flat
+            val instanceEdges = IntAccumulator(8192)
+            val disjointPairs = IntAccumulator(1024)
+            val domainKeys = ArrayList<String>(); val domainClass = IntAccumulator(2048); val domainSub = ArrayList<Boolean>()
+            val rangeKeys = ArrayList<String>(); val rangeClass = IntAccumulator(512); val rangeSub = ArrayList<Boolean>()
             var rules = 0
             var formCount = 0
             var taxonomyForms = 0
             var unprojectedTaxonomyForms = 0
 
             fun atom(e: KifExpr): String? = (e as? KifExpr.Atom)?.token?.takeIf { !it.startsWith("?") && !it.startsWith("\"") }
+            fun pair(acc: IntAccumulator, a: Int, b: Int) { acc.add(a); acc.add(b) }
 
             for (f in forms) {
                 formCount++
@@ -285,75 +313,97 @@ class SumoClassifier private constructor(
                     "=>", "<=>" -> rules++
                     "subclass" -> if (args.size == 2) {
                         val a = atom(args[0]); val b = atom(args[1])
-                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += ta; isClass += tb; subclassEdges += intArrayOf(ta, tb) }
+                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += ta; isClass += tb; pair(subclassEdges, ta, tb) }
                     }
                     "instance" -> if (args.size == 2) {
                         val a = atom(args[0]); val b = atom(args[1])
-                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += tb; instanceEdges += intArrayOf(ta, tb) }
+                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += tb; pair(instanceEdges, ta, tb) }
                     }
                     "domain", "domainSubclass" -> if (args.size == 3) {
                         val p = atom(args[0]); val n = atom(args[1])?.toIntOrNull(); val c = atom(args[2])
-                        if (p != null && n != null && c != null) { term(p); val tc = term(c); isClass += tc; domainSlots += Slot("$p/$n", tc, head == "domainSubclass") }
+                        if (p != null && n != null && c != null) {
+                            term(p); val tc = term(c); isClass += tc
+                            domainKeys += "$p/$n"; domainClass.add(tc); domainSub += head == "domainSubclass"
+                        }
                     }
                     "range", "rangeSubclass" -> if (args.size == 2) {
                         val p = atom(args[0]); val c = atom(args[1])
-                        if (p != null && c != null) { term(p); val tc = term(c); isClass += tc; rangeSlots += Slot(p, tc, head == "rangeSubclass") }
+                        if (p != null && c != null) {
+                            term(p); val tc = term(c); isClass += tc
+                            rangeKeys += p; rangeClass.add(tc); rangeSub += head == "rangeSubclass"
+                        }
                     }
                     "disjoint" -> if (args.size == 2) {
                         val a = atom(args[0]); val b = atom(args[1])
-                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += ta; isClass += tb; disjointPairs += intArrayOf(ta, tb) }
+                        if (a != null && b != null) { val ta = term(a); val tb = term(b); isClass += ta; isClass += tb; pair(disjointPairs, ta, tb) }
                     }
                     "partition", "disjointDecomposition" -> if (args.size >= 3) {
                         val whole = atom(args[0]) ?: continue
                         isClass += term(whole)
                         val parts = args.drop(1).mapNotNull { atom(it) }.map { term(it).also { t -> isClass += t } }
-                        for (i in parts.indices) for (j in i + 1 until parts.size) disjointPairs += intArrayOf(parts[i], parts[j])
+                        for (i in parts.indices) for (j in i + 1 until parts.size) pair(disjointPairs, parts[i], parts[j])
                     }
                     "exhaustiveDecomposition" -> args.mapNotNull { atom(it) }.forEach { isClass += term(it) }
                 }
             }
+            return SumoTaxonomy(
+                names.toTypedArray(), BooleanArray(names.size) { it in isClass },
+                subclassEdges.toIntArray(), instanceEdges.toIntArray(), disjointPairs.toIntArray(),
+                domainKeys.toTypedArray(), domainClass.toIntArray(), domainSub.toBooleanArray(),
+                rangeKeys.toTypedArray(), rangeClass.toIntArray(), rangeSub.toBooleanArray(),
+                intArrayOf(formCount, taxonomyForms, unprojectedTaxonomyForms, rules),
+            )
+        }
 
+        /** Build the classifier from a projected taxonomy: term ids, closure and slot maps. */
+        fun of(t: SumoTaxonomy): SumoClassifier {
+            val names = t.names
+            val termIndex = FunnelHashIndex.build(names.toSeries(), TERM_SEED)
             val classOfTerm = IntArray(names.size) { -1 }
-            val termOfClass = IntArray(isClass.size)
+            val termOfClass = IntArray(t.isClass.count { it })
             var c = 0
-            for (t in names.indices) if (t in isClass) { classOfTerm[t] = c; termOfClass[c] = t; c++ }
+            for (term in names.indices) if (t.isClass[term]) { classOfTerm[term] = c; termOfClass[c] = term; c++ }
             val parentLists = Array(termOfClass.size) { IntAccumulator(4) }
-            for ((sub, sup) in subclassEdges.map { it[0] to it[1] }) parentLists[classOfTerm[sub]].add(classOfTerm[sup])
+            for (i in 0 until t.subclassEdges.size step 2) parentLists[classOfTerm[t.subclassEdges[i]]].add(classOfTerm[t.subclassEdges[i + 1]])
             val closure = ClosureIndex.build(termOfClass.size) { ci -> parentLists[ci].toRoaring().toIntArray() }
 
             val directTypes = Array(names.size) { IntAccumulator(2) }
-            for (e in instanceEdges) directTypes[e[0]].add(classOfTerm[e[1]])
+            for (i in 0 until t.instanceEdges.size step 2) directTypes[t.instanceEdges[i]].add(classOfTerm[t.instanceEdges[i + 1]])
             // SUMO's implicit typing: every class is an instance of Class ((domain subclass 1 Class),
             // Class ⊂ SetOrClass), so a class term satisfies a `domain … Class` slot without a
             // spelled-out `(instance X Class)`.
-            val classClass = termIndex["Class"]?.let { classOfTerm[it] } ?: -1
-            if (classClass >= 0) for (t in names.indices) if (classOfTerm[t] >= 0) directTypes[t].add(classClass)
-            val instanceTypes = Array(names.size) { t ->
+            val classClass = termIndex.get("Class")?.let { classOfTerm[it] } ?: -1
+            if (classClass >= 0) for (term in names.indices) if (classOfTerm[term] >= 0) directTypes[term].add(classClass)
+            val instanceTypes = Array(names.size) { term ->
                 val acc = IntAccumulator(8)
-                directTypes[t].toRoaring().forEach { ci -> acc.add(closure.id(ci)); acc.addAll(closure.ancestorIds(ci)) }
+                directTypes[term].toRoaring().forEach { ci -> acc.add(closure.id(ci)); acc.addAll(closure.ancestorIds(ci)) }
                 acc.toRoaring()
             }
 
             val disjointLists = Array(termOfClass.size) { IntAccumulator(2) }
-            for (p in disjointPairs) { disjointLists[classOfTerm[p[0]]].add(classOfTerm[p[1]]); disjointLists[classOfTerm[p[1]]].add(classOfTerm[p[0]]) }
+            for (i in 0 until t.disjointPairs.size step 2) {
+                val a = classOfTerm[t.disjointPairs[i]]; val b = classOfTerm[t.disjointPairs[i + 1]]
+                disjointLists[a].add(b); disjointLists[b].add(a)
+            }
             val declaredDisjoint = Array(termOfClass.size) { disjointLists[it].toRoaring().toIntArray() }
 
             val domains = LinearHashMap<String, Int>(2048); val domainSubclass = LinearHashMap<String, Boolean>(512)
-            for (s in domainSlots) { domains[s.key] = classOfTerm[s.cls]; domainSubclass[s.key] = s.subclass }
+            for (i in t.domainKeys.indices) { domains[t.domainKeys[i]] = classOfTerm[t.domainClass[i]]; domainSubclass[t.domainKeys[i]] = t.domainSubclass[i] }
             val ranges = LinearHashMap<String, Int>(512); val rangeSubclass = LinearHashMap<String, Boolean>(128)
-            for (s in rangeSlots) { ranges[s.key] = classOfTerm[s.cls]; rangeSubclass[s.key] = s.subclass }
+            for (i in t.rangeKeys.indices) { ranges[t.rangeKeys[i]] = classOfTerm[t.rangeClass[i]]; rangeSubclass[t.rangeKeys[i]] = t.rangeSubclass[i] }
 
+            val (formCount, taxonomyForms, unprojectedTaxonomyForms, rules) = t.counts
             val stats = linkedMapOf(
                 "forms" to formCount, "taxonomyForms" to taxonomyForms,
                 "unprojectedTaxonomyForms" to unprojectedTaxonomyForms,
                 "otherForms" to formCount - taxonomyForms - unprojectedTaxonomyForms - rules,
                 "terms" to names.size, "classes" to termOfClass.size,
-                "subclassEdges" to subclassEdges.size, "instanceEdges" to instanceEdges.size,
-                "domainSlots" to domainSlots.size, "rangeSlots" to rangeSlots.size,
-                "disjointPairs" to disjointPairs.size, "rules" to rules,
+                "subclassEdges" to t.subclassEdges.size / 2, "instanceEdges" to t.instanceEdges.size / 2,
+                "domainSlots" to t.domainKeys.size, "rangeSlots" to t.rangeKeys.size,
+                "disjointPairs" to t.disjointPairs.size / 2, "rules" to rules,
                 "closureBytes" to closure.byteSize(),
             )
-            return SumoClassifier(names.toTypedArray(), termIndex, classOfTerm, termOfClass, closure, instanceTypes, declaredDisjoint, domains, domainSubclass, ranges, rangeSubclass, stats)
+            return SumoClassifier(names, termIndex, classOfTerm, termOfClass, closure, instanceTypes, declaredDisjoint, domains, domainSubclass, ranges, rangeSubclass, stats)
         }
     }
 }

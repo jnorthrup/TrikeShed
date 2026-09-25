@@ -1,5 +1,6 @@
 package borg.trikeshed.ontology
 
+import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.lib.*
 import borg.trikeshed.kif.KifExpr
 import java.security.MessageDigest
@@ -22,17 +23,24 @@ object SumoCorpus {
 
     val pinned: SumoClassifier by lazy { SumoClassifier.parse(text()) }
 
-    /**
-     * WordNet 3.0 noun lemma j preorder class id in [classifier], sorted by lemma, from the pinned
-     * `WordNetMappings30-noun.txt`. An equivalence mapping (`=`) outranks a subsumption mapping
-     * (`+`); ties keep the first synset. Lemmas are lowercase, `_` for spaces.
-     */
-    /** The full corpus when `sumo/full/corpus.pins` is on the classpath, else [pinned]. */
-    val classifier: SumoClassifier by lazy {
-        if (SumoCorpus::class.java.classLoader.getResource("sumo/full/corpus.pins") != null) full else pinned
-    }
+    private val loader: ClassLoader get() = SumoCorpus::class.java.classLoader
+    private val hasFull: Boolean get() = loader.getResource("sumo/full/corpus.pins") != null
 
-    val nounLexicon: Series2<String, Int> by lazy {
+    /** The frozen image when [SumoFrozen.RESOURCE] is on the classpath, else null. */
+    private val frozen: SumoFrozen.Image? by lazy { loader.getResourceAsStream(SumoFrozen.RESOURCE)?.use(SumoFrozen::read) }
+
+    /** The taxonomy parsed from KIF: the full corpus when present, else the pinned middle. */
+    fun parsedTaxonomy(): SumoTaxonomy =
+        if (hasFull) SumoClassifier.taxonomy(fullForms(loader)) else SumoClassifier.taxonomy(KifExpr.parseAll(text()))
+
+    /**
+     * WordNet 3.0 noun lemmas joined to SUMO term ids in [taxonomy], sorted by lemma, from the
+     * pinned `WordNetMappings30-noun.txt`. An equivalence mapping (`=`) outranks a subsumption
+     * mapping (`+`); ties keep the first synset. Lemmas are lowercase, `_` for spaces.
+     */
+    fun parsedLexicon(taxonomy: SumoTaxonomy): Pair<Array<String>, IntArray> {
+        val termOf = HashMap<String, Int>(taxonomy.names.size * 2)
+        for (i in taxonomy.names.indices) if (taxonomy.isClass[i]) termOf[taxonomy.names[i]] = i
         val rank = HashMap<String, Int>()
         val id = HashMap<String, Int>()
         text("sumo/WordNetMappings/WordNetMappings30-noun.txt").lineSequence().forEach { line ->
@@ -40,32 +48,36 @@ object SumoCorpus {
             val at = line.indexOf("&%").takeIf { it >= 0 } ?: return@forEach
             var end = at + 2
             while (end < line.length && (line[end].isLetterOrDigit() || line[end] == '_' || line[end] == '-')) end++
-            val cls = classifier.classId(line.substring(at + 2, end))?.value ?: return@forEach
+            val term = termOf[line.substring(at + 2, end)] ?: return@forEach
             val r = if (line.getOrNull(end) == '=') 0 else 1
             val f = line.split(' ')
             for (w in 0 until f[3].toInt(16)) {
                 val lemma = f[4 + 2 * w].lowercase()
-                if (r < (rank[lemma] ?: 2)) { rank[lemma] = r; id[lemma] = cls }
+                if (r < (rank[lemma] ?: 2)) { rank[lemma] = r; id[lemma] = term }
             }
         }
         val lemmas = id.keys.sorted().toTypedArray()
-        val ids = IntArray(lemmas.size) { id.getValue(lemmas[it]) }
-        lemmas.size j { i: Int -> lemmas[i] j ids[i] }
+        return lemmas to IntArray(lemmas.size) { id.getValue(lemmas[it]) }
     }
 
-    /** Preorder class id of [lemma] by binary search over [nounLexicon], or -1. */
-    fun nounClassId(lemma: String): Int {
-        val lex = nounLexicon
-        var lo = 0
-        var hi = lex.a - 1
-        while (lo <= hi) {
-            val mid = (lo + hi) ushr 1
-            val c = lex.b(mid).a.compareTo(lemma)
-            if (c == 0) return lex.b(mid).b
-            if (c < 0) lo = mid + 1 else hi = mid - 1
-        }
-        return -1
+    /** Taxonomy and noun lexicon: from the frozen image when present, else parsed from KIF. */
+    private val image: SumoFrozen.Image by lazy {
+        frozen ?: parsedTaxonomy().let { t -> parsedLexicon(t).let { (l, i) -> SumoFrozen.Image(t, l, i) } }
     }
+
+    /** Built from [image]: the full corpus when frozen or present, else the pinned middle. */
+    val classifier: SumoClassifier by lazy { SumoClassifier.of(image.taxonomy) }
+
+    /** Noun lemma → preorder class id in [classifier], frozen in a funnel index over the lemmas. */
+    private val nounIndex: Join<FunnelHashIndex<String>, IntArray> by lazy {
+        val names = image.taxonomy.names
+        val lemmas = image.lexiconLemmas
+        FunnelHashIndex.build(lemmas.toSeries(), 0x574E_4F55L) j
+            IntArray(lemmas.size) { i -> classifier.classId(names[image.lexiconTerms[i]])!!.value }
+    }
+
+    /** Preorder class id of [lemma], or -1. */
+    fun nounClassId(lemma: String): Int = nounIndex.a.get(lemma)?.let { nounIndex.b[it] } ?: -1
 
     /** The original Merge + Mid-level classifier keeps its identity and term IDs. */
     val middle: SumoClassifier get() = pinned
@@ -76,7 +88,10 @@ object SumoCorpus {
     val full: SumoClassifier by lazy { full(SumoCorpus::class.java.classLoader) }
 
     /** Explicit resource boundary, also usable by isolated classloaders. Files parse independently. */
-    fun full(classLoader: ClassLoader): SumoClassifier = SumoClassifier.of(
+    fun full(classLoader: ClassLoader): SumoClassifier = SumoClassifier.of(fullForms(classLoader))
+
+    /** Every top-level form of the full corpus, checksum-verified per file. */
+    fun fullForms(classLoader: ClassLoader): Iterable<KifExpr> =
         fullManifest(classLoader).view.asSequence().flatMap { (sha256, resource) ->
             val bytes = checkNotNull(classLoader.getResourceAsStream(resource)) {
                 "Full SUMO corpus is incomplete: $resource"
@@ -93,7 +108,6 @@ object SumoCorpus {
             }) { "Invalid full SUMO top-level form in $resource" }
             forms.asSequence()
         }.asIterable()
-    )
 
     /** SHA-256 joined to the complete classpath resource path, in manifest order. */
     fun fullManifest(classLoader: ClassLoader): Series2<String, String> {

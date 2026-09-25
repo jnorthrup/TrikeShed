@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.collections.associative.FunnelHashIndex
+import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -21,16 +23,32 @@ data class ClassRule(val key: TwInt, val evidence: EvidenceCoord) {
  * rule's evidence scaled by [discount], floored at [minSupport], as in [CausalityRete].
  */
 class ClassRete(rules: Series<ClassRule>, val discount: Float = 0.5f, val minSupport: Long = Nal.UNIT / 4) {
-    private val byAntecedent: Map<Int, List<ClassRule>> =
-        (0 until rules.a).map { rules.b(it) }.groupBy { it.antecedent }
+    /** Rules sorted by antecedent; rules of the k-th distinct antecedent are `sorted[start[k] until start[k + 1]]`. */
+    private val sorted: Array<ClassRule> = Array(rules.a) { rules.b(it) }.also { it.sortBy { r -> r.antecedent } }
+    private val distinct: IntArray
+    private val start: IntArray
 
-    val antecedents: RoaringSeries = RoaringSeries.of(byAntecedent.keys)
+    init {
+        val d = IntAccumulator(sorted.size)
+        val st = IntAccumulator(sorted.size + 1)
+        for (i in sorted.indices) if (i == 0 || sorted[i].antecedent != sorted[i - 1].antecedent) { d.add(sorted[i].antecedent); st.add(i) }
+        st.add(sorted.size)
+        distinct = d.toIntArray()
+        start = st.toIntArray()
+    }
+
+    /** Frozen antecedent class id → its position in [distinct]. */
+    private val index: FunnelHashIndex<Int> = FunnelHashIndex.build(distinct.size j { i: Int -> distinct[i] }, 0x434C_5254L)
+
+    val antecedents: RoaringSeries = RoaringSeries.of(distinct)
 
     /** Rules whose antecedent is in [selfAndAncestors], each joined to its discounted support. */
     fun fire(selfAndAncestors: RoaringSeries): Series<Join<ClassRule, EvidenceCoord>> {
         val out = ArrayList<Join<ClassRule, EvidenceCoord>>()
         (selfAndAncestors and antecedents).forEach { id ->
-            for (rule in byAntecedent.getValue(id)) {
+            val k = index.get(id)!!
+            for (i in start[k] until start[k + 1]) {
+                val rule = sorted[i]
                 val pos = (rule.evidence.positive * discount).toLong()
                 val neg = (rule.evidence.negative * discount).toLong()
                 val support = if (pos < minSupport && neg == 0L) EvidenceCoord(minSupport, 0L) else EvidenceCoord(pos, neg)

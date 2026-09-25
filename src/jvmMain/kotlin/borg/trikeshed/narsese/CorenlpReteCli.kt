@@ -28,8 +28,11 @@ object CorenlpReteCli {
         val promote = args[1].toFloat()
         val asks = args.drop(2)
 
+        val tS = System.nanoTime()
         val sumo = SumoCorpus.classifier
-        println("[sumo] ${sumo.classCount} classes, ${sumo.termCount} terms")
+        val tL = System.nanoTime()
+        SumoCorpus.nounClassId("dog")
+        println("[sumo] ${sumo.classCount} classes, ${sumo.termCount} terms: classifier ${(tL - tS) / 1_000_000}ms, lexicon ${(System.nanoTime() - tL) / 1_000_000}ms")
         fun classOf(lemma: String): Int? = lemma.lowercase().let { l ->
             SumoCorpus.nounClassId(l).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(l.removeSuffix("s")).takeIf { it >= 0 }
         }

@@ -320,4 +320,6 @@ class IntAccumulator(initial: Int = 16) {
     }
     fun addAll(set: RoaringSeries) { set.forEach { add(it) } }
     fun toRoaring(): RoaringSeries = RoaringSeries.of(buf.copyOf(size))
+    /** The accumulated values in insertion order, duplicates kept. */
+    fun toIntArray(): IntArray = buf.copyOf(size)
 }

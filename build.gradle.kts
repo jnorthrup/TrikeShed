@@ -664,14 +664,28 @@ tasks.register<JavaExec>("printForgeGallery") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// Frozen SUMO: full taxonomy + WordNet noun lexicon as one binary resource, built once.
+val sumoFrozenDir = layout.buildDirectory.dir("generated/sumo-frozen")
+val freezeSumo = tasks.register<JavaExec>("freezeSumo") {
+    group = "data"
+    description = "Parse the full SUMO corpus and WordNet noun mapping once into sumo/frozen.bin."
+    dependsOn("jvmJar", "sumoFullCorpusJar")
+    mainClass.set("borg.trikeshed.ontology.SumoFrozen")
+    classpath(tasks.named("jvmJar"), tasks.named("sumoFullCorpusJar"), configurations.getByName("jvmRuntimeClasspath"))
+    val out = sumoFrozenDir.map { it.file("sumo/frozen.bin") }
+    inputs.file("gradle/sumo-full-corpus.pins")
+    inputs.file("gradle/sumo-corpus.pins")
+    outputs.file(out)
+    argumentProviders.add(CommandLineArgumentProvider { listOf(out.get().asFile.absolutePath) })
+}
+
 // CoreNLP → NAL → rete over SUMO superclasses
 tasks.register<JavaExec>("corenlpRete") {
     group = "narsese"
     description = "CoreNLP lines → NAL evidence → eternal rules → rete fired over SUMO superclasses."
-    dependsOn("jvmJar")
-    dependsOn("sumoFullCorpusJar")
+    dependsOn("jvmJar", freezeSumo)
     mainClass.set("borg.trikeshed.narsese.CorenlpReteCli")
-    classpath(tasks.named("jvmJar"), tasks.named("sumoFullCorpusJar"), configurations.getByName("jvmRuntimeClasspath"))
+    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
     workingDir = rootDir
 }
 
