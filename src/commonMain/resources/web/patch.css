@@ -66,6 +66,7 @@ button.stop{border-color:var(--err);color:var(--err)}
 .node .hd .node-delete{margin-left:8px;border-left:1px solid var(--line);border-radius:0}
 .node .hd .node-delete:hover{color:var(--err);background:#55232b}
 .node .hd button:focus-visible,.node-resize:focus-visible{outline:2px solid var(--graal)}
+.node .hd button:focus:not(:focus-visible),.node-resize:focus:not(:focus-visible){outline:none}
 .node-resize{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;touch-action:none;z-index:10}
 .node-resize::after{content:"";position:absolute;right:3px;bottom:3px;width:11px;height:11px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim)}
 .node-resize:hover::after{border-color:var(--graal)}
