@@ -1816,6 +1816,15 @@ tasks.register<JavaExec>("curatorStateModel") {
     providers.gradleProperty("daysAhead").orNull?.let { args(it) }
 }
 
+// nl.rules over a corpus in two runs: evidence accumulates, rules and answers told to a bank.
+tasks.register<JavaExec>("nlRules") {
+    group = "narsese"
+    description = "Run the nl.rules LCNC node twice over a corpus and query the tuples it told."
+    dependsOn("jvmJar", freezeSumo)
+    mainClass.set("borg.trikeshed.narsese.NlRulesNode")
+    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // skill.curate once over a profile: usage → lifecycle tuples → bank queries.
 tasks.register<JavaExec>("skillCurate") {
     group = "oroboros"

@@ -121,6 +121,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     NAL_RECALL("nal.recall"),
     SKILL_DECAY("skill.decay"),
     SKILL_CURATE("skill.curate"),
+    NL_RULES("nl.rules"),
     NAL_ATTEND("nal.attend"),
     NAL_REINFORCE("nal.reinforce"),
     NAL_ENCODE("nal.encode"),
