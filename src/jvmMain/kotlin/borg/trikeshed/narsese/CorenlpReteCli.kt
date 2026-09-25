@@ -14,7 +14,7 @@ import java.io.File
  * Each line is parsed by CoreNLP; [NlpcoreAxiomatics] yields candidate implications. The
  * antecedent lemma resolves to a SUMO preorder class id through the WordNet noun mapping;
  * the consequent keeps its lemma. Candidates with the same (class id, lemma) revise one
- * evidence base; a rule whose NAL confidence reaches `promote` is admitted to [CausalityRete].
+ * evidence base; a rule whose NAL confidence reaches `promote` is admitted to [ClassRete].
  * An `ask` class matches rules by one Roaring AND of its self+ancestor ids against the
  * admitted antecedent ids.
  *
@@ -53,23 +53,20 @@ object CorenlpReteCli {
         val nlpMs = (System.nanoTime() - t0) / 1_000_000
 
         val eternal = evidence.filter { (_, e) -> Nal.truthOf(e).confidence >= promote }
-        val rules = eternal.map { (k, e) -> EternalRule(name(k.first), k.second, NalCopula.IMPLICATION, e) }
-        val antecedents = RoaringSeries.of(eternal.keys.map { it.first })
-        println("[rete] promoted ${rules.size}/${evidence.size} at c>=$promote: " +
-            rules.joinToString { "${it.antecedent}==>${it.consequent}" })
-        val rete = CausalityRete(rules.size j { i: Int -> rules[i] })
+            .map { (k, e) -> ClassRule(k.first, k.second, e) }
+        println("[rete] promoted ${eternal.size}/${evidence.size} at c>=$promote: " +
+            eternal.joinToString { "${name(it.antecedent)}==>${it.consequent}" })
+        val rete = ClassRete(eternal.size j { i: Int -> eternal[i] })
 
         for (ask in asks) {
             val self = sumo.classId(ask)?.value
             if (self == null) { println("[ask] $ask: not a SUMO class"); continue }
             val t1 = System.nanoTime()
-            val hits = (sumo.mask(ask, SumoMask.ANCESTORS) or RoaringSeries.singleton(self)) and antecedents
-            val assertions = hits.toIntArray().map { ReteAssertion(name(it), ask, 0L, EvidenceCoord(Nal.UNIT, 0L), RelationKind.CAUSALITY) }
-            val fired = rete.fire(assertions.size j { i: Int -> assertions[i] }).values()
+            val fired = rete.fire(sumo.mask(ask, SumoMask.ANCESTORS) or RoaringSeries.singleton(self)).values()
             val us = (System.nanoTime() - t1) / 1_000
             if (fired.isEmpty()) println("[ask] $ask: no rule  (${us}µs)")
-            for (f in fired) println("[ask] $ask ==> ${f.rule.consequent}  via ${f.matched.subject}" +
-                "  support c=${"%.3f".format(Nal.truthOf(f.support).confidence)}  (${us}µs, model calls 0)")
+            for (f in fired) println("[ask] $ask ==> ${f.a.consequent}  via ${name(f.a.antecedent)}" +
+                "  support c=${"%.3f".format(Nal.truthOf(f.b).confidence)}  (${us}µs, model calls 0)")
         }
         println("[time] corenlp ${nlpMs}ms for ${lines.size} lines")
     }
