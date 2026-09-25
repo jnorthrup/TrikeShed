@@ -1839,6 +1839,15 @@ tasks.register<JavaExec>("describePreset") {
     classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// skill.overlap distribution over a profile's SKILL.md files.
+tasks.register<JavaExec>("skillOverlap") {
+    group = "oroboros"
+    description = "Class-set Jaccard distribution of a Hermes profile's skills (skill.overlap probe)."
+    dependsOn("jvmJar", freezeSumo)
+    mainClass.set("borg.trikeshed.narsese.SkillOverlapCli")
+    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // skill.curate once over a profile: usage → lifecycle tuples → bank queries.
 tasks.register<JavaExec>("skillCurate") {
     group = "oroboros"

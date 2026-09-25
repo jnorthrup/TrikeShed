@@ -842,12 +842,14 @@ object LcncPresets {
                 LcncNode("n5", "display", x = 580.0, y = 200.0),
                 LcncNode("n6", "skill.curate", params = mapOf("daysAhead" to "0"), x = 300.0, y = 380.0),
                 LcncNode("n7", "display", x = 580.0, y = 380.0),
+                LcncNode("n9", "skill.overlap", params = mapOf("min" to "0.2", "common" to "0.25"), x = 300.0, y = 540.0),
+                LcncNode("n10", "display", x = 580.0, y = 540.0),
                 LcncNode("n8", "note", params = mapOf("text" to
                     "describe it — no model calls.\n" +
                     "sentences → CoreNLP → NAL evidence → SUMO class rules;\n" +
                     "each ask inherits through its SUMO path, revised by its own evidence.\n" +
-                    "skill.curate models Hermes' .usage.json beside it.\n" +
-                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v)"),
+                    "skill.curate models Hermes' .usage.json beside it; skill.overlap proposes consolidations.\n" +
+                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v) (skillOverlap ?a ?b ?j)"),
                     x = 820.0, y = 120.0),
             ).toSeries(),
             wires = listOf(
@@ -856,9 +858,10 @@ object LcncPresets {
                 LcncWire("n3", "rules", "n4", "x"),
                 LcncWire("n3", "answers", "n5", "x"),
                 LcncWire("n6", "skills", "n7", "x"),
+                LcncWire("n9", "pairs", "n10", "x"),
             ).toSeries(),
             view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
-            seq = 9,
+            seq = 11,
         )
         return LcncProgramConfix.toJson(program)
     }

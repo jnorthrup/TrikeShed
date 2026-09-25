@@ -27,12 +27,13 @@ object DescribePresetCli {
         runners["display"] = LcncNodeRunner { _, inputs -> mapOf("x" to (inputs["x"] ?: "")) }
         runners["note"] = LcncNodeRunner { _, _ -> emptyMap() }
         runners[SkillCurateNode.TYPE] = SkillCurateNode.runner(File(args[0])) { bank.assertKif(it) }
+        runners[SkillOverlapNode.TYPE] = SkillOverlapNode.runner(File(args[0])) { bank.assertKif(it) }
         ClassRuleLane().use { lane ->
             runners[NlRulesNode.TYPE] = NlRulesNode.runner(lane) { bank.assertKif(it) }
             val out = LcncRunner(runners).runAll(program)
-            for (id in listOf("n4", "n5", "n7")) println("[$id display] ${out[id]?.get("x")}")
+            for (id in listOf("n4", "n5", "n10")) println("[$id display] ${out[id]?.get("x")}")
         }
-        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)"))
+        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)", "(skillOverlap ?a ?b ?j)"))
             println("[bank] $q → " + bank.query(KifExpr.parse(q)).joinToString { b -> b.values.joinToString(" ") })
     }
 }
