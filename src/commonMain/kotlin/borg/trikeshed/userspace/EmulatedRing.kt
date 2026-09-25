@@ -137,7 +137,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     override fun registerBuffers(buffers: List<ByteBuffer>): Result<Int> = runCatching {
         registrationAvailable()
         require(buffers.isNotEmpty()) { "empty buffer registration" }
-        registeredBuffers = buffers.toTypedArray().toSeries()
+        registeredBuffers = buffers.toSeries() // ⚡ Bolt: Avoid intermediate Array allocation by using direct List.toSeries()
         buffers.size
     }
 
