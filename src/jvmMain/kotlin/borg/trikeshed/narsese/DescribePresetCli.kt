@@ -33,7 +33,7 @@ object DescribePresetCli {
             val out = LcncRunner(runners).runAll(program)
             for (id in listOf("n4", "n5", "n10")) println("[$id display] ${out[id]?.get("x")}")
         }
-        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)", "(skillOverlap ?a ?b ?j)"))
+        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)", "(skillOverlap ?a ?b ?f ?c)"))
             println("[bank] $q → " + bank.query(KifExpr.parse(q)).joinToString { b -> b.values.joinToString(" ") })
     }
 }

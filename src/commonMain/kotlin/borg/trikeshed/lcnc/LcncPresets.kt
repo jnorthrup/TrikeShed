@@ -849,7 +849,7 @@ object LcncPresets {
                     "sentences → CoreNLP → NAL evidence → SUMO class rules;\n" +
                     "each ask inherits through its SUMO path, revised by its own evidence.\n" +
                     "skill.curate models Hermes' .usage.json beside it; skill.overlap proposes consolidations.\n" +
-                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v) (skillOverlap ?a ?b ?j)"),
+                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v) (skillOverlap ?a ?b ?f ?c)"),
                     x = 820.0, y = 120.0),
             ).toSeries(),
             wires = listOf(
