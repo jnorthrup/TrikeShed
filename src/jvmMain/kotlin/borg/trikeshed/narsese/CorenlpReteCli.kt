@@ -14,7 +14,7 @@ import java.io.File
  * Each line is parsed by CoreNLP; [NlpcoreAxiomatics] yields candidate implications. The
  * antecedent lemma resolves to a SUMO preorder class id through the WordNet noun mapping;
  * the consequent keeps its lemma. Candidates with the same (class id, lemma) revise one
- * evidence base; a rule whose NAL confidence reaches `promote` is admitted to [ClassRete].
+ * [EvidenceLedger] entry, the line number as source id; a rule whose NAL confidence reaches `promote` is admitted to [ClassRete].
  * An `ask` class matches rules by one Roaring AND of its self+ancestor ids against the
  * admitted antecedent ids.
  *
@@ -32,10 +32,10 @@ object CorenlpReteCli {
         fun classOf(lemma: String): Int? = lemma.lowercase().let { lexicon[it] ?: lexicon[it.removeSuffix("s")] }
         fun name(id: Int) = sumo.className(SumoClassId(id))
 
-        val evidence = LinkedHashMap<Pair<Int, String>, EvidenceCoord>()
+        val ledger = EvidenceLedger<Pair<Int, String>>()
         val t0 = System.nanoTime()
         CoreNlpRuntime().use { nlp ->
-            for (line in lines) {
+            for ((source, line) in lines.withIndex()) {
                 val doc = nlp.analyze(line)
                 val lemmaOf = HashMap<String, String>()
                 for (s in doc.sentences.values()) for (t in s.tokens.values()) lemmaOf[t.word] = t.lemma.ifBlank { t.word }
@@ -45,16 +45,15 @@ object CorenlpReteCli {
                     val cls = classOf(lemmaOf[a.antecedent] ?: a.antecedent)
                     if (cls == null) { println("[sumo] no class for ${a.antecedent}: $line"); continue }
                     val key = cls to (lemmaOf[a.consequent] ?: a.consequent).lowercase()
-                    evidence[key] = revise(evidence[key] ?: EvidenceCoord.EMPTY, a.rule.evidence)
-                    println("[nal] ${name(cls)} ==> ${key.second}  c=${"%.3f".format(Nal.truthOf(evidence[key]!!).confidence)}  ← $line")
+                    val entry = ledger.observe(key, source, a.rule.evidence)
+                    println("[nal] ${name(cls)} ==> ${key.second}  c=${"%.3f".format(Nal.truthOf(entry.evidence).confidence)}  ← #$source $line")
                 }
             }
         }
         val nlpMs = (System.nanoTime() - t0) / 1_000_000
 
-        val eternal = evidence.filter { (_, e) -> Nal.truthOf(e).confidence >= promote }
-            .map { (k, e) -> ClassRule(k.first, k.second, e) }
-        println("[rete] promoted ${eternal.size}/${evidence.size} at c>=$promote: " +
+        val eternal = ledger.eternal(promote).map { (k, e) -> ClassRule(k.first, k.second, e.evidence) }
+        println("[rete] promoted ${eternal.size}/${ledger.size} at c>=$promote: " +
             eternal.joinToString { "${name(it.antecedent)}==>${it.consequent}" })
         val rete = ClassRete(eternal.size j { i: Int -> eternal[i] })
 
