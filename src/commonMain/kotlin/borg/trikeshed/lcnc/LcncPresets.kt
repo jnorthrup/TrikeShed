@@ -56,6 +56,14 @@ object LcncPresets {
             tweakFirst = "A counterpart's position, then compare the connection results.",
         ),
         LcncPresetInfo(
+            "preset-describe", "Describe it",
+            does = "Learns class rules from plain sentences, answers for unseen SUMO classes with the path it inherited through, " +
+                "and models Hermes' skill curation beside it — both told to the shared bank as tuples.",
+            needs = "Nothing — SUMO, WordNet and CoreNLP ship inside; no model calls.",
+            see = "The rules learned, each answer with its via-class and truth, and each skill's clock vs modelled state.",
+            tweakFirst = "The sentences: add \"Lions do not cause allergies.\" twice and watch Lion's answer revise.",
+        ),
+        LcncPresetInfo(
             "preset-hermes", "Board at a glance",
             does = "Reads the kanban board every 15 seconds and lays its cards out in columns by status.",
             needs = "Nothing — it runs as it is.",
@@ -330,6 +338,7 @@ object LcncPresets {
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
         LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
+        "preset-describe" to describe(),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),
@@ -815,6 +824,44 @@ object LcncPresets {
     }
 
     // ── W6.3 curator: the pre-assembled curation loop ────────────────────
+
+    // ── describe it: sentences → class rules → answers; curation modelled beside ──
+    private fun describe(): String {
+        val program = LcncProgram(
+            name = "preset-describe",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "Mammals cause allergies.\nMammals cause allergies.\nMammals cause allergies.\n" +
+                    "Vehicles cause emissions.\nVehicles cause emissions.\nVehicles cause emissions.\n" +
+                    "Lions do not cause allergies.\nLions do not cause allergies.\nLions do not cause allergies."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "text.value", params = mapOf("value" to "DomesticDog Lion Tiger Helicopter Parrot"),
+                    x = 30.0, y = 260.0),
+                LcncNode("n3", "nl.rules", params = mapOf("promote" to "0.7"), x = 300.0, y = 120.0),
+                LcncNode("n4", "display", x = 580.0, y = 40.0),
+                LcncNode("n5", "display", x = 580.0, y = 200.0),
+                LcncNode("n6", "skill.curate", params = mapOf("daysAhead" to "0"), x = 300.0, y = 380.0),
+                LcncNode("n7", "display", x = 580.0, y = 380.0),
+                LcncNode("n8", "note", params = mapOf("text" to
+                    "describe it — no model calls.\n" +
+                    "sentences → CoreNLP → NAL evidence → SUMO class rules;\n" +
+                    "each ask inherits through its SUMO path, revised by its own evidence.\n" +
+                    "skill.curate models Hermes' .usage.json beside it.\n" +
+                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v)"),
+                    x = 820.0, y = 120.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n3", "text?"),
+                LcncWire("n2", "value", "n3", "ask?"),
+                LcncWire("n3", "rules", "n4", "x"),
+                LcncWire("n3", "answers", "n5", "x"),
+                LcncWire("n6", "skills", "n7", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
+            seq = 9,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
 
     private fun curator(): String {
         val program = LcncProgram(

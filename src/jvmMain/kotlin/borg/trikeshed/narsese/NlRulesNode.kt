@@ -38,10 +38,10 @@ object NlRulesNode {
     }
 
     fun runner(lane: ClassRuleLane, into: (String) -> Unit): LcncNodeRunner = LcncNodeRunner { node, inputs ->
-        val text = (inputs["text"] ?: node.params["text"]) as? String ?: ""
+        val text = (inputs["text"] ?: inputs["text?"] ?: node.params["text"]) as? String ?: ""
         val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val promote = node.params["promote"]?.toFloatOrNull() ?: 0.7f
-        val asks = ((inputs["ask"] ?: node.params["ask"]) as? String ?: "").split(',', ' ', '\n').filter { it.isNotBlank() }
+        val asks = ((inputs["ask"] ?: inputs["ask?"] ?: node.params["ask"]) as? String ?: "").split(',', ' ', '\n').filter { it.isNotBlank() }
         synchronized(lane) {
             val observed = lane.observe(lines)
             val rete = lane.promote(promote)

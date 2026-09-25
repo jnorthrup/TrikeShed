@@ -1825,6 +1825,15 @@ tasks.register<JavaExec>("nlRules") {
     classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// preset-describe headless: parse, type-check and run the stored program with the real runners.
+tasks.register<JavaExec>("describePreset") {
+    group = "narsese"
+    description = "Type-check and run preset-describe (nl.rules + skill.curate) through LcncRunner; query the bank."
+    dependsOn("jvmJar", freezeSumo)
+    mainClass.set("borg.trikeshed.narsese.DescribePresetCli")
+    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // skill.curate once over a profile: usage → lifecycle tuples → bank queries.
 tasks.register<JavaExec>("skillCurate") {
     group = "oroboros"
