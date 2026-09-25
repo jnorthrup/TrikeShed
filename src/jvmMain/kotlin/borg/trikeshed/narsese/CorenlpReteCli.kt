@@ -52,10 +52,15 @@ object CorenlpReteCli {
         }
         val nlpMs = (System.nanoTime() - t0) / 1_000_000
 
-        val eternal = ledger.eternal(promote).map { (k, e) -> ClassRule(k.first, k.second, e.evidence) }
-        println("[rete] promoted ${eternal.size}/${ledger.size} at c>=$promote: " +
+        // Promotion: confident AND affirmative. A confident negative belief is knowledge, not a rule.
+        val eternal = ledger.eternal(promote).filter { Nal.truthOf(it.second.evidence).frequency > 0.5f }
+            .map { (k, e) -> ClassRule(k.first, k.second, e.evidence) }
+        println("[rete] promoted ${eternal.size}/${ledger.size} at c>=$promote, f>0.5: " +
             eternal.joinToString { "${name(it.antecedent)}==>${it.consequent}" })
         val rete = ClassRete(eternal.size j { i: Int -> eternal[i] })
+        // SUMO subclass/instance edges are axiomatic: near-certain premises for deduction.
+        val isA = TruthCoord(1f, 0.99f)
+        fun show(e: EvidenceCoord) = Nal.truthOf(e).let { "f=${"%.2f".format(it.frequency)} c=${"%.2f".format(it.confidence)}" }
 
         for (ask in asks) {
             val self = sumo.classId(ask)?.value
@@ -64,8 +69,21 @@ object CorenlpReteCli {
             val fired = rete.fire(sumo.mask(ask, SumoMask.ANCESTORS) or RoaringSeries.singleton(self)).values()
             val us = (System.nanoTime() - t1) / 1_000
             if (fired.isEmpty()) println("[ask] $ask: no rule  (${us}µs)")
-            for (f in fired) println("[ask] $ask ==> ${f.a.consequent}  via ${name(f.a.antecedent)}" +
-                "  support c=${"%.3f".format(Nal.truthOf(f.b).confidence)}  (${us}µs, model calls 0)")
+            for (f in fired) {
+                val rule = f.a
+                // Bitset proposes; NAL deduction weighs the inherited rule; the ledger's direct
+                // observations of this class revise it. Specific evidence is never overruled by the bitset.
+                val deduced = if (rule.antecedent == self) rule.evidence else Nal.deduce(Nal.truthOf(rule.evidence), isA)
+                val ruleBasis = ledger[rule.antecedent to rule.consequent]!!.basis
+                val direct = ledger[self to rule.consequent]
+                val belief = when {
+                    direct == null -> deduced
+                    direct.basis.intersects(ruleBasis) -> direct.evidence
+                    else -> revise(direct.evidence, deduced)
+                }
+                println("[ask] $ask ==> ${rule.consequent}  via ${name(rule.antecedent)}  deduced ${show(deduced)}" +
+                    (direct?.let { "  observed ${show(it.evidence)}" } ?: "") + "  belief ${show(belief)}  (${us}µs, model calls 0)")
+            }
         }
         println("[time] corenlp ${nlpMs}ms for ${lines.size} lines")
     }

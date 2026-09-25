@@ -66,6 +66,10 @@ object NlpcoreAxiomatics {
     /** Exhaustive: a causal-verb ROOT may govern exactly a subject, an object and punctuation. */
     private val rootAllowed = setOf("nsubj", "obj", "dobj", "punct")
 
+    /** Negation of a causal ROOT: UD `advmod` (v2) or `neg` (v1) carrying `not`/`n't`. */
+    private val negRelations = setOf("advmod", "neg")
+    private val negWords = setOf("not", "n't")
+
     /** The subordinate `if`-clause verb: subject, optional object, and the mark itself. */
     private val conditionVerbAllowed = setOf("nsubj", "obj", "dobj", "mark", "punct")
 
@@ -125,13 +129,15 @@ object NlpcoreAxiomatics {
             fun add(
                 antecedentToken: NlpToken, predicate: String, consequentToken: NlpToken, confidence: Float,
                 antecedentTerm: String = antecedentToken.word, consequentTerm: String = consequentToken.word,
+                negated: Boolean = false,
             ) {
                 if (antecedentToken.index == consequentToken.index || antecedentTerm.isBlank() || consequentTerm.isBlank()) return
                 val rule = EternalRule(
                     antecedent = antecedentTerm,
                     consequent = consequentTerm,
                     copula = NalCopula.IMPLICATION,
-                    evidence = EvidenceCoord((confidence * Nal.UNIT).toLong().coerceAtLeast(1L), 0L),
+                    evidence = (confidence * Nal.UNIT).toLong().coerceAtLeast(1L)
+                        .let { w -> if (negated) EvidenceCoord(0L, w) else EvidenceCoord(w, 0L) },
                     provenanceCid = sourceCid,
                 )
                 val key = "${sentence.index}|${antecedentToken.index}|${consequentToken.index}|${rule.copula.name}"
@@ -154,6 +160,22 @@ object NlpcoreAxiomatics {
                 if (subject != null && obj != null && noun(subject) && noun(obj) &&
                     complete(setOf(root.index, subject.index, obj.index), setOf(root.index), setOf(".")))
                     add(subject, predicate, obj, 0.9f)
+            }
+
+            // Negated causal ROOT: subject do/does not CAUSE object — the same claim as
+            // negative evidence. The bare verb (VB) carries exactly one present `do` aux
+            // and one `not` modifier, both leaves.
+            val auxDo = childrenOf(root.index).filter { it.relation.lowercase() == "aux" }.mapNotNull { byIndex[it.dependent] }
+            val notMod = childrenOf(root.index).filter { it.relation.lowercase() in negRelations }.mapNotNull { byIndex[it.dependent] }
+            if (predicate in causalVerbs && root.tag.uppercase() == "VB" &&
+                auxDo.size == 1 && auxDo[0].lemma.lowercase() == "do" && isPresent(auxDo[0]) && isLeaf(auxDo[0].index) &&
+                notMod.size == 1 && notMod[0].word.lowercase() in negWords && isLeaf(notMod[0].index) &&
+                onlySupports(root.index, rootAllowed + "aux" + negRelations)) {
+                val subject = subjectOf(root.index)
+                val obj = objectOf(root.index)
+                if (subject != null && obj != null && noun(subject) && noun(obj) &&
+                    complete(setOf(root.index, subject.index, obj.index, auxDo[0].index, notMod[0].index), setOf(root.index), setOf(".")))
+                    add(subject, predicate, obj, 0.9f, negated = true)
             }
 
             // CoreNLP attaches an explicit conditional marker to the subordinate verb:
