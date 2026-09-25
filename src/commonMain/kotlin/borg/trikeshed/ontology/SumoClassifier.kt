@@ -92,6 +92,9 @@ class SumoClassifier private constructor(
 
     fun className(id: SumoClassId): String = names[termOfClass[closure.node(id.value)]]
 
+    /** Proper ancestors of the class with preorder id [id], as preorder ids. */
+    fun ancestors(id: SumoClassId): RoaringSeries = closure.ancestorIds(closure.node(id.value))
+
     fun mask(term: String, kind: SumoMask): RoaringSeries {
         val t = termId(term)
         if (t < 0) return RoaringSeries.EMPTY

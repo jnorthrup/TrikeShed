@@ -19,6 +19,11 @@ object SkillOverlapCli {
             if (u > 0) pairs.add(Triple(a, b, (sa and sb).cardinality.toFloat() / u))
         }
         pairs.sortByDescending { it.third }
-        for ((a, b, jac) in pairs.take(15)) println("[pair] ${"%.3f".format(jac)}  $a ~ $b")
+        val byName = sets.toMap()
+        for ((a, b, jac) in pairs.take(15)) {
+            val spec = SkillOverlapNode.specific(byName.getValue(a) and byName.getValue(b)).toIntArray()
+                .map { borg.trikeshed.ontology.SumoCorpus.classifier.className(borg.trikeshed.ontology.SumoClassId(it)) }
+            println("[pair] ${"%.3f".format(jac)}  $a ~ $b  ${spec.size} specific: ${spec.take(10)}")
+        }
     }
 }

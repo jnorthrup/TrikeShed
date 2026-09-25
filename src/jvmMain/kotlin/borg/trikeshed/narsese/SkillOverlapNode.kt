@@ -3,19 +3,27 @@ package borg.trikeshed.narsese
 import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 import java.io.File
 
 /**
- * `skill.overlap` — the consolidation half of Hermes' curator without a model call. Each
- * `SKILL.md` under `<profile>/skills` becomes one Roaring set of SUMO class ids: every word that
- * resolves through the WordNet noun lexicon. Classes carried by more than [common] of the skills
- * are dropped as vocabulary, not subject. Pairs whose Jaccard over the remaining classes reaches
- * `min` are consolidation candidates; each is told to the bank as
+ * `skill.overlap` — the consolidation half of Hermes' curator without a model call.
  *
- *     (skillOverlap A B "jaccard")
+ * Each `SKILL.md` under `<profile>/skills` is a set of SUMO concepts: every word that resolves
+ * through the WordNet noun lexicon, together with every concept it inherits (SUMO subclass is
+ * transitive, so a skill about `Debugging` is also about its superclasses). The ancestor closure
+ * is the dense bitset tree; it only assists — one OR per concept instead of a hierarchy walk.
+ * Concepts held by more than [common] of the skills are dropped as vocabulary, not subject.
  *
- * with the shared classes returned for the reason. Read-only against the profile.
+ * Similarity is NAL evidence over those concepts: each concept both skills hold is positive
+ * evidence for ⟨A ↔ B⟩, each held by only one is negative. Pairs whose frequency reaches `min`
+ * are consolidation candidates, told to the bank as
+ *
+ *     (skillOverlap A B "f" "c")
+ *
+ * with the most specific shared concepts — those no other shared concept specialises — as the
+ * reason. Read-only against the profile.
  */
 object SkillOverlapNode {
     const val TYPE = "skill.overlap"
@@ -36,10 +44,26 @@ object SkillOverlapNode {
                     val id = SumoCorpus.nounClassId(w).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(w.removeSuffix("s"))
                     if (id >= 0) { acc.add(id); wordOf.getOrPut(id) { w } }
                 }
-                f.parentFile.name to acc.toRoaring()
+                f.parentFile.name to inherited(acc.toRoaring())
             }
             .sortedBy { it.first }
             .toList()
+
+    /** [direct] together with every SUMO ancestor of each of its concepts. */
+    fun inherited(direct: RoaringSeries): RoaringSeries {
+        val sumo = SumoCorpus.classifier
+        var out = direct
+        direct.forEach { out = out or sumo.ancestors(SumoClassId(it)) }
+        return out
+    }
+
+    /** The members of [shared] that no other member of [shared] specialises. */
+    fun specific(shared: RoaringSeries): RoaringSeries {
+        val sumo = SumoCorpus.classifier
+        var general = RoaringSeries.EMPTY
+        shared.forEach { general = general or sumo.ancestors(SumoClassId(it)) }
+        return shared andNot general
+    }
 
     /** Classes present in more than [common] of [sets]. */
     fun vocabulary(sets: List<Pair<String, RoaringSeries>>, common: Float): RoaringSeries {
@@ -65,15 +89,20 @@ object SkillOverlapNode {
             val (a, sa) = sets[i]; val (b, sb) = sets[j]
             if (sa.isEmpty() || sb.isEmpty()) continue
             val shared = sa and sb
-            val jaccard = shared.cardinality.toFloat() / (sa or sb).cardinality
-            if (jaccard < min) continue
-            into("(skillOverlap $a $b \"${"%.2f".format(jaccard)}\")")
+            val union = (sa or sb).cardinality.toLong()
+            val evidence = EvidenceCoord(shared.cardinality * Nal.UNIT, (union - shared.cardinality) * Nal.UNIT)
+            val t = Nal.truthOf(evidence)
+            if (t.frequency < min) continue
+            into("(skillOverlap $a $b \"${"%.2f".format(t.frequency)}\" \"${"%.2f".format(t.confidence)}\")")
             pairs.add(mapOf(
-                "a" to a, "b" to b, "jaccard" to jaccard,
-                "shared" to shared.toIntArray().take(12).map { "${wordOf[it]}:${SumoCorpus.classifier.className(borg.trikeshed.ontology.SumoClassId(it))}" },
+                "a" to a, "b" to b, "frequency" to t.frequency, "confidence" to t.confidence,
+                "specific" to specific(shared).toIntArray().map { id ->
+                    val c = SumoCorpus.classifier.className(SumoClassId(id))
+                    wordOf[id]?.let { "$it:$c" } ?: c
+                },
             ))
         }
-        pairs.sortByDescending { it["jaccard"] as Float }
+        pairs.sortByDescending { it["frequency"] as Float }
         mapOf("pairs" to pairs, "skills" to sets.size, "vocabulary" to vocab.cardinality)
     }
 }
