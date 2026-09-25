@@ -32,6 +32,13 @@ public class CouchWal {
     public void runGradleBuild() throws IOException, InterruptedException {
         ProcessBuilder builder = new ProcessBuilder();
         builder.directory(new File(projectRoot));
+        // Whitelisted env: the daemon's own carries provider keys. gradlew needs java, so the running JVM's home rides along.
+        String javaHome = System.getProperty("java.home");
+        builder.environment().clear();
+        builder.environment().putAll(borg.trikeshed.agent.AgentEnvironment.INSTANCE.build(
+            System.getenv(),
+            java.util.List.of(new File(javaHome, "bin").getPath()),
+            java.util.Map.of("JAVA_HOME", javaHome)));
 
         // Use the gradle wrapper from the project root
         String gradlewCommand = "./gradlew";

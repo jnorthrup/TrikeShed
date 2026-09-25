@@ -277,7 +277,7 @@ object KanbanGraphEngine {
             io = nextIo,
             effects = card.effects.view.plus(effect).toSeries(),
         )
-        val cards = graph.cards.map { if (it.id == card.id) moved else it }.toSeries()
+        val cards = graph.cards.view.map { if (it.id == card.id) moved else it }.toSeries()
 
         // W4.4: FANOUT lowers to N Submits (one per FANOUT branch in the group);
         // JOIN lowers to one Submit whose dependencies are the FANOUT branch jobIds.

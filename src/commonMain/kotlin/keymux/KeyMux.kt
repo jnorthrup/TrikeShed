@@ -688,7 +688,7 @@ class KeyMuxBuilder {
 
     fun api(baseUrl: String, vararg hdrs: Pair<String, String>): KeyMuxBuilder = apply {
         // ⚡ Bolt: Use direct array mapped projection via j operator to prevent allocating an intermediate List<Join<String, String>> from .map { ... }
-        val h = hdrs.size j { hdrs[it].first j hdrs[it].second }
+        val h = hdrs.size j { i: Int -> hdrs[i].first j hdrs[i].second }
         sources.add("*".toKeyPath() j ApiSource(baseUrl, h))
     }
 
