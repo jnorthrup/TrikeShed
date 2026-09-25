@@ -3,10 +3,17 @@ package borg.trikeshed.narsese
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.TwInt
 import borg.trikeshed.lib.j
 
-/** An eternal implication whose antecedent is a preorder class id of a [borg.trikeshed.collections.bits.ClosureIndex]. */
-data class ClassRule(val antecedent: Int, val consequent: String, val evidence: EvidenceCoord)
+/**
+ * An eternal implication packed in one register: [key] is antecedent preorder class id
+ * (of a [borg.trikeshed.collections.bits.ClosureIndex]) j consequent term id.
+ */
+data class ClassRule(val key: TwInt, val evidence: EvidenceCoord) {
+    val antecedent: Int get() = key.first
+    val consequent: Int get() = key.second
+}
 
 /**
  * Rete alpha network over preorder class ids. The admitted antecedents are one Roaring set;

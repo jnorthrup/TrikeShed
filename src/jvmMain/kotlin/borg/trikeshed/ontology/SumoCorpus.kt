@@ -23,11 +23,16 @@ object SumoCorpus {
     val pinned: SumoClassifier by lazy { SumoClassifier.parse(text()) }
 
     /**
-     * WordNet 3.0 noun lemma → preorder class id in [pinned], from the pinned
-     * `WordNetMappings30-noun.txt`. An equivalence mapping (`=`) outranks a subsumption
-     * mapping (`+`); ties keep the first synset. Lemmas are lowercase, `_` for spaces.
+     * WordNet 3.0 noun lemma j preorder class id in [classifier], sorted by lemma, from the pinned
+     * `WordNetMappings30-noun.txt`. An equivalence mapping (`=`) outranks a subsumption mapping
+     * (`+`); ties keep the first synset. Lemmas are lowercase, `_` for spaces.
      */
-    val nounClassIds: Map<String, Int> by lazy {
+    /** The full corpus when `sumo/full/corpus.pins` is on the classpath, else [pinned]. */
+    val classifier: SumoClassifier by lazy {
+        if (SumoCorpus::class.java.classLoader.getResource("sumo/full/corpus.pins") != null) full else pinned
+    }
+
+    val nounLexicon: Series2<String, Int> by lazy {
         val rank = HashMap<String, Int>()
         val id = HashMap<String, Int>()
         text("sumo/WordNetMappings/WordNetMappings30-noun.txt").lineSequence().forEach { line ->
@@ -35,7 +40,7 @@ object SumoCorpus {
             val at = line.indexOf("&%").takeIf { it >= 0 } ?: return@forEach
             var end = at + 2
             while (end < line.length && (line[end].isLetterOrDigit() || line[end] == '_' || line[end] == '-')) end++
-            val cls = pinned.classId(line.substring(at + 2, end))?.value ?: return@forEach
+            val cls = classifier.classId(line.substring(at + 2, end))?.value ?: return@forEach
             val r = if (line.getOrNull(end) == '=') 0 else 1
             val f = line.split(' ')
             for (w in 0 until f[3].toInt(16)) {
@@ -43,7 +48,23 @@ object SumoCorpus {
                 if (r < (rank[lemma] ?: 2)) { rank[lemma] = r; id[lemma] = cls }
             }
         }
-        id
+        val lemmas = id.keys.sorted().toTypedArray()
+        val ids = IntArray(lemmas.size) { id.getValue(lemmas[it]) }
+        lemmas.size j { i: Int -> lemmas[i] j ids[i] }
+    }
+
+    /** Preorder class id of [lemma] by binary search over [nounLexicon], or -1. */
+    fun nounClassId(lemma: String): Int {
+        val lex = nounLexicon
+        var lo = 0
+        var hi = lex.a - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val c = lex.b(mid).a.compareTo(lemma)
+            if (c == 0) return lex.b(mid).b
+            if (c < 0) lo = mid + 1 else hi = mid - 1
+        }
+        return -1
     }
 
     /** The original Merge + Mid-level classifier keeps its identity and term IDs. */

@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
+import borg.trikeshed.lib.TwInt
 import borg.trikeshed.lib.j
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
@@ -27,12 +28,17 @@ object CorenlpReteCli {
         val promote = args[1].toFloat()
         val asks = args.drop(2)
 
-        val sumo = SumoCorpus.pinned
-        val lexicon = SumoCorpus.nounClassIds
-        fun classOf(lemma: String): Int? = lemma.lowercase().let { lexicon[it] ?: lexicon[it.removeSuffix("s")] }
+        val sumo = SumoCorpus.classifier
+        println("[sumo] ${sumo.classCount} classes, ${sumo.termCount} terms")
+        fun classOf(lemma: String): Int? = lemma.lowercase().let { l ->
+            SumoCorpus.nounClassId(l).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(l.removeSuffix("s")).takeIf { it >= 0 }
+        }
+        val terms = ArrayList<String>()
+        val termIds = HashMap<String, Int>()
+        fun termId(t: String): Int = termIds.getOrPut(t) { terms.size.also { terms.add(t) } }
         fun name(id: Int) = sumo.className(SumoClassId(id))
 
-        val ledger = EvidenceLedger<Pair<Int, String>>()
+        val ledger = EvidenceLedger<TwInt>()
         val t0 = System.nanoTime()
         CoreNlpRuntime().use { nlp ->
             for ((source, line) in lines.withIndex()) {
@@ -44,9 +50,9 @@ object CorenlpReteCli {
                 for (a in axioms) {
                     val cls = classOf(lemmaOf[a.antecedent] ?: a.antecedent)
                     if (cls == null) { println("[sumo] no class for ${a.antecedent}: $line"); continue }
-                    val key = cls to (lemmaOf[a.consequent] ?: a.consequent).lowercase()
+                    val key = cls j termId((lemmaOf[a.consequent] ?: a.consequent).lowercase())
                     val entry = ledger.observe(key, source, a.rule.evidence)
-                    println("[nal] ${name(cls)} ==> ${key.second}  c=${"%.3f".format(Nal.truthOf(entry.evidence).confidence)}  ← #$source $line")
+                    println("[nal] ${name(cls)} ==> ${terms[key.second]}  c=${"%.3f".format(Nal.truthOf(entry.evidence).confidence)}  ← #$source $line")
                 }
             }
         }
@@ -54,9 +60,9 @@ object CorenlpReteCli {
 
         // Promotion: confident AND affirmative. A confident negative belief is knowledge, not a rule.
         val eternal = ledger.eternal(promote).filter { Nal.truthOf(it.second.evidence).frequency > 0.5f }
-            .map { (k, e) -> ClassRule(k.first, k.second, e.evidence) }
+            .map { (k, e) -> ClassRule(k, e.evidence) }
         println("[rete] promoted ${eternal.size}/${ledger.size} at c>=$promote, f>0.5: " +
-            eternal.joinToString { "${name(it.antecedent)}==>${it.consequent}" })
+            eternal.joinToString { "${name(it.antecedent)}==>${terms[it.consequent]}" })
         val rete = ClassRete(eternal.size j { i: Int -> eternal[i] })
         // SUMO subclass/instance edges are axiomatic: near-certain premises for deduction.
         val isA = TruthCoord(1f, 0.99f)
@@ -74,14 +80,14 @@ object CorenlpReteCli {
                 // Bitset proposes; NAL deduction weighs the inherited rule; the ledger's direct
                 // observations of this class revise it. Specific evidence is never overruled by the bitset.
                 val deduced = if (rule.antecedent == self) rule.evidence else Nal.deduce(Nal.truthOf(rule.evidence), isA)
-                val ruleBasis = ledger[rule.antecedent to rule.consequent]!!.basis
-                val direct = ledger[self to rule.consequent]
+                val ruleBasis = ledger[rule.key]!!.basis
+                val direct = ledger[self j rule.consequent]
                 val belief = when {
                     direct == null -> deduced
                     direct.basis.intersects(ruleBasis) -> direct.evidence
                     else -> revise(direct.evidence, deduced)
                 }
-                println("[ask] $ask ==> ${rule.consequent}  via ${name(rule.antecedent)}  deduced ${show(deduced)}" +
+                println("[ask] $ask ==> ${terms[rule.consequent]}  via ${name(rule.antecedent)}  deduced ${show(deduced)}" +
                     (direct?.let { "  observed ${show(it.evidence)}" } ?: "") + "  belief ${show(belief)}  (${us}µs, model calls 0)")
             }
         }

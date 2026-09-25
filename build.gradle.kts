@@ -669,8 +669,9 @@ tasks.register<JavaExec>("corenlpRete") {
     group = "narsese"
     description = "CoreNLP lines → NAL evidence → eternal rules → rete fired over SUMO superclasses."
     dependsOn("jvmJar")
+    dependsOn("sumoFullCorpusJar")
     mainClass.set("borg.trikeshed.narsese.CorenlpReteCli")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    classpath(tasks.named("jvmJar"), tasks.named("sumoFullCorpusJar"), configurations.getByName("jvmRuntimeClasspath"))
     workingDir = rootDir
 }
 
