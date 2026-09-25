@@ -1816,6 +1816,15 @@ tasks.register<JavaExec>("curatorStateModel") {
     providers.gradleProperty("daysAhead").orNull?.let { args(it) }
 }
 
+// skill.curate once over a profile: usage → lifecycle tuples → bank queries.
+tasks.register<JavaExec>("skillCurate") {
+    group = "oroboros"
+    description = "Run the skill.curate LCNC node over a Hermes profile and query the tuples it told."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.narsese.SkillCurateCli")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+}
+
 // Native IPNS client; its transport and durable state use the common uring facade.
 tasks.register<JavaExec>("ipns") {
     useStagedJvmClasspath()

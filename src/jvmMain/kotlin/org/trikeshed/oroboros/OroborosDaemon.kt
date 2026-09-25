@@ -1561,6 +1561,7 @@ object OroborosDaemon {
             }
         }
         moduleContext.lcncRunners["nal.encode"] = borg.trikeshed.narsese.BeliefsNodes.encodeRunner()
+        borg.trikeshed.narsese.SkillCurateNode.register(moduleContext.lcncRunners, kifBank)
         // ── Rule admission: the seam that ends the live rete's dead spin —
         // the daemon boots causalityRete over ZERO rules; these admit law.
         causalityRete?.let { liveRete ->
