@@ -1685,7 +1685,7 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
             .map { row ->
                 val parts = row.split(Regex("""\s+"""), limit = 2)
                 require(parts.size == 2 && parts[0].matches(Regex("[0-9a-f]{64}"))) { "$pinFile: malformed row `$row`" }
-                require(parts[1].matches(Regex("[A-Za-z0-9_./-]+\\.kif")) &&
+                require(parts[1].matches(Regex("[A-Za-z0-9_./-]+\\.(kif|txt)")) &&
                     parts[1].split('/').none { it.isEmpty() || it == "." || it == ".." }) {
                     "$pinFile: invalid repository path `${parts[1]}`"
                 }

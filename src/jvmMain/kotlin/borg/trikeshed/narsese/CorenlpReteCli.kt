@@ -26,10 +26,10 @@ object CorenlpReteCli {
         val asks = args.drop(2)
 
         val sumo = SumoCorpus.pinned
-        fun sumoTerm(lemma: String): String {
-            val t = lemma.replaceFirstChar { it.uppercase() }
-            return if (sumo.isClass(t)) t else lemma
-        }
+        val lexicon = SumoCorpus.nounLemmas
+        fun sumoTerm(lemma: String): String = lemma.lowercase().let { l ->
+            lexicon[l] ?: lexicon[l.removeSuffix("s")]
+        } ?: lemma.replaceFirstChar { it.uppercase() }.takeIf { sumo.isClass(it) } ?: lemma
 
         val evidence = LinkedHashMap<Pair<String, String>, EvidenceCoord>()
         val t0 = System.nanoTime()

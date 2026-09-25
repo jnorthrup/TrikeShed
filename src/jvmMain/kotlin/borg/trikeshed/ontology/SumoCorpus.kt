@@ -22,6 +22,28 @@ object SumoCorpus {
 
     val pinned: SumoClassifier by lazy { SumoClassifier.parse(text()) }
 
+    /**
+     * WordNet 3.0 noun lemma → SUMO class, from the pinned `WordNetMappings30-noun.txt`.
+     * Per lemma an equivalence mapping (`=`) outranks a subsumption mapping (`+`); ties keep
+     * the first synset in file order. Lemmas are lowercase with `_` for spaces.
+     */
+    val nounLemmas: Map<String, String> by lazy {
+        val best = HashMap<String, Pair<Int, String>>()
+        text("sumo/WordNetMappings/WordNetMappings30-noun.txt").lineSequence().forEach { line ->
+            if (line.isEmpty() || !line[0].isDigit()) return@forEach
+            val m = Regex("&%([A-Za-z0-9_-]+)([=+@])").find(line) ?: return@forEach
+            val rank = when (m.groupValues[2]) { "=" -> 0; "+" -> 1; else -> 2 }
+            val f = line.split(' ')
+            val words = f[3].toInt(16)
+            for (w in 0 until words) {
+                val lemma = f[4 + 2 * w].lowercase()
+                val prior = best[lemma]
+                if (prior == null || rank < prior.first) best[lemma] = rank to m.groupValues[1]
+            }
+        }
+        best.mapValues { it.value.second }
+    }
+
     /** The original Merge + Mid-level classifier keeps its identity and term IDs. */
     val middle: SumoClassifier get() = pinned
 
