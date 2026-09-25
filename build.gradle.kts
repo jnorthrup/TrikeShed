@@ -664,6 +664,16 @@ tasks.register<JavaExec>("printForgeGallery") {
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// CoreNLP → NAL → rete over SUMO superclasses
+tasks.register<JavaExec>("corenlpRete") {
+    group = "narsese"
+    description = "CoreNLP lines → NAL evidence → eternal rules → rete fired over SUMO superclasses."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.narsese.CorenlpReteCli")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    workingDir = rootDir
+}
+
 // TrajectoryReduction CLI — fold JulesCause chains into freeze verdicts
 tasks.register<JavaExec>("trajectoryReduction") {
     group = "oroboros"
