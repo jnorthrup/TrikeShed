@@ -910,7 +910,8 @@ class PatchWire(
     private fun loadEndpointRegistry(att: CouchAttachmentGateway): List<Map<String, Any?>> =
         att.getAttachment("keymux/endpoints")?.let { (_, bytes) ->
             runCatching {
-                (JsonSupport.parse(bytes.decodeToString()) as? List<*>)?.filterIsInstance<Map<String, Any?>>()
+                (JsonSupport.parse(bytes.decodeToString()) as? List<*>)?.mapNotNull { it as? Map<String, Any?> }
+                // ⚡ Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
             }.getOrNull()
         } ?: emptyList()
 
