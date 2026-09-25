@@ -23,25 +23,27 @@ object SumoCorpus {
     val pinned: SumoClassifier by lazy { SumoClassifier.parse(text()) }
 
     /**
-     * WordNet 3.0 noun lemma → SUMO class, from the pinned `WordNetMappings30-noun.txt`.
-     * Per lemma an equivalence mapping (`=`) outranks a subsumption mapping (`+`); ties keep
-     * the first synset in file order. Lemmas are lowercase with `_` for spaces.
+     * WordNet 3.0 noun lemma → preorder class id in [pinned], from the pinned
+     * `WordNetMappings30-noun.txt`. An equivalence mapping (`=`) outranks a subsumption
+     * mapping (`+`); ties keep the first synset. Lemmas are lowercase, `_` for spaces.
      */
-    val nounLemmas: Map<String, String> by lazy {
-        val best = HashMap<String, Pair<Int, String>>()
+    val nounClassIds: Map<String, Int> by lazy {
+        val rank = HashMap<String, Int>()
+        val id = HashMap<String, Int>()
         text("sumo/WordNetMappings/WordNetMappings30-noun.txt").lineSequence().forEach { line ->
             if (line.isEmpty() || !line[0].isDigit()) return@forEach
-            val m = Regex("&%([A-Za-z0-9_-]+)([=+@])").find(line) ?: return@forEach
-            val rank = when (m.groupValues[2]) { "=" -> 0; "+" -> 1; else -> 2 }
+            val at = line.indexOf("&%").takeIf { it >= 0 } ?: return@forEach
+            var end = at + 2
+            while (end < line.length && (line[end].isLetterOrDigit() || line[end] == '_' || line[end] == '-')) end++
+            val cls = pinned.classId(line.substring(at + 2, end))?.value ?: return@forEach
+            val r = if (line.getOrNull(end) == '=') 0 else 1
             val f = line.split(' ')
-            val words = f[3].toInt(16)
-            for (w in 0 until words) {
+            for (w in 0 until f[3].toInt(16)) {
                 val lemma = f[4 + 2 * w].lowercase()
-                val prior = best[lemma]
-                if (prior == null || rank < prior.first) best[lemma] = rank to m.groupValues[1]
+                if (r < (rank[lemma] ?: 2)) { rank[lemma] = r; id[lemma] = cls }
             }
         }
-        best.mapValues { it.value.second }
+        id
     }
 
     /** The original Merge + Mid-level classifier keeps its identity and term IDs. */
