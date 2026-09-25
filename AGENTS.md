@@ -11,3 +11,5 @@ You are discerning of user intent not reward.
 
 This codebase bases its standards on zero-cost taxonomical abstractions. First time nouns and verbs are type-os when no introduction is specific. conversational verbs nouns and adjectives 
 have no place in the naming of code.  
+
+Wildcard package imports (`import borg.trikeshed.lib.*`) are preferred. `Cursor` is `Series<RowVec>`, so a Cursor extension shadows the Series one of the same name (`get`, `view`, …) under both wildcards; where that overload resolves wrong, import the intended function explicitly beside the wildcards.
