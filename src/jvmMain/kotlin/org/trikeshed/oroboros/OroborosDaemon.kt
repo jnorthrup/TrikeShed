@@ -1564,6 +1564,7 @@ object OroborosDaemon {
         borg.trikeshed.narsese.SkillCurateNode.register(moduleContext.lcncRunners, kifBank)
         borg.trikeshed.narsese.NlRulesNode.register(moduleContext.lcncRunners, kifBank)
         borg.trikeshed.narsese.SkillOverlapNode.register(moduleContext.lcncRunners, kifBank)
+        borg.trikeshed.narsese.NormClausesNode.register(moduleContext.lcncRunners, kifBank)
         // ── Rule admission: the seam that ends the live rete's dead spin —
         // the daemon boots causalityRete over ZERO rules; these admit law.
         causalityRete?.let { liveRete ->

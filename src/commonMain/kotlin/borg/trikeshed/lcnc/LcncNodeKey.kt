@@ -123,6 +123,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     SKILL_CURATE("skill.curate"),
     NL_RULES("nl.rules"),
     SKILL_OVERLAP("skill.overlap"),
+    NORM_CLAUSES("norm.clauses"),
     NAL_ATTEND("nal.attend"),
     NAL_REINFORCE("nal.reinforce"),
     NAL_ENCODE("nal.encode"),

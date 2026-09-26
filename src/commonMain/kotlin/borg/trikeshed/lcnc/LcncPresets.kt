@@ -339,6 +339,7 @@ object LcncPresets {
     fun all(): Map<String, String> = linkedMapOf(
         LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
         "preset-describe" to describe(),
+        "preset-norms" to norms(),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),
@@ -862,6 +863,33 @@ object LcncPresets {
             ).toSeries(),
             view = LcncView(x = 30.0, y = 20.0, zoom = 0.9),
             seq = 11,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    // ── norms: text → normative beliefs by section ──
+    private fun norms(): String {
+        val program = LcncProgram(
+            name = "preset-norms",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "A tenant must pay rent on time.\n\nNo tenant may sublet without consent.\n\n" +
+                    "A tenant must pay rent before the fifth day.\n\nNo tenant may sublet without written consent."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "norm.clauses", params = mapOf("promote" to "0.6"), x = 330.0, y = 60.0),
+                LcncNode("n3", "display", x = 630.0, y = 60.0),
+                LcncNode("n4", "note", params = mapOf("text" to
+                    "norms: any text in; sections are paragraphs unless a heading regex is set.\n" +
+                    "clauses restated across sections gain confidence; contradicted ones lose frequency.\n" +
+                    "bank: (norm ?subject ?predicate ?f ?c)"), x = 330.0, y = 260.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n2", "text"),
+                LcncWire("n2", "beliefs", "n3", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 5,
         )
         return LcncProgramConfix.toJson(program)
     }

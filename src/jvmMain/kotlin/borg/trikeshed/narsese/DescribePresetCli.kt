@@ -19,7 +19,8 @@ import java.io.File
 object DescribePresetCli {
     @JvmStatic
     fun main(args: Array<String>) = runBlocking {
-        val program = LcncProgramConfix.fromJson("preset-describe", LcncPresets.all().getValue("preset-describe"))
+        val name = args.getOrNull(1) ?: "preset-describe"
+        val program = LcncProgramConfix.fromJson(name, LcncPresets.all().getValue(name))
         val violations = LcncTypeCheck.check(program)
         println("[check] ${violations.size} violations" + violations.joinToString("") { "\n  $it" })
         val bank = KifKnowledgeBase()
@@ -28,12 +29,13 @@ object DescribePresetCli {
         runners["note"] = LcncNodeRunner { _, _ -> emptyMap() }
         runners[SkillCurateNode.TYPE] = SkillCurateNode.runner(File(args[0])) { bank.assertKif(it) }
         runners[SkillOverlapNode.TYPE] = SkillOverlapNode.runner(File(args[0])) { bank.assertKif(it) }
+        runners[NormClausesNode.TYPE] = NormClausesNode.runner { bank.assertKif(it) }
         ClassRuleLane().use { lane ->
             runners[NlRulesNode.TYPE] = NlRulesNode.runner(lane) { bank.assertKif(it) }
             val out = LcncRunner(runners).runAll(program)
-            for (id in listOf("n4", "n5", "n10")) println("[$id display] ${out[id]?.get("x")}")
+            for ((id, o) in out) println("[$id] " + o.entries.joinToString { (k, v) -> "$k=${v.toString().take(900)}" })
         }
-        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)", "(skillOverlap ?a ?b ?f ?c)"))
+        for (q in listOf("(ruleLearned ?a ?c)", "(ruleAnswer ?s ?c ?via ?f ?conf)", "(skillModelled ?s ?v)", "(skillOverlap ?a ?b ?f ?c)", "(norm ?s ?p ?f ?c)"))
             println("[bank] $q → " + bank.query(KifExpr.parse(q)).joinToString { b -> b.values.joinToString(" ") })
     }
 }
