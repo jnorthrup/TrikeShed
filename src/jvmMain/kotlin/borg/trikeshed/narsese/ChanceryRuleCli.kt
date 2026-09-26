@@ -17,18 +17,22 @@ import java.io.File
  * Usage: ChanceryRuleCli <gibson.txt> <fromSection> <toSection> <out.tsv>
  */
 object ChanceryRuleCli {
-    private val heading = Regex("""^§\s+(\d{1,4})\.\s+(.+?)\s*[.—]\s*—\s*(.*)$""")
+    private val heading = Regex("""^§\s+(\d{1,4})\.\s+(.*)$""")
 
-    /** Section number → cleaned body text, for sections whose heading carries the `— ` run-in. */
+    /**
+     * Section number → cleaned body text. A body heading is a `§ N.` line at full measure or carrying
+     * the `—` run-in; the short `§ N.` lines of a chapter's table of contents are neither. The first
+     * body heading for a number wins.
+     */
     fun sections(raw: String): Map<Int, String> {
         val out = LinkedHashMap<Int, StringBuilder>()
         var cur: StringBuilder? = null
         for (line in raw.lines()) {
             val flat = line.replace(Regex(" {2,}"), " ").trim()
             val h = heading.find(flat)
-            if (h != null) {
+            if (h != null && (line.length >= 60 || '—' in flat)) {
                 val n = h.groupValues[1].toInt()
-                cur = if (n in out) null else StringBuilder("${h.groupValues[2]}. ${h.groupValues[3]} ").also { out[n] = it }
+                cur = if (n in out) null else StringBuilder(h.groupValues[2].replace('—', '.')).append(' ').also { out[n] = it }
                 continue
             }
             // Body lines run the full measure; the footnote column is about half as wide.
@@ -38,7 +42,7 @@ object ChanceryRuleCli {
             b.toString()
                 .replace(Regex("""(\w)- ?\n(\w)"""), "$1$2")
                 .replace('\n', ' ')
-                .replace(Regex("""(?<=[a-z,;:.)])\d{1,3}(?=[\s,;.])"""), "")
+                .replace(Regex("""(?<=[a-z,;:.)])\d{1,4}(?=[\s,;.—])"""), "")
                 .replace(Regex("""\s+"""), " ")
                 .trim()
         }

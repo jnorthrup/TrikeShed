@@ -42,7 +42,8 @@ object ChanceryRules {
             fun phrase(t: NlpToken): String {
                 val mods = kids(t.index, *modifiers.toTypedArray()).mapNotNull { tokens[it.dependent] }
                     .filter { it.index < t.index }.sortedBy { it.index }
-                return (mods + t).joinToString(" ") { it.lemma.lowercase() }
+                // A possessive pronoun keeps its own form: CoreNLP lemmatises "his" to "he".
+                return (mods + t).joinToString(" ") { (if (it.tag == "PRP$") it.word else it.lemma).lowercase() }
             }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
             for (verb in tokens.values.filter { it.tag.startsWith("VB") }) {
