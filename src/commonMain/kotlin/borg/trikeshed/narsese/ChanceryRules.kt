@@ -47,14 +47,21 @@ object ChanceryRules {
             }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
             for (verb in tokens.values.filter { it.tag.startsWith("VB") }) {
-                val subj = kids(verb.index, "nsubj").mapNotNull { tokens[it.dependent] }.firstOrNull() ?: continue
+                val subjDep = kids(verb.index, "nsubj").firstOrNull() ?: continue
+                val subj = tokens[subjDep.dependent] ?: continue
                 if (!subj.tag.startsWith("NN")) continue
+                // "the bill will be dismissed": the subject is the patient, so the predicate is passive.
+                val passive = subjDep.relation.lowercase().endsWith(":pass")
+                // A bare copula ("the case is") carries no rule.
+                if (verb.lemma.lowercase() == "be" && kids(verb.index, "obj", "dobj", "xcomp", "obl").isEmpty()) continue
                 val aux = kids(verb.index, "aux").mapNotNull { tokens[it.dependent] }
                 val modal = aux.firstOrNull { it.lemma.lowercase() in modals || it.word.lowercase() in modals }
                 val generic = modal == null && verb.tag in setOf("VBZ", "VBP") && subj.lemma.lowercase() in court
                 if (modal == null && !generic) continue
-                val negated = kids(verb.index, "advmod", "neg", "det").mapNotNull { tokens[it.dependent] }
+                // Negation on the verb ("will not"), in the modal ("cannot"), or on the subject ("no one").
+                val negated = kids(verb.index, "advmod", "neg").mapNotNull { tokens[it.dependent] }
                     .any { it.lemma.lowercase() in negators } ||
+                    kids(subj.index, "det", "advmod").mapNotNull { tokens[it.dependent] }.any { it.lemma.lowercase() in negators } ||
                     modal?.word?.lowercase() == "cannot"
                 val obj = kids(verb.index, "obj", "dobj", "xcomp").mapNotNull { tokens[it.dependent] }.firstOrNull()
                 val obl = kids(verb.index, "obl").mapNotNull { tokens[it.dependent] }.firstOrNull()?.let { o ->
@@ -65,7 +72,7 @@ object ChanceryRules {
                     subject = phrase(subj),
                     modal = modal?.lemma?.lowercase()?.let { if (it == "can" && negated) "cannot" else it } ?: "generic",
                     affirmative = !negated,
-                    verb = verb.lemma.lowercase(),
+                    verb = (if (passive) "be_" else "") + verb.lemma.lowercase(),
                     obj = obj?.let(::phrase),
                     oblique = obl,
                     sentence = text,
