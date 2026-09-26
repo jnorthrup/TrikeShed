@@ -57,6 +57,10 @@ object NormClausesNode {
             mapOf("subject" to subj, "predicate" to pred, "frequency" to t.frequency, "confidence" to t.confidence,
                 "sections" to ledger.basis(s).toIntArray().toList())
         }.sortedByDescending { it["confidence"] as Float }
-        mapOf("beliefs" to beliefs, "clauses" to clauses, "sections" to secs.size)
+        // Affirmative beliefs are admissible law, shaped for nal.rule.admit; confidence is the discount.
+        val rules = beliefs.filter { (it["frequency"] as Float) > 0.5f }.map {
+            mapOf("antecedent" to it["subject"], "consequent" to it["predicate"], "copula" to "==>", "discount" to it["confidence"])
+        }
+        mapOf("beliefs" to beliefs, "rules" to rules, "clauses" to clauses, "sections" to secs.size)
     }
 }

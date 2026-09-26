@@ -941,9 +941,9 @@ object LcncContracts {
                 "promote" to LcncPortContract.LcncParamSpec(v = "0.7"),
             ), isEffect = true),
         LcncPortContract("norm.clauses", "text → sections → normative clauses → NAL beliefs by section",
-            listOf("text"), listOf("beliefs", "clauses", "sections"),
+            listOf("text"), listOf("beliefs", "rules", "clauses", "sections"),
             inputKinds = mapOf("text" to "text"),
-            outputKinds = mapOf("beliefs" to "json", "clauses" to "num", "sections" to "num"),
+            outputKinds = mapOf("beliefs" to "json", "rules" to "json", "clauses" to "num", "sections" to "num"),
             params = mapOf(
                 "heading" to LcncPortContract.LcncParamSpec(ph = "section heading regex (blank = paragraphs)"),
                 "generic" to LcncPortContract.LcncParamSpec(ph = "subjects whose present tense states a rule"),
