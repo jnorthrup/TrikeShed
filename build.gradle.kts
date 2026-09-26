@@ -1848,6 +1848,16 @@ tasks.register<JavaExec>("skillOverlap") {
     classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
 }
 
+// Gibson's Suits in Chancery → normative rules (CoreNLP dependency parse + NAL evidence by section).
+tasks.register<JavaExec>("chanceryRules") {
+    group = "narsese"
+    description = "Extract modal/generic rules from Gibson's Suits in Chancery sections; revise them as NAL evidence."
+    dependsOn("jvmJar")
+    mainClass.set("borg.trikeshed.narsese.ChanceryRuleCli")
+    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    maxHeapSize = "4g"
+}
+
 // skill.curate once over a profile: usage → lifecycle tuples → bank queries.
 tasks.register<JavaExec>("skillCurate") {
     group = "oroboros"
