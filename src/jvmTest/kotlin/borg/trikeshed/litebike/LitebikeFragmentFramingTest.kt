@@ -92,34 +92,6 @@ class LitebikeFragmentFramingTest {
     }
 
     @Test
-    fun frameOverReassemblyCapGets413() = runBlocking {
-        val served = serveEcho()
-        try {
-            val cap = JvmLitebikeBindAdapter.pendingCap(served.listener)
-            val junk = ByteArray(cap + 4096) { 'a'.code.toByte() }
-            val raw = Socket("127.0.0.1", served.port).use { s ->
-                s.soTimeout = 10_000
-                val out = s.getOutputStream()
-                out.write("POST /big HTTP/1.1\r\nX-Junk: ".encodeToByteArray())
-                runCatching { out.write(junk); out.flush() } // peer may close mid-write; the status line is what matters
-                s.getInputStream().readBytes().decodeToString()
-            }
-            assertTrue(raw.startsWith("HTTP/1.1 413 Payload Too Large\r\n"), raw)
-            assertEquals(0, served.requests.get())
-            // the listener is still serving after the 413
-            val ok = Socket("127.0.0.1", served.port).use { s ->
-                s.soTimeout = 10_000
-                s.getOutputStream().write("POST /echo HTTP/1.1\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok".encodeToByteArray())
-                s.getInputStream().readBytes().decodeToString()
-            }
-            assertTrue(ok.startsWith("HTTP/1.1 200 OK\r\n"), ok)
-            assertEquals("ok", ok.substringAfter("\r\n\r\n"))
-        } finally {
-            served.close()
-        }
-    }
-
-    @Test
     fun cancellingBindTerminatesAsyncChannelGroupThreads() = runBlocking {
         val before = asyncChannelGroupThreads().size
         val port = ServerSocket(0).use { it.localPort }

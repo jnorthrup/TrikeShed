@@ -58,22 +58,6 @@ import java.util.concurrent.TimeUnit
 object JvmLitebikeBindAdapter {
 
     /**
-     * Reassembly cap, in units of [LitebikeListenerElement.maxBatch]:
-     * an incomplete HTTP frame may hold at most
-     * `maxBatch * PENDING_FRAMES_PER_BATCH` bytes (64 KiB at the
-     * default maxBatch of 64) before the connection is answered with
-     * 413 and closed. Bounds the per-connection `pending` buffer.
-     */
-    const val PENDING_FRAMES_PER_BATCH: Int = 1024
-
-    /** Minimal reply for a frame that outgrew the reassembly cap. */
-    internal val PAYLOAD_TOO_LARGE: ByteArray =
-        "HTTP/1.1 413 Payload Too Large\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encodeToByteArray()
-
-    /** Effective reassembly cap for [element]. */
-    internal fun pendingCap(element: LitebikeListenerElement): Int = element.maxBatch * PENDING_FRAMES_PER_BATCH
-
-    /**
      * Bind + accept-loop on [port] and pipe every accepted byte stream
      * into [element]'s fanout. The bind + accept loop suspends the
      * current coroutine; cancel to stop.
@@ -200,8 +184,9 @@ object JvmLitebikeBindAdapter {
             supervisor: borg.trikeshed.userspace.nio.spi.NioSupervisor? = null,
         ) {
             val buf = ByteBuffer.allocate(8 * 1024)
-            var pending = ByteArray(0)
-            val cap = pendingCap(element)
+            // Reassembly buffer: grows by doubling, so a large body costs O(n), not O(n²).
+            var pending = ByteArray(64 * 1024)
+            var pendingSize = 0
             
             // Use a CompletableDeferred to wait for channel closure
             val done = kotlinx.coroutines.CompletableDeferred<Unit>()
@@ -219,35 +204,27 @@ object JvmLitebikeBindAdapter {
                                 done.complete(Unit)
                                 return
                             }
-                            val chunk = ByteArray(read).also { buf.flip(); buf.get(it) }
+                            buf.flip()
+                            if (pendingSize + read > pending.size) pending = pending.copyOf(maxOf(pending.size * 2, pendingSize + read))
+                            buf.get(pending, pendingSize, read)
+                            pendingSize += read
                             // Reassemble: one TCP read is not one request. An HTX
                             // client writes the head and the body as two writes, so
                             // frame HTTP/1.1 on Content-Length before dispatching —
                             // otherwise the body fragment is sniffed as its own
                             // protocol (Json) and the connection is dropped.
-                            pending = pending + chunk
-                            val head = pending.copyOf(minOf(pending.size, 8))
-                            val proto: Protocol = ProtocolDetector.detect(head, pending.size)
-                            if (proto == Protocol.Http && !httpFrameComplete(pending)) {
-                                if (pending.size > cap) {
-                                    // Frame outgrew the reassembly cap: answer 413 on
-                                    // this connection only (the registry write closes
-                                    // and unregisters it); the listener keeps serving.
-                                    pending = ByteArray(0)
-                                    runBlocking { connections.write(connId, PAYLOAD_TOO_LARGE) }
-                                    runCatching { ch.close() }
-                                    supervisor?.releaseIo()
-                                    done.complete(Unit)
-                                    return
-                                }
+                            val head = pending.copyOf(minOf(pendingSize, 8))
+                            val proto: Protocol = ProtocolDetector.detect(head, pendingSize)
+                            if (proto == Protocol.Http && !httpFrameComplete(pending, pendingSize)) {
                                 // Incomplete frame: keep the accumulated bytes and read
                                 // the next chunk into a cleared buffer; re-check on append.
                                 buf.clear()
                                 readLoop()
                                 return
                             }
-                            val bytes = pending
-                            pending = ByteArray(0)
+                            val bytes = pending.copyOf(pendingSize)
+                            pending = ByteArray(64 * 1024)
+                            pendingSize = 0
                             System.err.println("[BIND] conn=$connId frame complete proto=$proto bytes=${bytes.size} seq-alloc")
                             // R05 — the worker answers through the originating
                             // socket; the registry write closes the connection
@@ -306,18 +283,18 @@ object JvmLitebikeBindAdapter {
      * many body bytes follow it. Chunked request bodies are not framed
      * here (no caller sends them).
      */
-    internal fun httpFrameComplete(bytes: ByteArray): Boolean {
-        val boundary = indexOfHeaderBoundary(bytes)
+    internal fun httpFrameComplete(bytes: ByteArray, size: Int = bytes.size): Boolean {
+        val boundary = indexOfHeaderBoundary(bytes, size)
         if (boundary < 0) return false
         val headText = bytes.decodeToString(0, boundary)
         val contentLength = headText.split("\r\n")
             .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
-            ?.substringAfter(':')?.trim()?.toIntOrNull() ?: 0
-        return bytes.size - (boundary + 4) >= contentLength
+            ?.substringAfter(':')?.trim()?.toLongOrNull() ?: 0L
+        return size - (boundary + 4) >= contentLength
     }
 
-    private fun indexOfHeaderBoundary(bytes: ByteArray): Int {
-        for (i in 0..bytes.size - 4) {
+    private fun indexOfHeaderBoundary(bytes: ByteArray, size: Int): Int {
+        for (i in 0..size - 4) {
             if (bytes[i] == '\r'.code.toByte() && bytes[i + 1] == '\n'.code.toByte() &&
                 bytes[i + 2] == '\r'.code.toByte() && bytes[i + 3] == '\n'.code.toByte()
             ) return i

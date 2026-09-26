@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
 <link rel="stylesheet" href="/application-nav.css">
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Futon · trikeshed</title>
@@ -48,28 +47,28 @@ td.rev{color:var(--dim);max-width:130px}
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
-  <button title="Apply filter">go</button>
-  <button>new document</button>
+  <button onclick="firstPage()" title="Apply filter">go</button>
+  <button onclick="newDoc()">new document</button>
   <span id="info">…</span>
-  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
+  <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button onclick="qsInstall()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button onclick="qsFeedback()" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
 </div>
 <div id="wrap">
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button id="prevB"><span aria-hidden="true">‹</span> prev</button><button id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
   </div>
   <div id="edit">
     <div class="head">
       <input id="docid" placeholder="_id" >
-      <button class="primary">save</button>
-      <button>delete</button>
-      <button>reload</button>
+      <button class="primary" onclick="saveDoc()">save</button>
+      <button onclick="deleteDoc()">delete</button>
+      <button onclick="loadDoc(document.getElementById('docid').value)">reload</button>
     </div>
     <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
     <div class="att" id="att"></div>
     <div id="status">select a document, or create one</div>
   </div>
 </div>
-
+<script src="/kotlin/pages/pages.js" defer></script>
 </body>
 </html>

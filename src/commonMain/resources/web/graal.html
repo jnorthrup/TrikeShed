@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
 <link rel="stylesheet" href="/application-nav.css">
-
 <link rel="stylesheet" href="/allocation-inspector.css">
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Graal Console</title>
@@ -210,25 +208,25 @@ html[data-skin="marker"] #crumb{text-shadow:none}
   <div class="chip" id="cPoint"><b>–</b><span>pointcut routes</span></div>
   <div class="chip" id="cVm"><b>–</b><span>sub-vms</span></div>
   <div class="chip" id="cDocs"><b>–</b><span>documents</span></div>
-  <div class="chip" id="cAot" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
-  <div class="chip" id="cHermes" style="cursor:pointer"><b>XTERM256</b><span>hermes vm</span></div>
-  <div class="chip" id="cBoard" style="cursor:pointer"><b>0</b><span>blackboard</span></div>
+  <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
+  <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>XTERM256</b><span>hermes vm</span></div>
+  <div class="chip" id="cBoard" onclick="toggleBoard()" style="cursor:pointer"><b>0</b><span>blackboard</span></div>
 </div>
 <div id="river"></div>
-<div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
-<div class="panel" id="points"><header><b>pointcut routes</b><span class="x">✕</span></header><div class="body" id="pointsBody"></div></div>
-<div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x">✕</span></header><div class="body" id="vmsBody"></div></div>
-<div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x">✕</span></header><div class="body" id="sheetBody"></div></div>
-<div class="panel" id="ledger"><header><b id="ledgerTitle">ledger</b><span class="x">✕</span></header><div class="body" id="ledgerBody"></div></div>
-<div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x">✕</span></header><div class="body" id="aotBody"></div></div>
-<div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x">✕</span></header><div class="body" id="gcBody"></div></div>
-<div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x">✕</span></header><div class="body" id="zoomBody"></div></div>
-<div class="panel" id="board"><header><b>blackboard — durable facts</b><span class="x">✕</span></header><div class="body" id="boardBody"></div></div>
+<div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" onclick="toggleSheetView()" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x" onclick="hide('doc')">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
+<div class="panel" id="points"><header><b>pointcut routes</b><span class="x" onclick="hide('points')">✕</span></header><div class="body" id="pointsBody"></div></div>
+<div class="panel" id="vms"><header><b>graal sub-vms</b><span class="x" onclick="hide('vms')">✕</span></header><div class="body" id="vmsBody"></div></div>
+<div class="panel" id="sheet"><header><b id="sheetTitle">tree sheet</b><span class="x" onclick="hide('sheet')">✕</span></header><div class="body" id="sheetBody"></div></div>
+<div class="panel" id="ledger"><header><b id="ledgerTitle">ledger</b><span class="x" onclick="hide('ledger')">✕</span></header><div class="body" id="ledgerBody"></div></div>
+<div class="panel" id="aot"><header><b>HotSpot AOT cache</b><span class="x" onclick="hide('aot')">✕</span></header><div class="body" id="aotBody"></div></div>
+<div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x" onclick="hide('gc')">✕</span></header><div class="body" id="gcBody"></div></div>
+<div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x" onclick="hide('zoom')">✕</span></header><div class="body" id="zoomBody"></div></div>
+<div class="panel" id="board"><header><b>blackboard — durable facts</b><span class="x" onclick="hide('board')">✕</span></header><div class="body" id="boardBody"></div></div>
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>
 <div id="help"><b>wheel</b> zoom · <b>drag</b> pan · <b>drop folder</b> → project db · <b>right-click territory</b> kill db · <b>dblclick</b> dive · <b>click</b> inspect+edges · <b>0</b> fit · <b>T</b> tree sheet · <b>L</b> ledger · <b>P</b> pointcuts · <b>V</b> vms · <b>H</b> Hermes xterm256 · <b>A</b> AOT · <b>O</b> blackboard · <b>M</b> mode · <b>1/2/3</b> layer · <b>F</b> fog · <b>B</b> skin · <a href="/futon" style="color:var(--dim)">futon ↗</a> · <button id="qsLink" style="background:none;border:none;padding:0;font:inherit;color:var(--commit);cursor:pointer">⚡ install now</button> · <button id="fbLink" style="background:none;border:none;padding:0;font:inherit;color:var(--warn);cursor:pointer">⚑ feedback</button></div>
-<div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
-
+<div class="panel" id="vt"><header><b id="vtTitle">hermes vt</b><span><span class="x" onclick="vtKill()" title="interrupt + close the guest" style="margin-right:10px">⏻ kill</span><span class="x" onclick="hide('vt')">✕</span></span></header><div class="body" id="vtBody" style="padding:0"><pre id="vtScroll"></pre><div id="vtLine"><span id="vtPrompt">#</span><input id="vtInput" autocomplete="off" spellcheck="false"></div></div></div>
+<script src="/kotlin/graal/graal.js" defer></script>
 </body>
 </html>

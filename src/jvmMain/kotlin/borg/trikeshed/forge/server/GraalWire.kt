@@ -559,52 +559,7 @@ class GraalWire(
                 } finally { runCatching { java.nio.file.Files.deleteIfExists(tmpMd) } }
             }
             val shapeKey = runCatching { borg.trikeshed.kanban.ForgeKanbanIngest.planShape(markdown) }.getOrDefault("")
-            // 4) byte epistemic surface: organic Kolmogorov comprehension of raw bytes.
-            //    Persisted — chunks/links/signals become documents (cids, not scalars), so the
-            //    byte continent is zoomable and the signals feed the belief bag. Code fields
-            //    carry the 8/16-bit zoom rings minted by ByteEpistemicIngest.
-            val byteSurface = if (!texty) runCatching {
-                borg.trikeshed.cas.ByteEpistemicIngest.ingest(database.cas, bytes)
-            }.getOrNull() else null
-            if (byteSurface != null) {
-                val rev = database.store.head.getRev(docId)
-                for (ci in 0 until byteSurface.chunks.size) {
-                    val c = byteSurface.chunks[ci]
-                    database.store.put(borg.trikeshed.couch.Document(
-                        "$docId.chunks/${c.index}",
-                        listOf(
-                            borg.trikeshed.couch.Field("kind", "byte-chunk"),
-                            borg.trikeshed.couch.Field("sourceCid", byteSurface.sourceCid.value),
-                            borg.trikeshed.couch.Field("chunkCid", c.cid.value),
-                            borg.trikeshed.couch.Field("startOffset", c.startOffset.toString()),
-                            borg.trikeshed.couch.Field("endOffset", c.endOffset.toString()),
-                            borg.trikeshed.couch.Field("structuralKey", c.structuralKey.take(256)),
-                            borg.trikeshed.couch.Field("entropy", c.metrics.shannonBitsPerByte.toString()),
-                            borg.trikeshed.couch.Field("code", c.code.toString()),
-                            borg.trikeshed.couch.Field("codeRing8", c.codeRing8.toString()),
-                        ),
-                    ), rev)
-                }
-                val signalDocs = mutableListOf<Map<String, Any?>>()
-                for (si in 0 until byteSurface.signals.size) {
-                    val s = byteSurface.signals[si]
-                    val sid = "$docId.links/$si"
-                    database.store.put(borg.trikeshed.couch.Document(
-                        sid,
-                        listOf(
-                            borg.trikeshed.couch.Field("kind", "byte-link"),
-                            borg.trikeshed.couch.Field("sourceCid", byteSurface.sourceCid.value),
-                            borg.trikeshed.couch.Field("subjectCid", s.subjectCid ?: ""),
-                            borg.trikeshed.couch.Field("objectCid", s.objectCid ?: ""),
-                            borg.trikeshed.couch.Field("relation", s.relation.name),
-                            borg.trikeshed.couch.Field("angular", s.angular.toString()),
-                            borg.trikeshed.couch.Field("evidencePos", s.evidence.positive.toString()),
-                            borg.trikeshed.couch.Field("evidenceNeg", s.evidence.negative.toString()),
-                        ),
-                    ), rev)
-                    signalDocs += mapOf("id" to sid, "angular" to s.angular.toString(), "relation" to s.relation.name)
-                }
-            }
+            val byteSurface: borg.trikeshed.cas.ByteEpistemicSurface? = null
             JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
                 "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),

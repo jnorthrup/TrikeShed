@@ -41,7 +41,7 @@ group = "borg.trikeshed"
 version = "0.1.0-SNAPSHOT"
 val enableNativeSharedLib = providers.gradleProperty("native.sharedLib").orNull == "true"
 val enableBrowserTests = providers.gradleProperty("browserTests").orNull == "true"
-val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph")
+val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph", "graal", "harness", "pages")
 // Select the browser apps packaged with the daemon: -PkotlinJsApps=documents,spacegraph.
 val kotlinJsApps = providers.gradleProperty("kotlinJsApps").orElse(kotlinJsBrowserApps.joinToString(",")).get()
     .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
@@ -367,6 +367,14 @@ kotlin {
         // findByName("macosX64Test")?.dependsOn(posixTest)
         // linuxMain/linuxTest are connected where they are created, above.
         // T7 browser storage: IndexedDB test doubles for JS/Wasm storage tests.
+        getByName("jsMain") {
+            dependencies {
+                // Browser libraries the Kotlin/JS pages bind (were hand-vendored copies under web/vendor).
+                implementation(npm("lucide", "0.468.0"))
+                implementation(npm("d3-force", "3.0.0"))
+                implementation(npm("fflate", "0.8.2"))
+            }
+        }
         getByName("jsTest") {
             dependencies {
                 implementation(npm("fake-indexeddb", "6.0.0"))

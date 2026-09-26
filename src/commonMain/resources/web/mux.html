@@ -2,12 +2,10 @@
 <html lang="en">
 <head>
   <link rel="stylesheet" href="/application-nav.css">
-
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light"><title>ModelMux</title>
   <link rel="stylesheet" href="/mux.css">
-
-</head>
+  </head>
 <body data-app-page="mux">
   <aside class="sidebar">
     <a class="brand" href="/modelmux"><i data-lucide="workflow"></i><span>FORGE <b>MUX</b></span></a>
@@ -74,5 +72,6 @@
   </form></dialog>
   <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle">Rename session</h2><label>Title<input name="title" required maxlength="100"></label><div class="dialog-actions"><button type="button" data-action="close-rename">Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>
   <div id="toast" role="status" hidden></div>
+<script src="/kotlin/pages/pages.js" defer></script>
 </body>
 </html>
