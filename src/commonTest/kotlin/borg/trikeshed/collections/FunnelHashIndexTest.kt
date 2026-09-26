@@ -54,14 +54,14 @@ class FunnelHashIndexTest {
     }
 
     @Test fun manyKeys() {
-        val keys = (0 until 200).map { "key${it}" }.toTypedArray().toSeries()
+        val keys = (0 until 200).map { "key${it}" }.toSeries() /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
         val idx = FunnelHashIndex.build(keys, 0xcafeL)
         (0 until keys.size).forEach { i -> val k = keys[i]; assertEquals(i, idx.get(k)) }
         assertNull(idx.get("missing"))
     }
 
     @Test fun probeDistribution() {
-        val keys = (0 until 50).map { "key${it}" }.toTypedArray().toSeries()
+        val keys = (0 until 50).map { "key${it}" }.toSeries() /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
         val idx = FunnelHashIndex.build(keys, 0xcafeL)
         val probes = idx.probeDistribution()
         val probeSize = probes.size
@@ -71,8 +71,8 @@ class FunnelHashIndexTest {
 
     @Test fun testProbeDistributionScaling() {
         val n = 100000
-        val keys = (0 until n).map { "rand_key_${it.hashCode() * 31}" }.toTypedArray().toSeries()
-        val advKeys = (0 until n).map { "adv_${it shl 4}" }.toTypedArray().toSeries()
+        val keys = (0 until n).map { "rand_key_${it.hashCode() * 31}" }.toSeries() /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
+        val advKeys = (0 until n).map { "adv_${it shl 4}" }.toSeries() /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
 
         val slacks = listOf(0.05, 0.10, 0.20, 0.50)
 
