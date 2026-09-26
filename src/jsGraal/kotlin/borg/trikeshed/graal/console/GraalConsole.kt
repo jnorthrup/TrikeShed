@@ -518,7 +518,6 @@ object GraalConsole {
             packed += 12 + pb.size + buf.byteLength
         }
         for (f in files) {
-            if (num(f.file.size) > Ingest.FILE_CAP) { skipped++; continue } // request cap ~4MB
             frame(f.rel, f.file.arrayBuffer().unsafeCast<Promise<ArrayBuffer>>().await())
             if (packed > Ingest.BATCH_BYTES || frames.size >= Ingest.BATCH_PARTS) flushBatch()
         }

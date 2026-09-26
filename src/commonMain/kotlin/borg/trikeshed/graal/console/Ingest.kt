@@ -5,8 +5,6 @@ object Ingest {
     val PROJECT_MARKERS = Regex("^(settings\\.gradle(\\.kts)?|build\\.gradle(\\.kts)?|package\\.json|Cargo\\.toml|CMakeLists\\.txt|Makefile|pom\\.xml|go\\.mod|pyproject\\.toml|setup\\.py|mix\\.exs|Package\\.swift|.*\\.xcodeproj/.*)$")
     val SKIP_DIRS = setOf("node_modules", "build", "target", "dist", "out", "__pycache__", "venv", ".venv", ".git", ".gradle", ".idea", "DerivedData")
 
-    /** Files above this are skipped (request cap ~4MB). */
-    const val FILE_CAP = 3500000
     /** A batch flushes past this many packed bytes … */
     const val BATCH_BYTES = 3000000
     /** … or at this many frame parts. */

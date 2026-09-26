@@ -114,7 +114,6 @@ suspend fun Panels.onDrop(e: dynamic) {
                     frames.push(h.buffer, pb, l.buffer, buf); packed += 12 + num(pb.length) + num(buf.byteLength)
                 }
                 for ((rel, file) in files) {
-                    if (num(file.size) > 3500000) { skipped++; continue }
                     frame(rel, awaitJs(file.arrayBuffer()))
                     if (packed > 3000000 || num(frames.length) >= 256) flushBatch()
                 }
