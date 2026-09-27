@@ -68,6 +68,12 @@ object PureNodes {
         // silent the moment it ran headless — the canvas was the only place it
         // worked. Both run everywhere now.
         "text.value" to LcncNodeRunner { node, _ -> mapOf("value" to (node.params["value"] ?: "")) },
+        // The if/else join: exactly one guarded ring ran, so exactly one of a?/b? is present.
+        "merge" to LcncNodeRunner { node, inputs ->
+            val a = inputs["a"] ?: inputs["a?"]; val b = inputs["b"] ?: inputs["b?"]
+            require(a == null || b == null) { "merge ${node.id}: both branches yielded" }
+            mapOf("value" to (a ?: b))
+        },
         "json.value" to LcncNodeRunner { node, _ ->
             val raw = (node.params["value"] ?: "").trim()
             // A literal that will not parse must say so rather than quietly

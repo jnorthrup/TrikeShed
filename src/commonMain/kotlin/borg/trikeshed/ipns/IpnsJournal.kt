@@ -12,6 +12,13 @@ import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission.*
 import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermissions
 import kotlin.time.Instant
 
+/**
+ * Who takes a journal lease: this process's [id], and whether a recorded holder id still runs. With an
+ * owner the lease records its holder, so a lease left by a stopped process is reclaimed; without
+ * one (or when the lease names no holder) a held lease stays the operator's to remove.
+ */
+class IpnsLeaseOwner(val id: Long, val alive: (Long) -> Boolean)
+
 /** Durable signer and append-only signed versions. One publisher owns a journal at a time. */
 class IpnsJournal private constructor(
     private val channel: FileChannel,
@@ -63,18 +70,41 @@ class IpnsJournal private constructor(
     companion object {
         private val MAGIC = "TSIPNS01".encodeToByteArray()
         private const val HEADER_SIZE = 104
-        fun open(path: String, crypto: IpnsCrypto): IpnsJournal {
-            val permissions = PosixFilePermissions.asFileAttribute(setOf(OWNER_READ, OWNER_WRITE))
+        fun open(path: String, crypto: IpnsCrypto, owner: IpnsLeaseOwner? = null): IpnsJournal {
             val lease = "$path.lock"
-            // Exclusive creation also guards separate processes. A crash leaves an explicit stale lease;
-            // it must only be removed after the operator has established that its owner is stopped.
-            FileChannel.open(lease, setOf(WRITE, CREATE_NEW), permissions).close()
+            claim(lease, owner)
             return try { acquire(path, crypto, lease) }
             catch (failure: Throwable) {
                 runCatching { unlink(lease) }.exceptionOrNull()?.let(failure::addSuppressed)
                 throw failure
             }
         }
+
+        /**
+         * Exclusive creation also guards separate processes. A crash leaves the lease behind; it is
+         * reclaimed only when it names a holder [owner] can prove stopped — never a live or unnamed one.
+         */
+        private fun claim(lease: String, owner: IpnsLeaseOwner?) {
+            val permissions = PosixFilePermissions.asFileAttribute(setOf(OWNER_READ, OWNER_WRITE))
+            val channel = try { FileChannel.open(lease, setOf(WRITE, CREATE_NEW), permissions) }
+            catch (held: UringIOException) {
+                if (held.result != -17 || owner == null) throw held
+                val holder = holderOf(lease)
+                if (holder == null) throw IllegalStateException("IPNS journal lease $lease names no holder; remove it once its owner is stopped", held)
+                if (owner.alive(holder)) throw IllegalStateException("IPNS journal lease $lease is held by running process $holder", held)
+                unlink(lease)
+                FileChannel.open(lease, setOf(WRITE, CREATE_NEW), permissions)
+            }
+            try {
+                if (owner != null) { writeAll(channel, owner.id.toString().encodeToByteArray(), 0); channel.force(true) }
+            } finally { channel.close() }
+        }
+
+        private fun holderOf(lease: String): Long? = runCatching {
+            val channel = FileChannel.open(lease, setOf(READ))
+            try { channel.size().toInt().takeIf { it in 1..20 }?.let { readAll(channel, it, 0).decodeToString().trim().toLongOrNull() } }
+            finally { channel.close() }
+        }.getOrNull()
 
         private fun acquire(path: String, crypto: IpnsCrypto, lease: String): IpnsJournal {
             val permissions = PosixFilePermissions.asFileAttribute(setOf(OWNER_READ, OWNER_WRITE))

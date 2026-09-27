@@ -78,6 +78,51 @@ object TurtleRdf {
         return RdfGraph(triples, quads)
     }
 
+    /**
+     * SPARQL basic graph pattern over [graph]: `PREFIX p: <ns>` declarations, then `WHERE { … }`
+     * holding `s p o` patterns ended by `.`. Terms are `?var`, `<iri>`, `prefix:local`, `a`, or a
+     * literal. Patterns join on shared variables, left to right. Rows bind only `SELECT ?v …`
+     * variables (every variable for `SELECT *` or no SELECT).
+     */
+    fun select(graph: RdfGraph, sparql: String): List<Map<String, RdfTerm>> {
+        val prefixes = defaultPrefixes().toMutableMap()
+        for (m in Regex("""PREFIX\s+(\w*):\s*<([^>]+)>""", RegexOption.IGNORE_CASE).findAll(sparql)) prefixes[m.groupValues[1]] = m.groupValues[2]
+        val where = Regex("""\{([\s\S]*)\}""").find(sparql)?.groupValues?.get(1) ?: sparql
+        val token = Regex("""<[^>]*>|"(?:[^"\\]|\\.)*"(?:@\w+|\^\^(?:<[^>]+>|\w*:\w+))?|\?\w+|[^\s.;]+(?:\.[^\s.;]+)*|\.""")
+        val patterns = ArrayList<List<String>>()
+        var cur = ArrayList<String>()
+        for (m in token.findAll(where)) {
+            if (m.value == ".") { if (cur.isNotEmpty()) patterns.add(cur); cur = ArrayList(); continue }
+            cur.add(m.value)
+            if (cur.size == 3) { patterns.add(cur); cur = ArrayList() }
+        }
+        fun term(t: String): RdfTerm? = when {
+            t.startsWith("?") -> null
+            t == "a" -> RdfVocab.rdf("type")
+            else -> parseTerm(t.replace(Regex("""\^\^(\w*):(\w+)$""")) { "^^<" + (prefixes[it.groupValues[1]] ?: "") + it.groupValues[2] + ">" }, prefixes)
+        }
+        val compiled = patterns.filter { it.size == 3 }.map { p -> p.map { if (it.startsWith("?")) it else null } to p.map(::term) }
+        val triples = graph.allTriples()
+        var rows: List<Map<String, RdfTerm>> = listOf(emptyMap())
+        for ((vars, consts) in compiled) {
+            rows = rows.flatMap { row ->
+                triples.mapNotNull { t ->
+                    val parts = arrayOf(t.s, t.p, t.o)
+                    val out = HashMap(row)
+                    for (i in 0..2) {
+                        val v = vars[i]
+                        if (v == null) { if (consts[i] != parts[i]) return@mapNotNull null }
+                        else { val b = out[v]; if (b == null) out[v] = parts[i] else if (b != parts[i]) return@mapNotNull null }
+                    }
+                    out
+                }
+            }
+        }
+        val head = Regex("""SELECT\s+([\s\S]*?)\s+WHERE""", RegexOption.IGNORE_CASE).find(sparql)?.groupValues?.get(1)
+            ?.split(Regex("\\s+"))?.filter { it.startsWith("?") }?.takeIf { it.isNotEmpty() }
+        return if (head == null) rows else rows.map { r -> head.mapNotNull { v -> r[v]?.let { v to it } }.toMap() }
+    }
+
     private fun parseTerm(raw: String, prefixes: Map<String, String>): RdfTerm? {
         val t = raw.trim()
         return when {

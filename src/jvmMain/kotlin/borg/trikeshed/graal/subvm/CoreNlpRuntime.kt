@@ -12,35 +12,50 @@ import borg.trikeshed.vm.GuestModuleManifest
 import java.lang.reflect.InvocationTargetException
 import java.util.Properties
 
-/** A serialized pipeline per reader; models and implementation stay in the managed module. */
+/**
+ * A reader over the one process-wide pipeline: the models load once per module loader, not once per
+ * reader, and every reader serializes through it. A text parsed before is answered from a bounded
+ * cache, so curation passes that re-read the same sections cost no parse.
+ */
 class CoreNlpRuntime : NlpReader, AutoCloseable {
-    private var bridge: Bridge? = null
-
     override suspend fun read(text: String): NlpDocument = analyze(text)
 
-    @Synchronized
-    override fun close() {
-        bridge = null
-    }
+    /** The pipeline is shared; a reader holds nothing to release. */
+    override fun close() {}
 
-    @Synchronized
-    fun analyze(text: String): NlpDocument {
-        val loader = GuestModules.loaderFor(MODULE)
-            ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
-        val previous = Thread.currentThread().contextClassLoader
-        Thread.currentThread().contextClassLoader = loader
-        return try {
-            val current = bridge?.takeIf { it.loader === loader } ?: Bridge(loader, MODULE).also { bridge = it }
-            current.analyze(text)
-        } catch (e: InvocationTargetException) {
-            throw e.targetException
-        } finally {
-            Thread.currentThread().contextClassLoader = previous
-        }
-    }
+    fun analyze(text: String): NlpDocument = Companion.analyze(text)
 
     companion object {
         const val MODULE = "corenlp"
+        /** Cache bound, in characters of cached text. */
+        const val CACHED_CHARS = 8 shl 20
+
+        private var bridge: Bridge? = null
+        private var cachedChars = 0L
+        private val parsed = object : LinkedHashMap<String, NlpDocument>(256, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, NlpDocument>): Boolean =
+                (cachedChars > CACHED_CHARS).also { if (it) cachedChars -= eldest.key.length }
+        }
+
+        @Synchronized
+        private fun analyze(text: String): NlpDocument {
+            parsed[text]?.let { return it }
+            val loader = GuestModules.loaderFor(MODULE)
+                ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
+            val previous = Thread.currentThread().contextClassLoader
+            Thread.currentThread().contextClassLoader = loader
+            val doc = try {
+                val current = bridge?.takeIf { it.loader === loader } ?: Bridge(loader, MODULE).also { bridge = it }
+                current.analyze(text)
+            } catch (e: InvocationTargetException) {
+                throw e.targetException
+            } finally {
+                Thread.currentThread().contextClassLoader = previous
+            }
+            cachedChars += text.length
+            parsed[text] = doc
+            return doc
+        }
     }
 
     private class Bridge(val loader: ClassLoader, module: String) {

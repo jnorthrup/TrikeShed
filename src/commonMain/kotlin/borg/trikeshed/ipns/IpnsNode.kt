@@ -19,6 +19,7 @@ class IpnsNode(
     private val context: CoroutineContext,
     private val limits: IpnsDhtLimits = IpnsDhtLimits(),
     private val policy: IpnsPublicationPolicy = IpnsPublicationPolicy(),
+    private val leaseOwner: IpnsLeaseOwner? = null,
 ) : AsyncContextElement(parentJob = context[Job]) {
     init { requireNotNull(context[Job]) { "IPNS node requires an owning Job" } }
     companion object Key : CoroutineContext.Key<IpnsNode>
@@ -46,7 +47,7 @@ class IpnsNode(
         state = ElementState.OPEN
         try {
             supervisor.ensureActive()
-            val store = IpnsJournal.open(journalPath, crypto).also { journal = it }
+            val store = IpnsJournal.open(journalPath, crypto, leaseOwner).also { journal = it }
             val transport = UringLibp2pDialer(tlsBackend(store.identity), parentJob = supervisor,
                 timeoutMillis = limits.rpcTimeoutMillis, maxConnections = limits.parallelism,
                 context = context + this).also { dialer = it }

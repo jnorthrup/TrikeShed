@@ -44,6 +44,26 @@ class IpnsJournalTest {
         } finally { journal.close(); Files.delete(path); Files.delete(directory) }
     }
 
+    @Test fun leaseNamingAStoppedHolderIsReclaimedALiveOneIsNot() {
+        val directory = Files.createTempDirectory("ipns-lease-")
+        val path = directory.resolve("identity")
+        val lease = directory.resolve("identity.lock")
+        val live = setOf(1L)
+        fun owner(id: Long) = IpnsLeaseOwner(id) { it in live }
+        try {
+            IpnsJournal.open(path.toString(), crypto, owner(1)).close()
+            Files.write(lease, "1".toByteArray())     // left by a holder that still runs
+            assertFails { IpnsJournal.open(path.toString(), crypto, owner(2)) }
+            Files.write(lease, "99".toByteArray())    // left by a stopped holder
+            val journal = IpnsJournal.open(path.toString(), crypto, owner(2))
+            assertEquals("2", Files.readString(lease))
+            journal.close()
+            assertFalse(Files.exists(lease))
+            Files.write(lease, ByteArray(0))          // unnamed: the operator's to remove
+            assertFails { IpnsJournal.open(path.toString(), crypto, owner(2)) }
+        } finally { Files.deleteIfExists(lease); Files.deleteIfExists(path); Files.delete(directory) }
+    }
+
     @Test fun cancelledOwnerFinallyReleasesJournalLease() = runTest {
         val directory = Files.createTempDirectory("ipns-cancel-")
         val path = directory.resolve("identity")

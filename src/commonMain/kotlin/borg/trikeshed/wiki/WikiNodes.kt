@@ -571,12 +571,23 @@ object WikiNodes {
         val cidish = target.removePrefix("trace:").removePrefix("raw:").trim()
         if (cidish.startsWith("sha256:") || Regex("^[0-9a-f]{64}$").matches(cidish)) {
             val cid = if (cidish.startsWith("sha256:")) cidish else "sha256:$cidish"
-            val t = traces.load(cid) ?: return "(no trace with cid $cid)" to "not_found"
+            val t = traces.load(cid) ?: return withContext(fileIoContext) {
+                // A miss names the traces the wiki's own pages cite, the ones worth reading.
+                val cited = home.patterns.listFiles()?.filter { it.isFile() }.orEmpty()
+                    .flatMap { Regex("sha256:[0-9a-f]{64}").findAll(it.readText()).map { m -> m.value }.toList() }.distinct()
+                "(no trace with cid $cid; " + (if (cited.isEmpty()) "no pattern page cites a trace — propose from the pages read"
+                    else "traces cited by pattern pages: ${cited.take(16).joinToString(", ")}") + ")" to "not_found"
+            }
             return window(t.text, limit) to "trace:${t.source}"
         }
         val f = home.resolve(target) ?: return "(path outside the wiki: $target)" to "not_found"
         return withContext(fileIoContext) {
-            if (f.isFile()) f.readText().take(limit) to "wiki" else "(no such wiki file: $target)" to "not_found"
+            if (f.isFile()) f.readText().take(limit) to "wiki" else {
+                // A miss names what exists, so the next turn reads a real page or proposes from the summary.
+                val pages = home.patterns.listFiles()?.filter { it.isFile() }?.map { "patterns/${it.name}" }?.sorted().orEmpty()
+                "(no such wiki file: $target; " + (if (pages.isEmpty()) "the wiki has no pattern pages yet — propose from the outcome summary"
+                    else "pattern pages: ${pages.take(64).joinToString(", ")}") + ")" to "not_found"
+            }
         }
     }
 

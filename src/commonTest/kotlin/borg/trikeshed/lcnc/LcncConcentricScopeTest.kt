@@ -164,6 +164,41 @@ class LcncConcentricScopeTest {
             "true guard: the ring runs")
     }
 
+    // ── if (cond) { ring } else { ring }: one guard, two rings, one typed merge ──
+
+    @Test
+    fun elseRingRunsOnlyOnFalseAndMergeTakesTheRingThatRan() = runBlocking {
+        fun branched(cond: String) = program(
+            "ifelse",
+            listOf(
+                LcncNode("c", "source", params = mapOf("v" to cond)),
+                LcncNode("t", LcncContracts.SCOPE, children = listOf(
+                    LcncNode("ts", "source", params = mapOf("v" to "then")),
+                    LcncNode("to", LcncContracts.SCOPE_OUT, params = mapOf("name" to "v")),
+                ).toSeries()),
+                LcncNode("e", LcncContracts.SCOPE, params = mapOf("else" to "true"), children = listOf(
+                    LcncNode("es", "source", params = mapOf("v" to "else")),
+                    LcncNode("eo", LcncContracts.SCOPE_OUT, params = mapOf("name" to "v")),
+                ).toSeries()),
+                LcncNode("m", "merge"),
+            ),
+            listOf(
+                LcncWire("c", "out", "t", "when?"),
+                LcncWire("c", "out", "e", "when?"),
+                LcncWire("ts", "out", "to", "value"),
+                LcncWire("es", "out", "eo", "value"),
+                LcncWire("t", "v", "m", "a?"),
+                LcncWire("e", "v", "m", "b?"),
+            ),
+        )
+        val runner = LcncRunner(registry + PureNodes.registry { 0L }.filterKeys { it == "merge" })
+        for ((cond, want) in listOf("true" to "then", "false" to "else")) {
+            val out = runner.runProcedure(branched(cond)).nodeOutputs
+            assertEquals(want, (out["m"] as Map<*, *>)["value"], "guard $cond: merge carries the $want ring's yield")
+            assertTrue((if (cond == "true") "e" else "t") !in out, "guard $cond: the other ring is skipped")
+        }
+    }
+
     // ── line 1: inline ≡ named — a named ring is lazy containment and STILL
     //    sees the enclosing environment (the anti-vacuum gate) ──────────────
 

@@ -340,6 +340,7 @@ object LcncPresets {
         LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
         "preset-describe" to describe(),
         "preset-norms" to norms(),
+        "preset-constellation" to constellation(),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
         "preset-curator" to curator(),
@@ -890,6 +891,152 @@ object LcncPresets {
             ).toSeries(),
             view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
             seq = 5,
+        )
+        return LcncProgramConfix.toJson(program)
+    }
+
+    private fun constellation(): String {
+        val program = LcncProgram(
+            name = "preset-constellation",
+            nodes = listOf(
+                LcncNode("n1", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "No tenant may sublet the premises.\n\nA court may dismiss the bill."),
+                    x = 30.0, y = 60.0),
+                LcncNode("n2", "text.value", params = mapOf("value" to
+                    "A tenant must pay rent when it is due.\n\nThe landlord must repair the roof.\n\n" +
+                    "A tenant may sublet the premises.\n\nA judge must hear the witness."),
+                    x = 30.0, y = 260.0),
+                LcncNode("n3", "book.curate", params = mapOf("book" to "first", "work" to "lease", "date" to "1"), x = 330.0, y = 60.0),
+                LcncNode("n5", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 60.0),
+                // The second edition reads its words in the senses the first one's bearers resolved to.
+                LcncNode("n4", "book.curate", params = mapOf("book" to "second", "work" to "lease", "date" to "2", "constellation" to "leases"), x = 330.0, y = 260.0),
+                LcncNode("n6", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 260.0),
+                LcncNode("n7", "display", x = 930.0, y = 260.0),
+                LcncNode("n9", "constellation.render", params = mapOf("constellation" to "leases"), x = 930.0, y = 60.0),
+                // while (text changes) { text = render(parse(text)) }: the atoms go back through the parser
+                // until parse ∘ render is idempotent.
+                LcncNode("n10", LcncContracts.SCOPE, params = mapOf("carry" to "true", "limit" to "8"), x = 1230.0, y = 60.0,
+                    children = listOf(
+                        LcncNode("n11", LcncContracts.SCOPE_IN, params = mapOf("name" to "text")),
+                        LcncNode("n12", "constellation.render"),
+                        LcncNode("n13", LcncContracts.SCOPE_OUT, params = mapOf("name" to "text")),
+                        LcncNode("n14", LcncContracts.SCOPE_OUT, params = mapOf("name" to "drift")),
+                    ).toSeries()),
+                LcncNode("n15", "display", x = 1530.0, y = 60.0),
+                // for (command in tasks) { kanban.submit(command) }: conflicts and widely restated norms become cards.
+                LcncNode("n16", LcncContracts.SCOPE, params = mapOf("item" to "command"), x = 930.0, y = 460.0,
+                    children = listOf(
+                        LcncNode("n17", LcncContracts.SCOPE_IN, params = mapOf("name" to "command")),
+                        LcncNode("n18", "kanban.submit"),
+                        LcncNode("n19", LcncContracts.SCOPE_OUT, params = mapOf("name" to "card")),
+                    ).toSeries()),
+                LcncNode("n20", "display", x = 1230.0, y = 460.0),
+                // The wiki comes back as a book: its pages are sections, and it joins the same constellation.
+                LcncNode("n21", "wiki.read", x = 30.0, y = 660.0),
+                LcncNode("n22", "book.curate", params = mapOf("book" to "wiki", "work" to "wiki", "date" to "3", "heading" to "^§ "), x = 330.0, y = 660.0),
+                LcncNode("n23", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 660.0),
+                LcncNode("n24", "display", x = 930.0, y = 660.0),
+                // Norms inherit down SUMO: what a vehicle must do, a car and a truck must do, unless their own
+                // sections say otherwise (a truck's own exception revises the inherited default).
+                LcncNode("n25", "text.value", params = mapOf("value" to
+                    "A vehicle must stop at the crossing.\n\nA vehicle must carry a light.\n\n" +
+                    "A vehicle must carry a light.\n\nA vehicle must carry a light.\n\n" +
+                    "A truck must not carry a light.\n\nA vehicle must stop at the crossing."), x = 30.0, y = 860.0),
+                LcncNode("n26", "book.curate", params = mapOf("book" to "road", "work" to "road", "date" to "1"), x = 330.0, y = 860.0),
+                LcncNode("n27", "constellation.join", params = mapOf("constellation" to "roads"), x = 630.0, y = 860.0),
+                LcncNode("n28", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Automobile"), x = 930.0, y = 860.0),
+                LcncNode("n29", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Truck"), x = 930.0, y = 1000.0),
+                // The rete join: a conditioned norm fires only when its premise is among the facts.
+                LcncNode("n30", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant"), x = 1230.0, y = 60.0),
+                LcncNode("n31", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant",
+                    "facts" to "The rent is due."), x = 1230.0, y = 200.0),
+                // The answer edge: a book stating the fact a premise asks about closes it for the constellation.
+                LcncNode("n32", "text.value", params = mapOf("value" to "The rent is due on the first."), x = 30.0, y = 1100.0),
+                LcncNode("n33", "book.curate", params = mapOf("book" to "notice", "work" to "notice", "date" to "4"), x = 330.0, y = 1100.0),
+                LcncNode("n34", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 1100.0),
+                LcncNode("n35", "display", x = 930.0, y = 1100.0),
+                // for (move in settle(board)) { kanban.move(move) }: answered premise cards go to done.
+                LcncNode("n36", "board.get", x = 930.0, y = 1240.0),
+                LcncNode("n37", "constellation.settle", params = mapOf("constellation" to "leases"), x = 1230.0, y = 1240.0),
+                LcncNode("n38", LcncContracts.SCOPE, params = mapOf("item" to "command"), x = 1530.0, y = 1240.0,
+                    children = listOf(
+                        LcncNode("n39", LcncContracts.SCOPE_IN, params = mapOf("name" to "command")),
+                        LcncNode("n40", "kanban.move"),
+                        LcncNode("n41", LcncContracts.SCOPE_OUT, params = mapOf("name" to "card")),
+                    ).toSeries()),
+                LcncNode("n42", "display", x = 1830.0, y = 1240.0),
+                // The RDF atoms are queryable: which SUMO class bears which predicate, at what confidence.
+                LcncNode("n43", "rdf.select", params = mapOf("sparql" to
+                    "SELECT ?class ?predicate ?confidence WHERE { ?n a forge:Norm . ?n forge:bearerClass ?class . " +
+                    "?n forge:predicate ?predicate . ?n forge:confidence ?confidence . }"), x = 930.0, y = 1380.0),
+                LcncNode("n44", "display", x = 1230.0, y = 1380.0),
+                // The frontier as the wiki passes' outcome summary: wire `summary` into wiki.propose's summary?.
+                LcncNode("n45", "constellation.brief", params = mapOf("constellation" to "leases"), x = 930.0, y = 1520.0),
+                LcncNode("n46", "display", x = 1230.0, y = 1520.0),
+                // if (unresolved) { brief } else { settled }: two rings on one guard, joined by a typed merge.
+                LcncNode("n47", LcncContracts.SCOPE, x = 930.0, y = 1660.0, children = listOf(
+                    LcncNode("n48", "constellation.brief", params = mapOf("constellation" to "leases", "page" to "true")),
+                    LcncNode("n49", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary")),
+                    // The unresolved brief is the proposer's outcome summary: one atomic wiki proposal per run.
+                    LcncNode("n55", LcncContracts.WIKI_PROPOSE, params = mapOf("maxTurns" to "4", "contextId" to "constellation/leases")),
+                    LcncNode("n56", LcncContracts.SCOPE_OUT, params = mapOf("name" to "proposal")),
+                ).toSeries()),
+                LcncNode("n50", LcncContracts.SCOPE, params = mapOf("else" to "true"), x = 930.0, y = 1800.0, children = listOf(
+                    LcncNode("n51", "text.value", params = mapOf("value" to "Constellation 'leases' is settled: no conflicts, no open premises.")),
+                    LcncNode("n52", LcncContracts.SCOPE_OUT, params = mapOf("name" to "summary")),
+                ).toSeries()),
+                LcncNode("n53", "merge", x = 1230.0, y = 1730.0),
+                LcncNode("n54", "display", x = 1530.0, y = 1730.0),
+                LcncNode("n8", "note", params = mapOf("text" to
+                    "two editions of one work join a constellation: restated norms gain confidence, opposed force is a conflict,\n" +
+                    "bearers typed by SUMO class; frontier = new, untyped and conflicting statements as blackboard addresses.\n" +
+                    "bank: (norm ?id ?modality ?class ?predicate ?f ?c), (normSource ?id ?book ?section)"), x = 330.0, y = 460.0),
+            ).toSeries(),
+            wires = listOf(
+                LcncWire("n1", "value", "n3", "text"),
+                LcncWire("n2", "value", "n4", "text"),
+                LcncWire("n3", "book", "n5", "book?"),
+                LcncWire("n4", "book", "n6", "book?"),
+                LcncWire("n6", "frontier", "n7", "x"),
+                LcncWire("n9", "text", "n10", "text"),
+                LcncWire("n11", "value", "n12", "text?"),
+                LcncWire("n12", "text", "n13", "value"),
+                LcncWire("n12", "drift", "n14", "value"),
+                LcncWire("n10", "returns", "n15", "x"),
+                LcncWire("n6", "tasks", "n16", "each?"),
+                LcncWire("n17", "value", "n18", "command?"),
+                LcncWire("n18", "jobId", "n19", "value"),
+                LcncWire("n16", "card", "n20", "x"),
+                LcncWire("n21", "text", "n22", "text"),
+                LcncWire("n22", "book", "n23", "book?"),
+                LcncWire("n23", "frontier", "n24", "x"),
+                LcncWire("n25", "value", "n26", "text"),
+                LcncWire("n26", "book", "n27", "book?"),
+                LcncWire("n32", "value", "n33", "text"),
+                LcncWire("n33", "book", "n34", "book?"),
+                LcncWire("n34", "frontier", "n35", "x"),
+                LcncWire("n36", "json", "n37", "board?"),
+                LcncWire("n37", "moves", "n38", "each?"),
+                LcncWire("n39", "value", "n40", "command?"),
+                LcncWire("n40", "jobId", "n41", "value"),
+                LcncWire("n38", "card", "n42", "x"),
+                LcncWire("n34", "rdf", "n43", "turtle?"),
+                LcncWire("n43", "rows", "n44", "x"),
+                LcncWire("n34", "frontier", "n45", "trigger?"),
+                LcncWire("n45", "summary", "n46", "x"),
+                LcncWire("n34", "unresolved", "n47", "when?"),
+                LcncWire("n34", "unresolved", "n50", "when?"),
+                LcncWire("n48", "summary", "n49", "value"),
+                LcncWire("n48", "summary", "n55", "summary?"),
+                LcncWire("n55", "report", "n56", "value"),
+                LcncWire("n51", "value", "n52", "value"),
+                LcncWire("n47", "summary", "n53", "a?"),
+                LcncWire("n50", "summary", "n53", "b?"),
+                LcncWire("n53", "value", "n54", "x"),
+            ).toSeries(),
+            view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
+            seq = 9,
         )
         return LcncProgramConfix.toJson(program)
     }

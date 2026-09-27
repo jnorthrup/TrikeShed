@@ -1,6 +1,6 @@
 package borg.trikeshed.couch.wal;
 
-import borg.trikeshed.cursor.ConfixBlackboard;
+import borg.trikeshed.graal.ConfixBlackboard;
 import borg.trikeshed.cursor.ClassfileBlackboardAdapter;
 
 import java.io.BufferedReader;
@@ -124,6 +124,6 @@ public class CouchWal {
         wal.runGradleBuild();
         System.out.println("Parsing compiled classes...");
         wal.parseBuiltClasses();
-        System.out.println("Done. Registered classes: " + wal.getBlackboard().ids().size());
+        System.out.println("Done. Registered classes: " + wal.getBlackboard().keys().size());
     }
 }

@@ -12,9 +12,16 @@ import java.io.InputStream
  */
 object SumoFrozen {
     const val RESOURCE = "sumo/frozen.bin"
-    private const val MAGIC = 0x53554d31 // "SUM1"
+    private const val MAGIC = 0x53554d33 // "SUM3": every sense (CSR) and the axiom relation (CSR)
 
-    class Image(val taxonomy: SumoTaxonomy, val lexiconLemmas: Array<String>, val lexiconTerms: IntArray)
+    /**
+     * The lexicon is CSR: senses of lemma i are `lexiconTerms[lexiconStarts[i] until lexiconStarts[i+1]]`,
+     * preferred first. The axiom relation is CSR over term ids: `relatedIds[relatedStarts[t] until relatedStarts[t+1]]`.
+     */
+    class Image(
+        val taxonomy: SumoTaxonomy, val lexiconLemmas: Array<String>, val lexiconStarts: IntArray, val lexiconTerms: IntArray,
+        val relatedStarts: IntArray, val relatedIds: IntArray,
+    )
 
     fun write(out: DataOutputStream, image: Image) {
         val t = image.taxonomy
@@ -25,7 +32,8 @@ object SumoFrozen {
         strings(out, t.domainKeys); ints(out, t.domainClass); bools(out, t.domainSubclass)
         strings(out, t.rangeKeys); ints(out, t.rangeClass); bools(out, t.rangeSubclass)
         ints(out, t.counts)
-        strings(out, image.lexiconLemmas); ints(out, image.lexiconTerms)
+        strings(out, image.lexiconLemmas); ints(out, image.lexiconStarts); ints(out, image.lexiconTerms)
+        ints(out, image.relatedStarts); ints(out, image.relatedIds)
     }
 
     fun read(input: InputStream): Image {
@@ -39,7 +47,7 @@ object SumoFrozen {
             strings(d), ints(d), bools(d),
             ints(d),
         )
-        return Image(taxonomy, strings(d), ints(d))
+        return Image(taxonomy, strings(d), ints(d), ints(d), ints(d), ints(d))
     }
 
     private fun strings(out: DataOutputStream, a: Array<String>) {
@@ -55,10 +63,12 @@ object SumoFrozen {
     /** Freeze the full (else pinned) corpus and the WordNet noun lexicon to `args[0]`. */
     @JvmStatic
     fun main(args: Array<String>) {
-        val taxonomy = SumoCorpus.parsedTaxonomy()
-        val (lemmas, terms) = SumoCorpus.parsedLexicon(taxonomy)
+        val forms = SumoCorpus.forms().toList()
+        val taxonomy = SumoClassifier.taxonomy(forms)
+        val (lemmas, starts, terms) = SumoCorpus.parsedLexicon(taxonomy)
+        val (relStarts, relIds) = SumoCorpus.parsedRelated(taxonomy, forms)
         val file = File(args[0]).apply { parentFile.mkdirs() }
-        DataOutputStream(file.outputStream().buffered(1 shl 16)).use { write(it, Image(taxonomy, lemmas, terms)) }
-        println("froze ${taxonomy.names.size} terms, ${lemmas.size} lemmas → $file (${file.length()} bytes)")
+        DataOutputStream(file.outputStream().buffered(1 shl 16)).use { write(it, Image(taxonomy, lemmas, starts, terms, relStarts, relIds)) }
+        println("froze ${taxonomy.names.size} terms, ${lemmas.size} lemmas, ${terms.size} senses, ${relIds.size / 2} axiom pairs → $file (${file.length()} bytes)")
     }
 }

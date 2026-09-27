@@ -111,38 +111,7 @@ class SparqlKifMcpServer(
 
     private fun sparqlQuery(sparql: String): String {
         if (sparql.isBlank()) return err("sparql required")
-        // light: handle SELECT ?v WHERE { s p o } with vars ?x — we treat whole WHERE as one triple pattern
-        // fallback: try parse as KIF pattern
-        val whereRe = Regex("""WHERE\s*\{\s*([^}]+)\}""", RegexOption.IGNORE_CASE)
-        val where = whereRe.find(sparql)?.groupValues?.get(1)?.trim() ?: sparql
-        // where may be turtle-like triple; attempt TurtleRdf.parse for single triple query
-        val all = graph.allTriples()
-        // simple BGP: each line is a triple pattern with ?vars
-        val patterns = where.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
-        if (patterns.isEmpty()) return """{"bindings":[]}"""
-        // for light effort, unify first pattern against all triples
-        val pat = patterns[0].removeSuffix(".").trim()
-        val patParts = pat.split(Regex("\\s+"))
-        if (patParts.size < 3) return err("pattern needs 3 parts")
-        fun matchTerm(patTok: String, actual: String): Pair<Boolean, String?> {
-            if (patTok.startsWith("?")) return true to actual
-            // handle prefix:term or <iri> or "lit"
-            val normPat = if (patTok.contains(":")) TurtleRdf.parse("@prefix x: <http://example/> . $patTok <http://example/p> \"o\".").allTriples().firstOrNull()?.s?.toString() ?: patTok else patTok
-            return (patTok == actual || patTok.removeSurrounding("<", ">") == actual.removeSurrounding("<", ">")) to null
-        }
-        // degenerate: return all triples as bindings for ?vars in pattern
-        val vars = patParts.filter { it.startsWith("?") }
-        val bindings = mutableListOf<Map<String, String>>()
-        for (t in all) {
-            val candidates = listOf(t.s.toTurtle(), t.p.toTurtle(), t.o.toTurtle())
-            var ok = true
-            val map = mutableMapOf<String, String>()
-            for ((pi, pt) in patParts.withIndex()) {
-                if (pt.startsWith("?")) map[pt] = candidates.getOrNull(pi) ?: ""
-                else if (candidates.getOrNull(pi) != pt && candidates.getOrNull(pi)?.removeSurrounding("<", ">") != pt.removeSurrounding("<", ">")) { ok = false; break }
-            }
-            if (ok) bindings.add(map)
-        }
+        val bindings = TurtleRdf.select(graph, sparql).map { r -> r.mapValues { it.value.toTurtle() } }
         return """{"bindings":${rowsToJson(bindings)}}"""
     }
 

@@ -683,6 +683,9 @@ val freezeSumo = tasks.register<JavaExec>("freezeSumo") {
     val out = sumoFrozenDir.map { it.file("sumo/frozen.bin") }
     inputs.file("gradle/sumo-full-corpus.pins")
     inputs.file("gradle/sumo-corpus.pins")
+    // The image's format is the code's: re-freeze when the writer or the lexicon parse changes.
+    inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoFrozen.kt")
+    inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoCorpus.kt")
     outputs.file(out)
     argumentProviders.add(CommandLineArgumentProvider { listOf(out.get().asFile.absolutePath) })
 }
@@ -756,11 +759,23 @@ tasks.register<JavaExec>("runForgeJvm") {
 // watch `.class` files by mtime. The whole `build/` tree is gitignored.
 val stagingLibDir = layout.buildDirectory.dir("staging/lib")
 
+// The frozen SUMO image (full taxonomy + WordNet lexicon + axiom relation) as a jar: the daemon's
+// classpath is jars only (AOT rejects directories), and without it SumoCorpus falls back to the
+// pinned middle ontology, where e.g. Automobile is not a class.
+val sumoFrozenJar = tasks.register<Jar>("sumoFrozenJar") {
+    group = "data"
+    description = "Package build/generated/sumo-frozen (sumo/frozen.bin) for the daemon classpath."
+    dependsOn(freezeSumo)
+    from(sumoFrozenDir)
+    archiveClassifier.set("sumo-frozen")
+}
+
 val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     group = "oroboros"
     description = "Copy the JVM runtime classpath jars into build/staging/lib/ for debug-friendly launchers."
     dependsOn("jvmJar")
     from(configurations.named("jvmRuntimeClasspath"))
+    from(sumoFrozenJar)
     into(stagingLibDir)
 }
 

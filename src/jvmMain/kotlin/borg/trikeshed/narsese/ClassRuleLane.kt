@@ -93,6 +93,6 @@ class ClassRuleLane(private val nlp: () -> CoreNlpRuntime = { CoreNlpRuntime() }
 
     companion object {
         /** SUMO subclass/instance edges are axiomatic: near-certain premises for deduction. */
-        val IS_A = TruthCoord(1f, 0.99f)
+        val IS_A = Constellation.IS_A
     }
 }

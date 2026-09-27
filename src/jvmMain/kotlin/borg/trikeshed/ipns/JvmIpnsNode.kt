@@ -12,5 +12,6 @@ fun jvmIpnsNode(path: String, context: CoroutineContext,
     val crypto = JvmIpnsCrypto()
     return IpnsNode(path, crypto,
         IpnsDhtAddresses.bootstrap(bootstrap.split(',').toSeries(), limits.allowPrivateAddresses),
-        { identity -> JvmLibp2pTls(identity, crypto)::backend }, context, limits, policy)
+        { identity -> JvmLibp2pTls(identity, crypto)::backend }, context, limits, policy,
+        IpnsLeaseOwner(ProcessHandle.current().pid()) { pid -> ProcessHandle.of(pid).map { it.isAlive }.orElse(false) })
 }

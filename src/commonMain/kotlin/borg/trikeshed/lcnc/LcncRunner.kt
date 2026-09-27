@@ -301,9 +301,12 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 ?: node.type.takeIf { loader != null && it !in registry && LcncContracts.find(it) == null }
             val inline = node.children.size > 0
             if (inline || (subName != null && loader != null)) {
-                // if (cond) { ring }: a falsy guard skips — yields stay absent.
+                // if (cond) { ring }: a falsy guard skips — yields stay absent. An `else` ring runs
+                // only on a falsy guard; two rings on one guard, their yields joined by `merge`
+                // (typed a?: T, b?: T → T), are if/else with a checked merge.
                 val guard = if ("when" in inputs) inputs["when"] else inputs["when?"]
-                if (guard == false || guard == "false") continue
+                val falsy = guard == false || guard == "false"
+                if (falsy != (node.params["else"] == "true")) continue
 
                 val ringName = subName ?: node.id
                 // A reference cycle is a data error, not a stack overflow.
@@ -381,6 +384,30 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     continue
                 }
                 val childFrame = LcncScopeFrame(bindings = bound, chain = childChain, parent = frame, bindingSources = sources)
+                // while (…) { ring }: with `carry`, each iteration's yields rebind the same-named
+                // scope.in of the next (loop-carried values, source "carry"). The loop ends at the
+                // fixed point (carried yields unchanged), when the `until` yield is empty, or at `limit`.
+                if (node.params["carry"] == "true") {
+                    val limit = node.params["limit"]?.toIntOrNull()?.coerceAtLeast(1) ?: 64
+                    val until = node.params["until"]?.takeIf { it.isNotBlank() }
+                    val carried = LinkedHashMap(bound); val carriedSources = LinkedHashMap(sources)
+                    var yielded: Map<String, Any?> = emptyMap()
+                    var turns = 0
+                    while (turns < limit) {
+                        turns++
+                        val iterFrame = LcncScopeFrame(bindings = LinkedHashMap(carried), chain = childChain, parent = frame, bindingSources = LinkedHashMap(carriedSources))
+                        onScopeEnter?.invoke(pathNames + ringName, childChain)
+                        val next = withContext(iterFrame) {
+                            runRing(bodyNodes, if (inline) state else WalkState(bodyDoc!!), iterFrame, pathNames + ringName)
+                        }
+                        val fixed = turns > 1 && next == yielded
+                        yielded = next
+                        if (fixed || (until != null && empty(next[until]))) break
+                        for ((k, v) in next) { carried[k] = v; carriedSources[k] = "carry" }
+                    }
+                    frame.outputs[node.id] = yielded + ("returns" to yielded) + ("count" to turns)
+                    continue
+                }
                 onScopeEnter?.invoke(pathNames + ringName, childChain)
                 // Ring entry IS withContext: any suspend runner in the subtree
                 // reads currentCoroutineContext()[LcncScopeFrame] — block
@@ -406,6 +433,15 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
             frame.outputs[node.id] = runner.run(node, inputs)
         }
         return returns
+    }
+
+    /** A loop's `until` yield ends it when absent, false, zero, or an empty text/list/map. */
+    private fun empty(v: Any?): Boolean = when (v) {
+        null, false, "false", "" -> true
+        is Number -> v.toDouble() == 0.0
+        is Collection<*> -> v.isEmpty()
+        is Map<*, *> -> v.isEmpty()
+        else -> false
     }
 
     /** The body's non-optional `scope.in` names — a trailing `?` on the name or a declared default opts out. */
