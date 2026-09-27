@@ -16,6 +16,7 @@ fun main() {
 }
 
 private fun boot() {
+    if (document.getElementById("curator") != null) { CuratorPage.mount(); return }
     if (document.getElementById("world") == null) return
     val p = Panels()
     p.blip.install()

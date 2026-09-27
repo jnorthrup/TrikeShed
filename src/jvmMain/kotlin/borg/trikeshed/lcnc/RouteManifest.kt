@@ -103,6 +103,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/lcnc/facts", "the vocabulary, corpus wires and bindings as KIF tuples — what LcncFacts.parse reads back"),
             RouteEntry("POST", "/api/lcnc/run", "generic runner dispatch"),
             RouteEntry("GET", "/api/lcnc/content", "bounded immutable LCNC content by cid; raw JSON or shared sheet projection"),
+            RouteEntry("GET", "/api/lcnc/trail", "the LCNC activity ring drained from ?since=<seq>&nodes=<known>: packed begin/end/ring/yield/turn/skip/fail events, new node rows, and how many events the reader lost"),
             RouteEntry("GET", "/api/lcnc/runs", "the head run for a program's current version and canonical inputs (?program=&inputs=&show=): what a page's lcnc-run block shows — lamp, reason, receipt cid, rebuildOf, and the stale marker naming the moved documents"),
             RouteEntry("POST", "/api/lcnc/run/cancel", "cancel an active scoped run; receipt lands on the durable work timeline"),
             RouteEntry("POST", "/api/lcnc/run/rebuild", "re-execute a completed receipt's exact program version with its recorded inputs {runId} or {receiptCid}; the new receipt names rebuildOf and retires the old stale marker"),

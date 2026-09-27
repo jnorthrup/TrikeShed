@@ -229,6 +229,7 @@ internal class LcncRunService(
                     record("start", "running")
                     val walker = LcncRunner(ctx.lcncRunners).apply {
                         maxNodeExecutions = maxNodes
+                        trail = borg.trikeshed.lcnc.LcncTrail.live
                         // What the run READS rides the receipt (Cut F/S): stored prompts by name to cid,
                         // project documents and listings by id to cid, one fingerprint over the cids.
                         ledger = LcncConsumedLedger()

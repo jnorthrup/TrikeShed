@@ -485,6 +485,9 @@ class JvmKanbanServer(
         // the concentric construction canvas rides the page plane, not a module
         // claim — ModuleRouteRegistry is exact /api/* by discipline
         "/panels" to ("web/panels.html" to "text/html; charset=utf-8"),
+        // the curator scope: live LCNC activity grown as a tree, drained from /api/lcnc/trail
+        "/curator" to ("web/curator.html" to "text/html; charset=utf-8"),
+        "/curator.html" to ("web/curator.html" to "text/html; charset=utf-8"),
         // the blackboard harness draws board territories and LCNC typed cables
         "/harness.html" to ("web/harness.html" to "text/html; charset=utf-8"),
         "/harness" to ("web/harness.html" to "text/html; charset=utf-8"),

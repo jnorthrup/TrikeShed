@@ -109,6 +109,15 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     /** Deepest scope nesting a single walk may enter — a cycle of subprogram
      *  references is a data error and must surface, not stack-overflow. */
     var maxScopeDepth: Int = 16
+
+    /** The activity ring this walk fills (node begin/end, rings, yields, loop turns); null fills nothing. */
+    var trail: LcncTrail? = null
+    private var trailRun = -1
+    private var trailProgram = ""
+    private fun mark(kind: LcncTrail.Kind, path: List<String>, node: LcncNode, note: String? = null) {
+        val t = trail ?: return
+        t.emit(trailRun, kind, t.node(trailProgram, path, node.id, node.type), note)
+    }
     var maxNodeExecutions: Int = 10000
     private var executedNodes: Int = 0
     private val argumentBindings = ArrayList<Map<String, Any?>>()
@@ -160,6 +169,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
     suspend fun runProcedure(program: LcncProgram, args: Map<String, Any?> = emptyMap()): ScopeResult {
         require(!program.controls.inspectionOnly) { "Inspection-only wiring specimen; execution is disabled" }
         executedNodes = 0
+        trail?.let { trailProgram = program.name; trailRun = it.run(program.name) }
         argumentBindings.clear()
         bindingsTruncated = false
         val state = WalkState(program)
@@ -282,6 +292,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 if (fed) {
                     if (name != null) returns[name] = inputs["value"] ?: inputs["value?"]
                     frame.outputs[node.id] = emptyMap()
+                    mark(LcncTrail.Kind.YIELD, pathNames, node, name)
                 }
                 continue
             }
@@ -306,9 +317,10 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 // (typed a?: T, b?: T → T), are if/else with a checked merge.
                 val guard = if ("when" in inputs) inputs["when"] else inputs["when?"]
                 val falsy = guard == false || guard == "false"
-                if (falsy != (node.params["else"] == "true")) continue
+                if (falsy != (node.params["else"] == "true")) { mark(LcncTrail.Kind.SKIP, pathNames, node, "guard"); continue }
 
                 val ringName = subName ?: node.id
+                mark(LcncTrail.Kind.RING, pathNames, node, ringName)
                 // A reference cycle is a data error, not a stack overflow.
                 if (pathNames.size >= maxScopeDepth) throw LcncScopeDepthExceeded(pathNames + ringName)
 
@@ -365,7 +377,8 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     // Every declared yield name is a list even when nothing iterates: an empty
                     // corpus yields empty lists, not absent ports.
                     for (c in bodyNodes.view) if (c.type == LcncContracts.SCOPE_OUT) c.params["name"]?.removeSuffix("?")?.let { perName.getOrPut(it) { ArrayList() } }
-                    for (element in each.take(limit)) {
+                    for ((turn, element) in each.take(limit).withIndex()) {
+                        mark(LcncTrail.Kind.TURN, pathNames, node, "item ${turn + 1}")
                         val iterBound = LinkedHashMap(bound).also { it[itemName] = element }
                         val iterSources = LinkedHashMap(sources).also { it[itemName] = "each" }
                         // A named body re-walks from a fresh state per iteration; an inline
@@ -395,6 +408,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     var turns = 0
                     while (turns < limit) {
                         turns++
+                        mark(LcncTrail.Kind.TURN, pathNames, node, "turn $turns")
                         val iterFrame = LcncScopeFrame(bindings = LinkedHashMap(carried), chain = childChain, parent = frame, bindingSources = LinkedHashMap(carriedSources))
                         onScopeEnter?.invoke(pathNames + ringName, childChain)
                         val next = withContext(iterFrame) {
@@ -427,10 +441,14 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
             // Readiness: every REQUIRED input must be fed (silent degrade).
             val required = requiredInputs(node.type)
                 ?: state.wiresTo[node.id].orEmpty().map { it.toPort }.filterNot { it.endsWith("?") }.toSet()
-            if (required.any { req -> inputs[req] == null }) continue
+            if (required.any { req -> inputs[req] == null }) { mark(LcncTrail.Kind.SKIP, pathNames, node, "unfed"); continue }
 
             val runner = registry[node.type] ?: throw LcncUnknownNodeType(node.type)
-            frame.outputs[node.id] = runner.run(node, inputs)
+            mark(LcncTrail.Kind.BEGIN, pathNames, node)
+            val produced = try { runner.run(node, inputs) }
+                catch (failure: Throwable) { mark(LcncTrail.Kind.FAIL, pathNames, node, failure.message); throw failure }
+            frame.outputs[node.id] = produced
+            mark(LcncTrail.Kind.END, pathNames, node, if (trail != null) LcncTrail.summary(produced) else null)
         }
         return returns
     }

@@ -627,6 +627,14 @@ class KanbanModule : ForgeModule {
         // in commonMain (LcncRunHead) so the page, this route and a curl reader cannot disagree.
         // ModuleRouteRegistry claims are EXACT paths with the query stripped, so /api/lcnc/runs is
         // its own key and neither it nor /api/lcnc/run shadows the other.
+        // The activity ring's drain: events after ?since= (a sequence) and node rows past ?nodes=.
+        ctx.routes.claim(id, "/api/lcnc/trail") { method, path, _, _ ->
+            if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+            val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(borg.trikeshed.lcnc.LcncTrail.live.since(
+                query["since"]?.toLongOrNull() ?: 0L, query["nodes"]?.toIntOrNull() ?: 0)))
+        }
+
         ctx.routes.claim(id, "/api/lcnc/runs") { method, path, _, _ ->
             if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))

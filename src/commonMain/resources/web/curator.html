@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/application-nav.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Curator scope · trikeshed</title>
+<link rel="icon" href="/icons/forge-icon.svg">
+<style>
+:root{--bg:#0b0e14;--panel:#121722;--line:#232b3a;--ink:#e3e7ef;--dim:#8b94a7;--gold:#f0c870}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+header{display:flex;gap:14px;align-items:baseline;padding:8px 14px;border-bottom:1px solid var(--line)}
+header b{color:var(--gold);font-size:16px;letter-spacing:.02em}
+header span{color:var(--dim)}
+header kbd{background:#1b2230;border:1px solid var(--line);border-radius:3px;padding:0 5px;font:11px ui-monospace,monospace;color:var(--ink)}
+#status{margin-left:auto;font:12px ui-monospace,monospace}
+main{flex:1;display:flex;min-height:0}
+#curator{flex:1;position:relative;overflow:hidden;cursor:grab;touch-action:none}
+#curator:active{cursor:grabbing}
+#curator-panel{width:320px;border-left:1px solid var(--line);background:var(--panel);padding:16px;overflow:auto}
+#curator-panel .glyph{width:44px;height:44px;border-radius:50%;box-shadow:0 0 28px currentColor;margin-bottom:10px}
+#curator-panel h2{margin:0 0 6px;font-size:20px;text-transform:capitalize}
+#curator-panel h2 span{display:block;font-size:13px;color:var(--gold);font-weight:400;text-transform:none}
+#curator-panel .gloss{color:#c9d0dc;font-style:italic}
+#curator-panel dl{display:grid;grid-template-columns:64px 1fr;gap:2px 8px;font-size:12px}
+#curator-panel dt{color:var(--dim)} #curator-panel dd{margin:0;font-family:ui-monospace,monospace;word-break:break-all}
+#curator-panel h3{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 4px}
+#curator-panel ol{padding-left:18px;margin:0;font:11.5px/1.5 ui-monospace,monospace;color:#b8c2d0}
+.dim{color:var(--dim)}
+</style>
+</head>
+<body data-app-page="curator">
+<header><b>Curator scope</b><span>live LCNC curation as a growing tree — wheel/drag to take the camera, it returns to follow after a while · <kbd>space</kbd> pin · <kbd>F</kbd> follow · click a node for its story</span><span id="status"><span id="curator-status">connecting…</span></span></header>
+<main><div id="curator" aria-label="Live curation tree"></div><aside id="curator-panel" aria-live="polite"></aside></main>
+<script src="/kotlin/spacegraph/spacegraph.js" defer></script>
+</body>
+</html>
