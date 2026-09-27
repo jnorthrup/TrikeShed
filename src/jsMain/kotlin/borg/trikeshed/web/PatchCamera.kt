@@ -1,5 +1,6 @@
 package borg.trikeshed.web
 
+import borg.trikeshed.landscape.LandscapeMomentum
 import borg.trikeshed.landscape.LandscapeNavigation
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -135,40 +136,30 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
         }
     }
 
-    /* momentum — pan velocity in screen px/ms, zoom velocity in log-scale per 16.7ms anchored at the
-       last wheel point. Frame-rate independent decay. Off under prefers-reduced-motion. */
+    /* momentum — the common LandscapeMomentum: pan velocity in screen px/ms, zoom velocity in
+       log-scale per 16.7ms anchored at the last wheel point. Off under prefers-reduced-motion. */
     val reducedMotion: Boolean = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    private var vx = 0.0; private var vy = 0.0; private var zv = 0.0; private var ax = 0.0; private var ay = 0.0
-    private var momT = 0.0; private var momFrame = 0; private var panning = false
+    private val momentum = LandscapeMomentum(reducedMotion)
+    private var momFrame = 0
 
-    fun killMomentum() { vx = 0.0; vy = 0.0; zv = 0.0 }
+    fun killMomentum() = momentum.kill()
 
     private fun now(): Double = window.performance.now()
 
     private fun tickMomentum() {
         momFrame = 0
-        val t = now(); val dt = min(50.0, t - momT); momT = t
-        if (reducedMotion) { killMomentum(); return }
-        val k = dt / 16.7
-        var live = false
-        if (!panning && (abs(vx) > 0.002 || abs(vy) > 0.002)) {
-            view.x = num(view.x) + vx * dt; view.y = num(view.y) + vy * dt
-            val fr = 0.93.pow(k); vx *= fr; vy *= fr
-            if (abs(vx) <= 0.002 && abs(vy) <= 0.002) { vx = 0.0; vy = 0.0 } else live = true
-        }
-        if (abs(zv) > 0.0008) {
-            val f = exp(zv * k)
-            val ceiling = scopeZoomCeiling(ax, ay)
+        val g = momentum.frame(now()) ?: return
+        view.x = num(view.x) + g.dx; view.y = num(view.y) + g.dy
+        if (g.factor != 1.0) {
+            val ceiling = scopeZoomCeiling(g.ax, g.ay)
             val before = num(view.z)
-            PatchNavigation.zoomAt(view, num(view.z) * f, ax, ay, ceiling)
+            PatchNavigation.zoomAt(view, num(view.z) * g.factor, g.ax, g.ay, ceiling)
             val h = harness()
-            if (num(view.z) > before && h != null) h.observeZoom(ax, ay)
-            if (num(view.z) == before || num(view.z) == ceiling || num(view.z) == LandscapeNavigation.minZoom) zv = 0.0
-            else zv *= 0.88.pow(k)
-            if (abs(zv) <= 0.0008) zv = 0.0 else live = true
+            if (num(view.z) > before && h != null) h.observeZoom(g.ax, g.ay)
+            momentum.landed(g, before, num(view.z), ceiling)
         }
         applyView()
-        if (live) glide() else saveCameraSoon()
+        if (momentum.live) glide() else saveCameraSoon()
     }
 
     private fun glide() { if (momFrame == 0) momFrame = window.requestAnimationFrame { tickMomentum() } }
@@ -188,30 +179,25 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
     }
 
     /** deltaMode: 0=pixel, 1=line, 2=page. Firefox sends lines. */
-    private fun wheelPixels(e: dynamic, rectHeight: Double): Double {
-        val k = if (e.deltaMode == 1) 16.0 else if (e.deltaMode == 2) rectHeight else 1.0
-        return num(e.deltaY) * k
-    }
+    private fun wheelPixels(e: dynamic, rectHeight: Double): Double =
+        LandscapeMomentum.wheelPixels(num(e.deltaY), num(e.deltaMode).toInt(), rectHeight)
 
     fun install() {
         on(viewport, "pointerdown", { e ->
             if (e.button != 0) return@on
             val hb = harness(); if (hb != null) hb.terrainBookmark = null
-            killMomentum(); panning = true
-            viewport.classList.add("panning")
             val sx = num(e.clientX); val sy = num(e.clientY); val ox = num(view.x); val oy = num(view.y)
-            var lx = sx; var ly = sy; var velX = 0.0; var velY = 0.0; var velT = now()
+            momentum.press(sx, sy, now())
+            viewport.classList.add("panning")
             lateinit var mv: (dynamic) -> Unit
             lateinit var up: (dynamic) -> Unit
             mv = { ev ->
                 view.x = ox + num(ev.clientX) - sx; view.y = oy + num(ev.clientY) - sy; applyView()
-                val t = now(); val dt = max(1.0, t - velT)
-                velX = 0.75 * velX + 0.25 * ((num(ev.clientX) - lx) / dt); velY = 0.75 * velY + 0.25 * ((num(ev.clientY) - ly) / dt)
-                lx = num(ev.clientX); ly = num(ev.clientY); velT = t
+                momentum.drag(num(ev.clientX), num(ev.clientY), now())
             }
             up = {
-                panning = false; viewport.classList.remove("panning"); off(window, "pointermove", mv); off(window, "pointerup", up); saveCameraSoon()
-                if (!reducedMotion && now() - velT < 80) { vx = velX; vy = velY; momT = now(); glide() }
+                viewport.classList.remove("panning"); off(window, "pointermove", mv); off(window, "pointerup", up); saveCameraSoon()
+                if (momentum.release(now())) glide()
             }
             on(window, "pointermove", mv); on(window, "pointerup", up)
         })
@@ -228,15 +214,7 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
             val h = harness()
             if (num(view.z) > before && h != null) h.observeZoom(px, py)
             applyView(); saveCameraSoon()
-            if (!reducedMotion) {
-                ax = px; ay = py; vx = 0.0; vy = 0.0
-                if (num(view.z) == before || num(view.z) == ceiling || num(view.z) == LandscapeNavigation.minZoom) zv = 0.0
-                else {
-                    if (sign(zv) != sign(ln(f))) zv = 0.0
-                    zv = max(-0.12, min(0.12, zv + ln(f) * 0.28))
-                }
-                momT = now(); if (zv != 0.0) glide()
-            }
+            if (momentum.wheel(px, py, f, before, num(view.z), ceiling, now())) glide()
         }, passive)
     }
 

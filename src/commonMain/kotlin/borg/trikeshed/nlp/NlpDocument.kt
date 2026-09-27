@@ -16,12 +16,26 @@ data class NlpToken(
 /** Sentence-local, one-based indices; governor zero denotes the parser's explicit root. */
 data class NlpDependency(val governor: Int, val dependent: Int, val relation: String)
 
+/**
+ * An open relation triple (subject; relation; object) as token-index spans of its sentence, with the
+ * extractor's confidence. Natural-logic polarity is carried on the relation's own tokens.
+ */
+data class NlpRelation(
+    val subject: IntRange, val relation: IntRange, val `object`: IntRange,
+    val subjectText: String, val relationText: String, val objectText: String,
+    val confidence: Double,
+)
+
+/** A coreference mention (sentence ordinal, token span) and the representative mention of its chain. */
+data class NlpMention(val sentence: Int, val span: IntRange, val text: String, val chain: Int, val representative: Boolean)
+
 data class NlpSentence(
     val index: Int,
     val begin: Int,
     val end: Int,
     val tokens: Series<NlpToken>,
     val dependencies: Series<NlpDependency>,
+    val relations: List<NlpRelation> = emptyList(),
 )
 
 /**
@@ -38,7 +52,11 @@ data class NlpMetadata(
 )
 
 /** [metadata] is null when the reader reports none: fixtures and records from before it existed. */
-data class NlpDocument(val text: String, val sentences: Series<NlpSentence>, val metadata: NlpMetadata? = null)
+data class NlpDocument(
+    val text: String, val sentences: Series<NlpSentence>, val metadata: NlpMetadata? = null,
+    /** Coreference mentions across the whole text, when the reader resolves them. */
+    val mentions: List<NlpMention> = emptyList(),
+)
 
 fun interface NlpReader {
     suspend fun read(text: String): NlpDocument

@@ -99,19 +99,19 @@ class Book(
     val support: List<IntArray>,
     /** Facts the book states, in premise form: what answers another book's conditions. */
     val facts: Set<String> = emptySet(),
+    /** Section → section pointers found in its prose (the citation tupler), as (from, to) ordinals. */
+    val cites: List<Pair<Int, Int>> = emptyList(),
 ) {
     init { require(statements.size == support.size) }
 
     companion object {
-        /** A section's heading: its number and title, up to the title's closing period. */
-        fun heading(section: String): String {
-            val afterNumber = Regex("""^\S+\s*[\w.]+\.\s""").find(section)?.range?.last ?: 0
-            val end = section.indexOf(". ", afterNumber).let { if (it < 0) section.length else it + 1 }
-            return section.substring(0, minOf(end, afterNumber + 100, section.length)).trim()
-        }
+        /** A section's heading: its opening line, where the section tupler cut it, bounded for display. */
+        fun heading(section: String): String = section.take(HEADING).substringBefore(". ", section.take(HEADING)).trim()
+
+        const val HEADING = 120
 
         fun of(name: String, work: String, date: String, sections: List<String>, clauses: List<List<NormClause>>,
-               classOf: (NormClause) -> Int = { -1 }, facts: Set<String> = emptySet()): Book {
+               classOf: (NormClause) -> Int = { -1 }, facts: Set<String> = emptySet(), cites: List<Pair<Int, Int>> = emptyList()): Book {
             val index = LinkedHashMap<String, Int>()
             val statements = ArrayList<NormStatement>()
             val sectionsOf = ArrayList<IntAccumulator>()
@@ -120,7 +120,7 @@ class Book(
                 val at = index.getOrPut(s.key) { statements.add(s); sectionsOf.add(IntAccumulator(4)); statements.size - 1 }
                 sectionsOf[at].add(ordinal)
             }
-            return Book(name, work, date, sections.map(::heading), statements, sectionsOf.map { it.toRoaring().toIntArray() }, facts)
+            return Book(name, work, date, sections.map(::heading), statements, sectionsOf.map { it.toRoaring().toIntArray() }, facts, cites)
         }
     }
 }

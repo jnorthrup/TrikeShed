@@ -64,6 +64,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/snapshots/{cid}", "one snapshot's canonical bytes, cid-verified"),
             RouteEntry("GET", "/api/projects/{name}/docs", "a mounted project's document listing (prefix, glob, limit)"),
             RouteEntry("GET", "/api/projects/{name}/docs/{id}", "one project document: text, cid, rev, seq, and the miner's extract twin"),
+            RouteEntry("PUT", "/api/projects/{name}/notes/{id}", "curation notes beside a document (`key: value` conventions + prose), read by project.notes and book.curate"),
             RouteEntry("POST", "/api/projects/{name}/mine", "Tika/OCR mining over a project"),
             RouteEntry("GET", "/api/projects/{name}/mine", "mining progress"),
         ),

@@ -150,7 +150,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
 
     /**
      * `wiki.read`: the wiki's pages back as one text, each page opened by a `§ <path>. ` heading line,
-     * so `book.curate` with heading `^§ ` curates the wiki like any book and a constellation can join
+     * a recurring shape `book.curate` finds as its sections, so it curates the wiki like any book and a constellation can join
      * it. `pages` lists the page paths with their content ids, so a caller sees which pages changed.
      */
     private val wikiRead = LcncNodeRunner { node, _ ->
@@ -176,6 +176,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         "statements" to b.statements.map { it.toMap() },
         "support" to b.support.map { it.toList() },
         "facts" to b.facts.toList(),
+        "cites" to b.cites.map { listOf(it.first, it.second) },
     )))
 
     private fun load(name: String): Book? {
@@ -192,6 +193,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             },
             (m["support"] as List<*>).map { l -> (l as List<*>).map { (it as Number).toInt() }.toIntArray() },
             (m["facts"] as? List<*>)?.map { it.toString() }?.toSet() ?: emptySet(),
+            (m["cites"] as? List<*>)?.map { p -> (p as List<*>).let { (it[0] as Number).toInt() to (it[1] as Number).toInt() } } ?: emptyList(),
         )
     }
 
@@ -204,14 +206,26 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
 
     private val curate = LcncNodeRunner { node, inputs ->
         val text = (inputs["text"] ?: inputs["text?"]) as? String ?: ""
-        val name = node.params["book"]?.takeIf { it.isNotBlank() } ?: error("book.curate: name the book")
-        val heading = node.params["heading"]?.takeIf { it.isNotBlank() }?.let { Regex(it, RegexOption.MULTILINE) }
-        val generic = (node.params["generic"] ?: "").split(',', ' ').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
-        val sections = NormClausesNode.sections(text, heading)
-        // What is already believed: the classes a named constellation's bearers resolved to, with their ancestors.
-        val believed = node.params["constellation"]?.takeIf { it.isNotBlank() }?.let { n ->
-            constellation(n).bearing.keys.fold(RoaringSeries.EMPTY) { acc, c -> acc or SumoCorpus.closure(c) }
-        } ?: RoaringSeries.EMPTY
+        // The book is the document it was read from: a wired doc's id, else the text's own content id.
+        val doc = (inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>
+        // Conventions bind late: the document's curation notes, then the node's params, then the text itself.
+        val notes = ((inputs["conventions"] ?: inputs["conventions?"]) as? Map<*, *>).orEmpty().entries
+            .associate { (k, v) -> k.toString().lowercase() to v.toString() }
+        fun convention(key: String) = node.params[key]?.takeIf { it.isNotBlank() } ?: notes[key]?.takeIf { it.isNotBlank() }
+        val name = convention("book") ?: doc?.get("id")?.toString()
+            ?: borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value.takeLast(16)
+        val generic = (convention("generic") ?: "").split(',', ' ').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        val cut = SectionShapes.sections(text)
+        val shape = cut.shape; val sections = cut.texts
+        val cites = SectionShapes.cites(cut)
+        // The notes' prose, read by the same parser: what the curator holds the work to. Its statements are
+        // conventions for the reading (their bearers' classes steer senses) and the measure of conformance.
+        val notesProse = ((inputs["notes"] ?: inputs["notes?"]) as? String)?.takeIf { it.isNotBlank() }
+        val noted = notesProse?.let { np -> CoreNlpRuntime().use { nlp -> NormClauses.extract(nlp.analyze(np), generic) } }.orEmpty()
+            .map { NormStatement.of(it, ::bearerClass) }
+        // What is already believed: the classes a named constellation's bearers and the notes' bearers resolve to, with ancestors.
+        val believed = (convention("constellation")?.let { n -> constellation(n).bearing.keys }.orEmpty() + noted.map { it.bearerClass }.filter { it >= 0 })
+            .fold(RoaringSeries.EMPTY) { acc, c -> acc or SumoCorpus.closure(c) }
         val typed = java.util.IdentityHashMap<NormClause, Int>()
         val facts = LinkedHashSet<String>()
         val clauses = CoreNlpRuntime().use { nlp -> sections.map { sec ->
@@ -223,11 +237,25 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             facts.addAll(NormClauses.facts(doc))
             found
         } }
-        val book = Book.of(name, node.params["work"]?.takeIf { it.isNotBlank() } ?: name, node.params["date"] ?: "", sections, clauses, { typed[it] ?: bearerClass(it) }, facts)
+        val book = Book.of(name, convention("work") ?: name, convention("date") ?: convention("edition") ?: doc?.get("seq")?.toString() ?: "", sections, clauses, { typed[it] ?: bearerClass(it) }, facts, cites)
         val senses = book.statements.filter { it.bearerClass >= 0 }.associate { it.bearer to SumoCorpus.classifier.className(SumoClassId(it.bearerClass)) }
         save(book)
+        // Conformance: each noted statement is held (the text states it), contradicted (the text states the
+        // opposing force on its proposition), or unstated.
+        val byProposition = book.statements.withIndex().groupBy({ it.value.proposition }, { it.index })
+        fun where(i: Int) = book.support[i].take(3).map { book.headings.getOrElse(it) { "#$it" } }
+        val conformance = noted.map { n ->
+            val same = byProposition[n.proposition].orEmpty()
+            val held = same.filter { book.statements[it].modality == n.modality }
+            val against = same.filter { book.statements[it].modality.opposes(n.modality) }
+            mapOf("note" to n.sentence, "verdict" to when { against.isNotEmpty() -> "contradicted"; held.isNotEmpty() -> "held"; else -> "unstated" },
+                "sections" to (against.ifEmpty { held }).flatMap(::where))
+        }
         mapOf("book" to name, "sections" to sections.size, "clauses" to clauses.sumOf { it.size }, "statements" to book.statements.size,
-            "senses" to senses, "facts" to facts.size)
+            "senses" to senses, "facts" to facts.size,
+            "shape" to shape?.let { mapOf("key" to it.key, "lines" to it.lines.size, "counts" to it.counts.toString(), "heads" to it.heads.toString(),
+                "belief" to it.belief.expectation()) },
+            "cites" to cites.size, "conformance" to conformance)
     }
 
     private val join = LcncNodeRunner { node, inputs ->
@@ -306,7 +334,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     private val render = LcncNodeRunner { node, inputs ->
         val text = (inputs["text"] ?: inputs["text?"]) as? String
         val nlp = CoreNlpRuntime()
-        fun read(t: String) = NormClausesNode.sections(t, null).flatMap { NormClauses.extract(nlp.analyze(it)) }.map { NormStatement.of(it, ::bearerClass) }
+        fun read(t: String) = NormClausesNode.sections(t).flatMap { NormClauses.extract(nlp.analyze(it)) }.map { NormStatement.of(it, ::bearerClass) }
         val statements = if (text != null) read(text).distinctBy { it.key } else {
             val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.render: name the constellation or wire text")
             constellation(name).let { c -> c.restated().map { c.statements[it] } }
@@ -348,6 +376,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 next.add("(normSource $sym ${q(c.books[g ushr 20].name)} ${g and 0xFFFFF})")
             }
         }
+        // The books' own cross-references, section to section: what the prose points at.
+        for (b in c.books) for ((from, to) in b.cites) next.add("(cites ${q(b.name)} $from $to)")
         bank.replace(prior.map { borg.trikeshed.kif.KifExpr.parse(it) }, next.map { borg.trikeshed.kif.KifExpr.parse(it) })
         prior.clear(); prior.addAll(next)
     }

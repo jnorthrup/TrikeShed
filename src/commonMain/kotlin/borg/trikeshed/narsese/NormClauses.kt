@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.nlp.NlpDocument
+import borg.trikeshed.nlp.NlpRelation
 import borg.trikeshed.nlp.NlpToken
 
 /**
@@ -46,7 +47,9 @@ object NormClauses {
             fun phrase(t: NlpToken): String {
                 val mods = kids(t.index, *modifiers).mapNotNull { tokens[it.dependent] }.filter { it.index < t.index }.sortedBy { it.index }
                 // A possessive pronoun keeps its own form: CoreNLP lemmatises "his" to "he".
-                return (mods + t).joinToString(" ") { (if (it.tag == "PRP$") it.word else it.lemma).lowercase() }
+                // A possessive pronoun or a demonstrative/quantifying determiner does not name the bearer.
+                return (mods.filter { !it.tag.startsWith("PRP") && it.lemma.lowercase() !in setOf("such", "said", "same") } + t)
+                    .joinToString(" ") { it.lemma.lowercase() }
             }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
             for (verb in tokens.values.filter { it.tag.startsWith("VB") }) {
@@ -66,6 +69,8 @@ object NormClauses {
                     kids(subj.index, "det", "advmod").mapNotNull { tokens[it.dependent] }.any { it.lemma.lowercase() in negators } ||
                     modal?.word?.lowercase() == "cannot"
                 val obj = kids(verb.index, "obj", "dobj", "xcomp").mapNotNull { tokens[it.dependent] }.firstOrNull()
+                    // A wh-word or pronoun object names no term: the clause it opens is not this norm's object.
+                    ?.takeIf { !it.tag.startsWith("W") && !it.tag.startsWith("PRP") }
                 val obl = kids(verb.index, "obl").mapNotNull { tokens[it.dependent] }.firstOrNull()?.let { o ->
                     val case = kids(o.index, "case").mapNotNull { tokens[it.dependent] }.firstOrNull()
                     listOfNotNull(case?.lemma?.lowercase(), phrase(o)).joinToString(" ")
@@ -91,6 +96,50 @@ object NormClauses {
                     condition = condition,
                     head = subj.lemma.lowercase(),
                     ner = subj.ner,
+                ))
+            }
+        }
+        // Every other asserted clause, as OpenIE reads it: (subject; relation; object) with the relation's
+        // own polarity. A modal clause is already above; a coreferent subject reads as its chain's name.
+        for (s in doc.sentences.values()) {
+            if (s.relations.isEmpty()) continue
+            val tokens = s.tokens.values().associateBy { it.index }
+            val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
+            val named = HashMap<IntRange, String>()
+            for (m in doc.mentions) if (m.sentence == s.index && !m.representative)
+                doc.mentions.firstOrNull { it.chain == m.chain && it.representative }?.let { named[m.span] = it.text }
+            // Of the nested spans OpenIE emits for one clause, keep the most confident per subject head and relation.
+            val best = LinkedHashMap<Pair<Int, String>, NlpRelation>()
+            for (r in s.relations) {
+                val rel = r.relation.mapNotNull { tokens[it] }
+                if (rel.any { it.lemma.lowercase() in modals || it.word.lowercase() in modals }) continue
+                val head = r.subject.lastOrNull { tokens[it]?.tag?.startsWith("NN") == true } ?: continue
+                val key = head to rel.filter { it.tag.startsWith("VB") }.joinToString("_") { it.lemma.lowercase() }
+                // A bare copula states no relation; its object is the predicate, which the fact tupler reads.
+                if (key.second.isEmpty() || key.second == "be") continue
+                // An object that is a pronoun or a whole clause is not a term.
+                val objTokens = r.`object`.mapNotNull { tokens[it] }
+                if (objTokens.isNotEmpty() && objTokens.all { it.tag.startsWith("W") || it.tag.startsWith("PRP") || it.tag == "DT" }) continue
+                if (objTokens.any { it.tag.startsWith("VB") } && objTokens.size > 4) continue
+                val prior = best[key]
+                if (prior == null || r.confidence > prior.confidence ||
+                    r.confidence == prior.confidence && r.`object`.count() > prior.`object`.count()) best[key] = r
+            }
+            for ((key, r) in best) {
+                val rel = r.relation.mapNotNull { tokens[it] }
+                val head = tokens[key.first]!!
+                val negated = rel.any { it.lemma.lowercase() in negators }
+                // Determiners, possessives and pronoun modifiers are not part of the bearer's name.
+                fun term(ts: List<NlpToken>) = ts.filter { !it.tag.startsWith("DT") && !it.tag.startsWith("PRP") && it.tag != "PDT" && it.tag != "POS" &&
+                    it.lemma.lowercase() !in setOf("such", "said", "same") }.joinToString(" ") { it.lemma.lowercase() }
+                // A coreferent subject reads as its chain's representative mention.
+                val subject = named[r.subject]?.lowercase() ?: term(r.subject.mapNotNull { tokens[it] })
+                if (subject.isBlank()) continue
+                val obj = term(r.`object`.mapNotNull { tokens[it] }).takeIf { it.isNotBlank() }
+                out.add(NormClause(
+                    subject = subject.lowercase(), modal = "generic", affirmative = !negated,
+                    verb = key.second, obj = obj, oblique = null, sentence = text,
+                    head = head.lemma.lowercase(), ner = head.ner,
                 ))
             }
         }

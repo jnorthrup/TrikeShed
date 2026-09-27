@@ -56,6 +56,24 @@ class ProjectMiner(
         const val MAX_BYTES = 50L * 1024 * 1024   // OCR on a 250MB video-sized blob is not mining, it's arson
     }
 
+    /**
+     * Lands a twin beside a document the way the store keeps it: an upload scope through its upload
+     * path, a directory scope in its clone dir (the durable source) and as an attachment.
+     */
+    fun putTwin(name: String, twinId: String, bytes: ByteArray, agent: String, revision: String) {
+        val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
+        val kind = scopes.list().firstOrNull { it.name == name }?.kind ?: pdb.kind
+        if (kind == "upload") { scopes.uploadPut(name, twinId, bytes); return }
+        filesRoot?.let { fr -> runCatching { File(File(fr, name), twinId).apply { parentFile?.mkdirs() }.writeBytes(bytes) } }
+        pdb.gateway.putAttachment(
+            OroborosAttachmentRef(
+                path = twinId, contentType = ContentTypes.forPath(twinId), length = bytes.size.toLong(),
+                contentId = ContentId.of(bytes), agentId = agent, revision = revision, sequence = System.currentTimeMillis(),
+            ),
+            bytes,
+        )
+    }
+
     /** Detached mining pass. One run per db at a time; re-runs skip docs already extracted. */
     suspend fun mine(name: String, cap: Int = 1000): Progress {
         val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
@@ -73,6 +91,8 @@ class ProjectMiner(
             val id = storeIds.b(i)
             if (id.endsWith(".extract.md")) {
                 already.add(id)
+            } else if (id.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) {
+                continue
             } else if (id.substringAfterLast('.', "").lowercase() in MINEABLE) {
                 ids.add(id)
             }
@@ -95,28 +115,7 @@ class ProjectMiner(
                     if (onDisk == null) src.delete()
                     val body = md?.trim().orEmpty()
                     if (body.length < 80) { prog.failed++; continue }   // no text worth landing
-                    val bytes = body.encodeToByteArray()
-                    val extractId = "$id.extract.md"
-                    if (kind == "upload") {
-                        scopes.uploadPut(name, extractId, bytes)
-                    } else {
-                        // dir-backed: the clone dir is the durable source — write there too
-                        filesRoot?.let { fr ->
-                            runCatching { File(File(fr, name), extractId).apply { parentFile?.mkdirs() }.writeBytes(bytes) }
-                        }
-                        pdb.gateway.putAttachment(
-                            OroborosAttachmentRef(
-                                path = extractId,
-                                contentType = ContentTypes.forPath(extractId),
-                                length = bytes.size.toLong(),
-                                contentId = ContentId.of(bytes),
-                                agentId = "project-miner",
-                                revision = "mined",
-                                sequence = System.currentTimeMillis(),
-                            ),
-                            bytes,
-                        )
-                    }
+                    putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "mined")
                     prog.extracted++
                 } catch (t: Throwable) {
                     prog.failed++

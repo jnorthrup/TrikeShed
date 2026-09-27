@@ -28,7 +28,7 @@ class JvmProjectCorpus(
         val pdb = registry.get(project) ?: return@withContext emptyList()
         val head = pdb.store.head
         pdb.gateway.listAttachments(prefix).asSequence()
-            .filter { !it.path.endsWith(ProjectNodes.EXTRACT_SUFFIX) && ProjectGlob.matches(glob, it.path) }
+            .filter { !it.path.endsWith(ProjectNodes.EXTRACT_SUFFIX) && !it.path.endsWith(ProjectNodes.NOTES_SUFFIX) && ProjectGlob.matches(glob, it.path) }
             .sortedBy { it.path }
             .take(limit)
             // seq is the store's own commit sequence (0-based, as `_changes` numbers it), never the

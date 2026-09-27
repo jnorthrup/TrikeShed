@@ -803,11 +803,28 @@ class PatchWire(
                         else json(mapOf("error" to "not_text", "project" to name, "id" to id, "contentType" to listed.contentType, "length" to listed.length, "cid" to listed.cid), 415)
                     } else {
                         val twin = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX, 262_144)
+                        val notes = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX, 262_144)
                         val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
                         json(linkedMapOf<String, Any?>("project" to name, "id" to id, "cid" to text.cid, "rev" to text.rev, "seq" to text.seq,
-                            "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text).also { m -> twin?.let { m["extract"] = it.text } })
+                            "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text)
+                            .also { m -> twin?.let { m["extract"] = it.text }; notes?.let { m["notes"] = it.text } })
                     }
                 }
+            }
+
+            // Curation notes beside a document: `PUT /api/projects/<name>/notes/<id>` with the notes as the body.
+            method == "PUT" && p.startsWith("/api/projects/") && p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("notes/") -> {
+                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
+                val rest = p.removePrefix("/api/projects/")
+                val name = rest.substringBefore('/')
+                val id = java.net.URLDecoder.decode(rest.substringAfter("notes/"), "UTF-8")
+                val notes = rawBody(text)
+                val bytes = notes.encodeToByteArray()
+                runCatching { m.putTwin(name, id + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX, bytes, "curator", "notes") }.fold(
+                    onSuccess = { json(mapOf("verdict" to "ok", "project" to name, "id" to id, "cid" to ContentId.of(bytes).value,
+                        "conventions" to borg.trikeshed.lcnc.ProjectNodes.conventions(notes))) },
+                    onFailure = { json(mapOf("verdict" to "refused", "detail" to (it.message ?: "")), 400) },
+                )
             }
 
             method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {

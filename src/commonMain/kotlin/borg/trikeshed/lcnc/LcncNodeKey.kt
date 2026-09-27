@@ -46,6 +46,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     PROJECT_DOCS(ProjectNodes.DOCS),
     PROJECT_READ(ProjectNodes.READ),
     PROJECT_EXTRACT(ProjectNodes.EXTRACT),
+    PROJECT_NOTES(ProjectNodes.NOTES),
     BELIEFS_INTROSPECT("beliefs.introspect"),
     POINTCUT_ROUTES("pointcut.routes"),
     PANELS_LIST("panels.list"),

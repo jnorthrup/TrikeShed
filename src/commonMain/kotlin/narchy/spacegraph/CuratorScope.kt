@@ -1,5 +1,7 @@
 package narchy.spacegraph
 
+import borg.trikeshed.landscape.LandscapeMomentum
+import borg.trikeshed.landscape.LandscapeNavigation
 import borg.trikeshed.lib.*
 import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
@@ -151,10 +153,38 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         return doubleArrayOf((x0 + x1) / 2, (y0 + y1) / 2, z)
     }
 
-    // ── camera: operator input takes it for [hold] ms; after that it eases back onto the production ──
+    // ── camera: the spatial surfaces' own navigation — LandscapeNavigation's wheel step and zoom
+    //    clamps, LandscapeMomentum's flick and wheel glide. Operator input takes the camera for
+    //    [hold] ms after the glide settles; then it eases back onto the production. ──
+    val momentum = LandscapeMomentum()
+
     fun pan(dx: Double, dy: Double) { cx -= dx / zoom; cy += dy / zoom; touched = now }
-    fun zoom(factor: Double, sx: Double, sy: Double) {
-        val c = camera().zoomAt(factor, Vec3(sx, sy), viewport); cx = c.center.x; cy = c.center.y; zoom = c.zoom; touched = now
+
+    /** Zooms by [factor] at screen ([sx], [sy]) within LandscapeNavigation's clamps; returns (before, after). */
+    fun zoom(factor: Double, sx: Double, sy: Double): DoubleArray {
+        val before = zoom
+        val target = (zoom * factor).coerceIn(LandscapeNavigation.minZoom, LandscapeNavigation.detailZoom)
+        val c = camera().zoomAt(target / zoom, Vec3(sx, sy), viewport); cx = c.center.x; cy = c.center.y; zoom = c.zoom; touched = now
+        return doubleArrayOf(before, zoom)
+    }
+
+    fun press(sx: Double, sy: Double, t: Double) { now = t; momentum.press(sx, sy, t); touched = now }
+    fun drag(dx: Double, dy: Double, sx: Double, sy: Double, t: Double) { now = t; pan(dx, dy); momentum.drag(sx, sy, t) }
+    fun release(t: Double) { now = t; momentum.release(t); touched = now }
+    /** A wheel event: [deltaY] in [deltaMode] units, stepped by LandscapeNavigation and left to glide. */
+    fun wheel(deltaY: Double, deltaMode: Int, sx: Double, sy: Double, t: Double) {
+        now = t
+        val f = LandscapeNavigation.wheelFactor(LandscapeMomentum.wheelPixels(deltaY, deltaMode, viewport.height.toDouble()))
+        val (before, after) = zoom(f, sx, sy).let { it[0] to it[1] }
+        momentum.wheel(sx, sy, f, before, after, LandscapeNavigation.detailZoom, t)
+    }
+
+    /** Applies one glide step; the hold restarts while the glide moves. */
+    private fun glide() {
+        if (!momentum.live) return
+        val g = momentum.frame(now) ?: return
+        if (g.dx != 0.0 || g.dy != 0.0) pan(g.dx, g.dy)
+        if (g.factor != 1.0) { val r = zoom(g.factor, g.ax, g.ay); momentum.landed(g, r[0], r[1], LandscapeNavigation.detailZoom) }
     }
     fun follow() { pinned = false; touched = -1e18 }
     fun pin() { pinned = true; touched = now }
@@ -191,6 +221,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     /** Advances the camera to [localNow] and plans the frame. */
     fun frame(localNow: Double): FramePlan {
         now = localNow
+        glide()
         if (!pinned && now - touched > hold && keys.isNotEmpty()) {
             val path = trail(FOLLOW)
             val focus = if (path.isEmpty()) keys.indices.toList() else path + path.mapNotNull { parents[it].takeIf { p -> p >= 0 } }

@@ -88,7 +88,7 @@ class RunStaleProduction : ReteProduction {
                     val glob = c.fields["glob"]?.toString().orEmpty()
                     val listing = docs.filter { d ->
                         val id = d.factId.b
-                        d.fields["contentId"] != null && !id.endsWith(ProjectNodes.EXTRACT_SUFFIX) && id.startsWith(prefix) && ProjectGlob.matches(glob, id)
+                        d.fields["contentId"] != null && !id.endsWith(ProjectNodes.EXTRACT_SUFFIX) && !id.endsWith(ProjectNodes.NOTES_SUFFIX) && id.startsWith(prefix) && ProjectGlob.matches(glob, id)
                     }.sortedWith(compareBy { it.factId.b })
                     val fingerprint = LcncConsumedLedger.indexFingerprintOf(listing.α { it.factId.b }.toList())
                     if (fingerprint == oldCid) continue

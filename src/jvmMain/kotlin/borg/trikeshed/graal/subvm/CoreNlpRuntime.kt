@@ -4,8 +4,10 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.j
 import borg.trikeshed.nlp.NlpDependency
 import borg.trikeshed.nlp.NlpDocument
+import borg.trikeshed.nlp.NlpMention
 import borg.trikeshed.nlp.NlpMetadata
 import borg.trikeshed.nlp.NlpReader
+import borg.trikeshed.nlp.NlpRelation
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.vm.GuestModuleManifest
@@ -67,7 +69,11 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         private val edgeClass = loader.loadClass("edu.stanford.nlp.semgraph.SemanticGraphEdge")
         private val indexedWordClass = loader.loadClass("edu.stanford.nlp.ling.IndexedWord")
         private val properties = Properties().apply {
-            setProperty("annotators", "tokenize,ssplit,pos,lemma,depparse,ner")
+            // natlog + openie read every clause as (subject; relation; object), not only modal ones;
+            // coref ties "this maxim" to the maxim a section names.
+            setProperty("annotators", "tokenize,ssplit,pos,lemma,depparse,ner,coref,natlog,openie")
+            setProperty("coref.algorithm", "statistical")
+            setProperty("openie.resolve_coref", "true")
             setProperty("threads", "1")
         }
         private val pipeline = pipelineClass.getConstructor(Properties::class.java).newInstance(properties)
@@ -89,6 +95,53 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         private val lemma = tokenClass.getMethod("lemma")
         private val tag = tokenClass.getMethod("tag")
         private val ner = tokenClass.getMethod("ner")
+        private val coreMap = loader.loadClass("edu.stanford.nlp.util.CoreMap")
+        private val coreMapGet = coreMap.getMethod("get", Class::class.java)
+        private val sentenceCoreMap = sentenceClass.getMethod("coreMap")
+        private val annotation = documentClass.getMethod("annotation")
+        private val tripleKey = loader.loadClass("edu.stanford.nlp.naturalli.NaturalLogicAnnotations\$RelationTriplesAnnotation")
+        private val tripleClass = loader.loadClass("edu.stanford.nlp.ie.util.RelationTriple")
+        private val tripleSubject = tripleClass.getField("subject")
+        private val tripleRelation = tripleClass.getField("relation")
+        private val tripleObject = tripleClass.getField("object")
+        private val tripleConfidence = tripleClass.getField("confidence")
+        private val subjectGloss = tripleClass.getMethod("subjectGloss")
+        private val relationGloss = tripleClass.getMethod("relationGloss")
+        private val objectGloss = tripleClass.getMethod("objectGloss")
+        private val chainsKey = loader.loadClass("edu.stanford.nlp.coref.CorefCoreAnnotations\$CorefChainAnnotation")
+        private val chainClass = loader.loadClass("edu.stanford.nlp.coref.data.CorefChain")
+        private val chainMentions = chainClass.getMethod("getMentionsInTextualOrder")
+        private val chainRepresentative = chainClass.getMethod("getRepresentativeMention")
+        private val mentionClass = loader.loadClass("edu.stanford.nlp.coref.data.CorefChain\$CorefMention")
+        private val mentionSent = mentionClass.getField("sentNum")
+        private val mentionStart = mentionClass.getField("startIndex")
+        private val mentionEnd = mentionClass.getField("endIndex")
+        private val mentionSpan = mentionClass.getField("mentionSpan")
+
+        /** A span of CoreLabels as one-based token indices. */
+        private fun span(labels: Any?): IntRange {
+            val l = labels as List<*>
+            if (l.isEmpty()) return IntRange.EMPTY
+            return (index.invoke(l.first()) as Int)..(index.invoke(l.last()) as Int)
+        }
+
+        private fun relations(sentence: Any): List<NlpRelation> =
+            (coreMapGet.invoke(sentenceCoreMap.invoke(sentence), tripleKey) as? Collection<*>).orEmpty().map { t ->
+                NlpRelation(span(tripleSubject.get(t)), span(tripleRelation.get(t)), span(tripleObject.get(t)),
+                    subjectGloss.invoke(t) as String, relationGloss.invoke(t) as String, objectGloss.invoke(t) as String,
+                    tripleConfidence.getDouble(t))
+            }
+
+        private fun mentions(doc: Any): List<NlpMention> {
+            val chains = coreMapGet.invoke(annotation.invoke(doc), chainsKey) as? Map<*, *> ?: return emptyList()
+            return chains.entries.flatMap { (id, chain) ->
+                val rep = chainRepresentative.invoke(chain)
+                (chainMentions.invoke(chain) as List<*>).map { m ->
+                    NlpMention(mentionSent.getInt(m) - 1, mentionStart.getInt(m) until mentionEnd.getInt(m),
+                        mentionSpan.get(m) as String, (id as Number).toInt(), m === rep)
+                }
+            }
+        }
 
         /**
          * What actually executed: the loaded processor class, the jar it resolved from, the
@@ -166,9 +219,10 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
                     tokenArray.lastOrNull()?.end ?: 0,
                     tokenArray.size j { i: Int -> tokenArray[i] },
                     dependencyArray.size j { i: Int -> dependencyArray[i] },
+                    relations(sentence),
                 )
             }
-            return NlpDocument(text, result.size j { i: Int -> result[i] }, metadata)
+            return NlpDocument(text, result.size j { i: Int -> result[i] }, metadata, mentions(doc))
         }
     }
 }

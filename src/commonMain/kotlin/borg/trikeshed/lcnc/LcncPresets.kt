@@ -934,7 +934,7 @@ object LcncPresets {
                 LcncNode("n20", "display", x = 1230.0, y = 460.0),
                 // The wiki comes back as a book: its pages are sections, and it joins the same constellation.
                 LcncNode("n21", "wiki.read", x = 30.0, y = 660.0),
-                LcncNode("n22", "book.curate", params = mapOf("book" to "wiki", "work" to "wiki", "date" to "3", "heading" to "^§ "), x = 330.0, y = 660.0),
+                LcncNode("n22", "book.curate", params = mapOf("book" to "wiki", "work" to "wiki", "date" to "3"), x = 330.0, y = 660.0),
                 LcncNode("n23", "constellation.join", params = mapOf("constellation" to "leases"), x = 630.0, y = 660.0),
                 LcncNode("n24", "display", x = 930.0, y = 660.0),
                 // Norms inherit down SUMO: what a vehicle must do, a car and a truck must do, unless their own

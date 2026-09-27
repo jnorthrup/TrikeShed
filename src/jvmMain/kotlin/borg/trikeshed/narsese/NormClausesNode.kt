@@ -8,7 +8,7 @@ import borg.trikeshed.lib.packInts
 /**
  * `norm.clauses` — text → sections → [NormClauses] → NAL evidence by section → bank tuples.
  *
- * Sections are paragraphs unless `heading` (a multiline regex) marks them. Each clause is evidence
+ * Sections are found in the text ([SectionShapes]), else paragraphs. Each clause is evidence
  * for ⟨subject ⇒ predicate⟩ sourced by section ordinal: affirmative positive, negated negative, so a
  * clause restated across sections gains confidence and a contradicted one loses frequency. Beliefs at
  * confidence ≥ `promote` are told as
@@ -22,23 +22,16 @@ object NormClausesNode {
         runners[TYPE] = runner { kif -> runCatching { bank.assertKif(kif) } }
     }
 
-    /** Sections of [text]: split at [heading] matches, else at blank lines. */
-    fun sections(text: String, heading: Regex?): List<String> {
-        val parts = if (heading == null) text.split(Regex("""\n\s*\n"""))
-        else heading.findAll(text).map { it.range.first }.toList().let { starts ->
-            starts.mapIndexed { i, s -> text.substring(s, if (i + 1 < starts.size) starts[i + 1] else text.length) }
-        }
-        return parts.map { it.replace(Regex("""(\w)-\n(\w)"""), "$1$2").replace(Regex("""\s+"""), " ").trim() }.filter { it.isNotEmpty() }
-    }
+    /** Sections of [text], at the heading shape the text itself evidences (else paragraphs). */
+    fun sections(text: String): List<String> = SectionShapes.sections(text).texts
 
     private fun q(s: String) = "\"" + s.replace("\"", "'") + "\""
 
     fun runner(into: (String) -> Unit): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         val text = (inputs["text"] ?: inputs["text?"]) as? String ?: ""
-        val heading = node.params["heading"]?.takeIf { it.isNotBlank() }?.let { Regex(it, RegexOption.MULTILINE) }
         val generic = (node.params["generic"] ?: "").split(',', ' ').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
         val promote = node.params["promote"]?.toFloatOrNull() ?: 0.6f
-        val secs = sections(text, heading)
+        val secs = sections(text)
         val terms = ArrayList<String>(); val ids = HashMap<String, Int>()
         fun term(t: String) = ids.getOrPut(t) { terms.size.also { terms.add(t) } }
         val ledger = EvidenceLedger()

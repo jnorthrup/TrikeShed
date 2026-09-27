@@ -39,6 +39,7 @@ object CuratorPage {
     private var capacity = 0
     private var ratio = 1.0
     private var drag: DoubleArray? = null
+    private var down: DoubleArray? = null
     private var panelKey = ""
 
     fun mount() {
@@ -76,22 +77,24 @@ object CuratorPage {
     private fun input() {
         fun at(e: dynamic): DoubleArray { val r = host.getBoundingClientRect(); return doubleArrayOf(num(e.clientX) - r.left, num(e.clientY) - r.top) }
         val opts = obj(); opts.passive = false
+        fun t() = window.performance.now()
         host.addEventListener("wheel", { e: dynamic -> e.preventDefault(); val p = at(e)
-            scope.zoom(kotlin.math.exp(-maxOf(-200.0, minOf(200.0, num(e.deltaY))) * .004), p[0], p[1]) }, opts)
-        host.addEventListener("pointerdown", { e: dynamic -> drag = at(e); host.asDynamic().setPointerCapture(e.pointerId) })
+            scope.wheel(num(e.deltaY), num(e.deltaMode).toInt(), p[0], p[1], t()) }, opts)
+        host.addEventListener("pointerdown", { e: dynamic -> if (num(e.button) == 0.0) { val p = at(e); drag = p; down = p
+            scope.press(p[0], p[1], t()); host.asDynamic().setPointerCapture(e.pointerId) } })
         host.addEventListener("pointermove", { e: dynamic ->
             val p = at(e); val d = drag
-            if (d != null) { scope.pan(p[0] - d[0], p[1] - d[1]); drag = p } else scope.hovered = scope.pick(p[0], p[1])
+            if (d != null) { scope.drag(p[0] - d[0], p[1] - d[1], p[0], p[1], t()); drag = p } else scope.hovered = scope.pick(p[0], p[1])
         })
-        host.addEventListener("pointerup", { e: dynamic -> val p = at(e); val d = drag; drag = null
-            if (d != null && kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3) scope.selected = scope.pick(p[0], p[1]) })
+        host.addEventListener("pointerup", { e: dynamic -> val p = at(e); val d = down; drag = null; down = null
+            if (d != null) { scope.release(t()); if (kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3) scope.selected = scope.pick(p[0], p[1]) } })
         host.addEventListener("pointerleave", { _: dynamic -> scope.hovered = -1 })
         document.addEventListener("keydown", { e: dynamic ->
             when (str(e.key)) {
                 "f", "F" -> { scope.selected = -1; scope.follow() }
                 " " -> { e.preventDefault(); if (scope.pinned) scope.follow() else scope.pin() }
-                "+", "=" -> scope.zoom(1.25, host.clientWidth / 2.0, host.clientHeight / 2.0)
-                "-" -> scope.zoom(.8, host.clientWidth / 2.0, host.clientHeight / 2.0)
+                "+", "=" -> scope.wheel(-120.0, 0, host.clientWidth / 2.0, host.clientHeight / 2.0, window.performance.now())
+                "-" -> scope.wheel(120.0, 0, host.clientWidth / 2.0, host.clientHeight / 2.0, window.performance.now())
                 "Escape" -> scope.selected = -1
             }
         })

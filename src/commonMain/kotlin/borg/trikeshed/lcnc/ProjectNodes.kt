@@ -171,8 +171,23 @@ object ProjectNodes {
     const val EXTRACT = "project.extract"
     /** The mined twin the project miner leaves beside a document (ProjectMiner). */
     const val EXTRACT_SUFFIX = ".extract.md"
+    /**
+     * The curation-notes twin a curator (or the wiki) writes beside a document: conventions the text
+     * does not carry about itself (`work:`, `edition:`, `date:`, … as `key: value` lines) and any prose
+     * the reading should be held to. Never listed as a document; `project.notes` and `book.curate` read it.
+     */
+    const val NOTES_SUFFIX = ".notes.md"
+    const val NOTES = "project.notes"
 
-    fun servedTypes(): Set<String> = setOf(LIST, DOCS, READ, EXTRACT)
+    /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */
+    fun conventions(notes: String): Map<String, String> = notes.lines().mapNotNull { l ->
+        Regex("^\\s*([A-Za-z][\\w-]{0,31})\\s*:\\s*(.+?)\\s*$").find(l)?.let { it.groupValues[1].lowercase() to it.groupValues[2] }
+    }.toMap()
+
+    /** The prose of a notes twin: every line that is not a `key: value` convention. */
+    fun prose(notes: String): String = notes.lines().filter { l -> !Regex("^\\s*[A-Za-z][\\w-]{0,31}\\s*:").containsMatchIn(l) }.joinToString("\n").trim()
+
+    fun servedTypes(): Set<String> = setOf(LIST, DOCS, READ, EXTRACT, NOTES)
 
     private fun str(inputs: Map<String, Any?>, node: LcncNode, port: String): String? =
         (inputs[port] ?: inputs["$port?"])?.toString()?.takeIf { it.isNotBlank() }
@@ -225,6 +240,18 @@ object ProjectNodes {
             if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$EXTRACT_SUFFIX", twin.cid, twin.seq, twin.rev)
             if (twin == null) mapOf("found" to false)
             else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true)
+        },
+        NOTES to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
+            val doc = docOf(inputs)
+            val project = doc?.project ?: str(inputs, node, "project")
+                ?: throw IllegalArgumentException("project.notes: no document wired and no project named")
+            val id = doc?.id ?: str(inputs, node, "id")
+                ?: throw IllegalArgumentException("project.notes: no document wired and no id named")
+            val notes = service.value.read(project, id + NOTES_SUFFIX, 262_144)
+            if (notes != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$NOTES_SUFFIX", notes.cid, notes.seq, notes.rev)
+            if (notes == null) mapOf("found" to false, "conventions" to emptyMap<String, String>())
+            else mapOf("text" to notes.text, "cid" to notes.cid, "found" to true,
+                "conventions" to conventions(notes.text), "prose" to prose(notes.text))
         },
     )
 }
