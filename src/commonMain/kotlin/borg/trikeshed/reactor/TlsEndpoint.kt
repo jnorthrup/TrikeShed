@@ -50,10 +50,10 @@ data class TlsConfig(
     val certificateFile: String? = null,
     val privateKeyFile: String? = null,
     val privateKeyPassword: String? = null,
-    val protocols: TlsProtocols = TlsProtocol.entries.toTypedArray().toSeries(),
-    val cipherSuites: TlsCipherSuites = TlsCipherSuite.entries.toTypedArray().toSeries(),
-    val supportedGroups: TlsSupportedGroups = TlsSupportedGroup.entries.toTypedArray().toSeries(),
-    val alpnProtocols: TlsApplicationProtocols = TlsApplicationProtocol.entries.toTypedArray().toSeries(),
+    val protocols: TlsProtocols = TlsProtocol.entries.toSeries(), /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
+    val cipherSuites: TlsCipherSuites = TlsCipherSuite.entries.toSeries(), /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
+    val supportedGroups: TlsSupportedGroups = TlsSupportedGroup.entries.toSeries(), /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
+    val alpnProtocols: TlsApplicationProtocols = TlsApplicationProtocol.entries.toSeries(), /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
     val clientAuth: ClientAuth = ClientAuth.NONE,
     val hostnameVerification: Boolean = true,
 )
