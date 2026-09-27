@@ -102,5 +102,6 @@ data object ProvenanceTrace {
 
     /** the cids at the walk's frontier: raw footings for BACKWARD, derived outcomes for FORWARD */
     fun frontier(nodes: List<ProvenanceNode>): List<ContentId> =
-        nodes.filterIsInstance<ProvenanceNode.Bytes>().map { it.cid }
+        // ⚡ Bolt: Prevent intermediate ArrayList allocation by using mapNotNull instead of filterIsInstance.map
+        nodes.mapNotNull { (it as? ProvenanceNode.Bytes)?.cid }
 }
