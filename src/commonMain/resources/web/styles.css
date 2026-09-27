@@ -449,7 +449,11 @@ button:focus:not(:focus-visible),
 .page-tree-item:focus:not(:focus-visible),
 .board-card:focus:not(:focus-visible),
 .workspace-switcher:focus:not(:focus-visible),
-.drop-zone:focus:not(:focus-visible) {
+.drop-zone:focus:not(:focus-visible),
+.host-form input:focus:not(:focus-visible),
+.host-form select:focus:not(:focus-visible),
+.host-form textarea:focus:not(:focus-visible),
+.sidebar-item:focus:not(:focus-visible) {
   outline: none;
 }
 
@@ -459,7 +463,11 @@ button:focus-visible,
 .page-tree-item:focus-visible,
 .board-card:focus-visible,
 .workspace-switcher:focus-visible,
-.drop-zone:focus-visible {
+.drop-zone:focus-visible,
+.host-form input:focus-visible,
+.host-form select:focus-visible,
+.host-form textarea:focus-visible,
+.sidebar-item:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
