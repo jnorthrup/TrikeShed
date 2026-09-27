@@ -1,12 +1,9 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.JvmTikaIngestAdapter
-import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.BeliefBagElement
-import borg.trikeshed.narsese.BeliefIntake
 import borg.trikeshed.util.io.ContentTypes
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
@@ -24,8 +21,6 @@ import java.util.concurrent.ConcurrentHashMap
  * The CAS linkages fall out of content addressing, not bookkeeping: two PDFs
  * with the same payload extract to the same markdown → the SAME ContentId →
  * the graal terrain's cyan shared-blob arcs connect them across territories.
- * Extracted text also mints epistemic signals into the belief bag (AngularCodec
- * coords keyed by `<db>/<path>`), so mined piles join resonance immediately.
  *
  * Durability follows each db's own shape: dir-backed dbs get the extract file
  * written into the forge-home clone (the next remount re-absorbs it); upload
@@ -59,8 +54,6 @@ class ProjectMiner(
             "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp",
         )
         const val MAX_BYTES = 50L * 1024 * 1024   // OCR on a 250MB video-sized blob is not mining, it's arson
-        const val MINT_PER_DOC = 8
-        const val MINT_PER_RUN = 2000
     }
 
     /** Detached mining pass. One run per db at a time; re-runs skip docs already extracted. */
@@ -87,7 +80,6 @@ class ProjectMiner(
 
         val work = ids.filter { "$it.extract.md" !in already }.take(cap)
         prog.total = work.size
-        var mintedRun = 0
 
         withContext(Dispatchers.IO) {
             for (id in work) {
@@ -126,35 +118,6 @@ class ProjectMiner(
                         )
                     }
                     prog.extracted++
-
-                    val bag = beliefBag
-                    if (bag != null && mintedRun < MINT_PER_RUN) {
-                        val surface = runCatching {
-                            borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, body)
-                        }.getOrNull()
-                        if (surface != null) {
-                            var perDoc = 0
-                            for (si in 0 until surface.signals.size) {
-                                if (perDoc >= MINT_PER_DOC || mintedRun >= MINT_PER_RUN) break
-                                val s = surface.signals[si]
-                                bag.intake.send(
-                                    BeliefIntake.Mint(
-                                        s.copy(
-                                            angular = AngularCodec.encode(
-                                                relation = s.relation,
-                                                taxonomyKey = "$name/$id",
-                                                subjectTerm = id.substringAfterLast('/'),
-                                                objectTerm = s.objectCid?.take(12),
-                                            ),
-                                        ),
-                                        BudgetCoord(0.5f, 0.35f, 0.5f),
-                                        gloss = borg.trikeshed.cas.epistemicGloss(surface, s, id.substringAfterLast('/'), body),
-                                    ),
-                                )
-                                perDoc++; mintedRun++; prog.minted++
-                            }
-                        }
-                    }
                 } catch (t: Throwable) {
                     prog.failed++
                     prog.note = "${id.take(60)}: ${t.message?.take(80)}"

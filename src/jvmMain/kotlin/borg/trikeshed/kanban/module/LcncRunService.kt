@@ -177,7 +177,7 @@ internal class LcncRunService(
         try {
             return coroutineScope {
                 active[runId] = currentCoroutineContext().job
-                val timeoutMs = ((request["timeoutMs"] as? Number)?.toLong() ?: 120000L).coerceIn(1L, 120000L)
+                val timeoutMs = ((request["timeoutMs"] as? Number)?.toLong() ?: 120000L).coerceIn(1L, 3_600_000L)
                 val maxNodes = ((request["maxNodes"] as? Number)?.toInt() ?: 10000).coerceIn(1, 10000)
                 val versions = linkedMapOf<String, String>()
                 val pinned = mutableMapOf<String, LcncProgram>()
@@ -257,7 +257,13 @@ internal class LcncRunService(
                     // a receipt names its prompts the way it names its program (Cut P).
                     val promptVersions = PromptNodes.promptVersionsOf(listOf(frozen) + pinned.values, result.nodeOutputs) +
                         (walker.ledger?.promptVersions() ?: emptyMap())
-                    val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs,
+                    // A node output over the receipt budget is named, not carried: its effects (bank tuples, admitted
+                    // rules) already landed, and the receipt stays a receipt.
+                    val outputs = result.nodeOutputs.mapValues { (_, v) ->
+                        val over = ValueBudget().violation(v)
+                        if (over == null) v else mapOf<String, Any?>("truncated" to over, "keys" to ((v as? Map<*, *>)?.keys?.map { k -> k.toString() } ?: emptyList<String>()))
+                    }
+                    val output = mapOf("returns" to result.returns, "outputs" to outputs,
                         "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated,
                         "promptVersions" to promptVersions,
                         "consumed" to result.consumed, "consumedTruncated" to result.consumedTruncated,

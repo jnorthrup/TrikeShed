@@ -44,7 +44,8 @@ class JvmProjectCorpus(
         if (!ProjectGlob.isTextual(ref.contentType, id)) return@withContext null
         if (bytes.size > 4L * maxChars) return@withContext null
         val text = bytes.decodeToString()
-        if ('�' in text) return@withContext null
+        // binary decodes to replacement chars at a high rate; OCR/extraction leaves a few unmapped glyphs
+        if (text.count { it == '\uFFFD' } * 100 > text.length) return@withContext null
         val head = pdb.store.head
         ProjectText(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, text.take(maxChars))
     }

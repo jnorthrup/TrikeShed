@@ -128,43 +128,8 @@ class ProjectScopes(
         )
         ledgerAppend(name, kind, sourceDir.absolutePath)
 
-        var minted = 0
-        val bag = beliefBag
-        if (bag != null) {
-            withContext(Dispatchers.IO) {
-                val mintCap = 512
-                outer@ for (path in snap.paths) {
-                    if (minted >= mintCap) break
-                    if (!path.endsWith(".md") && !path.endsWith(".markdown") && !path.endsWith(".txt")) continue
-                    val att = scopeGateway.getAttachment(path) ?: continue
-                    val docText = att.second.decodeToString()
-                    val surface = runCatching {
-                        borg.trikeshed.cas.ContentEpistemicIngest.ingest(casStore, docText)
-                    }.getOrNull() ?: continue
-                    for (si in 0 until surface.signals.size) {
-                        if (minted >= mintCap) break@outer
-                        val s = surface.signals[si]
-                        bag.intake.send(
-                            BeliefIntake.Mint(
-                                s.copy(
-                                    angular = AngularCodec.encode(
-                                        relation = s.relation,
-                                        taxonomyKey = path,
-                                        subjectTerm = path.substringAfterLast('/'),
-                                        objectTerm = s.objectCid?.take(12),
-                                    ),
-                                ),
-                                BudgetCoord(0.5f, 0.3f, 0.5f),
-                                gloss = borg.trikeshed.cas.epistemicGloss(surface, s, path.substringAfterLast('/'), docText),
-                            ),
-                        )
-                        minted++
-                    }
-                }
-            }
-        }
         val scope = Scope(
-            name, sourceDir.absolutePath, kind, prefix, snap.paths.size, minted,
+            name, sourceDir.absolutePath, kind, prefix, snap.paths.size, 0,
             docs = projectDbs?.get(name)?.docCount ?: 0,
         )
         scopes = scopes + scope
