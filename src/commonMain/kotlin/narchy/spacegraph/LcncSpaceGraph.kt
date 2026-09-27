@@ -3,6 +3,7 @@ package narchy.spacegraph
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.reduction.j
 import borg.trikeshed.narsese.SemanticSignal
 import borg.trikeshed.narsese.TruthCoord
 
@@ -85,7 +86,7 @@ object LcncSpaceGraph {
             if (n.id == nodeId) { found = true; n.copy(x = x, y = y) } else n.copy(children = moveNodes(n.children))
         }
         // Materialize once before returning so validation never depends on whether a lazy consumer visits a node.
-        fun freeze(nodes: Series<LcncNode>): Series<LcncNode> = nodes.view.map { it.copy(children = freeze(it.children)) }.toSeries()
+        fun freeze(nodes: Series<LcncNode>): Series<LcncNode> = nodes.size j { i -> nodes[i].copy(children = freeze(nodes[i].children)) } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .view.map { ... }.toSeries() */
         val moved = freeze(moveNodes(program.nodes))
         require(found) { "Unknown LCNC node $nodeId" }
         return program.copy(nodes = moved)

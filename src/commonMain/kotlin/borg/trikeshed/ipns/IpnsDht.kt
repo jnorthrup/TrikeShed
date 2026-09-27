@@ -6,6 +6,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.reduction.j
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -255,7 +256,7 @@ class IpnsDht(
         }
         val nearest = closest()
         val exhausted = nearest.none { it.key !in queried }
-        return IpnsLookupReport(nearest.map { it.value.peer }.toSeries(), replies.toSeries(), exhausted,
+        return IpnsLookupReport(nearest.size j { i -> nearest[i].value.peer } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */, replies.toSeries(), exhausted,
             !exhausted && queried.size >= limits.maxQueries, candidateLimit)
     }
 

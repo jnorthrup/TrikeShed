@@ -15,6 +15,7 @@ import borg.trikeshed.nlp.NlpMetadata
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.reduction.j
 
 /** Uses the existing canonical map/CBOR path, not the lossy ConfixDoc-to-map projection. */
 internal object DocumentCuratorCodec {
@@ -184,9 +185,9 @@ internal object DocumentCuratorCodec {
             capturedAt = (r["capturedAt"] as Number).toLong(),
         ) }
         return DocumentCurationRecord(source, nlp, model, m.str("modelId"), proposals,
-            m.array("reasons").map { it as String }.toSeries(),
+            m.array("reasons").let { arr -> arr.size j { i: Int -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
             m.cids("reserved"), m.cids("submitted"), m.cids("duplicates"),
-            m.array("observerFailures").map { it as String }.toSeries(),
+            m.array("observerFailures").let { arr -> arr.size j { i: Int -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
             m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
             m.optionalStrings("toolOntology").toSeries(), receipt = receipt,

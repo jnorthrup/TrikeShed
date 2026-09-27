@@ -1,0 +1,3 @@
+## 2024-05-24 - Zero-Allocation Mapped Projections over Iterables
+**Learning:** In Kotlin, chaining `.map { ... }.toSeries()` on any `Iterable` eagerly allocates a temporary `ArrayList` before wrapping it in a `Series`. This causes unnecessary object churn during high-frequency operations. However, `Series` natively supports a zero-allocation primitive mapped projection via its generic size constructor `size j { i -> element(i) }`.
+**Action:** When mapping over indexed structures like lists, arrays, or existing series to create another `Series`, use the `size j { i -> ... }` projection pattern instead of `.map { ... }.toSeries()` to bypass the intermediate `ArrayList` trap entirely.
