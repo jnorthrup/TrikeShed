@@ -53,6 +53,11 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   border-radius: var(--radius);
   cursor: pointer;
   user-select: none;
+  border: none;
+  background: transparent;
+  width: 100%;
+  font: inherit;
+  color: inherit;
 }
 .workspace-switcher:hover { background: var(--hover); }
 .workspace-icon {
@@ -109,10 +114,13 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   margin-top: 8px;
   border: 1px dashed var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
+  background: transparent;
   cursor: pointer;
   text-align: center;
   transition: all 0.2s;
+  width: 100%;
+  font: inherit;
+  color: inherit;
 }
 .drop-zone:hover, .drop-zone:focus-visible, .drop-zone.drag-active {
   border-color: var(--accent);
