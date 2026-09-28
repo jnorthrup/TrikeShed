@@ -1,0 +1,3 @@
+## 2024-03-24 - Focus visible styles missing on standalone HTML/CSS pages
+**Learning:** In this repository, many custom standalone HTML and CSS files (e.g., `curator.html`, `mux.css`) omit the core accessibility focus styles found in the main application CSS (`styles.css`). When checking these pages, ensure `:focus-visible` styling is included for interactive elements.
+**Action:** When working on standalone HTML or CSS files, always verify that `*:focus:not(:focus-visible)` and `*:focus-visible` rules are applied to suppress default mouse-click outlines and provide clear keyboard focus outlines.
