@@ -8,6 +8,7 @@ import borg.trikeshed.lib.α
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.reduction.j
 import kotlin.math.exp
 import kotlin.math.sqrt
 import kotlin.math.log
@@ -198,8 +199,8 @@ data class LocalAffine(
 
         fun toImmutable(): LocalAffine = LocalAffine(
             weightDiag = weightDiag.toSeries(),
-            weightLowRankU = weightLowRankU.map { it.toSeries() }.toSeries(),
-            weightLowRankV = weightLowRankV.map { it.toSeries() }.toSeries(),
+            weightLowRankU = weightLowRankU.size j { i -> weightLowRankU[i].toSeries() } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
+            weightLowRankV = weightLowRankV.size j { i -> weightLowRankV[i].toSeries() } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
             bias = bias.toSeries(),
         )
     }

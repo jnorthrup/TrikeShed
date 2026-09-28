@@ -6,6 +6,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.reduction.j
 
 /**
  * FrameId — the scope frame's rolling cid ([Frame] algebra in
@@ -58,7 +59,7 @@ class ProgramNavigator(
 
     /** Names from root to [current], most recently dove-into last. Empty at root. */
     val breadcrumb: Series<String>
-        get() = frames.map { it.name }.toSeries()
+        get() = frames.size j { i -> frames[i].name } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */
 
     val depth: Int get() = frames.size
 
