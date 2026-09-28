@@ -1,9 +1,10 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reifyMap
+
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNode
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
@@ -62,7 +63,7 @@ class NarsSeatNodeTest {
         )
         assertEquals("nars:belief-bag", out["model"])
         val content = out["content"] as String
-        val verdict = JsonSupport.parseMap(content.substring(content.indexOf('{')..content.lastIndexOf('}')))
+        val verdict = reifyMap(content.substring(content.indexOf('{')..content.lastIndexOf('}')))
         assertEquals("delivery was detained", verdict["disposition"])
         assertEquals(false, verdict["needsClarification"])
         assertEquals(false, verdict["mistrial"])
@@ -85,7 +86,7 @@ class NarsSeatNodeTest {
             mapOf("charge" to "rule on the unheard", "choices" to listOf("a claim nobody curated")),
         )
         val content = out["content"] as String
-        val verdict = JsonSupport.parseMap(content.substring(content.indexOf('{')..content.lastIndexOf('}')))
+        val verdict = reifyMap(content.substring(content.indexOf('{')..content.lastIndexOf('}')))
         assertEquals(true, verdict["needsClarification"])
         assertEquals("INSUFFICIENT CURATED EVIDENCE", verdict["disposition"])
         assertTrue((verdict["clarificationQuestion"] as String).isNotBlank())

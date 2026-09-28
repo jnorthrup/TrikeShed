@@ -1,10 +1,12 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.job.ContentId
@@ -47,13 +49,13 @@ object LcncProgramConfix {
             val p = program.controls.matingPoints[i]
             linkedMapOf("id" to p.id, "fromNode" to p.fromNode, "fromPort" to p.fromPort, "toNode" to p.toNode, "toPort" to p.toPort, "cardinality" to p.cardinality.name, "function" to p.function)
         }
-        return JsonSupport.stringify(linkedMapOf(
+        return jsonOf(linkedMapOf(
             "nodes" to nodes,
             "wires" to wires,
             "controls" to linkedMapOf("humanOversight" to program.controls.humanOversight, "matingPoints" to matingPoints).apply {
                 if (program.controls.inspectionOnly) put("inspectionOnly", true)
             },
-            "kanban" to program.kanban?.let { JsonSupport.parse(borg.trikeshed.kanban.KanbanGraphConfix.toJson(it)) },
+            "kanban" to program.kanban?.let { reify(borg.trikeshed.kanban.KanbanGraphConfix.toJson(it)) },
             "view" to program.view?.let { linkedMapOf("x" to it.x, "y" to it.y, "z" to it.zoom) },
             "seq" to program.seq,
         ))
@@ -72,7 +74,7 @@ object LcncProgramConfix {
             children = children.toSeries())
     }
 
-    /** JsonSupport backends reify arrays as List or Array — accept both. */
+    /** reify backends reify arrays as List or Array — accept both. */
     private fun childList(v: Any?): List<*> = when (v) {
         is List<*> -> v
         is Array<*> -> v.toList()
@@ -81,7 +83,7 @@ object LcncProgramConfix {
 
     /** Tolerant of the shapes JSON parsing actually produces (Double vs Int, missing optional fields). */
     fun fromJson(name: String, json: String): LcncProgram {
-        val parsed = JsonSupport.parse(json) as? Map<*, *> ?: error("not a program document: $name")
+        val parsed = reify(json) as? Map<*, *> ?: error("not a program document: $name")
         val nodes = ((parsed["nodes"] as? List<*>).orEmpty()).mapNotNull { raw -> nodeFrom(raw) }
         // A malformed cable is CORRUPT DATA, not an absent one. Dropping it silently
         // meant a document could execute with wires the author wrote and the engine
@@ -114,7 +116,7 @@ object LcncProgramConfix {
             }.toSeries()
             LcncConfixControls(c["humanOversight"] as? Boolean ?: true, points, c["inspectionOnly"] == true)
         } ?: LcncConfixControls()
-        val kanban = (parsed["kanban"] as? Map<*, *>)?.let { borg.trikeshed.kanban.KanbanGraphConfix.fromJson(JsonSupport.stringify(it)) }
+        val kanban = (parsed["kanban"] as? Map<*, *>)?.let { borg.trikeshed.kanban.KanbanGraphConfix.fromJson(jsonOf(it)) }
         val view = (parsed["view"] as? Map<*, *>)?.let { v ->
             LcncView(num(v["x"]), num(v["y"]), num(v["z"]))
         }

@@ -1,8 +1,9 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.forge.server.VmWire
 import borg.trikeshed.graal.subvm.CamelRuntime
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.HypervisorVmHost
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -26,7 +27,7 @@ class VmRuntimeIntegrationTest {
             assertEquals(id, spawn["vmId"])
             val response = assertNotNull(wire.route("POST", "/api/vm/$id/eval", """{"source":"6*7"}""", null))
             assertEquals(200, response.status, response.body)
-            assertEquals(42L, ((JsonSupport.parse(response.body) as Map<*, *>)["value"] as Number).toLong())
+            assertEquals(42L, ((reify(response.body) as Map<*, *>)["value"] as Number).toLong())
             val evaluated = runners.getValue(VmRuntimeNodes.EVAL).run(LcncNode("eval", VmRuntimeNodes.EVAL),
                 mapOf("vmId" to id, "source" to "7*9"))
             assertEquals(63L, evaluated["value"])

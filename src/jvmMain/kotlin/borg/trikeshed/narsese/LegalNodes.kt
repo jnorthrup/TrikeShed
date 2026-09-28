@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kif.KifExpr
@@ -420,7 +422,7 @@ object LegalNodes {
     @Suppress("UNCHECKED_CAST")
     private fun parseEyeciteJson(raw: String): List<Map<String, Any?>> {
         return try {
-            val root = borg.trikeshed.parse.json.JsonSupport.parse(raw)
+            val root = reify(raw)
             (root as? List<*>)?.mapNotNull { item ->
                 (item as? Map<*, *>)?.let { m ->
                     mapOf(
@@ -454,7 +456,7 @@ object LegalNodes {
         val json = raw.substringAfter("```json", raw).substringAfter("```", raw)
             .substringBeforeLast("```", raw).trim()
         return try {
-            val root = borg.trikeshed.parse.json.JsonSupport.parse(json) as? Map<*, *>
+            val root = reify(json) as? Map<*, *>
                 ?: return mapOf("error" to "non-object JSON", "raw" to raw.take(500))
             mapOf(
                 "citations" to (root["citations"] as? List<*> ?: emptyList<Any?>()),

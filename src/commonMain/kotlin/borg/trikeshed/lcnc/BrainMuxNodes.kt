@@ -1,5 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import keymux.CouchKeyStore
 import keymux.KeyMux
 import modelmux.ModelMux
@@ -13,7 +16,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.HtxHeader
@@ -493,7 +495,7 @@ ${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served
             "temperature" to temperature,
             "messages" to listOf(linkedMapOf("role" to "user", "content" to prompt)),
         )
-        val json = JsonSupport.stringify(bodyMap)
+        val json = jsonOf(bodyMap)
         fun hdr(k: String, v: String): HtxHeader =
             object : HtxHeader { override val a = k; override val b = v }
         val allHdrs = arrayOf(
@@ -509,7 +511,7 @@ ${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served
             ?: error("No HtxKey found in coroutine context for directHtxChat")
         val resp = htx.requestResult(htxReq).getOrThrow()
         val respBody = resp.body.toArray().decodeToString()
-        val parsed = JsonSupport.parse(respBody) as? Map<*, *>
+        val parsed = reify(respBody) as? Map<*, *>
             ?: error("non-JSON response: ${respBody.take(200)}")
         val choices = parsed["choices"] as? List<*>
             ?: error("no choices in response")
@@ -528,7 +530,7 @@ ${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served
     private fun parseHeaders(json: String): List<Pair<String, String>> {
         if (json.isBlank()) return emptyList()
         return runCatching {
-            val parsed = JsonSupport.parse(json)
+            val parsed = reify(json)
             @Suppress("UNCHECKED_CAST")
             val arr = parsed as? List<Map<String, Any?>> ?: return emptyList()
             arr.mapNotNull { row ->

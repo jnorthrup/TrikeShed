@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lcnc.BrainClientKey
@@ -12,7 +14,6 @@ import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.dag.ReteNetwork
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -115,7 +116,7 @@ object ConstructionBotNode {
         val json = stripTrailingCommas(
             raw.substringAfter("```json", raw).substringAfter("```", raw).substringBeforeLast("```", raw).trim(),
         )
-        val parsed = runCatching { JsonSupport.parse(json) }.getOrElse {
+        val parsed = runCatching { reify(json) }.getOrElse {
             error("read.construct bot JSON parse failed: ${it.message} — raw response: ${raw.take(2000)}")
         }
         val root = parsed as? Map<*, *>
@@ -141,7 +142,7 @@ object ConstructionBotNode {
     /**
      * Small models frequently emit a trailing comma before `}`/`]` in
      * structured JSON output (no strict-JSON-mode enforcement upstream).
-     * [borg.trikeshed.parse.json.Json]'s object parser requires every
+     * [borg.trikeshed.parse.reify]'s object parser requires every
      * comma-delimited segment to open on a quoted key, so an unguarded
      * trailing comma throws "malformed open quote" on the resulting empty
      * segment. Quote-aware: never touches a comma inside a string value.

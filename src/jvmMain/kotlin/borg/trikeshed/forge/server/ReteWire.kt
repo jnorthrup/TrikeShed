@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProduction
@@ -20,8 +22,6 @@ import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.ontology.SumoClassifier
 import borg.trikeshed.ontology.SumoMask
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * ReteWire — the READ surface of the one fact plane: what the [ReteNetwork]
  * holds right now, as JSON, as Turtle, and which productions watch it.
@@ -324,7 +324,7 @@ class ReteWire(
         }
 
         /**
-         * A field map as [JsonSupport.stringify] should see it: a [ContentId]
+         * A field map as [jsonOf] should see it: a [ContentId]
          * becomes its `sha256:` text (its `toString` is the data-class form),
          * maps and lists recurse, JSON scalars pass through, anything else
          * prints through `toString`.
@@ -349,6 +349,6 @@ class ReteWire(
             JvmKanbanServer.HttpResponse(200, body, contentType = "text/turtle; charset=utf-8")
 
         private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-            JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+            JvmKanbanServer.HttpResponse(status, jsonOf(value))
     }
 }

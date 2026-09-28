@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.jules.BrainClient
@@ -8,7 +10,6 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import keymux.KeyMux
@@ -66,7 +67,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = get(wire, "/api/mux/models")!!
         assertEquals(200, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertTrue(body.containsKey("models"), "shape must hold even when the roster is empty")
     }
 
@@ -75,7 +76,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = get(wire, "/api/mux/keys")!!
         assertEquals(200, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertTrue(body.containsKey("roster"))
     }
 
@@ -94,7 +95,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = post(wire, "/api/mux/chat", """{"prompt":"hello"}""")!!
         assertEquals(502, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertEquals("mux-error", body["verdict"])
         assertTrue((body["detail"] as String).contains("exhausted"))
     }
@@ -104,7 +105,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = post(wire, "/api/mux/chat", """{}""")!!
         assertEquals(400, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertEquals("prompt required", body["error"])
     }
 
@@ -115,7 +116,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = post(wire, "/api/mux/chat", """{"prompt":"hi","contextId":"ctx-opposing"}""")!!
         assertEquals(400, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertEquals("bad_contextId", body["error"])
     }
 
@@ -128,7 +129,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = post(wire, "/api/mux/chat", """{"prompt":"hi","contextId":"$parent"}""")!!
         assertEquals(502, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         assertEquals("mux-error", body["verdict"])
         assertTrue((body["detail"] as String).contains("exhausted"))
     }
@@ -140,7 +141,7 @@ class PatchWireTest {
         val (wire, _) = harness(tmpLedger())
         val r = get(wire, "/api/lcnc/mating-options?sourceType=timer&sourcePort=tick")!!
         assertEquals(200, r.status)
-        val body = JsonSupport.parse(r.body) as Map<*, *>
+        val body = reify(r.body) as Map<*, *>
         @Suppress("UNCHECKED_CAST")
         val options = body["options"] as List<Map<*, *>>
         assertTrue(options.isNotEmpty(), "timer tick has compatible targets")
@@ -155,7 +156,7 @@ class PatchWireTest {
         // Use timer.tick to verify the endpoint works, then confirm display has no output ports.
         val r1 = get(wire, "/api/lcnc/mating-options?sourceType=timer&sourcePort=tick")!!
         assertEquals(200, r1.status)
-        val body1 = JsonSupport.parse(r1.body) as Map<*, *>
+        val body1 = reify(r1.body) as Map<*, *>
         assertTrue((body1["options"] as List<*>).isNotEmpty(), "timer tick has compatible mates")
 
         // display has no outputKinds → sourceKind is null → empty candidates
@@ -163,7 +164,7 @@ class PatchWireTest {
         // Endpoint may return 400 (param parse issue) or 200 with empty list;
         // the important thing is NO compatible mates are returned.
         if (r2.status == 200) {
-            val body2 = JsonSupport.parse(r2.body) as Map<*, *>
+            val body2 = reify(r2.body) as Map<*, *>
             assertTrue((body2["options"] as? List<*>)?.isEmpty() != false,
                 "display has no output ports for mating")
         }

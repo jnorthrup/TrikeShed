@@ -1,10 +1,13 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -227,11 +230,11 @@ object CouncilNodes {
         // violations from CouncilProgram.build propagate loudly.
         "council.convene" to LcncNodeRunner { node, inputs ->
             val base = node.params["config"]?.takeIf { it.isNotBlank() }
-                ?.let { JsonSupport.parseMap(it) } ?: emptyMap()
+                ?.let { reifyMap(it) } ?: emptyMap()
             val over: Map<String, Any?> = when (val c = inputs["config"] ?: inputs["config?"]) {
                 null -> emptyMap()
                 is Map<*, *> -> c.entries.associate { (k, v) -> k.toString() to v }
-                is String -> if (c.isBlank()) emptyMap() else JsonSupport.parseMap(c)
+                is String -> if (c.isBlank()) emptyMap() else reifyMap(c)
                 else -> emptyMap()
             }
             val cfg = parseCouncilConfig(base + over)
@@ -240,7 +243,7 @@ object CouncilNodes {
             // reify types every JSON number as Double; `seq` is the one Int
             // toJson emits, so restore it — the emitted document must
             // re-stringify byte-identical to the builder's (test-pinned).
-            val doc = LinkedHashMap(JsonSupport.parseMap(LcncProgramConfix.toJson(program)))
+            val doc = LinkedHashMap(reifyMap(LcncProgramConfix.toJson(program)))
             doc["seq"] = program.seq
             mapOf(
                 "program" to doc,
@@ -289,7 +292,7 @@ object CouncilNodes {
             val transcriptDoc = transcriptParts.filter { it.isNotBlank() }.joinToString("\n\n---\n\n")
             val transcriptCid = seams.casPut(transcriptDoc.encodeToByteArray())
 
-            val verdictText = if (verdict is String) verdict else JsonSupport.stringify(verdict)
+            val verdictText = if (verdict is String) verdict else jsonOf(verdict)
             val verdictCid = seams.casPut(verdictText.encodeToByteArray())
 
             val verdictMistrial = (verdict as? Map<*, *>)?.get("mistrial").let { it == true || it == "true" }
@@ -310,7 +313,7 @@ object CouncilNodes {
                 "status" to status,
                 "turns" to turns,
             )
-            val caseCid = seams.casPut(JsonSupport.stringify(caseDoc).encodeToByteArray())
+            val caseCid = seams.casPut(jsonOf(caseDoc).encodeToByteArray())
 
             val recorded = if (status == "mistrial") {
                 seams.recordMistrial(
@@ -372,7 +375,7 @@ object CouncilNodes {
                 val transcriptCid = field("transcriptCid")
                     ?: field("caseCid")
                         ?.let { seams.casGet(it)?.decodeToString() }
-                        ?.let { runCatching { JsonSupport.parseMap(it) }.getOrNull() }
+                        ?.let { runCatching { reifyMap(it) }.getOrNull() }
                         ?.get("transcriptCid")?.toString()
                 mapOf("case" to linkedMapOf(
                     "caseId" to caseId,
@@ -448,7 +451,7 @@ object CouncilNodes {
             null -> {}
             is String -> out.add(v)
             is List<*> -> for (e in v) flattenText(e, out)
-            is Map<*, *> -> out.add(JsonSupport.stringify(v))
+            is Map<*, *> -> out.add(jsonOf(v))
             else -> out.add(v.toString())
         }
     }
@@ -481,7 +484,7 @@ object CouncilNodes {
                 }
             }
             if (start >= 0) {
-                val parsed = runCatching { JsonSupport.parse(text.substring(start, end + 1)) }.getOrNull()
+                val parsed = runCatching { reify(text.substring(start, end + 1)) }.getOrNull()
                 if (parsed is Map<*, *>) {
                     @Suppress("UNCHECKED_CAST")
                     return parsed as Map<String, Any?>

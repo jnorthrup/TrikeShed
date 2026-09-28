@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ConfixFacetPlan
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobEvent
@@ -91,7 +93,7 @@ class TribunalInstance internal constructor(
             "timestampMs" to 0L,
             "expectedRevision" to expectedRevision,
         )
-        val doc = confixDoc(borg.trikeshed.parse.json.JsonSupport.stringify(frame).encodeToByteArray(), Syntax.JSON)
+        val doc = confixDoc(jsonOf(frame).encodeToByteArray(), Syntax.JSON)
         val verdict = plan.validate(doc)
         if (!verdict.valid) throw IllegalArgumentException("tribunal frame rejected by schema: ${verdict.errors}")
 

@@ -39,7 +39,8 @@ internal object JvmMemorySyscalls {
         ValueLayout.ADDRESS, ValueLayout.JAVA_LONG, ValueLayout.JAVA_INT)) }
     val pageSize: Long by lazy {
         val call = function("getpagesize", FunctionDescriptor.of(ValueLayout.JAVA_INT))
-        status(call).toLong().also { check(it > 0) }
+        val state = errnoState.get()
+        status(state, call.invokeExact(state) as Int).toLong().also { check(it > 0) }
     }
 
     private fun errno(state: MemorySegment): Int {
@@ -49,11 +50,9 @@ internal object JvmMemorySyscalls {
             else -> value
         }
     }
-    private fun status(handle: MethodHandle, vararg args: Any): Int = Arena.ofConfined().use { arena ->
-        val state = arena.allocate(stateLayout)
-        val result = handle.invokeWithArguments(listOf(state) + args) as Int
-        if (result < 0) -errno(state) else result
-    }
+    /** The calling thread's errno capture: one segment per thread, reused by every call. */
+    private val errnoState = ThreadLocal.withInitial { Arena.ofAuto().allocate(stateLayout) }
+    private fun status(state: MemorySegment, result: Int): Int = if (result < 0) -errno(state) else result
     private fun mapFlags(flags: Int): Int {
         if (linux) return flags
         if (!darwin || flags and (1 or 2 or 0x10 or 0x20).inv() != 0)
@@ -62,23 +61,23 @@ internal object JvmMemorySyscalls {
     }
     fun map(address: Long, length: Long, protection: Int, flags: Int, fd: Int, offset: Long): MemorySegment {
         val hostFlags = mapFlags(flags)
-        return Arena.ofConfined().use { arena ->
-            val state = arena.allocate(stateLayout)
-            val result = mmap.invokeWithArguments(state, MemorySegment.ofAddress(address), length,
-                protection, hostFlags, fd, offset) as MemorySegment
-            if (result.address() == -1L) throw IllegalStateException("mmap failed: ${-errno(state)}")
-            result.reinterpret(length)
-        }
+        val state = errnoState.get()
+        val result = mmap.invokeExact(state, MemorySegment.ofAddress(address), length,
+            protection, hostFlags, fd, offset) as MemorySegment
+        if (result.address() == -1L) throw IllegalStateException("mmap failed: ${-errno(state)}")
+        return result.reinterpret(length)
     }
-    fun unmap(address: Long, length: Long): Int = status(munmap, MemorySegment.ofAddress(address), length)
+    fun unmap(address: Long, length: Long): Int { val state = errnoState.get(); return status(state, munmap.invokeExact(state, MemorySegment.ofAddress(address), length) as Int) }
     fun sync(address: Long, length: Long, flags: Int): Int {
         if (!linux && flags and 7.inv() != 0) return -95
         val hostFlags = if (linux) flags else (flags and 4.inv()) or if (flags and 4 != 0) 0x10 else 0
-        return status(msync, MemorySegment.ofAddress(address), length, hostFlags)
+        val state = errnoState.get()
+        return status(state, msync.invokeExact(state, MemorySegment.ofAddress(address), length, hostFlags) as Int)
     }
     fun advise(address: Long, length: Long, advice: Int): Int {
         if (!linux && advice !in 0..3) return -95
-        return status(madvise, MemorySegment.ofAddress(address), length, advice)
+        val state = errnoState.get()
+        return status(state, madvise.invokeExact(state, MemorySegment.ofAddress(address), length, advice) as Int)
     }
 }
 

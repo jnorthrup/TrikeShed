@@ -1,10 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * LCNC ON THE BLACKBOARD.
  *
@@ -72,7 +73,7 @@ object LcncBlackboard {
         }
         return linkedMapOf(
             "name" to name,
-            "document" to JsonSupport.parse(LcncProgramConfix.toJson(program)),
+            "document" to reify(LcncProgramConfix.toJson(program)),
             "cables" to cables,
             "violations" to LcncTypeCheck.check(program, contracts, strict = false).map { it.toMap() },
             "sourceCid" to sourceCid,
@@ -85,12 +86,12 @@ object LcncBlackboard {
         val m = entry as? Map<*, *> ?: return null
         val name = m["name"]?.toString() ?: return null
         val doc = m["document"] ?: return null
-        return runCatching { LcncProgramConfix.fromJson(name, JsonSupport.stringify(doc)) }.getOrNull()
+        return runCatching { LcncProgramConfix.fromJson(name, jsonOf(doc)) }.getOrNull()
     }
 
     /** The entry's document as Confix JSON text — what `/api/panels/<name>` serves for a board-only program. */
     fun documentJsonOf(entry: Any?): String? =
-        (entry as? Map<*, *>)?.get("document")?.let { JsonSupport.stringify(it) }
+        (entry as? Map<*, *>)?.get("document")?.let { jsonOf(it) }
 
     fun sourceCidOf(entry: Any?): String? = (entry as? Map<*, *>)?.get("sourceCid")?.toString()
 

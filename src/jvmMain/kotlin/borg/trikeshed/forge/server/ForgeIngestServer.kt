@@ -1,8 +1,9 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.kanban.ForgeKanbanIngest
 import borg.trikeshed.kanban.JvmTikaIngestAdapter
-import borg.trikeshed.parse.json.JsonSupport
 import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
@@ -49,7 +50,7 @@ object ForgeIngestServer {
             val persist = ex.requestURI.rawQuery?.split('&')?.firstOrNull { it.startsWith("persist=") }?.substringAfter('=')?.ifEmpty { null }
             val body = runCatching { ingest(name, ex.requestBody.readBytes(), persist) }
                 .getOrElse { mapOf("name" to name, "error" to (it.message ?: it.toString())) }
-            ex.reply(if ("error" in body) 422 else 200, "application/json", JsonSupport.stringify(body).encodeToByteArray())
+            ex.reply(if ("error" in body) 422 else 200, "application/json", jsonOf(body).encodeToByteArray())
         }
         server.createContext("/") { ex ->
             val rel = ex.requestURI.path.trimStart('/').ifEmpty { "index.html" }

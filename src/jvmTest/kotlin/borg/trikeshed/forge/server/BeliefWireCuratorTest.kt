@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CuratorImpulse
@@ -8,7 +10,6 @@ import borg.trikeshed.narsese.CuratorImpulseKind
 import borg.trikeshed.narsese.ReplayScenario
 import borg.trikeshed.narsese.ReplayTurn
 import borg.trikeshed.narsese.TurnReviewElement
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -48,7 +49,7 @@ class BeliefWireCuratorTest {
         """.trimIndent()
         val r = post(wire, "/api/beliefs/teach", body)!!
         assertEquals(200, r.status)
-        val resp = JsonSupport.parse(r.body) as Map<*, *>
+        val resp = reify(r.body) as Map<*, *>
         assertEquals("ok", resp["verdict"])
         assertTrue((resp["landed"] as Number).toInt() >= 0, "teach completes without error")
         assertTrue((resp["knowledgeSize"] as Number).toInt() > 0,
@@ -61,7 +62,7 @@ class BeliefWireCuratorTest {
         curator.knowledgeBank.assertKif("(subclass TriageMetric Metric)")
         val r = post(wire, "/api/beliefs/query", """{"pattern":"(subclass TriageMetric ?what)"}""")!!
         assertEquals(200, r.status)
-        val resp = JsonSupport.parse(r.body) as Map<*, *>
+        val resp = reify(r.body) as Map<*, *>
         assertEquals("ok", resp["verdict"])
         @Suppress("UNCHECKED_CAST")
         val results = resp["results"] as List<Map<String, String>>
@@ -77,7 +78,7 @@ class BeliefWireCuratorTest {
         val wire = BeliefWire(bag, review, memoryFiles = null, curator = null)
         val r = post(wire, "/api/beliefs/teach", """{"impulses":[]}""")!!
         assertEquals(503, r.status)
-        assertEquals("curator not wired", (JsonSupport.parse(r.body) as Map<*, *>)["error"])
+        assertEquals("curator not wired", (reify(r.body) as Map<*, *>)["error"])
     }
 
     @Test
@@ -100,13 +101,13 @@ class BeliefWireCuratorTest {
         """.trimIndent()
         val r = post(wire, "/api/beliefs/teach", body)!!
         assertEquals(200, r.status)
-        val resp = JsonSupport.parse(r.body) as Map<*, *>
+        val resp = reify(r.body) as Map<*, *>
         assertEquals("ok", resp["verdict"])
         assertEquals(1, (resp["groupings"] as Number).toInt())
         val q = post(wire, "/api/beliefs/query", """{"pattern":"(groupCoherence ?g ?action)"}""")!!
         assertEquals(200, q.status)
         @Suppress("UNCHECKED_CAST")
-        val results = (JsonSupport.parse(q.body) as Map<*, *>)["results"] as List<Map<String, String>>
+        val results = (reify(q.body) as Map<*, *>)["results"] as List<Map<String, String>>
         assertTrue(results.isNotEmpty(), "banked coherence fact answers the solver")
         assertTrue(curator.knowledgeBank.asserts().any { it.toString().contains("group_ring8_42") },
             "the group's KIF term is in the bank")

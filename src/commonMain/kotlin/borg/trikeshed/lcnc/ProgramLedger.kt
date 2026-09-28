@@ -1,9 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
@@ -83,7 +85,7 @@ class ProgramLedger(
         ledger?.let { file ->
             withContext(fileIoContext) {
                 file.parentFile?.mkdirs()
-                file.appendText(JsonSupport.stringify(line.toMap()) + "\n")
+                file.appendText(jsonOf(line.toMap()) + "\n")
             }
         }
         heads[name] = line
@@ -231,7 +233,7 @@ class ProgramLedger(
                 }
         }
         return lines.mapNotNull { raw ->
-            val m = runCatching { JsonSupport.parseMap(raw) }.getOrNull() ?: return@mapNotNull null
+            val m = runCatching { reifyMap(raw) }.getOrNull() ?: return@mapNotNull null
             val name = m["name"]?.toString() ?: return@mapNotNull null
             val cid = m["cid"]?.toString() ?: return@mapNotNull null
             LedgerLine(name, cid, m["previousCid"]?.toString(), (m["atMs"] as? Number)?.toLong() ?: 0L, m["actor"]?.toString().orEmpty())

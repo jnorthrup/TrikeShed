@@ -2,7 +2,9 @@
 
 package borg.trikeshed.forge
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
@@ -60,10 +62,10 @@ suspend fun ForgeBrowser.hostApi(path: String, body: Map<String, Any?>? = null):
     val response = window.fetch(path, if (body == null) RequestInit(method = "GET") else RequestInit(
         method = "POST",
         headers = Headers().also { it.append("Content-Type", "application/json") },
-        body = JsonSupport.stringify(body),
+        body = jsonOf(body),
     )).await()
     if (!response.ok) throw IllegalStateException(response.status.toString() + " " + response.text().await())
-    return JsonSupport.parse(response.text().await())
+    return reify(response.text().await())
 }
 
 fun ForgeBrowser.probeHostLive(onDone: (Boolean) -> Unit) {
@@ -139,7 +141,7 @@ fun ForgeBrowser.wireHostForm() {
                 val result: Any? = if (source.trim().isNotEmpty())
                     hostApi("./api/vm/" + urlEncode(id) + "/eval", mapOf("source" to source))
                 else mapOf("value" to null)
-                hostLogLine("< " + JsonSupport.stringify(result))
+                hostLogLine("< " + jsonOf(result))
                 val sheet = hostApi("./api/vm") as? Map<String, Any?>
                 renderHostVms(sheet)
             } catch (err: Throwable) {

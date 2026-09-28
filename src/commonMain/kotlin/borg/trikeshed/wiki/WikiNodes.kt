@@ -1,10 +1,12 @@
 package borg.trikeshed.wiki
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.common.File
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.withContext
 
@@ -182,7 +184,7 @@ object WikiNodes {
             "response" to reply.content,
         )
         val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
-        withContext(fileIoContext) { captureFile.writeText(JsonSupport.stringify(capture)) }
+        withContext(fileIoContext) { captureFile.writeText(jsonOf(capture)) }
 
         // ── parse the edit script; a non-JSON reply is a LOUD no-op ──
         val script = lastBalancedObject(reply.content)
@@ -403,7 +405,7 @@ object WikiNodes {
             val responseCid = casPut(reply.content.encodeToByteArray())
             val captureFile = home.rawResponses.resolve("${safeName(contextId)}.json")
             withContext(fileIoContext) {
-                captureFile.writeText(JsonSupport.stringify(linkedMapOf<String, Any?>(
+                captureFile.writeText(jsonOf(linkedMapOf<String, Any?>(
                     "pass" to "wiki.propose",
                     "turn" to turn,
                     "contextId" to contextId,
@@ -447,7 +449,7 @@ object WikiNodes {
                     "found" to (source != "not_found"),
                 )
                 readOrder.add(record)
-                withContext(fileIoContext) { readLog.appendText(JsonSupport.stringify(record) + "\n") }
+                withContext(fileIoContext) { readLog.appendText(jsonOf(record) + "\n") }
                 transcript.append("\n<<< ").append(t).append(" (").append(source).append(") >>>\n")
                 transcript.append(body).append("\n")
             }
@@ -527,7 +529,7 @@ object WikiNodes {
                 }
             }
         }
-        val proposalCid = casPut(JsonSupport.stringify(proposal).encodeToByteArray())
+        val proposalCid = casPut(jsonOf(proposal).encodeToByteArray())
         val impactLine = buildString {
             append("- proposal ").append(baseContextId).append(" | ").append(isoish(clock()))
             append(" | targetSkill=").append(skill)
@@ -764,7 +766,7 @@ object WikiNodes {
                 if (depth == 0) { start = j; break }
             }
             if (start >= 0) {
-                val parsed = runCatching { JsonSupport.parse(text.substring(start, end + 1)) }.getOrNull()
+                val parsed = runCatching { reify(text.substring(start, end + 1)) }.getOrNull()
                 if (parsed is Map<*, *>) {
                     @Suppress("UNCHECKED_CAST")
                     return parsed.entries.associate { (k, v) -> k.toString() to v } as Map<String, Any?>

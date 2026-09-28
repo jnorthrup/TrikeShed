@@ -1,5 +1,7 @@
 package borg.trikeshed.modelmux
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -91,7 +93,7 @@ object FrameChainStore {
 
     /** Parse back a frame produced by [encode]; verifies the rolling-cid algebra on load. */
     fun decode(json: String): Frame? {
-        val m = runCatching { borg.trikeshed.parse.json.JsonSupport.parse(json) as? Map<*, *> }.getOrNull() ?: return null
+        val m = runCatching { reify(json) as? Map<*, *> }.getOrNull() ?: return null
         val cidStr = m["cid"]?.toString() ?: return null
         val turnHex = m["turn"]?.toString() ?: return null
         val parentStr = m["parent"]?.toString()

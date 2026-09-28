@@ -35,9 +35,9 @@ class NodeLocalServer(
 
                     GlobalScope.launch {
                         try {
-                            val action = ReactorJsonCodec.decode(body)
+                            val action = reactorEnvelope(body).toReactorAction()
                             val result = localReactor.invoke(action)
-                            val resultBody = ReactorJsonCodec.encode(result)
+                            val resultBody = result.toConfixEnvelope().json()
                             res.writeHead(200, js("{'Content-Type': 'application/octet-stream'}"))
                             res.end(js("Buffer.from(resultBody)"))
                         } catch (e: Throwable) {

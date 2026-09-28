@@ -1,5 +1,7 @@
 package borg.trikeshed.ipns
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
@@ -9,7 +11,6 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption.*
 import kotlinx.coroutines.*
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.system.exitProcess
@@ -173,7 +174,7 @@ private class IpnsIoTrace : UringTrace {
         val file = FileChannel.open(path, WRITE, CREATE, TRUNCATE_EXISTING)
         try {
             for (event in events + jsonObject { put("event", "summary"); put("omitted", omitted); put("unpaired", admitted.size) }) {
-                val buffer = ByteBuffer((JsonSupport.stringify(event) + "\n").encodeToByteArray())
+                val buffer = ByteBuffer((jsonOf(event) + "\n").encodeToByteArray())
                 while (buffer.hasRemaining()) check(file.write(buffer) > 0)
             }
             file.force(true)
@@ -182,4 +183,4 @@ private class IpnsIoTrace : UringTrace {
 }
 
 private fun jsonObject(block: MutableMap<String, Any?>.() -> Unit): Map<String, Any?> = linkedMapOf<String, Any?>().apply(block)
-private fun emit(value: Map<String, Any?>) = println(JsonSupport.stringify(value))
+private fun emit(value: Map<String, Any?>) = println(jsonOf(value))

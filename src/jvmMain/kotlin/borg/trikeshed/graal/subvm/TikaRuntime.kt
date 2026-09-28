@@ -23,7 +23,8 @@ object TikaRuntime {
     const val TIKA_VERSION: String = "3.2.3"
     const val TIKA4ALL_FFMPEG_FILTER: String = "format=gray,eq=contrast=1.5:brightness=0.1:gamma=1.0:saturation=0.0"
     const val UNLIMITED_TEXT_CHARS: Int = -1
-    const val DEFAULT_MAX_INPUT_BYTES: Int = 256 * 1024 * 1024
+    /** No default cap: the bytes are already in memory when Tika is called; a caller that fetches untrusted input sets its own. */
+    const val DEFAULT_MAX_INPUT_BYTES: Int = Int.MAX_VALUE
 
     val MANAGED_TIKA_COORDINATES: List<String> = listOf(
         "org.apache.tika:tika-core:$TIKA_VERSION",

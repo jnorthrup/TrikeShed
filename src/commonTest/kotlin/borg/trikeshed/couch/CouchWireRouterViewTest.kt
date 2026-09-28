@@ -1,7 +1,8 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,7 +29,7 @@ class CouchWireRouterViewTest {
         suspend fun get(path: String): Pair<Map<String, Any?>, Int> {
             val reply = router.handle("GET", path, ByteArray(0))
                 ?: error("router declined $path — _view must be answered by the daemon router")
-            return JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?> to reply.status
+            return reify(reply.bytes) as Map<String, Any?> to reply.status
         }
 
         suspend fun put(id: String, body: String) {

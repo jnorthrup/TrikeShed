@@ -1,12 +1,13 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.graal.vitals.JvmVitals
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -36,7 +37,7 @@ class GraalClassfileSheetTest {
         val response = wire.route("GET", "/api/graal/sheet?id=$id", "", null)!!
         assertEquals(200, response.status)
         @Suppress("UNCHECKED_CAST")
-        val sheets = JsonSupport.parse(response.body) as List<Map<String, Any?>>
+        val sheets = reify(response.body) as List<Map<String, Any?>>
         val ids = sheets.map { it["id"] }
         assertTrue("$id/classFile" in ids)
         assertTrue("$id/fields" in ids)

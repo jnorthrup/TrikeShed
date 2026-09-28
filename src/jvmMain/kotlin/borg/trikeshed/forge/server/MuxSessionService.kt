@@ -1,11 +1,13 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.*
@@ -96,7 +98,7 @@ class MuxSessionService(
                 text.startsWith("POST ") -> text.substringAfter("\r\n\r\n", text.substringAfter("\n\n", ""))
                 else -> text
             }
-            val req = JsonSupport.parse(body) as? Map<*, *> ?: throw IllegalArgumentException("JSON object required")
+            val req = reify(body) as? Map<*, *> ?: throw IllegalArgumentException("JSON object required")
             when (route) {
                 Route.SESSIONS -> mutex.withLock {
                     require(sessions.size < 250) { "Session limit reached (250)" }
@@ -153,7 +155,7 @@ class MuxSessionService(
                 ?: attachments?.getAttachment("modelmux/sessions")?.second
         }
         if (saved != null) {
-            (JsonSupport.parse(saved.decodeToString()) as List<*>).map(::muxConversationFromWire).forEach {
+            (reify(saved) as List<*>).map(::muxConversationFromWire).forEach {
                 sessions[it.id] = if (it.status in activeStates) it.copy(status = "interrupted", error = "Server restarted during this turn") else it
                 sequence = maxOf(sequence, it.id)
             }
@@ -164,7 +166,7 @@ class MuxSessionService(
     /** Called under the session mutex so snapshots cannot overtake each other. */
     private suspend fun persist() {
         if (attachments == null && snapshotFile == null) return
-        val bytes = JsonSupport.stringify(sessions.values.map { it.toWire() }).encodeToByteArray()
+        val bytes = jsonOf(sessions.values.map { it.toWire() }).encodeToByteArray()
         val cid = ContentId.of(bytes)
         withContext(Dispatchers.IO) {
             snapshotFile?.let { JvmFileOperations().writeAtomically(it.absolutePath, bytes) }
@@ -303,6 +305,6 @@ class MuxSessionService(
         is String -> value.toLongOrNull()?.takeIf { it > 0 }
         else -> null
     } ?: throw IllegalArgumentException("Session id required")
-    private fun response(body: Any?, status: Int = 200) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(body))
+    private fun response(body: Any?, status: Int = 200) = JvmKanbanServer.HttpResponse(status, jsonOf(body))
     private companion object { val activeStates = setOf("queued", "running", "joining") }
 }

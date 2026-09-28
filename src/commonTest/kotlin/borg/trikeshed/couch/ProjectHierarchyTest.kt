@@ -1,7 +1,8 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.RelaxTransport
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import kotlinx.coroutines.test.runTest
@@ -173,7 +174,7 @@ class ProjectHierarchyTest {
 
         @Suppress("UNCHECKED_CAST")
         suspend fun json(path: String): Map<String, Any?> =
-            JsonSupport.parse(router.handle("GET", path, ByteArray(0))!!.bytes.decodeToString()) as Map<String, Any?>
+            reify(router.handle("GET", path, ByteArray(0))!!.bytes.decodeToString()) as Map<String, Any?>
 
         val listed = json("/trikeshed/_projects")
         val rows = Couch.asList(listed["rows"])!!.map { it as Map<*, *> }

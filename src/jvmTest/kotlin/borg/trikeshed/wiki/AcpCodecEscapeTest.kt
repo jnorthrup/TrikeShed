@@ -1,5 +1,7 @@
 package borg.trikeshed.wiki
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.emptySeriesOf
 import modelmux.acp.AcpCodec
@@ -51,7 +53,7 @@ class AcpCodecEscapeTest {
         // No raw control character rides inside the body.
         assertTrue(json.none { it.code < 0x20 }, "raw control character in the encoded request")
         // …and it round-trips through a strict JSON reader.
-        val parsed = borg.trikeshed.parse.json.JsonSupport.parse(json) as Map<*, *>
+        val parsed = reify(json) as Map<*, *>
         val content = ((parsed["messages"] as List<*>)[0] as Map<*, *>)["content"]
         assertEquals("tab\there\r\nand a \u0007 bell", content)
     }

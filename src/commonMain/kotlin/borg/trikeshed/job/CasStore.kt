@@ -19,6 +19,19 @@ open class CasStore protected constructor(
         return cid
     }
 
+    /** Makes every put so far durable; a root that names them is published only after this returns. */
+    open fun sync() {}
+
+    /**
+     * Names [bytes], already read from the file at [path] and digested as [cid], by reference where
+     * the store can: the file stays where it is and nothing is copied. Stores that hold bytes only
+     * fall back to [put].
+     */
+    open fun putRef(path: String, bytes: ByteArray, cid: ContentId): ContentId = put(bytes)
+
+    /** Whether [cid] was put here — named, whether or not its bytes are still servable; no bytes are read. */
+    open fun holds(cid: ContentId): Boolean = get(cid) != null
+
     fun put(doc: borg.trikeshed.parse.confix.ConfixDoc): ContentId {
         val canonical = CanonicalCbor.encode(doc)
         return put(canonical)

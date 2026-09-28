@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.gallery
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
+
 import kotlinx.serialization.Serializable
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
 
@@ -168,7 +169,7 @@ object ForgeGalleryCatalog {
             synopsis = "Type-safe config oracle with cursor navigation.",
             previewToken = "confix-doc-tree",
             supportTargets = setOf("JVM_DESKTOP", "JS_BROWSER", "JS_NODE", "WASM_JS_BROWSER", "WASM_JS_NODE"),
-            apiSignature = "class ConfixDoc / object JsonParser",
+            apiSignature = "class ConfixDoc / fun reify / fun jsonOf",
         ),
         confix("confix.cursor", "ConfixCursor",
             synopsis = "Lazy projection with column metadata and reduction facets.",
@@ -288,7 +289,7 @@ object ForgeGalleryCatalog {
         },
     )
 
-    fun renderJson(): String = JsonSupport.stringify(toJsonValue())
+    fun renderJson(): String = jsonOf(toJsonValue())
 
     /** Bumped when widget rows are added or removed — gate downstream caches. */
     const val CATALOG_VERSION: String = "forge-gallery-v2"

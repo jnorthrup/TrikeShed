@@ -1,9 +1,11 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.treedoc.TreeDocK
 import borg.trikeshed.treedoc.TreeDocPipeline
 import borg.trikeshed.treedoc.TreeDocument
@@ -12,13 +14,13 @@ import kotlin.test.*
 
 class ArchiveServiceTest {
     private fun request(path: String = "nested/quoted \"name\".txt", bytes: String = "aGVsbG8=") =
-        JsonSupport.stringify(mapOf("entries" to listOf(mapOf("path" to path, "mediaType" to "text/plain", "base64" to bytes))))
+        jsonOf(mapOf("entries" to listOf(mapOf("path" to path, "mediaType" to "text/plain", "base64" to bytes))))
 
     @Test fun importReopensWithNewServiceAndRestoresBytes(): Unit = runBlocking {
         val cas = CasStore.inMemory()
         val first = ArchiveService(cas).route("POST", "/api/archives/import", request())
         assertEquals(201, first.status, first.body)
-        val manifest = JsonSupport.parse(first.body) as Map<*, *>
+        val manifest = reify(first.body) as Map<*, *>
         val cid = manifest["cid"] as String
         val reopened = ArchiveService(cas).route("GET", "/api/archives/manifest?cid=$cid", "")
         assertEquals(200, reopened.status, reopened.body)
@@ -49,7 +51,7 @@ class ArchiveServiceTest {
             override fun put(bytes: ByteArray): ContentId { writes++; return super.put(bytes) }
         }
         for (paths in listOf(listOf("a", "a/b"), listOf("a/b", "a"), listOf("a", "a/"), listOf("a", "a"))) {
-            val body = JsonSupport.stringify(mapOf("entries" to paths.map { mapOf("path" to it, "base64" to "") }))
+            val body = jsonOf(mapOf("entries" to paths.map { mapOf("path" to it, "base64" to "") }))
             assertEquals(400, ArchiveService(cas).route("POST", "/api/archives/import", body).status)
         }
         assertEquals(0, writes)
@@ -57,12 +59,12 @@ class ArchiveServiceTest {
 
     @Test fun serverEnforcesEntryAndExpandedByteLimitsWithoutTrustingBrowser(): Unit = runBlocking {
         val service = ArchiveService(CasStore.inMemory())
-        val tooMany = JsonSupport.stringify(mapOf("entries" to (0..ArchiveService.MAX_ENTRIES).map { mapOf("path" to "file$it", "base64" to "") }))
+        val tooMany = jsonOf(mapOf("entries" to (0..ArchiveService.MAX_ENTRIES).map { mapOf("path" to "file$it", "base64" to "") }))
         assertEquals(400, service.route("POST", "/api/archives/import", tooMany).status)
         val oversized = "AAAA".repeat(ArchiveService.MAX_FILE / 3 + 2)
         assertEquals(400, service.route("POST", "/api/archives/import", request(bytes = oversized)).status)
         val full = "AAAA".repeat(ArchiveService.MAX_FILE / 3)
-        val batch = JsonSupport.stringify(mapOf("entries" to (0..2).map { mapOf("path" to "file$it", "base64" to full) }))
+        val batch = jsonOf(mapOf("entries" to (0..2).map { mapOf("path" to "file$it", "base64" to full) }))
         assertTrue(service.route("POST", "/api/archives/import", batch).status in listOf(400, 413))
         assertTrue(service.route("POST", "/api/archives/import", "{").status in listOf(400, 422))
     }

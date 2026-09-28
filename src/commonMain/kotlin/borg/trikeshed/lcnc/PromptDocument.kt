@@ -1,8 +1,9 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
 
+import borg.trikeshed.job.ContentId
 /**
  * A STORED PROMPT IS A CITIZEN.
  *
@@ -29,7 +30,7 @@ data class PromptDocument(
     val variables: List<String> get() = PromptTemplate.variables(text)
 
     /** Canonical bytes: a fixed key order, rendered by the one JSON writer. */
-    fun canonicalJson(): String = JsonSupport.stringify(
+    fun canonicalJson(): String = jsonOf(
         linkedMapOf<String, Any?>(
             "kind" to KIND,
             "name" to name,
@@ -58,7 +59,7 @@ data class PromptDocument(
 
         /** A document read back from its canonical bytes; loud when the bytes are not a prompt. */
         fun fromJson(json: String): PromptDocument {
-            val m = JsonSupport.parseMap(json)
+            val m = reifyMap(json)
             require(m["kind"] == KIND) { "not a prompt document: kind=${m["kind"]}" }
             val name = m["name"]?.toString() ?: error("prompt document without a name")
             return PromptDocument(
@@ -111,6 +112,6 @@ object PromptTemplate {
         null -> "null"
         is String -> v
         is Number, is Boolean -> v.toString()
-        else -> JsonSupport.stringify(v)
+        else -> jsonOf(v)
     }
 }

@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
@@ -11,7 +13,6 @@ import borg.trikeshed.lcnc.PromptStore
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import keymux.KeyMux
@@ -47,7 +48,7 @@ class PatchWirePromptsTest {
     private suspend fun postJson(wire: PatchWire, path: String, body: String) =
         wire.route("POST", path, "POST $path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n$body", null)!!
     @Suppress("UNCHECKED_CAST")
-    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = JsonSupport.parse(r.body) as Map<String, Any?>
+    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = reify(r.body) as Map<String, Any?>
 
     @Test
     fun saveListReadHistoryAndTheBoardEntryAgree(): Unit = runBlocking {

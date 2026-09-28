@@ -1,8 +1,9 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -29,7 +30,7 @@ class SkillUsageFeeder(private val profileDir: File) {
     suspend fun load(): Series<SkillUsageRecord> = withContext(Dispatchers.IO) {
         val f = File(profileDir, "skills/.usage.json")
         if (!f.isFile) return@withContext emptySeriesOf()
-        val parsed = runCatching { JsonSupport.parse(f.readText()) }.getOrNull() as? Map<*, *>
+        val parsed = runCatching { reify(f.readText()) }.getOrNull() as? Map<*, *>
             ?: return@withContext emptySeriesOf()
         @Suppress("UNCHECKED_CAST")
         SkillUsageLedger.records(parsed as Map<String, Any?>)

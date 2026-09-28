@@ -2,6 +2,9 @@
 
 package borg.trikeshed.forge
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.board.ForgeCommandQueue
 import borg.trikeshed.forge.board.SYNC_NOTE_OFFLINE
 import borg.trikeshed.forge.board.SYNC_NOTE_ONLINE
@@ -20,7 +23,6 @@ import borg.trikeshed.forge.shape.ShapeDoc
 import borg.trikeshed.forge.sheet.SheetSort
 import borg.trikeshed.forge.sheet.SourceSheet
 import borg.trikeshed.forge.sheet.sourceSheetsOf
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.Job
@@ -92,7 +94,7 @@ object ForgeBrowser {
     fun boot() {
         val seedEl = document.getElementById("forge-seed")
         seed = runCatching {
-            JsonSupport.parse(seedEl?.textContent ?: "{}") as? Map<String, Any?> ?: emptyMap()
+            reify(seedEl?.textContent ?: "{}") as? Map<String, Any?> ?: emptyMap()
         }.getOrElse { emptyMap() }
         loadState()
         sourceSheets = sourceSheetsOf(seed)
@@ -146,10 +148,10 @@ object ForgeBrowser {
             window.localStorage.setItem(ForgeStorageKeys.WORKSPACE, workspace.toJson())
             window.localStorage.setItem(
                 ForgeStorageKeys.BOARD_SEED,
-                JsonSupport.stringify(mapOf("cards" to workspace.board.cards.map { it.toMap() })),
+                jsonOf(mapOf("cards" to workspace.board.cards.map { it.toMap() })),
             )
             seed["causalGraph"]?.let { causal ->
-                window.localStorage.setItem(ForgeStorageKeys.CAUSAL_SEED, JsonSupport.stringify(causal))
+                window.localStorage.setItem(ForgeStorageKeys.CAUSAL_SEED, jsonOf(causal))
             }
         }
     }
@@ -185,13 +187,13 @@ object ForgeBrowser {
                 window.fetch(invokeUrl(), RequestInit(
                     method = "POST",
                     headers = Headers().also { it.append("Content-Type", "application/json") },
-                    body = JsonSupport.stringify(body),
+                    body = jsonOf(body),
                 )).await()
             }.getOrElse {
                 noteSync(SYNC_NOTE_UNREACHABLE)
                 return@launch
             }
-            val res = runCatching { JsonSupport.parse(response.text().await()) as? Map<String, Any?> }
+            val res = runCatching { reify(response.text().await()) as? Map<String, Any?> }
                 .getOrNull() ?: emptyMap()
             if (res["status"] == "queued") {
                 noteSync(syncNoteQueued(batchSize))
@@ -218,7 +220,7 @@ object ForgeBrowser {
         scope.launch {
             val body = runCatching {
                 val response = window.fetch(boardUrl()).await()
-                JsonSupport.parse(response.text().await()) as? Map<String, Any?>
+                reify(response.text().await()) as? Map<String, Any?>
             }.getOrNull() ?: return@launch
             val columns = body["columns"]
             val items = body["items"]
@@ -394,7 +396,7 @@ object ForgeBrowser {
         val entries = value.entries.joinToString(",\n") { (k, v) ->
             " \"${k}\": " + when (v) {
                 is List<*> -> "[${v.joinToString(", ") { "\"$it\"" }}]"
-                else -> JsonSupport.stringify(v)
+                else -> jsonOf(v)
             }
         }
         return "{\n$entries\n}"

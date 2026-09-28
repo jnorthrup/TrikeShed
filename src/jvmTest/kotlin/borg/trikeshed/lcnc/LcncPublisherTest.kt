@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
@@ -9,7 +11,6 @@ import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -103,7 +104,7 @@ class LcncPublisherTest {
         val board = ConfixBlackboard.empty()
         val raw = mapOf(
             "name" to "asserted",
-            "document" to JsonSupport.parse(LcncProgramConfix.toJson(program("asserted", "from-the-board"))),
+            "document" to reify(LcncProgramConfix.toJson(program("asserted", "from-the-board"))),
             "cables" to emptyList<Any?>(),
             "violations" to emptyList<Any?>(),
         )

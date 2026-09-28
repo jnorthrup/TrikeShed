@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -16,7 +19,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -66,7 +68,7 @@ class LcncRunProgramRouteTest {
             val bindings = result["bindings"] as List<*>
             assertEquals("invocation", (bindings.single() as Map<*, *>)["source"])
             val receipt = ctx.blackboard.get("lcnc/run/${result["runId"]}") as Map<*, *>
-            assertEquals(result["bindings"], JsonSupport.parse(JsonSupport.stringify(receipt["bindings"])))
+            assertEquals(result["bindings"], reify(jsonOf(receipt["bindings"])))
             assertEquals(result["inputs"], receipt["inputs"])
             val conflict = post(server, "/api/lcnc/run", request.replace("Concurrency\":3", "Concurrency\":4"))
             assertEquals(400, conflict.status, conflict.body)
@@ -119,7 +121,7 @@ class LcncRunProgramRouteTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> =
-        JsonSupport.parse(resp.body) as Map<String, Any?>
+        reify(resp.body) as Map<String, Any?>
 
     private fun program(name: String, nodes: List<LcncNode>, wires: List<LcncWire>) =
         LcncProgram(name, nodes.toSeries(), wires.toSeries())
@@ -316,7 +318,7 @@ class LcncRunProgramRouteTest {
             assertEquals(499, cancelled.status, cancelled.body)
             val body = json(cancelled)
             assertEquals("cancelled", body["status"])
-            val raw = JsonSupport.parse(ctx.casStore.get(borg.trikeshed.job.ContentId(body["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
+            val raw = reify(ctx.casStore.get(borg.trikeshed.job.ContentId(body["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
             assertEquals("cancelled", (raw["lcncRun"] as Map<*, *>)["status"])
         } finally { supervisor.detach("kanban") }
     }
@@ -421,7 +423,7 @@ class LcncRunProgramRouteTest {
             assertEquals(cid, borg.trikeshed.job.ContentId.of(content.body.encodeToByteArray()).value)
             val sheets = get("cid=$cid&view=sheet")
             assertEquals(200, sheets.status, sheets.body)
-            val family = JsonSupport.parse(sheets.body) as List<*>
+            val family = reify(sheets.body) as List<*>
             assertEquals(cid, (family.first() as Map<*, *>)["id"])
             assertEquals("root-at-admission,subprogram-at-first-use", receipt["versionPolicy"])
             val stored = json(get("cid=${receipt["receiptCid"]}"))["lcncRun"] as Map<*, *>

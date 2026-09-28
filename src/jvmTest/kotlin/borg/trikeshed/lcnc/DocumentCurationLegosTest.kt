@@ -1,5 +1,9 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.graal.subvm.harness.DocumentModelFixture
 import borg.trikeshed.job.CasStore
@@ -21,8 +25,7 @@ import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -51,7 +54,7 @@ class DocumentCurationLegosTest {
         val reporting = mapOf("returns" to retained, "outputs" to mapOf("curate" to retained),
             "bindings" to listOf(mapOf("value" to retained)))
         assertNull(ValueBudget().violation(reporting))
-        assertTrue(JsonSupport.stringify(reporting).length < 4_096)
+        assertTrue(jsonOf(reporting).length < 4_096)
         val ref = retained.getValue("record") as Map<*, *>
         assertEquals(cid.value, ref["cid"])
         assertEquals(original.value, ref["originalCid"])
@@ -131,7 +134,7 @@ class DocumentCurationLegosTest {
             val session = DocumentModelFixture.open(modelId = "fixture") { prompt ->
                 modelCalls++
                 assertEquals(instructions, prompt.messages[0].content)
-                val sent = JsonSupport.parseMap(prompt.messages[1].content)
+                val sent = reifyMap(prompt.messages[1].content)
                 assertEquals(text, (sent["source"] as Map<*, *>)["text"])
                 assertNotNull(sent["nlp"])
                 ModelResponse("""{"format":"TRIPLET_JSON","triplets":[{"subject":"Synthetic applicant","predicate":"skill","object":"Kotlin","confidence":0.9,"quote":"Kotlin","begin":0,"end":6,"polarity":true,"modality":"asserted"}]}""",
@@ -200,7 +203,7 @@ class DocumentCurationLegosTest {
 
     @Test
     fun jsonExtentsRetainIntegralCoordinates() {
-        val extent = DocumentCurationLegos.extent(JsonSupport.parse(
+        val extent = DocumentCurationLegos.extent(reify(
             """{"lba":8,"byteLength":3,"name":"source.txt","mediaType":"text/plain"}"""))
         assertEquals(8L, extent.lba)
         assertEquals(3, extent.byteLength)

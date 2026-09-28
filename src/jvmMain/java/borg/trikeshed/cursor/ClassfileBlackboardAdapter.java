@@ -6,7 +6,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import borg.trikeshed.graal.ConfixBlackboard;
-import borg.trikeshed.parse.json.JsonSupport;
+import borg.trikeshed.parse.ReifyKt;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -52,7 +52,7 @@ public class ClassfileBlackboardAdapter {
     }
 
     private void attach(String id, String json) {
-        blackboard.put("class/" + id, JsonSupport.INSTANCE.parseMap(json), "classfile");
+        blackboard.put("class/" + id, ReifyKt.reifyMap(json), "classfile");
     }
 
     private String buildJson(ClassNode cn) {

@@ -1,5 +1,7 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchChangesFactElement
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
@@ -25,7 +27,6 @@ import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
@@ -126,7 +127,7 @@ class CorpusStaleRebuildRouteTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
+    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = reify(resp.body) as Map<String, Any?>
 
     private fun consumedFacts(rig: Rig) = rig.ctx.rete.workingMemory.query(BlackboardContext(rig.project), "kind" j LcncRunFacts.KIND)
 

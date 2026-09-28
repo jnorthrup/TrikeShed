@@ -1,5 +1,7 @@
 package borg.trikeshed.hermes
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.collections.LineAperture
 import borg.trikeshed.graal.ConfixBlackboard
@@ -8,7 +10,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.parse.yaml.YamlParser
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.Teleported
 import java.nio.file.Files
 import java.nio.file.Path
@@ -347,7 +348,7 @@ class HermesPythonPort(
         guest.delegate("yaml_load") { args ->
             val text = (args.firstOrNull() as? Teleported.Str)?.v
                 ?: throw IllegalArgumentException("yaml_load requires text")
-            Teleported.Str(JsonSupport.stringify(YamlParser.reify(text)))
+            Teleported.Str(jsonOf(YamlParser.reify(text)))
         }
         guest.delegate("land") { args ->
             val name = (args.firstOrNull() as? Teleported.Str)?.v.orEmpty()

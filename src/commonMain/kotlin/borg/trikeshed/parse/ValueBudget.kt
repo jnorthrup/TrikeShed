@@ -1,4 +1,4 @@
-package borg.trikeshed.parse.json
+package borg.trikeshed.parse
 
 import kotlin.time.TimeSource
 

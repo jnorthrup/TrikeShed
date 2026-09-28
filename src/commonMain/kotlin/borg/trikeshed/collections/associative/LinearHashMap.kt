@@ -6,6 +6,7 @@ import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.right
+import borg.trikeshed.collections.MinHeap
 
 /**
  * Base class for open-addressing hash maps with triangular probing.
@@ -250,5 +251,22 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
         }
         live.sortWith(compareBy { it.a })
         return live.drain().right
+    }
+
+    /** Live entries in insertion order straight off the slot arrays: a [MinHeap] keyed by sequence, payload the slot. */
+    fun forEachInOrder(block: (K, V) -> Unit) {
+        val heap = MinHeap(size)
+        for (s in 0 until capacity) {
+            val k = keys[s]
+            if (isAbsent(k) || isDeleted(k)) continue
+            @Suppress("UNCHECKED_CAST")
+            heap.push((k as Join<K, ULong>).b.toLong(), s.toLong())
+        }
+        while (heap.size > 0) {
+            val s = heap.minPayload.toInt()
+            heap.popMin()
+            @Suppress("UNCHECKED_CAST")
+            block((keys[s] as Join<K, ULong>).a, values[s] as V)
+        }
     }
 }

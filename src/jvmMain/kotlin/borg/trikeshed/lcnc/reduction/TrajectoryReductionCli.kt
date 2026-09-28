@@ -1,7 +1,8 @@
 package borg.trikeshed.lcnc.reduction
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reduction.TrajectoryOutcome
 import borg.trikeshed.reduction.TrajectoryReduction
 import borg.trikeshed.reduction.verdictFor
@@ -13,7 +14,7 @@ import kotlin.system.exitProcess
  * CLI entry point for TrajectoryReduction.
  *
  * Reads a JSON-encoded list of JulesCause from stdin and prints the verdict to stdout.
- * Uses JsonParser from parse/json for JSON parsing.
+ * Uses reify (the confix JSON scan) for JSON parsing.
  *
  * Input format (stdin):
  *   {
@@ -53,8 +54,8 @@ fun main(args: Array<String>) {
             """{"causes":[{"type":"DrainApplied","commitSha":"abc123","rejects":0,"at":1000}],"taskFingerprint":"abc123def456","attemptCount":1,"deps":[]}"""
     }
 
-    // Parse with JsonSupport (the project's own JSON parser via confix)
-    val parsed = JsonSupport.parse(inputJson) as? Map<*, *>
+    // Parse with reify (the project's own JSON parser via confix)
+    val parsed = reify(inputJson) as? Map<*, *>
 
     if (parsed == null) {
         println("ERROR: failed to parse JSON")
@@ -197,7 +198,7 @@ private fun renderDashboard(json: String) {
     // Clear screen, home cursor
     print("\u001b[2J\u001b[H")
 
-    val parsed = JsonSupport.parse(json) as? Map<*, *>
+    val parsed = reify(json) as? Map<*, *>
     if (parsed == null) {
         println("ERROR: failed to parse JSON")
         return

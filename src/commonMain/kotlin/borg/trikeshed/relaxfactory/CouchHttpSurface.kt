@@ -1,13 +1,14 @@
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.ConfixDocStoreEntry
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The stored document as a JSON object. `ConfixDoc.reify(0)` on an object yields the
  * token's children, not a Map, so re-parse the source bytes the store already holds.
@@ -15,13 +16,13 @@ import borg.trikeshed.parse.json.JsonSupport
 internal fun ConfixDocStoreEntry.jsonBody(): Map<String, Any?> {
     val src = doc.b
     val text = ByteArray(src.size) { src[it] }.decodeToString()
-    val parsed = runCatching { JsonSupport.parse(text) }.getOrNull() as? Map<*, *> ?: return emptyMap()
+    val parsed = runCatching { reify(text) }.getOrNull() as? Map<*, *> ?: return emptyMap()
     return parsed.entries.associate { it.key.toString() to it.value }
 }
 
 /** One HTTP reply from [CouchHttpSurface]: status code plus a JSON body. */
 data class CouchHttpReply(val status: Int, val json: Map<String, Any?>) {
-    val body: String get() = JsonSupport.stringify(json)
+    val body: String get() = jsonOf(json)
 }
 
 /**
@@ -121,11 +122,11 @@ class CouchHttpSurface(
     )
 
     private fun putDoc(id: String, body: String, queryRev: String?): CouchHttpReply {
-        val parsed = if (body.isBlank()) emptyMap<String, Any?>() else JsonSupport.parse(body)
+        val parsed = if (body.isBlank()) emptyMap<String, Any?>() else reify(body)
         val fields = parsed as? Map<*, *> ?: return error(400, "bad_request", "Document must be a JSON object")
         val rev = queryRev ?: fields["_rev"] as? String
         if (rev == null && store.contains(id)) return conflict(id)
-        val entry = store.put(id, JsonSupport.stringify(stripMeta(fields)), rev) ?: return conflict(id)
+        val entry = store.put(id, jsonOf(stripMeta(fields)), rev) ?: return conflict(id)
         return CouchHttpReply(201, okReceipt(entry))
     }
 
@@ -142,10 +143,10 @@ class CouchHttpSurface(
     }
 
     private suspend fun post(body: String): CouchHttpReply {
-        val parsed = runCatching { JsonSupport.parse(body) }.getOrNull()
+        val parsed = runCatching { reify(body) }.getOrNull()
         val asMap = parsed as? Map<*, *> ?: return error(400, "bad_request", "invalid UTF-8 JSON")
         if (asMap.containsKey("operations")) {
-            val reply = JsonSupport.parse(requestFactory.processRequest(body)) as Map<*, *>
+            val reply = reify(requestFactory.processRequest(body)) as Map<*, *>
             return CouchHttpReply(200, reply.entries.associate { it.key.toString() to it.value })
         }
         val id = asMap["_id"] as? String ?: ContentId.of(body.encodeToByteArray()).hex

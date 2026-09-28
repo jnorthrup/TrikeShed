@@ -2,9 +2,10 @@
 
 package narchy.spacegraph
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.*
 import borg.trikeshed.lcnc.LcncProgramConfix
-import borg.trikeshed.parse.json.JsonSupport
 import narchy.spacegraph.graphics.spi.*
 
 /** JS is a value adapter. Geometry, camera, traversal and picking all execute commonMain code. */
@@ -16,7 +17,7 @@ class BrowserSpatialEngine {
     private var cachedSvg: String? = null
     fun project(name: String, document: String, geometry: String, spacing: Double, reset: Boolean): dynamic {
         val program = LcncProgramConfix.fromJson(name, document)
-        val scene = LcncExtrusion.project(program, LcncExtrusion.measurements(JsonSupport.parse(geometry)), spacing)
+        val scene = LcncExtrusion.project(program, LcncExtrusion.measurements(reify(geometry)), spacing)
         val camera = scene.camera(view.viewport)
         view.update(scene, camera, reset)
         return value(LcncExtrusion.value(scene, camera))

@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.vm.Teleported
 import borg.trikeshed.vm.VmBudget
@@ -103,8 +105,8 @@ object VmRuntimeNodes {
         val source = """
             import io, sys, shlex, contextlib, json
             sys.path[:0] = ['/workspace/puresite', '/workspace/computronium']
-            _lcnc_args = shlex.split(json.loads(${pythonString(JsonSupport.stringify(flags))}))
-            _lcnc_args.append(json.loads(${pythonString(JsonSupport.stringify(path))}))
+            _lcnc_args = shlex.split(json.loads(${pythonString(jsonOf(flags))}))
+            _lcnc_args.append(json.loads(${pythonString(jsonOf(path))}))
             import pytest
             _lcnc_buf = io.StringIO()
             with contextlib.redirect_stdout(_lcnc_buf), contextlib.redirect_stderr(_lcnc_buf):
@@ -183,6 +185,6 @@ object VmRuntimeNodes {
         is Teleported.Str -> value.v
         is Teleported.Arr -> value.v.map { hostValue(it) }
         is Teleported.Obj -> value.v.mapValues { hostValue(it.value) }
-        is Teleported.Bytes, is Teleported.Opaque -> JsonSupport.parse(value.canonical())
+        is Teleported.Bytes, is Teleported.Opaque -> reify(value.canonical())
     }
 }

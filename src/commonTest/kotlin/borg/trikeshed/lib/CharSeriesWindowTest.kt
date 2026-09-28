@@ -1,6 +1,8 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -108,7 +110,7 @@ class CharSeriesWindowTest {
     fun jsonNestedSlicesPreserveEscapesNumbersAndOffsets() {
         val text = "x".repeat(300) + "\n\u1234"
         val value = mapOf("long" to text, "nested" to listOf(mapOf("n" to 7, "b" to true), emptyList<Any>()))
-        val parsed = JsonSupport.parse(JsonSupport.stringify(value)) as Map<*, *>
+        val parsed = reify(jsonOf(value)) as Map<*, *>
         assertEquals(text, parsed["long"])
         val nested = parsed["nested"] as List<*>
         assertEquals(7.0, (nested[0] as Map<*, *>)["n"])

@@ -8,7 +8,10 @@ import borg.trikeshed.couch.MapFunction
 import borg.trikeshed.couch.ReduceFunction
 import borg.trikeshed.couch.ValueExpr
 import borg.trikeshed.couch.ViewDefinition
+import borg.trikeshed.couch.ViewResult
+import borg.trikeshed.couch.ViewRow
 import borg.trikeshed.couch.ViewServer
+import borg.trikeshed.collections.mutableSeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 
@@ -91,6 +94,9 @@ class ViewRoute(
         val design = docs.body(ddoc) ?: return ViewReply(404, err("not_found", "missing"))
         val spec = (design["views"] as? Map<*, *>)?.get(viewName) as? Map<*, *>
             ?: return ViewReply(404, err("not_found", "missing_named_view"))
+        (spec["map"] as? String)?.let { source ->
+            return hosted(design["language"] as? String ?: "javascript", ddoc, viewName, source, spec["reduce"] as? String, q)
+        }
         val map = spec["map"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
         val reduceFn = reduceFn(spec["reduce"])
         val wantReduce = q.wantReduce(reduceFn != null)
@@ -128,6 +134,53 @@ class ViewRoute(
             listOf(mapOf("key" to null, "value" to ViewQuery.rereduce(reduceFn!!, reduced)))
         }
         return ViewReply(200, mapOf("rows" to rows))
+    }
+
+    /**
+     * A view whose `map` is function source (CouchDB's query-server shape): the design doc's
+     * `language` names the [ViewLanguageHost] that runs it. Builtin reducers (`_count`, `_sum`,
+     * `_stats`) fold here; any other `reduce` source runs in the same host.
+     */
+    fun hosted(language: String, ddoc: String, viewName: String, source: String, reduceSource: String?, q: ViewQuery): ViewReply {
+        val host = ViewLanguages.hosts[language] ?: return ViewReply(400, err("unknown_query_language", language))
+        val wantReduce = q.wantReduce(reduceSource != null)
+        if (wantReduce && reduceSource == null) return ViewReply(400, err("query_parse_error", "Reduce is invalid for map-only views."))
+        val emitted = try {
+            host.map(ddoc, viewName, source, docs.all().map { (id, body) -> linkedMapOf<String, Any?>("_id" to id) + body })
+        } catch (e: Exception) {
+            return ViewReply(500, err("map_error", e.message ?: e.toString()))
+        }
+        val mapped = ViewResult(mutableSeriesOf<ViewRow>().also { for (row in emitted) it.append(row) })
+        val selected = q.select(mapped)
+        if (!wantReduce) return ViewReply(
+            200,
+            mapOf(
+                "total_rows" to mapped.size,
+                "offset" to q.offset(selected),
+                "rows" to q.page(selected).map { row ->
+                    val base = mapOf("id" to row.docId, "key" to row.key, "value" to row.value)
+                    if (q.include_docs) base + ("doc" to docs.couchDoc(row.docId)) else base
+                },
+            ),
+        )
+        val groups = LinkedHashMap<Any?, MutableList<ViewRow>>()
+        for (row in selected) {
+            val k = row.key
+            val groupKey = if (!q.grouped) null else if (q.group_level > 0 && k is List<*>) k.take(q.group_level) else k
+            groups.getOrPut(groupKey) { mutableListOf() }.add(row)
+        }
+        val grouped = groups.entries.drop(q.skip).take(q.limit)
+        return try {
+            ViewReply(200, mapOf("rows" to grouped.map { (k, rows) ->
+                val value = if (reduceSource!!.startsWith("_")) {
+                    val folded = ViewResult(mutableSeriesOf<ViewRow>().also { for (r in rows) it.append(r.copy(key = null)) }).reduce(reduceSource)
+                    folded[0].value
+                } else host.reduce(ddoc, viewName, reduceSource, rows.map { listOf(it.key, it.docId) }, rows.map { it.value }, false)
+                mapOf("key" to k, "value" to value)
+            }))
+        } catch (e: Exception) {
+            ViewReply(500, err("reduce_error", e.message ?: e.toString()))
+        }
     }
 
     // ── store projection ──────────────────────────────────────────

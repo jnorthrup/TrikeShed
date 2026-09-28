@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.collections.associative.toCommonSortedMap
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.kif.KifKnowledgeBase
@@ -316,7 +318,7 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
     fun refineLiteral(node: LcncNode, port: String, declared: String): String {
         if (declared != "json") return declared
         val raw = node.params[port] ?: return declared
-        val rows = runCatching { borg.trikeshed.parse.json.JsonSupport.parse(raw) }.getOrNull() as? List<*> ?: return declared
+        val rows = runCatching { reify(raw) }.getOrNull() as? List<*> ?: return declared
         if (rows.isEmpty() || rows.any { it !is Map<*, *> }) return declared
         var best: Pair<String, Int>? = null
         for ((k, keys) in shapes()) {

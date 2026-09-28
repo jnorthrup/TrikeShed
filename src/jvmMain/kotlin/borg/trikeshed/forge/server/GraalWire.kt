@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.CouchStore
@@ -12,7 +15,6 @@ import borg.trikeshed.graal.GraalDocumentPolicy
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.RepoOccupancy
 import kotlinx.coroutines.CoroutineScope
@@ -106,15 +108,15 @@ class GraalWire(
             method == "GET" && (p == "/graal" || p == "/graal/") -> page()
             method == "GET" && (p == "/futon" || p == "/futon/") -> asset("web/futon.html", "text/html; charset=utf-8")
             method == "GET" && p == "/graal.webmanifest" -> JvmKanbanServer.HttpResponse(200, MANIFEST, "application/manifest+json; charset=utf-8")
-            method == "GET" && p == "/api/graal/vitals" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.snapshot() + ("pointcuts" to pointcutSummary())))
+            method == "GET" && p == "/api/graal/vitals" -> JvmKanbanServer.HttpResponse(200, jsonOf(vitals.snapshot() + ("pointcuts" to pointcutSummary())))
             method == "GET" && p == "/api/graal/heap" -> withContext(Dispatchers.IO) {
-                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(vitals.heapHistogram()))
+                JvmKanbanServer.HttpResponse(200, jsonOf(vitals.heapHistogram()))
             }
             method == "GET" && p == "/api/graal/allocations" -> withContext(Dispatchers.IO) {
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val allocated = q["class"]?.takeIf { it.isNotBlank() }
                 val recent = vitals.allocationSites.snapshot(allocated, System.currentTimeMillis())
-                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(recent + mapOf(
+                JvmKanbanServer.HttpResponse(200, jsonOf(recent + mapOf(
                     "jfr" to vitals.jfrLive, "jfrError" to vitals.jfrError,
                     "aot" to HotSpotAotBlobAccess.snapshot(),
                 )))
@@ -126,10 +128,10 @@ class GraalWire(
                     ?: return@withContext JvmKanbanServer.HttpResponse(404, """{"error":"allocation_site_expired_or_missing"}""")
                 val result = runCatching { AllocationFrameProjection(couch).project(frame) }
                     .getOrElse { frame.wire() + mapOf("available" to false, "reason" to (it.message ?: "projection_failed")) }
-                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result))
+                JvmKanbanServer.HttpResponse(200, jsonOf(result))
             }
-            method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("routes" to pointcutRoutes())))
-            method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapMap()))
+            method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, jsonOf(mapOf("routes" to pointcutRoutes())))
+            method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, jsonOf(mapMap()))
             method == "GET" && p == "/api/graal/doc" -> withContext(Dispatchers.IO) { docRoute(path) }
             method == "GET" && p == "/api/graal/content" -> withContext(Dispatchers.IO) { contentRoute(path) }
             method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)
@@ -138,7 +140,7 @@ class GraalWire(
             method == "GET" && p == "/api/graal/sheet" -> withContext(Dispatchers.IO) { sheetRoute(path) }
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
-                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(q["id"]?.let { dagFor(it) } ?: dagHubs()))
+                JvmKanbanServer.HttpResponse(200, jsonOf(q["id"]?.let { dagFor(it) } ?: dagHubs()))
             }
             method == "GET" && p == "/api/graal/classfile" -> withContext(Dispatchers.IO) {
                 val id = borg.trikeshed.relaxfactory.CouchHttpSurface
@@ -147,7 +149,7 @@ class GraalWire(
                 val projection = classfileProjection(id)
                 JvmKanbanServer.HttpResponse(
                     (projection["status"] as? Number)?.toInt() ?: if (projection["error"] == null) 200 else 404,
-                    JsonSupport.stringify(projection),
+                    jsonOf(projection),
                 )
             }
             method == "GET" && p == "/api/graal/decompile" -> withContext(Dispatchers.IO) {
@@ -167,11 +169,11 @@ class GraalWire(
                     } == true) return@withContext JvmKanbanServer.HttpResponse(403, """{"error":"content_preview_blocked"}""")
                 JvmKanbanServer.HttpResponse(
                     if (projection["error"] == null) 200 else 404,
-                    JsonSupport.stringify(projection),
+                    jsonOf(projection),
                 )
             }
             method == "GET" && p == "/api/graal/aot" -> withContext(Dispatchers.IO) {
-                JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(HotSpotAotBlobAccess.snapshot()))
+                JvmKanbanServer.HttpResponse(200, jsonOf(HotSpotAotBlobAccess.snapshot()))
             }
             method == "GET" && p == "/api/graal/aot/blob" -> withContext(Dispatchers.IO) {
                 val blob = HotSpotAotBlobAccess.blob()
@@ -184,7 +186,7 @@ class GraalWire(
                 val captured = HotSpotAotBlobAccess.capture(db)
                 JvmKanbanServer.HttpResponse(
                     if (captured["ok"] == true) 201 else 409,
-                    JsonSupport.stringify(captured),
+                    jsonOf(captured),
                 )
             }
             method == "GET" && p == EVENTS_PATH && respond != null -> { stream(respond); JvmKanbanServer.HttpResponse(200, "") }
@@ -443,7 +445,7 @@ class GraalWire(
             val host = vmHost ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no sub-VM host mounted"}""")
             val columns = borg.trikeshed.vm.VM_COLUMNS.map { borg.trikeshed.forge.sheet.SheetColumn(it.first, it.second.name) }
             val sheet = borg.trikeshed.forge.sheet.sheetSeed("vms", "Sub-VMs", host.rows(), columns = columns)
-            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(listOf(sheet.toMap())))
+            return JvmKanbanServer.HttpResponse(200, jsonOf(listOf(sheet.toMap())))
         }
 
         val target = graalDocTarget(id) ?: return JvmKanbanServer.HttpResponse(503, """{"error":"store not wired"}""")
@@ -455,7 +457,7 @@ class GraalWire(
             val projection = safeDocument.filterKeys { !it.startsWith("_") || it == "_graal" }
             return JvmKanbanServer.HttpResponse(
                 200,
-                JsonSupport.stringify(projectionSheets(id, projection).map { it.toMap() }),
+                jsonOf(projectionSheets(id, projection).map { it.toMap() }),
             )
         }
         val fields = linkedMapOf<String, Any?>()
@@ -478,18 +480,18 @@ class GraalWire(
         }
         if (containsSecretText(projection)) return json(403, mapOf("error" to "content_preview_blocked"))
         if (projection !== fields && projection["error"] != null) return JvmKanbanServer.HttpResponse(
-            (projection["status"] as? Number)?.toInt() ?: 404, JsonSupport.stringify(projection),
+            (projection["status"] as? Number)?.toInt() ?: 404, jsonOf(projection),
         )
         if (projection !== fields) return JvmKanbanServer.HttpResponse(
-            200, JsonSupport.stringify(projectionSheets(id, projection).map { it.toMap() }),
+            200, jsonOf(projectionSheets(id, projection).map { it.toMap() }),
         )
         val confix = runCatching {
-            borg.trikeshed.parse.confix.confixDoc(JsonSupport.stringify(projection))
+            borg.trikeshed.parse.confix.confixDoc(jsonOf(projection))
         }.getOrElse {
             return JvmKanbanServer.HttpResponse(502, """{"error":"document did not parse as confix","detail":"${it.message}"}""")
         }
         val family = borg.trikeshed.forge.sheet.confixSheets(id, id, confix)
-        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(family.map { it.toMap() }))
+        return JvmKanbanServer.HttpResponse(200, jsonOf(family.map { it.toMap() }))
     }
 
     /**
@@ -560,7 +562,7 @@ class GraalWire(
             }
             val shapeKey = runCatching { borg.trikeshed.kanban.ForgeKanbanIngest.planShape(markdown) }.getOrDefault("")
             val byteSurface: borg.trikeshed.cas.ByteEpistemicSurface? = null
-            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+            JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
                 "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),
                 "plan" to plan, "persisted" to persisted,
@@ -576,13 +578,13 @@ class GraalWire(
                 "pdfLane" to (pdfText != null),
             )))
         } catch (t: Throwable) {
-            JvmKanbanServer.HttpResponse(500, JsonSupport.stringify(mapOf("error" to (t.message ?: t.toString()))))
+            JvmKanbanServer.HttpResponse(500, jsonOf(mapOf("error" to (t.message ?: t.toString()))))
         }
     }
 
     // ── capsule: the hermes sleeve's captured VT shell ────────────
 
-    private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(v))
+    private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, jsonOf(v))
 
 
     private fun capsuleRoute(method: String, p: String, payload: ByteArray): JvmKanbanServer.HttpResponse {
@@ -593,7 +595,7 @@ class GraalWire(
         if (tail == "spawn") {
             if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
             @Suppress("UNCHECKED_CAST")
-            val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+            val body = runCatching { reify(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
             val id = (body["id"] as? String)?.takeIf { it.isNotBlank() } ?: "hermes-${System.currentTimeMillis() % 100000}"
             if (!id.matches(Regex("[A-Za-z0-9._:-]{1,128}"))) return json(400, mapOf("error" to "invalid capsule id"))
             if (HermesCapsule.registry[id]?.alive == true) return json(409, mapOf("error" to "already running", "id" to id))
@@ -614,7 +616,7 @@ class GraalWire(
             "stdin" -> {
                 if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
                 @Suppress("UNCHECKED_CAST")
-                val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+                val body = runCatching { reify(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
                 capsule.type((body["text"] as? String).orEmpty())
                 json(200, mapOf("ok" to true))
             }
@@ -634,7 +636,7 @@ class GraalWire(
             if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
             val gateway = attachmentGateway ?: return json(503, mapOf("error" to "cas_database_unavailable"))
             @Suppress("UNCHECKED_CAST")
-            val body = runCatching { JsonSupport.parse(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
+            val body = runCatching { reify(CouchWire.bodyOf(payload).decodeToString()) as? Map<String, Any?> }.getOrNull().orEmpty()
             val pathStr = (body["path"] as? String)?.takeIf { it.isNotBlank() }
                 ?: return json(400, mapOf("error" to "path required"))
             val dir = java.io.File(pathStr)
@@ -721,7 +723,7 @@ class GraalWire(
                 "cas" to "/api/graal/cas/${cidOf(d)}",
             )
         }
-        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+        return JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
             "ring8" to ring8, "docs" to chunkDocs.size, "representatives" to reps,
         )))
     }
@@ -750,7 +752,7 @@ class GraalWire(
             overlap.contentOnly > 0 -> "CANDIDATE"
             else -> "NONE"
         }
-        return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+        return JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
             "a" to a, "b" to b,
             "linked" to grades.first, "partial" to grades.second, "contentOnly" to overlap.contentOnly,
             "proximity" to String.format("%.4f", proximity),
@@ -784,7 +786,7 @@ class GraalWire(
         val result = withContext(Dispatchers.IO) { store.lineIndex.residualDensity(spine, aperture) }
         return JvmKanbanServer.HttpResponse(
             200,
-            JsonSupport.stringify(densityMap(result) + ("path" to id) + ("aperture" to aperture.name)),
+            jsonOf(densityMap(result) + ("path" to id) + ("aperture" to aperture.name)),
         )
     }
 
@@ -926,19 +928,19 @@ class GraalWire(
         val out = Channel<String>(capacity = 256)
         val jobs = mutableListOf(
             vitals.events.onEach { e ->
-                out.send(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
+                out.send(jsonOf(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
             }.launchIn(scope),
             classEvents.onEach { e ->
-                out.send(JsonSupport.stringify(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
+                out.send(jsonOf(mapOf("kind" to e.kind, "at" to e.atMs) + e.detail))
             }.launchIn(scope),
             scoreEvents.onEach { m ->
-                out.send(JsonSupport.stringify(mapOf("kind" to "score", "at" to System.currentTimeMillis()) + m))
+                out.send(jsonOf(mapOf("kind" to "score", "at" to System.currentTimeMillis()) + m))
             }.launchIn(scope),
         )
         report?.let { r ->
             jobs += r.events.onEach { e ->
                 if (e is CouchReportEvent.Committed) {
-                    out.send(JsonSupport.stringify(mapOf("kind" to "commit", "id" to e.docId, "seq" to e.seq, "deleted" to e.deleted, "at" to e.timestampMs)))
+                    out.send(jsonOf(mapOf("kind" to "commit", "id" to e.docId, "seq" to e.seq, "deleted" to e.deleted, "at" to e.timestampMs)))
                 }
             }.launchIn(scope)
         }
@@ -947,7 +949,7 @@ class GraalWire(
             // the console until the next 5s poll. These land on the same feed the terrain uses.
             jobs += h.events.onEach { e ->
                 val m = e.toMap()
-                out.send(JsonSupport.stringify(mapOf("kind" to "vm", "vmKind" to m["kind"]) + m.filterKeys { it != "kind" }))
+                out.send(jsonOf(mapOf("kind" to "vm", "vmKind" to m["kind"]) + m.filterKeys { it != "kind" }))
             }.launchIn(scope)
         }
         try {

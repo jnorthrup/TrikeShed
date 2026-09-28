@@ -1,11 +1,13 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.hermes.HermesVmConsole
 import borg.trikeshed.lcnc.media.ManualMediaInput
 import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.view
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.terminal.VtKey
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.CoroutineScope
@@ -118,7 +120,7 @@ class HermesConsoleWire(
                         "detail" to event.detail,
                     )
                 }
-                send("data: ${JsonSupport.stringify(payload)}\n\n".toByteArray(StandardCharsets.UTF_8))
+                send("data: ${jsonOf(payload)}\n\n".toByteArray(StandardCharsets.UTF_8))
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -135,7 +137,7 @@ class HermesConsoleWire(
     }
 
     private fun json(status: Int, value: Map<String, Any?>): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     @Suppress("UNCHECKED_CAST")
     private fun parse(text: String): Map<String, Any?> {
@@ -145,7 +147,7 @@ class HermesConsoleWire(
             else -> text
         }
         return body.takeIf { it.isNotBlank() }
-            ?.let { runCatching { JsonSupport.parse(it) as? Map<String, Any?> }.getOrNull() }
+            ?.let { runCatching { reify(it) as? Map<String, Any?> }.getOrNull() }
             ?: emptyMap()
     }
 }

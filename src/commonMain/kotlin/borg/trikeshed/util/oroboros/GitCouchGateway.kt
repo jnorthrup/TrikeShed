@@ -52,6 +52,7 @@ class GitCouchGateway(
                     sequence = sequence,
                 ),
                 bytes,
+                source = physicalPath,
             )
         }
 

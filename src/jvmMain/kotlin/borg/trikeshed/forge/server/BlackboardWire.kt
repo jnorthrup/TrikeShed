@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.BlackboardNeighbors
 import borg.trikeshed.graal.NeighborK
@@ -8,7 +11,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoClassifier
 import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +43,7 @@ class BlackboardWire(
             for (payload in assertChannel) {
                 runCatching {
                     @Suppress("UNCHECKED_CAST")
-                    val map = JsonSupport.parse(payload) as? Map<String, Any?>
+                    val map = reify(payload) as? Map<String, Any?>
                     map?.forEach { (k, v) ->
                         // H5: definitions are not theater — route the assert-funnel key through
                         // the production writer so enabled=false suppresses the runtime site.
@@ -77,12 +79,12 @@ class BlackboardWire(
                 val replay = blackboard.replay(after)
                 if (replay.reset || (clientEpoch != null && clientEpoch != epoch)) {
                     val reason = if (clientEpoch != null && clientEpoch != epoch) "epoch_changed" else "replay_gap"
-                    val data = JsonSupport.stringify(mapOf("reason" to reason, "epoch" to epoch, "revision" to replay.snapshot.revision))
+                    val data = jsonOf(mapOf("reason" to reason, "epoch" to epoch, "revision" to replay.snapshot.revision))
                     respond?.invoke("event: reset\ndata: $data\n\n".toByteArray(StandardCharsets.UTF_8))
                     false
                 } else {
                     for (change in replay.changes) {
-                        val data = JsonSupport.stringify(mapOf(
+                        val data = jsonOf(mapOf(
                             "seq" to change.revision, "revision" to change.revision, "epoch" to epoch,
                             "key" to change.key, "value" to change.value, "deleted" to change.deleted,
                             "actor" to change.provenance.language, "atMs" to change.provenance.timestamp,
@@ -98,7 +100,7 @@ class BlackboardWire(
 
         if (method == "GET" && path.substringBefore('?') == "/blackboard/board") {
             val snapshot = blackboard.snapshot()
-            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+            return JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
                 "keys" to snapshot.values.size, "board" to snapshot.values,
                 "seq" to snapshot.revision, "revision" to snapshot.revision, "epoch" to epoch,
                 "provenance" to snapshot.provenance.mapValues { (_, p) -> mapOf(
@@ -123,7 +125,7 @@ class BlackboardWire(
                     ?: BlackboardNeighbors(snapshot, corpus()).also { neighborIndex = it }
             }
             val neighbors = index.neighbors(key, q["limit"]?.toIntOrNull()?.coerceIn(1, 256) ?: 32)
-            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf(
+            return JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
                 "key" to key, "revision" to snapshot.revision, "epoch" to epoch, "corpus" to variant,
                 "ontology" to index.sumo.stats, "indexedKeys" to snapshot.values.size,
                 "classifiedKeys" to index.concepts.count { !it.value.isEmpty() },
@@ -158,12 +160,12 @@ class BlackboardWire(
             var limited: String? = null
             fun familyOf(id: String, title: String, subject: Any?, parent: String?, budget: Int): List<borg.trikeshed.forge.sheet.SheetSeed> {
                 val shown = if (subject is Map<*, *> || subject is List<*>) subject else mapOf("value" to subject)
-                val issue = borg.trikeshed.parse.json.ValueBudget(maxChars = charsLeft.coerceAtLeast(0), maxNodes = rowsLeft.coerceAtLeast(1) * 8).violation(shown)
+                val issue = borg.trikeshed.parse.ValueBudget(maxChars = charsLeft.coerceAtLeast(0), maxNodes = rowsLeft.coerceAtLeast(1) * 8).violation(shown)
                 if (issue != null) {
                     limited = issue
                     return listOf(borg.trikeshed.forge.sheet.SheetSeed(id, title, emptyList(), emptyList(), parent, true, issue))
                 }
-                val json = JsonSupport.stringify(shown)
+                val json = jsonOf(shown)
                 charsLeft -= json.length + id.length + title.length
                 val confix = borg.trikeshed.parse.confix.confixDoc(json)
                 val family = borg.trikeshed.forge.sheet.confixSheets(id, title, confix,
@@ -206,9 +208,9 @@ class BlackboardWire(
                 else -> return JvmKanbanServer.HttpResponse(400, """{"error":"key or prefix required"}""")
             }
             val data = family.mapIndexed { i, sheet -> sheet.toMap() + if (i == 0) mapOf("boardRevision" to snapshot.revision, "nextKey" to nextKey) else emptyMap() }
-            val issue = borg.trikeshed.parse.json.ValueBudget(maxNodes = 32768, maxChars = 131072).violation(data)
-            if (issue != null) return JvmKanbanServer.HttpResponse(413, JsonSupport.stringify(mapOf("error" to issue)))
-            val body = JsonSupport.stringify(data)
+            val issue = borg.trikeshed.parse.ValueBudget(maxNodes = 32768, maxChars = 131072).violation(data)
+            if (issue != null) return JvmKanbanServer.HttpResponse(413, jsonOf(mapOf("error" to issue)))
+            val body = jsonOf(data)
             if (body.toByteArray(StandardCharsets.UTF_8).size > 1_048_576)
                 return JvmKanbanServer.HttpResponse(413, """{"error":"payload_limit"}""")
             return JvmKanbanServer.HttpResponse(200, body)
@@ -229,7 +231,7 @@ class BlackboardWire(
             val owner = query.split("&").find { it.startsWith("owner=") }?.substringAfter("owner=") ?: ""
             val prefix = if (owner.isNotEmpty()) "pointcut/${owner}/" else "pointcut//"
             val keys = blackboard.keys().filter { it.startsWith(prefix) }
-            return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(keys))
+            return JvmKanbanServer.HttpResponse(200, jsonOf(keys))
         }
 
         return null

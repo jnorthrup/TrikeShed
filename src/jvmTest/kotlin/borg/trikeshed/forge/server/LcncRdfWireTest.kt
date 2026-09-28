@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncProgramConfix
@@ -9,7 +12,6 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.narsese.KgNalBridge
 import borg.trikeshed.narsese.NalCopula
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +46,7 @@ class LcncRdfWireTest {
             val r = post(path, LcncProgramConfix.toJson(p))
             assertEquals(400, r.status, "$path: ${r.body}")
             @Suppress("UNCHECKED_CAST")
-            val m = JsonSupport.parse(r.body) as Map<String, Any?>
+            val m = reify(r.body) as Map<String, Any?>
             assertEquals(listOf("n1"), m["duplicates"])
         }
     }
@@ -52,12 +54,12 @@ class LcncRdfWireTest {
     @Test
     fun spatialProjectionPreservesTheDocumentAndRejectsInvalidPresentation() {
         val p = program(LcncNode("a", "text.value", mapOf("value" to "keep")))
-        val document = JsonSupport.parse(LcncProgramConfix.toJson(p)) as Map<*, *>
+        val document = reify(LcncProgramConfix.toJson(p)) as Map<*, *>
         val geometry = mapOf("id" to "a", "x" to 12, "y" to 24, "width" to 200, "height" to 90)
         val result = post("/api/lcnc/spacegraph?alignment=0&width=390&height=600",
-            JsonSupport.stringify(document + mapOf("geometry" to listOf(geometry))))
+            jsonOf(document + mapOf("geometry" to listOf(geometry))))
         assertEquals(200, result.status, result.body)
-        val body = JsonSupport.parse(result.body) as Map<*, *>
+        val body = reify(result.body) as Map<*, *>
         assertEquals(document, body["document"])
         assertEquals(null, body["alignment"])
         assertEquals(emptyList<Any>(), body["epistemic"])
@@ -72,9 +74,9 @@ class LcncRdfWireTest {
             mapOf("camera" to mapOf("position" to listOf(0, 0, 0), "center" to listOf(0, 0, 0))),
             mapOf("spacing" to -1),
         )) {
-            val refused = post("/api/lcnc/spacegraph?alignment=0", JsonSupport.stringify(document + options))
+            val refused = post("/api/lcnc/spacegraph?alignment=0", jsonOf(document + options))
             assertEquals(400, refused.status, refused.body)
-            assertTrue((JsonSupport.parse(refused.body) as Map<*, *>).containsKey("error"))
+            assertTrue((reify(refused.body) as Map<*, *>).containsKey("error"))
         }
     }
 
@@ -85,7 +87,7 @@ class LcncRdfWireTest {
         val r = post("/api/lcnc/rdf/align", LcncProgramConfix.toJson(p))
         assertEquals(200, r.status, r.body)
         @Suppress("UNCHECKED_CAST")
-        val nal = (JsonSupport.parse(r.body) as Map<String, Any?>)["nal"] as String
+        val nal = (reify(r.body) as Map<String, Any?>)["nal"] as String
         val mapped = KgNalBridge.bridge(nal)
         assertEquals(5, mapped.size, "3 inheritances + 2 implications, not zero: $nal")
         assertEquals(2, mapped.count { it.copula == NalCopula.IMPLICATION })

@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.sleeve.AgentSleeveRegistry
 import borg.trikeshed.sleeve.SleeveTddRedKanban
 
@@ -51,5 +52,5 @@ class SleeveWire {
     }
 
     private fun json(status: Int, value: Map<String, Any?>): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 }

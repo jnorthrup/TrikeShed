@@ -5,28 +5,35 @@ import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
 
 object ExtrudedSceneProjection {
+    /** A box's six faces as corner indices (bit 0 = x, bit 1 = y, bit 2 = z at max): -z, +z, -y, +y, -x, +x. */
+    val faceIndices = listOf(listOf(0, 1, 3, 2), listOf(4, 6, 7, 5), listOf(0, 4, 5, 1),
+        listOf(2, 3, 7, 6), listOf(0, 2, 6, 4), listOf(1, 5, 7, 3))
+    /** Outward normal of each face in [faceIndices]. */
+    val faceNormals = listOf(Vec3(z = -1.0), Vec3(z = 1.0), Vec3(y = -1.0), Vec3(y = 1.0), Vec3(x = -1.0), Vec3(x = 1.0))
+
+    /** Screen corners of [solid]'s face [index] (depth in z), or null when a corner does not project. */
+    fun face(solid: Bounds3, index: Int, camera: GraphCamera, viewport: Viewport): List<Vec3>? {
+        val points = faceIndices[index].map { i -> camera.project(Vec3(
+            if (i and 1 == 0) solid.min.x else solid.max.x,
+            if (i and 2 == 0) solid.min.y else solid.max.y,
+            if (i and 4 == 0) solid.min.z else solid.max.z), viewport) }
+        return if (points.any { it == null }) null else points.filterNotNull()
+    }
+
     /** The sole solid projection for every provider; text is a shared screen-space overlay. */
     fun frame(scene: ExtrudedScene, camera: GraphCamera, viewport: Viewport, selected: String? = null): FramePlan {
         val items = mutableListOf<Join<Double, DrawItem>>()
         val labels = mutableListOf<DrawItem>()
         fun depth(p: Vec3, level: Int) = if (camera.mode == CameraMode.ORTHOGRAPHIC) -level.toDouble() else p.z
-        val faceIndices = listOf(listOf(0, 1, 3, 2), listOf(4, 6, 7, 5), listOf(0, 4, 5, 1),
-            listOf(2, 3, 7, 6), listOf(0, 2, 6, 4), listOf(1, 5, 7, 3))
         for (n in scene.nodes.view) {
             val bounds = scene.screenBounds(n, camera, viewport)
             val ancestorClip = scene.clip(n, camera, viewport)
             val visible = bounds.intersection(ancestorClip) ?: continue
             if (visible.width < 1 || visible.height < 1) continue
             val outline = if (n.id == selected) Rgba(227, 80, 103) else n.color
-            for (solid in n.solids.view) for ((faceIndex, face) in faceIndices.withIndex()) {
+            for (solid in n.solids.view) for (faceIndex in faceIndices.indices) {
                 if (camera.mode == CameraMode.ORTHOGRAPHIC && faceIndex != 1) continue
-                val corners: Series<Vec3> = 8 j { i -> Vec3(
-                    if (i and 1 == 0) solid.min.x else solid.max.x,
-                    if (i and 2 == 0) solid.min.y else solid.max.y,
-                    if (i and 4 == 0) solid.min.z else solid.max.z) }
-                val points = face.map { camera.project(corners[it], viewport) }
-                if (points.any { it == null }) continue
-                val p = points.filterNotNull()
+                val p = face(solid, faceIndex, camera, viewport) ?: continue
                 val parts = (listOf<PathPart>(PathPart.Move(p[0])) + p.drop(1).map { PathPart.Line(it) } + PathPart.Close).toSeries()
                 val fill = if (n.scope) n.color
                     else if (faceIndex == 1) Rgba(30, 33, 39) else n.color

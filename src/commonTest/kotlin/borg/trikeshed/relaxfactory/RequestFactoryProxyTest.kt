@@ -1,5 +1,7 @@
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.ConfixDocStoreFactory
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
@@ -8,7 +10,6 @@ import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.couch.replicate.HttpReply
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -54,7 +55,7 @@ class RequestFactoryProxyTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(bytes: ByteArray): Map<String, Any?> = JsonSupport.parse(bytes.decodeToString()) as Map<String, Any?>
+    private fun json(bytes: ByteArray): Map<String, Any?> = reify(bytes) as Map<String, Any?>
 
     // ── the exact-matching claim ──────────────────────────────────
 

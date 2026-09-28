@@ -1,9 +1,9 @@
 package borg.trikeshed.jules
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.btrfs.TodoQueueItem
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * Jules durable queue — file-backed persistent queue for polyglot sleeve chokepoint TODOs.
  *
@@ -113,10 +113,10 @@ class JulesDurableTodoQueue(
     }
 
     private fun fromJsonLine(line: String): TodoQueueItem {
-        // minimal parse via JsonSupport if available, else regex
+        // minimal parse via reify if available, else regex
         val map = try {
             @Suppress("UNCHECKED_CAST")
-            JsonSupport.parse(line) as? Map<String, Any?> ?: emptyMap()
+            reify(line) as? Map<String, Any?> ?: emptyMap()
         } catch (_: Throwable) { emptyMap<String, Any?>() }
         if (map.isNotEmpty()) {
             return TodoQueueItem(

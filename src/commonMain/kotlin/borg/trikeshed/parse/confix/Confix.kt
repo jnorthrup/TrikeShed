@@ -65,7 +65,8 @@ enum class Syntax {
     )
 
     fun scan0(src: Series<Byte>): Join<Cursor, FlatIndex> {
-        val chars: Series<Char> = src.size j { src[it].toInt().toChar() }
+        // One read of the source into a primitive array; the scan below indexes it with no boxed calls.
+        val chars = CharArray(src.size) { src[it].toInt().toChar() }
         val opens = series()
         val closes = series()
         val tags = ChunkedMutableSeries<IOMemento>()
@@ -74,15 +75,18 @@ enum class Syntax {
             closes.add(close)
             tags.add(tag)
         }
-        data class Pending(val open: Int, val tag: IOMemento)
-        val stack = ChunkedMutableSeries<Pending>()
+        // Pending opens as parallel primitive stacks: the open offset and its tag ordinal.
+        var stackOpen = IntArray(64); var stackTag = IntArray(64); var depth = 0
         var inQuote = false
         var escaped = false
-        fun push(open: Int, tag: IOMemento) = stack.add(Pending(open, tag))
+        fun push(open: Int, tag: IOMemento) {
+            if (depth == stackOpen.size) { stackOpen = stackOpen.copyOf(depth * 2); stackTag = stackTag.copyOf(depth * 2) }
+            stackOpen[depth] = open; stackTag[depth] = tag.ordinal; depth++
+        }
         fun pop(close: Int) {
-            if (stack.size == 0) return
-            val pending = stack.removeAt(stack.size - 1)
-            add(pending.open, close, pending.tag)
+            if (depth == 0) return
+            depth--
+            add(stackOpen[depth], close, IOMemento.entries[stackTag[depth]])
         }
         var index = 0
         while (index < src.size) {
@@ -134,10 +138,7 @@ enum class Syntax {
             }
             index++
         }
-        while (stack.size > 0) {
-            val pending = stack.removeAt(stack.size - 1)
-            add(pending.open, src.size - 1, pending.tag)
-        }
+        while (depth > 0) pop(src.size - 1)
         return buildTree(opens, closes, tags)
     }
 
@@ -242,41 +243,52 @@ enum class Syntax {
     }
 
     fun buildTree(
-        opens: ChunkedMutableSeries<Int>,
-        closes: ChunkedMutableSeries<Int>,
+        opens: PackedIntBuf,
+        closes: PackedIntBuf,
         rawTags: ChunkedMutableSeries<IOMemento>,
     ): Join<Cursor, FlatIndex> {
         val total = opens.size
-        val sourceOrder = (0 until total).sortedBy { opens[it] }
-        val spans: Series<Twin<Int>> = total j { index: Int -> opens[sourceOrder[index]] j closes[sourceOrder[index]] }
-        val tags: Series<IOMemento> = total j { index: Int -> rawTags[sourceOrder[index]] }
-        val depths: Series<Int> = total j { index: Int ->
-            val span = spans[index]
-            (0 until total).count { other -> other != index && spans[other].a < span.a && spans[other].b >= span.b }
+        // Source order: packed (open shl 32) or scan slot, sorted — equal opens keep the scanner's order.
+        val order = LongArray(total) { (opens[it].toLong() shl 32) or it.toLong() }
+        order.sort()
+        val open = IntArray(total); val close = IntArray(total)
+        val tag = arrayOfNulls<IOMemento>(total)
+        for (k in 0 until total) {
+            val slot = order[k].toInt()
+            open[k] = opens[slot]; close[k] = closes[slot]; tag[k] = rawTags[slot]
         }
-        val childOf: (Int) -> Series<Int> = { parent: Int ->
-            val parentSpan = spans[parent]
-            val childDepth = depths[parent] + 1
-            val children = IntArray(total)
-            var count = 0
-            for (candidate in 0 until total) {
-                if (candidate == parent) continue
-                val span = spans[candidate]
-                if (span.a > parentSpan.a && span.b <= parentSpan.b && depths[candidate] == childDepth) children[count++] = candidate
-            }
-            count j { childIndex: Int -> children[childIndex] }
+        // One stack sweep: a span's parent is the innermost open span that still covers it.
+        val depth = IntArray(total); val parent = IntArray(total)
+        val stack = IntArray(total); var top = 0
+        val start = IntArray(total + 1)
+        var rootCount = 0
+        for (k in 0 until total) {
+            while (top > 0 && close[stack[top - 1]] < close[k]) top--
+            parent[k] = if (top > 0) stack[top - 1] else -1
+            depth[k] = top
+            if (top > 0) start[parent[k] + 1]++ else rootCount++
+            stack[top++] = k
         }
+        for (k in 0 until total) start[k + 1] += start[k]
+        val kid = IntArray(total); val fill = start.copyOf(total)
+        val root = IntArray(rootCount); var r = 0
+        for (k in 0 until total) if (parent[k] >= 0) kid[fill[parent[k]]++] = k else root[r++] = k
+
+        val spans: Series<Twin<Int>> = total j { k: Int -> open[k] j close[k] }
+        @Suppress("UNCHECKED_CAST")
+        val tags: Series<IOMemento> = total j { k: Int -> tag[k] as IOMemento }
+        val depths: Series<Int> = total j { k: Int -> depth[k] }
+        val childOf: (Int) -> Series<Int> = { k: Int -> val a = start[k]; (start[k + 1] - a) j { c: Int -> kid[a + c] } }
         val rowCache = arrayOfNulls<RowVec>(total)
         fun row(index: Int): RowVec {
             rowCache[index]?.let { return it }
-            val span = spans[index]
             val children = childOf(index)
             val cursor: Cursor = children.size j { childIndex: Int -> row(children[childIndex]) }
             val row = (4 j { column: Int ->
                 when (column) {
-                    0 -> (span.a as Any?) j COL_META[0]
-                    1 -> (span.b as Any?) j COL_META[1]
-                    2 -> (tags[index] as Any?) j COL_META[2]
+                    0 -> (open[index] as Any?) j COL_META[0]
+                    1 -> (close[index] as Any?) j COL_META[1]
+                    2 -> (tag[index] as Any?) j COL_META[2]
                     3 -> (cursor as Any?) j COL_META[3]
                     else -> error("4")
                 }
@@ -284,11 +296,11 @@ enum class Syntax {
             rowCache[index] = row
             return row
         }
-        val roots = (0 until total).filter { depths[it] == 0 }
-        return (roots.size j { rootIndex: Int -> row(roots[rootIndex]) }) j FlatIndex(spans, tags, depths, childOf)
+        return (rootCount j { rootIndex: Int -> row(root[rootIndex]) }) j FlatIndex(spans, tags, depths, childOf)
     }
 
-    fun series(): ChunkedMutableSeries<Int> = ChunkedMutableSeries()
+    /** A growable primitive int list (32-bit lanes): offsets and ordinals never box. */
+    fun series(): PackedIntBuf = PackedIntBuf(32)
 
     fun scanYaml0(src: Series<Byte>): Join<Cursor, FlatIndex> {
         var firstNonWhitespace = -1

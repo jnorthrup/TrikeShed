@@ -1,11 +1,12 @@
 package borg.trikeshed.chronicle
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.SplatFanoutDispatcherElement.DeliveryOutcome
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.splat.Splat
 
 class ChronicleEventDecoder {
@@ -69,7 +70,7 @@ class ChronicleEventDecoder {
 
     fun decode(bytes: ByteArray): Series<ChronicleEvent> {
         val jsonString = bytes.decodeToString()
-        val parsed = JsonSupport.parse(jsonString)
+        val parsed = reify(jsonString)
         
         val eventsList = if (parsed is List<*>) parsed else listOf(parsed)
         

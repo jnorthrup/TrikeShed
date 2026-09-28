@@ -1,10 +1,12 @@
 package borg.trikeshed.couch.replicate
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.revWins
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CancellationException
 
 /** One HTTP round trip. The daemon binds this to HtxElement; tests bind it to another [Couch] in-process. */
@@ -246,7 +248,7 @@ class CouchReplicator(
             var progressed = 0
             for (chunk in want.chunked(bulkChunk)) {
                 val requested = chunk.toSet()
-                val r = http.call("POST", "$peer/_cas/_bulk", JsonSupport.stringify(mapOf("cids" to chunk)).encodeToByteArray(), "application/json")
+                val r = http.call("POST", "$peer/_cas/_bulk", jsonOf(mapOf("cids" to chunk)).encodeToByteArray(), "application/json")
                 if (!r.ok) continue
                 for ((cid, bytes) in borg.trikeshed.couch.CasBulkCodec.decode(r.body)) {
                     if (cid !in requested) continue
@@ -293,7 +295,7 @@ class CouchReplicator(
                 if (firstUndelivered == null) firstUndelivered = "$docId: ${e.message ?: e::class.simpleName}"
                 return false
             }
-        val acknowledged = reply.ok && (runCatching { JsonSupport.parse(reply.text) }.getOrNull() as? Map<*, *>)
+        val acknowledged = reply.ok && (runCatching { reify(reply.text) }.getOrNull() as? Map<*, *>)
             ?.get("cid") == ContentId.of(bytes).value
         if (!acknowledged && firstUndelivered == null) firstUndelivered =
             "$docId: peer did not acknowledge the requested blob (HTTP ${reply.status})"
@@ -308,7 +310,7 @@ class CouchReplicator(
     private suspend fun saveCheckpoint(replId: String, seq: Long, peer: String) {
         local.localPut(replId, mapOf("last_seq" to seq, "peer" to peer))
         // 1.x writes the checkpoint on both ends; the far side is best-effort.
-        runCatching { http.call("PUT", "$peer/_local/$replId", JsonSupport.stringify(mapOf("last_seq" to seq)).encodeToByteArray(), "application/json") }
+        runCatching { http.call("PUT", "$peer/_local/$replId", jsonOf(mapOf("last_seq" to seq)).encodeToByteArray(), "application/json") }
     }
 
     // ── json helpers ──────────────────────────────────────────────
@@ -325,14 +327,14 @@ class CouchReplicator(
     private suspend fun getJson(url: String): Map<String, Any?> {
         val r = http.call("GET", url, null, null)
         check(r.ok) { "Replication GET failed: HTTP ${r.status}" }
-        return JsonSupport.parse(r.text) as? Map<String, Any?> ?: error("Replication GET returned a non-object response")
+        return reify(r.text) as? Map<String, Any?> ?: error("Replication GET returned a non-object response")
     }
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun postJson(url: String, body: Any?, expectList: Boolean = false): Map<String, Any?> {
-        val r = http.call("POST", url, JsonSupport.stringify(body).encodeToByteArray(), "application/json")
+        val r = http.call("POST", url, jsonOf(body).encodeToByteArray(), "application/json")
         check(r.ok) { "Replication POST failed: HTTP ${r.status}" }
-        val parsed = JsonSupport.parse(r.text)
+        val parsed = reify(r.text)
         return if (expectList) mapOf("results" to (Couch.asList(parsed) ?: error("Replication POST returned a non-array response")))
         else parsed as? Map<String, Any?> ?: error("Replication POST returned a non-object response")
     }

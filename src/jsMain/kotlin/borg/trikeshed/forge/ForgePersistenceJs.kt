@@ -1,13 +1,14 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
 
 @JsExport
 fun parseForge(json: String): dynamic {
-    return JsonSupport.parse(json)
+    return reify(json)
 }
 
 @JsExport
 fun stringifyForge(obj: dynamic): String {
-    return JsonSupport.stringify(obj)
+    return jsonOf(obj)
 }

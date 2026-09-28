@@ -1,10 +1,12 @@
 package borg.trikeshed.mcp
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.JvmBoardWal
 import borg.trikeshed.lcnc.LcncKanbanExperience
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -84,11 +86,11 @@ class McpKanbanRaceTest {
         )
         rig.inFlight.enter()
         val raw = try {
-            rig.mcp.handle(JsonSupport.stringify(doc))
+            rig.mcp.handle(jsonOf(doc))
         } finally {
             rig.inFlight.exit()
         }
-        val reply = JsonSupport.parse(raw) as Map<*, *>
+        val reply = reify(raw) as Map<*, *>
         val result = reply["result"] as? Map<*, *> ?: error("no result: $reply")
         return result["structuredContent"] as Map<*, *>
     }

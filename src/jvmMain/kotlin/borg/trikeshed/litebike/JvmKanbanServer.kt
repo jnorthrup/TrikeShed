@@ -2,6 +2,10 @@
 
 package borg.trikeshed.litebike
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.forge.persistence.CausalWal
 import borg.trikeshed.graph.CausalGraphNode
@@ -19,7 +23,6 @@ import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.forge.server.ForgeRoutes
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
@@ -442,7 +445,7 @@ class JvmKanbanServer(
                             sessions = emptyList(),
                             activitiesBySession = emptyMap(),
                         )
-                        JsonSupport.stringify(surf)
+                        jsonOf(surf)
                     }.getOrElse { ex ->
                         """{"error":"surface_projection_failed","reason":"${ex.message?.take(200)}"}"""
                     }
@@ -548,7 +551,7 @@ class JvmKanbanServer(
     private fun invoke(body: String): HttpResponse {
         val payload = body.substringAfter("\r\n\r\n", "").ifEmpty { body.substringAfter("\n\n", "") }
         if (payload.isBlank()) return HttpResponse(400, """{"error":"empty_body"}""")
-        val parsed = runCatching { JsonSupport.parse(payload) }.getOrNull()
+        val parsed = runCatching { reify(payload) }.getOrNull()
             ?: return HttpResponse(400, """{"error":"bad_json"}""")
         val commands: List<*> = when (parsed) {
             is Map<*, *> -> (parsed["commands"] as? List<*>) ?: listOf(parsed)
@@ -559,7 +562,7 @@ class JvmKanbanServer(
         val keys = commands.mapNotNull { (it as? Map<*, *>)?.get("idempotencyKey") as? String }
         return HttpResponse(
             202,
-            JsonSupport.stringify(
+            jsonOf(
                 linkedMapOf(
                     "ok" to true,
                     "accepted" to commands.size,
@@ -585,12 +588,12 @@ class JvmKanbanServer(
             writeStringJvm(tmp, payload)
             val reduction = ForgeKanbanIngest.persistMarkdown("jim", tmp)
             reduction.causalNodes.forEach { node ->
-                causalWal.append(node.causalKey, JsonSupport.stringify(node.toWalMap()).encodeToByteArray())
+                causalWal.append(node.causalKey, jsonOf(node.toWalMap()).encodeToByteArray())
                 graphIndex.addOrGet(node)
             }
             HttpResponse(
                 201,
-                JsonSupport.stringify(
+                jsonOf(
                     linkedMapOf(
                         "ok" to true,
                         "correlations" to reduction.correlations.size,
@@ -642,7 +645,7 @@ class JvmKanbanServer(
     private fun replayCausalWal() {
         causalWal.replay().forEach { (_, bytes) ->
             runCatching {
-                val map = JsonSupport.parseMap(bytes.decodeToString())
+                val map = reifyMap(bytes)
                 graphIndex.addOrGet(map.toCausalNode())
             }.onFailure { error ->
                 System.err.println("causal WAL replay skipped corrupt record: ${error.message}")

@@ -1,6 +1,6 @@
 package org.trikeshed.oroboros.forge
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
 
 public interface CcekElement {
     val id: String
@@ -8,7 +8,7 @@ public interface CcekElement {
 }
 
 fun parseCcek(jsonString: String): CcekElement {
-    val parsed = JsonSupport.parse(jsonString) as? Map<*, *>
+    val parsed = reify(jsonString) as? Map<*, *>
     val parsedId = parsed?.get("id") as? String ?: "default"
     return object : CcekElement {
         override val id = parsedId

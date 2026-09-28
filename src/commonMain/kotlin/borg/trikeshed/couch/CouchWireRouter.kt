@@ -1,6 +1,8 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.util.io.ContentTypes
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import borg.trikeshed.ipns.IpnsCid
@@ -22,7 +24,7 @@ import kotlin.time.Clock
 data class WireReply(val status: Int, val contentType: String, val bytes: ByteArray) {
     companion object {
         fun json(status: Int, value: Any?): WireReply =
-            WireReply(status, "application/json; charset=utf-8", JsonSupport.stringify(value).encodeToByteArray())
+            WireReply(status, "application/json; charset=utf-8", jsonOf(value).encodeToByteArray())
         fun notFound(reason: String = "missing") = json(404, mapOf("error" to "not_found", "reason" to reason))
         fun badRequest(reason: String) = json(400, mapOf("error" to "bad_request", "reason" to reason))
         fun methodNotAllowed(m: String) = json(405, mapOf("error" to "method_not_allowed", "reason" to m))
@@ -415,7 +417,7 @@ class CouchWireRouter(
 
     @Suppress("UNCHECKED_CAST")
     private fun parseMap(body: ByteArray): Map<String, Any?>? =
-        runCatching { JsonSupport.parse(body.decodeToString()) as? Map<String, Any?> }.getOrNull()
+        runCatching { reify(body) as? Map<String, Any?> }.getOrNull()
 
     private fun unquote(s: String): String = if (s.length >= 2 && s.startsWith("\"") && s.endsWith("\"")) s.substring(1, s.length - 1) else s
 }

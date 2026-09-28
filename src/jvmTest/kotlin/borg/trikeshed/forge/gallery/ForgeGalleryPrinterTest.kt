@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.gallery
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -33,7 +34,7 @@ class ForgeGalleryPrinterTest {
     @Test
     fun renderJsonIsPortableSeed() {
         val payload = ForgeGalleryPrinter.renderJson()
-        val parsed = JsonSupport.parse(payload) as Map<*, *>
+        val parsed = reify(payload) as Map<*, *>
         val catalog = parsed["catalog"] as Map<*, *>
         assertEquals(ForgeGalleryCatalog.CATALOG_VERSION, catalog["version"])
         val blackboard = parsed["blackboard"] as Map<*, *>

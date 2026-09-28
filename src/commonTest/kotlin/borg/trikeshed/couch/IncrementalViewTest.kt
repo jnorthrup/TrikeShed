@@ -1,5 +1,7 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.lcnc.LcncNode
@@ -10,7 +12,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.cascade.fibTicks
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -138,7 +139,7 @@ class IncrementalViewTest {
         val reply = router.handle("GET", "/inc/_design/test/_view/by_type", ByteArray(0))!!
         assertEquals(200, reply.status)
         @Suppress("UNCHECKED_CAST")
-        val body = JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?>
+        val body = reify(reply.bytes) as Map<String, Any?>
         assertEquals(true, body["incremental"], "route proves it used the registered element")
         val rows = Couch.asList(body["rows"])!!
         assertEquals(1, rows.size)

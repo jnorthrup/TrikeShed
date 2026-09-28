@@ -1,5 +1,7 @@
 package borg.trikeshed.parse.yaml
 
+import borg.trikeshed.parse.reify
+
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -10,7 +12,7 @@ class TestStation17RoundTrip {
         val path = Path.of("/tmp/station17.yaml")
         if (!java.nio.file.Files.exists(path)) {
             val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
-            val original = borg.trikeshed.parse.json.JsonSupport.parse(jsonText) as Map<*, *>
+            val original = reify(jsonText) as Map<*, *>
             val stations = original["stations"] as List<*>
             val s17 = stations[17]
             val helper = YamlBigJsonParityTest()

@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.HypervisorVmHost
 import borg.trikeshed.vm.VM_COLUMNS
 import borg.trikeshed.vm.VmHost
@@ -19,7 +20,7 @@ class VmWireTest {
         "$method $path HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\n\r\n$body"
 
     @Suppress("UNCHECKED_CAST")
-    private fun obj(json: String) = JsonSupport.parse(json) as Map<String, Any?>
+    private fun obj(json: String) = reify(json) as Map<String, Any?>
     private fun list(x: Any?): List<*> = (x as? List<*>) ?: (x as Array<*>).toList()
 
     @Test

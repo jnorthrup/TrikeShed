@@ -1,9 +1,11 @@
 package borg.trikeshed.wiki
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.lcnc.LcncNode
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.AfterTest
@@ -82,7 +84,7 @@ class WikiNodesMechanicsTest {
     fun iterationOneCreatesAndIterationTwoPatchesAnExistingPattern() = runBlocking {
         val root = File(tmp, "wiki1")
         val dialog1 = ScriptedDialog(
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "analysis" to "root cause on A, strategy from B",
                 "edits" to listOf(
                     mapOf(
@@ -111,7 +113,7 @@ class WikiNodesMechanicsTest {
         // Iteration 2: a REPLACE and an INSERT on the page iteration 1 wrote,
         // plus one refused span that is not present.
         val dialog2 = ScriptedDialog(
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "analysis" to "sharpen the workaround",
                 "edits" to listOf(
                     mapOf(
@@ -161,7 +163,7 @@ class WikiNodesMechanicsTest {
         // Response capture is mandatory and correlated by contextId.
         val capture = File(root, "raw-responses/ctx-iter-2.json")
         assertTrue(capture.isFile, "the model response was not persisted")
-        val captured = JsonSupport.parse(capture.readText()) as Map<*, *>
+        val captured = reify(capture.readText()) as Map<*, *>
         assertEquals("ctx-iter-2", captured["contextId"])
         assertEquals(r2["responseCid"], captured["responseCid"])
         assertTrue((captured["response"] as String).contains("sharpen the workaround"))
@@ -176,7 +178,7 @@ class WikiNodesMechanicsTest {
     fun aPatternPageWithoutTraceProvenanceIsRefused() = runBlocking {
         val root = File(tmp, "wiki2")
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf("edits" to listOf(
+            jsonOf(mapOf("edits" to listOf(
                 mapOf("op" to "create", "file" to "patterns/no-provenance.md", "text" to "# Nothing cited\n"),
             ))),
         )
@@ -197,7 +199,7 @@ class WikiNodesMechanicsTest {
         // Bare hex, no `sha256:` prefix — the spelling a Maintainer's prose uses.
         page.writeText("# P1\n\nSee trace `${cidA.removePrefix("sha256:")}`\n")
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf("edits" to listOf(
+            jsonOf(mapOf("edits" to listOf(
                 // (a) an edit that keeps the bare-hex provenance is allowed…
                 mapOf("op" to "append", "file" to "patterns/p1.md", "text" to "\nRefined workaround.\n"),
                 // (b) …one that strips the only cid is not.
@@ -237,7 +239,7 @@ class WikiNodesMechanicsTest {
     fun writesOutsideTheWikiRootAreRefused() = runBlocking {
         val root = File(tmp, "wiki4")
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf("edits" to listOf(
+            jsonOf(mapOf("edits" to listOf(
                 mapOf("op" to "create", "file" to "../escape.md", "text" to "nope $cidA"),
                 mapOf("op" to "create", "file" to "/etc/absolute.md", "text" to "nope $cidA"),
             ))),
@@ -260,12 +262,12 @@ class WikiNodesMechanicsTest {
         File(root, "skill-impact.md").writeText("(no prior proposals)\n")
 
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "action" to "read",
                 "targets" to listOf("patterns/marker-blind-verdict.md", "trace:$cidA", "patterns/absent.md"),
                 "why" to "diagnose",
             )),
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "action" to "propose",
                 "skill" to "verdict-marker-discipline",
                 "kind" to "new",
@@ -296,7 +298,7 @@ class WikiNodesMechanicsTest {
         // The read log is a machine artifact written by the runner, in order.
         val readLog = File(root, "read-log/ctx-prop.jsonl")
         assertTrue(readLog.isFile, "no runner-emitted read log")
-        val lines = readLog.readLines().filter { it.isNotBlank() }.map { JsonSupport.parse(it) as Map<*, *> }
+        val lines = readLog.readLines().filter { it.isNotBlank() }.map { reify(it) as Map<*, *> }
         assertEquals(3, lines.size)
         assertEquals(listOf(1, 2, 3), lines.map { (it["seq"] as Number).toInt() })
         assertEquals("patterns/marker-blind-verdict.md", lines[0]["target"])
@@ -327,7 +329,7 @@ class WikiNodesMechanicsTest {
         File(root, "patterns").mkdirs()
         File(root, "patterns/p1.md").writeText("# P1\n$cidA\n")
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "action" to "propose", "kind" to "new",
                 "skill" to "one", "skills" to listOf("two"),
                 "skillMd" to "x", "purposeMd" to "patterns/p1.md",
@@ -346,7 +348,7 @@ class WikiNodesMechanicsTest {
         File(root, "patterns").mkdirs()
         File(root, "patterns/p1.md").writeText("# P1\n$cidA\n")
         val dialog = ScriptedDialog(
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "action" to "propose", "kind" to "new", "skill" to "orphan",
                 "skillMd" to "x", "purposeMd" to "Motivated by nothing in particular.",
             )),

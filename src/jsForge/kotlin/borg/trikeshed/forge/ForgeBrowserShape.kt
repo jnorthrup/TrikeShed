@@ -2,6 +2,8 @@
 
 package borg.trikeshed.forge
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.forge.shape.ShapeDoc
 import borg.trikeshed.forge.shape.ShapeRoute
 import borg.trikeshed.forge.shape.SHAPE_NAMES
@@ -14,7 +16,6 @@ import borg.trikeshed.forge.shape.shapeLadderRungs
 import borg.trikeshed.forge.shape.shapeRouteOf
 import borg.trikeshed.forge.shape.storeShapeDocOf
 import borg.trikeshed.forge.sheet.workbookColumnName
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
@@ -141,7 +142,7 @@ fun ForgeBrowser.loadStoreRows() {
     scope.launch {
         runCatching {
             val response = window.fetch("/api/graal/map").await()
-            val m = JsonSupport.parse(response.text().await()) as? Map<String, Any?>
+            val m = reify(response.text().await()) as? Map<String, Any?>
             for (row in m?.get("rows").asList()) {
                 val doc = storeShapeDocOf(row) ?: continue
                 if (shapeDocs.any { it.name == doc.name && it.via == "store" }) continue
@@ -333,7 +334,7 @@ fun ForgeBrowser.tikaIngest(f: File, done: (ShapeDoc) -> Unit) {
                 headers = org.w3c.fetch.Headers().also { it.append("X-Forge-Name", f.name) },
             )).await()
             if (!response.ok) throw IllegalStateException(response.status.toString())
-            val j = JsonSupport.parse(response.text().await()) as? Map<String, Any?> ?: emptyMap()
+            val j = reify(response.text().await()) as? Map<String, Any?> ?: emptyMap()
             val text = j["markdown"].asStr()
             val importedView = importExtractedFile(f.name, text)
             shapeOfText(f.name, text)

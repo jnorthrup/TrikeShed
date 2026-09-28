@@ -1,5 +1,8 @@
 package borg.trikeshed.graal.subvm.harness
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -21,7 +24,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.DocumentAppendLog
 import borg.trikeshed.narsese.DocumentCuratorCodec
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.userspace.nio.DocumentFeedStorage
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -64,7 +66,7 @@ object DocumentCurationStorageHarness {
         bag.open()
         val fixture = DocumentModelFixture.open { prompt ->
             modelCalls++
-            val source = JsonSupport.parse(prompt.messages[1].content) as Map<*, *>
+            val source = reify(prompt.messages[1].content) as Map<*, *>
             check((source["linguistics"] as Map<*, *>)["status"] == "AVAILABLE")
             val extracted = source["text"] as String
             val proposals = if (source["name"] == "fixture:positive") {
@@ -75,7 +77,7 @@ object DocumentCurationStorageHarness {
                     "confidence" to 0.73, "quote" to quote, "begin" to start, "end" to start + quote.length,
                     "polarity" to true, "modality" to "asserted"))
             } else emptyList()
-            ModelResponse(JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
+            ModelResponse(jsonOf(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
                 ModelUsage(-1, -1, -1), "fixture", "fixture")
         }
         val docScope = CoroutineScope(scope.coroutineContext + fixture.htx + fixture.reactor)
@@ -97,12 +99,12 @@ object DocumentCurationStorageHarness {
                     check(storage.cas.get(originalCid)?.decodeToString() == sourceText) { "Original CAS bytes did not reopen" }
                     mapOf("originalCid" to originalCid.value, "name" to name, "mediaType" to "text/plain")
                 }
-                val request = JsonSupport.stringify(mapOf("type" to DocumentCurationLegos.CURATE,
+                val request = jsonOf(mapOf("type" to DocumentCurationLegos.CURATE,
                     "inputs" to mapOf("source" to source)))
                 val response = server.routeHttp(("POST /api/lcnc/run HTTP/1.1\r\n" +
                     "Host: verification\r\nContent-Type: application/json\r\n\r\n$request").encodeToByteArray())
                 check(response.status == 200) { response.body }
-                val envelope = JsonSupport.parse(response.body) as Map<*, *>
+                val envelope = reify(response.body) as Map<*, *>
                 check(envelope["ok"] == true)
                 val output = envelope["outputs"] as Map<*, *>
                 val receiptCid = ContentId(output["receiptCid"] as String)
@@ -123,7 +125,7 @@ object DocumentCurationStorageHarness {
             storage.drain()
             val io = storage.volume.ioReceipts()
             check(io.any { it.opcode.name == "WRITE" } && io.any { it.opcode.name == "READ" } && io.any { it.opcode.name == "FSYNC" })
-            println(JsonSupport.stringify(mapOf(
+            println(jsonOf(mapOf(
                 "phase" to args[0], "model" to "deterministic fixture; no provider claim",
                 "entrypoint" to "JvmKanbanServer.routeHttp -> KanbanModule POST /api/lcnc/run -> document.curate",
                 "transport" to "production HTTP parser/handler; no bound network listener in this fixture",

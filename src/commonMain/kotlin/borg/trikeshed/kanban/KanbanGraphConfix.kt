@@ -1,13 +1,14 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.map
-import borg.trikeshed.parse.json.JsonSupport
-
 /** Confix document for the orchestration graph; predicate bodies stay runtime-registered. */
 object KanbanGraphConfix {
-    fun toJson(graph: KanbanGraph): String = JsonSupport.stringify(linkedMapOf(
+    fun toJson(graph: KanbanGraph): String = jsonOf(linkedMapOf(
         "version" to 2,
         "boardId" to graph.boardId,
         // Bolt: Remove .toList() before map to prevent O(N) allocation
@@ -19,7 +20,7 @@ object KanbanGraphConfix {
     ))
 
     fun fromJson(json: String): KanbanGraph {
-        val root = JsonSupport.parse(json) as? Map<*, *> ?: error("graph document must be an object")
+        val root = reify(json) as? Map<*, *> ?: error("graph document must be an object")
         fun map(v: Any?): Map<String, String> = (v as? Map<*, *>).orEmpty().mapNotNull { (k, value) -> k?.toString()?.let { it to (value?.toString() ?: "") } }.toMap()
         fun str(v: Any?, fallback: String = "") = v?.toString() ?: fallback
         fun integer(v: Any?) = v?.toString()?.toDoubleOrNull()?.toInt() ?: 0

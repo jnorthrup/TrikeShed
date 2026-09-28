@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
@@ -11,7 +13,6 @@ import borg.trikeshed.lcnc.WorkspaceSnapshot
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import keymux.KeyMux
@@ -59,7 +60,7 @@ class PatchWirePublishTest {
     private suspend fun get(wire: PatchWire, path: String) = wire.route("GET", path, "GET $path HTTP/1.1\r\n\r\n", null)!!
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = JsonSupport.parse(r.body) as Map<String, Any?>
+    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = reify(r.body) as Map<String, Any?>
 
     @Test
     fun aStaleBaseIsRefusedAMatchingBaseSucceedsAndNoBaseKeepsLastWriterWins(): Unit = runBlocking {
@@ -81,7 +82,7 @@ class PatchWirePublishTest {
         val body = json(refused)
         assertEquals("stale_base", body["error"]); assertEquals(v1, body["baseCid"]); assertEquals(v2, body["currentCid"])
         assertEquals(v2, rig.publisher.boardProgramCid("notes"), "the board did not move")
-        assertEquals("two", ((JsonSupport.parse(get(wire, "/api/panels/notes").body) as Map<*, *>)["nodes"] as List<*>).let { ((it[0] as Map<*, *>)["params"] as Map<*, *>)["text"] })
+        assertEquals("two", ((reify(get(wire, "/api/panels/notes").body) as Map<*, *>)["nodes"] as List<*>).let { ((it[0] as Map<*, *>)["params"] as Map<*, *>)["text"] })
         val outcome = rig.board.get(LcncBlackboard.publishKey("notes")) as Map<*, *>
         assertEquals("refused", outcome["verdict"]); assertEquals("stale_base", outcome["reason"]); assertEquals(v2, outcome["currentCid"])
         assertEquals("lcnc", rig.board.getProvenance(LcncBlackboard.publishKey("notes"))?.language)
@@ -150,7 +151,7 @@ class PatchWirePublishTest {
         assertEquals(v2, (rebooted.board.get(LcncBlackboard.programKey("notes")) as Map<*, *>)["programCid"])
         val listed = json(get(after, "/api/panels"))["panels"] as List<Map<*, *>>
         assertEquals(listOf("notes" to v2), listed.map { it["name"] to it["cid"] }, "the harness's program list, from the attachments")
-        assertEquals("two", ((JsonSupport.parse(get(after, "/api/panels/notes").body) as Map<*, *>)["nodes"] as List<*>)
+        assertEquals("two", ((reify(get(after, "/api/panels/notes").body) as Map<*, *>)["nodes"] as List<*>)
             .let { ((it[0] as Map<*, *>)["params"] as Map<*, *>)["text"] }, "and it serves the LAST version, not the first")
 
         // The lineage continues across the boot: today this reply would say null.

@@ -1,13 +1,13 @@
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchCascade
 import borg.trikeshed.couch.ReduceFunction
 import borg.trikeshed.couch.ViewResult
 import borg.trikeshed.couch.ViewRow
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * ViewQuery — the one CouchDB 1.6.2 view-parameter dialect, shared by the HTTP surface
  * (`GET /{db}/_design/{d}/_view/{v}?…`) and the RequestFactory envelope (`{"op":"query","view":{…}}`).
@@ -64,9 +64,9 @@ data class ViewQuery(
     companion object {
         /** `?key=%22x%22&startkey=4&…` — key/startkey/endkey are JSON-encoded; booleans/ints as text. */
         fun fromQueryString(q: Map<String, String>): ViewQuery = ViewQuery(
-            key = q["key"]?.let(JsonSupport::parse) ?: if (q.containsKey("key")) null else Unset,
-            startkey = q["startkey"]?.let(JsonSupport::parse) ?: if (q.containsKey("startkey")) null else Unset,
-            endkey = q["endkey"]?.let(JsonSupport::parse) ?: if (q.containsKey("endkey")) null else Unset,
+            key = q["key"]?.let(::reify) ?: if (q.containsKey("key")) null else Unset,
+            startkey = q["startkey"]?.let(::reify) ?: if (q.containsKey("startkey")) null else Unset,
+            endkey = q["endkey"]?.let(::reify) ?: if (q.containsKey("endkey")) null else Unset,
             inclusive_end = q["inclusive_end"]?.toBoolean() ?: true,
             descending = q["descending"]?.toBoolean() == true,
             skip = q["skip"]?.toIntOrNull() ?: 0,

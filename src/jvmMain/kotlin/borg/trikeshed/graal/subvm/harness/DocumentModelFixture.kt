@@ -1,5 +1,8 @@
 package borg.trikeshed.graal.subvm.harness
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxExchangeLifecycle
 import borg.trikeshed.htx.HtxExchangeResult
@@ -14,7 +17,6 @@ import borg.trikeshed.modelmux.ModelResponse
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.narsese.DocumentModel
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import keymux.KeyMux
 import keymux.TestKeySource
@@ -48,7 +50,7 @@ object DocumentModelFixture {
         val keyMux = KeyMux { bind("llm.$modelId.key", TestKeySource()) }
         val routeService = object : HtxRouteService {
             override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
-                val body = JsonSupport.parse(request.body.toArray().decodeToString()) as Map<*, *>
+                val body = reify(request.body.toArray().decodeToString()) as Map<*, *>
                 val rawMessages = body["messages"] as List<*>
                 val messages = rawMessages.map {
                     val entry = it as Map<*, *>
@@ -66,7 +68,7 @@ object DocumentModelFixture {
                     maxTokens = (body["max_tokens"] as? Number)?.toInt() ?: 1024,
                 )
                 val response = responder(prompt)
-                val json = JsonSupport.stringify(mapOf(
+                val json = jsonOf(mapOf(
                     "choices" to listOf(mapOf("message" to mapOf("content" to response.content))),
                     "usage" to mapOf(
                         "prompt_tokens" to response.usage.promptTokens,

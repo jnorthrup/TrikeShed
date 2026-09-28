@@ -25,8 +25,9 @@ class CouchAttachmentGateway(
     private val casStore: CasStore
 ) {
 
-    fun putAttachment(ref: OroborosAttachmentRef, bytes: ByteArray) {
-        val cid = casStore.put(bytes)
+    /** [source]: the file [bytes] were read from; the CAS then names it in place rather than copying it. */
+    fun putAttachment(ref: OroborosAttachmentRef, bytes: ByteArray, source: String? = null) {
+        val cid = if (source != null) casStore.putRef(source, bytes, ref.contentId) else casStore.put(bytes)
         require(cid == ref.contentId) { "Provided bytes do not match expected ContentId" }
 
         // The derived-code-as-metadata precedent (MemoryStore.spineCid): the locality-preserving

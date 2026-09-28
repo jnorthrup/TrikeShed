@@ -1,6 +1,7 @@
 package borg.trikeshed.graal.vitals
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
+
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.runBlocking
@@ -22,7 +23,7 @@ object GraalConsoleCli {
             "vitals" -> {
                 val warm = args.toList().zipWithNext().firstOrNull { it.first == "--warm-ms" }?.second?.toLongOrNull() ?: 1_500L
                 Thread.sleep(warm)
-                println(JsonSupport.stringify(vitals.snapshot()))
+                println(jsonOf(vitals.snapshot()))
                 vitals.stop()
             }
             "watch" -> {
@@ -31,7 +32,7 @@ object GraalConsoleCli {
                 runBlocking {
                     vitals.events.onEach { e ->
                         val color = when (e.kind) { "compile" -> 32; "deopt" -> 31; "gc" -> 33; else -> 36 }
-                        println("[${color}m${e.kind.padEnd(7)}[0m ${JsonSupport.stringify(e.detail)}")
+                        println("[${color}m${e.kind.padEnd(7)}[0m ${jsonOf(e.detail)}")
                     }.collect()
                 }
             }

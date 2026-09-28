@@ -1,12 +1,13 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.couch.replicate.HttpReply
 import borg.trikeshed.couch.replicate.ReplicationReport
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.test.runTest
@@ -125,7 +126,7 @@ class CouchReplicationTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(reply: WireReply): Map<String, Any?> = JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?>
+    private fun json(reply: WireReply): Map<String, Any?> = reify(reply.bytes) as Map<String, Any?>
 
     @Test
     fun revisionIsTheBodyBlobAndAttachmentsHoistThroughTheRewrite() = runTest {

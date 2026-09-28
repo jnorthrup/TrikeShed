@@ -1,5 +1,7 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.vm.Teleported
 import borg.trikeshed.vm.Teleported.Arr
 import borg.trikeshed.vm.Teleported.Bool
@@ -9,7 +11,6 @@ import borg.trikeshed.vm.Teleported.Obj
 import borg.trikeshed.vm.Teleported.Opaque
 import borg.trikeshed.vm.Teleported.Real
 import borg.trikeshed.vm.Teleported.Str
-import borg.trikeshed.parse.json.JsonSupport
 import org.graalvm.polyglot.Context
 import org.graalvm.polyglot.HostAccess
 import org.graalvm.polyglot.proxy.ProxyArray
@@ -72,10 +73,10 @@ class TeleportTest {
         assertEquals(bytes.cid, back.let { (it as Obj).v.getValue("k") }.let { (it as Arr).v.first().cid })
         // a foreign speaker sending the raw JSON object (not the canonical string) is accepted with loss: markers
         // and the Num/Real distinction are not recovered from the generic envelope parser
-        val rawJson = SubVmProtocol.teleportOf(JsonSupport.parse(bytes.canonical()))
+        val rawJson = SubVmProtocol.teleportOf(reify(bytes.canonical()))
         assertIs<Obj>(rawJson)
         assertEquals(setOf("\$bytes"), rawJson.v.keys)
-        assertEquals(Real(3.0), SubVmProtocol.teleportOf(JsonSupport.parse("3")))
+        assertEquals(Real(3.0), SubVmProtocol.teleportOf(reify("3")))
     }
 
     @Test fun parseCanonicalIsTheExactInverseOfCanonical() {

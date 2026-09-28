@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.GuestModules
@@ -14,7 +16,6 @@ import borg.trikeshed.lib.s_
 import borg.trikeshed.lib.size
 import borg.trikeshed.narsese.DocumentAppendLog
 import borg.trikeshed.narsese.DocumentCasStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reactor.JvmTlsCodecBackend
 import borg.trikeshed.reactor.JvmTlsCodecBackendTest
 import borg.trikeshed.reactor.TlsApplicationProtocol
@@ -169,7 +170,7 @@ class HeadhunterHttpsTest {
 
     fun assertNoCredential(cookie: String, vararg values: Any?) {
         for (value in values) {
-            val serialized = JsonSupport.stringify(value)
+            val serialized = jsonOf(value)
             assertFalse(serialized.contains(cookie))
             assertFalse(serialized.contains(cookie.substringAfter('=')))
         }

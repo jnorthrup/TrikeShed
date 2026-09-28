@@ -1,5 +1,9 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.common.File
 import borg.trikeshed.job.CasStore
@@ -8,7 +12,6 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncPublisher
 import borg.trikeshed.lcnc.PromptStore
 import borg.trikeshed.lcnc.WorkspaceSnapshot
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +68,7 @@ class WorkspaceSnapshotService(
         )
         val taken = Taken(cid.value, snapshot.previousCid, snapshot.atMs, snapshot.note, snapshot.counts(), json)
         val line = linkedMapOf<String, Any?>("cid" to taken.cid, "previousCid" to taken.previousCid, "atMs" to taken.atMs, "note" to taken.note, "actor" to actor, "counts" to taken.counts)
-        ledger?.let { f -> withContext(Dispatchers.IO) { f.parentFile?.mkdirs(); f.appendText(JsonSupport.stringify(line) + "\n") } }
+        ledger?.let { f -> withContext(Dispatchers.IO) { f.parentFile?.mkdirs(); f.appendText(jsonOf(line) + "\n") } }
         synchronized(lineage) { lineage.add(0, line) }
         headTaken = taken
         publisher?.publishSnapshot(taken.headEntry(actor))
@@ -92,7 +95,7 @@ class WorkspaceSnapshotService(
     suspend fun restore(): Int {
         val f = ledger ?: return 0
         val lines = withContext(Dispatchers.IO) { if (f.isFile()) f.readLines().filter { it.isNotBlank() } else emptyList() }
-        val parsed = lines.mapNotNull { runCatching { JsonSupport.parseMap(it) }.getOrNull() }
+        val parsed = lines.mapNotNull { runCatching { reifyMap(it) }.getOrNull() }
         synchronized(lineage) { lineage.clear(); lineage.addAll(parsed.reversed()) }
         val last = parsed.lastOrNull() ?: return 0
         val cid = last["cid"]?.toString() ?: return 0
@@ -112,7 +115,7 @@ class WorkspaceSnapshotService(
         ctx.lcncRunners[LEGO] = LcncNodeRunner { node, inputs ->
             val note = (inputs["note"] ?: inputs["note?"])?.toString()?.takeIf { it.isNotBlank() } ?: node.params["note"].orEmpty()
             val taken = take(note, actor = LEGO)
-            mapOf("cid" to taken.cid, "previousCid" to taken.previousCid, "snapshot" to JsonSupport.parse(taken.json))
+            mapOf("cid" to taken.cid, "previousCid" to taken.previousCid, "snapshot" to reify(taken.json))
         }
     }
 

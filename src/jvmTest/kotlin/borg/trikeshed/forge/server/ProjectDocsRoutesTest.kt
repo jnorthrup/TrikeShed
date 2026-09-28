@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -7,7 +9,6 @@ import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import keymux.KeyMux
@@ -46,7 +47,7 @@ class ProjectDocsRoutesTest {
     private suspend fun get(wire: PatchWire, path: String) = wire.route("GET", path, "GET $path HTTP/1.1\r\n\r\n", null)!!
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = JsonSupport.parse(r.body) as Map<String, Any?>
+    private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = reify(r.body) as Map<String, Any?>
 
     @Test
     fun listsReadsAndRefusesThroughTheRoutes(): Unit = runBlocking {

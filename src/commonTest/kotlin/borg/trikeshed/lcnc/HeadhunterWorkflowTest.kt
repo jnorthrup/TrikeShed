@@ -1,7 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -67,7 +68,7 @@ class HeadhunterWorkflowTest {
         val workflow = HeadhunterWorkflow(fixture.rig.store) {
             calls++
             prompt = it
-            JsonSupport.stringify(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q")) j "draft-fixture"
+            jsonOf(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q")) j "draft-fixture"
         }
         val pinned = workflow.pin(fixture.request("model"))
         val result = fixture.run(workflow, pinned)
@@ -280,7 +281,7 @@ class HeadhunterWorkflowTest {
             assertSame(workflow, currentCoroutineContext()[HeadhunterWorkflowKey]?.value)
             invocation = assertNotNull(currentCoroutineContext()[LcncNodeKey.HEADHUNTER_DRAFT])
             val citation = "[${fixture.evidence["id"]}@${fixture.evidence["cid"]}]"
-            JsonSupport.stringify(mapOf(
+            jsonOf(mapOf(
                 "resume" to "Built structured Kotlin channel compositions. $citation",
                 "email" to "Please review the selected experience. $citation",
                 "phone" to "Discuss the selected experience. $citation",
@@ -303,13 +304,13 @@ class HeadhunterWorkflowTest {
     }
 
     @Test fun providerFailureAndMalformedModelOutputSaveNoArtifacts() = runTest {
-        val valid = JsonSupport.stringify(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q"))
+        val valid = jsonOf(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q"))
         for (response in s_[
             null,
             "{\"resume\":\"only one artifact\"}",
             valid + " trailing non-JSON output",
-            JsonSupport.stringify(mapOf("resume" to "", "email" to "e", "phone" to "p", "qa" to "q")),
-            JsonSupport.stringify(mapOf("resume" to "r".repeat(24001), "email" to "e", "phone" to "p", "qa" to "q")),
+            jsonOf(mapOf("resume" to "", "email" to "e", "phone" to "p", "qa" to "q")),
+            jsonOf(mapOf("resume" to "r".repeat(24001), "email" to "e", "phone" to "p", "qa" to "q")),
         ].view) {
             val fixture = Fixture().apply { open() }
             val before = fixture.rig.log.committed

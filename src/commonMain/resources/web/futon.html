@@ -32,6 +32,7 @@ tr:nth-child(even) td{background:var(--row2)}
 tr:hover td{background:#f3e9e7;cursor:pointer}
 td.rev{color:var(--dim);max-width:130px}
 #pager{display:flex;gap:8px;align-items:center;padding:8px 12px;color:var(--dim)}
+#viewbar{display:flex;gap:8px;align-items:center;padding:8px 12px;color:var(--dim);border-top:1px solid var(--line);background:var(--chrome);flex-wrap:wrap}
 #edit .head{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:var(--chrome);flex-wrap:wrap}
 #docid{font-family:ui-monospace,monospace;width:100%;max-width:100%}
 #docbody{flex:1;margin:0;border:0;padding:12px;font:12px/1.5 ui-monospace,Menlo,monospace;resize:none;outline:none;background:#fffdf9}
@@ -46,6 +47,7 @@ td.rev{color:var(--dim);max-width:130px}
 <body data-app-page="futon">
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
+  <select id="db" onchange="selectDb(this.value)" title="database (from /_all_dbs)"></select>
   <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
   <button onclick="firstPage()" title="Apply filter">go</button>
   <button onclick="newDoc()">new document</button>
@@ -56,6 +58,15 @@ td.rev{color:var(--dim);max-width:130px}
   <div id="list">
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
     <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="views">
+      <div id="viewbar"><b>views</b>
+        <select id="viewsel"></select>
+        <input id="viewq" placeholder="limit=20&amp;reduce=false" size="24">
+        <button onclick="runView()">run</button>
+        <button onclick="loadViews()" title="re-read _design/ docs">↻</button>
+        <span id="viewinfo"></span></div>
+      <table id="viewrows"></table>
+    </div>
   </div>
   <div id="edit">
     <div class="head">

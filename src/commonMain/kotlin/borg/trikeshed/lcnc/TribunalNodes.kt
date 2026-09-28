@@ -4,7 +4,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.KanbanCardState
 import borg.trikeshed.kanban.KanbanPredicate
 import borg.trikeshed.kanban.KanbanPredicateRegistry
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext

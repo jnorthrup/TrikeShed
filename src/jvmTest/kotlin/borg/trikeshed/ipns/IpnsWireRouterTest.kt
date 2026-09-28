@@ -1,12 +1,13 @@
 package borg.trikeshed.ipns
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.WireReply
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lib.j
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -165,7 +166,7 @@ class IpnsWireRouterTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun json(reply: WireReply): Map<String, Any?> = JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?>
+    fun json(reply: WireReply): Map<String, Any?> = reify(reply.bytes) as Map<String, Any?>
 
     inner class Node(context: CoroutineContext, replicas: Int = 1, quorum: Int = 1,
                      rpcTimeout: Long = 1000, operationTimeout: Long = 10_000) {

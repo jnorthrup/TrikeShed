@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese.legacy
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.narsese.CuratorImpulseElement
 import borg.trikeshed.narsese.CuratorLedger
 import borg.trikeshed.narsese.GroupCoherenceEnactment
@@ -14,7 +16,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.memory.memoryFile
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -70,7 +71,7 @@ class CuratorImpulseFeeder(
         val records = ArrayList<Map<String, Any?>>()
         for (line in ledger.readLines()) {
             if (line.isBlank()) continue
-            val parsed = runCatching { JsonSupport.parse(line) }.getOrNull() as? Map<*, *> ?: continue
+            val parsed = runCatching { reify(line) }.getOrNull() as? Map<*, *> ?: continue
             @Suppress("UNCHECKED_CAST")
             records.add(parsed as Map<String, Any?>)
         }

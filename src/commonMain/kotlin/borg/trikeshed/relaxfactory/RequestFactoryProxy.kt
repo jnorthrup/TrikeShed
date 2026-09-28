@@ -2,11 +2,13 @@
 
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -53,7 +55,7 @@ fun interface RelaxTransport {
             return RelaxTransport { envelope ->
                 val reply = exchange.call("POST", url, envelope.encodeToByteArray(), "application/json")
                 if (reply.ok) reply.text
-                else JsonSupport.stringify(
+                else jsonOf(
                     mapOf(
                         "ok" to false,
                         "receipts" to listOf(mapOf("ok" to false, "error" to "transport", "reason" to "peer answered ${reply.status}")),
@@ -218,7 +220,7 @@ class RelaxReceipt(val fields: Map<String, Any?>) {
     /** Result of a `rpc` operation. */
     val result: Any? get() = fields["result"]
 
-    override fun toString(): String = JsonSupport.stringify(fields)
+    override fun toString(): String = jsonOf(fields)
 }
 
 /** A whole batch's answer: [ok] only when every receipt is. */
@@ -255,10 +257,10 @@ class RequestFactoryProxy(private val transport: RelaxTransport) {
     suspend fun submit(ops: List<RelaxOp>): RelaxBatch {
         // Unset is absent, not null: an operation omitting `id` asks the store to derive one, and
         // omitting `rev` asks for no rev check — the same distinction the routes make.
-        val envelope = JsonSupport.stringify(
+        val envelope = jsonOf(
             mapOf("operations" to ops.map { op -> op.toMap().filterValues { it != null } }),
         )
-        val reply = runCatching { JsonSupport.parse(transport.exchange(envelope)) }.getOrNull() as? Map<*, *>
+        val reply = runCatching { reify(transport.exchange(envelope)) }.getOrNull() as? Map<*, *>
             ?: return RelaxBatch(false, listOf(RelaxReceipt(mapOf("ok" to false, "error" to "parse", "reason" to "unreadable reply"))))
         @Suppress("UNCHECKED_CAST")
         val receipts = Couch.asList(reply["receipts"])

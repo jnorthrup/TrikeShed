@@ -1,9 +1,10 @@
 package borg.trikeshed.hermes
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.pointcut.VmFacet
-import borg.trikeshed.parse.json.JsonSupport
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -45,8 +46,8 @@ object HermesSingleLanguagePortCli {
                 put("note", "TDD-red: each facet must be GREEN for single-language polyglot. pyqt/tkinter→braille, Native→host delegate, rest→Jules parts. graaljs-sleeve missing is intentional RED.")
             }
             report.parent?.let(Files::createDirectories)
-            Files.writeString(report, JsonSupport.stringify(payload), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-            println(JsonSupport.stringify(mapOf(
+            Files.writeString(report, jsonOf(payload), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+            println(jsonOf(mapOf(
                 "report" to report.toString(),
                 "python" to pyReport.verdict,
                 "js" to jsReport.verdict,

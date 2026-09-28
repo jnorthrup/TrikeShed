@@ -1,8 +1,9 @@
 package borg.trikeshed.jules.legacy
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.jules.HermesModelUsage
 
-import borg.trikeshed.parse.json.JsonSupport
 import java.io.File
 import java.sql.DriverManager
 
@@ -158,7 +159,7 @@ object HermesActiveSession {
 
     internal fun parseModelConfig(json: String?): Map<*, *>? {
         if (json.isNullOrBlank()) return null
-        return runCatching { JsonSupport.parse(json) as? Map<*, *> }.getOrNull()
+        return runCatching { reify(json) as? Map<*, *> }.getOrNull()
     }
 
     private fun str(v: Any?): String? = (v as? String)?.trim()?.takeIf { it.isNotEmpty() }

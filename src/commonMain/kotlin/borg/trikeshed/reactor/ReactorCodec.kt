@@ -5,6 +5,10 @@ import borg.trikeshed.context.nuid.Nonce
 import borg.trikeshed.context.nuid.Subnet
 import borg.trikeshed.context.nuid.nuid
 import borg.trikeshed.lib.j
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyMap
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -94,4 +98,35 @@ fun ConfixReactorEnvelope.toReactorAction(): ReactorAction {
     val nuid = nuid(cap, nonce, parsedSubnet)
 
     return nuid j (verb j payload)
+}
+
+/** The envelope as JSON wire bytes: nuid fields nested under "nuid", byte fields base64. */
+@OptIn(ExperimentalEncodingApi::class)
+fun ConfixReactorEnvelope.json(): ByteArray = jsonOf(mapOf(
+    "nuid" to buildMap {
+        put("capabilityCat", capabilityCat)
+        capabilityToken?.let { put("capabilityToken", it) }
+        put("nonceBytes", Base64.encode(nonceBytes))
+        nonceDerivedKey?.let { put("nonceDerivedKey", it) }
+        put("subnet", subnet)
+    },
+    "verb" to verb,
+    "payload" to Base64.encode(payload),
+)).encodeToByteArray()
+
+/** Inverse of [json]. */
+@OptIn(ExperimentalEncodingApi::class)
+fun reactorEnvelope(bytes: ByteArray): ConfixReactorEnvelope {
+    val m = reifyMap(bytes)
+    @Suppress("UNCHECKED_CAST")
+    val n = m["nuid"] as Map<String, Any?>
+    return ConfixReactorEnvelope(
+        capabilityCat = n["capabilityCat"] as String,
+        capabilityToken = n["capabilityToken"] as String?,
+        nonceBytes = Base64.decode(n["nonceBytes"] as String),
+        nonceDerivedKey = n["nonceDerivedKey"] as String?,
+        subnet = n["subnet"] as String,
+        verb = m["verb"] as String,
+        payload = Base64.decode(m["payload"] as String),
+    )
 }

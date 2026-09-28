@@ -1,5 +1,7 @@
 package borg.trikeshed.canary
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.InMemoryPromptReads
@@ -15,7 +17,6 @@ import borg.trikeshed.lcnc.PromptTemplate
 import borg.trikeshed.lcnc.PureNodes
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.native.Platform
 import kotlin.system.exitProcess
@@ -93,7 +94,7 @@ fun main(args: Array<String>) {
     }
     checks["contracts"] = LcncContracts.all().size
 
-    val receipt = JsonSupport.stringify(checks)
+    val receipt = jsonOf(checks)
     val cid = ContentId.of(receipt.encodeToByteArray()).value
     println(receipt)
     println("""{"receiptCid":"$cid","failed":$failed}""")

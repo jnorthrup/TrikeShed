@@ -1,10 +1,12 @@
 package borg.trikeshed.hermes
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cas.LineSpine
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
-import borg.trikeshed.parse.json.JsonSupport
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -61,16 +63,16 @@ object HermesPythonPortCli {
                 ))
             }
             report.parent?.let(Files::createDirectories)
-            Files.writeString(report, JsonSupport.stringify(payload), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+            Files.writeString(report, jsonOf(payload), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
             queue.parent?.let(Files::createDirectories)
-            Files.writeString(queue, JsonSupport.stringify(mapOf(
+            Files.writeString(queue, jsonOf(mapOf(
                 "upstreamSpineCid" to inventory.upstreamSpineCid,
                 "sleeveSpineCid" to inventory.sleeveSpineCid,
                 "ontologySpineCid" to inventory.ontology.cid.hex,
                 "delta" to delta.toMap(),
                 "significantGaps" to inventory.significantGaps().view.map { it.toMap() },
             )), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-            println(JsonSupport.stringify(mapOf(
+            println(jsonOf(mapOf(
                 "report" to report.toString(),
                 "queue" to queue.toString(),
                 "ontologySpineCid" to inventory.ontology.cid.hex,
@@ -91,7 +93,7 @@ object HermesPythonPortCli {
     private fun previousOntology(report: Path): LineSpine? {
         if (!Files.isRegularFile(report)) return null
         return runCatching {
-            val root = JsonSupport.parse(Files.readString(report)) as? Map<*, *> ?: return@runCatching null
+            val root = reify(Files.readString(report)) as? Map<*, *> ?: return@runCatching null
             val ontology = root["ontology"] as? Map<*, *> ?: return@runCatching null
             val lines = (ontology["lines"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
             if (lines.isEmpty()) null else trimmedOntologyLineSpine(lines.toSeries())

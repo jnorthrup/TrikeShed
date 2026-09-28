@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.ConfixBlackboard
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -48,7 +49,7 @@ class BlackboardRecoveryTest {
             chunks.clear()
             wire.route("GET", "/blackboard/facts?since=300&epoch=old", "") { chunks.append(it.decodeToString()) }
             assertTrue("epoch_changed" in chunks.toString())
-            val snapshot = JsonSupport.parse(wire.route("GET", "/blackboard/board", "")!!.body) as Map<*, *>
+            val snapshot = reify(wire.route("GET", "/blackboard/board", "")!!.body) as Map<*, *>
             assertEquals(300L, (snapshot["revision"] as Number).toLong())
             assertEquals(snapshot["revision"], snapshot["seq"])
             assertNotNull(snapshot["epoch"])

@@ -1,10 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.random.Random
 import kotlin.test.Test
@@ -151,7 +152,7 @@ class LcncShakeDemoTest {
             val wired = specimen.program.copy(wires = specimen.counterparts)
             val roundTrip = LcncProgramConfix.fromJson(wired.name, LcncProgramConfix.toJson(wired))
             val runner = LcncRunner(mapOf(
-                "json.value" to LcncNodeRunner { node, _ -> mapOf("value" to JsonSupport.parse(node.params.getValue("value"))) },
+                "json.value" to LcncNodeRunner { node, _ -> mapOf("value" to reify(node.params.getValue("value"))) },
                 "gauge" to LcncNodeRunner { _, _ -> emptyMap() },
             )).apply { maxScopeDepth = 20 }
             assertEquals(123, runner.runProcedure(roundTrip, mapOf("value" to 123)).returns["result"])
@@ -173,7 +174,7 @@ class LcncShakeDemoTest {
         val inherited = explicit.copy(wires = (0 until explicit.wires.size).map { explicit.wires[it] }
             .filterNot { it.toNode == "depth.8.scope" && it.toPort == "value" }.toSeries())
         val runner = LcncRunner(mapOf(
-            "json.value" to LcncNodeRunner { node, _ -> mapOf("value" to JsonSupport.parse(node.params.getValue("value"))) },
+            "json.value" to LcncNodeRunner { node, _ -> mapOf("value" to reify(node.params.getValue("value"))) },
             "gauge" to LcncNodeRunner { _, _ -> emptyMap() },
         )).apply { maxScopeDepth = 20 }
         assertEquals(999.0, runner.runProcedure(inherited, mapOf("value" to 123)).returns["result"])

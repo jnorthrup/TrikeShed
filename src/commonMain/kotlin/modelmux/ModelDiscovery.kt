@@ -1,5 +1,7 @@
 package modelmux
 
+import borg.trikeshed.parse.reify
+
 import keymux.KeyMux
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
@@ -12,7 +14,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.α
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
@@ -45,7 +46,7 @@ object ModelDiscovery {
 
     /** Parse one provider `/models` payload into discovered models. */
     fun parseModels(provider: String, json: String): Series<DiscoveredModel> {
-        val root = runCatching { JsonSupport.parse(json) }.getOrNull() as? Map<*, *>
+        val root = runCatching { reify(json) }.getOrNull() as? Map<*, *>
             ?: return emptySeriesOf()
         val data = root["data"] as? List<*> ?: return emptySeriesOf()
         val out = ArrayList<DiscoveredModel>()

@@ -2,6 +2,8 @@
 
 package borg.trikeshed.forge.sheet
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.asBool
 import borg.trikeshed.forge.asInt
 import borg.trikeshed.forge.asList
@@ -9,7 +11,6 @@ import borg.trikeshed.forge.asMaps
 import borg.trikeshed.forge.asStr
 import borg.trikeshed.forge.asStrOrNull
 import borg.trikeshed.forge.forgeUid
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
@@ -162,7 +163,7 @@ fun sheetRefId(cell: Any?): String? = (cell as? Map<*, *>)?.get("sheet") as? Str
 /** `cellText`: scalar text, JSON for objects. */
 fun cellText(cell: Any?): String = when (cell) {
     null -> ""
-    is Map<*, *>, is List<*> -> JsonSupport.stringify(cell)
+    is Map<*, *>, is List<*> -> jsonOf(cell)
     else -> cell.toString()
 }
 

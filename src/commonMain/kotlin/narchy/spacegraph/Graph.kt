@@ -1,11 +1,11 @@
 package narchy.spacegraph
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.value
-import borg.trikeshed.parse.json.JsonSupport
-
 /** Full upstream node catalog, including types outside the default registration. */
 enum class NodeKind {
     ShapeNode, InstancedNode, InstancedShapeNode, TexturedMeshNode, TextMeshNode,
@@ -34,7 +34,7 @@ class NodeData(val document: ConfixDoc = confixDoc("{}")) {
         copy[key] = value
         return of(copy)
     }
-    companion object { fun of(values: Map<String, Any?>) = NodeData(confixDoc(JsonSupport.stringify(values))) }
+    companion object { fun of(values: Map<String, Any?>) = NodeData(confixDoc(jsonOf(values))) }
 }
 
 data class NodeSpec(

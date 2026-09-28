@@ -1,12 +1,13 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.cas.FileTreeManifest
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.channels.Channel
 
 /**
@@ -191,7 +192,7 @@ class Couch(
 
     /** `POST /{db}/_bulk_docs` — `new_edits=false` lands foreign revisions; otherwise ordinary puts. */
     fun bulkDocs(docs: List<Map<String, Any?>>, newEdits: Boolean): List<Map<String, Any?>> = docs.map { body ->
-        val id = body["_id"] as? String ?: ContentId.of(JsonSupport.stringify(body).encodeToByteArray()).hex
+        val id = body["_id"] as? String ?: ContentId.of(jsonOf(body).encodeToByteArray()).hex
         val deleted = body["_deleted"] == true
         if (!newEdits) {
             val rev = body["_rev"] as? String ?: return@map mapOf("id" to id, "error" to "bad_request", "reason" to "new_edits=false requires _rev")
@@ -348,7 +349,7 @@ class Couch(
             m["_attachments"] = mapOf(
                 "content" to mapOf(
                     "content_type" to (field(doc, "contentType") ?: "application/octet-stream"),
-                    // JSON PUTs land length as a Double (JsonSupport reifies numbers so), the
+                    // JSON PUTs land length as a Double (reify reifies numbers so), the
                     // attachment gateway as a String — the stub must be right either way.
                     "length" to (field(doc, "length").let { l -> (l as? Number)?.toLong() ?: (l as? String)?.toLongOrNull() } ?: 0L),
                     "digest" to "sha256-${cid.removePrefix("sha256:")}",
@@ -364,7 +365,7 @@ class Couch(
         Document(id, body.entries.filter { !it.key.startsWith("_") && it.value != null }.map { Field(it.key, it.value!!) })
 
     companion object {
-        /** JSON arrays arrive as `Array<Any?>` from JsonSupport and as `List` from CBOR/Kotlin; accept both. */
+        /** JSON arrays arrive as `Array<Any?>` from reify and as `List` from CBOR/Kotlin; accept both. */
         fun asList(v: Any?): List<Any?>? = when (v) {
             is List<*> -> v
             is Array<*> -> v.toList()

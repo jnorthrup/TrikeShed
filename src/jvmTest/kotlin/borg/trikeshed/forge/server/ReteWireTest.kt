@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.PlaneFacts
@@ -13,7 +15,6 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.TurtleRdf
 import kotlinx.coroutines.runBlocking
@@ -71,7 +72,7 @@ class ReteWireTest {
     private fun rows(path: String): Pair<Map<String, Any?>, List<Map<String, Any?>>> {
         val r = get(path) ?: error("no route for $path")
         assertEquals(200, r.status, r.body)
-        val m = JsonSupport.parse(r.body) as Map<String, Any?>
+        val m = reify(r.body) as Map<String, Any?>
         // the parser hands an empty array back as Array<Any?> and a filled one as a List — read both
         val facts: List<Map<String, Any?>> = when (val f = m["facts"]) {
             is Array<*> -> f.map { it as Map<String, Any?> }
@@ -221,7 +222,7 @@ class ReteWireTest {
             val r = get("/api/rete/productions") ?: error("no route")
             assertEquals(200, r.status)
             @Suppress("UNCHECKED_CAST")
-            val m = JsonSupport.parse(r.body) as Map<String, Any?>
+            val m = reify(r.body) as Map<String, Any?>
             @Suppress("UNCHECKED_CAST")
             val prods = m["productions"] as List<Map<String, Any?>>
             assertEquals(m.count, prods.size)
@@ -233,7 +234,7 @@ class ReteWireTest {
             disposer.close()
         }
         @Suppress("UNCHECKED_CAST")
-        val after = JsonSupport.parse(get("/api/rete/productions")!!.body) as Map<String, Any?>
+        val after = reify(get("/api/rete/productions")!!.body) as Map<String, Any?>
         assertEquals(1, after.count, "a disposed production leaves the roster")
     }
 
@@ -277,7 +278,7 @@ class ReteWireTest {
             val response = connectionWire.route("GET", "/api/rete/connections?partition=panels&limit=1", "", null)!!
             assertEquals(200, response.status)
             @Suppress("UNCHECKED_CAST")
-            val data = JsonSupport.parse(response.body) as Map<String, Any?>
+            val data = reify(response.body) as Map<String, Any?>
             assertEquals("trikeshed.rete-connections/v1", data["schema"])
             @Suppress("UNCHECKED_CAST")
             val facts = data["facts"] as Map<String, Any?>
@@ -302,7 +303,7 @@ class ReteWireTest {
     @Test
     fun connectionsWithoutAnAttachedBankDoNotFabricateKifLinks() {
         @Suppress("UNCHECKED_CAST")
-        val data = JsonSupport.parse(get("/api/rete/connections?limit=1")!!.body) as Map<String, Any?>
+        val data = reify(get("/api/rete/connections?limit=1")!!.body) as Map<String, Any?>
         assertNull(data["ontology"])
         val projection = objectRows(data["projections"]).single()
         assertEquals(false, projection["tracked"])

@@ -1,6 +1,8 @@
 package borg.trikeshed.docs
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.MainScope
@@ -179,7 +181,7 @@ object DocumentSurfacePage {
             "text" to text, "mediaType" to "text/plain",
             "name" to curationPendingName.ifBlank { "Untitled" },
         )
-        val json = requestJson("/api/documents/curate", "POST", JsonSupport.stringify(mapOf("source" to source)))
+        val json = requestJson("/api/documents/curate", "POST", jsonOf(mapOf("source" to source)))
         curationBusy = false
         val err = DocumentSurface.curationError(json)
         val result = if (err == null) DocumentSurface.curationResult(json) else null
@@ -308,7 +310,7 @@ object DocumentSurfacePage {
         val response = if (method == "GET") window.fetch(url).await() else window.fetch(url, RequestInit(
             method = method, headers = Headers().apply { append("Content-Type", "application/json") }, body = body,
         )).await()
-        val parsed = JsonSupport.parse(response.text().await())
+        val parsed = reify(response.text().await())
         if (response.ok) parsed else {
             val fields = (parsed as? Map<*, *>)?.toMutableMap() ?: mutableMapOf<Any?, Any?>()
             if (fields["error"] == null) fields["error"] = "Request failed (HTTP ${response.status})"
@@ -319,7 +321,7 @@ object DocumentSurfacePage {
     private suspend fun getJson(url: String): Any? = runCatching {
         val response = window.fetch(url).await()
         val text = response.text().await()
-        JsonSupport.parse(text)
+        reify(text)
     }.getOrNull()
 
     private suspend fun postJson(url: String, body: String): Any? = runCatching {
@@ -330,7 +332,7 @@ object DocumentSurfacePage {
         )
         val response = window.fetch(url, init).await()
         val text = response.text().await()
-        JsonSupport.parse(text)
+        reify(text)
     }.getOrNull()
 }
 

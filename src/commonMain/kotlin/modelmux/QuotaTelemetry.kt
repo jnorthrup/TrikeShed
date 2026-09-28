@@ -1,11 +1,12 @@
 package modelmux
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.*
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.Serializable
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lib.*
 import borg.trikeshed.cursor.*
 
@@ -25,7 +26,7 @@ class QuotaTelemetry(
             "write API is reactor-internal" 
         }
         
-        val jsonString = JsonSupport.stringify(snapshot)
+        val jsonString = jsonOf(snapshot)
         val cid = ContentId.of(jsonString.encodeToByteArray())
         
         val fields = listOf(

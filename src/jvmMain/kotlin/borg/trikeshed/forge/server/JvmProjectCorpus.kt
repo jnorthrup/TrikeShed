@@ -42,8 +42,8 @@ class JvmProjectCorpus(
         val pdb = registry.get(project) ?: return@withContext null
         val (ref, bytes) = pdb.gateway.getAttachment(id) ?: return@withContext null
         if (!ProjectGlob.isTextual(ref.contentType, id)) return@withContext null
-        if (bytes.size > 4L * maxChars) return@withContext null
-        val text = bytes.decodeToString()
+        // A text larger than asked for is read to its head, never refused: maxChars bounds the answer, not the document.
+        val text = bytes.decodeToString(0, minOf(bytes.size.toLong(), 4L * maxChars).toInt())
         // binary decodes to replacement chars at a high rate; OCR/extraction leaves a few unmapped glyphs
         if (text.count { it == '\uFFFD' } * 100 > text.length) return@withContext null
         val head = pdb.store.head

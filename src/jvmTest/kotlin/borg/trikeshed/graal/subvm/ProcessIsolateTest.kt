@@ -23,7 +23,7 @@ import kotlin.test.fail
  * [SubVmMain] on this JVM's `java.class.path`).
  *
  * Teleported values ride the envelope as canonical strings ([Teleported.parseCanonical]), so `Num`
- * survives the wall. The envelope itself is `JsonSupport`; see [sourcesWithQuotesOrNewlinesCrossTheWall]
+ * survives the wall. The envelope itself is `reify`; see [sourcesWithQuotesOrNewlinesCrossTheWall]
  * for what that means for the `source` field.
  */
 @Timeout(value = 240, unit = TimeUnit.SECONDS)
@@ -95,7 +95,7 @@ class ProcessIsolateTest {
     }
 
     /**
-     * The envelope is `JsonSupport`: `stringify` escapes a source's `"` and newlines, but the reader
+     * The envelope is `reify`: `stringify` escapes a source's `"` and newlines, but the reader
      * hands the escapes through verbatim, so the guest receives `\"` and `\n` as two characters. Every
      * other test here keeps sources single-line and single-quoted; this one does not.
      */

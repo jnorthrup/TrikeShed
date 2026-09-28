@@ -1,5 +1,7 @@
 package borg.trikeshed.dag
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifExpr
@@ -8,7 +10,6 @@ import borg.trikeshed.lib.SeriesBuffer
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.RdfTriple
@@ -93,11 +94,11 @@ object PlaneFacts {
         ContentId.of(canonicalJson(fields).encodeToByteArray())
 
     /**
-     * [JsonSupport.stringify] over a copy whose maps are key-sorted at every
+     * [jsonOf] over a copy whose maps are key-sorted at every
      * depth; lists keep their order (order is meaning in a list). Non-JSON
      * scalars (a [ContentId], any other object) print through `toString`.
      */
-    fun canonicalJson(value: Any?): String = JsonSupport.stringify(canonicalize(value))
+    fun canonicalJson(value: Any?): String = jsonOf(canonicalize(value))
 
     private fun canonicalize(value: Any?): Any? = when (value) {
         null, is String, is Number, is Boolean -> value

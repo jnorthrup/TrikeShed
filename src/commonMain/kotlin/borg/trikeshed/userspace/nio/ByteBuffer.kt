@@ -38,6 +38,12 @@ public open class ByteBuffer protected constructor(
         return base + index
     }
 
+    /** Start of a bulk transfer: may sit at [capacity] when the transfer is empty, as java.nio allows. */
+    private fun absoluteStart(index: Int, length: Int): Int {
+        require(index >= 0 && length >= 0 && index <= capacity - length) { "index out of bounds: $index+$length" }
+        return base + index
+    }
+
     private fun requireIndex(index: Int, size: Int = 1) {
         require(index >= 0) { "index must be non-negative" }
         require(index + size <= capacity) { "index out of bounds" }
@@ -110,7 +116,7 @@ public open class ByteBuffer protected constructor(
     public override fun get(dst: ByteArray, offset: Int, length: Int): ByteBuffer {
         require(offset >= 0 && length >= 0 && offset + length <= dst.size) { "destination out of bounds" }
         requireReadable(length)
-        val start = absoluteIndex(position0)
+        val start = absoluteStart(position0, length)
         backing.copyInto(dst, destinationOffset = offset, startIndex = start, endIndex = start + length)
         position0 += length
         return this
@@ -121,7 +127,7 @@ public open class ByteBuffer protected constructor(
     public fun get(index: Int, dst: ByteArray, offset: Int, length: Int): ByteBuffer {
         require(offset >= 0 && length >= 0 && offset + length <= dst.size) { "destination out of bounds" }
         requireIndex(index, length)
-        backing.copyInto(dst, destinationOffset = offset, startIndex = absoluteIndex(index), endIndex = absoluteIndex(index) + length)
+        backing.copyInto(dst, destinationOffset = offset, startIndex = absoluteStart(index, length), endIndex = absoluteStart(index, length) + length)
         return this
     }
 
@@ -133,8 +139,8 @@ public open class ByteBuffer protected constructor(
     public fun put(src: ByteBuffer): ByteBuffer {
         val srcRem = src.remaining()
         requireWritable(srcRem)
-        val thisStart = absoluteIndex(position0)
-        val srcStart = src.absoluteIndex(src.position())
+        val thisStart = absoluteStart(position0, srcRem)
+        val srcStart = src.absoluteStart(src.position(), srcRem)
         src.backing.copyInto(backing, destinationOffset = thisStart, startIndex = srcStart, endIndex = srcStart + srcRem)
         position0 += srcRem
         src.position(src.position() + srcRem)
@@ -145,14 +151,14 @@ public open class ByteBuffer protected constructor(
         requireWritable()
         require(srcOffset >= 0 && length >= 0 && srcOffset + length <= src.capacity) { "source out of bounds" }
         requireIndex(index, length)
-        src.backing.copyInto(backing, destinationOffset = absoluteIndex(index), startIndex = src.base + srcOffset, endIndex = src.base + srcOffset + length)
+        src.backing.copyInto(backing, destinationOffset = absoluteStart(index, length), startIndex = src.base + srcOffset, endIndex = src.base + srcOffset + length)
         return this
     }
 
     public override fun put(src: ByteArray, offset: Int, length: Int): ByteBuffer {
         require(offset >= 0 && length >= 0 && offset + length <= src.size) { "source out of bounds" }
         requireWritable(length)
-        src.copyInto(backing, destinationOffset = absoluteIndex(position0), startIndex = offset, endIndex = offset + length)
+        src.copyInto(backing, destinationOffset = absoluteStart(position0, length), startIndex = offset, endIndex = offset + length)
         position0 += length
         return this
     }
@@ -163,7 +169,7 @@ public open class ByteBuffer protected constructor(
         require(offset >= 0 && length >= 0 && offset + length <= src.size) { "source out of bounds" }
         requireWritable()
         requireIndex(index, length)
-        src.copyInto(backing, destinationOffset = absoluteIndex(index), startIndex = offset, endIndex = offset + length)
+        src.copyInto(backing, destinationOffset = absoluteStart(index, length), startIndex = offset, endIndex = offset + length)
         return this
     }
 

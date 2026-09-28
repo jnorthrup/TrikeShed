@@ -1,9 +1,11 @@
 package borg.trikeshed.wiki
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.narsese.CausalConstruction
 import borg.trikeshed.narsese.ConstructionPatternGate
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.platform.CommonResources
 import borg.trikeshed.platform.text
 import kotlin.test.Test
@@ -25,13 +27,13 @@ class HermesWikiTrainer1ATest {
 
     @Suppress("UNCHECKED_CAST")
     private fun objectAt(path: String): Map<String, Any?> =
-        JsonSupport.parse(text(path)) as Map<String, Any?>
+        reify(text(path)) as Map<String, Any?>
 
     @Suppress("UNCHECKED_CAST")
     private fun jsonLines(path: String): List<Map<String, Any?>> = text(path)
         .lineSequence()
         .filter { it.isNotBlank() }
-        .map { JsonSupport.parse(it) as Map<String, Any?> }
+        .map { reify(it) as Map<String, Any?> }
         .toList()
 
     @Test
@@ -71,7 +73,7 @@ class HermesWikiTrainer1ATest {
             assertEquals(decision["sourceSpan"], dep["sourceSpan"])
             // Confix reifies a non-empty JSON array as a List and an empty one as
             // EmptySeries. Canonical JSON is the target-neutral emptiness check.
-            val hasSupport = JsonSupport.stringify(dep["causalSupport"]) != "[]"
+            val hasSupport = jsonOf(dep["causalSupport"]) != "[]"
             if (decision["expectedDecision"] == "admit") {
                 assertTrue(hasSupport)
                 assertNotNull(decision["narsEvidence"])

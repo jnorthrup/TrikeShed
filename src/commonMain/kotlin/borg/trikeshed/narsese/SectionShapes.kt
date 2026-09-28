@@ -147,8 +147,77 @@ object SectionShapes {
     }
 
     /** A book's sections, each one's carried ordinal, and the believed shapes that cut them (empty: paragraphs). */
-    class Sections(val believed: List<Shape>, val texts: List<String>, val ordinals: List<LongArray?>) {
+    class Sections(val believed: List<Shape>, val texts: List<String>, val ordinals: List<LongArray?>,
+                   val genre: Genre? = null) {
         val shape: Shape? get() = believed.firstOrNull()
+    }
+
+    /**
+     * What kind of book a text is, judged from its own layout as NAL evidence — never from a title or
+     * a filename. A reference work (dictionary, encyclopedia, digest, code) is a long run of short,
+     * independent entries keyed by a term or number in order, each opening with that key and defining
+     * or stating it; a treatise is fewer, longer sections of argued prose that lean on each other.
+     *
+     * Judgements, each over the book's entries (one source per entry):
+     *  - keyed:     the entry opens with its own key (headword or numbered heading), in order
+     *  - short:     the entry is a unit of lookup: under four times the book's median entry, under 4000 chars
+     *  - defining:  its key is followed at once by a gloss, a copula or a register (`X. Lat. To fall`)
+     *  - glossed:   it carries source abbreviations or citations (`Co. Litt. 72`, `Escriche, Dic.`)
+     *  - crossref:  it points at another entry (`q. v.`, `See X`, `§ n`)
+     * Reference-ness is the intersection of keyed, short and defining; glossed and crossref corroborate.
+     */
+    class Genre(val kind: Kind, val entries: Int, val keyed: TruthCoord, val short: TruthCoord, val defining: TruthCoord,
+                val glossed: TruthCoord, val crossref: TruthCoord, val belief: TruthCoord) {
+        enum class Kind { REFERENCE, TREATISE, PROSE }
+        val reference: Boolean get() = kind == Kind.REFERENCE
+    }
+
+    /** Longest entry that still reads as a unit of lookup. */
+    const val SHORT_ENTRY = 1500
+
+    private val CROSSREF = Regex("\\bq\\.\\s?v\\.|\\bSee\\s+[A-Z]|\\bvid\\.|\\bcf\\.|§\\s?\\d")
+    private val GLOSS = Regex("\\b(?:[A-Z][a-z]{0,6}\\.\\s?){1,3}\\d{1,4}|\\b(?:Lat|Fr|Sax|Span)\\.")
+
+    /**
+     * The genre of a cut text: reference work, treatise, or plain prose. Core evidence is keyed ∧ short
+     * (a reference entry is a unit of lookup, a treatise section is an argument); being keyed by terms in
+     * alphabetical order rather than numbers, glosses and cross-references corroborate.
+     */
+    fun genre(texts: List<String>, keyedCount: Int, termKeyed: Boolean = false): Genre {
+        val entries = texts.size
+        fun tv(p: Long, n: Long) = Nal.truthOf(EvidenceCoord(p * Nal.UNIT, n * Nal.UNIT))
+        if (entries < 2) { val z = tv(0, 1); return Genre(Genre.Kind.PROSE, entries, z, z, z, z, z, z) }
+        val lengths = texts.map { it.length }.sorted()
+        val median = lengths[lengths.size / 2].coerceAtLeast(1)
+        var sp = 0L; var sn = 0L; var dp = 0L; var dn = 0L; var gp = 0L; var gn = 0L; var xp = 0L; var xn = 0L
+        for (e in texts) {
+            // Short: a unit of lookup, not an argued section.
+            if (e.length <= SHORT_ENTRY) sp++ else sn++
+            // Defining: past any sign and number, the key's first sentence says what the key is — a gloss,
+            // a copula, a register — rather than opening an argument that runs on.
+            val head = e.take(240).replaceFirst(Regex("^\\W*\\d+(?:\\.\\d+)*\\.?\\s*"), "")
+            val key = head.takeWhile { it != '.' && it != ',' }.trim()
+            val after = head.drop(key.length + 1).trimStart()
+            val firstSentence = after.takeWhile { it != '.' }
+            if (key.isNotEmpty() && key.length <= 60 && firstSentence.length in 1..120 && (after.startsWith("is ") || after.startsWith("means ") ||
+                    after.startsWith("In ") || after.startsWith("Lat") || after.startsWith("Fr") || after.startsWith("A ") || after.startsWith("The "))) dp++ else dn++
+            if (GLOSS.containsMatchIn(e)) gp++ else gn++
+            if (CROSSREF.containsMatchIn(e)) xp++ else xn++
+        }
+        val keyed = tv(keyedCount.toLong(), (entries - keyedCount).coerceAtLeast(0).toLong())
+        val short = tv(sp, sn); val defining = tv(dp, dn); val glossed = tv(gp, gn); val crossref = tv(xp, xn)
+        val coreF = keyed.frequency * short.frequency
+        val coreC = keyed.confidence * short.confidence
+        // Keyed by terms in alphabetical order is the dictionary's own mark; defining openings, glosses
+        // and cross-references each corroborate.
+        val lift = ((if (termKeyed) 1f else 0f) + defining.frequency + glossed.frequency + crossref.frequency) / 4f
+        val belief = TruthCoord((coreF + (1 - coreF) * coreF * lift).coerceIn(0f, 1f), coreC)
+        val kind = when {
+            belief.expectation() > .5f -> Genre.Kind.REFERENCE
+            keyed.expectation() > .5f -> Genre.Kind.TREATISE
+            else -> Genre.Kind.PROSE
+        }
+        return Genre(kind, entries, keyed, short, defining, glossed, crossref, belief)
     }
 
     /**
@@ -159,8 +228,16 @@ object SectionShapes {
         val t = tuples(text)
         // The strongest believed shape cuts; the others stay as candidates the caller can read.
         val believed = shapes(t).filter { it.belief.expectation() > .5f }
-        if (believed.isEmpty()) return text.split(Regex("\n\\s*\n")).map(::clean).filter { it.isNotEmpty() }.let { Sections(emptyList(), it, it.map { null }) }
-        val starts = believed.first().starts.toList()
+        val numbered = believed.firstOrNull()
+        // A shape that cuts a handful of sections from a long text is not the text's structure: the
+        // other kind of book keys its entries by a word, not a number (a dictionary's headwords).
+        val headwords = headwords(t)
+        val byHeadword = !(numbered != null && numbered.starts.size >= headwords.size / 8) && headwords.size >= MIN_ENTRIES
+        val starts = when {
+            !byHeadword && numbered != null -> numbered.starts.toList()
+            byHeadword -> headwords
+            else -> return text.split(Regex("\n\\s*\n")).map(::clean).filter { it.isNotEmpty() }.let { Sections(emptyList(), it, it.map { null }, genre(it, 0)) }
+        }
         val offsets = IntArray(t.lines.size + 1)
         for (i in t.lines.indices) offsets[i + 1] = offsets[i] + t.lines[i].length + 1
         val texts = ArrayList<String>(); val ords = ArrayList<LongArray?>()
@@ -169,7 +246,8 @@ object SectionShapes {
             val body = clean(text.substring(offsets[at], minOf(text.length, if (k + 1 < starts.size) offsets[starts[k + 1]] else text.length)))
             if (body.isNotEmpty()) { texts.add(body); ords.add(t.ordinals[at]) }
         }
-        return Sections(believed, texts, ords)
+        // Cut by headwords, no numbered shape describes the book: nothing to cite by sign + number.
+        return Sections(if (byHeadword) emptyList() else believed, texts, ords, genre(texts, starts.size, byHeadword))
     }
 
     /**
@@ -191,6 +269,37 @@ object SectionShapes {
         }
         return out.distinct()
     }
+
+    /**
+     * The headword tupler: a line that opens with an all-capital word run ended by a period
+     * (`ACCIDERE.`, `ACTION.`) is a headword when the headwords it keeps come in alphabetical order —
+     * the ordering a dictionary's entries carry instead of numbers. Judged the same way as numbered
+     * shapes: the longest ascending chain of headwords is the book's entries; strays are not.
+     */
+    fun headwords(t: Tuples): List<Int> {
+        val cand = ArrayList<Int>(); val keys = ArrayList<String>()
+        for ((i, l) in t.lines.withIndex()) {
+            val m = HEADWORD.find(l.trimStart()) ?: continue
+            val w = m.groupValues[1]
+            if (w.count(Char::isLetter) < 2) continue
+            cand.add(i); keys.add(w.filter(Char::isLetter))
+        }
+        if (cand.isEmpty()) return emptyList()
+        // Longest ascending (non-decreasing, one entry may continue a prior one) chain by headword.
+        val tails = ArrayList<Int>(); val back = IntArray(cand.size) { -1 }; val tailAt = ArrayList<Int>()
+        for (k in cand.indices) {
+            var lo = 0; var hi = tails.size
+            while (lo < hi) { val mid = (lo + hi) ushr 1; if (keys[tails[mid]] <= keys[k]) lo = mid + 1 else hi = mid }
+            if (lo > 0) back[k] = tailAt[lo - 1]
+            if (lo == tails.size) { tails.add(k); tailAt.add(k) } else { tails[lo] = k; tailAt[lo] = k }
+        }
+        val out = ArrayList<Int>(); var k = tailAt.lastOrNull() ?: -1
+        while (k >= 0) { out.add(cand[k]); k = back[k] }
+        return out.asReversed()
+    }
+
+    private val HEADWORD = Regex("^([A-Z][A-Z'\\- ]{1,40}[A-Z])[.,]")
+    const val MIN_ENTRIES = 200
 
     fun clean(s: String) = s.replace(Regex("(\\w)-\n(\\w)"), "$1$2").replace(Regex("\\s+"), " ").trim()
 }

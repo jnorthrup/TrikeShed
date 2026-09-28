@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CanonicalCbor
@@ -18,7 +20,6 @@ import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -261,7 +262,7 @@ class DocumentCuratorElement private constructor(
                         val prompt = Prompt(
                             listOf(
                                 PromptMessage.System(read.work.instructions),
-                                PromptMessage.User(JsonSupport.stringify(payload)),
+                                PromptMessage.User(jsonOf(payload)),
                             ).toSeries(),
                             modelId,
                             temperature = 0.0,

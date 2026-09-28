@@ -1,7 +1,7 @@
 package borg.trikeshed.parse;
 
 import borg.trikeshed.lib.CharSeries;
-import borg.trikeshed.parse.json.JsonSupport;
+import borg.trikeshed.parse.ReifyKt;
 import java.lang.management.ManagementFactory;
 
 /** Same-process thread allocation counter; run unchanged against before/after classpaths. */
@@ -25,7 +25,7 @@ public class CharSeriesAllocationProbe {
         });
         if (checksum != 4064L * 'x') throw new AssertionError("Window contents changed");
         measure(bean, "json-reify", 150, () -> {
-            result = JsonSupport.INSTANCE.parse(json);
+            result = ReifyKt.reify(json);
             checksum = consume(result);
         });
         if (checksum != 16L * (512 + 10)) throw new AssertionError("JSON contents changed: " + checksum);

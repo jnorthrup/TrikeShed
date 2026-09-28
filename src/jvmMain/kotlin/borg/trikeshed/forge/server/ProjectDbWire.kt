@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchWireRouter
@@ -32,7 +34,7 @@ class ProjectDb(
  * First-segment names must not shadow the daemon's own surfaces — the reserved
  * set + the primary db name are refused at mount.
  */
-class ProjectDbRegistry(private val primaryDbName: String) {
+class ProjectDbRegistry(val primaryDbName: String) {
     private val dbs = ConcurrentHashMap<String, ProjectDb>()
 
     /** Invoked on every successful mount (daemon wires the per-db Rete tendon here). */
@@ -87,6 +89,10 @@ class ProjectDbWire(
         val p = path.substringBefore('?')
         val segments = p.trim('/').split('/')
         val first = segments.firstOrNull() ?: return null
+
+        // CouchDB `GET /_all_dbs`: the primary db and every mounted project db, by name.
+        if (p == "/_all_dbs") return if (method != "GET") json(405, """{"error":"method_not_allowed"}""")
+            else json(200, jsonOf(listOf(registry.primaryDbName) + registry.all().map { it.name }))
 
         // ── upload lane: POST /_project/<name>/begin · POST /_project/<name>/put?path=<rel> ──
         if (first == "_project") {

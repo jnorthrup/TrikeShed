@@ -1,5 +1,8 @@
 package borg.trikeshed.mux
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.lcnc.ccek.ccekReactorBinding
@@ -11,7 +14,6 @@ import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.lcnc.LcncRunner
 import borg.trikeshed.lcnc.MuxAgentTricks
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -188,8 +190,8 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
         }
         val collapsed = "--expanded" !in args
         if ("--describe" in args) {
-            println(JsonSupport.stringify(MuxAgentTricks.programs(model, maxTokens, collapsed).mapValues {
-                JsonSupport.parse(LcncProgramConfix.toJson(it.value))
+            println(jsonOf(MuxAgentTricks.programs(model, maxTokens, collapsed).mapValues {
+                reify(LcncProgramConfix.toJson(it.value))
             }))
             return true
         }
@@ -206,9 +208,9 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
                     model(id = model, caps = setOf("chat"), baseUrl = row.baseUrl, provider = provider)
                 }
                 val report = MuxAgentTricks.run(keyMux, mux, model, maxTokens, collapsed) { step ->
-                    if ("--json" !in args) println(JsonSupport.stringify(mapOf("step" to step)))
+                    if ("--json" !in args) println(jsonOf(mapOf("step" to step)))
                 }
-                println(JsonSupport.stringify(report))
+                println(jsonOf(report))
                 report["ok"] == true
             }
         }
@@ -710,7 +712,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
             val resp = htx.request(req)
             if (resp.status !in 200..299) return emptyList()
             val body = resp.body.toArray().decodeToString()
-            val parsed = borg.trikeshed.parse.json.JsonSupport.parse(body) as? Map<*, *>
+            val parsed = reify(body) as? Map<*, *>
                 ?: return emptyList()
             val data = parsed["data"] as? List<*> ?: return emptyList()
             data.mapNotNull { (it as? Map<*, *>)?.get("id") as? String }.take(limit)

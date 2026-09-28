@@ -1,6 +1,7 @@
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import java.nio.file.Path
 import kotlin.random.Random
 import kotlin.test.Test
@@ -12,7 +13,7 @@ class YamlBigJsonParityTest {
     @Test
     fun bigJsonYamlRoundTrip_matchesRandomLeafSamples() {
         val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
-        val original = JsonSupport.parse(jsonText)
+        val original = reify(jsonText)
         val yaml = renderYaml(original)
         val reparsed = YamlParser.reify(yaml)
 

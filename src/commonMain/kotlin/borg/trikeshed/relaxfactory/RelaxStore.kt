@@ -1,12 +1,12 @@
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The store a [CouchRequestFactory] resolves requests against.
  *
@@ -126,7 +126,7 @@ private class CouchDatabaseRelaxStore(
     override fun get(id: String): Map<String, Any?>? = db.docJson(id)
 
     override fun put(id: String, json: String, rev: String?): Map<String, Any?> {
-        val body = runCatching { JsonSupport.parse(json) }.getOrNull() as? Map<*, *>
+        val body = runCatching { reify(json) }.getOrNull() as? Map<*, *>
             ?: return mapOf("error" to "bad_request", "reason" to "Document must be a JSON object", "id" to id)
         @Suppress("UNCHECKED_CAST")
         return db.put(id, body as Map<String, Any?>, rev ?: body["_rev"] as? String)

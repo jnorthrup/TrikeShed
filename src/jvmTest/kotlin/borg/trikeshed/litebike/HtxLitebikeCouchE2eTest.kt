@@ -1,5 +1,7 @@
 package borg.trikeshed.litebike
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.ConfixDocStoreFactory
 import borg.trikeshed.htx.HtxClientReactorElement
 import borg.trikeshed.htx.HtxMethod
@@ -9,7 +11,6 @@ import borg.trikeshed.htx.openHtxClientReactorElement
 import borg.trikeshed.htx.parseHtxRequest
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.litebike.taxonomy.Protocol
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CoroutineScope
@@ -282,7 +283,7 @@ class HtxLitebikeCouchE2eTest {
             request(parseHtxRequest(base + path, method = method, body = ByteSeries(body ?: "")))
         }
         val text = response.body.asString()
-        val parsed = JsonSupport.parse(text) as? Map<*, *> ?: error("non-object reply ${response.status}: $text")
+        val parsed = reify(text) as? Map<*, *> ?: error("non-object reply ${response.status}: $text")
         return parsed.entries.associate { it.key.toString() to it.value } to response.status
     }
 

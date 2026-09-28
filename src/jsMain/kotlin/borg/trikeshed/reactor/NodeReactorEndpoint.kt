@@ -11,10 +11,10 @@ class NodeReactorEndpoint(
             verb = "POST",
             path = "/api/invoke",
             headers = mapOf("Content-Type" to "application/octet-stream"),
-            body = ReactorJsonCodec.encode(action),
+            body = action.toConfixEnvelope().json(),
         )
         val response = NodeHttpForwarder.send(baseUrl, spec)
         if (response.status != 200) throw RuntimeException("reactor returned ${response.status}")
-        return ReactorJsonCodec.decode(response.body)
+        return reactorEnvelope(response.body).toReactorAction()
     }
 }

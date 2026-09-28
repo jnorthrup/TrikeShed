@@ -36,6 +36,8 @@ data class NlpSentence(
     val tokens: Series<NlpToken>,
     val dependencies: Series<NlpDependency>,
     val relations: List<NlpRelation> = emptyList(),
+    /** Stanford relation extraction (KBP): typed slot relations such as `org:founded_by`, spans as in [relations]. */
+    val kbp: List<NlpRelation> = emptyList(),
 )
 
 /**

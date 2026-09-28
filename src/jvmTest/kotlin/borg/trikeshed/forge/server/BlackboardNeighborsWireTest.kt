@@ -1,8 +1,9 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.ontology.SumoClassifier
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
@@ -16,7 +17,7 @@ class BlackboardNeighborsWireTest {
         suspend fun query(): Map<*, *> {
             val response = wire.route("GET", "/blackboard/neighbors?key=listing%2Fa%26b", "")!!
             assertEquals(200, response.status)
-            return JsonSupport.parse(response.body) as Map<*, *>
+            return reify(response.body) as Map<*, *>
         }
         val first = query()
         assertEquals("middle", first["corpus"])

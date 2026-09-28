@@ -1,7 +1,8 @@
 package borg.trikeshed.torrent
 
+import borg.trikeshed.parse.reifyStrict
+
 import borg.trikeshed.couch.WireReply
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CancellationException
 
 /** HTTP request composition over the real torrent element; sockets remain owned by the caller. */
@@ -29,7 +30,7 @@ class TorrentHttpRouter(val element: TorrentElement) {
                 "/torrent/add" -> {
                     if (method != "POST") return WireReply.methodNotAllowed(method)
                     val handle = if (body.firstOrNull() == '{'.code.toByte()) {
-                        val value = JsonSupport.parseStrict(BencodeValue.Bytes(body).text()) as? Map<*, *>
+                        val value = reifyStrict(BencodeValue.Bytes(body).text()) as? Map<*, *>
                             ?: throw IllegalArgumentException("Expected torrent request object")
                         val uri = value["uri"] as? String ?: throw IllegalArgumentException("Torrent uri required")
                         val destination = value["destinationDir"]

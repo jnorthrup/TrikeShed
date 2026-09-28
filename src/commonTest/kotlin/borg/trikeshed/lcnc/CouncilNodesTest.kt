@@ -1,7 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -232,7 +233,7 @@ class CouncilNodesTest {
         val program = out["program"] as Map<*, *>
         assertEquals(
             LcncProgramConfix.toJson(CouncilProgram.build(CouncilConfig.DEFAULT_3x5)),
-            JsonSupport.stringify(program),
+            jsonOf(program),
         )
     }
 
@@ -320,7 +321,7 @@ class CouncilNodesTest {
         // CAS: per-turn bytes, transcript, verdict, case doc all present.
         assertNotNull(store.cas[ContentId.of("take one".encodeToByteArray()).value])
         assertNotNull(store.cas[ContentId.of("take two".encodeToByteArray()).value])
-        assertEquals(JsonSupport.stringify(verdict), store.cas[verdictCid]!!.decodeToString())
+        assertEquals(jsonOf(verdict), store.cas[verdictCid]!!.decodeToString())
         assertTrue(store.cas[transcriptCid]!!.decodeToString().contains("panel one transcript"))
 
         // Lifecycle: recordRuling spied once with matching cids, no mistrial.
@@ -415,7 +416,7 @@ class CouncilNodesTest {
             .run(LcncNode("cc", "council.case", params = mapOf("caseId" to "case-7")), emptyMap())
         val case = out["case"] as Map<*, *>
         assertEquals("case-7", case["caseId"])
-        assertEquals(JsonSupport.stringify(verdict), case["verdict"])
+        assertEquals(jsonOf(verdict), case["verdict"])
         assertTrue((case["transcript"] as String).contains("panel one transcript"))
         assertEquals("ruled", (case["index"] as Map<*, *>)["status"])
 
@@ -425,7 +426,7 @@ class CouncilNodesTest {
         val bare = (reg.getValue("council.case")
             .run(LcncNode("cc", "council.case"), mapOf("caseId?" to "case-7"))["case"]) as Map<*, *>
         assertTrue((bare["transcript"] as String).contains("panel one transcript"))
-        assertEquals(JsonSupport.stringify(verdict), bare["verdict"])
+        assertEquals(jsonOf(verdict), bare["verdict"])
 
         // Unknown case: a loud not_found, never a silent empty body.
         val missing = (reg.getValue("council.case")

@@ -1,10 +1,11 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * ModuleWire — the module control surface, mounted on the kanban listener:
  *
@@ -52,7 +53,7 @@ class ModuleWire(
     }
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     @Suppress("UNCHECKED_CAST")
     private fun parse(text: String): Map<String, Any?> {
@@ -62,6 +63,6 @@ class ModuleWire(
             else -> text
         }
         if (body.isBlank()) return emptyMap()
-        return runCatching { JsonSupport.parse(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
+        return runCatching { reify(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
     }
 }

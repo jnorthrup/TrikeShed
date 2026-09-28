@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.ConfixBlackboard
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,7 +23,7 @@ class BlackboardSheetRouteTest {
     private fun wire(bb: ConfixBlackboard) = BlackboardWire(bb, CoroutineScope(SupervisorJob() + Dispatchers.Default))
 
     @Suppress("UNCHECKED_CAST")
-    private fun family(body: String): List<Map<String, Any?>> = JsonSupport.parse(body) as List<Map<String, Any?>>
+    private fun family(body: String): List<Map<String, Any?>> = reify(body) as List<Map<String, Any?>>
 
     @Test
     fun oneFactIsOneFamilyWithRefsForNestedContainers() = runTest {

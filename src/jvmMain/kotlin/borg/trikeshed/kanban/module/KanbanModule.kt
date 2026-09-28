@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardApply
 import borg.trikeshed.lib.α
@@ -15,7 +18,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ForgeModule
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleHandle
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -139,7 +141,7 @@ class KanbanModule : ForgeModule {
         fun boardJson(): String {
             val seq = store.lastSequence
             if (bag == null) cached?.let { if (it.first == seq) return it.second }
-            val json = JsonSupport.stringify(lcnc.boardView())
+            val json = jsonOf(lcnc.boardView())
             if (bag == null) cached = seq to json
             return json
         }
@@ -460,7 +462,7 @@ class KanbanModule : ForgeModule {
                     """{"error":"method_not_allowed","reason":"this server offers no GET event stream; POST JSON-RPC to this path"}""",
                 ) else JvmKanbanServer.HttpResponse(
                     200,
-                    JsonSupport.stringify(
+                    jsonOf(
                         mapOf(
                             "server" to borg.trikeshed.mcp.LcncKanbanMcp.SERVER_NAME,
                             "protocolVersions" to borg.trikeshed.mcp.LcncKanbanMcp.SUPPORTED_PROTOCOLS,
@@ -490,7 +492,7 @@ class KanbanModule : ForgeModule {
 
         ctx.routes.claim(id, "/api/lcnc/kanban") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(lcnc.activeSheets()))
+            else JvmKanbanServer.HttpResponse(200, jsonOf(lcnc.activeSheets()))
         }
 
         // The concentric composition surface: modules + rings + wizard roster,
@@ -501,7 +503,7 @@ class KanbanModule : ForgeModule {
                 borg.trikeshed.lcnc.LcncPresets.all().map { (name, doc) -> name to doc }
             }.getOrNull().orEmpty()
             val surface = borg.trikeshed.lcnc.ConcentricSurface.render(programs = programs)
-            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(surface))
+            JvmKanbanServer.HttpResponse(200, jsonOf(surface))
         }
 
         // /panels — the concentric construction canvas (revived editor) — is a
@@ -532,7 +534,7 @@ class KanbanModule : ForgeModule {
 
         ctx.routes.claim(id, "/api/lcnc/contracts") { method, _, _, _ ->
             if (method != "GET") JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            else JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(publisher.publishVocabulary()))
+            else JvmKanbanServer.HttpResponse(200, jsonOf(publisher.publishVocabulary()))
         }
 
         // Rebuild (Forge genesis, Cut S): re-execute a completed receipt's exact program version with its
@@ -540,7 +542,7 @@ class KanbanModule : ForgeModule {
         // rebuildOf and, once complete, the old run's consumed facts and stale marker are retired.
         ctx.routes.claim(id, "/api/lcnc/run/rebuild") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
             val wantedRun = req["runId"]?.toString()?.takeIf { it.isNotBlank() }
             val wantedCid = req["receiptCid"]?.toString()?.takeIf { it.isNotBlank() }
@@ -552,14 +554,14 @@ class KanbanModule : ForgeModule {
                 else -> null
             } as? Map<String, Any?>) ?: return@claim JvmKanbanServer.HttpResponse(404, """{"error":"no_such_receipt"}""")
             val status = receipt["status"]?.toString()
-            if (status in listOf("validating", "running")) return@claim JvmKanbanServer.HttpResponse(409, JsonSupport.stringify(mapOf("error" to "receipt_not_terminal", "status" to status)))
+            if (status in listOf("validating", "running")) return@claim JvmKanbanServer.HttpResponse(409, jsonOf(mapOf("error" to "receipt_not_terminal", "status" to status)))
             val programCid = receipt["programCid"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(422, """{"error":"receipt_names_no_program"}""")
             val bytes = ctx.casStore.get(borg.trikeshed.job.ContentId(programCid))
-                ?: return@claim JvmKanbanServer.HttpResponse(404, JsonSupport.stringify(mapOf("error" to "program_version_missing", "programCid" to programCid)))
+                ?: return@claim JvmKanbanServer.HttpResponse(404, jsonOf(mapOf("error" to "program_version_missing", "programCid" to programCid)))
             val name = receipt["program"]?.toString() ?: "rebuild"
             val program = runCatching { borg.trikeshed.lcnc.LcncProgramConfix.fromJson(name, bytes.decodeToString()) }
-                .getOrElse { return@claim JvmKanbanServer.HttpResponse(422, JsonSupport.stringify(mapOf("error" to "program_version_unreadable", "detail" to (it.message ?: "")))) }
+                .getOrElse { return@claim JvmKanbanServer.HttpResponse(422, jsonOf(mapOf("error" to "program_version_unreadable", "detail" to (it.message ?: "")))) }
             val inputs = (receipt["inputs"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v } ?: emptyMap<String, Any?>()
             val budgets = receipt["budgets"] as? Map<*, *>
             val request = mapOf(
@@ -571,9 +573,9 @@ class KanbanModule : ForgeModule {
         }
         ctx.routes.claim(id, "/api/lcnc/run/cancel") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
             val cancelled = req?.get("runId")?.toString()?.let(runs::cancel) ?: false
-            JvmKanbanServer.HttpResponse(if (cancelled) 202 else 404, JsonSupport.stringify(mapOf("ok" to cancelled)))
+            JvmKanbanServer.HttpResponse(if (cancelled) 202 else 404, jsonOf(mapOf("ok" to cancelled)))
         }
 
         // The same vocabulary as a GRAPH: kinds, ports, and the binding edges,
@@ -597,22 +599,22 @@ class KanbanModule : ForgeModule {
 
         ctx.routes.claim(id, "/api/lcnc/treeshake") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
             val programData = req["program"]
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"program_required"}""")
             val program = runCatching {
-                borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", JsonSupport.stringify(programData))
+                borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", jsonOf(programData))
             }.getOrElse {
-                return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf("error" to "bad_program", "detail" to (it.message ?: ""))))
+                return@claim JvmKanbanServer.HttpResponse(400, jsonOf(mapOf("error" to "bad_program", "detail" to (it.message ?: ""))))
             }
             val result = try {
                 val options = borg.trikeshed.lcnc.LcncTreeShakeOptions.fromMap(req["options"] as? Map<*, *>)
                 borg.trikeshed.lcnc.LcncMating.treeshake(program, options, publisher.vocabulary())
             } catch (e: IllegalArgumentException) {
-                return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf("error" to "bad_selection", "detail" to e.message)))
+                return@claim JvmKanbanServer.HttpResponse(400, jsonOf(mapOf("error" to "bad_selection", "detail" to e.message)))
             }
-            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(result.toMap()))
+            JvmKanbanServer.HttpResponse(200, jsonOf(result.toMap()))
         }
 
         ctx.routes.claim(id, "/api/lcnc/content") { method, path, _, _ ->
@@ -631,8 +633,9 @@ class KanbanModule : ForgeModule {
         ctx.routes.claim(id, "/api/lcnc/trail") { method, path, _, _ ->
             if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
-            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(borg.trikeshed.lcnc.LcncTrail.live.since(
-                query["since"]?.toLongOrNull() ?: 0L, query["nodes"]?.toIntOrNull() ?: 0)))
+            JvmKanbanServer.HttpResponse(200, jsonOf(borg.trikeshed.lcnc.LcncTrail.live.since(
+                query["since"]?.toLongOrNull() ?: 0L, query["nodes"]?.toIntOrNull() ?: 0,
+                query["epoch"]?.toLongOrNull() ?: 0L)))
         }
 
         ctx.routes.claim(id, "/api/lcnc/runs") { method, path, _, _ ->
@@ -651,11 +654,11 @@ class KanbanModule : ForgeModule {
         // modules) are reachable too.
         ctx.routes.claim(id, "/api/lcnc/run") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            if (text.length > 1_048_576) return@claim JvmKanbanServer.HttpResponse(413, """{"error":"payload_limit"}""")
-            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            // A run may carry its input inline (a whole book as a text value): no body size is refused here.
+            val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
-            borg.trikeshed.parse.json.ValueBudget().violation(req)?.let { limit ->
-                return@claim JvmKanbanServer.HttpResponse(413, JsonSupport.stringify(mapOf("error" to limit)))
+            borg.trikeshed.parse.ValueBudget().violation(req)?.let { limit ->
+                return@claim JvmKanbanServer.HttpResponse(413, jsonOf(mapOf("error" to limit)))
             }
             @Suppress("UNCHECKED_CAST")
             if (req.containsKey("inputs") && req["inputs"] !is Map<*, *>)
@@ -666,7 +669,7 @@ class KanbanModule : ForgeModule {
             if (programName != null) {
                 val program = ctx.programLoader(programName)
                     ?: return@claim JvmKanbanServer.HttpResponse(
-                        404, JsonSupport.stringify(mapOf("error" to "no_such_program", "program" to programName)),
+                        404, jsonOf(mapOf("error" to "no_such_program", "program" to programName)),
                     )
                 return@claim runs.execute(programName, program, true, inputs, req)
             }
@@ -679,9 +682,9 @@ class KanbanModule : ForgeModule {
             if (document != null) {
                 val label = req["name"]?.toString()?.takeIf { it.isNotBlank() } ?: "inline"
                 val program = runCatching {
-                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson(label, JsonSupport.stringify(document))
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson(label, jsonOf(document))
                 }.getOrElse { e ->
-                    return@claim JvmKanbanServer.HttpResponse(400, JsonSupport.stringify(mapOf(
+                    return@claim JvmKanbanServer.HttpResponse(400, jsonOf(mapOf(
                         "error" to "bad_document", "detail" to (e.message ?: e.toString()),
                     )))
                 }
@@ -691,19 +694,19 @@ class KanbanModule : ForgeModule {
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
             val runner = ctx.lcncRunners[type]
                 ?: return@claim JvmKanbanServer.HttpResponse(
-                    404, JsonSupport.stringify(mapOf("error" to "no_runner", "type" to type)),
+                    404, jsonOf(mapOf("error" to "no_runner", "type" to type)),
                 )
             val params = (req["params"] as? Map<*, *>)?.entries
                 ?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") } ?: emptyMap()
             val node = LcncNode(id = "http-run", type = type, params = params)
             runCatching { runner.run(node, inputs) }.fold(
                 onSuccess = { out ->
-                    JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(mapOf("ok" to true, "type" to type, "outputs" to out)))
+                    JvmKanbanServer.HttpResponse(200, jsonOf(mapOf("ok" to true, "type" to type, "outputs" to out)))
                 },
                 onFailure = { e ->
                     JvmKanbanServer.HttpResponse(
                         400,
-                        JsonSupport.stringify(mapOf("ok" to false, "type" to type, "error" to (e.message ?: e.toString()))),
+                        jsonOf(mapOf("ok" to false, "type" to type, "error" to (e.message ?: e.toString()))),
                     )
                 },
             )
@@ -725,18 +728,18 @@ class KanbanModule : ForgeModule {
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"caseId_required"}""")
             val runner = ctx.lcncRunners["council.case"]
                 ?: return@claim JvmKanbanServer.HttpResponse(
-                    404, JsonSupport.stringify(mapOf("error" to "no_runner", "type" to "council.case")),
+                    404, jsonOf(mapOf("error" to "no_runner", "type" to "council.case")),
                 )
             val out = runner.run(
                 LcncNode(id = "council-case-get", type = "council.case", params = mapOf("caseId" to caseId)),
                 emptyMap(),
             )
-            JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(out))
+            JvmKanbanServer.HttpResponse(200, jsonOf(out))
         }
 
         ctx.routes.claim(id, "/api/lcnc/kanban/move") { method, _, text, _ ->
             if (method != "POST") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-            val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+            val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
             val jobId = req["itemId"]?.toString() ?: req["jobId"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"jobId_required"}""")
@@ -745,7 +748,7 @@ class KanbanModule : ForgeModule {
             val item = req["item"] as? Map<*, *>
             val revision = req["expectedRevision"] ?: item?.get("revision")
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"expectedRevision_required"}""")
-            // JsonSupport decodes JSON numbers as a numeric value whose
+            // reify decodes JSON numbers as a numeric value whose
             // toString may be `3.0`; the LCNC reducer consumes a long.
             val normalizedRevision = revision.toString().toDoubleOrNull()?.toLong()?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"expectedRevision_invalid"}""")
@@ -760,7 +763,7 @@ class KanbanModule : ForgeModule {
                 ),
             )
             val result = lcncRegistry.getValue("kanban.move").run(node, emptyMap())
-            JvmKanbanServer.HttpResponse(if (result["accepted"] == true) 202 else 409, JsonSupport.stringify(result))
+            JvmKanbanServer.HttpResponse(if (result["accepted"] == true) 202 else 409, jsonOf(result))
         }
 
         return object : ModuleHandle {
@@ -801,7 +804,7 @@ class KanbanModule : ForgeModule {
     private suspend fun invoke(store: BoardStoreElement, text: String): JvmKanbanServer.HttpResponse {
         val body = rawBody(text)
         if (body.isBlank()) return JvmKanbanServer.HttpResponse(400, """{"error":"empty_body"}""")
-        val parsed = runCatching { JsonSupport.parse(body) }.getOrNull()
+        val parsed = runCatching { reify(body) }.getOrNull()
             ?: return JvmKanbanServer.HttpResponse(400, """{"error":"bad_json"}""")
         val commands: List<*> = borg.trikeshed.kanban.InvokeLowering.commandsOf(parsed)
         val results = commands.map { c ->
@@ -827,7 +830,7 @@ class KanbanModule : ForgeModule {
         }
         return JvmKanbanServer.HttpResponse(
             202,
-            JsonSupport.stringify(
+            jsonOf(
                 linkedMapOf(
                     "ok" to results.none { it["verdict"] == "rejected" },
                     "accepted" to results.count { it["verdict"] == "committed" },
@@ -872,7 +875,7 @@ class KanbanModule : ForgeModule {
         }
         return JvmKanbanServer.HttpResponse(
             200,
-            JsonSupport.stringify(
+            jsonOf(
                 linkedMapOf(
                     "ok" to true,
                     "parsed" to bullets.size,

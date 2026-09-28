@@ -1,5 +1,8 @@
 package borg.trikeshed.graal.subvm.harness
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.couch.isam.WalFrame
 import borg.trikeshed.graal.ConfixBlackboard
@@ -29,7 +32,6 @@ import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentNlpStatus
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.DocumentExtent
@@ -56,7 +58,7 @@ object DocumentCurationIndexHarness {
         val provenance = mapOf("path" to "PRELOAD.md", "fileCid" to ContentId.of(fileBytes).value,
             "begin" to begin, "end" to begin + passage.length, "coordinates" to "UTF-16, end exclusive",
             "line" to fileText.substring(0, begin).count { it == '\n' } + 1)
-        println(JsonSupport.stringify(run(CoroutineScope(currentCoroutineContext()), passage, provenance, args[1])))
+        println(jsonOf(run(CoroutineScope(currentCoroutineContext()), passage, provenance, args[1])))
     }
 
     suspend fun run(scope: CoroutineScope, passage: String, provenance: Map<String, Any?>, absentRoot: String): Map<String, Any?> {
@@ -216,7 +218,7 @@ object DocumentCurationIndexHarness {
         var calls = 0
         var realInput: Map<*, *>? = null
         suspend fun invoke(prompt: Prompt): ModelResponse {
-            val input = JsonSupport.parse(prompt.messages[1].content) as Map<*, *>
+            val input = reify(prompt.messages[1].content) as Map<*, *>
             val linguistic = input["linguistics"] as? Map<*, *> ?: error("Model did not receive linguistic index")
             check(linguistic["status"] == "AVAILABLE")
             val sentences = linguistic["sentences"] as? List<*> ?: error("Missing model sentence input")
@@ -235,7 +237,7 @@ object DocumentCurationIndexHarness {
                     "quote" to f.text, "begin" to begin, "end" to begin + f.text.length,
                     "polarity" to f.polarity, "modality" to f.modality))
             } ?: emptyList()
-            return ModelResponse(JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to triplets)),
+            return ModelResponse(jsonOf(mapOf("format" to "TRIPLET_JSON", "triplets" to triplets)),
                 ModelUsage(-1, -1, -1), "fixture", "fixture")
         }
     }

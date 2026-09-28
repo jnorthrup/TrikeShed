@@ -1,5 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+
 import borg.trikeshed.ccek.AgentStatusEvent
 import borg.trikeshed.ccek.ArticulatedNode
 import borg.trikeshed.ccek.CausalAssertion
@@ -16,7 +19,6 @@ import borg.trikeshed.forge.ForgeDoc
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxRouteService
 import borg.trikeshed.lcnc.ccek.CcekReactorBinding
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.userspace.concurrency.ParseScopeKey
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
@@ -572,7 +574,7 @@ object CcekNodes {
     private fun csv(text: String?): List<String> = text.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }
     private fun obj(value: Any?): Map<String, Any?> = when (value) {
         is Map<*, *> -> value.entries.associate { (k, v) -> k.toString() to v }
-        is String -> if (value.isBlank()) emptyMap() else JsonSupport.parseMap(value)
+        is String -> if (value.isBlank()) emptyMap() else reifyMap(value)
         else -> emptyMap()
     }
     private fun rows(value: Any?): List<Map<String, Any?>> = when (value) {
@@ -586,7 +588,7 @@ object CcekNodes {
             }
             list
         }
-        is String -> if (value.isBlank()) emptyList() else rows(JsonSupport.parse(value))
+        is String -> if (value.isBlank()) emptyList() else rows(reify(value))
         else -> emptyList()
     }
     private fun str(row: Map<String, Any?>, key: String): String = row[key]?.toString().orEmpty()
@@ -627,7 +629,7 @@ object CcekNodes {
             require(handle.isNotBlank()) { "ccek.signal ${node.id}: no handle wired" }
             val over: Map<String, Any?> = when (val f = inputs["fields"] ?: inputs["fields?"]) {
                 is Map<*, *> -> f.entries.associate { (k, v) -> k.toString() to v }
-                is String -> if (f.isBlank()) emptyMap() else JsonSupport.parseMap(f)
+                is String -> if (f.isBlank()) emptyMap() else reifyMap(f)
                 else -> emptyMap()
             }
             fun field(name: String): String =
@@ -732,7 +734,7 @@ object CcekNodes {
             val kind = node.params["kind"]?.takeIf { it.isNotBlank() } ?: "observation"
             val fields: Map<String, Any> = when (val f = inputs["fields"] ?: inputs["fields?"]) {
                 is Map<*, *> -> f.entries.mapNotNull { (k, v) -> v?.let { k.toString() to it } }.toMap()
-                is String -> if (f.isBlank()) emptyMap() else JsonSupport.parseMap(f)
+                is String -> if (f.isBlank()) emptyMap() else reifyMap(f)
                     .mapNotNull { (k, v) -> v?.let { k to it } }.toMap()
                 else -> emptyMap()
             }

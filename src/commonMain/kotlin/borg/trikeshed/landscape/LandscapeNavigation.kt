@@ -1,6 +1,7 @@
 package borg.trikeshed.landscape
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
+
 import kotlin.math.exp
 import kotlin.math.hypot
 
@@ -204,7 +205,7 @@ data object LandscapeNavigation {
 
     fun program(name: String): String = "program:" + name
 
-    fun node(program: String, id: String): String = "node:" + JsonSupport.stringify(listOf(program, id))
+    fun node(program: String, id: String): String = "node:" + jsonOf(listOf(program, id))
 
     fun `object`(id: String): String = "object:" + id
 

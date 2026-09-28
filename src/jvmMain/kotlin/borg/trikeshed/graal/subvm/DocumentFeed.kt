@@ -1,5 +1,8 @@
 package borg.trikeshed.graal.subvm
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -17,7 +20,6 @@ import borg.trikeshed.narsese.DocumentCuratorObserver
 import borg.trikeshed.narsese.DocumentSource
 import borg.trikeshed.narsese.DocumentCurationToolset
 import borg.trikeshed.narsese.DocumentModel
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.pointcut.PointcutEvent
 import borg.trikeshed.pointcut.VmFacet
@@ -159,7 +161,7 @@ class DocumentFeed private constructor(
             processor = CamelRuntime.PayloadProcessor { payload ->
                 // This is a synchronous Java Processor callback, not a GraalJS entry.
                 runBlocking(job) {
-                    val envelope = JsonSupport.parse(payload.body) as? Map<*, *>
+                    val envelope = reify(payload.body) as? Map<*, *>
                         ?: error("Document exchange must carry a source reference")
                     val originalCid = ContentId(envelope["originalCid"] as String)
                     val name = envelope["name"] as String
@@ -213,7 +215,7 @@ class DocumentFeed private constructor(
 
     private suspend fun submit(source: DocumentBytes): Receipt {
         check(cas.put(source.bytes) == source.cid)
-        val body = JsonSupport.stringify(mapOf("originalCid" to source.cid.value,
+        val body = jsonOf(mapOf("originalCid" to source.cid.value,
             "name" to source.extent.name, "mediaType" to source.extent.mediaType))
         val reply = withContext(Dispatchers.IO) {
             CamelRuntime.request(routeId, CamelRuntime.Request(body))

@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.dag.KifTee
 import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
@@ -9,7 +12,6 @@ import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lib.toList
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.ontology.SumoCorpus
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 
 /** Controlled fixture through production matching, projection, index and HTTP routing. No daemon state is touched. */
@@ -38,8 +40,8 @@ object ReteConnectionsProof {
             val response = server.routeHttp("GET /api/rete/connections HTTP/1.1\r\nHost: proof\r\n\r\n".encodeToByteArray())
             check(response.status == 200) { response.body }
             @Suppress("UNCHECKED_CAST")
-            val data = JsonSupport.parse(response.body) as Map<String, Any?>
-            println(JsonSupport.stringify(data + ("capture" to linkedMapOf(
+            val data = reify(response.body) as Map<String, Any?>
+            println(jsonOf(data + ("capture" to linkedMapOf(
                 "kind" to "isolated-proof", "description" to "Synthetic submitted-job fact; real job-dependency production and pinned SUMO corpus. No job command was executed.",
                 "corpusCid" to ContentId.of(corpus.encodeToByteArray()).value,
             ))))

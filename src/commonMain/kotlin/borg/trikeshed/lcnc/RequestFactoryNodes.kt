@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+
 import borg.trikeshed.relaxfactory.RelaxOp
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 
@@ -39,7 +41,7 @@ object RequestFactoryNodes {
     private fun jsonObject(raw: Any?): Map<String, Any?> = when (raw) {
         null -> emptyMap()
         is Map<*, *> -> raw.entries.associate { (k, v) -> k.toString() to v }
-        is String -> if (raw.isBlank()) emptyMap() else JsonSupport.parseMap(raw)
+        is String -> if (raw.isBlank()) emptyMap() else reifyMap(raw)
         else -> emptyMap()
     }
 
@@ -47,7 +49,7 @@ object RequestFactoryNodes {
         null -> emptyList()
         is Map<*, *> -> listOf(raw.entries.associate { (k, v) -> k.toString() to v })
         is List<*> -> raw.mapNotNull(::operationMap)
-        is String -> if (raw.isBlank()) emptyList() else when (val parsed = JsonSupport.parse(raw)) {
+        is String -> if (raw.isBlank()) emptyList() else when (val parsed = reify(raw)) {
             is Map<*, *> -> listOf(parsed.entries.associate { (k, v) -> k.toString() to v })
             is List<*> -> parsed.mapNotNull(::operationMap)
             else -> emptyList()

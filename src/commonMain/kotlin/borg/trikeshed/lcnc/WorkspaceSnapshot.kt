@@ -1,8 +1,9 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
 
+import borg.trikeshed.job.ContentId
 /**
  * THE WORKSPACE SNAPSHOT (Forge genesis, Cut C; the post's bullet 2, "snapshots or VCS
  * integration"): one content-addressed document that names, at one instant, every
@@ -31,7 +32,7 @@ data class WorkspaceSnapshot(
      * The canonical form: sorted keys, and every integral number written as an integer, so a
      * document parsed back (the parser reifies numbers as doubles) re-mints the same cid.
      */
-    fun canonicalJson(): String = JsonSupport.stringify(
+    fun canonicalJson(): String = jsonOf(
         normalize(
             linkedMapOf<String, Any?>(
                 "kind" to KIND,
@@ -104,7 +105,7 @@ data class WorkspaceSnapshot(
         }
 
         fun fromJson(text: String): WorkspaceSnapshot? {
-            val m = JsonSupport.parse(text) as? Map<*, *> ?: return null
+            val m = reify(text) as? Map<*, *> ?: return null
             if (m["kind"] != KIND) return null
             @Suppress("UNCHECKED_CAST")
             fun strMap(v: Any?): Map<String, String> = (v as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()

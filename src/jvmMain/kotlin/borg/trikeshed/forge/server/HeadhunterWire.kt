@@ -1,5 +1,10 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.graal.subvm.GuestModules
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lcnc.*
@@ -8,7 +13,6 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
@@ -167,7 +171,7 @@ class HeadhunterWire private constructor(
                     json(deleted)
                 } else if (method == "POST") {
                     require(text.length <= 4 * 1024 * 1024) { "Request exceeds the 4 MiB request limit; upload files up to 2 MiB" }
-                    val input = objectOf(JsonSupport.parseStrict(text.substringAfter("\r\n\r\n", text)), "request")
+                    val input = objectOf(reifyStrict(text.substringAfter("\r\n\r\n", text)), "request")
                     when (target) {
                         "/api/headhunter/record" -> json(save(input))
                         "/api/headhunter/curation" -> json(curation.run(required(input, "planCid")) + ("curation" to curationPlan()))
@@ -275,10 +279,10 @@ class HeadhunterWire private constructor(
             source["originalCid"] = ctx.casStore.put(bytes).value
         }
         val route = ctx.routes.match("/api/lcnc/run") ?: error("LCNC execution is unavailable")
-        val response = route.route("POST", "/api/lcnc/run", JsonSupport.stringify(mapOf(
+        val response = route.route("POST", "/api/lcnc/run", jsonOf(mapOf(
             "program" to INTAKE_PROGRAM, "inputs" to mapOf("source" to source), "timeoutMs" to 120_000)), null)
             ?: error("LCNC returned no intake run")
-        val run = JsonSupport.parseMap(response.body)
+        val run = reifyMap(response.body)
         check(response.status == 200 && run["error"] == null) { run["error"]?.toString() ?: "Source intake failed" }
         val returned = objectOf(run["returns"], "intake results")
         val reference = returned["record"] as? Map<*, *>
@@ -289,7 +293,7 @@ class HeadhunterWire private constructor(
     private suspend fun programView(): Map<String, Any?> {
         val saved = panels.route("GET", "/api/panels/${HeadhunterWorkflow.PROGRAM}", "", null)
         val document = if (saved?.status == 200) saved.body else LcncProgramConfix.toJson(HeadhunterWorkflow.program())
-        return mapOf("name" to HeadhunterWorkflow.PROGRAM, "document" to JsonSupport.parse(document), "saved" to (saved?.status == 200))
+        return mapOf("name" to HeadhunterWorkflow.PROGRAM, "document" to reify(document), "saved" to (saved?.status == 200))
     }
 
     private suspend fun ensureProgram() = programLock.withLock {
@@ -305,9 +309,9 @@ class HeadhunterWire private constructor(
         val request = mapOf("program" to HeadhunterWorkflow.PROGRAM,
             "inputs" to mapOf("request" to pinned), "timeoutMs" to 120000)
         val runner = ctx.routes.match("/api/lcnc/run") ?: error("LCNC execution is unavailable")
-        val result = runner.route("POST", "/api/lcnc/run", JsonSupport.stringify(request), null)
+        val result = runner.route("POST", "/api/lcnc/run", jsonOf(request), null)
             ?: error("LCNC returned no run result")
-        val run = JsonSupport.parseMap(result.body)
+        val run = reifyMap(result.body)
         val returns = run["returns"] as? Map<*, *>
         return json(mapOf("run" to run, "artifacts" to (returns?.get("artifacts") ?: emptyList<Any?>()),
             "collisions" to (returns?.get("collisions") ?: emptyList<Any?>()), "error" to run["error"]), result.status)
@@ -341,6 +345,6 @@ class HeadhunterWire private constructor(
     private fun required(fields: Map<String, *>, key: String) = fields[key]?.toString()?.takeIf { it.isNotBlank() }
         ?: throw IllegalArgumentException("$key is required")
     private fun escape(value: String) = value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;")
-    private fun json(value: Map<String, Any?>, status: Int = 200) = WireHttpResponse(status, JsonSupport.stringify(value),
+    private fun json(value: Map<String, Any?>, status: Int = 200) = WireHttpResponse(status, jsonOf(value),
         headers = mapOf("Cache-Control" to "no-store"))
 }

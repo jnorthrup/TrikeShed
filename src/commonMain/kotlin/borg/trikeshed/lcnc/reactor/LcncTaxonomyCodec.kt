@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc.reactor
 
+import borg.trikeshed.parse.reifyStrict
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.isam.LcncBlock
 import borg.trikeshed.lcnc.isam.LcncDatabase
@@ -9,8 +11,6 @@ import borg.trikeshed.lcnc.isam.LcncWorkspace
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * Materializes interchange documents into the one LCNC taxonomy.
  *
@@ -23,10 +23,10 @@ import borg.trikeshed.parse.json.JsonSupport
  */
 object LcncTaxonomyCodec {
 
-    fun json(text: String): Series<LcncEntity> = decodeJson(JsonSupport.parseStrict(text), "json", text)
+    fun json(text: String): Series<LcncEntity> = decodeJson(reifyStrict(text), "json", text)
 
     /** LCNC_NATIVE is the same taxonomy shape with optional entity wrappers. */
-    fun native(text: String): Series<LcncEntity> = decodeJson(JsonSupport.parseStrict(text), "native", text)
+    fun native(text: String): Series<LcncEntity> = decodeJson(reifyStrict(text), "native", text)
 
     fun html(text: String): Series<LcncEntity> {
         val pageId = generated("html", "$", text)

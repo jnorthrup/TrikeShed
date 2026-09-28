@@ -227,15 +227,18 @@ class Constellation(val name: String) {
         require(b < 4096) { "constellation '$name' is full" }
         books.add(book)
         val mine = IntAccumulator(book.statements.size)
+        // New ids gather per join and fold into the class, premise and unless sets once, not one OR per statement.
+        val newBearing = HashMap<Int, IntAccumulator>(); val newPremised = HashMap<String, IntAccumulator>()
+        val newUnconditioned = IntAccumulator(); val newUnless = IntAccumulator()
         for ((i, s) in book.statements.withIndex()) {
             val id = ids.getOrPut(s.key) {
                 statements.add(s); support.add(RoaringSeries.EMPTY)
                 byProposition.getOrPut(s.proposition) { ArrayList() }.add(statements.size - 1)
-                val one = RoaringSeries.of(listOf(statements.size - 1))
-                if (s.bearerClass >= 0) bearing[s.bearerClass] = (bearing[s.bearerClass] ?: RoaringSeries.EMPTY) or one
-                s.premise?.let { p -> premised[p] = (premised[p] ?: RoaringSeries.EMPTY) or one } ?: run { unconditioned = unconditioned or one }
-                if (s.unless) unless = unless or one
-                statements.size - 1
+                val one = statements.size - 1
+                if (s.bearerClass >= 0) newBearing.getOrPut(s.bearerClass) { IntAccumulator(4) }.add(one)
+                s.premise?.let { p -> newPremised.getOrPut(p) { IntAccumulator(4) }.add(one) } ?: newUnconditioned.add(one)
+                if (s.unless) newUnless.add(one)
+                one
             }
             val sections = book.support[i].map { (b shl 20) or it }
             support[id] = support[id] or RoaringSeries.of(sections)
@@ -250,6 +253,10 @@ class Constellation(val name: String) {
             }
         }
         statementsOf.add(mine.toRoaring())
+        for ((k, a) in newBearing) bearing[k] = (bearing[k] ?: RoaringSeries.EMPTY) or a.toRoaring()
+        for ((p, a) in newPremised) premised[p] = (premised[p] ?: RoaringSeries.EMPTY) or a.toRoaring()
+        unconditioned = unconditioned or newUnconditioned.toRoaring()
+        unless = unless or newUnless.toRoaring()
         facts.addAll(book.facts)
         return b
     }

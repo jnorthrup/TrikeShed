@@ -135,6 +135,15 @@ class CouchCommitStore(
 
     private fun append(event: Map<String, Any?>) {
         check(count < Int.MAX_VALUE) { "Couch commit history exceeds replay capacity" }
+        // The home was removed under this writer: its history is gone from the CAS. Linking onto it would
+        // publish a HEAD whose chain cannot be read back. Stop instead; the next open starts clean.
+        head?.let { prior ->
+            if (cas.get(prior) == null) {
+                val lost = IllegalStateException("Couch home lost its history ($prior missing): directory removed under a running writer")
+                failure = lost
+                throw lost
+            }
+        }
         val next = count + 1
         val cid = putVerified(CanonicalCbor.encodeMap(event + mapOf(
             "format" to EVENT_FORMAT, "index" to next, "previous" to head?.value,
@@ -147,6 +156,7 @@ class CouchCommitStore(
     private fun publishRoot(cid: ContentId?, size: Long) {
         val bytes = CanonicalCbor.encodeMap(mapOf("format" to ROOT_FORMAT, "head" to cid?.value, "count" to size))
         try {
+            cas.sync()
             requireNotNull(fileOps).writeAtomically(requireNotNull(rootPath), bytes)
             check(fileOps.readAllBytes(rootPath).contentEquals(bytes)) { "Couch root publication did not retain its bytes" }
         } catch (cause: Throwable) {
@@ -164,14 +174,21 @@ class CouchCommitStore(
         require((cursor == null) == (size == 0L)) { "Couch root does not identify its history" }
         val events = mutableListOf<Map<String, Any?>>()
         var remaining = size
+        var truncated = false
         while (remaining > 0) {
-            val event = decode(readVerified(requireNotNull(cursor)))
+            // A home removed under a live writer leaves a HEAD whose older links are gone. Every frame and
+            // local event carries its whole body, so the readable newest events are a consistent store.
+            val bytes = cas.get(requireNotNull(cursor))
+            if (bytes == null) { truncated = true; break }
+            require(ContentId.of(bytes) == cursor) { "Corrupt Couch object $cursor" }
+            val event = decode(bytes)
             require(event["format"] == EVENT_FORMAT && integer(event, "index") == remaining) { "Invalid Couch history order" }
             events.add(event)
             cursor = nullableCid(event, "previous")
             remaining--
         }
-        require(cursor == null) { "Couch history exceeds its declared root" }
+        if (truncated) println("[COUCH] history truncated below index ${remaining + 1}: ${events.size} of $size events readable from ${nullableCid(root, "head")}")
+        else require(cursor == null) { "Couch history exceeds its declared root" }
         val frames = mutableListOf<CouchCommittedFrame>()
         for (event in events.asReversed()) {
             when (event["kind"]) {
@@ -195,7 +212,7 @@ class CouchCommitStore(
                 "local-put" -> {
                     require(event.keys == LOCAL_PUT_KEYS) { "Invalid local document schema" }
                     val sequence = integer(event, "sequence")
-                    require(localSequence < Long.MAX_VALUE && sequence == localSequence + 1) { "Invalid local revision sequence" }
+                    require(localSequence < Long.MAX_VALUE && (sequence == localSequence + 1 || truncated && sequence > localSequence)) { "Invalid local revision sequence" }
                     val id = string(event, "id")
                     val body = readVerified(requireNotNull(nullableCid(event, "body")))
                     val local = decode(body)
@@ -205,14 +222,20 @@ class CouchCommitStore(
                 }
                 "local-delete" -> {
                     require(event.keys == LOCAL_DELETE_KEYS) { "Invalid local deletion schema" }
-                    require(locals.remove(string(event, "id")) != null) { "Local deletion has no preceding document" }
+                    require(locals.remove(string(event, "id")) != null || truncated) { "Local deletion has no preceding document" }
                 }
                 else -> error("Unsupported Couch event")
             }
         }
         recovered = frames
-        head = nullableCid(root, "head")
-        count = size
+        if (truncated && events.isEmpty()) {
+            // Nothing of the history is readable: the home was removed and HEAD names a head that is gone.
+            // The store is empty; the next commit publishes a HEAD that starts a readable chain again.
+            head = null; count = 0
+        } else {
+            head = nullableCid(root, "head")
+            count = size
+        }
     }
 
     private fun capture(frame: CouchCommittedFrame): CouchCommittedFrame {
@@ -232,11 +255,20 @@ class CouchCommitStore(
         return frame.copy(doc = doc)
     }
 
+    /**
+     * An attachment's content must be named by the CAS; its bytes are not read back. A named source
+     * edited since stands until the next reconcile supersedes it. Only a file tree is opened, for its extents.
+     */
     private fun validateReferences(doc: Document) {
         val fields = doc.fields.associate { it.name to it.value }
         val reference = fields["contentId"] as? String ?: return
         if (!reference.startsWith("sha256:")) return
-        val bytes = readVerified(ContentId(reference))
+        val cid = ContentId(reference)
+        if (fields["contentType"] != FileTreeManifest.CONTENT_TYPE) {
+            require(cas.holds(cid)) { "Missing Couch object $cid" }
+            return
+        }
+        val bytes = readVerified(cid)
         fields["length"]?.let { length ->
             val size = when (length) {
                 is Number -> exactInteger(length)
@@ -245,11 +277,9 @@ class CouchCommitStore(
             }
             require(size == bytes.size.toLong()) { "Attachment length mismatch" }
         }
-        if (fields["contentType"] == FileTreeManifest.CONTENT_TYPE) {
-            val tree = FileTreeManifest.decode(bytes)
-            for ((_, extent) in tree.entries.view) if (extent != null) {
-                require(readVerified(extent.a).size.toLong() == extent.b) { "File-tree extent length mismatch" }
-            }
+        val tree = FileTreeManifest.decode(bytes)
+        for ((_, extent) in tree.entries.view) if (extent != null) {
+            require(cas.holds(extent.a)) { "Missing Couch object ${extent.a}" }
         }
     }
 

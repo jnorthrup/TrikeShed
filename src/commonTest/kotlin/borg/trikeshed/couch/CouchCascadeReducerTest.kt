@@ -1,10 +1,11 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.relaxfactory.RelaxTransport
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import borg.trikeshed.relaxfactory.ViewQuery
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.viewserver.CouchDbCascadeTool
 import borg.trikeshed.viewserver.ViewValue
 import kotlinx.coroutines.test.runTest
@@ -207,7 +208,7 @@ class CouchCascadeReducerTest {
         val route = router.handle("GET", "/trikeshed/_design/cascade/_view/byMachine?group=true", ByteArray(0))!!
         assertEquals(200, route.status)
         @Suppress("UNCHECKED_CAST")
-        val routeJson = JsonSupport.parse(route.bytes.decodeToString()) as Map<String, Any?>
+        val routeJson = reify(route.bytes) as Map<String, Any?>
         val routeRows = Couch.asList(routeJson["rows"])!!.map { it as Map<*, *> }
         assertEquals(1, routeRows.size)
         @Suppress("UNCHECKED_CAST")

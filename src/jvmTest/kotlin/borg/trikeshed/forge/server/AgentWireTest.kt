@@ -1,11 +1,12 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lcnc.AgentCliInfo
 import borg.trikeshed.lcnc.AgentNodes
 import borg.trikeshed.lcnc.AgentRunResult
 import borg.trikeshed.lcnc.InMemoryAgentRuns
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +16,7 @@ import kotlin.test.assertNull
 class AgentWireTest {
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(body: String) = JsonSupport.parse(body) as Map<String, Any?>
+    private fun json(body: String) = reify(body) as Map<String, Any?>
 
     @Test
     fun rosterAndRunsAreServedNewestFirstAndFiltered(): Unit = runBlocking {

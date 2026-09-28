@@ -195,7 +195,7 @@ class KifKnowledgeBase {
 
     private fun assertsLocked(): List<KifExpr> =
         snapshot ?: ArrayList<KifExpr>(held.count).also { out ->
-            for (entry in held.entriesInOrder().view) out.add(entry.b)
+            held.forEachInOrder { _, expr -> out.add(expr) }
             snapshot = out
         }
     /** Distinct assertions currently held. */
@@ -301,20 +301,43 @@ class KifKnowledgeBase {
         return a to b
     }
 
+    /** Atoms and list widths agree wherever [p] is not a variable: the allocation-free refusal. */
+    private fun shapes(p: KifExpr, f: KifExpr): Boolean = when (p) {
+        is KifExpr.Var -> true
+        is KifExpr.Atom -> f is KifExpr.Atom && p.token == f.token
+        is KifExpr.ListExpr -> {
+            if (f !is KifExpr.ListExpr || p.elements.size != f.elements.size) false
+            else { var i = 0; while (i < p.elements.size && shapes(p.elements[i], f.elements[i])) i++; i == p.elements.size }
+        }
+        else -> false
+    }
+
+    /**
+     * Binds [pattern]'s variables against [fact]. Index walks, no zip/iterator; a fact [shapes] refuses
+     * costs no allocation, and the binding map is made on the first bind.
+     */
     private fun unify(pattern: KifExpr, fact: KifExpr): Map<String, String>? {
-        val map = mutableMapOf<String, String>()
+        if (!shapes(pattern, fact)) return null
+        var map: HashMap<String, String>? = null
         fun go(p: KifExpr, f: KifExpr): Boolean = when {
             p is KifExpr.Var -> {
                 val v = p.name
                 val fv = when (f) { is KifExpr.Atom -> f.token; is KifExpr.Var -> f.name; else -> f.toKifString() }
-                val prev = map[v]
-                if (prev != null) prev == fv else { map[v] = fv; true }
+                val bound = map ?: HashMap<String, String>(4).also { map = it }
+                val prev = bound[v]
+                if (prev != null) prev == fv else { bound[v] = fv; true }
             }
             p is KifExpr.Atom && f is KifExpr.Atom -> p.token == f.token
-            p is KifExpr.ListExpr && f is KifExpr.ListExpr -> p.elements.size == f.elements.size && p.elements.zip(f.elements).all { (a, b) -> go(a, b) }
+            p is KifExpr.ListExpr && f is KifExpr.ListExpr -> {
+                val pe = p.elements; val fe = f.elements
+                var ok = pe.size == fe.size
+                var i = 0
+                while (ok && i < pe.size) { ok = go(pe[i], fe[i]); i++ }
+                ok
+            }
             else -> false
         }
-        return if (go(pattern, fact)) map else null
+        return if (go(pattern, fact)) map ?: emptyMap() else null
     }
 
     fun sparqlSelectSparqlLike(pattern: String): String {

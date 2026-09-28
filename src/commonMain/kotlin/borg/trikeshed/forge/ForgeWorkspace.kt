@@ -2,6 +2,9 @@
 
 package borg.trikeshed.forge
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.board.ForgeBoard
 import borg.trikeshed.forge.board.ForgeBoardCard
 import borg.trikeshed.forge.board.ForgeBoardColumn
@@ -12,7 +15,6 @@ import borg.trikeshed.forge.graph.ForgeGraphMode
 import borg.trikeshed.forge.sheet.Workbook
 import borg.trikeshed.forge.sheet.WorkbookSheet
 import borg.trikeshed.forge.sheet.normalizeWorkbook
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.datetime.Clock
 import kotlin.random.Random
 
@@ -37,7 +39,7 @@ enum class ForgeView(val id: String) {
     }
 }
 
-/** JSON value coercion — JsonSupport reifies numbers as Double and may hand back Array for empty lists. */
+/** JSON value coercion — reify reifies numbers as Double and may hand back Array for empty lists. */
 fun Any?.asStr(fallback: String = ""): String = (this as? String) ?: fallback
 fun Any?.asStrOrNull(): String? = this as? String
 fun Any?.asInt(fallback: Int = 0): Int =
@@ -100,7 +102,7 @@ class ForgeWorkspace(
         "graphMode" to graphMode?.id,
     )
 
-    fun toJson(): String = JsonSupport.stringify(toMap())
+    fun toJson(): String = jsonOf(toMap())
 }
 
 /** localStorage keys — the persisted lanes of the retired script. */
@@ -227,14 +229,14 @@ fun normalizeForgeWorkspace(loaded: Map<String, Any?>): ForgeWorkspace {
  * anything else falls back to the seed-derived default. Board-card overlay is the caller's second lane.
  */
 fun forgeWorkspaceFromJson(raw: String?, seed: Map<String, Any?>): ForgeWorkspace {
-    val parsed = raw?.let { runCatching { JsonSupport.parse(it) }.getOrNull() } as? Map<String, Any?>
+    val parsed = raw?.let { runCatching { reify(it) }.getOrNull() } as? Map<String, Any?>
     return if (parsed != null && parsed["pages"].asList().isNotEmpty()) normalizeForgeWorkspace(parsed)
     else normalizeForgeWorkspace(defaultForgeWorkspace(seed).toMap())
 }
 
 /** The board-cards overlay persisted under its own key (`forge:seed:board`). */
 fun ForgeWorkspace.overlayBoardCards(raw: String?) {
-    val parsed = raw?.let { runCatching { JsonSupport.parse(it) }.getOrNull() } as? Map<String, Any?> ?: return
+    val parsed = raw?.let { runCatching { reify(it) }.getOrNull() } as? Map<String, Any?> ?: return
     val cards = parsed["cards"]?.asMaps() ?: return
     board.cards.clear()
     board.cards.addAll(cards.map { ForgeBoardCard.fromMap(it) })

@@ -47,7 +47,7 @@ class PlaneFactsTest {
         val a = linkedMapOf<String, Any?>("kind" to "x", "key" to "k", "shape" to linkedMapOf("z" to 1, "a" to 2), "n" to 3)
         val b = linkedMapOf<String, Any?>("n" to 3, "shape" to linkedMapOf("a" to 2, "z" to 1), "key" to "k", "kind" to "x")
         assertEquals(PlaneFacts.versionOf(a), PlaneFacts.versionOf(b))
-        // JsonSupport.stringify joins with ", " — deterministic, which is all canonical needs
+        // jsonOf joins with ", " — deterministic, which is all canonical needs
         assertEquals("""{"key":"k", "kind":"x", "n":3, "shape":{"a":2, "z":1}}""", PlaneFacts.canonicalJson(a))
         assertEquals(PlaneFacts.canonicalJson(a), PlaneFacts.canonicalJson(b))
 

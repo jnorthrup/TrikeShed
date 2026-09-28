@@ -1,5 +1,7 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -20,8 +22,7 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,7 +119,7 @@ class RunHeadRouteTest {
             (inputs?.let { "&inputs=" + enc(it) } ?: "") + (show?.let { "&show=" + enc(it) } ?: ""))
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
+    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = reify(resp.body) as Map<String, Any?>
 
     // ── the refusals ────────────────────────────────────────────────────────
 
@@ -295,7 +296,7 @@ class RunHeadRouteTest {
             assertNull(ValueBudget().violation(body), "the daemon's own bytes must pass its own preflight")
 
             // And the page's reader gets a Stale frame with exactly one Rebuild to press.
-            val state = RunBlock.state(JsonSupport.parse(answer.body))!!
+            val state = RunBlock.state(reify(answer.body))!!
             assertEquals(LcncRunHead.Lamp.STALE, state.lamp, state.reason)
             assertFalse(state.refused, state.reason)
             val spec = RunBlock.parse(0, """{"program":"echo","inputs":{"text":"hi","n":3},"show":"b"}""") as RunBlock.Spec
@@ -341,7 +342,7 @@ class RunHeadRouteTest {
             // And the bytes the daemon actually writes, read by the page's own reader: a failed
             // target keeps its Build button. Without it a run that broke — or one a restart stamped
             // `interrupted` — would be unbuildable from the page forever.
-            val state = RunBlock.state(JsonSupport.parse(head(rig, show = "b").body))!!
+            val state = RunBlock.state(reify(head(rig, show = "b").body))!!
             assertEquals(LcncRunHead.Lamp.FAILED, state.lamp, verdict.toString())
             assertFalse(state.refused, state.reason)
             val spec = RunBlock.parse(0, """{"program":"echo","inputs":{"text":"hi","n":3},"show":"b"}""") as RunBlock.Spec

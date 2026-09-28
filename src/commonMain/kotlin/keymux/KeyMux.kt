@@ -1,5 +1,8 @@
 package keymux
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
@@ -81,10 +84,10 @@ class PersistSource(
     val explicitFileOps: FileOperations? = null,
     private val codec: (ByteArray) -> Map<String, String> = { bytes ->
         val text = bytes.decodeToString()
-        (borg.trikeshed.parse.json.JsonSupport.parse(text) as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
+        (reify(text) as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
     },
     private val encode: (Map<String, String>) -> ByteArray = { m ->
-        borg.trikeshed.parse.json.JsonSupport.stringify(m).encodeToByteArray()
+        jsonOf(m).encodeToByteArray()
     }
 ) : KeySource() {
     override val name = "persist"

@@ -1,8 +1,10 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.ForgeApp
 import borg.trikeshed.kanban.ForgeKanbanIngest
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.datetime.Clock
 
 /**
@@ -107,7 +109,7 @@ object ForgeRoutes {
     fun boardJson(): HttpForwarderResponse {
         val json = runCatching {
             val reduction = ForgeKanbanIngest.loadProjection("jim")
-            JsonSupport.stringify(linkedMapOf(
+            jsonOf(linkedMapOf(
                 "title" to reduction.source.title,
                 "userId" to reduction.source.userId,
                 "items" to reduction.board.cards.sortedBy { it.order }.map { card ->
@@ -116,7 +118,7 @@ object ForgeRoutes {
                 "correlations" to reduction.correlations.size,
             ))
         }.getOrElse {
-            JsonSupport.stringify(linkedMapOf(
+            jsonOf(linkedMapOf(
                 "title" to "Board (degraded)",
                 "userId" to "jim",
                 "items" to emptyList<Any?>(),
@@ -136,7 +138,7 @@ object ForgeRoutes {
     fun invokeJson(payload: String): HttpForwarderResponse {
         val raw = payload.substringAfter("\r\n\r\n", "").ifEmpty { payload.substringAfter("\n\n", "") }
         if (raw.isBlank()) return HttpForwarderResponse(400, body = """{"error":"empty_body"}""".encodeToByteArray())
-        val parsed = runCatching { JsonSupport.parse(raw) }.getOrNull()
+        val parsed = runCatching { reify(raw) }.getOrNull()
             ?: return HttpForwarderResponse(400, body = """{"error":"bad_json"}""".encodeToByteArray())
         val commands: List<*> = when (parsed) {
             is Map<*, *> -> (parsed["commands"] as? List<*>) ?: listOf(parsed)
@@ -145,7 +147,7 @@ object ForgeRoutes {
         }
         // sequence is ephemeral in commonMain; jvm side increments atomically. Here we just echo size.
         val keys = commands.mapNotNull { (it as? Map<*, *>)?.get("idempotencyKey") as? String }
-        val json = JsonSupport.stringify(linkedMapOf("ok" to true, "accepted" to commands.size, "idempotencyKeys" to keys))
+        val json = jsonOf(linkedMapOf("ok" to true, "accepted" to commands.size, "idempotencyKeys" to keys))
         return HttpForwarderResponse(202, body = json.encodeToByteArray())
     }
 

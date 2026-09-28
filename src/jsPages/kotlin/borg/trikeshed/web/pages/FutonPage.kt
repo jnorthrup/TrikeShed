@@ -1,17 +1,21 @@
 package borg.trikeshed.web.pages
 
+import borg.trikeshed.couch.FutonPaths
 import kotlinx.browser.document
 import kotlinx.browser.window
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLOptionElement
+import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.HTMLTableElement
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.dom.events.Event
 
-/** Futon: the CouchDB-1.x style document browser over `/trikeshed`. */
+/** Futon: the CouchDB-1.x style document browser over every database `/_all_dbs` names. */
 object FutonPage {
-    private const val DB = "trikeshed"
+    /** The selected database; every request below addresses it. */
+    private var DB = "trikeshed"
     private const val LIMIT = 100
     private var pageStack: MutableList<String?> = mutableListOf(null)
     private var currentRev: String? = null
@@ -31,7 +35,7 @@ object FutonPage {
 
     private suspend fun refreshInfo() {
         try {
-            val i: dynamic = fetchResponse("/$DB").jsonValue()
+            val i: dynamic = fetchResponse(FutonPaths.db(DB)).jsonValue()
             byId("info").textContent = (i.doc_count.toLocaleString() as String) + " docs · seq " + str(i.update_seq)
         } catch (_: Throwable) {
         }
@@ -39,7 +43,7 @@ object FutonPage {
 
     private suspend fun loadPage(startkey: String?) {
         val p = input("prefix").value
-        var url = "/$DB/_all_docs?limit=" + (LIMIT + 1)
+        var url = FutonPaths.db(DB) + "/_all_docs?limit=" + (LIMIT + 1)
         val sk = startkey ?: p.ifEmpty { null }
         if (!sk.isNullOrEmpty()) url += "&startkey=" + encodeUri("\"" + sk + "\"")
         if (p.isNotEmpty()) url += "&endkey=" + encodeUri("\"" + p + "\uFFF0\"")
@@ -85,7 +89,7 @@ object FutonPage {
         byId("att").innerHTML = ""
         currentRev = null
         try {
-            val r = fetchResponse("/$DB/" + enc(id))
+            val r = fetchResponse(FutonPaths.db(DB) + "/" + enc(id))
             if (!r.ok) { status("load failed: " + r.status, "err"); return }
             val d: dynamic = r.jsonValue()
             currentRev = if (d._rev == null) null else str(d._rev)
@@ -96,7 +100,7 @@ object FutonPage {
             if (truthy(d._attachments) && truthy(d._attachments.content)) {
                 val a: dynamic = d._attachments.content
                 val length: dynamic = if (truthy(a.length)) a.length else 0
-                byId("att").innerHTML = "attachment: <a href=\"/$DB/" + enc(id) + "/content\" target=\"_blank\">content</a> · " +
+                byId("att").innerHTML = "attachment: <a href=\"" + FutonPaths.db(DB) + "/" + enc(id) + "/content\" target=\"_blank\">content</a> · " +
                     (if (truthy(a.content_type)) str(a.content_type) else "") + " · " + (length.toLocaleString() as String) +
                     " bytes · <span style=\"font-family:monospace\">" + (if (truthy(a.digest)) str(a.digest) else "").take(22) + "…</span>"
             }
@@ -120,7 +124,7 @@ object FutonPage {
         js("Reflect").deleteProperty(b, "_id")
         if (currentRev != null && !truthy(b._rev)) b._rev = currentRev
         try {
-            val r = fetchResponse("/$DB/" + enc(id), requestInit("PUT", jsonHeaders(), JSON.stringify(b)))
+            val r = fetchResponse(FutonPaths.db(DB) + "/" + enc(id), requestInit("PUT", jsonHeaders(), JSON.stringify(b)))
             val d: dynamic = r.jsonValue()
             if (truthy(d.ok)) {
                 currentRev = str(d.rev)
@@ -138,7 +142,7 @@ object FutonPage {
         if (id.isEmpty() || rev == null) { status("load the doc first (need its _rev)", "err"); return }
         if (!window.confirm("delete $id ?")) return
         try {
-            val r = fetchResponse("/$DB/" + enc(id) + "?rev=" + encodeUri(rev), requestInit("DELETE"))
+            val r = fetchResponse(FutonPaths.db(DB) + "/" + enc(id) + "?rev=" + encodeUri(rev), requestInit("DELETE"))
             val d: dynamic = r.jsonValue()
             if (truthy(d.ok)) {
                 status("deleted", "ok")
@@ -159,6 +163,90 @@ object FutonPage {
         status("new document — set an _id and save")
     }
 
+    private fun select(id: String) = byId(id) as HTMLSelectElement
+
+    private fun option(sel: HTMLSelectElement, value: String, label: String = value) {
+        val o = document.createElement("option") as HTMLOptionElement
+        o.value = value
+        o.textContent = label
+        sel.appendChild(o)
+    }
+
+    /** Fill the database selector from `/_all_dbs`; the `?db=` query picks the initial one. */
+    private suspend fun loadDbs() {
+        val want = js("new URLSearchParams(window.location.search)").get("db") as String?
+        val names = try { jsArray(fetchResponse(FutonPaths.ALL_DBS).jsonValue()).map { str(it) } } catch (_: Throwable) { listOf(DB) }
+        val sel = select("db")
+        sel.innerHTML = ""
+        for (n in names.ifEmpty { listOf(DB) }) option(sel, n)
+        DB = if (want != null && want in names) want else if (DB in names) DB else names.firstOrNull() ?: DB
+        sel.value = DB
+    }
+
+    private fun selectDb(name: String) {
+        DB = name
+        input("docid").value = ""
+        body().value = ""
+        currentRev = null
+        byId("att").innerHTML = ""
+        byId("viewrows").innerHTML = ""
+        status("database $name")
+        firstPage()
+        launchPage { loadViews() }
+    }
+
+    /** The views panel: every `_design/` doc of the selected db, one option per named view. */
+    private suspend fun loadViews() {
+        val sel = select("viewsel")
+        sel.innerHTML = ""
+        val d: dynamic = try { fetchResponse(FutonPaths.designDocs(DB)).jsonValue() } catch (_: Throwable) { null }
+        val rows = if (d != null && truthy(d.rows)) jsArray(d.rows) else emptyArray()
+        var count = 0
+        for (r in rows) {
+            val doc: dynamic = r.doc
+            if (!truthy(doc)) continue
+            var views: dynamic = doc.views
+            if (isString(views)) views = try { JSON.parse<dynamic>(str(views)) } catch (_: Throwable) { null }
+            if (!truthy(views)) continue
+            val lang = if (truthy(doc.language)) str(doc.language) else "javascript"
+            for (v in js("Object.keys")(views).unsafeCast<Array<String>>()) {
+                option(sel, str(r.id) + "\u0000" + v, str(r.id).removePrefix("_design/") + " / " + v + " · " + lang)
+                count++
+            }
+        }
+        if (count == 0) option(sel, "", "no views in $DB")
+        byId("viewinfo").textContent = "$count view" + (if (count == 1) "" else "s")
+    }
+
+    private suspend fun runView() {
+        val choice = select("viewsel").value
+        if (choice.isEmpty()) return
+        val ddoc = choice.substringBefore('\u0000')
+        val view = choice.substringAfter('\u0000')
+        val t = byId("viewrows") as HTMLTableElement
+        t.innerHTML = "<tr><th>key</th><th>value</th><th>id</th></tr>"
+        val started = window.performance.now()
+        try {
+            val r = fetchResponse(FutonPaths.view(DB, ddoc, view, input("viewq").value))
+            val d: dynamic = r.jsonValue()
+            if (!r.ok) { byId("viewinfo").textContent = "view " + r.status + ": " + (if (truthy(d.reason)) str(d.reason) else str(d.error)); return }
+            val rows = if (truthy(d.rows)) jsArray(d.rows) else emptyArray()
+            for (row in rows) {
+                val tr = document.createElement("tr") as HTMLElement
+                val id = if (row.id == null) "" else str(row.id)
+                tr.innerHTML = "<td>" + JSON.stringify(row.key).esc() + "</td><td>" + JSON.stringify(row.value).esc() + "</td><td>" + id.esc() + "</td>"
+                if (id.isNotEmpty()) tr.onclick = { launchPage { loadDoc(id) } }
+                t.appendChild(tr)
+            }
+            byId("viewinfo").textContent = rows.size.toString() + " rows" + (if (d.total_rows != null) " of " + str(d.total_rows) else "") +
+                " · " + (window.performance.now() - started).toInt() + " ms"
+        } catch (e: Throwable) {
+            byId("viewinfo").textContent = "view failed: " + errorString(e)
+        }
+    }
+
+    private fun String?.esc(): String = (this ?: "undefined").replace("&", "&amp;").replace("<", "&lt;")
+
     private fun qsInstall() {
         val d = document.createElement("div") as HTMLElement
         d.setAttribute("data-qs", "1")
@@ -178,6 +266,7 @@ object FutonPage {
         val coords: dynamic = obj()
         coords.prefix = (document.getElementById("prefix") as HTMLInputElement?)?.value ?: ""
         coords.doc = (document.getElementById("docid") as HTMLInputElement?)?.value ?: ""
+        coords.db = DB
         val b = "**Surface:** futon\n**URL:** " + window.location.href + "\n**Coordinates:**\n```json\n" + JSON.stringify(coords, null, 1) +
             "\n```\n\n**What I did:**\n\n**What happened:**\n\n**What I expected:**\n"
         window.open("https://github.com/jnorthrup/TrikeShed/issues/new?labels=quickstart-feedback&title=" + encodeUri("[futon] ") + "&body=" + encodeUri(b), "_blank")
@@ -194,6 +283,13 @@ object FutonPage {
         w.newDoc = { newDoc() }
         w.qsInstall = { qsInstall() }
         w.qsFeedback = { qsFeedback() }
-        firstPage()
+        w.selectDb = { name: String -> selectDb(name) }
+        w.loadViews = { launchPage { loadViews() } }
+        w.runView = { launchPage { runView() } }
+        launchPage {
+            loadDbs()
+            firstPage()
+            loadViews()
+        }
     }
 }

@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.dag.ReteProduction
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncPresets
@@ -10,7 +13,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.narsese.EternalRule
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.rdf.TurtleRdf
 
 /**
@@ -54,7 +56,7 @@ class LcncRdfWire(
                     query["width"]?.toIntOrNull()?.coerceIn(1, 8192) ?: 1000,
                     query["height"]?.toIntOrNull()?.coerceIn(1, 8192) ?: 700,
                 )
-                val options = JsonSupport.parse(rawBody(text)) as? Map<*, *> ?: emptyMap<Any, Any>()
+                val options = reify(rawBody(text)) as? Map<*, *> ?: emptyMap<Any, Any>()
                 val extrusion = narchy.spacegraph.LcncExtrusion
                 val scene = try {
                     extrusion.project(program, extrusion.measurements(options["geometry"]),
@@ -67,7 +69,7 @@ class LcncRdfWire(
                 val encoded = narchy.spacegraph.graphics.spi.SvgGraphicsProvider.encode(frame)
                 json(linkedMapOf(
                     "source" to "LCNC/commonMain", "name" to program.name,
-                    "document" to JsonSupport.parse(LcncProgramConfix.toJson(program)),
+                    "document" to reify(LcncProgramConfix.toJson(program)),
                     "frame" to narchy.spacegraph.FrameJson.value(frame), "svg" to encoded.a,
                     "scene" to extrusion.value(scene, camera),
                     "ports" to (0 until shadow.ports.size).map { i -> shadow.ports[i].let { port ->
@@ -190,7 +192,7 @@ class LcncRdfWire(
     private fun programFrom(text: String): LcncProgram? {
         val body = rawBody(text)
         if (body.isBlank()) return null
-        val parsed = runCatching { JsonSupport.parse(body) as? Map<*, *> }.getOrNull() ?: return null
+        val parsed = runCatching { reify(body) as? Map<*, *> }.getOrNull() ?: return null
         val name = parsed["name"]?.toString()?.takeIf { it.isNotBlank() } ?: "canvas"
         return runCatching { LcncProgramConfix.fromJson(name, body) }.getOrNull()
     }
@@ -199,7 +201,7 @@ class LcncRdfWire(
         JvmKanbanServer.HttpResponse(200, body, contentType = "text/turtle; charset=utf-8")
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     private fun rawBody(text: String): String = when {
         "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")

@@ -1,5 +1,9 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
@@ -7,7 +11,7 @@ import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfQuad
 import borg.trikeshed.rdf.RdfTerm
@@ -169,9 +173,14 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         )
     }
 
-    private fun bookFile(name: String) = File(books, name.replace(Regex("[^A-Za-z0-9._-]+"), "-") + ".json")
+    private fun safe(name: String) = name.replace(Regex("[^A-Za-z0-9._-]+"), "-")
+    private fun bookFile(name: String) = File(books, safe(name) + ".json")
 
-    private fun save(b: Book) = bookFile(b.name).writeText(JsonSupport.stringify(mapOf(
+    /** The section texts beside a book, one JSON string per line in section order: what a section reading shows. */
+    private fun saveSections(name: String, sections: List<String>) =
+        File(books, "${safe(name)}.sections.jsonl").writeText(sections.joinToString("\n") { jsonOf(it) })
+
+    private fun save(b: Book) = bookFile(b.name).writeText(jsonOf(mapOf(
         "name" to b.name, "work" to b.work, "date" to b.date, "headings" to b.headings,
         "statements" to b.statements.map { it.toMap() },
         "support" to b.support.map { it.toList() },
@@ -179,9 +188,18 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         "cites" to b.cites.map { listOf(it.first, it.second) },
     )))
 
+    /** Books as last read, keyed by name; a book re-reads only when its file changes (length and mtime). */
+    private val loaded = HashMap<String, Pair<Long, Book>>()
+
     private fun load(name: String): Book? {
         val f = bookFile(name).takeIf { it.isFile } ?: return null
-        val m = JsonSupport.parseMap(f.readText())
+        val stamp = f.lastModified() * 31 + f.length()
+        synchronized(loaded) { loaded[name]?.takeIf { it.first == stamp }?.let { return it.second } }
+        return read(f)?.also { b -> synchronized(loaded) { loaded[name] = stamp to b } }
+    }
+
+    private fun read(f: File): Book? {
+        val m = reifyMap(f.readText())
         fun str(v: Any?) = v?.toString()?.takeIf { it.isNotEmpty() }
         return Book(
             m["name"].toString(), m["work"].toString(), m["date"].toString(),
@@ -199,7 +217,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
 
     private fun constellation(name: String): Constellation = live.getOrPut(name) {
         Constellation(name).also { c ->
-            File(root, "$name.members").takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() }
+            File(root, "$name.members").takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() }?.distinct()
                 ?.forEach { b -> load(b)?.let(c::join) }
         }
     }
@@ -228,18 +246,50 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             .fold(RoaringSeries.EMPTY) { acc, c -> acc or SumoCorpus.closure(c) }
         val typed = java.util.IdentityHashMap<NormClause, Int>()
         val facts = LinkedHashSet<String>()
-        val clauses = CoreNlpRuntime().use { nlp -> sections.map { sec ->
+        val began = System.currentTimeMillis()
+        // Pointcuts into the activity ring: the book is a trunk under the run, each section a leaf that
+        // begins at its parse and ends with what it yielded, so /curator and /api/lcnc/trail show the reading.
+        val trail = borg.trikeshed.lcnc.LcncTrail.live
+        val run = trail.lastRun()
+        val bookNode = listOf("book.curate", name)
+        val secNodes = IntArray(sections.size) { -1 }
+        val secKeys = sectionKeys(sections.map(Book::heading))
+        val clauses = CoreNlpRuntime().use { nlp -> sections.mapIndexed { k, sec ->
+            if (k % 25 == 0) System.err.println("[CURATE] $name: section $k/${sections.size}, ${(System.currentTimeMillis() - began) / 1000}s")
+            val at = trail.node(bookNode[0], listOf(bookNode[1]), secKeys[k], "book.section")
+            secNodes[k] = at
+            trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.BEGIN, at)
+            val t0 = System.currentTimeMillis()
             val doc = nlp.analyze(sec)
             val found = NormClauses.extract(doc, generic)
+            trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, at,
+                "${found.size} statements, ${doc.sentences.a} sentences, ${sec.length} chars, ${System.currentTimeMillis() - t0}ms · ${k + 1}/${sections.size}")
             // The section's other nouns are the context a bearer's sense is read in.
             val nouns = doc.sentences.values().flatMap { s -> s.tokens.values().filter { it.tag.startsWith("NN") }.map { it.lemma.lowercase() } }.distinct()
             for (c in found) typed[c] = bearerClass(c, nouns, believed)
+            // The reading into the ring: each statement a node under its section, each concept a hub in the
+            // shared pool, and the predicate as links statement → bearer (subject) and → object (relation).
+            // An atom is a noun the parse tagged (a lemma, alphabetic, not a stray letter): numbers, pronouns
+            // and fragments of an object phrase are not concepts.
+            val nounLemmas = doc.sentences.values().flatMap { s -> s.tokens.values().filter { it.tag.startsWith("NN") }.map { it.lemma.lowercase() } }.toSet()
+            fun atom(phrase: String?): String? = phrase?.split(' ')?.lastOrNull { it.length > 2 && it.all(Char::isLetter) && it in nounLemmas }
+            for ((j, c) in found.withIndex()) {
+                val st = NormStatement.of(c) { typed[it] ?: -1 }
+                val sNode = trail.node(bookNode[0], listOf(bookNode[1], secKeys[k]), "s$j", "book.statement")
+                trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, sNode,
+                    listOfNotNull(st.bearer, st.modality.key, st.action.replace('_', ' '), st.obj, st.condition).joinToString(" · "))
+                ring(trail, run, sNode, st, atom(st.bearer), atom(st.obj))
+            }
             facts.addAll(NormClauses.facts(doc))
             found
         } }
+        // Bridges between sections: what the book's own prose cites.
+        for ((from, to) in cites) if (secNodes.getOrElse(from) { -1 } >= 0 && secNodes.getOrElse(to) { -1 } >= 0)
+            trail.link(run, secNodes[from], secNodes[to], "cites")
         val book = Book.of(name, convention("work") ?: name, convention("date") ?: convention("edition") ?: doc?.get("seq")?.toString() ?: "", sections, clauses, { typed[it] ?: bearerClass(it) }, facts, cites)
         val senses = book.statements.filter { it.bearerClass >= 0 }.associate { it.bearer to SumoCorpus.classifier.className(SumoClassId(it.bearerClass)) }
         save(book)
+        saveSections(name, sections)
         // Conformance: each noted statement is held (the text states it), contradicted (the text states the
         // opposing force on its proposition), or unstated.
         val byProposition = book.statements.withIndex().groupBy({ it.value.proposition }, { it.index })
@@ -258,10 +308,118 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             "cites" to cites.size, "conformance" to conformance)
     }
 
+    /**
+     * One section of a curated book, read whole: its text and shape (line kinds, Shannon bits, LZ
+     * description length and normalized K-complexity), every statement it supports with force, SUMO
+     * class and book-wide truth, the facts it states, the sections it cites and that cite it, and the
+     * conflicts it takes part in with the opposing section. [section] is an ordinal or a heading prefix.
+     */
+    fun section(bookName: String, section: String): Map<String, Any?> {
+        val b = load(bookName) ?: return mapOf("error" to "book '$bookName' is not curated")
+        val k = section.toIntOrNull()?.takeIf { it in b.headings.indices }
+            ?: b.headings.indexOfFirst { it.startsWith(section) }.takeIf { it >= 0 }
+            ?: return mapOf("error" to "no section '$section' in '$bookName'")
+        val text = File(books, "${safe(bookName)}.sections.jsonl").takeIf { it.isFile }?.useLines { ls -> ls.drop(k).firstOrNull() }
+            ?.let { reify(it) as? String }
+        val lines = (text ?: b.headings[k]).split(Regex("(?<=[.;:])\\s+")).toSeries()
+        val metrics = borg.trikeshed.cas.textualMetrics(lines)
+        val sig = borg.trikeshed.cas.kolmogorovSchemaSignature(lines, metrics)
+        val mine = b.support.indices.filter { k in b.support[it] }
+        val sumo = SumoCorpus.classifier
+        val byProp = b.statements.indices.groupBy { b.statements[it].proposition }
+        fun ev(i: Int): Map<String, Any?> {
+            // Book-wide truth: each supporting section one source, opposed force negative.
+            val s = b.statements[i]
+            val same = byProp[s.proposition].orEmpty()
+            val pos = same.filter { b.statements[it].modality == s.modality }.sumOf { b.support[it].size }
+            val neg = same.filter { b.statements[it].modality.opposes(s.modality) }.sumOf { b.support[it].size }
+            val t = Nal.truthOf(EvidenceCoord(pos * Nal.UNIT.toLong(), neg * Nal.UNIT.toLong()))
+            return linkedMapOf("id" to s.id, "sentence" to s.sentence, "bearer" to s.bearer, "force" to s.modality.key,
+                "action" to s.action, "object" to s.obj, "condition" to s.condition,
+                "class" to if (s.bearerClass >= 0) sumo.className(SumoClassId(s.bearerClass)) else null,
+                "sections" to b.support[i].size, "f" to t.frequency, "c" to t.confidence,
+                "opposed" to same.filter { b.statements[it].modality.opposes(s.modality) }.flatMap { o -> b.support[o].take(4).map { b.headings.getOrElse(it) { "#$it" } } })
+        }
+        // Per sentence, everything the parse registered: each noun a concept typed by SUMO (with its
+        // nearest ancestors), each named entity, each predicate, and the statements read from it.
+        val sentences = text?.let { body ->
+            val doc = CoreNlpRuntime().use { it.analyze(body) }
+            val bySentence = NormClauses.extract(doc).groupBy { it.sentence }
+            doc.sentences.values().map { s ->
+                val said = body.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
+                val toks = s.tokens.values()
+                val concepts = toks.filter { it.tag.startsWith("NN") }.map { t ->
+                    val lemma = t.lemma.lowercase()
+                    val id = SumoCorpus.nounClassId(lemma).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(lemma.removeSuffix("s"))
+                    val lineage = if (id >= 0) SumoCorpus.closure(id).toIntArray().filter { it != id }.sortedDescending().take(3)
+                        .map { sumo.className(SumoClassId(it)) } else emptyList()
+                    linkedMapOf("word" to t.word, "lemma" to lemma, "class" to if (id >= 0) sumo.className(SumoClassId(id)) else null, "is" to lineage)
+                }.distinctBy { it["lemma"] }
+                val entities = toks.filter { it.ner != "O" }.groupBy { it.ner }.mapValues { (_, ts) -> ts.map { it.word }.distinct() }
+                val predicates = toks.filter { it.tag.startsWith("VB") }.map { it.lemma.lowercase() }.distinct()
+                val read = bySentence[said].orEmpty().map { c ->
+                    val st = NormStatement.of(c) { bearerClass(it) }
+                    linkedMapOf("bearer" to st.bearer, "force" to st.modality.key, "action" to st.action, "object" to st.obj,
+                        "condition" to st.condition, "class" to if (st.bearerClass >= 0) sumo.className(SumoClassId(st.bearerClass)) else null)
+                }
+                linkedMapOf("text" to said, "tokens" to toks.size, "concepts" to concepts, "entities" to entities,
+                    "predicates" to predicates, "statements" to read)
+            }
+        }.orEmpty()
+        val classes = sentences.flatMap { s -> (s["concepts"] as List<*>).mapNotNull { (it as Map<*, *>)["class"] } }
+            .groupingBy { it.toString() }.eachCount().entries.sortedByDescending { it.value }.map { mapOf("class" to it.key, "n" to it.value) }
+        return linkedMapOf(
+            "book" to b.name, "work" to b.work, "date" to b.date, "ordinal" to k, "of" to b.headings.size,
+            "heading" to b.headings[k], "text" to text, "sentences" to sentences, "classes" to classes,
+            "shape" to mapOf("kinds" to sig.structuralKey, "lines" to metrics.lines, "chars" to metrics.characters,
+                "tokens" to metrics.tokens, "uniqueTokens" to metrics.uniqueTokens, "shannonBitsPerByte" to metrics.shannonBitsPerByte,
+                "lzPhrases" to sig.lzPhraseCount, "descriptionBits" to sig.descriptionBits, "k" to sig.normalizedComplexity),
+            "statements" to mine.map(::ev).sortedByDescending { (it["sections"] as Int) },
+            "cites" to b.cites.filter { it.first == k }.map { (_, to) -> b.headings.getOrElse(to) { "#$to" } },
+            "citedBy" to b.cites.filter { it.second == k }.map { (from, _) -> b.headings.getOrElse(from) { "#$from" } },
+            "prev" to b.headings.getOrNull(k - 1), "next" to b.headings.getOrNull(k + 1),
+        )
+    }
+
+    /**
+     * [c] stands in the ring under [runId]: a book read before this daemon started is not in the ring yet,
+     * so its saved reading (sections, statements, concepts) goes in as it stands, with no parse, and the
+     * constellation's conflicts bridge the sections stating each side.
+     */
+    private fun stand(c: Constellation, runId: Int) {
+        val trail = borg.trikeshed.lcnc.LcncTrail.live
+        for (bk in c.books) if (bk.headings.isNotEmpty() && !trail.known("$CURATE/${bk.name}/${sectionKeys(bk.headings)[0]}")) replay(trail, runId, bk)
+        val keysOf = c.books.map { sectionKeys(it.headings) }
+        fun sectionNode(g: Int): Int? = keysOf.getOrNull(g ushr 20)?.let { ks ->
+            ks.getOrNull(g and 0xFFFFF)?.let { h -> trail.node(CURATE, listOf(c.books[g ushr 20].name), h, "book.section") } }
+        for ((x, y) in c.conflicts().take(CONFLICT_LINKS)) {
+            val a = c.support[x].toIntArray().firstOrNull()?.let(::sectionNode) ?: continue
+            val b = c.support[y].toIntArray().firstOrNull()?.let(::sectionNode) ?: continue
+            if (a != b) trail.link(runId, a, b, "conflict: ${c.statements[x].predicate.replace('_', ' ')}")
+        }
+    }
+
+    /** Every saved constellation stands in the ring again, as its members were last joined. */
+    fun restore() {
+        val saved = root.listFiles { f -> f.isFile && f.name.endsWith(".members") }.orEmpty()
+        for (f in saved) {
+            val c = constellation(f.name.removeSuffix(".members"))
+            // Editions of one work align oldest → newest, as each join aligned them.
+            for (i in c.books.indices) for (j in i + 1 until c.books.size) if (c.books[i].work == c.books[j].work) {
+                if (c.books[i].date <= c.books[j].date) c.align(i, j) else c.align(j, i)
+            }
+            if (c.books.isNotEmpty()) stand(c, borg.trikeshed.lcnc.LcncTrail.live.run("$JOIN/${c.name}"))
+        }
+    }
+
     private val join = LcncNodeRunner { node, inputs ->
         val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.join: name the constellation")
         val bookName = (inputs["book"] ?: inputs["book?"])?.toString() ?: node.params["book"] ?: error("constellation.join: no book")
         val book = load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
+        // A member curated again is read again: the constellation is cleared and rebuilt from its
+        // members' saved books, so the new reading replaces the old one in statements, truth,
+        // conflicts, alignment and tells — never kept stale, never counted twice.
+        if (live[name]?.bookOrdinal(bookName)?.let { it >= 0 && live[name]!!.books[it].statements != book.statements } == true) live.remove(name)
         val c = constellation(name)
         val at = c.bookOrdinal(bookName).takeIf { it >= 0 } ?: c.join(book).also {
             File(root, "$name.members").appendText(bookName + "\n")
@@ -272,6 +430,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             c.align(older, newer)
         }
         val frontier = publish(c)
+        stand(c, borg.trikeshed.lcnc.LcncTrail.live.lastRun())
         val admissible = c.admissible()
         val rules = admissible.map { id ->
             val s = c.statements[id]
@@ -344,6 +503,55 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             if (s.key in back) null else mapOf("id" to s.id, "sentence" to s.sentence, "key" to s.key, "readBack" to back)
         }
         mapOf("text" to statements.joinToString("\n\n") { it.sentence }, "statements" to statements.size, "drift" to drift)
+    }
+
+    /**
+     * A saved book's reading into the activity ring, as curation laid it: each section a leaf of the
+     * book, each statement a line of the sections that state it, its concepts linked into the shared
+     * pool. The concept atom is the last lexicon noun of the bearer and object phrases (the parse's
+     * noun tags are not saved with the book).
+     */
+    private fun replay(trail: borg.trikeshed.lcnc.LcncTrail, run: Int, b: Book) {
+        val bySection = Array(b.headings.size) { ArrayList<Int>() }
+        for ((i, secs) in b.support.withIndex()) for (k in secs) if (k in bySection.indices) bySection[k].add(i)
+        fun atom(phrase: String?): String? = phrase?.split(' ')?.lastOrNull { it.length > 2 && it.all(Char::isLetter) && SumoCorpus.nounClassId(it) >= 0 }
+        val keys = sectionKeys(b.headings)
+        for ((k, heading) in keys.withIndex()) {
+            val at = trail.node(CURATE, listOf(b.name), heading, "book.section")
+            trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, at, "${bySection[k].size} statements · ${k + 1}/${b.headings.size}")
+            for ((j, i) in bySection[k].withIndex()) {
+                val st = b.statements[i]
+                val sNode = trail.node(CURATE, listOf(b.name, heading), "s$j", "book.statement")
+                trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, sNode,
+                    listOfNotNull(st.bearer, st.modality.key, st.action.replace('_', ' '), st.obj, st.condition).joinToString(" · "))
+                ring(trail, run, sNode, st, atom(st.bearer), atom(st.obj))
+            }
+        }
+        for ((from, to) in b.cites) if (from in keys.indices && to in keys.indices)
+            trail.link(run, trail.node(CURATE, listOf(b.name), keys[from], "book.section"),
+                trail.node(CURATE, listOf(b.name), keys[to], "book.section"), "cites")
+    }
+
+    /**
+     * Ring keys of a book's sections: the heading bounded for display, and a heading that repeats in the
+     * book (two entries both headed "REG") carries its ordinal, so distinct sections never share a node.
+     */
+    private fun sectionKeys(headings: List<String>): List<String> {
+        val seen = HashSet<String>()
+        return headings.mapIndexed { k, h -> h.take(48).let { if (seen.add(it)) it else "$it #$k" } }
+    }
+
+    /**
+     * A statement's concepts into the activity ring. Concepts are one pool across every book (root
+     * [POOL], one column per SUMO class): the same concept read in two books is one node, so its edges
+     * reach into both and common concepts from uncommon sources meet in one place.
+     */
+    private fun ring(trail: borg.trikeshed.lcnc.LcncTrail, run: Int, statement: Int, st: NormStatement, bearer: String?, obj: String?) {
+        val sumo = SumoCorpus.classifier
+        fun hub(lemma: String, cls: Int): Int =
+            trail.node(POOL, listOf(if (cls >= 0) sumo.className(SumoClassId(cls)) else "Unclassified"), lemma, "concept")
+        bearer?.let { b -> trail.link(run, statement, hub(b, if (st.bearerClass >= 0) st.bearerClass else SumoCorpus.nounClassId(b)), "subject") }
+        obj?.let { o -> trail.link(run, statement, hub(o, SumoCorpus.nounClassId(o)), st.modality.key + " " + st.action.replace('_', ' ')) }
     }
 
     /**
@@ -521,10 +729,22 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             NlRulesNode.register(ctx.lcncRunners, bank)
             SkillOverlapNode.register(ctx.lcncRunners, bank)
             NormClausesNode.register(ctx.lcncRunners, bank)
-            ConstellationNodes(ctx.stateDir, ctx.blackboard, bank).register(ctx.lcncRunners)
+            val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank).also { it.register(ctx.lcncRunners) }
+            // The ring is in memory: saved constellations stand in it again without waiting for a join.
+            Thread({ runCatching { nodes.restore() }.onFailure { System.err.println("[OROBOROS] constellation restore failed: $it") } },
+                "constellation-restore").apply { isDaemon = true }.start()
+            // One curated section read whole: `?book=<name>&section=<ordinal or heading>`.
+            ctx.routes.claim("language", "/api/curation/section") { method, path, _, _ ->
+                if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val out = nodes.section(q["book"].orEmpty(), q["section"].orEmpty())
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 404 else 200, jsonOf(out))
+            }
         }
 
         const val CURATE = "book.curate"
+        /** Conflict bridges drawn per join. */
+        const val CONFLICT_LINKS = 600
         const val JOIN = "constellation.join"
         const val RENDER = "constellation.render"
         const val WIKI_READ = "wiki.read"
@@ -533,6 +753,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         const val SELECT = "rdf.select"
         const val BRIEF = "constellation.brief"
         const val LANGUAGE = "constellation"
+        /** The activity ring's root for the concept pool every curated book reads into. */
+        const val POOL = "concepts"
         const val NORMS = 200
         const val BEARERS = 50
         const val SAMPLE = 25

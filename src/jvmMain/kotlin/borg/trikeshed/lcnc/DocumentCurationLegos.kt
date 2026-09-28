@@ -246,7 +246,7 @@ object DocumentCurationLegos {
         val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.extent must be an extent object" }
         fun integer(name: String): Long {
             val number = fields[name]
-            // JsonSupport reifies numeric literals as Double. Accept integral JSON values
+            // reify reifies numeric literals as Double. Accept integral JSON values
             // without truncating fractions or accepting coordinates that lost precision.
             if (number is Double || number is Float) {
                 val value = (number as Number).toDouble()

@@ -2,6 +2,9 @@
 
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.Document
@@ -12,7 +15,6 @@ import borg.trikeshed.couch.ViewDefinition
 import borg.trikeshed.couch.ViewServer
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -79,12 +81,12 @@ class CouchRequestFactory(
     /** The store's replication/CAS lanes, when it has them. */
     private val lanes: RelaxLanes? get() = store.lanes
 
-    override suspend fun processRequest(payload: String): String = JsonSupport.stringify(process(payload))
+    override suspend fun processRequest(payload: String): String = jsonOf(process(payload))
 
     suspend fun process(payload: String): Map<String, Any?> {
         if (payload.isBlank()) return failure(null, "empty", "blank payload")
         val root = try {
-            JsonSupport.parse(payload)
+            reify(payload)
         } catch (e: Throwable) {
             return failure(null, "parse", e.message ?: "unparseable payload")
         }
@@ -104,7 +106,7 @@ class CouchRequestFactory(
             when (verb) {
                 "put" -> {
                     val doc = op["doc"] ?: return failure(id, "put", "doc required")
-                    put(id, rev, JsonSupport.stringify(doc))
+                    put(id, rev, jsonOf(doc))
                 }
                 "get" -> get(id ?: return failure(null, "get", "id required"))
                 "delete" -> delete(

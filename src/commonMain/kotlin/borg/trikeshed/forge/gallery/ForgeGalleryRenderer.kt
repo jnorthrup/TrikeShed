@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.gallery
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lcnc.editor.*
 import borg.trikeshed.forge.blackboard.LineCasRtsSnapshot
 
@@ -16,7 +17,7 @@ object ForgeGalleryRenderer {
      * Render the catalog as a portable JSON string suitable for embedding in
      * the workspace seed or fetching via a dedicated endpoint.
      */
-    fun renderJson(): String = JsonSupport.stringify(ForgeGalleryCatalog.toJsonValue())
+    fun renderJson(): String = jsonOf(ForgeGalleryCatalog.toJsonValue())
 
     /**
      * Render the gallery as an HTML string. This is the "kitchen sink" view

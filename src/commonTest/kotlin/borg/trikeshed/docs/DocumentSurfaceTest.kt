@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,10 +16,10 @@ class DocumentSurfaceTest {
 
     @Test
     fun theSidebarNestsAWorkspacesPagesUnderTheOpenOne() {
-        val projects = DocumentSurface.projects(JsonSupport.parse(projectsJson))
+        val projects = DocumentSurface.projects(reify(projectsJson))
         assertEquals(listOf("genesis-notes", "trikeshed"), projects.map { it.name })
         assertEquals(3, projects[0].docs)
-        val docs = DocumentSurface.docs(JsonSupport.parse(docsJson))
+        val docs = DocumentSurface.docs(reify(docsJson))
         assertEquals(listOf("a.md", "c.txt"), docs.map { it.id })
         assertEquals(0L, docs[0].seq)
 
@@ -48,13 +49,13 @@ class DocumentSurfaceTest {
 
     @Test
     fun theTableSortsTheWorkspaceWithoutEditingIt() {
-        val docs = DocumentSurface.docs(JsonSupport.parse(docsJson))
+        val docs = DocumentSurface.docs(reify(docsJson))
         assertEquals(listOf("a.md", "c.txt"), DocumentSurface.sortDocs(docs, DocColumn.NAME, true).map { it.id })
         assertEquals(listOf("c.txt", "a.md"), DocumentSurface.sortDocs(docs, DocColumn.NAME, false).map { it.id })
         // 13 B before 73 B: size sorts as a number, never as its rendered string
         assertEquals(listOf("c.txt", "a.md"), DocumentSurface.sortDocs(docs, DocColumn.SIZE, true).map { it.id })
         assertEquals(listOf("a.md", "c.txt"), DocumentSurface.sortDocs(docs, DocColumn.SEQ, true).map { it.id })
-        assertEquals(docs, DocumentSurface.docs(JsonSupport.parse(docsJson)))   // sorting edits nothing
+        assertEquals(docs, DocumentSurface.docs(reify(docsJson)))   // sorting edits nothing
         assertEquals(DocColumn.SEQ, DocColumn.of("seq"))
         assertEquals(DocColumn.NAME, DocColumn.of("nonsense"))
 
@@ -75,13 +76,13 @@ class DocumentSurfaceTest {
 
     @Test
     fun rendersMarkdownDocumentsAndEscapesTheRest() {
-        val md = DocumentSurface.document(JsonSupport.parse("""{"project":"genesis-notes","id":"a.md","cid":"sha256:59204cb01ed1947253923d6a198d","rev":"1-x","seq":0,"contentType":"text/markdown","text":"# Alpha\n\nfirst"}"""))!!
+        val md = DocumentSurface.document(reify("""{"project":"genesis-notes","id":"a.md","cid":"sha256:59204cb01ed1947253923d6a198d","rev":"1-x","seq":0,"contentType":"text/markdown","text":"# Alpha\n\nfirst"}"""))!!
         val html = DocumentSurface.documentHtml(md)
         assertTrue(html.contains("<h1 class=\"ds-title\">a.md</h1>"), html)
         assertTrue(html.contains("title=\"sha256:59204cb01ed1947253923d6a198d\">sha256:59204cb01ed1</code>"), html)
         assertTrue(html.contains("<article class=\"ds-body\"><h1>Alpha</h1>\n<p>first</p>\n</article>"), html)
 
-        val txt = DocumentSurface.document(JsonSupport.parse("""{"project":"p","id":"c.txt","cid":"sha256:abc","rev":"1-x","seq":2,"contentType":"text/plain","text":"<b>not markup</b>","extract":"## mined\n\ntwin"}"""))!!
+        val txt = DocumentSurface.document(reify("""{"project":"p","id":"c.txt","cid":"sha256:abc","rev":"1-x","seq":2,"contentType":"text/plain","text":"<b>not markup</b>","extract":"## mined\n\ntwin"}"""))!!
         val plain = DocumentSurface.documentHtml(txt)
         assertTrue(plain.contains("<pre>&lt;b&gt;not markup&lt;/b&gt;</pre>"), plain)
         assertTrue(plain.contains("<section class=\"ds-extract\"><h2>Extract (the miner's twin)</h2><h2>mined</h2>\n<p>twin</p>\n</section>"), plain)
@@ -124,9 +125,9 @@ class DocumentSurfaceTest {
 
     @Test
     fun absentOrMalformedJsonIsEmptyNotAnException() {
-        assertEquals(emptyList(), DocumentSurface.projects(JsonSupport.parse("""{"error":"x"}""")))
+        assertEquals(emptyList(), DocumentSurface.projects(reify("""{"error":"x"}""")))
         assertEquals(emptyList(), DocumentSurface.docs(null))
-        assertNull(DocumentSurface.document(JsonSupport.parse("""{"error":"absent"}""")))
+        assertNull(DocumentSurface.document(reify("""{"error":"absent"}""")))
         assertTrue(DocumentSurface.documentHtml(null).contains("Pick a page"))
         assertTrue(DocumentSurface.tableHtml(null, emptyList()).contains("Pick a workspace"))
         assertTrue(DocumentSurface.sidebarHtml(emptyList(), null).contains("No project is mounted"))

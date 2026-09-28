@@ -1,7 +1,9 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
+import borg.trikeshed.parse.ValueBudget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -83,13 +85,13 @@ class LcncRunHeadTest {
     fun canonicalInputsIgnoreKeyOrderAndIntegralFloatingPoint() {
         // Every JSON number arrives as a Double, and a WAL-replayed receipt comes back the same way,
         // so {"n":3} and {"n":3.0} are one value and must be one key.
-        val a = LcncRunHead.canonicalInputs(JsonSupport.parse("""{"b":1,"a":{"y":2.0,"x":"s"},"n":[3,{"q":1,"p":2}]}"""))
-        val b = LcncRunHead.canonicalInputs(JsonSupport.parse("""{"n":[3.0,{"p":2.0,"q":1}],"a":{"x":"s","y":2},"b":1.0}"""))
+        val a = LcncRunHead.canonicalInputs(reify("""{"b":1,"a":{"y":2.0,"x":"s"},"n":[3,{"q":1,"p":2}]}"""))
+        val b = LcncRunHead.canonicalInputs(reify("""{"n":[3.0,{"p":2.0,"q":1}],"a":{"x":"s","y":2},"b":1.0}"""))
         assertEquals(a, b)
         assertEquals("""{"a":{"x":"s", "y":2}, "b":1, "n":[3, {"p":2, "q":1}]}""", a)
         // A round trip through the one stringifier and the one parser is a fixpoint, which is what
         // lets a page hand this text to the route and the route re-canonicalise the parsed value.
-        assertEquals(a, LcncRunHead.canonicalInputs(JsonSupport.parse(a)))
+        assertEquals(a, LcncRunHead.canonicalInputs(reify(a)))
         // Lists keep their order; a non-integral Double stays a Double.
         assertEquals("""{"xs":[2, 1], "y":1.5}""", LcncRunHead.canonicalInputs(mapOf("y" to 1.5, "xs" to listOf(2, 1))))
         // An absent inputs is the empty object, never null.
@@ -136,7 +138,7 @@ class LcncRunHeadTest {
         // Same program, other inputs: no cross-talk.
         assertNull(headOf(mine, wanted = mapOf("project" to "other")).latest)
         // Same inputs written differently: the same target.
-        assertEquals("r1", headOf(mine, wanted = JsonSupport.parse("""{"project":"genesis-notes"}""")).latest?.runId)
+        assertEquals("r1", headOf(mine, wanted = reify("""{"project":"genesis-notes"}""")).latest?.runId)
         // The program was re-published: the old receipt is not this target's head (invariant 2).
         assertNull(headOf(receipt("r1", "completed", programCid = otherCid)).latest)
         // An inline ring records no programKey and is never a page's head.
@@ -426,7 +428,7 @@ class LcncRunHeadTest {
         assertEquals("a.md", ((body["stale"] as Map<*, *>)["inputs"] as List<*>).map { (it as Map<*, *>)["id"] }.single())
         assertEquals("""{"project":"genesis-notes"}""", body["inputsCanonical"])
         // The whole body serialises and stays inside one budget.
-        assertNull(borg.trikeshed.parse.json.ValueBudget().violation(body))
-        assertTrue(JsonSupport.stringify(body).contains("\"lamp\":\"stale\""))
+        assertNull(borg.trikeshed.parse.ValueBudget().violation(body))
+        assertTrue(jsonOf(body).contains("\"lamp\":\"stale\""))
     }
 }

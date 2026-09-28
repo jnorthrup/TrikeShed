@@ -1,5 +1,8 @@
 package borg.trikeshed.memory.ace
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNodeRunner
@@ -7,8 +10,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * Step K's LCNC citizenship: the context-assembly nodes are ordinary LCNC
  * runners, registered like any other family (the host composes them into
@@ -34,9 +35,9 @@ object AceContextNodes {
             val raw = inputs["bullets"]
             val parsed = when (raw) {
                 is List<*> -> raw
-                is String -> (runCatching { JsonSupport.parse(raw) }.getOrNull() as? List<*>).orEmpty()
+                is String -> (runCatching { reify(raw) }.getOrNull() as? List<*>).orEmpty()
                 null -> emptyList<Any?>()
-                else -> (runCatching { JsonSupport.parse(raw.toString()) }.getOrNull() as? List<*>).orEmpty()
+                else -> (runCatching { reify(raw.toString()) }.getOrNull() as? List<*>).orEmpty()
             }
             val deltas = parsed.mapNotNull { raw ->
                 val m = raw as? Map<*, *> ?: return@mapNotNull null
@@ -77,12 +78,12 @@ object AceContextNodes {
                 mapOf(
                     "chainHead" to head,
                     "frames" to cids.size.toString(),
-                    "cids" to JsonSupport.stringify(cids),
+                    "cids" to jsonOf(cids),
                     "configSalt" to config.salt().value,
                 ),
                 "ace",
             )
-            mapOf("chain" to JsonSupport.stringify(cids), "chainHead" to head)
+            mapOf("chain" to jsonOf(cids), "chainHead" to head)
         },
     )
 }

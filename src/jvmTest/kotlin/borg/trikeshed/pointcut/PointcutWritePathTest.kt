@@ -1,10 +1,12 @@
 package borg.trikeshed.pointcut
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.TypedefProductionSystem
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,7 +59,7 @@ class PointcutWritePathTest {
          * blackboard key, and apply it — the runtime observes the new definition.
          */
         fun writeDefinition(owner: String, methodName: String, siteIdx: Int, enabled: Boolean) {
-            val doc = JsonSupport.stringify(
+            val doc = jsonOf(
                 mapOf(
                     "$DEFINITION_PREFIX$owner/$methodName/$siteIdx" to
                         mapOf("method" to methodName, "site" to siteIdx.toString(), "enabled" to enabled.toString()),
@@ -65,7 +67,7 @@ class PointcutWritePathTest {
             )
             // through the same funnel the wire feeds — one writer, no direct puts
             @Suppress("UNCHECKED_CAST")
-            val map = JsonSupport.parse(doc) as? Map<String, Any?>
+            val map = reify(doc) as? Map<String, Any?>
             map?.forEach { (k, v) -> blackboard.put(k, v, "ide") }
             applied.trySend(Definition(owner, methodName, siteIdx, enabled))
         }

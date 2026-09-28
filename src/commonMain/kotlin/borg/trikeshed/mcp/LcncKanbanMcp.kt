@@ -1,10 +1,12 @@
 package borg.trikeshed.mcp
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.kanban.BoardCol
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The MCP projection of the LCNC Kanban asset (KMFSM-004/005 in
  * `docs/marketability-kanban-mcp-audit.md`).
@@ -104,7 +106,7 @@ class LcncKanbanMcp(
      * 202 and no body.
      */
     suspend fun handle(requestText: String): String {
-        val parsed = runCatching { JsonSupport.parse(requestText) }.getOrNull()
+        val parsed = runCatching { reifyStrict(requestText) }.getOrNull()
             ?: return errorJson(null, PARSE_ERROR, "invalid JSON")
         if (parsed is List<*>) {
             return errorJson(null, INVALID_REQUEST, "JSON-RPC batching is not supported (removed in MCP 2025-06-18)")
@@ -384,7 +386,7 @@ class LcncKanbanMcp(
         }
         return mapOf(
             "contents" to listOf(
-                mapOf("uri" to uri, "mimeType" to "application/json", "text" to JsonSupport.stringify(body)),
+                mapOf("uri" to uri, "mimeType" to "application/json", "text" to jsonOf(body)),
             ),
         )
     }
@@ -463,18 +465,18 @@ class LcncKanbanMcp(
     // ── JSON-RPC envelope ─────────────────────────────────────────────
 
     private fun resultJson(id: Any?, result: Map<String, Any?>): String =
-        """{"jsonrpc":"2.0","id":${idJson(id)},"result":${JsonSupport.stringify(result)}}"""
+        """{"jsonrpc":"2.0","id":${idJson(id)},"result":${jsonOf(result)}}"""
 
     private fun errorJson(id: Any?, code: Int, message: String): String =
         """{"jsonrpc":"2.0","id":${idJson(id)},"error":${
-            JsonSupport.stringify(mapOf("code" to code, "message" to message))
+            jsonOf(mapOf("code" to code, "message" to message))
         }}"""
 
     /** An integral id must go back out as `7`, not `7.0` — clients match on it. */
     private fun idJson(id: Any?): String = when (id) {
         null -> "null"
         is Number -> numberText(id)
-        else -> JsonSupport.stringify(id)
+        else -> jsonOf(id)
     }
 
     private fun numberText(value: Any?): String = when (value) {

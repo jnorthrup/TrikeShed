@@ -1,5 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -319,7 +322,7 @@ object SubVmLegos {
         // failure is a real fault, not an empty/omitted `sentences` value.
         val raw = result["text"] as? String
             ?: throw IllegalStateException("vm lego '${node.id}': corenlp.extract produced no text output to parse 'sentences' from")
-        val sentences = runCatching { borg.trikeshed.parse.json.JsonSupport.parse(raw) }.getOrNull() as? List<*>
+        val sentences = runCatching { reify(raw) }.getOrNull() as? List<*>
             ?: throw IllegalStateException("vm lego '${node.id}': corenlp.extract output was not a JSON array of sentences: $raw")
         result + ("sentences" to sentences)
     }
@@ -433,7 +436,7 @@ object SubVmLegos {
     ): Map<String, Any?> {
         // JSON.stringify of the text is the one safe JS string literal form;
         // GraalJS parses it with no further interpretation.
-        val literal = borg.trikeshed.parse.json.JsonSupport.stringify(text)
+        val literal = jsonOf(text)
         return evalInVm(host, node, facetName, "var GUEST_TEXT = $literal;\n$script", inputs, defaultModule)
     }
 

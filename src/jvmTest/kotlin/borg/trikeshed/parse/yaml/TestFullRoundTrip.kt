@@ -1,6 +1,7 @@
 package borg.trikeshed.parse.yaml
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -9,7 +10,7 @@ class TestFullRoundTrip {
     @Test
     fun debugFullDocument() {
         val jsonText = java.nio.file.Files.readString(Path.of("src/commonTest/resources/big.json"))
-        val original = JsonSupport.parse(jsonText) as Map<*, *>
+        val original = reify(jsonText) as Map<*, *>
         
         val helper = YamlBigJsonParityTest()
         val yaml = helper.renderYaml(original)

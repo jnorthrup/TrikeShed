@@ -1,8 +1,9 @@
 package borg.trikeshed.docs
 
-import borg.trikeshed.lcnc.LcncRunHead
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
 
+import borg.trikeshed.lcnc.LcncRunHead
 /**
  * THE RUN BLOCK (AutoTools, Cut B): a build target written into a page.
  *
@@ -69,7 +70,7 @@ object RunBlock {
      * never show. A page names a stored program.
      */
     fun parse(ordinal: Int, body: String): Block {
-        val parsed = runCatching { JsonSupport.parse(body) }.getOrElse {
+        val parsed = runCatching { reify(body) }.getOrElse {
             return Bad(ordinal, body, "the block body is not JSON: " + (it.message ?: "unparsed"))
         }
         val request = parsed as? Map<*, *>
@@ -231,7 +232,7 @@ object RunBlock {
      * one rule, so a press can never send a rebuild of nothing.
      */
     fun rebuildRequest(state: State?): Pair<String, String>? =
-        state?.runId?.takeIf { it.isNotBlank() }?.let { REBUILD_PATH to JsonSupport.stringify(mapOf("runId" to it)) }
+        state?.runId?.takeIf { it.isNotBlank() }?.let { REBUILD_PATH to jsonOf(mapOf("runId" to it)) }
 
     /** The optimistic state the pressing tab wears while its POST is in flight; the artifact stays visible. */
     fun pending(prior: State?): State = (prior ?: State(null, "", "")).copy(
@@ -323,7 +324,7 @@ object RunBlock {
         val value = state.shown ?: return ""
         val prose = prose(value)
         return if (prose != null) "<div class=\"ds-run-output\">" + DocumentMarkdown.render(prose) + "</div>"
-        else "<div class=\"ds-run-output\"><pre>" + esc(JsonSupport.stringify(value)) + "</pre></div>"
+        else "<div class=\"ds-run-output\"><pre>" + esc(jsonOf(value)) + "</pre></div>"
     }
 
     /**

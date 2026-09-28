@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProduction
@@ -12,8 +14,6 @@ import borg.trikeshed.lib.isNotEmpty
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.toList
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The hover blip: one node of the LCNC blackboard read across the planes it
  * lands on, with what was ASSERTED kept apart from what was INFERRED, and
@@ -122,5 +122,5 @@ class LcncBlipWire(
     private fun decode(s: String): String = runCatching { java.net.URLDecoder.decode(s, Charsets.UTF_8) }.getOrDefault(s)
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 }

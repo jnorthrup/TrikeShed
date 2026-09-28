@@ -1,10 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.htx.openHtxElement
 import borg.trikeshed.lcnc.ccek.ccekReactorBinding
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.lib.s_
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import com.sun.net.httpserver.HttpServer
 import keymux.ApiSource
@@ -41,7 +42,7 @@ class LcncCcekModelSocketTest {
                 received.complete(mapOf(
                     "method" to it.requestMethod,
                     "authorization" to it.requestHeaders.getFirst("Authorization"),
-                    "body" to JsonSupport.parse(it.requestBody.readBytes().decodeToString()),
+                    "body" to reify(it.requestBody.readBytes().decodeToString()),
                 ))
                 val body = """{"choices":[{"message":{"content":"socket answered"}}],"usage":{"prompt_tokens":3,"completion_tokens":2}}""".encodeToByteArray()
                 it.responseHeaders.set("Content-Type", "application/json")

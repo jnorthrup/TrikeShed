@@ -1,6 +1,6 @@
 package borg.trikeshed.landscape
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
 
 /**
  * LandscapeActivity — the evidence taxonomy of the spatial blackboard medium,
@@ -141,7 +141,7 @@ data object LandscapeActivity {
             val moved = (((r?.get("stale") as? Map<*, *>)?.field("inputs") as? List<*>) ?: emptyList<Any?>())
                 .mapNotNull { ((it as? Map<*, *>)?.field("oldCid")) as? String }.toSet()
             val out = (r?.get("outputs") as? Map<*, *>)?.field(id)
-            if (out != null && moved.isNotEmpty() && JsonSupport.stringify(out).split('"').any(moved::contains))
+            if (out != null && moved.isNotEmpty() && jsonOf(out).split('"').any(moved::contains))
                 return program.copy(state = ActivityState.STALE, reason = "Node $id read an input that has since changed")
             if (r?.get("status") == "completed" && (r["outputs"] as? Map<*, *>)?.hasField(id) == true)
                 return program.copy(state = ActivityState.COMPLETED, reason = "Output recorded for node $id; its inputs did not move")

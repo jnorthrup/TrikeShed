@@ -1,13 +1,13 @@
 package borg.trikeshed.cursor
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.blackboard.BlackboardSurface
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.json.JsonSupport
-
 // ==================== LCNC FACET HANDLES ====================
 
 /**
@@ -98,7 +98,7 @@ typealias ResponseCursor = Cursor
  * Convert a generated request to a request cursor.
  */
 fun convertRequestToCursor(request: Any?): RequestCursor {
-    val json = JsonSupport.stringify(request)
+    val json = jsonOf(request)
     val doc = confixDoc(json)
     return BlackboardSurface.project("request", borg.trikeshed.graph.CausalGraphNodeIndex(), doc, emptyList()).asCursor()
 }
@@ -106,7 +106,7 @@ fun convertRequestToCursor(request: Any?): RequestCursor {
 /**
  * Convert a response cursor to an HTTP response.
  */
-fun convertCursorToResponse(responseCursor: ResponseCursor): Any? = JsonSupport.stringify(responseCursor)
+fun convertCursorToResponse(responseCursor: ResponseCursor): Any? = jsonOf(responseCursor)
 
 // ==================== SUPERVISOR SCAFFOLD CONTRACT ====================
 

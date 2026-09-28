@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.causal.CausalEdgeKind
 import borg.trikeshed.causal.CausalGraph
 import borg.trikeshed.causal.CausalGraphBuilder
@@ -12,7 +15,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobReducer
 import borg.trikeshed.job.JobSnapshot
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.LexicalMemory
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -192,7 +194,7 @@ class BoardStoreElement(
     suspend fun command(jobId: String): Map<*, *>? {
         val cid = published.rows[jobId]?.commandCid ?: return null
         return withContext(Dispatchers.Unconfined) {
-            cas.get(cid)?.let { JsonSupport.parse(it.decodeToString()) as? Map<*, *> }
+            cas.get(cid)?.let { reify(it) as? Map<*, *> }
         }
     }
 
@@ -213,7 +215,7 @@ class BoardStoreElement(
                 val cid = ContentId(text.substring(tab + 1))
                 val payload = withContext(Dispatchers.Unconfined) { cas.get(cid) }
                 if (payload != null) {
-                    val raw = runCatching { JsonSupport.parse(payload.decodeToString()) as? Map<*, *> }.getOrNull()
+                    val raw = runCatching { reify(payload) as? Map<*, *> }.getOrNull()
                     if (raw != null) applyOne(raw, durable = false, replaySeq = seq, replayCid = cid)
                 }
             }
@@ -291,7 +293,7 @@ class BoardStoreElement(
         // Durable truth: the raw command map, canonical-serialized once, CAS-addressed.
         val (cid, seq) = withContext(Dispatchers.Unconfined) {
             // Parsing may normalize numbers; replay must never re-address the payload.
-            val cid = replayCid ?: cas.put(JsonSupport.stringify(raw).encodeToByteArray())
+            val cid = replayCid ?: cas.put(jsonOf(raw).encodeToByteArray())
             cid to (replaySeq
                 ?: if (durable && wal != null) wal.append("$jobId\t${cid.value}".encodeToByteArray())
                 else sequence + 1)

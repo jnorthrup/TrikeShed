@@ -1,9 +1,10 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.InvokeLowering
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The daemon half of the node types the canvas could only reach by `fetch`.
  *
@@ -102,7 +103,7 @@ object SurfaceNodes {
             if (command["idempotencyKey"]?.toString().isNullOrBlank()) {
                 command.remove("idempotencyKey")
                 val canonical = command.entries.sortedBy { it.key }.associate { it.key to it.value }
-                command["idempotencyKey"] = "lcnc:${node.id}:${ContentId.of(JsonSupport.stringify(canonical).encodeToByteArray()).hex}"
+                command["idempotencyKey"] = "lcnc:${node.id}:${ContentId.of(jsonOf(canonical).encodeToByteArray()).hex}"
             }
             val results = invokeResults(service.value, node.type, listOf(command))
             mapOf("result" to results.single())
@@ -110,7 +111,7 @@ object SurfaceNodes {
         "job.batch" to boundLcnc(SurfaceCallKey(call)) { service, node, inputs ->
             val input = inputs["commands"] ?: inputs["commands?"] ?: node.params["commands"]
                 ?: error("job.batch: commands required")
-            val parsed = if (input is String) JsonSupport.parse(input) else input
+            val parsed = if (input is String) reify(input) else input
             val commands = InvokeLowering.listishOf(parsed)
                 ?: (parsed as? Map<*, *>)?.let(InvokeLowering::commandsOf)
                 ?: error("job.batch: commands must be an array or command object")

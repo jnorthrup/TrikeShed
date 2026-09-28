@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
 
 object LcncClockKey : LcncServiceKey<() -> Long>("LcncClockKey")
 
@@ -80,7 +80,7 @@ object PureNodes {
             // emitting nothing: an empty socket downstream is the exact failure
             // this node exists to end.
             if (raw.isEmpty()) mapOf("value" to emptyList<Any?>())
-            else runCatching { mapOf("value" to JsonSupport.parse(raw)) }
+            else runCatching { mapOf("value" to reify(raw)) }
                 .getOrElse { mapOf("error" to "json.value: not valid json") }
         },
         // The list widget's value. It had a contract and a canvas runner and no
@@ -89,7 +89,7 @@ object PureNodes {
         "list.pairs" to LcncNodeRunner { node, _ ->
             val raw = (node.params["pairs"] ?: "").trim()
             if (raw.isEmpty()) mapOf("pairs" to emptyList<Any?>())
-            else runCatching { mapOf("pairs" to JsonSupport.parse(raw)) }
+            else runCatching { mapOf("pairs" to reify(raw)) }
                 .getOrElse { mapOf("error" to "list.pairs: not valid json") }
         },
         // Gesture sources. A press is an EDGE that only exists when a person

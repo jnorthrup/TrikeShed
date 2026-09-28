@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
@@ -7,7 +9,6 @@ import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.graal.vitals.JvmVitals
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -50,7 +51,7 @@ class GraalWireDocumentSafetyTest {
         assertFalse(response.body.contains(cid.value), "content cid must not create a preview bypass")
         assertTrue(response.body.contains("[redacted]"))
         @Suppress("UNCHECKED_CAST")
-        val body = JsonSupport.parse(response.body) as Map<String, Any?>
+        val body = reify(response.body) as Map<String, Any?>
         @Suppress("UNCHECKED_CAST")
         val graal = body["_graal"] as Map<String, Any?>
         assertEquals(true, graal["redacted"])
@@ -114,7 +115,7 @@ class GraalWireDocumentSafetyTest {
         assertEquals(200, response.status)
         assertFalse(response.body.contains(opaque))
         assertFalse(response.body.contains(cid.value))
-        val body = JsonSupport.parse(response.body) as Map<*, *>
+        val body = reify(response.body) as Map<*, *>
         assertEquals(true, (body["_graal"] as Map<*, *>)["previewBlocked"])
         val content = wire.route("GET", "/api/graal/content?id=$id", "", null)!!
         assertEquals(403, content.status)

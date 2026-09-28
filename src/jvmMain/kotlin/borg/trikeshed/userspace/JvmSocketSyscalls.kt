@@ -53,22 +53,23 @@ internal object JvmSocketSyscalls {
         else -> value
     }
 
-    private fun status(handle: MethodHandle, vararg args: Any): Int = Arena.ofConfined().use { arena ->
-        val state = arena.allocate(stateLayout)
-        val result = (handle.invokeWithArguments(listOf(state) + args) as Number).toLong()
-        if (result < 0) -errno(state.get(int, errnoOffset)) else result.toInt()
-    }
+    /** The calling thread's errno capture: one segment per thread, reused by every call. */
+    private val errnoState = ThreadLocal.withInitial { Arena.ofAuto().allocate(stateLayout) }
+    /** [result] of a call that captured into [state]: the value, or -errno (Linux numbering). */
+    private fun status(state: MemorySegment, result: Long): Int = if (result < 0) -errno(state.get(int, errnoOffset)) else result.toInt()
+    private fun status(state: MemorySegment, result: Int): Int = status(state, result.toLong())
 
     private fun configure(fd: Int): Int {
-        val flags = status(fcntlCall, fd, 3, 0)
+        val state = errnoState.get()
+        val flags = status(state, fcntlCall.invokeExact(state, fd, 3, 0) as Int)
         if (flags < 0) return flags
-        val nonblocking = status(fcntlCall, fd, 4, flags or if (linux) 0x800 else 4)
+        val nonblocking = status(state, fcntlCall.invokeExact(state, fd, 4, flags or if (linux) 0x800 else 4) as Int)
         if (nonblocking < 0) return nonblocking
-        val cloexec = status(fcntlCall, fd, 2, 1)
+        val cloexec = status(state, fcntlCall.invokeExact(state, fd, 2, 1) as Int)
         if (cloexec < 0) return cloexec
         if (darwin) return Arena.ofConfined().use { arena ->
             val enabled = arena.allocate(int).also { it.set(int, 0, 1) }
-            status(setOptionCall, fd, 0xffff, 0x1022, enabled, 4) // SO_NOSIGPIPE
+            status(state, setOptionCall.invokeExact(state, fd, 0xffff, 0x1022, enabled, 4) as Int) // SO_NOSIGPIPE
         }
         return 0
     }
@@ -76,7 +77,8 @@ internal object JvmSocketSyscalls {
     fun socket(domain: Int, type: Int, protocol: Int): Int {
         if (type and (0xf or 0x800 or 0x80000).inv() != 0) return -22
         val family = if (darwin && domain == 10) 30 else domain
-        val fd = status(socketCall, family, type and 0xf, protocol)
+        val state = errnoState.get()
+        val fd = status(state, socketCall.invokeExact(state, family, type and 0xf, protocol) as Int)
         if (fd < 0) return fd
         val configured = configure(fd)
         if (configured < 0) { close(fd); return configured }
@@ -114,14 +116,15 @@ internal object JvmSocketSyscalls {
     }
 
     fun bind(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
-        status(bindCall, fd, addr, size)
+        val state = errnoState.get(); status(state, bindCall.invokeExact(state, fd, addr, size) as Int)
     }
-    fun listen(fd: Int, backlog: Int): Int = status(listenCall, fd, backlog)
-    fun close(fd: Int): Int = status(closeCall, fd)
-    fun shutdown(fd: Int, how: Int): Int = status(shutdownCall, fd, how)
+    fun listen(fd: Int, backlog: Int): Int { val state = errnoState.get(); return status(state, listenCall.invokeExact(state, fd, backlog) as Int) }
+    fun close(fd: Int): Int { val state = errnoState.get(); return status(state, closeCall.invokeExact(state, fd) as Int) }
+    fun shutdown(fd: Int, how: Int): Int { val state = errnoState.get(); return status(state, shutdownCall.invokeExact(state, fd, how) as Int) }
 
     fun accept(fd: Int): Int {
-        val client = status(acceptCall, fd, MemorySegment.NULL, MemorySegment.NULL)
+        val state = errnoState.get()
+        val client = status(state, acceptCall.invokeExact(state, fd, MemorySegment.NULL, MemorySegment.NULL) as Int)
         if (client < 0) return client
         val configured = configure(client)
         if (configured < 0) { close(client); return configured }
@@ -130,15 +133,16 @@ internal object JvmSocketSyscalls {
 
     /** -EINPROGRESS retains completion ownership in the backend; this call never waits. */
     fun connectStart(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
-        status(connectCall, fd, addr, size)
+        val state = errnoState.get(); status(state, connectCall.invokeExact(state, fd, addr, size) as Int)
     }
 
     /** Query only after POLLOUT/POLLERR/POLLHUP; zero before readiness does not prove connection. */
     fun connectFinish(fd: Int): Int = Arena.ofConfined().use { arena ->
         val error = arena.allocate(int)
         val bytes = arena.allocate(int).also { it.set(int, 0, 4) }
-        val queried = status(getOptionCall, fd, if (linux) 1 else 0xffff,
-            if (linux) 4 else 0x1007, error, bytes)
+        val state = errnoState.get()
+        val queried = status(state, getOptionCall.invokeExact(state, fd, if (linux) 1 else 0xffff,
+            if (linux) 4 else 0x1007, error, bytes) as Int)
         if (queried < 0) queried else -errno(error.get(int, 0))
     }
 
@@ -149,8 +153,9 @@ internal object JvmSocketSyscalls {
             val bytes = arena.allocate(maxOf(1, length).toLong())
             val start = buffer.arrayOffset() + buffer.position()
             if (!read) MemorySegment.copy(MemorySegment.ofArray(buffer.array()), start.toLong(), bytes, 0, length.toLong())
-            val result = status(if (read) recvCall else sendCall, fd, bytes, length.toLong(),
-                if (!read && linux) 0x4000 else 0) // MSG_NOSIGNAL
+            val state = errnoState.get()
+            val result = status(state, (if (read) recvCall else sendCall).invokeExact(state, fd, bytes, length.toLong(),
+                if (!read && linux) 0x4000 else 0) as Long) // MSG_NOSIGNAL
             if (result > 0) {
                 if (read) MemorySegment.copy(bytes, 0, MemorySegment.ofArray(buffer.array()), start.toLong(), result.toLong())
                 buffer.position(buffer.position() + result)
@@ -167,8 +172,9 @@ internal object JvmSocketSyscalls {
             records.set(ValueLayout.JAVA_SHORT, index * 8L + 4, masks[index].toShort())
             records.set(ValueLayout.JAVA_SHORT, index * 8L + 6, 0)
         }
-        val count: Any = if (linux) fds.size.toLong() else fds.size
-        val result = status(pollCall, records, count, timeout)
+        val state = errnoState.get()
+        val result = status(state, if (linux) pollCall.invokeExact(state, records, fds.size.toLong(), timeout) as Int
+            else pollCall.invokeExact(state, records, fds.size, timeout) as Int)
         result to IntArray(fds.size) { records.get(ValueLayout.JAVA_SHORT, it * 8L + 6).toInt() and 0xffff }
     }
 }

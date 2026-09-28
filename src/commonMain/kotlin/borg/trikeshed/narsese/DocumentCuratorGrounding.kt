@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -11,8 +13,6 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.nlp.NlpDocument
-import borg.trikeshed.parse.json.JsonSupport
-
 /** Semantic admission stays NNV-only; a verified quotation admits only occurrence in source text. */
 internal object DocumentCuratorGrounding {
     private const val proposalInstructions = """Return only a JSON object with format "TRIPLET_JSON" and a triplets array.
@@ -61,7 +61,7 @@ substitute filename, link or adjacency heuristics.
             }
             val entries = envelope["triplets"] as? List<*> ?: error("expected triplets array")
             entries.map { value ->
-                val raw = JsonSupport.stringify(value)
+                val raw = jsonOf(value)
                 try {
                     val p = value as? Map<*, *> ?: error("expected proposal object")
                     require(p.keys == setOf("subject", "predicate", "object", "confidence", "quote", "begin", "end", "polarity", "modality")) {
@@ -221,7 +221,7 @@ substitute filename, link or adjacency heuristics.
         require(p.subject != null && begin >= 0 && end > begin && end <= source.text.length &&
             source.text.substring(begin, end) == p.quote) { "Quotation is not a verified source span" }
         val span = kif("span", KifExpr.Atom(source.extractedTextCid.value), KifExpr.Atom(begin.toString()),
-            KifExpr.Atom(end.toString()), KifExpr.Atom(JsonSupport.stringify(p.quote)))
+            KifExpr.Atom(end.toString()), KifExpr.Atom(jsonOf(p.quote)))
         return kif("quotes", KifExpr.Atom(source.originalCid.value), KifExpr.Quoted(span))
     }
 
@@ -234,7 +234,7 @@ substitute filename, link or adjacency heuristics.
     ))
 
     private fun expression(source: DocumentSource, p: DocumentProposal): KifExpr.ListExpr {
-        fun literal(value: String) = KifExpr.Atom(JsonSupport.stringify(value))
+        fun literal(value: String) = KifExpr.Atom(jsonOf(value))
         val inner = KifExpr.ListExpr(listOf(literal(p.predicate!!), literal(p.subject!!), literal(p.obj!!)))
         return kif("states", KifExpr.Atom(source.originalCid.value), KifExpr.Quoted(inner))
     }

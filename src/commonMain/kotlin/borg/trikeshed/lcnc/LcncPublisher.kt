@@ -1,10 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 
 /**
@@ -272,7 +273,7 @@ class LcncPublisher(
 
     private fun putIfChanged(key: String, value: Any?, actor: String) {
         val existing = blackboard.get(key)
-        val same = existing != null && runCatching { JsonSupport.stringify(existing) == JsonSupport.stringify(value) }.getOrDefault(false)
+        val same = existing != null && runCatching { jsonOf(existing) == jsonOf(value) }.getOrDefault(false)
         if (!same) blackboard.put(key, value, actor)
     }
 }

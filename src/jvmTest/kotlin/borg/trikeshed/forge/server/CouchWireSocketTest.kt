@@ -1,5 +1,7 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
@@ -18,7 +20,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -169,7 +170,7 @@ class CouchWireSocketTest {
 
         @Suppress("UNCHECKED_CAST")
         fun json(reply: Pair<Int, ByteArray>): Map<String, Any?> =
-            (JsonSupport.parse(reply.second.decodeToString()) as? Map<String, Any?>) ?: error("non-object ${reply.first}: ${reply.second.decodeToString()}")
+            (reify(reply.second) as? Map<String, Any?>) ?: error("non-object ${reply.first}: ${reply.second.decodeToString()}")
 
         /** Raw bytes straight off a socket — a JSON-minded client would corrupt a blob. */
         fun bytes(port: Int, path: String): ByteArray = Socket("127.0.0.1", port).use { s ->

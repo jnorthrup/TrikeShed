@@ -11,7 +11,8 @@ import kotlin.time.TimeSource
  * Nodes intern once by their ring path (`ring/…/id`), so a program run twice lights the same nodes.
  */
 class LcncTrail(capacity: Int = CAPACITY) {
-    enum class Kind { RUN, BEGIN, END, SKIP, RING, YIELD, TURN, FAIL }
+    /** LINK: a relation between two nodes beside the tree — node is the source, note `<target ordinal>|<label>`. */
+    enum class Kind { RUN, BEGIN, END, SKIP, RING, YIELD, TURN, FAIL, LINK }
 
     private val mask = capacity - 1
     private val times = LongArray(capacity)
@@ -19,6 +20,9 @@ class LcncTrail(capacity: Int = CAPACITY) {
     private val notes = arrayOfNulls<String>(capacity)
     private var head = 0L
     private val origin = TimeSource.Monotonic.markNow()
+    /** This ring's identity: a reader's cursor and node ordinals mean something only under the epoch that issued them. */
+    // Within 2^53: it travels as a JSON number and must survive a double (a browser's) exactly.
+    val epoch: Long = kotlin.random.Random.nextLong(1L, 1L shl 53)
 
     private val nodeIndex = HashMap<String, Int>()
     private val nodeKeys = ArrayList<String>()
@@ -50,7 +54,16 @@ class LcncTrail(capacity: Int = CAPACITY) {
         nodeKeys.size - 1
     }
 
+    /** True when a node with ring path [key] (`program/ring/…/id`) is interned. */
+    fun known(key: String): Boolean = synchronizedLock(this) { key in nodeIndex }
+
     fun emit(run: Int, kind: Kind, node: Int, note: String? = null) = synchronizedLock(this) { put(run, kind, node, note) }
+
+    /** A relation from [from] to [to] named [label]: what the tree alone cannot draw. */
+    fun link(run: Int, from: Int, to: Int, label: String) = emit(run, Kind.LINK, from, "$to|$label")
+
+    /** The most recently opened run: where a runner's own pointcuts land. */
+    fun lastRun(): Int = synchronizedLock(this) { runNames.size - 1 }
 
     private fun put(run: Int, kind: Kind, node: Int, note: String?) {
         val slot = (head and mask.toLong()).toInt()
@@ -64,10 +77,10 @@ class LcncTrail(capacity: Int = CAPACITY) {
      * Drains from [cursor]: the events after it as columns, the node rows past [knownNodes], and
      * `dropped` — events the ring overwrote before this reader came back.
      */
-    fun since(cursor: Long, knownNodes: Int): Map<String, Any?> = synchronizedLock(this) {
-        // A cursor past the head was issued by an earlier ring (the process restarted): the reader
-        // starts over from what this ring holds, and `reset` tells it to drop its node table.
-        val reset = cursor > head || knownNodes > nodeKeys.size
+    fun since(cursor: Long, knownNodes: Int, epoch: Long = this.epoch): Map<String, Any?> = synchronizedLock(this) {
+        // A cursor issued by another ring (the process restarted) means nothing here, even when it happens
+        // to be in range: the reader starts over and `reset` tells it to drop its node table.
+        val reset = epoch != this.epoch || cursor > head || knownNodes > nodeKeys.size
         val start = if (reset) 0L else cursor
         val from = maxOf(start, head - (mask + 1), 0L)
         val n = (head - from).toInt()
@@ -80,7 +93,7 @@ class LcncTrail(capacity: Int = CAPACITY) {
         }
         val k = if (reset) 0 else knownNodes.coerceIn(0, nodeKeys.size)
         linkedMapOf(
-            "head" to head, "from" to from, "dropped" to (from - start).coerceAtLeast(0L), "reset" to reset,
+            "head" to head, "from" to from, "dropped" to (from - start).coerceAtLeast(0L), "reset" to reset, "epoch" to this.epoch,
             "now" to origin.elapsedNow().inWholeNanoseconds / 1e6,
             "t" to t, "kind" to kind, "run" to run, "node" to node, "note" to note,
             "nodesFrom" to k, "nodeKeys" to nodeKeys.subList(k, nodeKeys.size).toList(),
@@ -91,7 +104,8 @@ class LcncTrail(capacity: Int = CAPACITY) {
     }
 
     companion object {
-        const val CAPACITY = 1 shl 16
+        /** A curated book emits a statement and its relations per clause: tens of thousands of events. */
+        const val CAPACITY = 1 shl 20
         const val NOTE = 160
         /** The process's ring: every daemon run fills it; viewers drain it. */
         val live = LcncTrail()

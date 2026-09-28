@@ -1,5 +1,9 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.graal.subvm.harness.DocumentModelFixture
 import borg.trikeshed.job.CasStore
@@ -21,7 +25,6 @@ import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -74,12 +77,12 @@ class DocumentCuratorTest {
                 assertEquals(raw, result.record.model!!.content)
                 val stored = DocumentCuratorCodec.decode(assertNotNull(f.cas.get(result.recordCid)))
                 assertEquals(raw, stored.model!!.content)
-                assertFalse(JsonSupport.parseMap(stored.model.content).containsKey("format"))
+                assertFalse(reifyMap(stored.model.content).containsKey("format"))
                 assertEquals(DocumentCuratorCodec.nlp(nlp), DocumentCuratorCodec.nlp(assertNotNull(stored.nlp)))
 
-                val envelope = JsonSupport.parseMap(raw)
+                val envelope = reifyMap(raw)
                 val explicit = DocumentCuratorGrounding.reconcile(source, nlp,
-                    DocumentCuratorGrounding.parse(JsonSupport.stringify(envelope + ("format" to "TRIPLET_JSON"))))[0]
+                    DocumentCuratorGrounding.parse(jsonOf(envelope + ("format" to "TRIPLET_JSON"))))[0]
                 assertEquals(0, explicit.reasons.size)
                 assertEquals(p.subject, explicit.subject)
                 assertEquals(p.predicate, explicit.predicate)
@@ -88,7 +91,7 @@ class DocumentCuratorTest {
                     envelope + ("format" to "KIF"), envelope + ("format" to null),
                     envelope + ("commentary" to "extra envelope fields remain unsupported"),
                 )) {
-                    val refused = DocumentCuratorGrounding.parse(JsonSupport.stringify(invalid))[0]
+                    val refused = DocumentCuratorGrounding.parse(jsonOf(invalid))[0]
                     assertNull(refused.subject)
                     assertTrue(refused.reasons.size > 0)
                 }
@@ -241,8 +244,8 @@ class DocumentCuratorTest {
             try {
                 val runner = DocumentCurationLegos.curate(curator)
                 val node = LcncNode("profile", DocumentCurationLegos.CURATE, mapOf("instructions" to instructions))
-                val output = runner.run(node, mapOf("source" to JsonSupport.parse(
-                    JsonSupport.stringify(DocumentCuratorCodec.source(corrected)))))
+                val output = runner.run(node, mapOf("source" to reify(
+                    jsonOf(DocumentCuratorCodec.source(corrected)))))
                 val cid = ContentId(output["receiptCid"] as String)
                 val record = assertNotNull(curator.record(cid))
                 assertEquals(instructions, record.instructions)
@@ -251,7 +254,7 @@ class DocumentCuratorTest {
                 assertEquals("AVAILABLE", output["nlpStatus"])
                 assertNotNull(output["sheet"])
                 assertEquals(instructions, sentPrompt!!.messages[0].content)
-                assertEquals(JsonSupport.stringify(mapOf(
+                assertEquals(jsonOf(mapOf(
                     "source" to DocumentCuratorCodec.source(record.source),
                     "nlp" to DocumentCuratorCodec.nlp(assertNotNull(record.nlp)),
                 )), sentPrompt!!.messages[1].content)
@@ -513,7 +516,7 @@ class DocumentCuratorTest {
                 assertNotNull(currentCoroutineContext()[DocumentCuratorElement])
                 modelCalls++
                 assertTrue(release.isCompleted)
-                val input = JsonSupport.parse(it.messages[it.messages.size - 1].content) as Map<*, *>
+                val input = reify(it.messages[it.messages.size - 1].content) as Map<*, *>
                 val linguistic = input["nlp"] as Map<*, *>
                 assertEquals("Rain causes floods.", linguistic["text"])
                 val sentence = (linguistic["sentences"] as List<*>).single() as Map<*, *>
@@ -683,7 +686,7 @@ class DocumentCuratorTest {
             })
             try {
                 val result = curator.curate(f.source)
-                val payload = JsonSupport.parseMap(assertNotNull(sentPrompt).messages[1].content)
+                val payload = reifyMap(assertNotNull(sentPrompt).messages[1].content)
                 assertEquals(ontology.values(), payload["toolOntology"])
                 assertEquals(ontology.values(), result.record.toolOntology.values())
                 assertEquals(ontology.values(), DocumentCuratorCodec.decode(
@@ -867,7 +870,7 @@ class DocumentCuratorTest {
 
     companion object {
         private fun response(content: String) = ModelResponse(content, ModelUsage(-1, -1, -1), "actual-provider", "answering-model")
-        private fun envelope(vararg proposals: Map<String, Any?>) = JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals.toList()))
+        private fun envelope(vararg proposals: Map<String, Any?>) = jsonOf(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals.toList()))
         private fun proposal(confidence: Double = 0.9, quote: String = "Rain causes floods.", begin: Int = 0,
             end: Int = 19, polarity: Boolean = true, modality: String = "asserted", predicate: String = "cause") =
             mapOf("subject" to "Rain", "predicate" to predicate, "object" to "floods", "confidence" to confidence,

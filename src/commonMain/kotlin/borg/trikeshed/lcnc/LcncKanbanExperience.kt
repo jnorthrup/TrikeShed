@@ -1,5 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.sheet.SheetSeed
 import borg.trikeshed.forge.sheet.confixSheets
 import borg.trikeshed.kanban.BoardApply
@@ -9,7 +12,6 @@ import borg.trikeshed.kanban.KanbanGraph
 import borg.trikeshed.kanban.KanbanGraphConfix
 import borg.trikeshed.kanban.toBoardMap
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.view
@@ -72,7 +74,7 @@ class LcncKanbanExperience(
         // never groups cards, invents statuses, or reshapes commands.
         val board = borg.trikeshed.kanban.BoardCursor.of(store.cards())
         val orchestration = graph()
-        val orchestrationMap = JsonSupport.parse(KanbanGraphConfix.toJson(orchestration))
+        val orchestrationMap = reify(KanbanGraphConfix.toJson(orchestration))
         return mapOf(
             "board" to LcncOperationalSheets.board(store).toLcncMap(),
             "byStatus" to LcncOperationalSheets.byStatus(store).map(SheetSeed::toLcncMap),
@@ -219,13 +221,13 @@ class LcncKanbanExperience(
                     ?.toString()
                     ?: error("confix.pickPath: json input or param required")
                 val path = required(node, "path")
-                val selected = resolveJsonPath(JsonSupport.parse(json), path)
+                val selected = resolveJsonPath(reify(json), path)
                 if (selected == null) {
                     mapOf("found" to false, "path" to path, "sheets" to emptyList<Any?>(), "sheet" to null)
                 } else {
                     // A scalar still needs a visible Confix row, while objects/arrays retain their native nesting.
                     val shown = if (selected is Map<*, *> || selected is List<*>) selected else mapOf("value" to selected)
-                    val family = confixSheets("confix/$path", path, confixDoc(JsonSupport.stringify(shown)))
+                    val family = confixSheets("confix/$path", path, confixDoc(jsonOf(shown)))
                     mapOf(
                         "found" to true,
                         "path" to path,

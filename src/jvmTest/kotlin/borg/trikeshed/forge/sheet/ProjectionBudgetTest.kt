@@ -1,8 +1,9 @@
 package borg.trikeshed.forge.sheet
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import kotlin.test.*
 
 class ProjectionBudgetTest {
@@ -14,7 +15,7 @@ class ProjectionBudgetTest {
     }
 
     @Test fun sheetBudgetIsFamilyWideAndNeverLeavesDanglingReferences() {
-        val doc = confixDoc(JsonSupport.stringify(mapOf("first" to List(100) { mapOf("x" to it) }, "last" to 3)))
+        val doc = confixDoc(jsonOf(mapOf("first" to List(100) { mapOf("x" to it) }, "last" to 3)))
         val sheets = confixSheets("root", "root", doc, maxSheets = 3, maxRows = 5)
         assertTrue(sheets.size <= 3)
         assertTrue(sheets.sumOf { it.rows.size } <= 5)

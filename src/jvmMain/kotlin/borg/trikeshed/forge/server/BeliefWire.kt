@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cas.GroupingReorientation
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.memory.HermesMemoryFiles
@@ -16,8 +19,6 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.narsese.ReplayScenario
 import borg.trikeshed.narsese.ReplayTurn
 import borg.trikeshed.narsese.TurnReviewElement
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * BeliefWire — the NARS curation loop's HTTP window, mounted on the kanban
  * listener like GraalWire/VmWire:
@@ -101,7 +102,7 @@ class BeliefWire(
             // landed (angular → gloss) pairs out. Quota-free by construction.
             method == "POST" && p == "/api/beliefs/teach" -> {
                 val c = curator ?: return json(mapOf("error" to "curator not wired"), 503)
-                val req = runCatching { JsonSupport.parse(rawBody(text)) as? Map<*, *> }.getOrNull()
+                val req = runCatching { reify(rawBody(text)) as? Map<*, *> }.getOrNull()
                     ?: return json(mapOf("error" to "bad_json"), 400)
                 val impulses = ((req["impulses"] as? List<*>).orEmpty()).mapNotNull { raw ->
                     val m = raw as? Map<*, *> ?: return@mapNotNull null
@@ -294,7 +295,7 @@ class BeliefWire(
     }
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     /** Extra routes receive the RAW request (headers + body) as `text`; split first. */
     private fun rawBody(text: String): String = when {
@@ -307,6 +308,6 @@ class BeliefWire(
     private fun parse(text: String): Map<String, Any?> {
         val body = rawBody(text)
         if (body.isBlank()) return emptyMap()
-        return runCatching { JsonSupport.parse(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
+        return runCatching { reify(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
     }
 }

@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
@@ -12,7 +15,6 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.narsese.*
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
@@ -155,11 +157,11 @@ class DocumentCurationWire private constructor(
 
     private suspend fun run(program: String, source: Map<String, Any?>, expectedProgramCid: String? = null): Map<String, Any?> {
         val route = ctx.routes.match("/api/lcnc/run") ?: error("LCNC execution is unavailable")
-        val response = route.route("POST", "/api/lcnc/run", JsonSupport.stringify(mapOf(
+        val response = route.route("POST", "/api/lcnc/run", jsonOf(mapOf(
             "program" to program, "inputs" to mapOf("source" to (source - "text")), "timeoutMs" to 120_000,
             "expectProgramCid" to expectedProgramCid)), null)
             ?: error("LCNC returned no document run")
-        val run = JsonSupport.parseMap(response.body)
+        val run = reifyMap(response.body)
         check(response.status == 200 && run["error"] == null) { run["error"]?.toString() ?: "Document composition failed" }
         return run
     }
@@ -241,7 +243,7 @@ class DocumentCurationWire private constructor(
                     }
                     method == "POST" && path.substringBefore('?') == "/api/documents/curate" -> {
                         require(text.length <= 4 * 1024 * 1024) { "Document request exceeds 4 MiB" }
-                        val input = JsonSupport.parseMap(text.substringAfter("\r\n\r\n", text))
+                        val input = reifyMap(text.substringAfter("\r\n\r\n", text))
                         val source = input["source"] as? Map<*, *> ?: error("source is required")
                         val body = source.entries.associate { it.key as String to it.value }.toMutableMap()
                         // New text is an original; retained documents must supply both matching CIDs.
@@ -278,5 +280,5 @@ class DocumentCurationWire private constructor(
 
     fun close() { try { nlp.close() } finally { log.close() } }
 
-    private fun json(value: Any?, status: Int = 200) = WireHttpResponse(status, JsonSupport.stringify(value), "application/json; charset=utf-8")
+    private fun json(value: Any?, status: Int = 200) = WireHttpResponse(status, jsonOf(value), "application/json; charset=utf-8")
 }

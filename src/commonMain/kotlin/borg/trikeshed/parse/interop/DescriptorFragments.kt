@@ -1,5 +1,7 @@
 package borg.trikeshed.parse.interop
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.TypeEvidence
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.RowVec
@@ -10,7 +12,6 @@ import borg.trikeshed.cursor.label
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.j
-import borg.trikeshed.parse.json.*
 import borg.trikeshed.parse.yaml.*
 enum class ReificationFlavor {
     Generic,
@@ -74,7 +75,7 @@ fun DescriptorFragment.signature(): String =
 data class NdjsonPreparedParser(
     val descriptor: DescriptorFragment,
 ) {
-    fun parse(line: String): Any? = JsonParser.reify(CharSeries(line))
+    fun parse(line: String): Any? = reify(line)
     fun describeRowTree(line: String): TreeCursor = StructuredParserSupport.describeJsonRowTree(line)
 }
 

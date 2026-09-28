@@ -1,6 +1,7 @@
 package borg.trikeshed.forge.gallery
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -35,7 +36,7 @@ class ForgeGalleryCatalogTest {
     @Test
     fun jsonValueIsPortableAndSelfDescribing() {
         val json = ForgeGalleryCatalog.renderJson()
-        val root = JsonSupport.parse(json) as Map<*, *>
+        val root = reify(json) as Map<*, *>
         assertEquals(ForgeGalleryCatalog.CATALOG_VERSION, root["version"])
         val sections = root["sections"] as List<*>
         assertEquals(ForgeGallerySection.values().map { it.name }, sections.map { it as String })

@@ -1,5 +1,7 @@
 package borg.trikeshed.ipns
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
@@ -8,7 +10,6 @@ import borg.trikeshed.forge.server.CouchWire
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Timeout
@@ -109,7 +110,7 @@ class IpnsNodeTest {
                 val text = (if (status >= 400) connection.errorStream else connection.inputStream)
                     .bufferedReader().use { it.readText() }
                 println("IPNS HTTP $method $path: $status $text")
-                status to (JsonSupport.parse(text) as Map<*, *>)
+                status to (reify(text) as Map<*, *>)
             } finally { connection.disconnect() }
         }
         try {

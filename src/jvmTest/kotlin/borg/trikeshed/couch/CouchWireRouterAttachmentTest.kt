@@ -1,7 +1,8 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -27,7 +28,7 @@ class CouchWireRouterAttachmentTest {
         @Suppress("UNCHECKED_CAST")
         suspend fun json(method: String, path: String, body: ByteArray = ByteArray(0)): Pair<Map<String, Any?>, Int> {
             val reply = raw(method, path, body)
-            return JsonSupport.parse(reply.bytes.decodeToString()) as Map<String, Any?> to reply.status
+            return reify(reply.bytes) as Map<String, Any?> to reply.status
         }
 
         /** The wire flow the absorber uses: bytes → `_cas` block, then the path doc naming its cid. */

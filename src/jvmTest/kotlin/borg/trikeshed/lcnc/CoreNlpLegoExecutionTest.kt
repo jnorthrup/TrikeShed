@@ -1,8 +1,9 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -62,7 +63,7 @@ class CoreNlpLegoExecutionTest {
         val node = LcncNode("n2", SubVmLegos.CORENLP_EXTRACT, params = mapOf("text" to text))
         val out = runner.run(node, emptyMap())
         val raw = out["text"] as? String ?: error("corenlp.extract must emit text")
-        val sentences = JsonSupport.parse(raw) as? List<*> ?: error("output must be a JSON array: $raw")
+        val sentences = reify(raw) as? List<*> ?: error("output must be a JSON array: $raw")
         assertEquals(2, sentences.size, "two input sentences: $raw")
 
         val s1 = sentences[0] as Map<*, *>
@@ -153,7 +154,7 @@ class CoreNlpLegoExecutionTest {
         val node = LcncNode("n3", SubVmLegos.CORENLP_EXTRACT, params = mapOf("text" to hostile))
         val out = runner.run(node, emptyMap())
         val raw = out["text"] as? String ?: error("hostile text must still produce JSON")
-        val sentences = JsonSupport.parse(raw) as? List<*>
+        val sentences = reify(raw) as? List<*>
         assertTrue(sentences != null && !sentences.isEmpty(), "hostile text must parse to a JSON array: $raw")
         host.close()
     }

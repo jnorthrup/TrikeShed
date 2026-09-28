@@ -71,6 +71,11 @@ class JvmFileWatchReactorElement(
     override suspend fun open() {
         if (state != ElementState.CREATED) return
         super.open()
+        if (FsEventStream.available && Files.isDirectory(rootPath)) {
+            openFsEvents()
+            state = ElementState.ACTIVE
+            return
+        }
         val service = FileSystems.getDefault().newWatchService()
         watchService = service
         registerTree(rootPath, service)
@@ -80,9 +85,48 @@ class JvmFileWatchReactorElement(
         }
     }
 
+    private var fsEvents: FsEventStream? = null
+
+    /**
+     * macOS: one kernel event stream for the whole tree. Paths arrive as real paths, so they are
+     * relativized against the root's real path; blocked segments and globs filter at event time.
+     * A dropped or root-level event is published as the root rescan signal `("", MODIFY)`.
+     */
+    private fun openFsEvents() {
+        val real = rootPath.toRealPath()
+        val prefix = real.toString() + "/"
+        fsEvents = FsEventStream(real.toString(), 0.3) { path, flags ->
+            val rescan = flags and (FsEventStream.MUST_SCAN_SUBDIRS or FsEventStream.USER_DROPPED or
+                FsEventStream.KERNEL_DROPPED or FsEventStream.ROOT_CHANGED) != 0
+            val event = when {
+                rescan -> FileEvent("", FileEventType.MODIFY)
+                !path.startsWith(prefix) -> null
+                else -> {
+                    val rel = path.substring(prefix.length)
+                    if (isIgnored(real.resolve(rel)) || !glob.accepts(rel)) null
+                    else {
+                        val removed = flags and FsEventStream.ITEM_REMOVED != 0
+                        val created = flags and FsEventStream.ITEM_CREATED != 0
+                        val renamed = flags and FsEventStream.ITEM_RENAMED != 0
+                        // Coalesced flags (created and removed in one latency window) are settled by what is there now.
+                        val type = if (removed || created || renamed) {
+                            if (Files.exists(real.resolve(rel))) {
+                                if (created || renamed) FileEventType.CREATE else FileEventType.MODIFY
+                            } else FileEventType.DELETE
+                        } else FileEventType.MODIFY
+                        FileEvent(rel, type)
+                    }
+                }
+            }
+            // The dispatch queue is serial: blocking it on a full channel is the backpressure.
+            if (event != null) runCatching { kotlinx.coroutines.runBlocking { eventChannel.send(event) } }
+        }
+    }
+
     override suspend fun drain() {
         if (state.isLessThan(ElementState.OPEN) || state.isAtLeast(ElementState.CLOSED)) return
         state = ElementState.DRAINING
+        fsEvents?.let { fsEvents = null; eventChannel.close(); it.close() }
         watchService?.close()
         watchJob?.cancelAndJoin()
         eventChannel.close()

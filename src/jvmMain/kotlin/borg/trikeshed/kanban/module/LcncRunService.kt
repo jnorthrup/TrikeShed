@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardApply
 import borg.trikeshed.kanban.BoardIntake
@@ -8,8 +11,7 @@ import borg.trikeshed.lcnc.*
 import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
 import borg.trikeshed.module.ModuleContext
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -32,7 +34,7 @@ internal class LcncRunService(
     private var admittedRuns = 0
     private var draining = false
 
-    private fun response(status: Int, body: Map<String, Any?>) = HttpResponse(status, JsonSupport.stringify(body))
+    private fun response(status: Int, body: Map<String, Any?>) = HttpResponse(status, jsonOf(body))
 
     suspend fun content(cidText: String?, view: String?, programKey: String?): HttpResponse = withContext(Dispatchers.IO) {
         val cid = runCatching { ContentId(cidText.orEmpty()) }.getOrNull()
@@ -53,7 +55,7 @@ internal class LcncRunService(
         if (bytes.size > 1_048_576) return@withContext response(413, mapOf("error" to "payload_limit"))
         if (ContentId.of(bytes) != cid) return@withContext response(409, mapOf("error" to "content_identity_mismatch"))
         val text = bytes.decodeToString()
-        val value = runCatching { JsonSupport.parse(text) }.getOrElse {
+        val value = runCatching { reify(text) }.getOrElse {
             return@withContext response(422, mapOf("error" to "content_not_json"))
         }
         ValueBudget().violation(value)?.let { return@withContext response(413, mapOf("error" to it)) }
@@ -63,7 +65,7 @@ internal class LcncRunService(
         ValueBudget(maxNodes = 32768, maxChars = 131072).violation(sheets)?.let {
             return@withContext response(413, mapOf("error" to it))
         }
-        HttpResponse(200, JsonSupport.stringify(sheets))
+        HttpResponse(200, jsonOf(sheets))
     }
 
     /**
@@ -81,7 +83,7 @@ internal class LcncRunService(
         val name = programName?.takeIf { it.isNotBlank() }
             ?: return@withContext response(400, mapOf("error" to "program_required"))
         val inputsValue: Any? = if (inputsText.isNullOrBlank()) emptyMap<String, Any?>()
-        else runCatching { JsonSupport.parse(inputsText) }.getOrElse {
+        else runCatching { reify(inputsText) }.getOrElse {
             return@withContext response(400, mapOf("error" to "bad_inputs", "detail" to (it.message ?: "unparsed")))
         }
         if (inputsValue !is Map<*, *>) return@withContext response(400, mapOf("error" to "inputs_must_be_object"))
@@ -177,13 +179,15 @@ internal class LcncRunService(
         try {
             return coroutineScope {
                 active[runId] = currentCoroutineContext().job
-                val timeoutMs = ((request["timeoutMs"] as? Number)?.toLong() ?: 120000L).coerceIn(1L, 3_600_000L)
-                val maxNodes = ((request["maxNodes"] as? Number)?.toInt() ?: 10000).coerceIn(1, 10000)
+                // A run takes as long and walks as many statements as its work needs: a treatise or a
+                // dictionary curated whole is hours and tens of thousands of nodes. The caller sets them.
+                val timeoutMs = ((request["timeoutMs"] as? Number)?.toLong() ?: 120000L).coerceAtLeast(1L)
+                val maxNodes = ((request["maxNodes"] as? Number)?.toInt() ?: 10000).coerceAtLeast(1)
                 val versions = linkedMapOf<String, String>()
                 val pinned = mutableMapOf<String, LcncProgram>()
                 suspend fun freeze(label: String, source: LcncProgram): Pair<LcncProgram, String> = withContext(Dispatchers.IO) {
                     val bytes = LcncProgramConfix.toJson(source).encodeToByteArray()
-                    require(bytes.size <= 1_048_576) { "program payload_limit" }
+                    // A frozen program carries its inline literals, a whole book included.
                     LcncProgramConfix.fromJson(label, bytes.decodeToString()) to ctx.casStore.put(bytes).value
                 }
                 val (frozen, cid) = freeze(name, program)

@@ -1,8 +1,9 @@
 package borg.trikeshed.utils.kanban
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.jules.JulesCause
 import borg.trikeshed.jules.JulesSnapshot
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
@@ -16,7 +17,7 @@ import borg.trikeshed.util.oroboros.MergeReceipt
  * demands the spool, they ride the same log as records.
  *
  * Records are JSON-syntax Confix objects, one per WAL entry. We control both
- * writer and reader; [JsonSupport] (CharSeries parser, no kotlinx) reads back.
+ * writer and reader; [reify] (CharSeries parser, no kotlinx) reads back.
  */
 object KanbanEventCodec {
 
@@ -142,7 +143,7 @@ object KanbanEventCodec {
         // declared KanbanEvent? and callers (load/loadQueue/buildCausalGraph)
         // have explicit null-skip branches for forward-compat. Throwing here
         // aborts the entire WAL replay on a single malformed record.
-        val m = JsonSupport.parse(record) as? Map<*, *> ?: return null
+        val m = reify(record) as? Map<*, *> ?: return null
         return when (m["t"]) {
             "snap" -> SnapEvent(
                 JulesSnapshot(
@@ -309,13 +310,11 @@ object KanbanEventCodec {
         is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
-    // NO second unescape pass here. `JsonSupport.parse` (Json.kt `unescapeJson`)
+    // NO second unescape pass here. `reify` (confix `decodeTextSpan`)
     // already decodes string content, so re-decoding it ate one layer of
     // backslashes: a title containing `\"` came back as `"`, and `\\` collapsed
     // to `\`. The escapes people notice — \n and \t — looked fine either way,
-    // which is why it survived. `doc/todo.md` asked for the unescape because
-    // JsonParser used to hand back raw escaped chars; once the parser was fixed
-    // this became the compensating bug, not the fix.
+    // which is why it survived.
     // KanbanEventCodecEscapeTest round-trips every escape the task named.
     private fun Map<*, *>.str(k: String): String = this[k]?.toString() ?: ""
     private fun Map<*, *>.optStr(k: String): String? = this[k]?.toString()

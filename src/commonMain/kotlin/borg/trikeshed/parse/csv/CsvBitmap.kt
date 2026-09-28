@@ -3,11 +3,22 @@ package borg.trikeshed.parse.csv
 import borg.trikeshed.common.Files
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z
-import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.*
-import borg.trikeshed.parse.json.JsonBitmap.LexerEvents.Companion.test
 
 
 object CsvBitmap {
+
+    enum class LexerEvents(val predicate: (UByte) -> Boolean) {
+        Unchanged({ false }),
+        QuoteIncrement({ it.toUInt() == 0x22U }),
+        EscapeIncrement({ it.toUInt() == 0x5cU }),
+        UtfInitiatorOrContinuation({ it >= 0x80U })
+        ;
+
+        companion object {
+            val cache: Array<LexerEvents> = entries.drop(1).toTypedArray()
+            fun test(byte: UByte): Int = cache.firstOrNull { it.predicate(byte) }?.ordinal ?: Unchanged.ordinal
+        }
+    }
 
     enum class CsvStateEvent(val predicate: (UByte) -> Boolean) {
         Unchanged({ false }),
@@ -32,7 +43,7 @@ object CsvBitmap {
         val output = UByteArray(input.size)
         for (i in input.indices) {
             val csvStateEvent = CsvStateEvent.test(input[i])
-            val lexerEvent = test(input[i])
+            val lexerEvent = LexerEvents.test(input[i])
             val i1 = i / 2
             if (i % 2 == 0) output[i1] = (csvStateEvent or (lexerEvent shl 2) shl 4).toUByte()
             else output[i1] = output[i1] or (csvStateEvent or (lexerEvent shl 2)).toUByte()
@@ -93,12 +104,12 @@ object CsvBitmap {
                     if ((quoteCounter % 2).nz) {
                         when {
                             (escapeCounter % 2).nz -> escapeCounter = 0
-                            (maskBits and EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
-                            (maskBits and UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
-                            (maskBits and QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
+                            (maskBits and LexerEvents.EscapeIncrement.ordinal.toUInt()).nz -> escapeCounter = 1
+                            (maskBits and LexerEvents.UtfInitiatorOrContinuation.ordinal.toUInt()).nz -> {}//matters in super rare caase of initiator on top of quotes not yet impl
+                            (maskBits and LexerEvents.QuoteIncrement.ordinal.toUInt()).nz -> quoteCounter++
                         }
                     } else
-                        if ((maskBits and QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
+                        if ((maskBits and LexerEvents.QuoteIncrement.ordinal.toUInt()).nz) quoteCounter++
 
                     val csvStateBits = if ((quoteCounter % 2).nz) 0u else b.toUInt() and 0x3u
 //write the jsStateBits 2 bit result right-to-left in the input bits so we can reuse the input array

@@ -1,6 +1,7 @@
 package borg.trikeshed.forge
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -48,13 +49,13 @@ class ForgeAppShellTest {
         val seedText = html.substring(start, end)
         assertFalse(seedText.contains("</"), "a literal </ inside the JSON script element ends it early")
         @Suppress("UNCHECKED_CAST")
-        val seed = JsonSupport.parse(seedText.replace("<\\/", "</")) as Map<String, Any?>
+        val seed = reify(seedText.replace("<\\/", "</")) as Map<String, Any?>
         assertEquals("forge-shell-test", seed["userId"])
         val board = assertNotNull(seed["board"] as? Map<*, *>)
         assertTrue((board["columns"] as List<*>).isNotEmpty())
         val layout = assertNotNull(seed["graphLayout"] as? Map<*, *>)
         val nodes = layout["nodes"] as List<*>
-        // JsonSupport.parse reifies an empty "[]" as Array, a non-empty one as List.
+        // reify reifies an empty "[]" as Array, a non-empty one as List.
         val edges = (layout["edges"] as? List<*>) ?: (layout["edges"] as Array<*>).toList()
         val causal = seed["causalGraph"] as List<*>
         assertEquals(causal.size, nodes.size, "one laid-out node per causal node")
@@ -82,7 +83,7 @@ class ForgeAppShellTest {
         fun seedOf(h: String): Map<String, Any?> {
             val start = h.indexOf("<script id=\"forge-seed\" type=\"application/json\">") + "<script id=\"forge-seed\" type=\"application/json\">".length
             @Suppress("UNCHECKED_CAST")
-            return JsonSupport.parse(h.substring(start, h.indexOf("</script>", start)).replace("<\\/", "</")) as Map<String, Any?>
+            return reify(h.substring(start, h.indexOf("</script>", start)).replace("<\\/", "</")) as Map<String, Any?>
         }
         fun list(x: Any?): List<*> = (x as? List<*>) ?: (x as Array<*>).toList()
         val dead = seedOf(ForgeApp.renderHtml(userId = "forge-shell-test", vmHost = borg.trikeshed.vm.VmHost.NONE))["hosts"] as Map<*, *>

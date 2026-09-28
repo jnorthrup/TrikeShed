@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.ReifiedSplitSeries2
 import borg.trikeshed.cursor.`ColumnMeta↻`
@@ -7,7 +10,6 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import borg.trikeshed.treedoc.TreeDocK
 import borg.trikeshed.treedoc.TreeDocPipeline
@@ -33,7 +35,7 @@ internal class ArchiveService(cas: CasStore) {
             return withContext(Dispatchers.IO) {
                 if (operation == "import") {
                     if (body.length > MAX_BODY) return@withContext json(413, "Archive request byte limit exceeded")
-                    val request = JsonSupport.parse(body) as? Map<*, *> ?: error("Expected archive object")
+                    val request = reify(body) as? Map<*, *> ?: error("Expected archive object")
                     val raw = request["entries"] as? List<*> ?: error("Expected entries array")
                     require(raw.isNotEmpty() && raw.size <= MAX_ENTRIES) { "Archive entry limit is $MAX_ENTRIES" }
                     var total = 0
@@ -110,7 +112,7 @@ internal class ArchiveService(cas: CasStore) {
         }
     }
 
-    private fun response(status: Int, value: Any?) = HttpResponse(status, JsonSupport.stringify(value))
+    private fun response(status: Int, value: Any?) = HttpResponse(status, jsonOf(value))
     private fun json(status: Int, error: String) = response(status, mapOf("error" to error))
 
     companion object {

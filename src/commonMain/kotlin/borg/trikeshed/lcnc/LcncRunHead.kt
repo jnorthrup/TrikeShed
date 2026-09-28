@@ -1,8 +1,9 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import kotlin.math.abs
 import kotlin.math.floor
 
@@ -96,7 +97,7 @@ object LcncRunHead {
 
     /** The canonical text of a request's inputs; an absent `inputs` is the empty object, never null. */
     fun canonicalInputs(inputs: Any?): String =
-        JsonSupport.stringify(canonical(inputs ?: emptyMap<String, Any?>()))
+        jsonOf(canonical(inputs ?: emptyMap<String, Any?>()))
 
     /** A short stable handle for a target — a DOM id and a fetch de-duplication key, never an identity check. */
     fun inputsKey(program: String, canonicalInputs: String): String =

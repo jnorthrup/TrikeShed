@@ -281,6 +281,12 @@ kotlin {
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
 
+                // Kotlin scripting host: `language: "kotlin"` design-doc views compile
+                // against the daemon's own classpath and evaluate in its classloader.
+                implementation(kotlin("scripting-common"))
+                implementation(kotlin("scripting-jvm"))
+                implementation(kotlin("scripting-jvm-host"))
+
                 // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
                 implementation("org.xerial:sqlite-jdbc:3.42.0.0")
 

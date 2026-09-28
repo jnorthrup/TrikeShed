@@ -1,12 +1,13 @@
 package keymux
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.s_
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import kotlinx.coroutines.currentCoroutineContext
@@ -279,7 +280,7 @@ class HarnessSource(
     private fun readJson(ops: FileOperations, file: String): Map<String, Any?>? {
         if (!runCatching { ops.isFile(file) }.getOrDefault(false)) return null
         val text = runCatching { ops.readString(file) }.getOrNull() ?: return null
-        return runCatching { JsonSupport.parse(text) as? Map<String, Any?> }.getOrNull()
+        return runCatching { reify(text) as? Map<String, Any?> }.getOrNull()
     }
 
     private suspend fun fileOpsOrNull(): FileOperations? =

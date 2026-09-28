@@ -85,7 +85,7 @@ class SkillUsageLedgerTest {
 
     @Test
     fun coercesJsonNumbersAndBoolsFromAnyMinting() {
-        // JsonSupport may mint numbers as Double; pinned may arrive as a string.
+        // reify may mint numbers as Double; pinned may arrive as a string.
         val r = SkillUsageLedger.record(
             "x",
             mapOf(

@@ -1,7 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.subvm.GuestModules
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -43,7 +44,7 @@ class CamelLegoExecutionTest {
             val out = runner.run(node, emptyMap())
             val payload = (out["text"] as? String).orEmpty()
             assertTrue(payload.isNotBlank(), "camel lego produced no payload")
-            val obj = JsonSupport.parse(payload) as? Map<*, *>
+            val obj = reify(payload) as? Map<*, *>
                 ?: error("camel lego payload was not a JSON object: $payload")
             assertEquals("Started", obj["status"]?.toString(), "CamelContext should be Started: $payload")
             val routes = obj["routes"] as? List<*> ?: emptyList<Any?>()
@@ -68,7 +69,7 @@ class CamelLegoExecutionTest {
             )
             val out = runner.run(node, emptyMap())
             val payload = (out["text"] as? String).orEmpty()
-            val obj = JsonSupport.parse(payload) as? Map<*, *>
+            val obj = reify(payload) as? Map<*, *>
                 ?: error("camel lego payload was not a JSON object: $payload")
             assertEquals(body, obj["reply"]?.toString(), "the body must come back out of the route: $payload")
         } finally {

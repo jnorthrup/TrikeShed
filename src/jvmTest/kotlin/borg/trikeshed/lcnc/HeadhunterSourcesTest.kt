@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.subvm.GuestModules
@@ -18,7 +20,6 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import keymux.CouchKeyStore
 import kotlinx.coroutines.test.runTest
@@ -122,7 +123,7 @@ class HeadhunterSourcesTest {
         val secret = "session=isolated-cookie-value"
         val saved = sources.saveCredential(mapOf("origin" to "https://jobs.example/jobs/", "cookie" to secret,
             "pathPrefix" to "/jobs", "credentialRef" to "isolated-source"))
-        assertFalse(JsonSupport.stringify(saved).contains(secret))
+        assertFalse(jsonOf(saved).contains(secret))
         assertTrue(sources.credentials.listProviders().isEmpty())
         val requests = mutableListOf<HtxRequest>()
         val element = sourceElement { request ->
@@ -142,8 +143,8 @@ class HeadhunterSourcesTest {
             assertNull(requests[2].headerValue("Cookie"))
             assertEquals("https://listings.example/42", result["finalUrl"])
             assertEquals("Role: Kotlin engineer", result["text"])
-            assertFalse(JsonSupport.stringify(result).contains(secret))
-            assertFalse(JsonSupport.stringify(result).contains("isolated-cookie-value"))
+            assertFalse(jsonOf(result).contains(secret))
+            assertFalse(jsonOf(result).contains("isolated-cookie-value"))
             assertEquals("identity", requests[0].headerValue("Accept-Encoding"))
         } finally { element.close() }
     }
@@ -199,7 +200,7 @@ class HeadhunterSourcesTest {
                 assertEquals(if (throws) "fetch_failed" else "blocked", result["status"])
                 assertNull(result["originalCid"])
                 assertNull(result["text"])
-                assertFalse(JsonSupport.stringify(result).contains("isolated-secret"))
+                assertFalse(jsonOf(result).contains("isolated-secret"))
             }
         } finally { element.close() }
     }
@@ -213,7 +214,7 @@ class HeadhunterSourcesTest {
             mapOf("credentialRef" to "missing"))["status"])
         val secretUrl = sources.capture(mapOf("url" to "https://jobs.example/?access_token=isolated-secret"))
         assertEquals("invalid", secretUrl["status"])
-        assertFalse(JsonSupport.stringify(secretUrl).contains("isolated-secret"))
+        assertFalse(jsonOf(secretUrl).contains("isolated-secret"))
         assertFailsWith<SourceFailure> { sources.configuration(mapOf("cookie" to "isolated-secret")) }
         assertFailsWith<SourceFailure> { sources.saveCredential(mapOf("origin" to "http://jobs.example/", "cookie" to "isolated-secret")) }
         assertFailsWith<SourceFailure> { sources.saveCredential(mapOf("origin" to "https://jobs.example/", "cookie" to "isolated-secret\r\nX-Leak: yes")) }
@@ -248,7 +249,7 @@ class HeadhunterSourcesTest {
         try {
             val result = withContext(denied) { sources.capture(mapOf("url" to "https://$first/jobs")) }
             assertEquals("configuration_required", result["status"])
-            assertFalse(JsonSupport.stringify(result).contains("isolated-secret"))
+            assertFalse(jsonOf(result).contains("isolated-secret"))
         } finally { denied.close() }
     }
 

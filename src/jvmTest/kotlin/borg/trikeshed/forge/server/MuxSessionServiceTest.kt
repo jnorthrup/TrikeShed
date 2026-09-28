@@ -1,12 +1,14 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.htx.*
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toArray
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.*
 import keymux.FixedKeySource
@@ -34,11 +36,11 @@ class MuxSessionServiceTest {
     }
 
     private suspend fun post(service: MuxSessionService, path: String, body: Map<String, Any?>) =
-        service.route("POST", "/api/mux/sessions$path", JsonSupport.stringify(body))!!
+        service.route("POST", "/api/mux/sessions$path", jsonOf(body))!!
     private suspend fun create(service: MuxSessionService): Long =
-        (JsonSupport.parseMap(post(service, "", mapOf("title" to "Test")).body)["id"] as Number).toLong()
+        (reifyMap(post(service, "", mapOf("title" to "Test")).body)["id"] as Number).toLong()
     private suspend fun get(service: MuxSessionService, id: Long) =
-        JsonSupport.parseMap(service.route("GET", "/api/mux/sessions?id=$id", "")!!.body)
+        reifyMap(service.route("GET", "/api/mux/sessions?id=$id", "")!!.body)
     private suspend fun finished(service: MuxSessionService, id: Long): Map<String, Any?> = withTimeout(5000) {
         var value = get(service, id)
         while (value["status"] in setOf("queued", "running", "joining") || (value["calls"] as List<*>).none { (it as Map<*, *>)["turnId"] == value["turnId"] }) { delay(10); value = get(service, id) }
@@ -60,12 +62,12 @@ class MuxSessionServiceTest {
             assertTrue(requests.last().contains("first") && requests.last().contains("answer") && requests.last().contains("second"))
             val restored = MuxSessionService(brain, gateway, scope, kotlin.coroutines.EmptyCoroutineContext)
             assertEquals(result, get(restored, id))
-            val fork = JsonSupport.parseMap(post(service, "/fork", mapOf("id" to id)).body)
+            val fork = reifyMap(post(service, "/fork", mapOf("id" to id)).body)
             assertEquals(4, (fork["messages"] as List<*>).size)
             assertEquals(emptyList<Any>(), fork["calls"])
             val activity = service.route("GET", "/api/mux/activity", "")!!.body
             assertFalse(activity.contains("private-test-key"))
-            assertEquals(2, (JsonSupport.parseMap(activity)["calls"] as List<*>).size)
+            assertEquals(2, (reifyMap(activity)["calls"] as List<*>).size)
         } finally { scope.coroutineContext[Job]?.cancelAndJoin() }
     }
 
@@ -133,7 +135,7 @@ class MuxSessionServiceTest {
             val service = MuxSessionService(pinned, gateway, scope, kotlin.coroutines.EmptyCoroutineContext, catalogProvider = { catalogBrain.modelMux() })
             val response = service.route("GET", "/api/mux/catalog", "")!!
             assertEquals(200, response.status)
-            val rows = JsonSupport.parseMap(response.body)["models"] as List<*>
+            val rows = reifyMap(response.body)["models"] as List<*>
             assertEquals(setOf("test-a", "test-b"), rows.map { (it as Map<*, *>)["model"] }.toSet())
             assertTrue(rows.all { (it as Map<*, *>)["keyPresent"] == true })
             assertFalse(response.body.contains("private-test-key"))
@@ -151,7 +153,7 @@ class MuxSessionServiceTest {
         val service = MuxSessionService(brain, null, null, kotlin.coroutines.EmptyCoroutineContext, catalogProvider = { mux })
         val response = service.route("GET", "/api/mux/catalog", "")!!
         assertEquals(200, response.status)
-        val body = JsonSupport.parseMap(response.body)
+        val body = reifyMap(response.body)
         assertEquals("configured", body["defaultModel"])
         val card = (body["models"] as List<*>).single() as Map<*, *>
         assertEquals("custom", card["name"])
@@ -176,7 +178,7 @@ class MuxSessionServiceTest {
             assertEquals(get(service, id), get(fresh, id))
             val interrupted = get(fresh, id) + mapOf("status" to "running", "archived" to false)
             withContext(Dispatchers.IO) {
-                borg.trikeshed.userspace.nio.file.spi.JvmFileOperations().writeAtomically(snapshot.absolutePath, JsonSupport.stringify(listOf(interrupted)).encodeToByteArray())
+                borg.trikeshed.userspace.nio.file.spi.JvmFileOperations().writeAtomically(snapshot.absolutePath, jsonOf(listOf(interrupted)).encodeToByteArray())
             }
             val recovered = MuxSessionService(brain, freshGateway, scope, kotlin.coroutines.EmptyCoroutineContext, snapshotFile = snapshot)
             assertEquals("interrupted", get(recovered, id)["status"])

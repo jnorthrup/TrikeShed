@@ -1,5 +1,7 @@
 package borg.trikeshed.forge
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.common.Files
 import borg.trikeshed.cursor.blackboardContext
 import borg.trikeshed.cursor.provenance
@@ -36,7 +38,6 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.blackboard.BlackboardSurface
 import borg.trikeshed.graph.CausalGraphNodeIndex
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.datetime.Clock
 
 /**
@@ -126,7 +127,7 @@ object ForgeApp {
             "hosts" to forgeHostsSeed(vmHost),
         )
         // The seed lives inside <script type="application/json">; a literal "</" must not end that element.
-        return JsonSupport.stringify(seedMap).replace("</", "<\\/")
+        return jsonOf(seedMap).replace("</", "<\\/")
     }
 
     /**

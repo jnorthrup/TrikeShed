@@ -1,8 +1,8 @@
 package modelmux
 
-import kotlinx.serialization.Serializable
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
 
+import kotlinx.serialization.Serializable
 /**
  * Event vocabulary for observer/pointcut hooks into modelmux logic.
  */
@@ -33,7 +33,7 @@ sealed class ModelSelectionEvent {
                 "requestId" to requestId,
                 "at" to at
             )
-            return JsonSupport.stringify(map)
+            return jsonOf(map)
         }
     }
 }

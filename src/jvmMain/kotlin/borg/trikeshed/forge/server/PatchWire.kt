@@ -1,5 +1,9 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.job.ContentId
@@ -9,7 +13,6 @@ import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.job.CasStore
@@ -105,7 +108,7 @@ class ProjectScopes(
         // (Registry absent = legacy prefix-scope absorb into the shared db.)
         val registry = projectDbs
         val (prefix, scopeGateway) = if (registry != null) {
-            val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+            val store = projectStore(name)
             val db = borg.trikeshed.couch.Couch(name, store, casStore)
             val gateway = CouchAttachmentGateway(store, casStore)
             val pdb = ProjectDb(name, dir.absolutePath, kind, db, store, gateway,
@@ -152,7 +155,7 @@ class ProjectScopes(
         // Chrome hides dot-dirs from the walker, so `.git` can never be the signal here:
         // the CLIENT classifies by build-system markers and tells us. git|project → "git".
         val k = if (kind == "git" || kind == "project") "git" else "assets"
-        val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+        val store = projectStore(name)
         val db = borg.trikeshed.couch.Couch(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
@@ -172,6 +175,15 @@ class ProjectScopes(
         val rel = relPath.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$relPath'" }
         val cid = borg.trikeshed.job.ContentId.of(bytes)
+        // The upload lands once, under files/<name>/; the CAS names that file in place.
+        val landed = filesRoot?.let { fr ->
+            runCatching {
+                val f = File(File(fr, name), rel)
+                f.parentFile?.mkdirs()
+                if (!(f.isFile && f.length() == bytes.size.toLong() && borg.trikeshed.job.ContentId.of(f.readBytes()) == cid)) f.writeBytes(bytes)
+                f.absolutePath
+            }.getOrNull()
+        }
         pdb.gateway.putAttachment(
             borg.trikeshed.util.oroboros.OroborosAttachmentRef(
                 path = rel,
@@ -183,20 +195,34 @@ class ProjectScopes(
                 sequence = System.currentTimeMillis(),
             ),
             bytes,
+            source = landed,
         )
         manifestFileFor(name)?.let { mf ->
             runCatching { mf.appendText("$rel\t${cid.value}\t${bytes.size}\n") }
         }
-        // Browsable on-disk twin under files/<name>/ — the fs dedupes it against CAS blocks.
-        filesRoot?.let { fr ->
-            runCatching {
-                val f = File(File(fr, name), rel)
-                f.parentFile?.mkdirs()
-                f.writeBytes(bytes)
-            }
-        }
         scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
         return cid
+    }
+
+    /** Commit chains of the project dbs, by name: a project db's heads survive a restart like the core db's. */
+    private val commits = java.util.concurrent.ConcurrentHashMap<String, borg.trikeshed.couch.persistence.CouchCommitStore>()
+
+    private fun projectCouchDir(name: String): File? = ledgerFile?.let { File(it.parentFile, "project-couch/$name") }
+
+    /**
+     * A project db's couch store: durable commit-chained heads beside the ledger when the CAS and the
+     * filesystem are durable, so documents written into it (design docs, notes) persist; else the
+     * volatile projection its manifest rebuilds.
+     */
+    private fun projectStore(name: String): borg.trikeshed.couch.CouchStore {
+        val dir = projectCouchDir(name)
+        if (dir == null || casStore.durability != borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE ||
+            fileOps.durability != borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE)
+            return borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+        val chain = borg.trikeshed.couch.persistence.CouchCommitStore(casStore,
+            borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE, fileOps, dir.absolutePath)
+        commits.put(name, chain)?.close()
+        return borg.trikeshed.couch.CouchStoreFactory.durableCasBacked(casStore, chain)
     }
 
     private fun manifestFileFor(name: String): File? =
@@ -253,19 +279,26 @@ class ProjectScopes(
             runCatching {
                 val parts = line.split('\t')
                 if (parts.size < 2) return@runCatching
-                val bytes = casStore.get(borg.trikeshed.job.ContentId(parts[1])) ?: return@runCatching
                 val pdb = projectDbs?.get(name) ?: return@runCatching
+                // Durable heads already hold it at this content: no second revision per boot.
+                if (pdb.store.get(parts[0])?.fields?.any { it.name == "contentId" && it.value == parts[1] } == true) { docs++; return@runCatching }
+                val cid = borg.trikeshed.job.ContentId(parts[1])
+                val landed = filesRoot?.let { File(File(it, name), parts[0]) }?.takeIf { it.isFile }
+                val bytes = casStore.get(cid)
+                    ?: landed?.readBytes()?.takeIf { borg.trikeshed.job.ContentId.of(it) == cid }
+                    ?: return@runCatching
                 pdb.gateway.putAttachment(
                     borg.trikeshed.util.oroboros.OroborosAttachmentRef(
                         path = parts[0],
                         contentType = borg.trikeshed.util.io.ContentTypes.forPath(parts[0]),
                         length = bytes.size.toLong(),
-                        contentId = borg.trikeshed.job.ContentId(parts[1]),
+                        contentId = cid,
                         agentId = "manifest-replay",
                         revision = "upload",
                         sequence = docs.toLong() + 1,
                     ),
                     bytes,
+                    source = landed?.absolutePath,
                 )
                 docs++
             }.onFailure { skipped++ }
@@ -279,7 +312,7 @@ class ProjectScopes(
     private fun beginUploadInternal(name: String, kind: String = "assets"): Scope? {
         val registry = projectDbs ?: return null
         if (scopes.any { it.name == name } || registry.refusalFor(name) != null) return null
-        val store = borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore)
+        val store = projectStore(name)
         val db = borg.trikeshed.couch.Couch(name, store, casStore)
         val gateway = CouchAttachmentGateway(store, casStore)
         registry.register(
@@ -301,6 +334,8 @@ class ProjectScopes(
             runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
         }
         manifestFileFor(name)?.delete()
+        commits.remove(name)?.close()
+        projectCouchDir(name)?.deleteRecursively()
         filesRoot?.let { File(it, name).deleteRecursively() }
         System.err.println("[OROBOROS] project db unmounted: $name")
         true
@@ -587,7 +622,7 @@ class PatchWire(
                 val req = parse(text)
                 val programData = req["program"] ?: return json(mapOf("error" to "program_required"), 400)
                 val program = runCatching {
-                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", JsonSupport.stringify(programData))
+                    borg.trikeshed.lcnc.LcncProgramConfix.fromJson("treeshake", jsonOf(programData))
                 }.getOrElse { return json(mapOf("error" to "bad_program", "detail" to (it.message ?: "")), 400) }
                 val result = try {
                     val options = borg.trikeshed.lcnc.LcncTreeShakeOptions.fromMap(req["options"] as? Map<*, *>)
@@ -657,7 +692,7 @@ class PatchWire(
                 var tags = emptyList<String>()
                 var baseCid: String? = null
                 if (isJson) {
-                    val m = runCatching { JsonSupport.parseMap(body) }.getOrElse { return json(mapOf("error" to "bad json"), 400) }
+                    val m = runCatching { reifyMap(body) }.getOrElse { return json(mapOf("error" to "bad json"), 400) }
                     promptText = m["text"]?.toString() ?: return json(mapOf("error" to "text required"), 400)
                     role = m["role"]?.toString()?.takeIf { it.isNotBlank() } ?: role
                     tags = (m["tags"] as? List<*>)?.map { it.toString() } ?: tags
@@ -701,7 +736,7 @@ class PatchWire(
                         "needs" to info?.needs.orEmpty(),
                         "see" to info?.see.orEmpty(),
                         "tweakFirst" to info?.tweakFirst.orEmpty(),
-                        "document" to JsonSupport.parse(doc),
+                        "document" to reify(doc),
                     )
                 },
             ))
@@ -720,7 +755,7 @@ class PatchWire(
                 // daemon obeys. Seen is believed.
                 if (path.substringAfter('?', "").split('&').contains("entry=1")) {
                     val entry = publisher?.boardEntry(name) ?: return json(mapOf("error" to "not on the board", "name" to name), 404)
-                    return JvmKanbanServer.HttpResponse(200, JsonSupport.stringify(entry))
+                    return JvmKanbanServer.HttpResponse(200, jsonOf(entry))
                 }
                 // The attachment, else the BOARD's document — a program that exists
                 // only as a blackboard entry opens in the canvas like any other.
@@ -796,13 +831,14 @@ class PatchWire(
                     json(mapOf("project" to name, "docs" to docs.map { it.toMap() }, "count" to docs.size))
                 } else {
                     val id = java.net.URLDecoder.decode(tail, "UTF-8")
-                    val text = c.read(name, id, 262_144)
+                    val twin = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX, 262_144)
+                    // A binary document (a PDF, a scan) reads as its miner's extract twin.
+                    val text = c.read(name, id, 262_144) ?: twin
                     if (text == null) {
                         val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
                         if (listed == null) json(mapOf("error" to "absent", "project" to name, "id" to id), 404)
                         else json(mapOf("error" to "not_text", "project" to name, "id" to id, "contentType" to listed.contentType, "length" to listed.length, "cid" to listed.cid), 415)
                     } else {
-                        val twin = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX, 262_144)
                         val notes = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX, 262_144)
                         val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
                         json(linkedMapOf<String, Any?>("project" to name, "id" to id, "cid" to text.cid, "rev" to text.rev, "seq" to text.seq,
@@ -825,6 +861,27 @@ class PatchWire(
                         "conventions" to borg.trikeshed.lcnc.ProjectNodes.conventions(notes))) },
                     onFailure = { json(mapOf("verdict" to "refused", "detail" to (it.message ?: "")), 400) },
                 )
+            }
+
+            // One document at a time: what it is (`GET …/recognize/<id>`), and reading it in, by hand (`POST …/ingest/<id>`).
+            method == "GET" && p.startsWith("/api/projects/") && p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("recognize/") -> {
+                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
+                val rest = p.removePrefix("/api/projects/")
+                val id = java.net.URLDecoder.decode(rest.substringAfter("recognize/"), "UTF-8")
+                runCatching { m.recognize(rest.substringBefore('/'), id) }.fold({ json(it) }, { json(mapOf("error" to (it.message ?: "")), 400) })
+            }
+            method == "POST" && p.startsWith("/api/projects/") && p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("ingest/") -> {
+                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
+                val rest = p.removePrefix("/api/projects/")
+                val name = rest.substringBefore('/'); val id = java.net.URLDecoder.decode(rest.substringAfter("ingest/"), "UTF-8")
+                val bg = mountScope
+                if (bg == null) runCatching { m.ingest(name, id) }.fold({ json(it) }, { json(mapOf("error" to (it.message ?: "")), 400) })
+                else {
+                    System.err.println("[OROBOROS] ingest begun: $name/$id")
+                    bg.launch { runCatching { m.ingest(name, id) }.onSuccess { System.err.println("[OROBOROS] ingested $name/$id: $it") }
+                        .onFailure { System.err.println("[OROBOROS] ingest FAILED $name/$id: ${it.message}") } }
+                    json(mapOf("verdict" to "ingesting", "project" to name, "id" to id), 202)
+                }
             }
 
             method == "POST" && p.startsWith("/api/projects/") && p.endsWith("/mine") -> {
@@ -892,13 +949,13 @@ class PatchWire(
     private fun loadEndpointRegistry(att: CouchAttachmentGateway): List<Map<String, Any?>> =
         att.getAttachment("keymux/endpoints")?.let { (_, bytes) ->
             runCatching {
-                (JsonSupport.parse(bytes.decodeToString()) as? List<*>)?.mapNotNull { it as? Map<String, Any?> }
+                (reify(bytes) as? List<*>)?.mapNotNull { it as? Map<String, Any?> }
                 // ⚡ Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
             }.getOrNull()
         } ?: emptyList()
 
     private fun saveEndpointRegistry(att: CouchAttachmentGateway, entries: List<Map<String, Any?>>) {
-        val bytes = JsonSupport.stringify(entries).encodeToByteArray()
+        val bytes = jsonOf(entries).encodeToByteArray()
         val cid = ContentId.of(bytes)
         att.putAttachment(
             borg.trikeshed.util.oroboros.OroborosAttachmentRef(
@@ -911,7 +968,7 @@ class PatchWire(
     }
 
     private fun json(value: Any?, status: Int = 200): JvmKanbanServer.HttpResponse =
-        JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+        JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     private fun rawBody(text: String): String = when {
         "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")
@@ -923,6 +980,6 @@ class PatchWire(
     private fun parse(text: String): Map<String, Any?> {
         val body = rawBody(text)
         if (body.isBlank()) return emptyMap()
-        return runCatching { JsonSupport.parse(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
+        return runCatching { reify(body) as? Map<String, Any?> }.getOrNull() ?: emptyMap()
     }
 }

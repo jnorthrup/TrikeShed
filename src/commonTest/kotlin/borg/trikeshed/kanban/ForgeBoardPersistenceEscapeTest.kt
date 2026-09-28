@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
  * found in the board's source envelope — where it is not cosmetic.
  *
  * `decode` recomputes `ContentId.of(description)` and `require`s it to equal the
- * stored `contentId`. `JsonSupport.parse` has already decoded the string, so a
+ * stored `contentId`. `reify` has already decoded the string, so a
  * second `jsonUnescape` pass changed the description's bytes, the content id no
  * longer matched, and the envelope failed to load AT ALL with a mismatch error.
  *

@@ -1,6 +1,7 @@
 package borg.trikeshed.reactor.openapi
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.parse.yaml.parse as parseYaml
 
 private typealias OpenApiMap = Map<String, Any?>
@@ -88,7 +89,7 @@ object OpenApiRawParser {
     fun parse(text: String): OpenApiRawDocument {
         val root = when {
             text.isBlank() -> error("OpenAPI spec text is blank")
-            text.trimStart().startsWith("{") -> JsonSupport.parse(text).asMap()
+            text.trimStart().startsWith("{") -> reify(text).asMap()
             else -> parseYaml(text)
         } ?: error("OpenAPI root is not an object")
         require(!root["openapi"].asString().isNullOrBlank()) { "OpenAPI document is missing openapi version" }

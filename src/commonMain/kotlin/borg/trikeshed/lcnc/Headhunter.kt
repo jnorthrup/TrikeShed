@@ -1,11 +1,13 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -105,7 +107,7 @@ class HeadhunterStore(
     private suspend fun saveLocked(kind: String, id: String?, baseCid: String?, fields: HeadhunterRecord): HeadhunterRecord {
         require(kind in KINDS) { "Unknown headhunter record kind: $kind" }
         val encoded = canonical(if (kind == "action") actionFields(id, fields) else fields)
-        val nextFields = JsonSupport.parseMap(encoded)
+        val nextFields = reifyMap(encoded)
         val key = id ?: "$kind/${ContentId.of("$kind\n$encoded".encodeToByteArray()).hex}"
         require(ID.matches(key) && key.substringBefore('/') == kind) { "Record id must belong to $kind" }
         val old = heads[key]
@@ -263,10 +265,10 @@ class HeadhunterStore(
         var observed = 0L
         val last = log.replay { seq, bytes ->
             check(seq > observed) { "Non-monotonic headhunter ledger" }
-            val ref = JsonSupport.parseMap(bytes.decodeToString())
+            val ref = reifyMap(bytes)
             val id = required(ref, "id")
             val cid = ContentId(required(ref, "cid"))
-            val body = JsonSupport.parseMap(checkNotNull(cas.get(cid)) { "Missing headhunter version ${cid.value}" }.decodeToString())
+            val body = reifyMap(checkNotNull(cas.get(cid)) { "Missing headhunter version ${cid.value}" }.decodeToString())
             check(ID.matches(id) && body["id"] == id && body["kind"] == id.substringBefore('/') && body["kind"] in KINDS) {
                 "Headhunter ledger identity mismatch"
             }
@@ -482,7 +484,7 @@ class HeadhunterStore(
         /** Canonicalization is the CAS/JSON boundary; executable and opaque values are rejected. */
         fun canonical(value: Any?): String = when (value) {
             is Map<*, *> -> value.entries.sortedBy { require(it.key is String) { "Record keys must be strings" }; it.key as String }
-                .joinToString(prefix = "{", postfix = "}") { JsonSupport.stringify(it.key) + ":" + canonical(it.value) }
+                .joinToString(prefix = "{", postfix = "}") { jsonOf(it.key) + ":" + canonical(it.value) }
             is Iterable<*> -> value.joinToString(prefix = "[", postfix = "]") { canonical(it) }
             is Array<*> -> value.joinToString(prefix = "[", postfix = "]") { canonical(it) }
             is Join<*, *> -> {
@@ -490,13 +492,13 @@ class HeadhunterStore(
                 @Suppress("UNCHECKED_CAST")
                 canonical((value as Series<Any?>).view)
             }
-            null, is String, is Boolean -> JsonSupport.stringify(value)
+            null, is String, is Boolean -> jsonOf(value)
             is Number -> {
                 val number = value.toDouble()
                 require(number.isFinite()) { "Record numbers must be finite" }
                 require(value !is Long || value in -9_007_199_254_740_991L..9_007_199_254_740_991L) { "Integer exceeds Confix's exact JSON number range" }
                 if (number in -9_007_199_254_740_991.0..9_007_199_254_740_991.0 && number % 1.0 == 0.0)
-                    number.toLong().toString() else JsonSupport.stringify(value)
+                    number.toLong().toString() else jsonOf(value)
             }
             else -> throw IllegalArgumentException("Record values must be JSON data")
         }

@@ -1,9 +1,10 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.math.abs
@@ -144,7 +145,7 @@ object BeliefsNodes {
         val raw = port(inputs, "facts")
         val list = when (raw) {
             is List<*> -> raw
-            is String -> runCatching { JsonSupport.parse(raw) as? List<*> }.getOrNull().orEmpty()
+            is String -> runCatching { reify(raw) as? List<*> }.getOrNull().orEmpty()
             else -> emptyList<Any?>()
         }
         val facts = list.mapNotNull { f ->

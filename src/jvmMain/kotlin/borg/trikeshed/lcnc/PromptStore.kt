@@ -1,9 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.common.File
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.Dispatchers
@@ -149,7 +151,7 @@ class PromptStore(
             )
             if (record) ledger?.let { file ->
                 file.parentFile?.mkdirs()
-                file.appendText(JsonSupport.stringify(LedgerLine(doc.name, cid.value, doc.previousCid, atMs, actor).toMap()) + "\n")
+                file.appendText(jsonOf(LedgerLine(doc.name, cid.value, doc.previousCid, atMs, actor).toMap()) + "\n")
             }
         }
         heads[doc.name] = doc
@@ -162,7 +164,7 @@ class PromptStore(
         val file = ledger ?: return emptyList()
         val lines = withContext(Dispatchers.IO) { if (file.exists()) file.readLines() else emptyList() }
         return lines.mapNotNull { raw ->
-            val m = runCatching { JsonSupport.parseMap(raw) }.getOrNull() ?: return@mapNotNull null
+            val m = runCatching { reifyMap(raw) }.getOrNull() ?: return@mapNotNull null
             val name = m["name"]?.toString() ?: return@mapNotNull null
             val cid = m["cid"]?.toString() ?: return@mapNotNull null
             LedgerLine(name, cid, m["previousCid"]?.toString(), (m["atMs"] as? Number)?.toLong() ?: 0L, m["actor"]?.toString().orEmpty())

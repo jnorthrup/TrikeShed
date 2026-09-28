@@ -1,10 +1,12 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.ElementState
 import borg.trikeshed.kanban.InvokeLowering
 import borg.trikeshed.lib.toList
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.RelaxTransport
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import kotlinx.coroutines.CoroutineName
@@ -176,10 +178,10 @@ class LcncServiceBindingTest {
         val operations = ArrayList<Map<*, *>>()
         override suspend fun exchange(envelopeJson: String): String {
             assertSame(proxy, RequestFactoryProxyKey.require())
-            val envelope = JsonSupport.parseMap(envelopeJson)
+            val envelope = reifyMap(envelopeJson)
             val ops = checkNotNull(InvokeLowering.listishOf(envelope["operations"])).map { it as Map<*, *> }
             operations.addAll(ops)
-            return JsonSupport.stringify(mapOf(
+            return jsonOf(mapOf(
                 "ok" to true,
                 "receipts" to ops.map { mapOf("ok" to true, "result" to label) },
             ))

@@ -87,14 +87,14 @@ internal object PanamauRingSyscalls {
 
     private fun errno(state: MemorySegment): Int = state.get(int, errnoOffset)
 
-    private fun syscall3(nr: Long, a: Long, b: Long, c: Long): Long =
-        Arena.ofConfined().use { arena ->
-            val state = arena.allocate(stateLayout)
-            val result = syscallCall.invokeWithArguments(
-                listOf(state, nr, a, b, c, 0L, 0L, 0L),
-            ) as Long
-            if (result < 0) -errno(state).toLong() else result
-        }
+    /** The calling thread's errno capture: one segment per thread, reused by every call. */
+    private val errnoState = ThreadLocal.withInitial { Arena.ofAuto().allocate(stateLayout) }
+
+    private fun syscall3(nr: Long, a: Long, b: Long, c: Long): Long {
+        val state = errnoState.get()
+        val result = syscallCall.invokeExact(state, nr, a, b, c, 0L, 0L, 0L) as Long
+        return if (result < 0) -errno(state).toLong() else result
+    }
 
     fun setup(entries: Int, params: MemorySegment): Long =
         syscall3(NR_IO_URING_SETUP, entries.toLong(), params.address(), 0L)
@@ -103,21 +103,16 @@ internal object PanamauRingSyscalls {
         syscall3(NR_IO_URING_ENTER, fd.toLong(), toSubmit.toLong(), minComplete.toLong())
 
     fun mapRing(fd: Int, offset: Long, length: Long): MemorySegment =
-        Arena.ofConfined().use { arena ->
-            val state = arena.allocate(stateLayout)
-            val result = mmapCall.invokeWithArguments(
-                state, MemorySegment.NULL, length,
-                PROT_READ or PROT_WRITE, MAP_SHARED, fd, offset,
-            ) as MemorySegment
+        errnoState.get().let { state ->
+            val result = mmapCall.invokeExact(state, MemorySegment.NULL, length,
+                PROT_READ or PROT_WRITE, MAP_SHARED, fd, offset) as MemorySegment
             if (result.address() == -1L) throw IllegalStateException("ring mmap failed: ${-errno(state)}")
             result.reinterpret(length)
         }
 
     fun unmap(segment: MemorySegment) {
-        Arena.ofConfined().use { arena ->
-            val state = arena.allocate(stateLayout)
-            munmapCall.invokeWithArguments(state, MemorySegment.ofAddress(segment.address()), segment.byteSize())
-        }
+        val state = errnoState.get()
+        munmapCall.invokeExact(state, MemorySegment.ofAddress(segment.address()), segment.byteSize()) as Int
     }
 
     /** io_sqring_offsets field offsets (u32s): head, tail, ring_mask, ring_entries, flags, dropped, array, resv. */

@@ -1,11 +1,12 @@
 package borg.trikeshed.hook
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.Document
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.j
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -16,7 +17,23 @@ fun installOutboundWebhookBridge(
     blackboard: ConfixBlackboard,
     scope: CoroutineScope,
     ledger: HookDeliveryLedger,
-): () -> Unit = couch.subscribeMutations { event ->
+): () -> Unit {
+    // Subscription ids, seeded once and kept by the mutation stream itself: scanning the store per
+    // commit made every write linear in the store, so a bulk reconcile was quadratic.
+    val hookIds = java.util.concurrent.ConcurrentSkipListSet<String>()
+    val ids = couch.ids()
+    for (i in 0 until ids.a) ids.b(i).takeIf { it.startsWith("hooks/") }?.let(hookIds::add)
+    return couch.subscribeMutations { event -> onMutation(event, couch, blackboard, scope, ledger, hookIds) }
+}
+
+private fun onMutation(
+    event: CouchStore.MutationEvent,
+    couch: CouchStore,
+    blackboard: ConfixBlackboard,
+    scope: CoroutineScope,
+    ledger: HookDeliveryLedger,
+    hookIds: MutableSet<String>,
+) {
     val doc: Document? = when (event) {
         is CouchStore.MutationEvent.Inserted -> event.doc
         is CouchStore.MutationEvent.Updated -> event.doc
@@ -27,6 +44,8 @@ fun installOutboundWebhookBridge(
         is CouchStore.MutationEvent.Updated -> event.doc.id
         is CouchStore.MutationEvent.Deleted -> event.docId
     }
+    if (docId.startsWith("hooks/")) { if (doc == null) hookIds.remove(docId) else hookIds.add(docId) }
+    if (hookIds.isEmpty()) return
     val mutation = when (event) {
         is CouchStore.MutationEvent.Inserted -> "inserted"
         is CouchStore.MutationEvent.Updated -> "updated"
@@ -36,12 +55,12 @@ fun installOutboundWebhookBridge(
     // The rev is part of the delivery identity: without it, two successive updates of the same
     // doc to the same kind hash to the same NUID and the ledger suppresses the second forever.
     val rev = runCatching { couch.head.getRev(docId) }.getOrNull() ?: ""
-    val body = JsonSupport.stringify(mapOf("kind" to eventKind, "mutation" to mutation, "id" to docId, "rev" to rev))
+    val body = jsonOf(mapOf("kind" to eventKind, "mutation" to mutation, "id" to docId, "rev" to rev))
     val eventCid = ContentId.of(body.encodeToByteArray()).hex
 
     // Read subscription docs on every change: edits become effective without a mutable cache.
-    for (subDoc in couch.all()) {
-        if (!subDoc.id.startsWith("hooks/")) continue
+    for (id in hookIds) {
+        val subDoc = couch.get(id) ?: continue
         val sub = subscriptionOf(subDoc) ?: continue
         val delivery = HookDelivery("${sub.name}:$eventCid", eventKind, body)
         scope.launch {

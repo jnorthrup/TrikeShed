@@ -1,5 +1,8 @@
 package borg.trikeshed.graal.subvm.harness
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.couch.isam.WalFrame
 import borg.trikeshed.graal.ConfixBlackboard
@@ -16,7 +19,6 @@ import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.DocumentCuratorCodec
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.DocumentExtent
@@ -38,7 +40,7 @@ object DocumentFeedHarness {
     fun main(args: Array<String>) = runBlocking {
         System.setProperty("java.awt.headless", "true")
         require(args.isEmpty() || args.contentEquals(arrayOf("--ocr"))) { "Supported argument: --ocr" }
-        println(JsonSupport.stringify(run(CoroutineScope(currentCoroutineContext()), args.isNotEmpty())))
+        println(jsonOf(run(CoroutineScope(currentCoroutineContext()), args.isNotEmpty())))
     }
 
     suspend fun run(scope: CoroutineScope, ocr: Boolean = false): Map<String, Any?> {
@@ -191,7 +193,7 @@ object DocumentFeedHarness {
         }
     }
 
-    private fun describe(receipt: DocumentFeed.Receipt): String = JsonSupport.stringify(mapOf(
+    private fun describe(receipt: DocumentFeed.Receipt): String = jsonOf(mapOf(
         "name" to receipt.record.source.name, "reasons" to List(receipt.record.reasons.size) { receipt.record.reasons[it] },
         "proposals" to List(receipt.record.proposals.size) { i -> receipt.record.proposals[i].let {
             mapOf("raw" to it.raw, "reasons" to List(it.reasons.size) { r -> it.reasons[r] }) } }))
@@ -199,7 +201,7 @@ object DocumentFeedHarness {
     private class FixtureModel {
         private var failedRetry = false
         suspend fun invoke(prompt: Prompt): ModelResponse {
-            val source = JsonSupport.parse(prompt.messages[1].content) as Map<*, *>
+            val source = reify(prompt.messages[1].content) as Map<*, *>
             val text = source["text"] as String
             val name = source["name"] as String
             if (name == "retry.txt" && !failedRetry) {
@@ -223,7 +225,7 @@ object DocumentFeedHarness {
             val proposals = if (name == "conflict.txt")
                 listOf(proposal(quote, true), proposal("Acme does not pay Beta.", false))
             else listOf(proposal(quote, true, name == "span.txt"))
-            return ModelResponse(JsonSupport.stringify(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
+            return ModelResponse(jsonOf(mapOf("format" to "TRIPLET_JSON", "triplets" to proposals)),
                 ModelUsage(-1, -1, -1), "fixture", "fixture")
         }
     }

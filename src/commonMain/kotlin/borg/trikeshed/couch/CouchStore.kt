@@ -1,5 +1,7 @@
 package borg.trikeshed.couch
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.MutableSeries
 import borg.trikeshed.collections.mutableSeriesOf
@@ -10,8 +12,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import borg.trikeshed.lib.emptySeries
-import borg.trikeshed.parse.json.JsonSupport
-
 val couchStoreScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
@@ -250,7 +250,7 @@ object CouchStoreFactory {
             head.applyCommit(frame)
             changes.applyCommit(frame)
             couchStoreScope.launch {
-                persistence.persist(doc.id, JsonSupport.stringify(doc).encodeToByteArray())
+                persistence.persist(doc.id, jsonOf(doc).encodeToByteArray())
             }
             return existingRev == null || isDeleted
         }
@@ -364,7 +364,7 @@ object CouchStoreFactory {
             changes.applyCommit(frame)
             couchStoreScope.launch {
                 val docToPersist = frame.doc ?: Document(frame.docId, emptyList())
-                persistence.persist(docToPersist.id, JsonSupport.stringify(docToPersist).encodeToByteArray())
+                persistence.persist(docToPersist.id, jsonOf(docToPersist).encodeToByteArray())
             }
         }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
         return CouchStore(ingress, head, changes)

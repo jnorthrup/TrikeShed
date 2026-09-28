@@ -1,9 +1,11 @@
 package borg.trikeshed.kanban
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.common.Files
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.common.Files as LibFiles
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 
 /** Canonical persisted input. Derived cards, links, Rete facts, and causal nodes are not stored here. */
@@ -53,7 +55,7 @@ object ForgeBoardPersistence {
         decode(Files.readString(sourcePath(userId)))
     }
 
-    fun encode(source: ForgeKanbanSource): String = JsonSupport.stringify(
+    fun encode(source: ForgeKanbanSource): String = jsonOf(
         linkedMapOf(
             "version" to source.version,
             "userId" to source.userId,
@@ -65,8 +67,8 @@ object ForgeBoardPersistence {
     )
 
     fun decode(encoded: String): ForgeKanbanSource {
-        val fields = JsonSupport.parse(encoded) as? Map<*, *> ?: error("source envelope is not an object")
-        // NO second unescape pass: `JsonSupport.parse` already decoded these
+        val fields = reify(encoded) as? Map<*, *> ?: error("source envelope is not an object")
+        // NO second unescape pass: `reify` already decoded these
         // strings, and decoding them again ate a layer of backslashes. Here that
         // was not cosmetic — `description` is markdown (code fences, regexes,
         // Windows paths all carry backslashes), and the contentId check below
@@ -95,5 +97,5 @@ object ForgeBoardPersistence {
     }
 
     // (the private jsonUnescape wrapper went with the double-decode above —
-    //  `JsonSupport.parse` is the only unescape this envelope needs)
+    //  `reify` is the only unescape this envelope needs)
 }

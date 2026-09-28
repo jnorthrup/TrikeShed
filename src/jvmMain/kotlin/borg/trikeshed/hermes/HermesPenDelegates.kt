@@ -1,5 +1,7 @@
 package borg.trikeshed.hermes
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
@@ -20,7 +22,6 @@ import borg.trikeshed.narsese.RelationKind
 import borg.trikeshed.narsese.SemanticSignal
 import borg.trikeshed.narsese.TermIdentity
 import borg.trikeshed.ontology.zipper.PlaneAdapters
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.runBlocking
 import modelmux.ModelMux
@@ -121,7 +122,7 @@ class HermesPen(
 
     /** Refusals are vocabulary, not exceptions — guest code handles them as data. */
     private fun refusal(verdict: String, detail: String = ""): Teleported =
-        Teleported.Str(JsonSupport.stringify(mapOf("verdict" to verdict, "detail" to detail)))
+        Teleported.Str(jsonOf(mapOf("verdict" to verdict, "detail" to detail)))
 
     private fun str(args: List<Teleported>, i: Int): String? = (args.getOrNull(i) as? Teleported.Str)?.v
 
@@ -135,7 +136,7 @@ class HermesPen(
             mux.chat(modelId, 1 j { _: Int -> "user" j prompt })
         }
         return result.fold(
-            onSuccess = { Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "response" to it.toString()))) },
+            onSuccess = { Teleported.Str(jsonOf(mapOf("verdict" to "ok", "response" to it.toString()))) },
             onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
         )
     }
@@ -155,7 +156,7 @@ class HermesPen(
                 "subjectCid" to s.subjectCid,
             )
         }
-        return Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "beliefs" to rows)))
+        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "beliefs" to rows)))
     }
 
     private fun bagAssert(args: List<Teleported>): Teleported {
@@ -182,7 +183,7 @@ class HermesPen(
                 gloss = "$subjectTerm ==> ${objectTerm ?: "?"} (${if (success) "ok" else "failed"})",
             ),
         )
-        return Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "angular" to angular.toString())))
+        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "angular" to angular.toString())))
     }
 
     private fun crumbWalk(args: List<Teleported>): Teleported {
@@ -203,7 +204,7 @@ class HermesPen(
                 "trail" to (0 until p.trail.size).map { t -> p.trail[t].a.toString() },
             )
         }
-        return Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "picks" to rows)))
+        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "picks" to rows)))
     }
 
     private fun skillScribe(args: List<Teleported>): Teleported {
@@ -224,7 +225,7 @@ class HermesPen(
                 val before = skillMd.takeIf { it.isFile }?.readBytes()?.let { ContentId.of(it).hex }
                 dir.mkdirs()
                 skillMd.writeText(content)
-                Teleported.Str(JsonSupport.stringify(mapOf(
+                Teleported.Str(jsonOf(mapOf(
                     "verdict" to "ok", "action" to action,
                     "before" to before, "after" to ContentId.of(content.encodeToByteArray()).hex,
                 )))
@@ -233,7 +234,7 @@ class HermesPen(
                 if (!skillMd.isFile) return refusal("missing", "$category/$name")
                 val archived = File(dir, "SKILL.md.archived")
                 skillMd.renameTo(archived)
-                Teleported.Str(JsonSupport.stringify(mapOf("verdict" to "ok", "action" to "archive")))
+                Teleported.Str(jsonOf(mapOf("verdict" to "ok", "action" to "archive")))
             }
             else -> refusal("no-such-action", "create|patch|archive only — there is no delete")
         }

@@ -1,5 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reifyStrict
+
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
@@ -14,7 +16,6 @@ import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpMetadata
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.reduction.j
 
 /** Uses the existing canonical map/CBOR path, not the lossy ConfixDoc-to-map projection. */
@@ -196,7 +197,7 @@ internal object DocumentCuratorCodec {
     }
 
     /** Validate syntax strictly before crossing the existing JSON-shaped value boundary. */
-    fun strictJson(text: String): Any? = JsonSupport.parseStrict(text)
+    fun strictJson(text: String): Any? = reifyStrict(text)
 
     private fun Map<*, *>.str(key: String) = this[key] as String
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()

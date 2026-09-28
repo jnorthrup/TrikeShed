@@ -102,7 +102,7 @@ object NormClauses {
         // Every other asserted clause, as OpenIE reads it: (subject; relation; object) with the relation's
         // own polarity. A modal clause is already above; a coreferent subject reads as its chain's name.
         for (s in doc.sentences.values()) {
-            if (s.relations.isEmpty()) continue
+            if (s.relations.isEmpty() && s.kbp.isEmpty()) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
             val named = HashMap<IntRange, String>()
@@ -139,6 +139,18 @@ object NormClauses {
                 out.add(NormClause(
                     subject = subject.lowercase(), modal = "generic", affirmative = !negated,
                     verb = key.second, obj = obj, oblique = null, sentence = text,
+                    head = head.lemma.lowercase(), ner = head.ner,
+                ))
+            }
+            // Stanford relation extraction (KBP): typed relations between named mentions (org:founded_by,
+            // per:spouse), asserted facts; the slot name is the verb, the mentions are bearer and object.
+            for (r in s.kbp) {
+                val head = r.subject.lastOrNull()?.let { tokens[it] } ?: continue
+                // Without coref a pronoun names no one: neither bearer nor object is a term then.
+                if (head.tag.startsWith("PRP") || r.`object`.mapNotNull { tokens[it] }.all { it.tag.startsWith("PRP") }) continue
+                out.add(NormClause(
+                    subject = r.subjectText.lowercase(), modal = "generic", affirmative = true,
+                    verb = r.relationText, obj = r.objectText.lowercase(), oblique = null, sentence = text,
                     head = head.lemma.lowercase(), ner = head.ner,
                 ))
             }

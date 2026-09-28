@@ -233,20 +233,26 @@ object HarnessLandscape {
     fun detailVisible(): Boolean = viewPercent() >= 100 - detailLevel
 
     fun updateDetailIndicator() {
+        // One scale: the thumb is the snap depth (the zoom at which panels split into detail), the tick is the zoom now.
         val percent = viewPercent(); val cutoff = 100 - detailLevel
-        for ((id, value) in listOf("viewPercent" to "${jsString(percent)}%", "detailCutoff" to "$cutoff%")) {
-            val el = document.getElementById(id); if (el != null && el.textContent != value) el.textContent = value
+        val tick = document.getElementById("zoomTick").asDynamic()
+        if (tick != null) {
+            // The range thumb's travel is inset by half its width (16px thumb); the tick rides the same travel.
+            val left = "calc(${jsString(percent)}% + ${jsString(8 - percent * 16 / 100)}px)"
+            if (tick.style.left != left) tick.style.left = left
+            tick.className = if (percent >= cutoff) "" else "below"
+            tick.title = "zoom ${jsString(percent)}% · ${if (percent >= cutoff) "detail rendered" else "overview"}"
         }
-        val meter = document.getElementById("viewability").asDynamic()
-        if (meter != null) { meter.value = percent; meter.low = cutoff; meter.title = if (percent >= cutoff) "Rendered" else "Overview" }
+        val output = document.getElementById("detailValue")
+        val text = "zoom ${jsString(jsRound(percent).toDouble())}% · snap $cutoff%"
+        if (output != null && output.textContent != text) output.textContent = text
     }
 
     fun setDetail(value: dynamic, persist: Boolean = true) {
         if (value == null || value == "" || !jsNumber(value).isFinite()) return
         detailLevel = max(0, min(100, jsRound(jsNumber(value)).toInt()))
-        val slider = document.getElementById("detailLevel").asDynamic(); val output = document.getElementById("detailValue")
-        if (slider != null) { slider.value = detailLevel.toString(); slider.setAttribute("aria-valuetext", "$detailLevel% detail; view cutoff ${100 - detailLevel}%") }
-        if (output != null) output.textContent = "$detailLevel%"
+        val slider = document.getElementById("detailLevel").asDynamic()
+        if (slider != null) { slider.value = (100 - detailLevel).toString(); slider.setAttribute("aria-valuetext", "snap depth ${100 - detailLevel}% zoom") }
         if (persist) try { localStorage.setItem("blackboard.detail", detailLevel.toString()) } catch (_: Throwable) {}
         updateDetailIndicator(); schedule()
     }
@@ -488,8 +494,8 @@ object HarnessLandscape {
         try { detail = localStorage.getItem("blackboard.detail") ?: detail } catch (_: Throwable) {}
         setDetail(detail, false)
         val detailSlider = document.getElementById("detailLevel").asDynamic()
-        detailSlider?.addEventListener("input", { setDetail(detailSlider.value, false) })
-        detailSlider?.addEventListener("change", { setDetail(detailSlider.value) })
+        detailSlider?.addEventListener("input", { setDetail(100 - jsNumber(detailSlider.value), false) })
+        detailSlider?.addEventListener("change", { setDetail(100 - jsNumber(detailSlider.value)) })
         try {
             val saved: dynamic = JSON.parse(localStorage.getItem("graal.topology.mask") ?: "null")
             if (js("Number.isInteger(saved)") == true && num(saved) >= 0 && num(saved) <= num(topology.all)) mask = num(saved).toInt()

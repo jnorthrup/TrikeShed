@@ -1,12 +1,12 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * Rule-admission LCNC nodes — the seam that brings the daemon's LIVE
  * [CausalityReteElement] out of dead spin. The daemon boots the element over
@@ -56,7 +56,7 @@ object RuleNodes {
     ): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         val specs: List<Map<*, *>> = when (val raw = inputs["rules"] ?: inputs["rules?"]) {
             is List<*> -> raw.mapNotNull { it as? Map<*, *> }
-            is String -> (JsonSupport.parse(raw) as? List<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
+            is String -> (reify(raw) as? List<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
             else -> emptyList()
         }
         val offered: List<EternalRule> = if (specs.isNotEmpty()) specs.mapNotNull { spec ->

@@ -1,12 +1,13 @@
 package keymux
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.reactor.MuxKeyEntry
@@ -198,7 +199,7 @@ class HermesCredentialSource(
 
     private suspend fun loadPoolFile(ops: FileOperations, file: String): Map<String, List<Map<String, Any?>>>? {
         if (!ops.exists(file)) return null
-        val parsed = runCatching { JsonSupport.parse(ops.readString(file)) }.getOrNull() as? Map<*, *>
+        val parsed = runCatching { reify(ops.readString(file)) }.getOrNull() as? Map<*, *>
             ?: return null
         val pool = (parsed["credential_pool"] as? Map<*, *>) ?: emptyMap<Any?, Any?>()
         val out = LinkedHashMap<String, List<Map<String, Any?>>>()

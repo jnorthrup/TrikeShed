@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.parse.json.JsonSupport
+import borg.trikeshed.parse.jsonOf
+
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +32,7 @@ class CouncilPresetIdentityTest {
             .run(LcncNode("cv", "council.convene"), emptyMap())
         assertEquals(
             LcncPresets.all().getValue("preset-council"),
-            JsonSupport.stringify(out["program"]),
+            jsonOf(out["program"]),
             "council.convene(<empty>) must emit the preset's exact document",
         )
     }

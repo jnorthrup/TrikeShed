@@ -1,7 +1,8 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.graal.subvm.GuestModules
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -22,7 +23,7 @@ import kotlin.test.assertTrue
  */
 class VmModulesLegoTest {
 
-    /** JsonSupport reifies arrays as Array<Any?>, not List — and numbers as Double ("28.0"). */
+    /** reify reifies arrays as Array<Any?>, not List — and numbers as Double ("28.0"). */
     private fun rows(obj: Map<*, *>): List<Map<*, *>> = when (val m = obj["modules"]) {
         is List<*> -> m
         is Array<*> -> m.toList()
@@ -33,7 +34,7 @@ class VmModulesLegoTest {
 
     private fun run(params: Map<String, String>): Map<*, *> = kotlinx.coroutines.runBlocking {
         val out = SubVmLegos.modules().run(LcncNode("m1", SubVmLegos.MODULES, params = params), emptyMap())
-        JsonSupport.parse(out["modules"].toString()) as? Map<*, *>
+        reify(out["modules"].toString()) as? Map<*, *>
             ?: error("vm.modules did not emit a JSON object: ${out["modules"]}")
     }
 

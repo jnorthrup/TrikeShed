@@ -1,11 +1,13 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.ReplicationReport
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -112,7 +114,7 @@ class CouchWire(
                     val frames = db.framesSince(since).take(limit)
                     if (frames.isNotEmpty()) {
                         val last = frames.last().sequence + 1
-                        respond(JsonSupport.stringify(mapOf("results" to frames.map { db.changeRow(it, includeDocs) }, "last_seq" to last)).toByteArray(StandardCharsets.UTF_8))
+                        respond(jsonOf(mapOf("results" to frames.map { db.changeRow(it, includeDocs) }, "last_seq" to last)).toByteArray(StandardCharsets.UTF_8))
                         return
                     }
                     if (!awaitOrHeartbeat(signal, heartbeat, respond)) return
@@ -122,10 +124,10 @@ class CouchWire(
             while (true) {
                 val frames = db.framesSince(since)
                 for (f in frames) {
-                    respond((JsonSupport.stringify(db.changeRow(f, includeDocs)) + "\n").toByteArray(StandardCharsets.UTF_8))
+                    respond((jsonOf(db.changeRow(f, includeDocs)) + "\n").toByteArray(StandardCharsets.UTF_8))
                     since = f.sequence + 1
                     if (++sent >= limit) {
-                        respond(JsonSupport.stringify(mapOf("last_seq" to since)).toByteArray(StandardCharsets.UTF_8)); return
+                        respond(jsonOf(mapOf("last_seq" to since)).toByteArray(StandardCharsets.UTF_8)); return
                     }
                 }
                 if (!awaitOrHeartbeat(signal, heartbeat, respond)) return
@@ -151,14 +153,14 @@ class CouchWire(
 
     // ── _replicate ────────────────────────────────────────────────
 
-    private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(v))
+    private fun json(status: Int, v: Any?) = JvmKanbanServer.HttpResponse(status, jsonOf(v))
 
     private suspend fun replicate(method: String, body: ByteArray): JvmKanbanServer.HttpResponse {
         if (method == "GET") return json(200, mapOf("jobs" to continuous.map { (id, c) -> mapOf("id" to id, "spec" to c.spec, "active" to c.job.isActive, "last" to c.last?.toMap()) }))
         if (method != "POST") return json(405, mapOf("error" to "method_not_allowed"))
         val r = replicator ?: return json(501, mapOf("error" to "not_implemented", "reason" to "no HTX client bound for replication"))
         @Suppress("UNCHECKED_CAST")
-        val spec = runCatching { JsonSupport.parse(body.decodeToString()) as? Map<String, Any?> }.getOrNull()
+        val spec = runCatching { reify(body) as? Map<String, Any?> }.getOrNull()
             ?: return json(400, mapOf("error" to "bad_request", "reason" to "JSON body required"))
         val source = spec["source"] as? String ?: return json(400, mapOf("error" to "bad_request", "reason" to "source required"))
         val target = spec["target"] as? String ?: return json(400, mapOf("error" to "bad_request", "reason" to "target required"))

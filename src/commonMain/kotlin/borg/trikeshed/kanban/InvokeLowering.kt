@@ -87,7 +87,7 @@ object InvokeLowering {
                 ?: Outcome.Rejected(null, null, "command is not an object")
         }
 
-    /** Batch extraction shared with the HTTP handler. JsonSupport hands arrays back as Array — accept both. */
+    /** Batch extraction shared with the HTTP handler. reify hands arrays back as Array — accept both. */
     fun commandsOf(parsed: Any?): List<*> = when (parsed) {
         is Map<*, *> -> listishOf(parsed["commands"]) ?: listOf(parsed)
         else -> listishOf(parsed) ?: emptyList<Any?>()

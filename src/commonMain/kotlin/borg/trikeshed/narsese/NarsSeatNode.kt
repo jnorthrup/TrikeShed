@@ -1,12 +1,13 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * `nars.seat` — the council's NON-MODEL seat: NARS as the review of choices.
  *
@@ -48,7 +49,7 @@ object NarsSeatNode {
         null -> emptyList()
         is List<*> -> raw.flatMap { c -> if (c is List<*>) c.map { it.toString() } else listOf(c.toString()) }
         is String -> {
-            val parsed = runCatching { JsonSupport.parse(raw) as? List<*> }.getOrNull()
+            val parsed = runCatching { reify(raw) as? List<*> }.getOrNull()
             parsed?.map { it.toString() } ?: listOf(raw)
         }
         else -> listOf(raw.toString())
@@ -146,7 +147,7 @@ object NarsSeatNode {
                     .append(", w+=").append(r.evidence.positive).append(" w-=").append(r.evidence.negative)
                     .append(") ").appendLine(r.choice)
             }
-            append(JsonSupport.stringify(verdict))
+            append(jsonOf(verdict))
         }
 
         val record = linkedMapOf<String, Any?>(

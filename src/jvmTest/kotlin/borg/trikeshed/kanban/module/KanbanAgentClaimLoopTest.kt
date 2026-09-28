@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.agent.AgentCli
 import borg.trikeshed.agent.JvmAgentRunner
 import borg.trikeshed.couch.Couch
@@ -14,7 +17,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
@@ -109,12 +111,12 @@ class KanbanAgentClaimLoopTest {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = JsonSupport.parse(resp.body) as Map<String, Any?>
+    private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> = reify(resp.body) as Map<String, Any?>
 
     private fun arr(v: Any?): List<*> = when (v) { is List<*> -> v; is Array<*> -> v.toList(); else -> error("not an array: $v") }
 
     private fun invoke(rig: Rig, vararg commands: Map<String, Any?>) {
-        val resp = post(rig.server, "/api/invoke", JsonSupport.stringify(mapOf("commands" to commands.toList())))
+        val resp = post(rig.server, "/api/invoke", jsonOf(mapOf("commands" to commands.toList())))
         assertEquals(202, resp.status, resp.body)
     }
 

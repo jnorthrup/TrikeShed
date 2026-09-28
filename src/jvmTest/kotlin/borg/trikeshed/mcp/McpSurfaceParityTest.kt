@@ -1,11 +1,13 @@
 package borg.trikeshed.mcp
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kanban.BoardCol
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.JvmBoardWal
 import borg.trikeshed.lcnc.LcncKanbanExperience
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test
@@ -54,13 +56,13 @@ class McpSurfaceParityTest {
             put("jsonrpc", "2.0"); put("id", 1); put("method", method)
             params?.let { put("params", it) }
         }
-        val parsed = JsonSupport.parse(mcp.handle(JsonSupport.stringify(doc))) as Map<*, *>
+        val parsed = reify(mcp.handle(jsonOf(doc))) as Map<*, *>
         return parsed["result"] as? Map<*, *> ?: fail("$method returned ${parsed["error"]}")
     }
 
     private suspend fun readResource(mcp: LcncKanbanMcp, uri: String): Map<*, *> {
         val contents = result(mcp, "resources/read", mapOf("uri" to uri))["contents"] as List<*>
-        return JsonSupport.parse((contents.first() as Map<*, *>)["text"] as String) as Map<*, *>
+        return reify((contents.first() as Map<*, *>)["text"] as String) as Map<*, *>
     }
 
     private fun guide(): String {

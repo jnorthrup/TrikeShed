@@ -59,6 +59,12 @@ object CuratorMetaphors {
         "wiki.propose" to Metaphor("scribe", "drafts", "seals", Rgba(236, 150, 110), Shape.SCROLL,
             "A model reads the wiki and proposes one skill; the only statement here that spends tokens."),
         "display" to Metaphor("window", "opens", "shows", Rgba(120, 130, 150), Shape.EYE, "A value put on view."),
+        "book.section" to Metaphor("page", "is read", "is read", Rgba(206, 172, 96), Shape.SCROLL,
+            "One section of a book, cut where the book's own numbering says; its statements hang from it."),
+        "book.statement" to Metaphor("clause", "is said", "is said", Rgba(245, 214, 140), Shape.LEAF,
+            "One statement: a bearer, a force, a predicate, an object. Its arcs run to the concepts it relates."),
+        "concept" to Metaphor("atom", "is named", "is named", Rgba(120, 190, 240), Shape.FRUIT,
+            "A concept the text rests on, filed under its SUMO class; it grows with every statement that names it."),
     )
 
     val default = Metaphor("leaf", "buds", "unfolds", Rgba(120, 180, 120), Shape.LEAF, "A statement.")

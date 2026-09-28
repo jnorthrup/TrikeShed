@@ -65,6 +65,8 @@ object RouteManifest {
             RouteEntry("GET", "/api/projects/{name}/docs", "a mounted project's document listing (prefix, glob, limit)"),
             RouteEntry("GET", "/api/projects/{name}/docs/{id}", "one project document: text, cid, rev, seq, and the miner's extract twin"),
             RouteEntry("PUT", "/api/projects/{name}/notes/{id}", "curation notes beside a document (`key: value` conventions + prose), read by project.notes and book.curate"),
+            RouteEntry("GET", "/api/projects/{name}/recognize/{id}", "what one document is before ingest: bytes, type, text layer or OCR, pages, sampled columns per page, ingested yet"),
+            RouteEntry("POST", "/api/projects/{name}/ingest/{id}", "ingest one document by hand: its text lands as the extract twin (text layer in column order, else OCR)"),
             RouteEntry("POST", "/api/projects/{name}/mine", "Tika/OCR mining over a project"),
             RouteEntry("GET", "/api/projects/{name}/mine", "mining progress"),
         ),
@@ -178,6 +180,7 @@ object RouteManifest {
         // Pattern families for {db}/* mounts; see couch-oroboros.openapi.yaml
         // for full request/response schemas on the couch/_cas surface.
         "CouchWire" to listOf(
+            RouteEntry("GET", "/_all_dbs", "primary and project database names"),
             RouteEntry("GET", "/{db}", "database info"),
             RouteEntry("POST", "/{db}", "bare document put"),
             RouteEntry("GET", "/{db}/_all_docs", "all live document ids"),

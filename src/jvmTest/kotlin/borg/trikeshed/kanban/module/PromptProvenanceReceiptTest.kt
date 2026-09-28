@@ -1,5 +1,7 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -19,7 +21,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -77,7 +78,7 @@ class PromptProvenanceReceiptTest {
             )
             assertEquals(200, response.status, response.body)
             @Suppress("UNCHECKED_CAST")
-            val result = JsonSupport.parse(response.body) as Map<String, Any?>
+            val result = reify(response.body) as Map<String, Any?>
             assertEquals("echo: " + seed.text, (result["returns"] as Map<*, *>)["answer"])
             assertEquals(mapOf(LcncPromptSeeds.HELLO to seed.cid), result["promptVersions"])
             val receipt = ctx.blackboard.get("lcnc/run/${result["runId"]}") as Map<*, *>

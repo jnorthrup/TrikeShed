@@ -1,5 +1,7 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
@@ -309,7 +311,7 @@ class ProgramLedgerTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun textOf(json: String): String? {
-        val m = borg.trikeshed.parse.json.JsonSupport.parse(json) as Map<String, Any?>
+        val m = reify(json) as Map<String, Any?>
         val nodes = m["nodes"] as List<Map<String, Any?>>
         return (nodes[0]["params"] as Map<String, Any?>)["text"]?.toString()
     }

@@ -1,7 +1,8 @@
 package borg.trikeshed.forge.gallery
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.blackboard.ForgeBlackboardView
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.forge.blackboard.LineCasRtsSnapshot
 
 /**
@@ -71,8 +72,8 @@ object ForgeGalleryPrinter {
         }
     }
 
-    /** Same payload as the browser seed — portable via [JsonSupport]. */
-    fun renderJson(): String = JsonSupport.stringify(
+    /** Same payload as the browser seed — portable via [reify]. */
+    fun renderJson(): String = jsonOf(
         linkedMapOf(
             "catalog" to ForgeGalleryCatalog.toJsonValue(),
             "blackboard" to ForgeBlackboardView.DEFAULT.let { view ->

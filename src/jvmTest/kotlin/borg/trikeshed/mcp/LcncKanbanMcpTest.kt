@@ -1,11 +1,13 @@
 package borg.trikeshed.mcp
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.JvmBoardWal
 import borg.trikeshed.lcnc.LcncKanbanExperience
 import borg.trikeshed.lcnc.LcncNodeRunner
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.onSubscription
@@ -108,8 +110,8 @@ class LcncKanbanMcpTest {
             put("method", method)
             params?.let { put("params", it) }
         }
-        val reply = rig.mcp.handle(JsonSupport.stringify(doc))
-        val parsed = JsonSupport.parse(reply) as? Map<*, *> ?: error("not a JSON object: $reply")
+        val reply = rig.mcp.handle(jsonOf(doc))
+        val parsed = reify(reply) as? Map<*, *> ?: error("not a JSON object: $reply")
         assertEquals("2.0", parsed["jsonrpc"], reply)
         assertEquals(id.toLong(), num(parsed["id"]), "id must echo as an integer, not a float: $reply")
         return parsed
@@ -132,7 +134,7 @@ class LcncKanbanMcpTest {
         val contents = result["contents"] as? List<*> ?: error("no contents")
         val first = contents.first() as Map<*, *>
         assertEquals(uri, first["uri"])
-        return JsonSupport.parse(first["text"] as String) as Map<*, *>
+        return reify(first["text"] as String) as Map<*, *>
     }
 
     private fun num(value: Any?): Long? = (value as? Number)?.toLong()
@@ -472,7 +474,7 @@ class LcncKanbanMcpTest {
     fun malformedTrafficGetsTheRightJsonRpcCode() = withRig("envelope") { rig ->
 
         fun errorCode(reply: String): Long {
-            val parsed = JsonSupport.parse(reply) as Map<*, *>
+            val parsed = reify(reply) as Map<*, *>
             return num((parsed["error"] as Map<*, *>)["code"])!!
         }
 

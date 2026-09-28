@@ -1,11 +1,13 @@
 package borg.trikeshed.docs
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.lcnc.LcncBlackboard
 import borg.trikeshed.lcnc.LcncConsumedLedger
 import borg.trikeshed.lcnc.LcncRunHead
 import borg.trikeshed.lcnc.LcncStaleMarker
-import borg.trikeshed.parse.json.JsonSupport
-import borg.trikeshed.parse.json.ValueBudget
+import borg.trikeshed.parse.ValueBudget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -110,7 +112,7 @@ class RunBlockTest {
 
     @Test
     fun theRoutesAnswerBecomesTheFramesState() {
-        val answer = JsonSupport.parse("""{"ok":true,"program":"corpus","programCid":"sha256:aa","lamp":"stale","word":"Stale",
+        val answer = reify("""{"ok":true,"program":"corpus","programCid":"sha256:aa","lamp":"stale","word":"Stale",
             "reason":"Completed against inputs that have since changed: a.md","moved":["a.md"],
             "runId":"r1","receiptCid":"sha256:bb","latestReceiptCid":"sha256:bb","rebuildOf":"sha256:cc",
             "show":"n-show","shown":{"x":"a.md: alpha"},"shownMissing":false,"shownTruncated":false,
@@ -122,13 +124,13 @@ class RunBlockTest {
         assertEquals(1, state.staleCount)
         assertEquals(mapOf("x" to "a.md: alpha"), state.shown)
         // A refusal is a lamp-less state that says so, never a Build that would 404.
-        val absent = RunBlock.state(JsonSupport.parse("""{"error":"no_such_program","program":"ghost"}"""))!!
+        val absent = RunBlock.state(reify("""{"error":"no_such_program","program":"ghost"}"""))!!
         assertNull(absent.lamp)
         assertTrue(absent.reason.contains("ghost"), absent.reason)
         assertFalse(RunBlock.frameHtml(spec(), absent).contains("<button"), "nothing to press when the program is absent")
         // Anything else leaves the page's last state alone.
         assertNull(RunBlock.state(null))
-        assertNull(RunBlock.state(JsonSupport.parse("""{"ok":true}""")))
+        assertNull(RunBlock.state(reify("""{"ok":true}""")))
     }
 
     // ── the contract with the route's own body ──────────────────────────────
@@ -182,7 +184,7 @@ class RunBlockTest {
         assertEquals(true, body["ok"])
         // And it fits the preflight the route runs over it, or the reader gets a 413 instead of a frame.
         assertNull(ValueBudget().violation(body), "the route's own preflight must pass the body it mints")
-        return JsonSupport.parse(JsonSupport.stringify(body))
+        return reify(jsonOf(body))
     }
 
     /** The route's own body, through the wire and into a frame — which is the only path that counts. */
@@ -364,14 +366,14 @@ class RunBlockTest {
     fun onlyTheRefusalEnvelopeTakesTheButtonAway() {
         // The route's four refusals: `error`, no `ok`, no `lamp`. Nothing to press, and said so.
         for (error in listOf("no_such_program", "program_required", "bad_inputs", "inputs_must_be_object")) {
-            val refused = RunBlock.state(JsonSupport.parse("""{"error":"$error","program":"ghost"}"""))!!
+            val refused = RunBlock.state(reify("""{"error":"$error","program":"ghost"}"""))!!
             assertTrue(refused.refused, error)
             assertNull(refused.lamp)
             assertFalse(RunBlock.frameHtml(spec(), refused).contains("<button"), error)
             assertTrue(RunBlock.frameHtml(spec(), refused).contains("ds-run-lamp-refused"), error)
         }
         // An ANSWER that happens to carry a run's error text is not a refusal, whatever it is called.
-        val answered = RunBlock.state(JsonSupport.parse(
+        val answered = RunBlock.state(reify(
             """{"ok":true,"lamp":"failed","word":"Failed","reason":"The last run failed in execution: boom","runError":"boom","error":"boom","runId":"r1"}""",
         ))!!
         assertEquals(LcncRunHead.Lamp.FAILED, answered.lamp)

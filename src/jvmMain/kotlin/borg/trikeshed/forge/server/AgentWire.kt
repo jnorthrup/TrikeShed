@@ -1,11 +1,11 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lcnc.AgentNodes
 import borg.trikeshed.lcnc.AgentRuns
 import borg.trikeshed.litebike.JvmKanbanServer
-import borg.trikeshed.parse.json.JsonSupport
-
 /**
  * The coding-agent lane on the wire (Forge genesis, Cut A): the roster this host resolved at
  * boot, and the `agent/run/<runId>` receipts newest first. Read-only; a run is started by a
@@ -45,5 +45,5 @@ class AgentWire(
         }
     }
 
-    private fun json(value: Any?, status: Int = 200) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(value))
+    private fun json(value: Any?, status: Int = 200) = JvmKanbanServer.HttpResponse(status, jsonOf(value))
 }

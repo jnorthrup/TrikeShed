@@ -1,5 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.hook.CausalHookDeliveryLedger
@@ -7,7 +10,6 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -50,14 +52,14 @@ fun lcncHookIntake(
         val node = target ?: return@runCatching mapOf("status" to "no-such-node")
         val runner = runners[node.type]
             ?: return@runCatching mapOf("status" to "no-runner", "type" to node.type)
-        val payload = runCatching { JsonSupport.parse(e.body) }.getOrElse { e.body }
+        val payload = runCatching { reify(e.body) }.getOrElse { e.body }
         val outputs = runner.run(node, mapOf(e.port to payload))
         mapOf(
             "status" to "ran",
             "type" to node.type,
             // ONE honest serialization — real Confix JSON, never toString-mangled
             // maps double-encoded inside a string.
-            "outputs" to JsonSupport.stringify(outputs),
+            "outputs" to jsonOf(outputs),
         )
     }.getOrElse { t -> mapOf("status" to "error", "error" to (t.message ?: t.toString())) }
     blackboard.put(runKey, outcome, "webhook")

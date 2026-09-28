@@ -1,11 +1,12 @@
 package borg.trikeshed.forge.dashboard.serialization
 
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.dashboard.model.*
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.lib.toArray
 
 object DashboardSerialization {
-    fun toJson(card: KanbanCard): String = JsonSupport.stringify(
+    fun toJson(card: KanbanCard): String = jsonOf(
         mapOf(
             "id" to card.id,
             "title" to card.title,
@@ -13,7 +14,7 @@ object DashboardSerialization {
         )
     )
 
-    fun toJson(node: CcekNode): String = JsonSupport.stringify(
+    fun toJson(node: CcekNode): String = jsonOf(
         mapOf(
             "nuid" to node.nuid,
             "capability" to node.capability

@@ -1,5 +1,8 @@
 package borg.trikeshed.daemon
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.couch.persistence.asLocalBacking
 import kotlinx.coroutines.channels.Channel
@@ -24,7 +27,6 @@ import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.nio.ebpf.bpfProbeAttach
 import borg.trikeshed.userspace.nio.ebpf.Tracepoints
 import borg.trikeshed.util.io.ForgeCliArgs
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.FileCasStore
 import borg.trikeshed.util.oroboros.GitCouchGateway
@@ -476,7 +478,7 @@ object OroborosDaemon {
                     val aliveLine = "ALIVE $uptimeMs -1 -1 -1 -1 -1\n"
 
                     val metricsJson = try {
-                        "METRICS " + JsonSupport.stringify(mapOf("uptimeMs" to uptimeMs)) + "\n"
+                        "METRICS " + jsonOf(mapOf("uptimeMs" to uptimeMs)) + "\n"
                     } catch (e: Exception) {
                         "METRICS {}\n"
                     }
@@ -603,7 +605,7 @@ object OroborosDaemon {
             ipnsNode.open()
             borg.trikeshed.btrfs.JvmFilesystemTypeProbe.probe(casRootPath)
         }
-        val casSelection = (HostSystem.getenv("TRIKESHED_CAS") ?: "file").trim().lowercase()
+        val casSelection = (HostSystem.getenv("TRIKESHED_CAS") ?: "pack").trim().lowercase()
         var btrfsCasStore: borg.trikeshed.btrfs.BtrfsReflinkStore? = null
         val casStore: borg.trikeshed.job.CasStore = withContext(Dispatchers.IO) {
             when (casSelection) {
@@ -624,9 +626,10 @@ object OroborosDaemon {
                     btrfsCasStore = store
                     store
                 }
+                "pack" -> borg.trikeshed.job.PackCasStore(fileOps, casRootPath.toString())
                 "file" -> FileCasStore(fileOps, casRootPath)
                 else -> {
-                    HostSystem.err("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'btrfs' or 'file').")
+                    HostSystem.err("[OROBOROS] BOOT ABORTED: TRIKESHED_CAS='$casSelection' is not a known store (expected 'pack', 'btrfs' or 'file').")
                     exitProcess(1)
                 }
             }
@@ -2104,12 +2107,12 @@ object OroborosDaemon {
                 val text = buildString {
                     append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
                     append("Content-Type: application/json\r\n\r\n")
-                    if (body != null) append(JsonSupport.stringify(body))
+                    if (body != null) append(jsonOf(body))
                 }
                 val claimed = moduleRoutes.match(path)?.route
                 val response = claimed?.invoke(method, path, text, null)
                     ?: extraRouteList.firstNotNullOfOrNull { it(method, path, text, null) }
-                response?.body?.let { runCatching { JsonSupport.parse(it) }.getOrDefault(it) }
+                response?.body?.let { runCatching { reify(it) }.getOrDefault(it) }
             },
         )
         val kanbanServer = JvmKanbanServer(
@@ -2217,10 +2220,9 @@ object OroborosDaemon {
         // ── Pointcut Subsystem ──
         // Connect the pointcut adapter to the actual process-wide ConfixBlackboard instance if it existed globally.
         // Currently, we'll continue providing an empty blackboard here as there's no pre-existing global ConfixBlackboard exposed to OroborosDaemon.
-        // And PointcutCouchProjection ensures it propagates pointcut landings to couch.
-        // (the adapter itself is constructed next to the Hypervisor, which shares it)
+        // Pointcut landings stay in the adapter's flow and the blackboard (cursor reads); they are not couch documents.
         pointcutAdapter.install()
-        val pointcutProjection = borg.trikeshed.pointcut.PointcutCouchProjection(couchStore, pointcutAdapter, CoroutineScope(Dispatchers.Default))
+        borg.trikeshed.couch.viewserver.KotlinViewServer.install(pointcutAdapter)
 
 
         // ── Memory bridge: routes memory-eligible reconcile files through
@@ -2336,50 +2338,7 @@ object OroborosDaemon {
             }
         }
 
-        // Build plane: the hot-swap feed rewrites build/live/classes (and stageDaemonLib the jars);
-        // each generation is re-absorbed so the store always serves the classes that are running.
-        val buildDirty = Channel<Unit>(Channel.CONFLATED)
-        for ((dir, phase) in listOf(
-            buildClassesDir to "staged",
-            stagingLibDir to "staged",
-            File(Files.resolvePath(repoDir, "build/classes/kotlin/jvm/main")) to "compiled",
-            File(Files.resolvePath(repoDir, "build/classes/java/jvmMain")) to "compiled",
-        )) {
-            val w = FileWatchReactorElement(
-                root = dir.absolutePath,
-                parentJob = coroutineContext[kotlinx.coroutines.Job],
-                capacity = 1024,
-                includeGlobs = emptyList(),
-                excludeGlobs = emptyList(),
-                walkerBlockedSegments = emptySet(),
-                walkerBlockedRelativePrefixes = emptySet(),
-            )
-            launch(Dispatchers.IO) {
-                try {
-                    w.open()
-                    for (e in w.events) {
-                        if (phase == "staged") buildDirty.trySend(Unit)
-                        if (dir != stagingLibDir && e.path.endsWith(".class")) {
-                            graalWire.classFileChanged(
-                                buildPlanes.classesPrefix + e.path, phase,
-                                e.type == borg.trikeshed.util.oroboros.FileEventType.DELETE,
-                            )
-                        }
-                    }
-                } finally {
-                    withContext(kotlinx.coroutines.NonCancellable) { w.close() }
-                }
-            }
-        }
-        launch(Dispatchers.IO) {
-            for (unit in buildDirty) {
-                kotlinx.coroutines.delay(750) // coalesce a generation's burst of class writes
-                runCatching {
-                    val n = reconcileBuildPlane(buildPlanes, gitState.headSha())
-                    println("[OROBOROS] build-event: classpath re-absorbed ($n attachments)")
-                }.onFailure { println("[OROBOROS] build-event: reconcile failed ${it.message}") }
-            }
-        }
+        // The build plane is read in place; no watcher polls it and nothing re-absorbs it into couch.
 
         // Choreography 1: git filesystem events → GitStateCache invalidation.
         // The cache holds headSha, treeClean, and refHead — read from .git
@@ -2415,16 +2374,9 @@ object OroborosDaemon {
             }
         }
 
-        // Publish the build plane before repository scans or belief admission can delay it.
-        // These are attachment bytes; the running JVM may use the AOT JAR classpath.
+        // The build plane (classes, staged jars, resources) is read in place by the classpath routes; it is
+        // not absorbed into couch — a class file is not a document and a compile is not a revision.
         withContext(Dispatchers.IO) {
-            runCatching {
-                val buildPaths = reconcileBuildPlane(buildPlanes, gitState.headSha())
-                HostSystem.err("[OROBOROS] Build→Couch initial reconcile: $buildPaths classpath attachments → manifest ${buildPlanes.manifestFile}")
-            }.onFailure {
-                HostSystem.err("[OROBOROS] build plane reconcile failed: ${it.message}")
-                it.printStackTrace()
-            }
             // ── Foundation: git + worktree reconcile ──
             val reconcileResult = runCatching {
                 val headSha = gitState.headSha()

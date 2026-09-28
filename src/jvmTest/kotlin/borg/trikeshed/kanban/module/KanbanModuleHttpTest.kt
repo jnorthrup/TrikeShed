@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban.module
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -11,7 +14,6 @@ import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,9 +61,9 @@ class KanbanModuleHttpTest {
 
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> =
-        JsonSupport.parse(resp.body) as Map<String, Any?>
+        reify(resp.body) as Map<String, Any?>
 
-    /** JsonSupport backends return JSON arrays as Array or List — normalize for assertions. */
+    /** reify backends return JSON arrays as Array or List — normalize for assertions. */
     private fun arr(v: Any?): List<*> = when (v) {
         is List<*> -> v
         is Array<*> -> v.toList()
@@ -90,7 +92,7 @@ class KanbanModuleHttpTest {
 
         val invoke = post(
             server1, "/api/invoke",
-            JsonSupport.stringify(
+            jsonOf(
                 mapOf(
                     "userId" to "jim",
                     "commands" to listOf(
@@ -154,7 +156,7 @@ class KanbanModuleHttpTest {
                 put("jsonrpc", "2.0"); put("id", ++rpcId); put("method", method)
                 params?.let { put("params", it) }
             }
-            val resp = post(server, "/api/mcp", JsonSupport.stringify(doc))
+            val resp = post(server, "/api/mcp", jsonOf(doc))
             assertEquals(200, resp.status, resp.body.take(200))
             val parsed = json(resp)
             assertTrue(parsed["error"] == null, "$method failed: ${parsed["error"]}")
@@ -164,7 +166,7 @@ class KanbanModuleHttpTest {
 
         fun readResource(server: JvmKanbanServer, uri: String): Map<*, *> {
             val contents = arr(rpc(server, "resources/read", mapOf("uri" to uri))["contents"])
-            return JsonSupport.parse((contents.first() as Map<*, *>)["text"] as String) as Map<*, *>
+            return reify((contents.first() as Map<*, *>)["text"] as String) as Map<*, *>
         }
 
         // ── boot 1: an MCP client discovers the board and puts a card on it ──

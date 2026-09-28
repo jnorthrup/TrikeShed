@@ -1,9 +1,10 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.parse.reify
+
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.VmEvent
 import borg.trikeshed.vm.VmSupervisor
 
@@ -78,7 +79,7 @@ object ConcentricSurface {
      * raw Confix document is parsed here — the surface owns its own boundary.
      */
     fun ringPanel(name: String, confixDoc: String, trace: List<Map<String, Any?>>): Map<String, Any?> {
-        val doc: Map<*, *> = runCatching { JsonSupport.parse(confixDoc) as? Map<*, *> }.getOrNull() ?: emptyMap<Any?, Any?>()
+        val doc: Map<*, *> = runCatching { reify(confixDoc) as? Map<*, *> }.getOrNull() ?: emptyMap<Any?, Any?>()
         val nodes = (doc["nodes"] as? List<*>) ?: emptyList<Any?>()
         return mapOf(
             "name" to name,

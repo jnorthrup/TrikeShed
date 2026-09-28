@@ -84,6 +84,7 @@ class WorktreeCouchGateway(
                     sequence = sequence,
                 ),
                 bytes,
+                source = physicalPath,
             )
         }
 

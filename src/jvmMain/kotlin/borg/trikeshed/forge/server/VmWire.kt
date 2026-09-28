@@ -1,12 +1,14 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
+
 import borg.trikeshed.forge.sheet.SheetColumn
 import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.lcnc.media.ManualMediaInput
 import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.lib.view
-import borg.trikeshed.parse.json.JsonSupport
 import borg.trikeshed.vm.VM_COLUMNS
 import borg.trikeshed.vm.VmBudget
 import borg.trikeshed.vm.VmEvent
@@ -64,7 +66,7 @@ class VmWire(
         private val vmColumns = VM_COLUMNS.map { SheetColumn(it.first, it.second.name) }
     }
 
-    private fun json(status: Int, map: Map<String, Any?>) = JvmKanbanServer.HttpResponse(status, JsonSupport.stringify(map))
+    private fun json(status: Int, map: Map<String, Any?>) = JvmKanbanServer.HttpResponse(status, jsonOf(map))
     private fun body(text: String): String = when {
         "\r\n\r\n" in text -> text.substringAfter("\r\n\r\n")
         "\n\n" in text -> text.substringAfter("\n\n")
@@ -73,9 +75,9 @@ class VmWire(
 
     @Suppress("UNCHECKED_CAST")
     private fun parse(text: String): Map<String, Any?> =
-        body(text).takeIf { it.isNotBlank() }?.let { runCatching { JsonSupport.parse(it) as? Map<String, Any?> }.getOrNull() } ?: emptyMap()
+        body(text).takeIf { it.isNotBlank() }?.let { runCatching { reify(it) as? Map<String, Any?> }.getOrNull() } ?: emptyMap()
 
-    fun sheetJson(): String = JsonSupport.stringify(sheetSeed("vms", "Sub-VMs", host.rows(), columns = vmColumns).toMap())
+    fun sheetJson(): String = jsonOf(sheetSeed("vms", "Sub-VMs", host.rows(), columns = vmColumns).toMap())
 
     suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
@@ -190,7 +192,7 @@ class VmWire(
                 respond?.invoke(headers.toByteArray(StandardCharsets.UTF_8)) ?: return JvmKanbanServer.HttpResponse(200, "[]")
                 try {
                     host.events.collect { ev: VmEvent ->
-                        val data = "data: ${JsonSupport.stringify(ev.toMap())}\r\n\r\n"
+                        val data = "data: ${jsonOf(ev.toMap())}\r\n\r\n"
                         try { respond.invoke(data.toByteArray(StandardCharsets.UTF_8)) } catch (_: Throwable) { throw kotlinx.coroutines.CancellationException("client disconnected") }
                     }
                 } catch (_: kotlinx.coroutines.CancellationException) {
@@ -267,7 +269,7 @@ class VmWire(
                     )
                     is VmTerminalEvent.Phase -> mapOf("kind" to "phase", "vmId" to event.vmId, "phase" to event.phase, "detail" to event.detail)
                 }
-                send("data: ${JsonSupport.stringify(payload)}\n\n".toByteArray(StandardCharsets.UTF_8))
+                send("data: ${jsonOf(payload)}\n\n".toByteArray(StandardCharsets.UTF_8))
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
