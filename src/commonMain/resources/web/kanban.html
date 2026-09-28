@@ -175,6 +175,27 @@
   #timeline li.burst .n { color: var(--amber); font-weight: 650; }
   #timeline li.claim .good { color: var(--ok); font-weight: 650; }
   #timeline li.claim .bad { color: var(--danger); font-weight: 650; }
+
+/* keyboard navigation focus */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+summary:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex="0"]:focus:not(:focus-visible) {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent, var(--gold, #f0c870));
+  outline-offset: -2px;
+}
 </style>
 </head>
 <body data-app-page="kanban">

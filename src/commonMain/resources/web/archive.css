@@ -32,3 +32,24 @@
 .graal-file .classcard{font-size:12px;border-collapse:collapse}.graal-file td{padding:6px;border-bottom:1px solid var(--line)}
 .graal-file pre{overflow:auto}.graal-file .kgauge{width:80px}.graal-file .cas-ref{overflow-wrap:anywhere;white-space:normal}
 @media(max-width:600px){.archive-columns{grid-template-columns:minmax(0,1fr)}#archiveEntries{max-height:24dvh}#archivePreview{max-height:35dvh}.archive-actions input{min-width:0;width:100%}}
+
+/* keyboard navigation focus */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+summary:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex="0"]:focus:not(:focus-visible) {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent, var(--gold, #f0c870));
+  outline-offset: -2px;
+}

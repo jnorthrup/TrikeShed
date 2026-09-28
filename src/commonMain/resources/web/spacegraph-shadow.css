@@ -64,3 +64,24 @@
 @media(max-width:1150px){.sg-workspace{grid-template-columns:160px minmax(0,1fr) 260px}.sg-inspector-hidden .sg-workspace{grid-template-columns:160px minmax(0,1fr)}.sg-badge{left:172px;max-width:calc(100% - 450px)}}
 @media(max-width:900px){.sg-workspace{grid-template-columns:minmax(0,1fr) 260px}.sg-inspector-hidden .sg-workspace{grid-template-columns:minmax(0,1fr)}.sg-navigator{display:none}.sg-badge{left:12px;max-width:calc(100% - 290px)}}
 @media(max-width:650px){.sg-workspace{display:block}.sg-surface{position:absolute;inset:0}.sg-inspector{display:none;position:absolute;right:0;bottom:0;left:0;max-height:48%;border-top:1px solid var(--line);border-left:0;z-index:2}.sg-inspecting .sg-inspector{display:block}.sg-inspecting .sg-surface{bottom:48%}.sg-badge{left:10px;bottom:10px;max-width:calc(100% - 20px)}.sg-inspecting .sg-badge{display:none}.sg-tools{padding:0 8px}.sg-modes{margin-right:8px}.sg-inspector-section{padding:12px 16px}}
+
+/* keyboard navigation focus */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+summary:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex="0"]:focus:not(:focus-visible) {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+select:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--accent, var(--gold, #f0c870));
+  outline-offset: -2px;
+}
