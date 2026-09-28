@@ -246,7 +246,7 @@ class IpnsDht(
             val pending = closest().filter { it.key !in queried }.take(minOf(limits.parallelism, limits.maxQueries - queried.size))
             if (pending.isEmpty()) break
             for (entry in pending) queried += entry.key
-            val round = dispatch(pending.map { it.value.peer }.toSeries(), IpnsDhtMessage(type, key))
+            val round = dispatch(pending.size j { i -> pending[i].value.peer } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */, IpnsDhtMessage(type, key))
             for (reply in round.view) {
                 replies += reply
                 if (reply.failure != null) failed += IpnsEncoding.base58(reply.peer.id)
