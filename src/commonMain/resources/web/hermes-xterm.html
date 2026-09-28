@@ -32,6 +32,9 @@ main{min-height:0;display:grid;grid-template-columns:minmax(500px,1fr) 310px;gap
 #hint{margin-left:auto;color:var(--dim);font-size:11px}
 @media(max-width:900px){main{grid-template-columns:1fr}#rails{display:none}}
 @media(prefers-reduced-motion:reduce){.blink,#screen.focused .cursor{animation:none}}
+
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--amber); outline-offset: -2px; }
 </style>
 </head>
 <body data-app-page="hermes">
