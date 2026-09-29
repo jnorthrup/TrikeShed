@@ -22,6 +22,8 @@ button{background:linear-gradient(#fff,#e4e4de);border:1px solid var(--line);bor
 button:hover{border-color:var(--red);color:var(--red)}
 button.primary{background:linear-gradient(#c9503f,#a53326);color:#fff;border-color:#8a1f14}
 button.primary:hover{color:#fff;filter:brightness(1.06)}
+button:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible),a:focus:not(:focus-visible){outline:none}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 #wrap{display:flex;min-height:calc(100vh - 96px)}
 #list{flex:1.2;min-width:0;border-right:1px solid var(--line);background:var(--row)}
 #edit{flex:1;min-width:340px;display:flex;flex-direction:column;background:var(--row)}

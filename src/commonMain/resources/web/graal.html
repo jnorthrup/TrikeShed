@@ -151,6 +151,8 @@ canvas.spark{display:block;margin-top:3px}
 .dagchip:hover{border-color:var(--commit);color:var(--commit)}
 table{border-collapse:collapse;width:100%}
 td,th{padding:2px 8px 2px 0;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+button:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible),a:focus:not(:focus-visible){outline:none}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--commit);outline-offset:-2px}
 th{color:var(--dim);font-weight:normal;font-size:10px;text-transform:uppercase}
 .x{cursor:pointer;color:var(--dim)} .x:hover{color:var(--ink)}
 /* ── minimap + footer ────────────────────────────────────── */
