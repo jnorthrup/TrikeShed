@@ -12,6 +12,7 @@ import borg.trikeshed.lib.view
 import borg.trikeshed.lib.filter
 import borg.trikeshed.lib.mapIndexed
 import borg.trikeshed.lib.isEmpty
+import borg.trikeshed.lib.j
 
 /** Hermes-compatible production role carried by a lane, without fixing its order. */
 data class KanbanLane(
@@ -277,7 +278,7 @@ object KanbanGraphEngine {
             io = nextIo,
             effects = card.effects.view.plus(effect).toSeries(),
         )
-        val cards = graph.cards.view.map { if (it.id == card.id) moved else it }.toSeries()
+        val cards = graph.cards.size j { i: Int -> if (graph.cards[i].id == card.id) moved else graph.cards[i] } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .view.map { ... }.toSeries() */
 
         // W4.4: FANOUT lowers to N Submits (one per FANOUT branch in the group);
         // JOIN lowers to one Submit whose dependencies are the FANOUT branch jobIds.
