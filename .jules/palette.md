@@ -1,0 +1,3 @@
+## 2024-10-24 - Focus-visible styles on custom standalone HTML pages
+**Learning:** Custom standalone HTML pages in this app often omit core accessibility focus styles. When applying `:focus-visible`, explicitly suppress default outlines using `:focus:not(:focus-visible) { outline: none; }` to prevent jarring visual rings during mouse interactions.
+**Action:** Always include `:focus-visible` styling (with appropriate colors matching the explicit color scheme, such as couch-red or amber) when modifying custom standalone HTML pages to ensure keyboard navigation accessibility without degrading mouse click UX.

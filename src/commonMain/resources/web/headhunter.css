@@ -103,7 +103,8 @@ dialog::backdrop{background:#000a}
 dialog .panel-heading{position:sticky;top:-25px;padding-top:5px;padding-bottom:12px;background:var(--panel);z-index:1}
 .review-form{margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}
 .skip-link{position:fixed;left:12px;top:-70px;z-index:2000;padding:8px 12px;background:var(--panel)}
-.skip-link:focus{top:48px}
+.skip-link:focus-visible{top:48px}
+.skip-link:focus:not(:focus-visible){outline:none}
 .program-node{border-bottom:1px solid var(--line);padding:10px 0;font-size:13px}
 .program-node strong{display:block}
 @media(max-width:1050px){.hh-shell{padding:28px 24px 60px}.workspace-grid{grid-template-columns:minmax(0,1.3fr) minmax(260px,1fr)}.hh-tabs{gap:20px}}
