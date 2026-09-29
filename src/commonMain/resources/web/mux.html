@@ -5,7 +5,12 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light"><title>ModelMux</title>
   <link rel="stylesheet" href="/mux.css">
-  </head>
+
+<style>
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--amber, #f2a011); outline-offset: -2px; }
+</style>
+</head>
 <body data-app-page="mux">
   <aside class="sidebar">
     <a class="brand" href="/modelmux"><i data-lucide="workflow"></i><span>FORGE <b>MUX</b></span></a>

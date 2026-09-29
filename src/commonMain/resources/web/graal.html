@@ -192,6 +192,9 @@ html[data-skin="marker"] body{--bg:#f6f5f0;--panel:#ffffff;--panel2:#f0efe9;--li
 html[data-skin="marker"] .evt{background:rgba(255,255,255,.94)}
 html[data-skin="marker"] #hud{background:linear-gradient(180deg,rgba(246,245,240,.97),rgba(246,245,240,.85) 75%,transparent)}
 html[data-skin="marker"] #crumb{text-shadow:none}
+
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--graal, #ffc46b); outline-offset: -2px; }
 </style>
 </head>
 <body data-app-page="graal">
