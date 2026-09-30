@@ -158,5 +158,5 @@ fun LcncProgram.topo(): Series<LcncNode> {
         order.add(id)
     }
     for (i in 0 until nodes.size) visit(nodes[i].id)
-    return order.size j { i -> byId[order[i]]!! } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .mapNotNull { ... }.toSeries() */
+    return order.size j { i -> byId[order[i]]!! }
 }
