@@ -1,0 +1,3 @@
+## 2024-10-01 - Add Focus-Visible Styles
+**Learning:** Custom standalone HTML pages often omit core accessibility focus styles but have distinct, explicitly defined color schemes. When modifying them, ensure `:focus-visible` styling is included without duplicating custom CSS blocks or hardcoding colors across multiple pages. Strictly follow the "Use existing classes" constraint by utilizing CSS variables.
+**Action:** Consistently apply a generic focus ring pattern using `a:focus:not(:focus-visible) { outline: none; }` alongside `a:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }` customized per page schema.
