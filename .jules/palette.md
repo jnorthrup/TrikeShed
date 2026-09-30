@@ -1,0 +1,3 @@
+## 2024-05-18 - Missing focus styles in custom HTML pages
+**Learning:** Custom standalone HTML pages in this app (like `futon.html` and `graal.html`) often lack core accessibility focus styles because they don't inherit from the main application CSS, despite having distinct, explicitly defined color schemes (e.g., couch-red accents or graal-orange).
+**Action:** When working on standalone HTML pages, explicitly add `:focus-visible` styling for interactive elements using the existing defined CSS variables to maintain visual consistency without duplicating custom CSS blocks. Use `:focus:not(:focus-visible)` to suppress outlines for mouse interactions to prevent visual regressions for pointer users.
