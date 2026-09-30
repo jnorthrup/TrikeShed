@@ -10,6 +10,11 @@
 <link rel="stylesheet" href="/harness.css">
 <link rel="stylesheet" href="/patch-camera.css">
 <link rel="stylesheet" href="/archive.css">
+
+<style>
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--graal, #f2a011); outline-offset: -2px; }
+</style>
 </head>
 <body data-app-page="board">
 <div id="bar">
