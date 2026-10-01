@@ -22,3 +22,6 @@
 #wires path.cand.near{stroke-width:calc(2.4px * var(--wire-scale,1))}
 #wires path.cand.only{stroke-width:calc(2.8px * var(--wire-scale,1));filter:none}
 #wires text.wiretype,#channels text{font-size:calc(12px * var(--wire-label-scale,1));stroke-width:calc(4px * var(--wire-label-scale,1))}
+
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
