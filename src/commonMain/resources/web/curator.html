@@ -54,6 +54,10 @@ main{flex:1;display:flex;min-height:0}
 #curator-toc li b{font-weight:500}#curator-toc li em{color:var(--dim);font-style:normal;font-size:11px}
 #curator-toc li a{color:#7fa3c9;margin-left:4px;font-size:11px}#curator-toc li small{color:#9fb0c4;font:11px ui-monospace,monospace}
 </style>
+<style>
+a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
+a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, [tabindex="0"]:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+</style>
 </head>
 <body data-app-page="curator">
 <header><b>Curator scope</b><span>the law library: a shelf unit per project, concept pool on its own — wheel/drag to take the camera, it returns to follow after a while · <kbd>space</kbd> pin · <kbd>F</kbd> follow · click a book to open it, <kbd>←</kbd><kbd>→</kbd> turn pages, <kbd>Esc</kbd> close</span><span id="curator-track"><input id="curator-detail" type="range" min="0" max="100" step="1" value="50" aria-label="Detail" title="Snap depth: circles split into their contents once the view reaches this zoom. The tick is the current zoom."><i id="curator-zoom" aria-hidden="true"></i></span><span id="status"><span id="curator-status">connecting…</span></span></header>
