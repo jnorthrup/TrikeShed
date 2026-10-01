@@ -43,14 +43,14 @@ private fun teleportOf(v: Value?, depth: Int): Teleported = when {
     // string-keyed lookup is the real shape.
     v.hasHashEntries() -> runCatching {
         Teleported.Obj(
-            buildMap {
+            buildList {
                 val entries = v.hashEntriesIterator
                 while (entries.hasIteratorNextElement() && size < TELEPORT_MAX_ELEMENTS) {
                     val e = entries.iteratorNextElement
                     val k = e.getArrayElement(0)
-                    put(if (k.isString) k.asString() else k.toString(), teleportOf(e.getArrayElement(1), depth + 1))
+                    add((if (k.isString) k.asString() else k.toString()) to teleportOf(e.getArrayElement(1), depth + 1))
                 }
-            }.toList().sortedBy { it.first }.toMap(),
+            }.sortedBy { it.first }.toMap(), // ⚡ Bolt: Build list of pairs directly to avoid intermediate Maps and .toList() allocations
         )
     }.getOrElse { Teleported.Opaque(v.toString()) }
     v.hasArrayElements() -> runCatching {
