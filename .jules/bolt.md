@@ -1,0 +1,3 @@
+## 2023-10-02 - Avoid intermediate Map and List allocations in polyglot traversal
+**Learning:** Chaining `buildMap { ... }.toList().sortedBy { ... }.toMap()` or `entries.map { ... }.sortedBy { ... }.toMap()` during GraalVM polyglot traversal to construct object envelopes allocates multiple intermediate collections (LinkedHashMap and ArrayLists) that stress the GC during heavy polyglot serialization.
+**Action:** Always map the entries directly into a single `buildList { ... }` or directly onto `List<Pair<...>>` (by replacing `buildMap` with `buildList` and `put` with `add(pair)`), then immediately chain `.sortedBy { ... }.toMap()` to avoid the extra Map and List allocations.
