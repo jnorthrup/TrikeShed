@@ -101,7 +101,7 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
             ProcessHandle.current().info().command().orElse(System.getProperty("java.home") + "/bin/java"),
             "-Xmx$WORKER_HEAP", "-cp", System.getProperty("java.class.path"),
             CoreNlpRuntime::class.java.name,
-        ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
+        ).redirectError(ProcessBuilder.Redirect.INHERIT).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
         private val out = process.outputStream.bufferedWriter(Charsets.UTF_8)
         private val input = process.inputStream.bufferedReader(Charsets.UTF_8)
         val alive: Boolean get() = process.isAlive

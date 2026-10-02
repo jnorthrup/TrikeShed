@@ -417,7 +417,7 @@ object LeafDemo {
 
     /** stdout+stderr of a short command on exit 0, null on failure/timeout. */
     private fun exec(vararg cmd: String, timeoutMillis: Long = 5_000): String? = runCatching {
-        val p = ProcessBuilder(*cmd).redirectErrorStream(true).start()
+        val p = ProcessBuilder(*cmd).redirectErrorStream(true).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
         val buf = ByteArrayOutputStream()
         val pump = Thread({ runCatching { p.inputStream.copyTo(buf) } }, "leaf-demo-exec").apply { isDaemon = true; start() }
         if (!p.waitFor(timeoutMillis, TimeUnit.MILLISECONDS)) { p.destroyForcibly(); p.waitFor(); return@runCatching null }

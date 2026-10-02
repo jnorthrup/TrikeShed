@@ -209,7 +209,7 @@ object HeatSoak {
     /** `jcmd <pid> GC.class_histogram` top [n] lines — the evidence behind any heap claim (-Dsubvm.soak.histo=true). */
     fun classHistogram(n: Int): String = runCatching {
         val jcmd = java.io.File(System.getProperty("java.home"), "bin/jcmd").path
-        val p = ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true).start()
+        val p = ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
         val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readLines() }
         val finished = p.waitFor(1, java.util.concurrent.TimeUnit.MINUTES)
         if (!finished) {
