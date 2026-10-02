@@ -191,7 +191,7 @@ internal object DocumentCuratorCodec {
             m.array("observerFailures").let { arr -> arr.size j { i: Int -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
             m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
-            m.optionalStrings("toolOntology").toSeries(), receipt = receipt,
+            m.optionalStrings("toolOntology"), receipt = receipt,
             toolReceipts = ((m["toolReceipts"] as? List<*>) ?: emptyList<Any?>()).map { toolReceipt(it as Map<*, *>) }.toSeries(),
             axioms = (m["axioms"] as? List<*>)?.map { axiom(it as Map<*, *>) }?.toSeries())
     }
@@ -203,11 +203,11 @@ internal object DocumentCuratorCodec {
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()
     private fun Map<*, *>.array(key: String) = this[key] as List<*>
     private fun Map<*, *>.obj(key: String) = (this[key] as Map<*, *>).entries.associate { it.key as String to it.value }
-    private fun Map<*, *>.cids(key: String) = array(key).map { ContentId(it as String) }.toSeries()
+    private fun Map<*, *>.cids(key: String) = array(key).let { arr -> arr.size j { i -> ContentId(arr[i] as String) } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */
     private fun Map<*, *>.optionalCids(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
-        .map { ContentId(it as String) }.toSeries()
-    private fun Map<*, *>.optionalStrings(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
-        .map { it as String }
+        .let { arr -> arr.size j { i -> ContentId(arr[i] as String) } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */
+    private fun Map<*, *>.optionalStrings(key: String): Series<String> = ((this[key] as? List<*>) ?: emptyList<Any?>())
+        .let { arr -> arr.size j { i -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */
 }
 
 internal fun <T, R> Series<T>.values(f: (T) -> R): List<R> = List(size) { f(this[it]) }
