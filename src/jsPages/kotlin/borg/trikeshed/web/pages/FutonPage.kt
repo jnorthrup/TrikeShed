@@ -54,9 +54,15 @@ object FutonPage {
         for (r in rows.take(LIMIT)) {
             val tr = document.createElement("tr") as HTMLElement
             val rev = if (truthy(r.value) && truthy(r.value.rev)) str(r.value.rev) else ""
-            tr.innerHTML = "<td>" + str(r.id).replace("&", "&amp;").replace("<", "&lt;") + "</td><td class=\"rev\">" + rev.take(18) + "…</td>"
+            tr.innerHTML = "<td tabindex=\"0\">" + str(r.id).replace("&", "&amp;").replace("<", "&lt;") + "</td><td class=\"rev\">" + rev.take(18) + "…</td>"
             val id = str(r.id)
             tr.onclick = { launchPage { loadDoc(id) } }
+            tr.onkeydown = { e ->
+                if ((e as KeyboardEvent).key == "Enter" || e.key == " ") {
+                    e.preventDefault()
+                    launchPage { loadDoc(id) }
+                }
+            }
             t.appendChild(tr)
         }
         (byId("nextB") as HTMLButtonElement).disabled = rows.size <= LIMIT
@@ -234,7 +240,15 @@ object FutonPage {
             for (row in rows) {
                 val tr = document.createElement("tr") as HTMLElement
                 val id = if (row.id == null) "" else str(row.id)
-                tr.innerHTML = "<td>" + JSON.stringify(row.key).esc() + "</td><td>" + JSON.stringify(row.value).esc() + "</td><td>" + id.esc() + "</td>"
+                tr.innerHTML = "<td tabindex=\"0\">" + JSON.stringify(row.key).esc() + "</td><td>" + JSON.stringify(row.value).esc() + "</td><td>" + id.esc() + "</td>"
+                if (id.isNotEmpty()) {
+                    tr.onkeydown = { e ->
+                        if ((e as KeyboardEvent).key == "Enter" || e.key == " ") {
+                            e.preventDefault()
+                            launchPage { loadDoc(id) }
+                        }
+                    }
+                }
                 if (id.isNotEmpty()) tr.onclick = { launchPage { loadDoc(id) } }
                 t.appendChild(tr)
             }
