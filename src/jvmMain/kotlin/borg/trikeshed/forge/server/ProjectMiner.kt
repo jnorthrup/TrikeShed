@@ -89,7 +89,7 @@ class ProjectMiner(
      */
     private fun textLayerOf(f: File): String? = runCatching {
         fun run(vararg cmd: String): String {
-            val proc = ProcessBuilder(*cmd).redirectErrorStream(false).start()
+            val proc = ProcessBuilder(*cmd).redirectErrorStream(false).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
             val text = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes()
             check(proc.waitFor() == 0) { "${cmd[0]} failed" }
             return text
@@ -118,7 +118,7 @@ class ProjectMiner(
 
     /** Page count and the pages that carry a text layer, read by poppler; null when poppler is absent. */
     private fun layeredPages(f: File): Pair<Int, Set<Int>>? = runCatching {
-        val proc = ProcessBuilder("pdftotext", "-enc", "UTF-8", f.absolutePath, "-").start()
+        val proc = ProcessBuilder("pdftotext", "-enc", "UTF-8", f.absolutePath, "-").apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
         val layer = proc.inputStream.readAllBytes().decodeToString().also { proc.errorStream.readAllBytes(); proc.waitFor() }
         // pdftotext closes every page with a form feed, blank pages included: the page count is the feed count.
         val pages = layer.split('\u000c').dropLast(1)
@@ -141,7 +141,7 @@ class ProjectMiner(
             "ingested" to (pdb.store.get("$id.extract.md") != null), "notes" to (pdb.store.get("$id${borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX}") != null))
         if (ext == "pdf" && onDisk != null) {
             val info = runCatching {
-                val proc = ProcessBuilder("pdfinfo", onDisk.absolutePath).start()
+                val proc = ProcessBuilder("pdfinfo", onDisk.absolutePath).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
                 proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() }
             }.getOrDefault("")
             fun field(k: String) = Regex("(?m)^$k:\\s+(.+)$").find(info)?.groupValues?.get(1)?.trim()
@@ -157,7 +157,7 @@ class ProjectMiner(
                 val sample = listOf(pages / 10, pages / 2, pages - pages / 20).map { it.coerceIn(1, pages) }.distinct()
                 out["columns"] = sample.associate { pg ->
                     val html = runCatching {
-                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", onDisk.absolutePath, "-").start()
+                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", onDisk.absolutePath, "-").apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
                         proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() }
                     }.getOrDefault("")
                     val words = Regex("<word xMin=\"([\\d.]+)\" yMin=\"([\\d.]+)\" xMax=\"([\\d.]+)\" yMax=\"([\\d.]+)\">").findAll(html)
@@ -181,7 +181,7 @@ class ProjectMiner(
      */
     private suspend fun ocrPages(name: String, id: String, f: File, layered: Set<Int> = emptySet()): String? = coroutineScope {
         val pages = runCatching {
-            val proc = ProcessBuilder("pdfinfo", f.absolutePath).start()
+            val proc = ProcessBuilder("pdfinfo", f.absolutePath).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
             Regex("Pages:\\s+(\\d+)").find(proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() })?.groupValues?.get(1)?.toInt()
         }.getOrNull() ?: return@coroutineScope null
         val dir = File(filesRoot ?: File(System.getProperty("java.io.tmpdir")), ".ocr/$name/${id.replace('/', '_')}").apply { mkdirs() }
@@ -195,7 +195,7 @@ class ProjectMiner(
                 gate.acquire()
                 try {
                     if (pg in layered) {
-                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", f.absolutePath, "-").start()
+                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", f.absolutePath, "-").apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
                         val html = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes(); proc.waitFor()
                         File(out.absolutePath + ".part").apply { writeText(borg.trikeshed.narsese.PageColumns.readBbox(html)) }.renameTo(out)
                         ocrDone.merge(key, 1, Int::plus)
@@ -203,9 +203,9 @@ class ProjectMiner(
                     }
                     val png = File(dir, "p$pg")
                     ProcessBuilder("pdftoppm", "-f", "$pg", "-l", "$pg", "-r", "300", "-gray", "-png", "-singlefile", f.absolutePath, png.absolutePath)
-                        .redirectErrorStream(true).start().also { it.inputStream.readAllBytes(); it.waitFor() }
+                        .redirectErrorStream(true).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start().also { it.inputStream.readAllBytes(); it.waitFor() }
                     val img = File(png.absolutePath + ".png")
-                    val proc = ProcessBuilder("tesseract", img.absolutePath, "-", "--psm", "3").redirectErrorStream(false).start()
+                    val proc = ProcessBuilder("tesseract", img.absolutePath, "-", "--psm", "3").redirectErrorStream(false).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
                     val text = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes(); proc.waitFor()
                     img.delete()
                     File(out.absolutePath + ".part").apply { writeText(text) }.renameTo(out)

@@ -2653,8 +2653,7 @@ object OroborosDaemon {
     internal suspend fun preflight(repoDir: File): Boolean {
         // git fetch origin master (best-effort, 5s timeout)
         val fetchOk = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val builder = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run").directory(jfile(repoDir))
-            builder.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
+            val builder = ProcessBuilder("git", "fetch", "origin", "master", "--dry-run").directory(jfile(repoDir)).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }
             val fetch = builder.start()
             val finished = fetch.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
             if (!finished) fetch.destroyForcibly()
@@ -2663,8 +2662,7 @@ object OroborosDaemon {
         if (!fetchOk) return true // offline is OK, we'll poll anyway
 
         suspend fun command(vararg args: String): String = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val builder = ProcessBuilder(*args).directory(jfile(repoDir)).redirectErrorStream(true)
-            builder.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
+            val builder = ProcessBuilder(*args).directory(jfile(repoDir)).redirectErrorStream(true).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }
             val p = builder.start()
             val outAsync = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readText().trim() }
             val finished = p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
