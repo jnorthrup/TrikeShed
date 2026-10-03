@@ -246,7 +246,7 @@ class ProjectScopes(
         )
         for (cmd in attempts) {
             val ok = runCatching {
-                val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+                val pb = ProcessBuilder(cmd).redirectErrorStream(true); pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }; val p = pb.start()
                 val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.readBytes() }
                 val finished = p.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
                 if (!finished) {

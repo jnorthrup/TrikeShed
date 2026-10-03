@@ -235,7 +235,7 @@ object PanamaKanbanMovie {
             "-i", "temp-frames/frame%04d.png",
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-crf", "23", outputFile.absolutePath
-        ).directory(File(".")).redirectErrorStream(true).start()
+        ).directory(File(".")).redirectErrorStream(true).apply { environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) } }.start()
         
         val future = java.util.concurrent.CompletableFuture.supplyAsync { process.inputStream.bufferedReader().readText() }
         val finished = process.waitFor(10, java.util.concurrent.TimeUnit.MINUTES)
