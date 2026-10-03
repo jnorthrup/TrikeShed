@@ -10,6 +10,8 @@
 /* Futon lineage: utilitarian CouchDB-1.x admin — light, gray chrome, couch-red accents. */
 :root{--red:#b5382c;--bg:#f4f4f0;--chrome:#e9e9e4;--line:#c9c9c2;--ink:#2b2b28;--dim:#77776e;--link:#8a1f14;--ok:#2c5e32;--row:#ffffff;--row2:#f7f7f3}
 *{box-sizing:border-box}
+a:focus:not(:focus-visible),button:focus:not(:focus-visible),input:focus:not(:focus-visible),select:focus:not(:focus-visible),textarea:focus:not(:focus-visible),[tabindex="0"]:focus:not(:focus-visible){outline:none}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex="0"]:focus-visible{outline:2px solid var(--red);outline-offset:-2px}
 body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "Helvetica Neue",Arial,sans-serif}
 header{background:linear-gradient(#fdfdfb,var(--chrome));border-bottom:1px solid var(--line);padding:10px 16px;display:flex;align-items:baseline;gap:14px}
 header b{color:var(--red);font-size:20px;letter-spacing:.02em}
