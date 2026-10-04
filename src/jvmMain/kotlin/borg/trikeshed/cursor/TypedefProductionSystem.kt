@@ -347,10 +347,11 @@ object TypedefProductionSystem {
         val count = ring.a
         if (count == 0) return
 
-        val slab = Array(count) { ring.b(it) }
-
-        // clear ring — producer gets fresh scratch
-        while (ring.a > 0) { ring.removeAt(0) }
+        // The ring drains in at most two array copies; the producer gets fresh scratch.
+        @Suppress("UNCHECKED_CAST")
+        val slab = arrayOfNulls<TraceEvent>(count) as Array<TraceEvent>
+        ring.copyInto(slab)
+        ring.clear()
 
         val epoch = slabEpoch++
         val nanoStart = slab.firstOrNull()?.nano ?: 0L
@@ -432,7 +433,7 @@ object TypedefProductionSystem {
 
     fun reset() {
         active = false
-        while (ring.a > 0) { ring.removeAt(0) }
+        ring.clear()
         seq = 0
         slabEpoch = 0
         subscriber = null

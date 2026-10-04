@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.narsese.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex

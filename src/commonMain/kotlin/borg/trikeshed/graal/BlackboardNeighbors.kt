@@ -3,6 +3,7 @@ package borg.trikeshed.graal
 import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoClassifier
 import borg.trikeshed.ontology.SumoMask

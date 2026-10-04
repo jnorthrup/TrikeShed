@@ -38,8 +38,8 @@ class HeadhunterWire private constructor(
 
         fun intakeProgram(): LcncProgram {
             val outputs = borg.trikeshed.lib.s_["record", "source", "extraction", "curation"]
-            val nodes = borg.trikeshed.lib.SeriesBuffer<LcncNode>()
-            val wires = borg.trikeshed.lib.SeriesBuffer<LcncWire>()
+            val nodes = borg.trikeshed.collections.SeriesBuffer<LcncNode>()
+            val wires = borg.trikeshed.collections.SeriesBuffer<LcncWire>()
             nodes.add(LcncNode("input", LcncContracts.SCOPE_IN, mapOf("name" to "source", "kind" to "json"), 40.0, 80.0))
             nodes.add(LcncNode("capture", "headhunter.capture", x = 350.0, y = 80.0))
             wires.add(LcncWire("input", "value", "capture", "source"))

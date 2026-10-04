@@ -397,7 +397,7 @@ object LcncContracts {
         // ── project documents as typed workflow input (Forge genesis, Cut F) ──
         // A mounted folder is a document set a program can walk: `project.docs` lists
         // its documents as the exact type ProjectDoc, `project.read` reads one as text,
-        // `project.extract` reads the mined twin the miner leaves beside it.
+        // `project.extract` reads the mined twin, mining the document first when it has none.
         LcncPortContract(ProjectNodes.DOCS, "documents of a mounted folder",
             listOf("project?", "trigger?"), listOf("docs", "count"),
             inputKinds = mapOf("project" to "id", "trigger" to "trigger"),
@@ -426,7 +426,7 @@ object LcncContracts {
                 "project" to LcncPortContract.LcncParamSpec(ph = "the mounted folder, when no document is wired"),
                 "id" to LcncPortContract.LcncParamSpec(ph = "the document's path in it, when no document is wired"),
             )),
-        LcncPortContract(ProjectNodes.EXTRACT, "the mined text of a document, if any",
+        LcncPortContract(ProjectNodes.EXTRACT, "the text of a document: its mined twin, mined now when absent",
             listOf("doc?", "project?", "id?"), listOf("text", "cid", "found"),
             inputKinds = mapOf("doc" to ProjectDoc.KIND, "project" to "id", "id" to "id"),
             outputKinds = mapOf("text" to "text", "cid" to "id", "found" to "json"),

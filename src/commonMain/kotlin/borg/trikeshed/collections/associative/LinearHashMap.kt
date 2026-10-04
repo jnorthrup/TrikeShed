@@ -4,7 +4,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.lib.right
 import borg.trikeshed.collections.MinHeap
 

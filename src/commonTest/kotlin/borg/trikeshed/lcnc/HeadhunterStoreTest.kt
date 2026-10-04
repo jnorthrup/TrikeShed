@@ -5,6 +5,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*

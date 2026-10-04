@@ -8,27 +8,9 @@ import borg.trikeshed.nlp.NlpMetadata
 import borg.trikeshed.nlp.NlpRelation
 import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
-import borg.trikeshed.parse.jsonOf
 
-/** [NlpDocument] across the CoreNLP worker's pipe: every field, rows as positional arrays. */
+/** [NlpDocument] as the CoreNLP isolate answers it: every field, rows as positional arrays. */
 internal object NlpWire {
-    fun encode(doc: NlpDocument): String = jsonOf(mapOf(
-        "text" to doc.text,
-        "sentences" to List(doc.sentences.size) { k -> val s = doc.sentences[k]; listOf(
-            s.index, s.begin, s.end,
-            List(s.tokens.size) { i -> val t = s.tokens[i]; listOf(t.index, t.begin, t.end, t.word, t.lemma, t.tag, t.ner) },
-            List(s.dependencies.size) { i -> val d = s.dependencies[i]; listOf(d.governor, d.dependent, d.relation) },
-            s.relations.map(::relation), s.kbp.map(::relation),
-        ) },
-        "metadata" to doc.metadata?.let { m -> mapOf("processor" to m.processor, "implementation" to m.implementation,
-            "runtime" to m.runtime, "configuration" to m.configuration) },
-        "mentions" to doc.mentions.map { m -> listOf(m.sentence, m.span.first, m.span.last, m.text, m.chain, m.representative) },
-    ))
-
-    private fun relation(r: NlpRelation): List<Any?> = listOf(
-        r.subject.first, r.subject.last, r.relation.first, r.relation.last, r.`object`.first, r.`object`.last,
-        r.subjectText, r.relationText, r.objectText, r.confidence)
-
     private fun int(v: Any?): Int = (v as Number).toInt()
     private fun list(v: Any?): List<*> = v as List<*>
 

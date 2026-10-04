@@ -101,8 +101,30 @@ class Book(
     val facts: Set<String> = emptySet(),
     /** Section → section pointers found in its prose (the citation tupler), as (from, to) ordinals. */
     val cites: List<Pair<Int, Int>> = emptyList(),
+    /** (statement, section) pairs Jev judged, as packInts(i, k) ascending; [nouls] beside them. */
+    val judged: LongArray = LongArray(0),
+    /** Jev's noul that the section states the statement, per [judged] pair. */
+    val nouls: FloatArray = FloatArray(0),
+    /** Premises Jev found the book's pages state as fact: the open questions its pages answer, joined as facts. */
+    val established: Set<String> = emptySet(),
 ) {
-    init { require(statements.size == support.size) }
+    init { require(statements.size == support.size && judged.size == nouls.size) }
+
+    /** Evidence section [k] gives statement [i]: one unit scaled by Jev's noul, a whole unit where Jev has not judged. */
+    fun weight(i: Int, k: Int): Long {
+        val key = packInts(i, k)
+        var lo = 0; var hi = judged.size - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val x = judged[mid]
+            when {
+                x < key -> lo = mid + 1
+                x > key -> hi = mid - 1
+                else -> return maxOf(1L, (nouls[mid] * Nal.UNIT).toLong())
+            }
+        }
+        return Nal.UNIT
+    }
 
     companion object {
         /** A section's heading: its opening line, where the section tupler cut it, bounded for display. */
@@ -243,14 +265,17 @@ class Constellation(val name: String) {
             val sections = book.support[i].map { (b shl 20) or it }
             support[id] = support[id] or RoaringSeries.of(sections)
             mine.add(id)
-            val sign = if (s.modality == Modality.MUST_NOT) EvidenceCoord(0, Nal.UNIT) else EvidenceCoord(Nal.UNIT, 0)
             val p = propositionIds.getOrPut(s.proposition) { propositionIds.size }
-            for (g in sections) propositions.observe(packInts(p, 0), g, sign)
-            if (s.bearerClass >= 0) {
-                val key = packInts(s.bearerClass, predicationId(s.predication))
-                for (g in sections) predications.observe(key, g, sign)
-                predicationStatements.getOrPut(key) { IntAccumulator(2) }.add(id)
+            val typed = s.bearerClass >= 0
+            val key = if (typed) packInts(s.bearerClass, predicationId(s.predication)) else 0L
+            // Each section one source, its unit of evidence weighed by Jev's noul that the section states the statement.
+            for (k in book.support[i]) {
+                val w = book.weight(i, k)
+                val sign = if (s.modality == Modality.MUST_NOT) EvidenceCoord(0, w) else EvidenceCoord(w, 0)
+                propositions.observe(packInts(p, 0), (b shl 20) or k, sign)
+                if (typed) predications.observe(key, (b shl 20) or k, sign)
             }
+            if (typed) predicationStatements.getOrPut(key) { IntAccumulator(2) }.add(id)
         }
         statementsOf.add(mine.toRoaring())
         for ((k, a) in newBearing) bearing[k] = (bearing[k] ?: RoaringSeries.EMPTY) or a.toRoaring()
@@ -258,6 +283,7 @@ class Constellation(val name: String) {
         unconditioned = unconditioned or newUnconditioned.toRoaring()
         unless = unless or newUnless.toRoaring()
         facts.addAll(book.facts)
+        facts.addAll(book.established)
         return b
     }
 

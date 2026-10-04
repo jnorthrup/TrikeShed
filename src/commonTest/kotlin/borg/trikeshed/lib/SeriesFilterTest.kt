@@ -1,5 +1,6 @@
 package borg.trikeshed.lib
 
+import borg.trikeshed.collections.SeriesBuffer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

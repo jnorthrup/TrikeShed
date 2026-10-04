@@ -9,7 +9,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.plus

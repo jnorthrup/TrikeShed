@@ -112,6 +112,8 @@ class Couch(
         descending: Boolean = false,
         includeDocs: Boolean = false,
         keys: List<String>? = null,
+        prefix: String? = null,
+        delimiter: String? = null,
     ): Map<String, Any?> {
         val storeIds = store.ids()
         val rawIds = ArrayList<String>()
@@ -123,6 +125,17 @@ class Couch(
         }
 
         var ids = rawIds.sorted()
+        if (prefix != null) ids = ids.filter { it.startsWith(prefix) }
+        // A delimiter folds every id past its next delimiter into that folder: a path-shaped id space read
+        // as a hierarchy (`prefixes` are the folders directly under [prefix], `rows` the documents in it).
+        val folders = if (delimiter.isNullOrEmpty()) null else LinkedHashSet<String>()
+        if (folders != null) {
+            val p = prefix.orEmpty()
+            ids = ids.filter { id ->
+                val at = id.indexOf(delimiter!!, p.length)
+                if (at < 0) true else { folders.add(id.substring(0, at + delimiter.length)); false }
+            }
+        }
         if (keys != null) {
             val set = keys.toSet(); ids = keys.filter { it in set }
         } else {
@@ -132,7 +145,7 @@ class Couch(
         }
         val total = rawIds.size
         val page = ids.drop(skip).take(limit)
-        return mapOf(
+        return linkedMapOf(
             "total_rows" to total,
             "offset" to skip.coerceAtMost(ids.size),
             "rows" to page.map { id ->
@@ -141,7 +154,7 @@ class Couch(
                 if (includeDocs) row["doc"] = docJson(id)
                 row
             },
-        )
+        ).also { r -> if (folders != null) { r["prefixes"] = folders.sorted(); r["documents"] = ids.size } }
     }
 
     // ── _changes ──────────────────────────────────────────────────

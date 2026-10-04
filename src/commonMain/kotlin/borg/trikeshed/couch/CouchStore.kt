@@ -141,7 +141,8 @@ class CouchStore(
     fun subscribeMutations(observer: (MutationEvent) -> Unit): () -> Unit {
         var lastSeen = 0
         return changes.subscribe { twin: Twin<Series<CouchCommittedFrame>> ->
-            val series: Series<CouchCommittedFrame> = twin.a
+            // (before, after): the frames as they now stand are the after side.
+            val series: Series<CouchCommittedFrame> = twin.b
             while (lastSeen < series.size) {
                 val frame = series[lastSeen]
                 lastSeen++
@@ -161,7 +162,7 @@ class CouchStore(
     /** Subscribe to mutation events as Twin<Series<MutationEvent>> (for MutableSeries DSL). */
     fun subscribeMutationsSeries(observer: (Twin<Series<MutationEvent>>) -> Unit): () -> Unit {
         return changes.subscribe { twin: Twin<Series<CouchCommittedFrame>> ->
-            val src: Series<CouchCommittedFrame> = twin.a
+            val src: Series<CouchCommittedFrame> = twin.b
             // create an ephemeral projection to matching types
             val mapped: Series<MutationEvent> = src.size j { i: Int ->
                 val f = src[i]

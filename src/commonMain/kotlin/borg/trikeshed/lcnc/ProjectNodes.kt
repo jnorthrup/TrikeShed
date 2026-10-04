@@ -12,7 +12,7 @@ import kotlinx.coroutines.currentCoroutineContext
  * document an attachment with typed fields), but no lego let a program read
  * one. These do: `project.docs` lists a project's documents as exact
  * `List<ProjectDoc>`, `project.read` reads one as text, `project.extract` reads
- * the mined twin the miner leaves beside it. The daemon binds [ProjectCorpus]
+ * its mined twin, mining the document first when it has none. The daemon binds [ProjectCorpus]
  * to its project registry; a test binds [InMemoryProjectCorpus].
  */
 interface ProjectCorpus {
@@ -20,6 +20,12 @@ interface ProjectCorpus {
     suspend fun docs(project: String, prefix: String = "", glob: String = "", limit: Int = 256): List<ProjectDoc>
     /** Null when the document is absent, binary, or over the character budget. */
     suspend fun read(project: String, id: String, maxChars: Int = 65_536): ProjectText?
+    /**
+     * The document's extracted text: its twin when one exists, else the text the corpus reads out of
+     * the document (text layer or OCR) and keeps as the twin. Null when nothing can be read from it.
+     */
+    suspend fun extract(project: String, id: String, maxChars: Int): ProjectText? =
+        read(project, id + ProjectNodes.EXTRACT_SUFFIX, maxChars)
 }
 
 /** One mounted project, as `project.list` reports it. */
@@ -177,6 +183,13 @@ object ProjectNodes {
      * the reading should be held to. Never listed as a document; `project.notes` and `book.curate` read it.
      */
     const val NOTES_SUFFIX = ".notes.md"
+    /** The footnote-stream twin the miner leaves beside a paged document (PageStreams). */
+    const val FOOTNOTES_SUFFIX = ".footnotes.tsv"
+    /** A twin names what was derived from or written about another document; it is never a document itself. */
+    fun twin(id: String): Boolean = twinOf(id) != null
+
+    /** The document [id] is a twin of, or null when [id] is a document. */
+    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
     const val NOTES = "project.notes"
 
     /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */
@@ -236,7 +249,7 @@ object ProjectNodes {
             val id = doc?.id ?: str(inputs, node, "id")
                 ?: throw IllegalArgumentException("project.extract: no document wired and no id named")
             val maxChars = node.params["maxChars"]?.toIntOrNull()?.coerceAtLeast(1) ?: Int.MAX_VALUE / 4
-            val twin = service.value.read(project, id + EXTRACT_SUFFIX, maxChars)
+            val twin = service.value.extract(project, id, maxChars)
             if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$EXTRACT_SUFFIX", twin.cid, twin.seq, twin.rev)
             if (twin == null) mapOf("found" to false)
             else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true)

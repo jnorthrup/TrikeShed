@@ -4,7 +4,7 @@ import borg.trikeshed.dag.PlaneFacts
 import borg.trikeshed.dag.ReteStoredFact
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.lib.contains
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j

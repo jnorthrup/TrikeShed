@@ -3,6 +3,7 @@ package modelmux
 import keymux.*
 import modelmux.acp.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.htx.*
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.*

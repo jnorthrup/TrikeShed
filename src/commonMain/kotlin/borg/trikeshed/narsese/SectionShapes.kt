@@ -108,6 +108,10 @@ object SectionShapes {
                 if (prior == null || t.heads[i] > t.heads[prior]) byNumber[key] = i
             }
             val reps = (byNumber.values + unnumbered).sorted()
+                // A contents entry whose number heads nothing anywhere in the text is the contents of text
+                // that is not here (a multi-volume work's full table in its first volume): no evidence either
+                // way. It is told by its neighbours — a run of the same shape, each heading nothing.
+                .filter { i -> t.heads[i] > t.lines[i].length || !contents(t, s, i) }
             var hp = 0L; var hn = 0L; var np = 0L; var nn = 0L
             // A heading names something; a line that only repeats a title named before does not.
             val seen = HashSet<String>()
@@ -125,6 +129,10 @@ object SectionShapes {
                 chain.filter { t.heads[it] > t.lines[it].length }.toIntArray())
         }.sortedByDescending { it.weight }
     }
+
+    /** Line [i] of shape [s] sits in a contents run: a line of the same shape within two lines on either side. */
+    private fun contents(t: Tuples, s: Int, i: Int): Boolean =
+        (maxOf(0, i - 2)..minOf(t.lines.size - 1, i + 2)).any { j -> j != i && t.shapeOf[j] == s }
 
     /** The longest strictly ascending subsequence of [items] by [key] (patience sorting), in order. */
     private fun ascendingChain(items: List<Int>, key: (Int) -> LongArray): List<Int> {

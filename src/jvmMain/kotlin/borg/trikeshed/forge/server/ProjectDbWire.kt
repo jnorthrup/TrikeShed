@@ -100,6 +100,15 @@ class ProjectDbWire(
             // and that silence is itself the diagnosis (nothing reached the daemon).
             System.err.println("[OROBOROS] _project: $method $p (${payload.size}b)")
             val scopes = uploads ?: return json(503, """{"error":"uploads not wired"}""")
+            // DELETE /_project/<name>/doc?path=<rel>: a document (with its twins) or a whole folder leaves the upload.
+            if (method == "DELETE" && segments.size >= 3 && segments[2] == "doc") {
+                val rel = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))["path"]
+                    ?: return json(400, """{"error":"path query required"}""")
+                return runCatching { scopes.uploadRemove(borg.trikeshed.relaxfactory.CouchHttpSurface.percentDecode(segments[1]), rel) }.fold(
+                    onSuccess = { json(200, jsonOf(mapOf("verdict" to "removed", "ids" to it))) },
+                    onFailure = { json(400, jsonOf(mapOf("verdict" to "refused", "detail" to (it.message ?: "")))) },
+                )
+            }
             if (method != "POST" || segments.size < 3) return json(400, """{"error":"POST /_project/<name>/begin|put"}""")
             // Finder names carry spaces; the client sends them percent-encoded ("My%20PDF%20Stash").
             // Decode BEFORE sanitize, or '%20' mangles into literal '-20' in the db name.

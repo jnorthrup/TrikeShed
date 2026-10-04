@@ -1328,7 +1328,7 @@ object OroborosDaemon {
         ) { HostSystem.currentTimeMillis() }
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
-        val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes)
+        val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes, projectMiner)
         // Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, a lineage
         // in <forgeHome>/snapshots/ledger.jsonl, the head as lcnc/snapshot/head.
         val snapshotService = borg.trikeshed.forge.server.WorkspaceSnapshotService(
@@ -1564,7 +1564,10 @@ object OroborosDaemon {
             }
         }
         moduleContext.lcncRunners["nal.encode"] = borg.trikeshed.narsese.BeliefsNodes.encodeRunner()
-        borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank)
+        borg.trikeshed.forge.server.CurationIntake.install(
+            borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete),
+            moduleContext, projectCorpus, projectScopes, wireScope,
+        )
         // ── Rule admission: the seam that ends the live rete's dead spin —
         // the daemon boots causalityRete over ZERO rules; these admit law.
         causalityRete?.let { liveRete ->
@@ -2033,6 +2036,9 @@ object OroborosDaemon {
                         )
                     }
                     restored.addAll(borg.trikeshed.narsese.NarsDurableLedger.readRules(forgeHome))
+                    if (!borg.trikeshed.narsese.ConstellationNodes.SENSES_ENABLED) {
+                        restored.removeAll { it.provenanceCid == borg.trikeshed.narsese.ConstellationNodes.SENSES }
+                    }
                     if (restored.isNotEmpty()) ruleCount = liveRete.admit(borg.trikeshed.lib.seriesOf(restored))
                 }
                 HostSystem.err(

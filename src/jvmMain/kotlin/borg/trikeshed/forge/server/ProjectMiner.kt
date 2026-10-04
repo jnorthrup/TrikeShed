@@ -48,11 +48,16 @@ class ProjectMiner(
 
     private val runs = ConcurrentHashMap<String, Progress>()
 
+    /** Pages OCR'd at once across every document in flight: many books share the machine, not each its own budget. */
+    private val pageGate = kotlinx.coroutines.sync.Semaphore(OCR_PARALLEL)
+
     fun progress(name: String): Progress? = runs[name]
 
     companion object {
         /** Pages read per poppler call: bounds memory, not what gets read. */
         const val PAGE_BATCH = 50
+        /** The notes stream of a paged document, beside its extract. */
+        const val FOOTNOTES_SUFFIX = borg.trikeshed.lcnc.ProjectNodes.FOOTNOTES_SUFFIX
         /** OCR pages run at once: Tesseract is single-threaded per page, so pages are the parallel unit. */
         val OCR_PARALLEL = maxOf(2, Runtime.getRuntime().availableProcessors() - 2)
         /** Formats Tika earns its keep on. Plain text/markdown mints at mount already. */
@@ -83,37 +88,13 @@ class ProjectMiner(
     }
 
     /**
-     * The PDF's text layer in reading order: poppler's word boxes, [PageColumns] per page so a
-     * multi-column page (a dictionary, any index) reads column by column, never across. Pages go in
-     * batches, so a book of any length is never held whole. Null when poppler is absent or reads nothing.
+     * A PDF's text, every page OCR'd: old books read better through today's OCR than through the
+     * text layer an upstream scanner left in them, so no layer is trusted.
      */
-    private fun textLayerOf(f: File): String? = runCatching {
-        fun run(vararg cmd: String): String {
-            val proc = ProcessBuilder(*cmd).redirectErrorStream(false).start()
-            val text = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes()
-            check(proc.waitFor() == 0) { "${cmd[0]} failed" }
-            return text
-        }
-        val pages = Regex("Pages:\\s+(\\d+)").find(run("pdfinfo", f.absolutePath))?.groupValues?.get(1)?.toInt() ?: return@runCatching null
-        val out = StringBuilder()
-        var first = 1
-        while (first <= pages) {
-            val last = minOf(pages, first + PAGE_BATCH - 1)
-            out.append(borg.trikeshed.narsese.PageColumns.readBbox(run("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$first", "-l", "$last", f.absolutePath, "-")))
-                .append("\n\n")
-            first = last + 1
-        }
-        out.toString().takeIf { it.isNotBlank() }
-    }.getOrNull()
-
-    /**
-     * A PDF's text, page by page from the source each page has: when every page carries a text layer it
-     * is read whole ([textLayerOf]); otherwise the textless pages go to OCR and the rest keep their layer,
-     * so a scan whose cover alone has text (a Google Books copy) is read in full.
-     */
-    private suspend fun pdfText(name: String, id: String, f: File): String? {
-        val (count, layered) = layeredPages(f) ?: return null
-        return if (layered.size == count && count > 0) textLayerOf(f) else ocrPages(name, id, f, layered)
+    private suspend fun pdfText(name: String, id: String, f: File): String? = ocrPages(name, id, f)?.let { b ->
+        // The notes are their own stream, a twin beside the extract: page, folio, sections, marker, ordinal, measure.
+        putTwin(name, id + FOOTNOTES_SUFFIX, borg.trikeshed.narsese.PageStreams.notesTsv(b.notes).encodeToByteArray(), "project-miner", "page-streams")
+        b.body.takeIf { it.isNotBlank() }
     }
 
     /** Page count and the pages that carry a text layer, read by poppler; null when poppler is absent. */
@@ -144,13 +125,13 @@ class ProjectMiner(
                 val proc = ProcessBuilder("pdfinfo", onDisk.absolutePath).start()
                 proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() }
             }.getOrDefault("")
-            fun field(k: String) = Regex("(?m)^$k:\\s+(.+)$").find(info)?.groupValues?.get(1)?.trim()
+            fun field(k: String) = Regex("(?m)^$k:[ \\t]+(.+)$").find(info)?.groupValues?.get(1)?.trim()
             val pages = field("Pages")?.toIntOrNull()
             val layered = layeredPages(onDisk)?.second?.size ?: 0
             val text = pages != null && layered == pages
             out += mapOf("pages" to pages, "title" to field("Title"), "author" to field("Author"), "producer" to field("Producer"),
                 "textLayer" to text, "layeredPages" to layered,
-                "route" to if (text) "text layer (poppler, column order)" else "OCR per page (Tesseract, column order) where no text layer",
+                "route" to "OCR every page (Tesseract layout, column order)",
                 "ocrPagesDone" to ocrDone["$name/$id"])
             // Layout: columns found on a spread of sample pages (front, middle, back — where an index lives).
             if (text && pages != null && pages > 0) {
@@ -173,67 +154,67 @@ class ProjectMiner(
     private val ocrDone = java.util.concurrent.ConcurrentHashMap<String, Int>()
 
     /**
-     * An image-only PDF read page by page: each page rendered at 300 dpi and read by Tesseract's own
-     * layout analysis (`--psm 3`: tab-stop column finding, rules removed), so two-column pages and
-     * indexes read column by column. Each page's text is kept in a sidecar as it lands, so a stopped
-     * ingest resumes at the next page instead of starting over. Pages run [OCR_PARALLEL] at a time.
-     * A page in [layered] carries its own text layer and is read from it (column order), not OCR'd.
+     * A PDF read page by page: each page rendered at 300 dpi and read by Tesseract's own layout analysis
+     * (`--psm 3`: column finding by tab stops, rules removed), so two-column pages, dictionaries and
+     * indexes read column by column. Tesseract's word boxes (TSV) are kept per page as they land, so a
+     * stopped ingest resumes at the next page; the book is then read as page streams — running head,
+     * body, notes — from those boxes ([borg.trikeshed.narsese.PageStreams]). Pages run [OCR_PARALLEL] at a time.
      */
-    private suspend fun ocrPages(name: String, id: String, f: File, layered: Set<Int> = emptySet()): String? = coroutineScope {
+    private suspend fun ocrPages(name: String, id: String, f: File): borg.trikeshed.narsese.PageStreams.Book? = coroutineScope {
         val pages = runCatching {
             val proc = ProcessBuilder("pdfinfo", f.absolutePath).start()
-            Regex("Pages:\\s+(\\d+)").find(proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() })?.groupValues?.get(1)?.toInt()
+            Regex("Pages:[ \\t]+(\\d+)").find(proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() })?.groupValues?.get(1)?.toInt()
         }.getOrNull() ?: return@coroutineScope null
         val dir = File(filesRoot ?: File(System.getProperty("java.io.tmpdir")), ".ocr/$name/${id.replace('/', '_')}").apply { mkdirs() }
-        val gate = kotlinx.coroutines.sync.Semaphore(OCR_PARALLEL)
+        val gate = pageGate
         val key = "$name/$id"
-        ocrDone[key] = dir.listFiles { x -> x.name.endsWith(".txt") }?.size ?: 0
+        ocrDone[key] = dir.listFiles { x -> x.name.endsWith(".tsv") }?.size ?: 0
         (1..pages).map { pg ->
             async(Dispatchers.IO) {
-                val out = File(dir, "%05d.txt".format(pg))
+                val base = File(dir, "%05d".format(pg))
+                val out = File(base.path + ".tsv")
                 if (out.isFile) return@async
                 gate.acquire()
                 try {
-                    if (pg in layered) {
-                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", f.absolutePath, "-").start()
-                        val html = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes(); proc.waitFor()
-                        File(out.absolutePath + ".part").apply { writeText(borg.trikeshed.narsese.PageColumns.readBbox(html)) }.renameTo(out)
-                        ocrDone.merge(key, 1, Int::plus)
-                        return@async
-                    }
                     val png = File(dir, "p$pg")
                     ProcessBuilder("pdftoppm", "-f", "$pg", "-l", "$pg", "-r", "300", "-gray", "-png", "-singlefile", f.absolutePath, png.absolutePath)
                         .redirectErrorStream(true).start().also { it.inputStream.readAllBytes(); it.waitFor() }
                     val img = File(png.absolutePath + ".png")
-                    val proc = ProcessBuilder("tesseract", img.absolutePath, "-", "--psm", "3").redirectErrorStream(false).start()
-                    val text = proc.inputStream.readAllBytes().decodeToString(); proc.errorStream.readAllBytes(); proc.waitFor()
+                    // One read, two renderings: the page text and its word boxes.
+                    val part = File(dir, "part-$pg")
+                    val proc = ProcessBuilder("tesseract", img.absolutePath, part.absolutePath, "--psm", "3", "txt", "tsv").redirectErrorStream(true).start()
+                    proc.inputStream.readAllBytes(); proc.waitFor()
                     img.delete()
-                    File(out.absolutePath + ".part").apply { writeText(text) }.renameTo(out)
+                    File(part.path + ".txt").renameTo(File(base.path + ".txt"))
+                    File(part.path + ".tsv").renameTo(out)
                     val n = ocrDone.merge(key, 1, Int::plus) ?: 0
                     if (n % 25 == 0) System.err.println("[OROBOROS] OCR $key: $n/$pages pages")
                 } finally { gate.release() }
             }
         }.awaitAll()
-        val text = (1..pages).joinToString("\n\n") { pg -> File(dir, "%05d.txt".format(pg)).takeIf { it.isFile }?.readText().orEmpty() }
-        text.takeIf { it.isNotBlank() }
+        val read = (1..pages).map { pg -> borg.trikeshed.narsese.PageStreams.page(pg, File(dir, "%05d.tsv".format(pg)).takeIf { it.isFile }?.readText().orEmpty()) }
+        borg.trikeshed.narsese.PageStreams.book(read)
     }
 
     /** Ingest one document, by hand: its text lands as the extract twin. The same reading [mine] does. */
     suspend fun ingest(name: String, id: String): Map<String, Any?> = withContext(Dispatchers.IO) {
         val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
-        val att = pdb.gateway.getAttachment(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
+        // The uploaded file itself when it is on disk; the attachment bytes are read only when it is not.
         val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
-        val src = onDisk ?: File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second); deleteOnExit() }
+        val src = onDisk ?: run {
+            val att = pdb.gateway.getAttachment(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
+            File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second); deleteOnExit() }
+        }
         val began = System.currentTimeMillis()
         val pdf = id.lowercase().endsWith(".pdf")
-        val md = (if (pdf) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" } else null)
-            ?: runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
+        val md = if (pdf) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
+            else runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
         if (onDisk == null) src.delete()
         val body = md?.trim().orEmpty()
         if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
         putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "ingested")
         mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
-            "route" to if (pdf) "pdf pages (text layer, else ocr)" else "tika",
+            "route" to if (pdf) "pdf pages (ocr, column order)" else "tika",
             "ms" to (System.currentTimeMillis() - began))
     }
 
@@ -253,7 +234,7 @@ class ProjectMiner(
             val id = storeIds.b(i)
             if (id.endsWith(".extract.md")) {
                 already.add(id)
-            } else if (id.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) {
+            } else if (id.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX) || id.endsWith(FOOTNOTES_SUFFIX)) {
                 continue
             } else if (id.substringAfterLast('.', "").lowercase() in MINEABLE) {
                 ids.add(id)
@@ -268,15 +249,14 @@ class ProjectMiner(
                 try {
                     val att = pdb.gateway.getAttachment(id)
                     if (att == null) { prog.skipped++; continue }
-                    // Each PDF page is read from its own text layer when it has one, else OCR'd;
-                    // Tika is for non-PDF documents. No size decides whether a document is read.
+                    // Every PDF page is OCR'd (no upstream text layer trusted); Tika is for non-PDF documents.
                     // Prefer the on-disk twin (clone/mirror) — no byte copy for the parser.
                     val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
                     val src = onDisk ?: File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply {
                         writeBytes(att.second); deleteOnExit()
                     }
-                    val md = (if (id.lowercase().endsWith(".pdf")) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" } else null)
-                        ?: runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
+                    val md = if (id.lowercase().endsWith(".pdf")) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
+                        else runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
                     if (onDisk == null) src.delete()
                     val body = md?.trim().orEmpty()
                     if (body.length < 80) { prog.failed++; continue }   // no text worth landing

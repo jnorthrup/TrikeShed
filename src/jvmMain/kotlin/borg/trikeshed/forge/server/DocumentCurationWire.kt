@@ -12,6 +12,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.jules.BrainClient
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.narsese.*

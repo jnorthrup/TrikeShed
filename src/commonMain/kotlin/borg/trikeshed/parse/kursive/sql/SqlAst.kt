@@ -1,7 +1,6 @@
 package borg.trikeshed.parse.kursive.sql
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.collections._s
 
 private val CharSeries.cseq: CharSequence get() = cs
 

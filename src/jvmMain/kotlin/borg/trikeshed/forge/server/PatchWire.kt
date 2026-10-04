@@ -169,6 +169,9 @@ class ProjectScopes(
         scope
     }
 
+    /** Told of every document an upload lands (never its twins): the intake that reads and curates it. */
+    @Volatile var onDocument: ((project: String, id: String) -> Unit)? = null
+
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
     fun uploadPut(name: String, relPath: String, bytes: ByteArray): borg.trikeshed.job.ContentId {
         val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
@@ -201,7 +204,40 @@ class ProjectScopes(
             runCatching { mf.appendText("$rel\t${cid.value}\t${bytes.size}\n") }
         }
         scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
+        if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
+            onDocument?.invoke(name, rel)
         return cid
+    }
+
+    /** Told of every document a removal takes out of an upload (never its twins): what was curated from it leaves too. */
+    @Volatile var onRemoved: ((project: String, id: String) -> Unit)? = null
+
+    /**
+     * Take [path] out of upload-kind db [name]: the document at that id with its twins, or every document under
+     * that folder. Each leaves the couch head, the manifest (so boot does not replay it), the landed file and its
+     * OCR pages; CAS blobs stay (content-addressed). The removed ids, twins included.
+     */
+    suspend fun uploadRemove(name: String, path: String): List<String> = mutex.withLock {
+        val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
+        require(scopes.firstOrNull { it.name == name }?.path == "@upload") { "'$name' mirrors a directory: remove it at its source" }
+        val rel = path.trim('/')
+        require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$path'" }
+        fun taken(id: String) = id == rel || id.startsWith("$rel/") || borg.trikeshed.lcnc.ProjectNodes.twinOf(id) == rel
+        val ids = pdb.store.ids().let { s -> (0 until s.a).map { s.b(it) } }.filter { taken(it) && !pdb.store.head.isDeleted(it) }
+        for (id in ids) pdb.store.delete(id)
+        manifestFileFor(name)?.takeIf { it.isFile }?.let { mf ->
+            mf.writeText(mf.readLines().filter { it.isNotBlank() && !taken(it.substringBefore('\t')) }.joinToString("") { it + "\n" })
+        }
+        filesRoot?.let { fr ->
+            val dir = File(fr, name)
+            for (id in ids) File(dir, id).delete()
+            File(dir, rel).takeIf { it.isDirectory }?.deleteRecursively()
+            for (id in ids) File(fr, ".ocr/$name/${id.replace('/', '_')}").takeIf { it.isDirectory }?.deleteRecursively()
+        }
+        scopes = scopes.map { if (it.name == name) it.copy(paths = maxOf(0, it.paths - ids.size), docs = pdb.docCount) else it }
+        for (id in ids) if (!borg.trikeshed.lcnc.ProjectNodes.twin(id)) onRemoved?.invoke(name, id)
+        System.err.println("[OROBOROS] project db $name: removed ${ids.size} docs under $rel")
+        ids
     }
 
     /** Commit chains of the project dbs, by name: a project db's heads survive a restart like the core db's. */
@@ -305,6 +341,10 @@ class ProjectScopes(
         }
         if (skipped > 0) System.err.println("[OROBOROS] project db $name manifest replay: $docs docs, $skipped malformed/missing lines skipped")
         scopes = scopes.map { if (it.name == name) it.copy(paths = docs, docs = projectDbs?.get(name)?.docCount ?: docs) else it }
+        // A remounted document is offered again: the intake passes what it already curated and reads the rest.
+        onDocument?.let { hook -> for (line in mf.readLines()) line.substringBefore('\t').takeIf { it.isNotEmpty() }?.let { rel ->
+            if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) hook(name, rel)
+        } }
         return true
     }
 

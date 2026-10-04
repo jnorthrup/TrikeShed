@@ -19,6 +19,7 @@ import kotlinx.coroutines.withContext
 class JvmProjectCorpus(
     private val registry: ProjectDbRegistry,
     private val scopes: ProjectScopes,
+    private val miner: ProjectMiner? = null,
 ) : ProjectCorpus {
 
     override suspend fun projects(): List<ProjectRef> =
@@ -48,5 +49,16 @@ class JvmProjectCorpus(
         if (text.count { it == '\uFFFD' } * 100 > text.length) return@withContext null
         val head = pdb.store.head
         ProjectText(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, text.take(maxChars))
+    }
+
+    /** The twin when mined; else the miner reads the document now (text layer, else OCR) and the twin is read back. */
+    override suspend fun extract(project: String, id: String, maxChars: Int): ProjectText? {
+        val twin = id + ProjectNodes.EXTRACT_SUFFIX
+        // A PDF's extract is current only with its notes stream beside it: one read before page streams is read again.
+        val paged = id.lowercase().endsWith(".pdf")
+        if (!paged || read(project, id + ProjectMiner.FOOTNOTES_SUFFIX, 16) != null) read(project, twin, maxChars)?.let { return it }
+        val m = miner ?: return null
+        m.ingest(project, id)
+        return read(project, twin, maxChars)
     }
 }

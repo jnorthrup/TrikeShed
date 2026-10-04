@@ -23,36 +23,42 @@ import borg.trikeshed.lib.*
  * `JoinKt.get` ⇄ `ChunkedMutableSeries.append$lambda$2`, with 81 minutes of CPU
  * burned — the Confix parser benchmark never finished.
  *
+ * Appends fill a chunk to [chunkSize] before opening the next, so while nothing has been inserted or removed in
+ * the middle every chunk but the last is full and an index resolves by one division ([uniform]). A middle insert
+ * or removal makes chunk lengths uneven; from then on an index resolves by binary search over the cached
+ * cumulative chunk ends ([stairs]). [snapshot] and [iterator] walk the chunks in order rather than resolving
+ * every index.
+ *
  * `chunks` stays exposed as a `Series<Series<T>>` view for callers that read it;
- * it is now a projection of the backing store rather than the store itself.
+ * it is a projection of the backing store rather than the store itself.
  *
  * @param chunkSize  number of elements per chunk (default 4096)
  */
 class ChunkedMutableSeries<T>(
-    private val chunkSize: Int = 4096,
+    val chunkSize: Int = 4096,
 ) : MutableSeries<T> {
 
     init { require(chunkSize > 0) { "chunkSize must be positive" } }
 
     /** The real storage: a list of chunks, each a plain growable list. */
-    private val store: ArrayList<ArrayList<T>> = ArrayList()
+    val store: ArrayList<ArrayList<T>> = ArrayList()
 
     var totalSize: Int = 0
-        private set
+
+    /** True while every chunk but the last holds exactly [chunkSize] elements. */
+    var uniform: Boolean = true
 
     /** Read-only projection, so `.chunks` keeps working without being the store. */
     val chunks: Series<Series<T>>
         get() = store.size j { ci -> store[ci].let { c -> c.size j { i -> c[i] } } }
 
     /**
-     * Cumulative chunk ends. Cached because it is consulted on every indexed
-     * read; invalidated by anything that changes a chunk's length. Appends into
-     * the last chunk update it in place rather than dropping it, so the common
-     * path never rebuilds.
+     * Cumulative chunk ends, consulted once chunks are uneven. Invalidated by anything that changes a chunk's
+     * length; appends into the last chunk update it in place rather than dropping it.
      */
-    private var stairs: IntArray? = null
+    var stairs: IntArray? = null
 
-    private fun stairsOf(): IntArray {
+    fun stairsOf(): IntArray {
         stairs?.let { return it }
         val s = IntArray(store.size)
         var acc = 0
@@ -61,31 +67,32 @@ class ChunkedMutableSeries<T>(
         return s
     }
 
-    private fun chunkIndexAndOffset(index: Int): Twin<Int> {
-        if (index < 0 || index >= totalSize) {
-            throw IndexOutOfBoundsException("index $index, total $totalSize")
-        }
+    /** The chunk holding [index]. */
+    fun chunkOf(index: Int): Int {
+        if (index < 0 || index >= totalSize) throw IndexOutOfBoundsException("index $index, total $totalSize")
+        if (uniform) return index / chunkSize
         val s = stairsOf()
-        // Binary search for the first chunk whose cumulative end exceeds index.
-        var lo = 0; var hi = s.size - 1; var ci = -1
-        while (lo <= hi) {
+        // The first chunk whose cumulative end exceeds index; chunks are never empty, so the ends strictly rise.
+        var lo = 0; var hi = s.size - 1
+        while (lo < hi) {
             val mid = (lo + hi) ushr 1
-            if (s[mid] > index) { ci = mid; hi = mid - 1 } else lo = mid + 1
+            if (s[mid] > index) hi = mid else lo = mid + 1
         }
-        if (ci < 0) throw IndexOutOfBoundsException("index $index, total $totalSize")
-        val offset = if (ci == 0) index else index - s[ci - 1]
-        return ci j offset
+        return lo
     }
 
+    /** The index of chunk [ci]'s first element. */
+    fun startOf(ci: Int): Int = if (uniform) ci * chunkSize else if (ci == 0) 0 else stairsOf()[ci - 1]
+
     override val a: Int get() = totalSize
-    override val b: (Int) -> T get() = { i ->
-        val (ci, offset) = chunkIndexAndOffset(i)
-        store[ci][offset]
+    override val b: (Int) -> T = { i ->
+        val ci = chunkOf(i)
+        store[ci][i - startOf(ci)]
     }
 
     override fun set(index: Int, item: T) {
-        val (ci, offset) = chunkIndexAndOffset(index)
-        store[ci][offset] = item          // no length change: stairs stay valid
+        val ci = chunkOf(index)
+        store[ci][index - startOf(ci)] = item          // no length change: stairs stay valid
     }
 
     override fun append(item: T) {
@@ -103,59 +110,57 @@ class ChunkedMutableSeries<T>(
 
     override fun insert(index: Int, item: T) {
         if (index == totalSize) { append(item); return }
-        val (ci, offset) = chunkIndexAndOffset(index)
-        store[ci].add(offset, item)
+        val ci = chunkOf(index)
+        store[ci].add(index - startOf(ci), item)
+        uniform = false
         stairs = null
         totalSize++
     }
 
     override fun removeAt(index: Int): T {
-        val (ci, offset) = chunkIndexAndOffset(index)
-        val item = store[ci].removeAt(offset)
+        val ci = chunkOf(index)
+        val item = store[ci].removeAt(index - startOf(ci))
         if (store[ci].isEmpty()) store.removeAt(ci)
+        // Removing the very last element leaves every earlier chunk as it was.
+        if (index != totalSize - 1) uniform = false
         stairs = null
         totalSize--
         return item
     }
 
     override fun remove(item: T): Boolean {
-        for (i in 0 until totalSize) { if (b(i) == item) { removeAt(i); return true } }
+        var base = 0
+        for (c in store) {
+            val j = c.indexOf(item)
+            if (j >= 0) { removeAt(base + j); return true }
+            base += c.size
+        }
         return false
     }
 
     override fun clear() {
         store.clear()
         stairs = null
+        uniform = true
         totalSize = 0
     }
 
-    override fun freeze(): Series<T> {
-        val flat = Array<Any?>(totalSize) { i -> b(i) }
-        return FrozenArray(flat)
+    override fun snapshot(): Series<T> {
+        val out = arrayOfNulls<Any?>(totalSize)
+        var at = 0
+        for (c in store) for (i in 0 until c.size) out[at++] = c[i]
+        return FrozenArray(out)
     }
 
-    override fun snapshot(): MutableSeries<T> {
-        // A snapshot must not alias: the old version shared the chunk series, so
-        // later appends to the original were visible through the "snapshot".
-        val snap = ChunkedMutableSeries<T>(chunkSize)
-        for (c in store) snap.store.add(ArrayList(c))
-        snap.totalSize = totalSize
-        return snap
-    }
-
-    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit = {}
-    override fun version(): Long = 0L
-    override val isFrozen: Boolean get() = false
     override fun iterator(): Iterator<T> = object : Iterator<T> {
+        var c = 0
         var i = 0
-        override fun hasNext() = i < totalSize
-        override fun next() = b(i++)
-    }
-    override fun sequence(): Sequence<T> = Sequence { iterator() }
-    override fun plus(other: MutableSeries<T>): MutableSeries<T> {
-        val result = ChunkedMutableSeries<T>(chunkSize)
-        for (i in 0 until totalSize) result.append(b(i))
-        for (i in 0 until other.a) result.append(other.b(i))
-        return result
+        var seen = 0
+        override fun hasNext() = seen < totalSize
+        override fun next(): T {
+            while (i >= store[c].size) { c++; i = 0 }
+            seen++
+            return store[c][i++]
+        }
     }
 }

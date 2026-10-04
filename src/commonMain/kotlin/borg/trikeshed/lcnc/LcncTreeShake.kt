@@ -188,7 +188,7 @@ object LcncTreeShake {
             val wires = ChunkedMutableSeries<LcncWire>()
             for (i in 0 until program.wires.size) wires.add(program.wires[i])
             for (edge in matched) wires.add(LcncWire(edge.o.nd.id, edge.o.port, edge.i.nd.id, edge.i.port))
-            val trial = program.copy(wires = wires.freeze())
+            val trial = program.copy(wires = wires.snapshot())
             val violations = LcncTypeCheck.check(trial, contracts)
             lastViolations = violations
             if (violations.isEmpty()) {
@@ -446,7 +446,8 @@ object LcncTreeShake {
 
         // Starved reach: downstream from still-open REQUIRED holes
         val starvedSeed = stillOpen.filter { it.isRequired }.map { it.nd.id }.toSet()
-        val allWires = existingWires.snapshot()
+        // existingWires is not read again: the made wires join it in place.
+        val allWires = existingWires
         for (w in made) allWires.add(w)
         val starved: MutableSet<String> = HashSet(starvedSeed)
         var grew = true
@@ -460,7 +461,7 @@ object LcncTreeShake {
             }
         }
 
-        val updatedWires: Series<LcncWire> = allWires.freeze()
+        val updatedWires: Series<LcncWire> = allWires.snapshot()
         val updatedProgram: LcncProgram = program.copy(wires = updatedWires)
         if (specimen) {
             val violations: List<LcncTypeCheck.Violation> = LcncTypeCheck.check(updatedProgram, contracts)

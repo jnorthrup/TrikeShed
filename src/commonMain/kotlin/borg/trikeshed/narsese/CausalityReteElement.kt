@@ -145,6 +145,20 @@ class CausalityReteElement(
     }
 
     /**
+     * Retract from the LIVE rete every admitted rule [drop] selects, in one volatile swap, as [admit] admits; returns
+     * how many went. What a retracted rule already offered stays in the bag as the evidence it was; it fires no more.
+     */
+    fun retract(drop: (EternalRule) -> Boolean): Int = synchronizedLock(admitGate) {
+        val current = rete
+        val existing = current.rules
+        val kept = ArrayList<EternalRule>(existing.size)
+        for (i in 0 until existing.size) existing[i].let { if (!drop(it)) kept.add(it) }
+        val gone = existing.size - kept.size
+        if (gone > 0) rete = CausalityRete(kept.toSeries(), current.discount, current.minSupport)
+        gone
+    }
+
+    /**
      * Project the bag's live snapshot into rete assertions. Signals without a
      * registered term identity are skipped — the rete never guesses terms.
      */

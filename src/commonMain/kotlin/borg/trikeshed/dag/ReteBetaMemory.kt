@@ -2,7 +2,7 @@ package borg.trikeshed.dag
 
 import borg.trikeshed.collections.associative.LinearHashMap
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.iterator

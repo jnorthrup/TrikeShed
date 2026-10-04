@@ -1,12 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.`▶`
-import borg.trikeshed.collections.MutableSeries
 import borg.trikeshed.collections.mutableSeriesOf
-import borg.trikeshed.userspace.nio.spi.NioSupervisor
-import kotlin.coroutines.coroutineContext
-import kotlinx.coroutines.yield
 
 /**
  * CouchChangesProjection - Maintains a strict monotonic sequence of committed frames.
@@ -38,28 +33,19 @@ class CouchChangesProjection {
     }
 
     /**
-     * Resume after sequence - provides an iterator or stream of frames after a sequence.
+     * Frames after [sequence], as of now. Sequences strictly rise (see [applyCommit]), so the first frame past
+     * [sequence] is found by binary search over a snapshot, which appends never disturb.
      */
-    suspend fun afterSequence(sequence: Long): Series<CouchCommittedFrame> {
-        val hasSupervisor = coroutineContext[NioSupervisor.Key] != null
-        // Binary search could be used if series supported it, but simple scan works for now
-        var startIdx = -1
-        for ((i, frame) in frames.`▶`.withIndex()) {
-            if (hasSupervisor) {
-                if (i > 0 && i % 100 == 0) {
-                    yield()
-                }
-            }
-            if (frame.sequence > sequence) {
-                startIdx = i
-                break
-            }
+    fun afterSequence(sequence: Long): Series<CouchCommittedFrame> {
+        val all = frames.snapshot()
+        var lo = 0
+        var hi = all.a
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (all.b(mid).sequence > sequence) hi = mid else lo = mid + 1
         }
-        if (startIdx == -1) {
-            return 0 j { error("empty") }
-        }
-        val size = frames.size - startIdx
-        return size j { frames[startIdx + it] }
+        val start = lo
+        return (all.a - start) j { all.b(start + it) }
     }
 
     /**

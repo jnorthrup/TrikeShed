@@ -44,6 +44,8 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET /api/graal/content?id=…   selected attachment bytes through the same project-db resolver
  *   GET /api/graal/dag[?id=…]     the DAG arcs the tree cannot show: shared-blob cross-links and
  *                                 pointcut→class edges for one node, or the high-degree hubs
+ *   GET /api/graal/impact?node=…&depth=n  dependents of a node over the dag edges, ringed 1..n;
+ *                                 `source` rings the Kotlin import/package dependents of a `.kt` node
  *   GET /api/graal/classfile?id=… selected class attachment projection, parsed by JDK 25
  *   GET /api/graal/decompile?source=… source + byte-identical classpath mates, parsed by JDK 25
  *   GET /api/graal/aot             process AOT flags and configured HotSpot cache metadata
@@ -141,6 +143,11 @@ class GraalWire(
             method == "GET" && p == "/api/graal/dag" -> {
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 JvmKanbanServer.HttpResponse(200, jsonOf(q["id"]?.let { dagFor(it) } ?: dagHubs()))
+            }
+            method == "GET" && p == "/api/graal/impact" -> withContext(Dispatchers.IO) {
+                val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+                val node = q["node"] ?: return@withContext JvmKanbanServer.HttpResponse(400, """{"error":"node_required"}""")
+                JvmKanbanServer.HttpResponse(200, jsonOf(impactFor(node, (q["depth"]?.toIntOrNull() ?: 3).coerceIn(1, 16))))
             }
             method == "GET" && p == "/api/graal/classfile" -> withContext(Dispatchers.IO) {
                 val id = borg.trikeshed.relaxfactory.CouchHttpSurface
@@ -862,6 +869,91 @@ class GraalWire(
             }
         }
         return mapOf("node" to id, "cid" to cid, "edges" to edges.take(200))
+    }
+
+    /**
+     * Blast radius over [dagFor]'s edge set, walked in the dependent direction only: documents
+     * naming the same blob (shared-blob) and pointcuts aimed at a class (pointcut-source).
+     * Levels are breadth-first rings 1..depth; a node lands in the first ring that reaches it.
+     */
+    private fun impactFor(id: String, depth: Int): Map<String, Any?> {
+        val all = couchStore?.all().orEmpty()
+        val byCid = HashMap<String, MutableList<String>>()
+        val cidById = HashMap<String, String>()
+        val pointcutsByStem = HashMap<String, MutableList<String>>()
+        for (d in all) {
+            cidOf(d)?.let { cid -> cidById[d.id] = cid; byCid.getOrPut(cid) { mutableListOf() } += d.id }
+            if (d.id.startsWith("pointcut/")) {
+                @Suppress("UNCHECKED_CAST")
+                val cls = (d.fields.firstOrNull { it.name == "coordinate" }?.value as? Map<String, Any?>)?.get("className")?.toString()
+                if (cls != null) pointcutsByStem.getOrPut(cls.substringAfterLast('.')) { mutableListOf() } += d.id
+            }
+        }
+        if (all.none { it.id == id }) return mapOf("node" to id, "depth" to depth, "total" to 0, "levels" to emptyList<Any?>())
+        val seen = hashSetOf(id)
+        var ring = listOf(id)
+        val levels = mutableListOf<Map<String, Any?>>()
+        for (level in 1..depth) {
+            val next = mutableListOf<String>()
+            for (n in ring) {
+                cidById[n]?.let { cid -> for (m in byCid[cid].orEmpty()) if (seen.add(m)) next += m }
+                if (n.endsWith(".class")) for (m in pointcutsByStem[n.substringAfterLast('/').removeSuffix(".class")].orEmpty()) if (seen.add(m)) next += m
+            }
+            levels += mapOf("depth" to level, "count" to next.size, "ids" to next.take(200))
+            if (next.isEmpty()) break
+            ring = next
+        }
+        return mapOf("node" to id, "cid" to cidById[id], "depth" to depth, "total" to seen.size - 1, "levels" to levels,
+            "source" to kotlinImpact(all, id, depth))
+    }
+
+    private val kotlinHeaders = ConcurrentHashMap<String, borg.trikeshed.dag.KotlinHeader>()
+    @Volatile private var kotlinGraph: Triple<List<String>, List<String>, borg.trikeshed.dag.KotlinSourceGraph>? = null
+
+    /**
+     * Kotlin source dependents of a worktree `.kt` document: [borg.trikeshed.dag.KotlinSourceGraph]
+     * over every `projects/` `.kt` document's attachment bytes, headers cached by content id and
+     * the graph rebuilt when the id/cid set changes.
+     */
+    private fun kotlinImpact(all: List<Document>, id: String, depth: Int): Map<String, Any?> {
+        if (!id.endsWith(".kt")) return mapOf("available" to false, "reason" to "not_kotlin_source")
+        val db = couch ?: return mapOf("available" to false, "reason" to "cas_database_unavailable")
+        val docs = all.filter { it.id.startsWith("projects/") && it.id.endsWith(".kt") && !isGraalDeleted(it) && cidOf(it) != null }
+            .sortedBy { it.id }
+        val ids = docs.map { it.id }
+        val cids = docs.map { cidOf(it)!! }
+        val graph = kotlinGraph?.takeIf { it.first == ids && it.second == cids }?.third ?: run {
+            val headers = Array(docs.size) { k ->
+                kotlinHeaders.getOrPut(cids[k]) {
+                    borg.trikeshed.dag.kotlinHeader(db.blockGet(cids[k]) ?: ByteArray(0))
+                }
+            }
+            borg.trikeshed.dag.KotlinSourceGraph(headers).also { kotlinGraph = Triple(ids, cids, it) }
+        }
+        val node = ids.binarySearch(id)
+        if (node < 0) return mapOf("available" to false, "reason" to "source_document_missing")
+        val h = graph.headers[node]
+        val rings = graph.rings(node, depth)
+        return mapOf(
+            "available" to true,
+            "package" to h.pkg,
+            "imports" to h.imports.size,
+            "declared" to h.declared.distinct(),
+            "siblings" to (graph.packages[h.pkg]?.size ?: 1) - 1,
+            "graph" to mapOf(
+                "files" to ids.size, "packages" to graph.packages.size,
+                "importLines" to graph.importLines, "unresolvedImports" to graph.unresolvedImports,
+                "importEdges" to graph.importEdges, "packageEdges" to graph.packageEdges,
+            ),
+            "total" to rings.sumOf { it.a.size + it.b.size },
+            "levels" to rings.mapIndexed { k, r ->
+                mapOf(
+                    "depth" to k + 1, "count" to r.a.size + r.b.size,
+                    "viaImport" to r.a.size, "viaPackage" to r.b.size,
+                    "ids" to (r.a.map { ids[it] } + r.b.map { ids[it] }).take(200),
+                )
+            },
+        )
     }
 
     /** The DAG's high-degree vertices: blobs named by more than one document (dedup hubs). */

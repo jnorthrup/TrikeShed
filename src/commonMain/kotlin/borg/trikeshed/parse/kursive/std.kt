@@ -5,7 +5,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.kursive.legacy.KursiveParser
 import borg.trikeshed.parse.kursive.legacy.KursiveStep
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.parse.kursive.legacy.parser
 import borg.trikeshed.parse.kursive.legacy.s
 
@@ -125,7 +125,7 @@ object std {
             }
             items.add(next)
         }
-        items.snapshot()
+        items.drain()
     }
 
     fun trimmed(name: String, delegate: KursiveParser<CharSeries>): KursiveParser<CharSeries> = parser(name) { input ->

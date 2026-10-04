@@ -1,10 +1,9 @@
 package borg.trikeshed.parse.kursive.legacy
 
-import borg.trikeshed.collections.s_
 import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 
 typealias NarsiveEvent = Join<Series<Char>, Twin<Int>>
 typealias NarsiveTrace = Series<NarsiveEvent>

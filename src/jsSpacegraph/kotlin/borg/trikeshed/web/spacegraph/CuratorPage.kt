@@ -1,5 +1,6 @@
 package borg.trikeshed.web.spacegraph
 
+import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reify
 
 import borg.trikeshed.web.*
@@ -52,7 +53,9 @@ object CuratorPage {
         program()
         input()
         detail()
+        fold()
         finder()
+        ask()
         shelve()
         jsNew(js("ResizeObserver"), { _: dynamic -> resize() }).observe(host)
         resize()
@@ -114,36 +117,110 @@ object CuratorPage {
         slider.addEventListener("input", { _: dynamic -> scope.snapPercent = num(slider.value) })
     }
 
-    /** The finding aids: find by name, pattern query, and the ordered contents; a row click takes the camera there. */
+    /** Each die panel folds away to give the view the whole width; the button it was pressed on holds the state. */
+    private fun fold() {
+        val buttons = document.querySelectorAll("header button.fold")
+        for (i in 0 until buttons.length) {
+            val button = buttons.item(i) as? HTMLElement ?: continue
+            val side = document.getElementById(button.getAttribute("data-fold") ?: continue) as? HTMLElement ?: continue
+            button.addEventListener("click", { _: dynamic ->
+                val min = side.classList.toggle("min")
+                button.setAttribute("aria-pressed", min.toString())
+                resize()
+            })
+        }
+    }
+
+    /** The finding aids: find by name, pattern query, and the ordered contents; a row click takes the camera there.
+     *  Enter in the find box searches the curated leaves on the daemon, the depth box deep; with the Jev box checked,
+     *  what either box found goes to Jev and stands in Jev's order. */
     private var tocAt = -2
+    /** Bumped per search shown: an answer arriving after the next search began is dropped. */
+    private var shownAt = 0
     private fun finder() {
         val toc = document.getElementById("curator-toc") as? HTMLElement ?: return
         val search = document.getElementById("curator-search").asDynamic()
         val query = document.getElementById("curator-query").asDynamic()
-        fun show(title: String, rows: List<Map<String, Any?>>, up: Int?) {
+        val rank = document.getElementById("curator-rank").asDynamic()
+        val depth = document.getElementById("curator-depth").asDynamic()
+        fun show(title: String, rows: List<Map<*, *>>, up: Int?) {
             toc.innerHTML = (if (up != null) "<h3><a data-open='$up'>◂ contents</a></h3>" else "") + narchy.spacegraph.CuratorReading.rows(title, rows)
         }
         fun contents(i: Int) {
-            tocAt = i
+            tocAt = i; shownAt++
             val rows = scope.contents(i)
             show(if (i < 0) "library" else rows.firstOrNull()?.get("in")?.toString() ?: "contents", rows, if (i < 0) null else -1)
         }
+        fun dim(s: String) = "<p class='dim'>" + s.replace("&", "&amp;").replace("<", "&lt;") + "</p>"
+        // Rows as found; with the Jev box checked, the same rows again in Jev's order, each with its noul.
+        fun found(title: String, q: String, rows: List<Map<*, *>>) {
+            val at = ++shownAt; tocAt = -3
+            show(title, rows, -1)
+            if (!truthy(rank.checked) || rows.isEmpty()) return
+            toc.insertAdjacentHTML("afterbegin", dim("asking Jev…"))
+            val body = jsonOf(mapOf("q" to q, "rows" to rows))
+            launchJs {
+                try {
+                    val r = fetchJs("/api/curation/rank", objOf { it.method = "POST"; it.body = body })
+                    val v = reify(str(awaitJs(r.text()))) as Map<*, *>
+                    if (shownAt != at) return@launchJs
+                    if (v["ranked"] == true) show("$title · Jev order · ${v["asked"]} asked, ${v["tokens"]} tokens", (v["rows"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }, -1)
+                    else { show(title, rows, -1); toc.insertAdjacentHTML("afterbegin", dim("Jev: ${v["error"] ?: v["reason"]}")) }
+                } catch (e: dynamic) { if (shownAt == at) { show(title, rows, -1); toc.insertAdjacentHTML("afterbegin", dim("Jev failed: " + failureText(e))) } }
+            }
+        }
         search.addEventListener("input", { _: dynamic ->
-            val q = str(search.value); tocAt = -3
+            val q = str(search.value); tocAt = -3; shownAt++
             if (q.isBlank()) contents(-1) else show("find “$q”", scope.find(q), -1)
         })
+        search.addEventListener("keydown", { e: dynamic ->
+            val q = str(search.value).trim()
+            if (str(e.key) != "Enter" || q.isEmpty()) return@addEventListener
+            val at = ++shownAt; tocAt = -3
+            toc.innerHTML = dim("finding “$q”…")
+            val body = jsonOf(mapOf("q" to q, "depth" to (str(depth.value).toIntOrNull() ?: 3).coerceIn(1, 4)))
+            launchJs {
+                try {
+                    val r = fetchJs("/api/curation/find", objOf { it.method = "POST"; it.body = body })
+                    val v = reify(str(awaitJs(r.text()))) as Map<*, *>
+                    if (shownAt == at) found("found “$q” · ${v["found"]} of ${v["read"]} leaves", q, (v["rows"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> })
+                } catch (e: dynamic) { if (shownAt == at) toc.innerHTML = dim("find failed: " + failureText(e)) }
+            }
+        })
         query.addEventListener("keydown", { e: dynamic ->
-            if (str(e.key) == "Enter") { val q = str(query.value); tocAt = -3; show("statements", scope.query(q), -1) }
+            if (str(e.key) == "Enter") { val q = str(query.value); found("statements", q, scope.query(q).map { it + ("text" to it["note"]) }) }
         })
         toc.addEventListener("click", { e: dynamic ->
             val open = e.target.closest("[data-open]")
             if (open != null) { contents(str(open.getAttribute("data-open")).toInt()); return@addEventListener }
+            // A row the daemon found names its ring key: the node it stands for once the ring holds it.
+            val hit = e.target.closest("[data-ring]")
+            if (hit != null) {
+                val i = scope.nodeOf(str(hit.getAttribute("data-ring")))
+                if (i >= 0) scope.goto(i) else hit.title = "not in the ring yet"
+                return@addEventListener
+            }
             val row = e.target.closest("[data-node]") ?: return@addEventListener
             scope.goto(str(row.getAttribute("data-node")).toInt())
         })
         // The library's contents appear once the ring has laid it out.
         fun wait() { if (tocAt == -2 && scope.contents(-1).isNotEmpty()) contents(-1) else if (tocAt == -2) window.setTimeout({ wait() }, 500) }
         wait()
+        gate(rank)
+    }
+
+    /** The Jev box [rank] is live once the daemon's startup question to Jev came back as known; else it stays off, titled why. */
+    private fun gate(rank: dynamic) {
+        launchJs {
+            try {
+                val r = fetchJs("/api/curation/rank")
+                val v = reify(str(awaitJs(r.text()))) as Map<*, *>
+                val ready = v["ready"] == true
+                val why = (if (ready) "Jev orders the rows found · " else "Jev unavailable: ") + v["reason"]
+                rank.disabled = !ready; rank.title = why; rank.parentElement.title = why
+                if (v["reason"] == "probing") window.setTimeout({ gate(rank) }, 3_000)
+            } catch (e: dynamic) { rank.title = "Jev unavailable: " + failureText(e) }
+        }
     }
 
     private fun tick() {
@@ -171,6 +248,40 @@ object CuratorPage {
                 }
             } catch (e: dynamic) { status("shelves unreadable: " + failureText(e)) }
         }
+    }
+
+    /** The reading panel's ask box: a typed question, or one the NARS state puts to the page, goes to Jev over the constellation. */
+    private fun ask() {
+        val el = document.getElementById("curator-panel") ?: return
+        fun put(form: dynamic, q: String) {
+            // The answer belongs to the page asked from: kept under its key, and written into whichever panel shows it then.
+            val key = readingKey
+            fun show(html: String) {
+                answered.remove(key); answered[key] = q to html; if (answered.size > KEPT) answered.remove(answered.keys.first())
+                if (readingKey == key) el.querySelector(".oracle")?.innerHTML = html
+            }
+            show("<p class='dim'>asking Jev…</p>")
+            val body = jsonOf(mapOf("book" to str(form.getAttribute("data-book")),
+                "section" to (str(form.getAttribute("data-section")).toIntOrNull() ?: 0), "question" to q))
+            launchJs {
+                try {
+                    val r = fetchJs("/api/curation/jev", objOf { it.method = "POST"; it.body = body })
+                    show(narchy.spacegraph.CuratorReading.oracle(reify(str(awaitJs(r.text()))) as Map<*, *>))
+                } catch (e: dynamic) { show("<p class='dim'>Jev failed: ${failureText(e)}</p>") }
+            }
+        }
+        el.addEventListener("submit", { e: dynamic ->
+            e.preventDefault()
+            val q = str(e.target.q.value).trim()
+            if (q.isNotEmpty()) put(e.target, q)
+        })
+        el.addEventListener("click", { e: dynamic ->
+            val chip = e.target.closest("[data-ask]") ?: return@addEventListener
+            val form = el.querySelector("form.ask") ?: return@addEventListener
+            val q = str(chip.getAttribute("data-ask"))
+            form.asDynamic().q.value = q
+            put(form, q)
+        })
     }
 
     /** The open book's pages ask for what curation read; each answer is folded into its page. */
@@ -235,20 +346,36 @@ object CuratorPage {
     /** The illustrative panel: redrawn only when what it shows changes. */
     private var readingKey = ""
 
-    /** A curated section in view is read whole from the daemon: sentences, concepts, classes, statements, citations. */
+    /** Per section ring key, bounded: its panel as last read, and the last question put to Jev there with the answer's panel. */
+    private val shown = LinkedHashMap<String, String>()
+    private val answered = LinkedHashMap<String, Pair<String, String>>()
+    private const val KEPT = 48
+
+    /** The Jev answer kept for [key], back into the panel [el] now shows. */
+    private fun restore(el: org.w3c.dom.Element, key: String) {
+        val (q, html) = answered[key] ?: return
+        el.querySelector(".oracle")?.innerHTML = html
+        el.querySelector("form.ask")?.asDynamic()?.q?.value = q
+    }
+
+    /** A curated section in view is read whole from the daemon: sentences, concepts, classes, statements, citations.
+     *  A section read before shows at once and is read again behind it; the panel is replaced only when that differs. */
     private fun reading(el: org.w3c.dom.Element, key: String) {
         if (key == readingKey) return; readingKey = key
         // book.curate/<book>/<heading>
         val book = key.removePrefix("book.curate/").substringBeforeLast('/')
         val heading = key.substringAfterLast('/')
-        el.innerHTML = "<p class='dim'>reading ${heading.replace("<", "&lt;")}…</p>"
+        val had = shown[key]
+        if (had != null) { el.innerHTML = had; restore(el, key) } else el.innerHTML = "<p class='dim'>reading ${heading.replace("<", "&lt;")}…</p>"
         launchJs {
             try {
                 val r = fetchJs("/api/curation/section?book=" + encodeURIComponent(book) + "&section=" + encodeURIComponent(heading))
                 val body = str(awaitJs(r.text()))
                 val v = reify(body) as Map<*, *>
-                if (readingKey == key) el.innerHTML = if (v.containsKey("error")) "<p class='dim'>${v["error"]}</p>" else narchy.spacegraph.CuratorReading.html(v)
-            } catch (e: dynamic) { if (readingKey == key) el.innerHTML = "<p class='dim'>reading failed: ${failureText(e)}</p>" }
+                val html = if (v.containsKey("error")) "<p class='dim'>${v["error"]}</p>" else narchy.spacegraph.CuratorReading.html(v)
+                if (!v.containsKey("error")) { shown.remove(key); shown[key] = html; if (shown.size > KEPT) shown.remove(shown.keys.first()) }
+                if (readingKey == key && html != had) { el.innerHTML = html; restore(el, key) }
+            } catch (e: dynamic) { if (readingKey == key && had == null) el.innerHTML = "<p class='dim'>reading failed: ${failureText(e)}</p>" }
         }
     }
 

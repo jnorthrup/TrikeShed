@@ -60,6 +60,8 @@ class GitCouchGateway(
         for ((path, ref) in existingMap) {
             if (path !in currentPaths) attachments.deleteAttachment(path, ref.revision)
         }
+        // The mirror once stood at the store's root (`.git/`); it now stands inside its worktree's project.
+        for (ref in attachments.listAttachments("$GIT_DIR/")) attachments.deleteAttachment(ref.path, ref.revision)
 
         return Snapshot(revision, currentPaths.sorted())
     }
@@ -108,7 +110,8 @@ class GitCouchGateway(
 
     companion object {
         const val GIT_DIR = ".git"
-        const val GIT_PREFIX = "$GIT_DIR/"
+        /** The Git database stands inside its worktree's project, as it does on disk. */
+        val GIT_PREFIX: String get() = WorktreeCouchGateway.WORKTREE_PREFIX + "$GIT_DIR/"
 
         private fun parentOf(path: String): String? {
             val lastSep = maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\'))

@@ -1,25 +1,22 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.j
-import borg.trikeshed.nlp.NlpDependency
+import borg.trikeshed.lib.*
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpMention
+import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpMetadata
 import borg.trikeshed.nlp.NlpReader
-import borg.trikeshed.nlp.NlpRelation
-import borg.trikeshed.nlp.NlpSentence
-import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.vm.GuestModuleManifest
-import java.lang.reflect.InvocationTargetException
-import java.util.Properties
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap
 
 /**
- * A reader over the one process-wide pipeline: the models load once per module loader, not once per
- * reader, and every reader serializes through it. A text parsed before is answered from a bounded
- * cache, so curation passes that re-read the same sections cost no parse.
+ * A reader over the one pipeline, which lives in a Graal isolate: an [InProcessIsolate] on the JVM facet
+ * with the `corenlp` guest module mounted as its classpath, so `edu.stanford.nlp.*` resolves inside the
+ * isolate and nowhere else in the daemon. The pipeline is built once in the guest; each text crosses as
+ * a string and the document comes back in [NlpWire]'s positional shape. A text parsed before is answered
+ * from a bounded cache, so curation passes that re-read the same sections cost no parse.
  */
 class CoreNlpRuntime : NlpReader, AutoCloseable {
     override suspend fun read(text: String): NlpDocument = analyze(text)
@@ -34,168 +31,109 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         /** Cache bound, in characters of cached text. */
         const val CACHED_CHARS = 8 shl 20
 
+        /**
+         * natlog + openie read every clause as (subject; relation; object), not only modal ones; kbp is
+         * Stanford relation extraction: typed slot relations between named mentions. Statistical coref is
+         * quadratic in mentions and stalled a treatise section for 30+ minutes; fast neural coref costs ~19%
+         * on treatise sections for ~3% more clauses, a third of them misread (pleonastic `it`); it is off.
+         * kbp rebuilds the sentence's graph once per mention pair, so a statute's 1,100-character enumeration
+         * held one section for 11+ CPU minutes; kbp reads sentences of at most 100 tokens.
+         */
+        val CONFIGURATION = mapOf("annotators" to "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp", "threads" to "1", "kbp.maxlen" to "100")
+
         private var cachedChars = 0L
         private val parsed = object : LinkedHashMap<String, NlpDocument>(256, 0.75f, true) {
             override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, NlpDocument>): Boolean =
                 (cachedChars > CACHED_CHARS).also { if (it) cachedChars -= eldest.key.length }
         }
 
-        /** The child JVM's heap; CoreNLP's parse garbage lives and dies there, not in the daemon. */
-        val WORKER_HEAP: String = System.getenv("TRIKESHED_CORENLP_HEAP") ?: "6g"
+        /**
+         * The most text one parse takes. CoreNLP's per-document annotators (the entity matcher above all)
+         * grow past linear in document length, and a 340k-character treatise section exhausted a 24 GB heap;
+         * a longer text is parsed in paragraph-bounded pieces and stitched into one document.
+         */
+        const val PARSE_CHARS = 16_384
 
-        private var worker: Worker? = null
+        /** Texts at most this long (a question, a premise) parse in their own isolate, never behind a book's section. */
+        const val ASK_CHARS = 2_048
 
-        @Synchronized
+        /** One isolate and the parses it serializes. */
+        private class Lane { var guest: Guest? = null }
+        private val books = Lane()
+        private val asks = Lane()
+
         private fun analyze(text: String): NlpDocument {
-            parsed[text]?.let { return it }
-            GuestModules.loaderFor(MODULE)
-                ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
-            val doc = (worker?.takeIf { it.alive } ?: Worker().also { worker = it }).analyze(text)
-            cachedChars += text.length
-            parsed[text] = doc
+            synchronized(parsed) { parsed[text] }?.let { return it }
+            val lane = if (text.length <= ASK_CHARS) asks else books
+            val doc = synchronized(lane) {
+                val loader = GuestModules.loaderFor(MODULE)
+                    ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
+                val g = lane.guest?.takeIf { it.loader === loader && it.isolate.isAlive } ?: Guest(loader).also { lane.guest = it }
+                if (text.length <= PARSE_CHARS) g.analyze(text) else stitch(text, pieces(text).map { r -> r.first to g.analyze(text.substring(r.first, r.last + 1)) })
+            }
+            synchronized(parsed) { cachedChars += text.length; parsed[text] = doc }
             return doc
         }
 
-        /** In-process parse over the guest module's loader: the worker's side of the wire. */
-        private fun parseHere(text: String, cache: Array<Bridge?>): NlpDocument {
-            val loader = GuestModules.loaderFor(MODULE)
-                ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
+        /** Cuts of at most [PARSE_CHARS]: at the last paragraph break, else the last sentence end, else the last space. */
+        internal fun pieces(text: String): List<IntRange> {
+            val out = ArrayList<IntRange>()
+            var from = 0
+            while (from < text.length) {
+                var to = minOf(text.length, from + PARSE_CHARS)
+                if (to < text.length) {
+                    val floor = from + PARSE_CHARS / 4
+                    to = sequenceOf(text.lastIndexOf("\n\n", to), text.lastIndexOf(". ", to).let { if (it < 0) it else it + 1 }, text.lastIndexOf(' ', to))
+                        .firstOrNull { it > floor }?.let { it + 1 } ?: to
+                }
+                out.add(from until to)
+                from = to
+            }
+            return out
+        }
+
+        /** One document from pieces parsed apart: token offsets and sentence ordinals shifted onto the whole text. */
+        internal fun stitch(text: String, parts: List<Pair<Int, NlpDocument>>): NlpDocument {
+            val sentences = ArrayList<NlpSentence>()
+            val mentions = ArrayList<NlpMention>()
+            for ((off, d) in parts) {
+                val base = sentences.size
+                for (k in 0 until d.sentences.size) {
+                    val s = d.sentences[k]
+                    val toks = Array(s.tokens.size) { i -> s.tokens[i].let { it.copy(begin = it.begin + off, end = it.end + off) } }
+                    sentences.add(s.copy(index = base + k, begin = s.begin + off, end = s.end + off, tokens = toks.size j { toks[it] }))
+                }
+                d.mentions.mapTo(mentions) { it.copy(sentence = it.sentence + base) }
+            }
+            return NlpDocument(text, sentences.size j { sentences[it] }, parts.firstOrNull()?.second?.metadata, mentions)
+        }
+    }
+
+    /** The isolate and what the host reports of it: the processor class and the jar it resolved from. */
+    private class Guest(val loader: ClassLoader) {
+        val isolate = InProcessIsolate("corenlp", borg.trikeshed.pointcut.VmFacet.JVM, Budget(statements = 0, wallMillis = 0), guestModule = MODULE)
+        private val pipelineClass = loader.loadClass("edu.stanford.nlp.pipeline.StanfordCoreNLP")
+
+        init { withLoader { isolate.eval(SCRIPT.replace("\$CONFIGURATION", jsonOf(CONFIGURATION)), "corenlp.js") } }
+
+        private inline fun <T> withLoader(block: () -> T): T {
             val previous = Thread.currentThread().contextClassLoader
             Thread.currentThread().contextClassLoader = loader
-            return try {
-                val current = cache[0]?.takeIf { it.loader === loader } ?: Bridge(loader, MODULE).also { cache[0] = it }
-                current.analyze(text)
-            } catch (e: InvocationTargetException) {
-                throw e.targetException
-            } finally {
-                Thread.currentThread().contextClassLoader = previous
-            }
+            return try { block() } finally { Thread.currentThread().contextClassLoader = previous }
         }
-
-        /**
-         * Worker entry: one JSON line in (`{"text":…}`), one JSON line out (the document, or `{"error":…}`).
-         * stdout carries only the wire; CoreNLP's own printing goes to stderr.
-         */
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val wire = java.io.PrintStream(java.io.FileOutputStream(java.io.FileDescriptor.out), false, Charsets.UTF_8)
-            System.setOut(System.err)
-            val input = System.`in`.bufferedReader(Charsets.UTF_8)
-            val cache = arrayOfNulls<Bridge>(1)
-            while (true) {
-                val line = input.readLine() ?: break
-                if (line.isBlank()) continue
-                val reply = try {
-                    NlpWire.encode(parseHere(reifyMap(line)["text"] as String, cache))
-                } catch (t: Throwable) {
-                    jsonOf(mapOf("error" to (t.message ?: t.toString())))
-                }
-                wire.print(reply); wire.print('\n'); wire.flush()
-            }
-        }
-    }
-
-    /** One child JVM on the daemon's own classpath, running [main]; requests serialize through the companion's lock. */
-    private class Worker {
-        private val process: Process = ProcessBuilder(
-            ProcessHandle.current().info().command().orElse(System.getProperty("java.home") + "/bin/java"),
-            "-Xmx$WORKER_HEAP", "-cp", System.getProperty("java.class.path"),
-            CoreNlpRuntime::class.java.name,
-        ).redirectError(ProcessBuilder.Redirect.INHERIT).start()
-        private val out = process.outputStream.bufferedWriter(Charsets.UTF_8)
-        private val input = process.inputStream.bufferedReader(Charsets.UTF_8)
-        val alive: Boolean get() = process.isAlive
 
         fun analyze(text: String): NlpDocument {
-            out.write(jsonOf(mapOf("text" to text))); out.newLine(); out.flush()
-            val line = input.readLine() ?: error("CoreNLP worker exited (${process.waitFor()})")
-            val reply = reifyMap(line)
-            (reply["error"] as? String)?.let { error(it) }
-            return NlpWire.decode(reply)
-        }
-    }
-
-    private class Bridge(val loader: ClassLoader, module: String) {
-        private val pipelineClass = loader.loadClass("edu.stanford.nlp.pipeline.StanfordCoreNLP")
-        private val documentClass = loader.loadClass("edu.stanford.nlp.pipeline.CoreDocument")
-        private val sentenceClass = loader.loadClass("edu.stanford.nlp.pipeline.CoreSentence")
-        private val tokenClass = loader.loadClass("edu.stanford.nlp.ling.CoreLabel")
-        private val graphClass = loader.loadClass("edu.stanford.nlp.semgraph.SemanticGraph")
-        private val edgeClass = loader.loadClass("edu.stanford.nlp.semgraph.SemanticGraphEdge")
-        private val indexedWordClass = loader.loadClass("edu.stanford.nlp.ling.IndexedWord")
-        private val properties = Properties().apply {
-            // natlog + openie read every clause as (subject; relation; object), not only modal ones;
-            // kbp is Stanford relation extraction: typed slot relations between named mentions.
-            // Statistical coref is quadratic in mentions and stalled a treatise section for 30+ minutes; it is off.
-            setProperty("annotators", "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp")
-            setProperty("threads", "1")
-        }
-        private val pipeline = pipelineClass.getConstructor(Properties::class.java).newInstance(properties)
-        private val document = documentClass.getConstructor(String::class.java)
-        private val annotate = pipelineClass.getMethod("annotate", documentClass)
-        private val sentences = documentClass.getMethod("sentences")
-        private val tokens = sentenceClass.getMethod("tokens")
-        private val dependencyParse = sentenceClass.getMethod("dependencyParse")
-        private val edges = graphClass.getMethod("edgeListSorted")
-        private val roots = graphClass.getMethod("getRoots")
-        private val governor = edgeClass.getMethod("getGovernor")
-        private val dependent = edgeClass.getMethod("getDependent")
-        private val relation = edgeClass.getMethod("getRelation")
-        private val wordIndex = indexedWordClass.getMethod("index")
-        private val index = tokenClass.getMethod("index")
-        private val begin = tokenClass.getMethod("beginPosition")
-        private val end = tokenClass.getMethod("endPosition")
-        private val originalText = tokenClass.getMethod("originalText")
-        private val lemma = tokenClass.getMethod("lemma")
-        private val tag = tokenClass.getMethod("tag")
-        private val ner = tokenClass.getMethod("ner")
-        private val coreMap = loader.loadClass("edu.stanford.nlp.util.CoreMap")
-        private val coreMapGet = coreMap.getMethod("get", Class::class.java)
-        private val sentenceCoreMap = sentenceClass.getMethod("coreMap")
-        private val annotation = documentClass.getMethod("annotation")
-        private val tripleKey = loader.loadClass("edu.stanford.nlp.naturalli.NaturalLogicAnnotations\$RelationTriplesAnnotation")
-        private val kbpKey = loader.loadClass("edu.stanford.nlp.ling.CoreAnnotations\$KBPTriplesAnnotation")
-        private val tripleClass = loader.loadClass("edu.stanford.nlp.ie.util.RelationTriple")
-        private val tripleSubject = tripleClass.getField("subject")
-        private val tripleRelation = tripleClass.getField("relation")
-        private val tripleObject = tripleClass.getField("object")
-        private val tripleConfidence = tripleClass.getField("confidence")
-        private val subjectGloss = tripleClass.getMethod("subjectGloss")
-        private val relationGloss = tripleClass.getMethod("relationGloss")
-        private val objectGloss = tripleClass.getMethod("objectGloss")
-        private val chainsKey = loader.loadClass("edu.stanford.nlp.coref.CorefCoreAnnotations\$CorefChainAnnotation")
-        private val chainClass = loader.loadClass("edu.stanford.nlp.coref.data.CorefChain")
-        private val chainMentions = chainClass.getMethod("getMentionsInTextualOrder")
-        private val chainRepresentative = chainClass.getMethod("getRepresentativeMention")
-        private val mentionClass = loader.loadClass("edu.stanford.nlp.coref.data.CorefChain\$CorefMention")
-        private val mentionSent = mentionClass.getField("sentNum")
-        private val mentionStart = mentionClass.getField("startIndex")
-        private val mentionEnd = mentionClass.getField("endIndex")
-        private val mentionSpan = mentionClass.getField("mentionSpan")
-
-        /** A span of CoreLabels as one-based token indices. */
-        private fun span(labels: Any?): IntRange {
-            val l = labels as List<*>
-            if (l.isEmpty()) return IntRange.EMPTY
-            return (index.invoke(l.first()) as Int)..(index.invoke(l.last()) as Int)
-        }
-
-        private fun relations(sentence: Any, key: Class<*>): List<NlpRelation> =
-            (coreMapGet.invoke(sentenceCoreMap.invoke(sentence), key) as? Collection<*>).orEmpty().map { t ->
-                NlpRelation(span(tripleSubject.get(t)), span(tripleRelation.get(t)), span(tripleObject.get(t)),
-                    subjectGloss.invoke(t) as String, relationGloss.invoke(t) as String, objectGloss.invoke(t) as String,
-                    tripleConfidence.getDouble(t))
-            }
-
-        private fun mentions(doc: Any): List<NlpMention> {
-            val chains = coreMapGet.invoke(annotation.invoke(doc), chainsKey) as? Map<*, *> ?: return emptyList()
-            return chains.entries.flatMap { (id, chain) ->
-                val rep = chainRepresentative.invoke(chain)
-                (chainMentions.invoke(chain) as List<*>).map { m ->
-                    NlpMention(mentionSent.getInt(m) - 1, mentionStart.getInt(m) until mentionEnd.getInt(m),
-                        mentionSpan.get(m) as String, (id as Number).toInt(), m === rep)
+            val wire = withLoader { isolate.call("parse", borg.trikeshed.vm.Teleported.Str(text)) }
+            val m = reifyMap((wire as? borg.trikeshed.vm.Teleported.Str)?.v ?: error("corenlp isolate returned $wire"))
+            val doc = NlpWire.decode(m)
+            for (k in 0 until doc.sentences.size) for (i in 0 until doc.sentences[k].tokens.size) {
+                val t = doc.sentences[k].tokens[i]
+                check(t.begin >= 0 && t.end >= t.begin && t.end <= text.length) { "CoreNLP returned an out-of-range text span" }
+                check(t.word == text.substring(t.begin, t.end)) {
+                    "CoreNLP originalText \"${t.word}\" does not match source span \"${text.substring(t.begin, t.end)}\""
                 }
             }
+            return NlpDocument(doc.text, doc.sentences, metadata, doc.mentions)
         }
 
         /**
@@ -206,8 +144,8 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         private val metadata: NlpMetadata = NlpMetadata(
             processor = pipelineClass.name,
             implementation = CoreNlpRuntime::class.java.name,
-            runtime = runtime(module),
-            configuration = properties.stringPropertyNames().sorted().associateWith { properties.getProperty(it) },
+            runtime = runtime(MODULE),
+            configuration = CONFIGURATION.toSortedMap(),
         )
 
         private fun runtime(module: String): Map<String, String> {
@@ -227,58 +165,53 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
                 pkg?.implementationVersion?.let { put("packageVersion", it) }
             }
         }
-
-        fun analyze(text: String): NlpDocument {
-            val doc = document.newInstance(text)
-            annotate.invoke(pipeline, doc)
-            val rawSentences = sentences.invoke(doc) as List<*>
-            val result = Array(rawSentences.size) { sentenceIndex ->
-                val sentence = rawSentences[sentenceIndex]!!
-                val rawTokens = tokens.invoke(sentence) as List<*>
-                val tokenArray = Array(rawTokens.size) { i ->
-                    val token = rawTokens[i]!!
-                    NlpToken(
-                        index.invoke(token) as Int,
-                        begin.invoke(token) as Int,
-                        end.invoke(token) as Int,
-                        originalText.invoke(token) as String,
-                        lemma.invoke(token) as? String ?: "",
-                        tag.invoke(token) as? String ?: "",
-                        ner.invoke(token) as? String ?: "O",
-                    ).also {
-                        check(it.begin >= 0 && it.end >= it.begin && it.end <= text.length) {
-                            "CoreNLP returned an out-of-range text span"
-                        }
-                        check(it.word == text.substring(it.begin, it.end)) {
-                            "CoreNLP originalText \"${it.word}\" does not match source span \"${text.substring(it.begin, it.end)}\""
-                        }
-                    }
-                }
-                val graph = dependencyParse.invoke(sentence)
-                val rawEdges = edges.invoke(graph) as List<*>
-                val rootIndices = (roots.invoke(graph) as Collection<*>).map { wordIndex.invoke(it) as Int }.sorted()
-                val dependencyArray = Array(rootIndices.size + rawEdges.size) { i ->
-                    if (i < rootIndices.size) NlpDependency(0, rootIndices[i], "root")
-                    else {
-                        val edge = rawEdges[i - rootIndices.size]!!
-                        NlpDependency(
-                            wordIndex.invoke(governor.invoke(edge)) as Int,
-                            wordIndex.invoke(dependent.invoke(edge)) as Int,
-                            relation.invoke(edge).toString(),
-                        )
-                    }
-                }
-                NlpSentence(
-                    sentenceIndex,
-                    tokenArray.firstOrNull()?.begin ?: 0,
-                    tokenArray.lastOrNull()?.end ?: 0,
-                    tokenArray.size j { i: Int -> tokenArray[i] },
-                    dependencyArray.size j { i: Int -> dependencyArray[i] },
-                    relations(sentence, tripleKey),
-                    relations(sentence, kbpKey),
-                )
-            }
-            return NlpDocument(text, result.size j { i: Int -> result[i] }, metadata, mentions(doc))
-        }
     }
 }
+
+/**
+ * The guest side: the pipeline built once from the isolate's own classpath, and `parse(text)` answering
+ * one document as JSON in [NlpWire]'s positional rows — sentences of tokens, dependencies (roots first,
+ * governor 0), OpenIE triples and KBP triples as one-based token spans with their glosses.
+ */
+private val SCRIPT = """
+var Properties = Java.type('java.util.Properties');
+var StanfordCoreNLP = Java.type('edu.stanford.nlp.pipeline.StanfordCoreNLP');
+var CoreDocument = Java.type('edu.stanford.nlp.pipeline.CoreDocument');
+var TRIPLES = Java.type('edu.stanford.nlp.naturalli.NaturalLogicAnnotations${'$'}RelationTriplesAnnotation').class;
+var KBP = Java.type('edu.stanford.nlp.ling.CoreAnnotations${'$'}KBPTriplesAnnotation').class;
+var props = new Properties();
+var conf = JSON.parse('${'$'}CONFIGURATION');
+for (var k in conf) props.setProperty(k, conf[k]);
+var pipeline = new StanfordCoreNLP(props);
+function span(l) { return l.isEmpty() ? [1, 0] : [l.get(0).index(), l.get(l.size() - 1).index()]; }
+function relations(cm, key) {
+  var out = [], c = cm.get(key);
+  if (c == null) return out;
+  for (var it = c.iterator(); it.hasNext();) {
+    var t = it.next(), s = span(t.subject), r = span(t.relation), o = span(t.object);
+    out.push([s[0], s[1], r[0], r[1], o[0], o[1], t.subjectGloss(), t.relationGloss(), t.objectGloss(), t.confidence]);
+  }
+  return out;
+}
+function parse(text) {
+  var doc = new CoreDocument(text);
+  pipeline.annotate(doc);
+  var ss = doc.sentences(), out = [];
+  for (var k = 0; k < ss.size(); k++) {
+    var s = ss.get(k), ts = s.tokens(), toks = [];
+    for (var i = 0; i < ts.size(); i++) {
+      var t = ts.get(i);
+      toks.push([t.index(), t.beginPosition(), t.endPosition(), t.originalText(), t.lemma() || '', t.tag() || '', t.ner() || 'O']);
+    }
+    var g = s.dependencyParse(), deps = [], roots = [];
+    for (var ri = g.getRoots().iterator(); ri.hasNext();) roots.push(ri.next().index());
+    roots.sort(function (a, b) { return a - b; });
+    for (var j = 0; j < roots.length; j++) deps.push([0, roots[j], 'root']);
+    var es = g.edgeListSorted();
+    for (var j = 0; j < es.size(); j++) { var e = es.get(j); deps.push([e.getGovernor().index(), e.getDependent().index(), e.getRelation().toString()]); }
+    var cm = s.coreMap();
+    out.push([k, toks.length ? toks[0][1] : 0, toks.length ? toks[toks.length - 1][2] : 0, toks, deps, relations(cm, TRIPLES), relations(cm, KBP)]);
+  }
+  return JSON.stringify({ text: text, sentences: out, mentions: [] });
+}
+"""

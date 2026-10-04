@@ -132,6 +132,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/graal/density", "per-region residual density at a zoom band"),
             RouteEntry("GET", "/api/graal/sheet", "live CursorSheet for a document"),
             RouteEntry("GET", "/api/graal/dag", "DAG arcs and cross-links"),
+            RouteEntry("GET", "/api/graal/impact", "dependents of a node ringed by depth"),
             RouteEntry("GET", "/api/graal/classfile", "selected class attachment projection via JDK 25"),
             RouteEntry("GET", "/api/graal/decompile", "source + classpath mates via JDK 25"),
             RouteEntry("GET", "/api/graal/aot", "AOT flags and HotSpot cache metadata"),
@@ -240,6 +241,7 @@ object RouteManifest {
             RouteEntry("POST", "/_project/{name}/begin", "begin browser-drop upload"),
             RouteEntry("POST", "/_project/{name}/putBatch", "batched file upload"),
             RouteEntry("POST", "/_project/{name}/put", "single file upload"),
+            RouteEntry("DELETE", "/_project/{name}/doc", "remove an uploaded document with its twins, or a folder"),
         ),
         // -- IngestRoutes: drop-a-corpus entry points --
         "IngestRoutes" to listOf(

@@ -18,6 +18,7 @@ import borg.trikeshed.web.graal.toFixed
 import borg.trikeshed.web.graal.truthy
 import borg.trikeshed.web.graal.typeOf
 import kotlinx.browser.document
+import kotlinx.browser.localStorage
 import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.coroutines.launch
@@ -169,6 +170,29 @@ private suspend fun GraalConsole.openStoreDoc(id: String) {
                 selEdges.take(20).mapIndexed { i, e -> "<span class=\"dagchip\" onclick=\"openDoc(selEdges[" + i + "].id)\">" + e.kind + " → …" + esc(e.id.takeLast(38)) + "</span>" }.joinToString("")
             q("docBody").appendChild(div)
         }
+        // Breakage: what depends on this document, ring by ring. Off until checked; the choice persists.
+        val breakage = document.createElement("label") as HTMLElement
+        breakage.style.cssText = "display:block;margin-top:6px;color:var(--dim);cursor:pointer"
+        breakage.innerHTML = "<input type=\"checkbox\"> breakage <span></span>"
+        val box = breakage.querySelector("input").asDynamic()
+        val rings = breakage.querySelector("span") as HTMLElement
+        fun show() {
+            if (!(box.checked as Boolean)) { rings.textContent = ""; return }
+            rings.textContent = "…"
+            scope.launch {
+                try {
+                    val r: dynamic = fetchResponse("/api/graal/impact?node=" + encUri(id) + "&depth=3").json().await()
+                    val src: dynamic = r.source
+                    val levels = orr(if (truthy(src) && truthy(src.available)) src.levels else r.levels, js("[]")).unsafeCast<Array<dynamic>>()
+                    val total = if (truthy(src) && truthy(src.available)) src.total else r.total
+                    rings.textContent = levels.joinToString(" · ") { "d" + str(it.depth) + " " + str(it.count) } + " (total " + str(total) + ")"
+                } catch (e: Throwable) { rings.textContent = "failed: " + errText(e) }
+            }
+        }
+        box.checked = localStorage.getItem("breakage") == "1"
+        box.addEventListener("change", { _ -> localStorage.setItem("breakage", if (box.checked as Boolean) "1" else "0"); show() })
+        q("docBody").appendChild(breakage)
+        show()
     } catch (_: Throwable) {}
 }
 

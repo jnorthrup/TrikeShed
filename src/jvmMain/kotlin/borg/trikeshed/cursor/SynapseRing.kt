@@ -78,17 +78,15 @@ class SynapseRing(
 
         @Suppress("UNCHECKED_CAST")
         val slab = arrayOfNulls<FieldSynapse>(count) as Array<FieldSynapse>
+        // The ring drains in at most two array copies, and the stamps are scanned over the flat slab.
+        ring.copyInto(slab)
+        ring.clear()
         var nanoStart = Long.MAX_VALUE
         var nanoEnd = Long.MIN_VALUE
-        for (i in 0 until count) {
-            val evt = ring.b(i)
-            slab[i] = evt
+        for (evt in slab) {
             if (evt.nano < nanoStart) nanoStart = evt.nano
             if (evt.nano > nanoEnd)   nanoEnd = evt.nano
         }
-
-        // clear ring
-        while (ring.a > 0) { ring.removeAt(0) }
 
         val epoch = slabEpoch++
         subscriber?.onSlab(slab, count, epoch, nanoStart, nanoEnd)

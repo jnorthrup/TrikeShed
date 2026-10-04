@@ -3,6 +3,7 @@
 
 package borg.trikeshed.lib
 
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.isam.meta.IOMemento
 import kotlin.jvm.JvmInline
 import kotlin.jvm.JvmName

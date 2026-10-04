@@ -178,6 +178,8 @@ class CouchWireRouter(
                 descending = query["descending"] == "true",
                 includeDocs = query["include_docs"] == "true",
                 keys = keys,
+                prefix = query["prefix"]?.let(::unquote),
+                delimiter = query["delimiter"]?.let(::unquote),
             ),
         )
     }

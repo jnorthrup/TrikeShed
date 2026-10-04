@@ -2,6 +2,7 @@ package borg.trikeshed.ontology
 
 import borg.trikeshed.collections.associative.FunnelHashIndex
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.kif.KifExpr
 import java.security.MessageDigest
 
@@ -154,6 +155,31 @@ object SumoCorpus {
         nounIndex.b.copyOfRange(image.lexiconStarts[i], image.lexiconStarts[i + 1])
     } ?: IntArray(0)
 
+    /** WordNet's gloss of [lemma] in the first of its synsets mapped to SUMO [term], without the usage examples; null when none is. */
+    fun nounGloss(lemma: String, term: String): String? = glosses[lemma + '\u0000' + term]
+
+    /** WordNet's gloss of the first synset mapped to SUMO [term], whatever its word: what a class means when no lemma of it is in hand. */
+    fun classGloss(term: String): String? { glosses; return termGlosses[term] }
+
+    private val termGlosses = HashMap<String, String>()
+
+    private val glosses: Map<String, String> by lazy {
+        val out = HashMap<String, String>()
+        text("sumo/WordNetMappings/WordNetMappings30-noun.txt").lineSequence().forEach { line ->
+            if (line.isEmpty() || !line[0].isDigit()) return@forEach
+            val bar = line.indexOf(" | ").takeIf { it >= 0 } ?: return@forEach
+            val at = line.indexOf("&%", bar).takeIf { it >= 0 } ?: return@forEach
+            var end = at + 2
+            while (end < line.length && (line[end].isLetterOrDigit() || line[end] == '_' || line[end] == '-')) end++
+            val gloss = line.substring(bar + 3, at).substringBefore("; \"").trim()
+            val term = line.substring(at + 2, end)
+            termGlosses.putIfAbsent(term, gloss)
+            val f = line.split(' ')
+            for (w in 0 until f[3].toInt(16)) out.putIfAbsent(f[4 + 2 * w].lowercase() + '\u0000' + term, gloss)
+        }
+        out
+    }
+
     /**
      * The sense of [lemma] its [neighbors] (the other nouns read with it) and the [believed] classes
      * (self+ancestor ids of classes already believed) support most. Each neighbor votes the
@@ -228,8 +254,11 @@ object SumoCorpus {
         FloatArray(n) { kotlin.math.ln(n.toFloat() / under[it].coerceAtLeast(1)) }
     }
 
+    /** The information content of class [id]: ln(classes / classes under it), 0 at the root. */
+    fun informationOf(id: Int): Float = information.getOrElse(id) { 0f }
+
     /** The information content of the most specific class in [ids]. */
-    private fun informationOf(ids: borg.trikeshed.collections.bits.RoaringSeries): Float {
+    fun informationOf(ids: borg.trikeshed.collections.bits.RoaringSeries): Float {
         val ic = information
         var m = 0f
         ids.forEach { if (it in ic.indices && ic[it] > m) m = ic[it] }

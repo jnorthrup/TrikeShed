@@ -226,6 +226,7 @@ private fun wire(p: Panels) {
     on(byId("clearBtn"), "click", { if (window.confirm("clear the panel?")) p.load(objOf { it.nodes = jsArray(); it.wires = jsArray() }) })
     on(byId("paletteBtn"), "click", { byId("palette").classList.toggle("open") })
     on(byId("keysBtn"), "click", { launchJs { p.openKeyMuxDlg() } })
+    on(byId("assetsBtn"), "click", { borg.trikeshed.web.AssetTreeDialog.toggle() })
     on(byId("presetsBtn"), "click", { launchJs { p.openGallery() } })
     on(byId("rdfBtn"), "click", { p.openRdf() })
     on(byId("undoBtn"), "click", { p.history.undo() })

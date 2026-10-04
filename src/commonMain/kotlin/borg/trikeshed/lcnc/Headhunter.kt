@@ -8,6 +8,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
+import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
@@ -92,7 +93,7 @@ class HeadhunterStore(
     private fun sourcePaths(previous: HeadhunterRecord, incoming: HeadhunterRecord): HeadhunterRecord {
         val paths = SeriesBuffer<String>()
         fun add(value: Any?) {
-            if (value is String && value.isNotBlank() && value !in paths.snapshot()) paths.add(value)
+            if (value is String && value.isNotBlank() && value !in paths) paths.add(value)
         }
         fun append(fields: HeadhunterRecord) {
             add(fields["relativePath"])

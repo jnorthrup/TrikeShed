@@ -95,7 +95,7 @@ class ChunkedMutableSeriesScaleTest {
     fun freezeAndIterationAgreeWithIndexedReads() {
         val s = ChunkedMutableSeries<Int>(chunkSize = 16)
         for (i in 0 until 100) s.append(i * 2)
-        val frozen = s.freeze()
+        val frozen = s.snapshot()
         assertEquals(100, frozen.a)
         for (i in 0 until 100) assertEquals(s.b(i), frozen.b(i))
         assertEquals((0 until 100).map { it * 2 }, s.sequence().toList())

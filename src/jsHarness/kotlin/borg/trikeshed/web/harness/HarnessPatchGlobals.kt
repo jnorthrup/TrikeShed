@@ -375,6 +375,7 @@ object HarnessPatchGlobals {
         on(q("#clearBtn"), "click", { if (window.confirm("clear the panel?")) p.load(js("({nodes:[],wires:[]})")) })
         on(q("#paletteBtn"), "click", { q("#palette").classList.toggle("open") })
         on(q("#keysBtn"), "click", { launchJs { p.openKeyMuxDlg() } })
+        on(q("#assetsBtn"), "click", { borg.trikeshed.web.AssetTreeDialog.toggle() })
         on(q("#presetsBtn"), "click", { launchJs { p.openGallery() } })
         on(q("#rdfBtn"), "click", { p.openRdf() })
         on(q("#undoBtn"), "click", { p.undo() })

@@ -41,6 +41,8 @@ td.rev{color:var(--dim);max-width:130px}
 .att{padding:6px 12px;border-top:1px solid var(--line);font-size:12px}
 .att a{color:var(--link)}
 #info{color:var(--dim);font-size:12px;padding:0 4px}
+#crumbs{padding:6px 12px;border-bottom:1px solid var(--line);font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--dim)}
+#crumbs a{color:var(--link);text-decoration:none}
 @media (max-width:900px){#wrap{flex-direction:column}#list{border-right:0;border-bottom:1px solid var(--line)}}
 
 a:focus:not(:focus-visible), button:focus:not(:focus-visible), input:focus:not(:focus-visible), select:focus:not(:focus-visible), textarea:focus:not(:focus-visible), [tabindex="0"]:focus:not(:focus-visible) { outline: none; }
@@ -51,7 +53,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
   <select id="db" onchange="selectDb(this.value)" title="database (from /_all_dbs)"></select>
-  <input id="prefix" placeholder="id prefix filter (e.g. dropzone/, projects/trikeshed/docs/)" size="42">
+  <input id="prefix" placeholder="filter within this folder (id prefix)" size="42">
   <button onclick="firstPage()" title="Apply filter">go</button>
   <button onclick="newDoc()">new document</button>
   <span id="info">…</span>
@@ -59,6 +61,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 </div>
 <div id="wrap">
   <div id="list">
+    <div id="crumbs"></div>
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
     <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
     <div id="views">

@@ -41,30 +41,75 @@ object FutonPage {
         }
     }
 
+    /** The folder being browsed: an id prefix ending in `/`, walked one path segment at a time. */
+    private var folder = ""
+
     private suspend fun loadPage(startkey: String?) {
         val p = input("prefix").value
-        var url = FutonPaths.db(DB) + "/_all_docs?limit=" + (LIMIT + 1)
-        val sk = startkey ?: p.ifEmpty { null }
-        if (!sk.isNullOrEmpty()) url += "&startkey=" + encodeUri("\"" + sk + "\"")
-        if (p.isNotEmpty()) url += "&endkey=" + encodeUri("\"" + p + "\uFFF0\"")
+        // The typed filter narrows within the folder; the folder is the hierarchy (db → path segments → docs).
+        val within = folder + p
+        var url = FutonPaths.db(DB) + "/_all_docs?limit=" + (LIMIT + 1) + "&delimiter=" + encodeUri("/")
+        if (within.isNotEmpty()) url += "&prefix=" + encodeUri(within)
+        if (!startkey.isNullOrEmpty()) url += "&startkey=" + encodeUri("\"" + startkey + "\"")
         val d: dynamic = fetchResponse(url).jsonValue()
         val rows = if (truthy(d.rows)) jsArray(d.rows) else emptyArray()
+        val folders = if (startkey == null && truthy(d.prefixes)) jsArray(d.prefixes).map { str(it) } else emptyList()
+        crumbs()
         val t = byId("docs") as HTMLTableElement
         t.innerHTML = "<tr><th style=\"width:66%\">_id</th><th>_rev</th></tr>"
+        if (folder.isNotEmpty() && startkey == null) {
+            val up = document.createElement("tr") as HTMLElement
+            up.innerHTML = "<td>\u2191 ..</td><td class=\"rev\"></td>"
+            up.onclick = { enter(folder.removeSuffix("/").substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }) }
+            t.appendChild(up)
+        }
+        for (f in folders) {
+            val tr = document.createElement("tr") as HTMLElement
+            tr.innerHTML = "<td>\uD83D\uDCC1 " + f.removePrefix(folder).esc() + "</td><td class=\"rev\">folder</td>"
+            tr.onclick = { enter(f) }
+            t.appendChild(tr)
+        }
         for (r in rows.take(LIMIT)) {
             val tr = document.createElement("tr") as HTMLElement
             val rev = if (truthy(r.value) && truthy(r.value.rev)) str(r.value.rev) else ""
-            tr.innerHTML = "<td>" + str(r.id).replace("&", "&amp;").replace("<", "&lt;") + "</td><td class=\"rev\">" + rev.take(18) + "…</td>"
+            tr.innerHTML = "<td>" + str(r.id).removePrefix(folder).esc() + "</td><td class=\"rev\">" + rev.take(18) + "…</td>"
             val id = str(r.id)
             tr.onclick = { launchPage { loadDoc(id) } }
             t.appendChild(tr)
         }
         (byId("nextB") as HTMLButtonElement).disabled = rows.size <= LIMIT
         (byId("prevB") as HTMLButtonElement).disabled = pageStack.size <= 1
-        byId("pageinfo").textContent = if (rows.isNotEmpty()) str(rows[0].id).take(46) + " …" else "no documents"
+        byId("pageinfo").textContent = folders.size.toString() + " folders · " + str(d.documents ?: rows.size) + " documents here"
         nextKey = if (rows.size > LIMIT) str(rows[LIMIT].id) else null
         window.asDynamic()._nextKey = nextKey
         launchPage { refreshInfo() }
+    }
+
+    /** Descend into (or climb to) [prefix]: the listing restarts at that folder's first page. */
+    private fun enter(prefix: String) {
+        folder = prefix
+        input("prefix").value = ""
+        firstPage()
+    }
+
+    /** The path as links: the db, then each folder segment; a click climbs to it. */
+    private fun crumbs() {
+        val c = byId("crumbs")
+        c.innerHTML = ""
+        fun link(label: String, to: String) {
+            val a = document.createElement("a") as HTMLElement
+            a.textContent = label
+            a.setAttribute("href", "#")
+            a.onclick = { e: Event -> e.preventDefault(); enter(to) }
+            c.appendChild(a)
+        }
+        link(DB, "")
+        var acc = ""
+        for (seg in folder.split('/').filter { it.isNotEmpty() }) {
+            acc += "$seg/"
+            c.appendChild(document.createTextNode(" / "))
+            link(seg, acc)
+        }
     }
 
     private fun firstPage() {
@@ -185,6 +230,7 @@ object FutonPage {
 
     private fun selectDb(name: String) {
         DB = name
+        folder = ""
         input("docid").value = ""
         body().value = ""
         currentRev = null

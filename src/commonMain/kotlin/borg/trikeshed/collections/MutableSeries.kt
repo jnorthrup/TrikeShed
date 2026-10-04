@@ -2,9 +2,11 @@
 
 package borg.trikeshed.collections
 
+import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.j
+import kotlin.concurrent.Volatile
 
 // ──────────────────────────────────────────────────────────────────────────
 //  MutableSeries — the canonical mutable series
@@ -12,198 +14,235 @@ import borg.trikeshed.lib.j
 
 /**
  * MutableSeries — the canonical mutable series type.
- * A MutableSeries IS a Series<T> = Join<Int, (Int) -> T>.
+ * A MutableSeries IS a Series<T> = Join<Int, (Int) -> T> that also takes writes. Only the mutation core is
+ * required; [add], `+=` and `-=` are spellings of it, and [snapshot], [iterator] and [sequence] have defaults
+ * a backend overrides when it can do better. Freezing and observation belong to [COWArrayBackend], the one
+ * backend that implements them.
  */
 interface MutableSeries<T> : Series<T>, Snapshotable<T> {
 
-
-    fun append(item: T): Unit
-    fun insert(index: Int, item: T): Unit
-    operator fun set(index: Int, item: T): Unit
+    fun append(item: T)
+    fun insert(index: Int, item: T)
+    operator fun set(index: Int, item: T)
     fun removeAt(index: Int): T
     fun remove(item: T): Boolean
-    fun clear(): Unit
+    fun clear()
 
-    // ── COW / freeze ─────────────────────────────────────────────
-    fun freeze(): Series<T>
-    override fun snapshot(): MutableSeries<T>
-    fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit
-    fun version(): Long
-    val isFrozen: Boolean
-
-    /** Iterator over elements. */
-    operator fun iterator(): Iterator<T>
-
-    /** Sequence view — lazy. */
-    fun sequence(): Sequence<T>
-
-    /** Concatenation — structural sharing if both frozen. */
-    operator fun plus(other: MutableSeries<T>): MutableSeries<T>
-
-    // Operator aliases for backward compat
     fun add(item: T) = append(item)
     fun add(index: Int, item: T) = insert(index, item)
-    operator fun plus(item: T): MutableSeries<T> { append(item); return this }
-    operator fun minus(item: T): MutableSeries<T> { remove(item); return this }
-    operator fun plusAssign(item: T) { append(item) }
+    operator fun plusAssign(item: T) = append(item)
     operator fun minusAssign(item: T) { remove(item) }
+
+    /** An immutable copy as of now: later writes to this series do not reach it. */
+    override fun snapshot(): Series<T> = FrozenArray(Array<Any?>(a) { b(it) })
+
+    /** Iterator over elements. */
+    operator fun iterator(): Iterator<T> = object : Iterator<T> {
+        var i = 0
+        override fun hasNext() = i < a
+        override fun next(): T = b(i++)
+    }
+
+    /** Sequence view — lazy. */
+    fun sequence(): Sequence<T> = Sequence { iterator() }
 
     companion object
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-//  Backends — different capability tradeoffs
+//  COWArrayBackend — the default backend
 // ──────────────────────────────────────────────────────────────────────────
 
 /**
- * COWArrayBackend — default. All four capabilities via copy-on-write Array<Any?>.
- * Read: O(1). Write: O(n) arraycopy. Freeze: O(1) flag flip.
+ * COWArrayBackend — a growable array shared copy-on-write with its snapshots, its frozen view and its observers.
+ *
+ * Read: O(1). Append: amortized O(1), the array doubling when full, never a whole copy per append. An append
+ * writes past every shared prefix, so it never copies for sharing; any other write copies first while the array
+ * is shared with a [snapshot] or a [freeze] view, or observed, so none of those sees it change. [snapshot] and
+ * [freeze] hand the array out without a copy.
+ *
+ * One writer. [count] is published after the element it covers: a reader on another thread that reads the size
+ * first reads only elements already written.
  */
 class COWArrayBackend<T>(
-    private var arr: Array<Any?> = emptyArray(),
-    private var frozen: Boolean = false,
-    private var ver: Long = 0L,
-    private var observer: ((Twin<Series<T>>) -> Unit)? = null,
+    var arr: Array<Any?> = emptyArray(),
+    filled: Int = arr.size,
 ) : MutableSeries<T> {
 
-    override val a: Int get() = arr.size
-    override val b: (Int) -> T get() = { i -> arr[i] as T }
-    override val isFrozen: Boolean get() = frozen
+    @Volatile var count: Int = filled
+    /** True while [arr] is also read through a snapshot or the frozen view. */
+    @Volatile var shared: Boolean = false
+    var isFrozen: Boolean = false
+    var ver: Long = 0L
+    /** Subscriptions in order; replaced whole on every change, so a notification walks a fixed list. */
+    @Volatile var observers: List<Observer<T>> = emptyList()
 
-    @Suppress("UNCHECKED_CAST")
-    fun get(index: Int): T = arr[index] as T
+    /** One subscription, the identity its disposer removes: one lambda subscribed twice is two subscriptions. */
+    class Observer<T>(val notify: (Twin<Series<T>>) -> Unit)
 
-    override fun set(index: Int, item: T) {
-        check(!frozen) { "Series is frozen" }
-        arr[index] = item
-        ver++
-        bump()
+    override val a: Int get() = count
+    override val b: (Int) -> T = { i -> get(i) }
+
+    operator fun get(index: Int): T {
+        val n = count
+        if (index < 0 || index >= n) throw IndexOutOfBoundsException("index $index, size $n")
+        return arr[index] as T
     }
 
-    // ── Appendable ────────────────────────────────────────────────
+    override fun set(index: Int, item: T) {
+        check(!isFrozen) { FROZEN }
+        val n = count
+        if (index < 0 || index >= n) throw IndexOutOfBoundsException("index $index, size $n")
+        val before = arr
+        val observed = observers.isNotEmpty()
+        if (shared || observed) { arr = arr.copyOf(); shared = false }
+        arr[index] = item
+        ver++
+        if (observed) notify(before, n)
+    }
 
     override fun append(item: T) {
-        check(!frozen) { "Series is frozen" }
-        arr = arr.copyOf(arr.size + 1)
-        arr[arr.size - 1] = item
+        check(!isFrozen) { FROZEN }
+        val n = count
+        val before = arr
+        if (n == arr.size) { arr = arr.copyOf(if (n < MIN) MIN else n shl 1); shared = false }
+        arr[n] = item
+        count = n + 1
         ver++
-        bump()
+        notify(before, n)
     }
 
     override fun insert(index: Int, item: T) {
-        check(!frozen) { "Series is frozen" }
-        val copy = Array<Any?>(arr.size + 1) { i ->
-            when {
-                i < index -> arr[i]
-                i == index -> item
-                else -> arr[i - 1]
-            }
-        }
-        arr = copy
+        check(!isFrozen) { FROZEN }
+        val n = count
+        if (index < 0 || index > n) throw IndexOutOfBoundsException("index $index, size $n")
+        if (index == n) { append(item); return }
+        val before = arr
+        val observed = observers.isNotEmpty()
+        val target = if (shared || observed || n == arr.size)
+            arrayOfNulls<Any?>(if (n == arr.size) n shl 1 else arr.size).also { arr.copyInto(it, 0, 0, index) }
+        else arr
+        arr.copyInto(target, index + 1, index, n)
+        target[index] = item
+        if (target !== arr) { arr = target; shared = false }
+        count = n + 1
         ver++
-        bump()
+        if (observed) notify(before, n)
     }
 
-    // ── Removable ─────────────────────────────────────────────────
-
     override fun removeAt(index: Int): T {
-        check(!frozen) { "Series is frozen" }
+        check(!isFrozen) { FROZEN }
+        val n = count
+        if (index < 0 || index >= n) throw IndexOutOfBoundsException("index $index, size $n")
+        val before = arr
         val removed = arr[index] as T
-        arr = Array<Any?>(arr.size - 1) { i -> if (i < index) arr[i] else arr[i + 1] }
+        val observed = observers.isNotEmpty()
+        if (shared || observed) {
+            val target = arrayOfNulls<Any?>(arr.size)
+            arr.copyInto(target, 0, 0, index)
+            arr.copyInto(target, index, index + 1, n)
+            arr = target; shared = false
+        } else {
+            arr.copyInto(arr, index, index + 1, n)
+            arr[n - 1] = null
+        }
+        count = n - 1
         ver++
-        bump()
+        if (observed) notify(before, n)
         return removed
     }
 
     override fun remove(item: T): Boolean {
-        val i = arr.indexOfFirst { it == item }
-        if (i < 0) return false
-        removeAt(i)
-        return true
+        for (i in 0 until count) if (arr[i] == item) { removeAt(i); return true }
+        return false
     }
 
     override fun clear() {
-        arr = emptyArray()
+        check(!isFrozen) { FROZEN }
+        val n = count
+        if (n == 0) return
+        val before = arr
+        val observed = observers.isNotEmpty()
+        if (shared || observed) { arr = emptyArray(); shared = false } else arr.fill(null, 0, n)
+        count = 0
         ver++
-        bump()
+        if (observed) notify(before, n)
     }
 
-    // ── Freezable ─────────────────────────────────────────────────
-
-    override fun freeze(): Series<T> {
-        frozen = true
-        return FrozenArray(arr)
+    /** Seals this series and returns its array as an immutable view, without a copy. */
+    fun freeze(): Series<T> {
+        val n = count
+        isFrozen = true
+        shared = true
+        return FrozenArray(arr, n)
     }
 
-    // ── COWOnly ───────────────────────────────────────────────────
-
-    override fun snapshot(): MutableSeries<T> = COWArrayBackend(arr.copyOf(), false, ver, observer)
-
-    override fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit {
-        val prior = this.observer
-        this.observer = observer
-        return { this.observer = prior }
+    /**
+     * The elements as of now, without a copy: the next write that is not an append copies the array instead.
+     * The size is read before the array, so a reader on another thread never pairs a newer size with an older,
+     * shorter array.
+     */
+    override fun snapshot(): Series<T> {
+        val n = count
+        shared = true
+        return FrozenArray(arr, n)
     }
 
-    override fun version(): Long = ver
+    /**
+     * Calls [observer] after every write with (before, after): before is the prior state, after is this series.
+     * Before is a view of the prior array, valid for the call; [snapshot] it to keep it.
+     */
+    fun subscribe(observer: (Twin<Series<T>>) -> Unit): () -> Unit {
+        val o = Observer(observer)
+        synchronizedLock(this) { observers = observers + o }
+        return { synchronizedLock(this) { observers = observers.filter { it !== o } } }
+    }
 
-    // ── Series/Iterable ───────────────────────────────────────────
+    fun version(): Long = ver
 
     override fun iterator(): Iterator<T> = object : Iterator<T> {
-        private var i = 0
-        override fun hasNext() = i < arr.size
-        @Suppress("UNCHECKED_CAST") override fun next() = arr[i++] as T
+        var i = 0
+        override fun hasNext() = i < count
+        override fun next(): T = get(i++)
     }
 
-    override fun sequence(): Sequence<T> = arr.asSequence().map { it as T }
-
-    override fun plus(other: MutableSeries<T>): MutableSeries<T> {
-        val combined = Array<Any?>(arr.size + other.a) { i ->
-            if (i < arr.size) arr[i] else other.b(i - arr.size)
-        }
-        return COWArrayBackend(combined, false, ver, observer)
+    fun notify(before: Array<Any?>, n: Int) {
+        val obs = observers
+        if (obs.isEmpty()) return
+        val twin: Twin<Series<T>> = FrozenArray<T>(before, n) j this
+        for (o in obs) o.notify(twin)
     }
 
-    // ── Internal ──────────────────────────────────────────────────
-
-    private fun bump() {
-        observer?.invoke(this j this)
+    companion object {
+        const val MIN = 8
+        const val FROZEN = "Series is frozen"
     }
 }
 
 /**
- * FrozenArray — immutable snapshot. Can thaw back to mutable.
+ * FrozenArray — an immutable view over the first [count] slots of an array that is not written again. Can thaw
+ * back to mutable.
  */
-class FrozenArray<T>(internal val arr: Array<Any?>) : Series<T> {
-    override val a: Int get() = arr.size
-    override val b: (Int) -> T get() = { i -> arr[i] as T }
-    fun thaw(): MutableSeries<T> = COWArrayBackend(arr.copyOf(), false)
-    operator fun get(index: Int): T = arr[index] as T
-    operator fun iterator(): Iterator<T> = object : Iterator<T> {
-        private var i = 0
-        override fun hasNext() = i < arr.size
-        @Suppress("UNCHECKED_CAST") override fun next() = arr[i++] as T
+class FrozenArray<T>(val arr: Array<Any?>, val count: Int = arr.size) : Series<T> {
+    override val a: Int get() = count
+    override val b: (Int) -> T = { i -> get(i) }
+    fun thaw(): MutableSeries<T> = COWArrayBackend(arr.copyOf(count))
+    operator fun get(index: Int): T {
+        if (index < 0 || index >= count) throw IndexOutOfBoundsException("index $index, size $count")
+        return arr[index] as T
     }
-    fun sequence(): Sequence<T> = arr.asSequence().map { it as T }
+    operator fun iterator(): Iterator<T> = object : Iterator<T> {
+        var i = 0
+        override fun hasNext() = i < count
+        override fun next(): T = arr[i++] as T
+    }
+    fun sequence(): Sequence<T> = Sequence { iterator() }
 }
 
 // ── Factory functions ──────────────────────────────────────────────────────
 
 /** Create a COW-backed MutableSeries (default). */
-@Suppress("UNCHECKED_CAST")
-fun <T> mutableSeriesOf(vararg items: T): MutableSeries<T> =
-    COWArrayBackend(items as Array<Any?>)
+fun <T> mutableSeriesOf(vararg items: T): COWArrayBackend<T> = COWArrayBackend(arrayOf<Any?>(*items))
 
 /** Create from a sequence. */
-fun <T> mutableSeriesFrom(items: Sequence<T>): MutableSeries<T> {
-    val list = items.toList()
-    val arr = Array<Any?>(list.size) { i -> list[i] }
-    return COWArrayBackend(arr)
-}
-
-// ── Backward compatibility aliases ────────────────────────────────────────
-
-
-
-
-/** Backward-compat factory. */
+fun <T> mutableSeriesFrom(items: Sequence<T>): COWArrayBackend<T> = COWArrayBackend<T>().apply { for (x in items) append(x) }

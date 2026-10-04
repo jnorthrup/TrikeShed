@@ -91,6 +91,15 @@ object NarsDurableLedger {
             """"provenanceCid":"${esc(rule.provenanceCid ?: "")}"}""",
     )
 
+    /**
+     * Record that the rules admitted under [rule]'s antecedent and provenance no longer hold: [readRules] drops every
+     * earlier one, and only a later admission stands. A revision is a retraction followed by the revised rule.
+     */
+    fun appendRetraction(forgeHome: File, rule: EternalRule) = append(
+        ruleFile(forgeHome),
+        """{"retract":"1","antecedent":"${esc(rule.antecedent)}","provenanceCid":"${esc(rule.provenanceCid ?: "")}"}""",
+    )
+
     /** Distinct taught axioms, oldest first. A line that will not parse is skipped, not fatal. */
     fun readAxioms(forgeHome: File): List<String> {
         val f = axiomFile(forgeHome)
@@ -100,13 +109,18 @@ object NarsDurableLedger {
         return seen.toList()
     }
 
-    /** Distinct admitted rules, oldest first, reconstructed with their original `ruleCid`. */
+    /** Distinct admitted rules, oldest first, reconstructed with their original `ruleCid`; a retraction drops those before it. */
     fun readRules(forgeHome: File): List<EternalRule> {
         val f = ruleFile(forgeHome)
         if (!f.isFile()) return emptyList()
         val out = LinkedHashMap<String, EternalRule>()
         f.forEachLine { line ->
             val antecedent = field(line, "antecedent") ?: return@forEachLine
+            val provenance = field(line, "provenanceCid")?.takeIf { it.isNotBlank() }
+            if (field(line, "retract") != null) {
+                out.values.removeAll { it.antecedent == antecedent && it.provenanceCid == provenance }
+                return@forEachLine
+            }
             val consequent = field(line, "consequent") ?: return@forEachLine
             val packed = field(line, "evidence")?.toLongOrNull() ?: return@forEachLine
             val copula = runCatching { NalCopula.valueOf(field(line, "copula") ?: "") }.getOrNull()
@@ -116,7 +130,7 @@ object NarsDurableLedger {
                 consequent = consequent,
                 copula = copula,
                 evidence = EvidenceCoord(packed),
-                provenanceCid = field(line, "provenanceCid")?.takeIf { it.isNotBlank() },
+                provenanceCid = provenance,
             )
             out[rule.ruleCid.value] = rule
         }

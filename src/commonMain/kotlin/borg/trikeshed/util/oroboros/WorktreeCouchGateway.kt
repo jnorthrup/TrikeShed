@@ -100,6 +100,11 @@ class WorktreeCouchGateway(
         for ((path, ref) in existing) {
             if (path in currentLogicalPaths) continue
             if (unreadable.any { path.startsWith(it) }) continue
+            // A path the walk excludes (`.git`, `build`, …) was never looked at: absence there is not deletion,
+            // and another plane (the Git mirror under `<prefix>.git/`) may own it.
+            val relative = path.removePrefix(prefix)
+            if (relative.split('/').any { it in excludedSegments } ||
+                excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
             attachments.deleteAttachment(path, ref.revision)
             deletedPaths.add(path)
         }

@@ -54,7 +54,9 @@ class HtxReactorElement(
             super.open()
             state = ElementState.ACTIVE
             worker = CoroutineScope(currentCoroutineContext() + supervisor + this + channelOperations).launch {
-                for (dispatch in requests) {
+                // Each exchange owns its connection, ring and TLS engine, so exchanges run side by side:
+                // a slow upstream never holds the requests queued behind it past their callers' deadlines.
+                for (dispatch in requests) launch {
                     try {
                         dispatch.b.complete(exchangeRequest(dispatch.a.a, dispatch.a.b))
                     } catch (failure: Throwable) {

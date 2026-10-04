@@ -3,7 +3,7 @@ package borg.trikeshed.manimwm
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.SeriesBuffer
+import borg.trikeshed.collections.SeriesBuffer
 
 /**
  * Represents causality events emitted by the native window manager (ManimWmSpi)
