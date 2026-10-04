@@ -5,6 +5,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.reduction.j
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.map
@@ -277,7 +278,8 @@ object KanbanGraphEngine {
             io = nextIo,
             effects = card.effects.view.plus(effect).toSeries(),
         )
-        val cards = graph.cards.view.map { if (it.id == card.id) moved else it }.toSeries()
+        /* ⚡ Bolt: Use zero-allocation 'j' constructor instead of intermediate List allocations via .map { ... }.toSeries() */
+        val cards = graph.cards.size j { i -> val it = graph.cards[i]; if (it.id == card.id) moved else it }
 
         // W4.4: FANOUT lowers to N Submits (one per FANOUT branch in the group);
         // JOIN lowers to one Submit whose dependencies are the FANOUT branch jobIds.
