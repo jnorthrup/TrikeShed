@@ -53,6 +53,25 @@ main{flex:1;display:flex;min-height:0}
 #curator-toc li{padding:1px 0;cursor:pointer}#curator-toc li:hover b{color:var(--gold)}
 #curator-toc li b{font-weight:500}#curator-toc li em{color:var(--dim);font-style:normal;font-size:11px}
 #curator-toc li a{color:#7fa3c9;margin-left:4px;font-size:11px}#curator-toc li small{color:#9fb0c4;font:11px ui-monospace,monospace}
+
+/* keyboard navigation focus */
+a:focus:not(:focus-visible),
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+[tabindex="0"]:focus:not(:focus-visible) {
+  outline: none;
+}
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex="0"]:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
 </style>
 </head>
 <body data-app-page="curator">
