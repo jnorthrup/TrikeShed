@@ -202,7 +202,7 @@ public class FunctionalUringFacade(
             for (i in 0 until batch.submissions.size) batches.remove(batch.submissions[i].userData)
             release(batch.submissions)
             batch.result.complete(batch.failure?.let { Result.failure(it) }
-                ?: Result.success(batch.completions.toSeries()) /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */)
+                ?: Result.success(batch.completions.toSeries()))
         }
     }
 
@@ -386,7 +386,7 @@ public class FunctionalUringFacade(
     suspend fun submitAwait(): Series<UringCompletion> {
         val batch = synchronous {
             check(!closing) { "Uring is draining or closed" }
-            pending.toSeries().also { submissions -> /* ⚡ Bolt: Use direct .toSeries() instead of intermediate .toTypedArray().toSeries() */
+            pending.toSeries().also { submissions ->
                 pending.clear()
                 for (i in 0 until submissions.size) outstanding.add(submissions[i].userData)
                 active++

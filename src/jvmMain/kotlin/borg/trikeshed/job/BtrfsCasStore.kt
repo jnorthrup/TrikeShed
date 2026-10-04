@@ -45,7 +45,6 @@ class BtrfsCasStore(
         val exists = withContext(Dispatchers.IO) { target.exists() }
         if (exists) {
             // Verify existing content matches (integrity check)
-            // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
             val existing = withContext(Dispatchers.IO) { target.readBytes() }
             if (ContentId.of(existing) == cid) {
                 return cid // Already stored, deduplicated
@@ -55,7 +54,6 @@ class BtrfsCasStore(
         }
         
         // Write to temp file first (atomic)
-        // ⚡ Bolt: ensure File.createTempFile and writeBytes are wrapped in IO dispatcher
         val temp = withContext(Dispatchers.IO) {
             File.createTempFile("cas-", ".tmp", root)
         }
@@ -96,7 +94,6 @@ class BtrfsCasStore(
         val exists = withContext(Dispatchers.IO) { target.exists() }
         if (!exists) return null
         
-        // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
         val bytes = withContext(Dispatchers.IO) { target.readBytes() }
         if (ContentId.of(bytes) != cid) {
             throw IllegalStateException("CAS integrity failure: stored blob for $cid does not match hash")
@@ -255,7 +252,6 @@ class BtrfsCasStore(
             }
         }
 
-        // ⚡ Bolt: Wrap blocking I/O operations in Dispatchers.IO to prevent coroutine starvation
         val apparent = withContext(kotlinx.coroutines.Dispatchers.IO) {
             java.nio.file.Files.walk(root.toPath()).use { stream ->
                 stream.filter { java.nio.file.Files.isRegularFile(it) }

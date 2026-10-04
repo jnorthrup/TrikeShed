@@ -59,7 +59,7 @@ class ProgramNavigator(
 
     /** Names from root to [current], most recently dove-into last. Empty at root. */
     val breadcrumb: Series<String>
-        get() = frames.size j { i -> frames[i].name } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */
+        get() = frames.size j { i -> frames[i].name }
 
     val depth: Int get() = frames.size
 

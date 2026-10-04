@@ -475,7 +475,6 @@ enum class Syntax {
             val tag = flat.tags[i]
             val children = flat.childOf(i)
             if (tag == IOMemento.IoObject || tag == IOMemento.IoArray || children.size > 0) {
-                // ⚡ Bolt: Optimize string concatenation in Confix hash calculation
                 val hashStringBuilder = StringBuilder("node:\n")
                 for (c in 0 until children.size) {
                     val childIdx = children[c]

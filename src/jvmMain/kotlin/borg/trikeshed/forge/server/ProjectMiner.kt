@@ -97,9 +97,12 @@ class ProjectMiner(
         b.body.takeIf { it.isNotBlank() }
     }
 
+    /** A poppler or tesseract run, started with the guest environment rather than a copy of the daemon's. */
+    private fun tool(vararg cmd: String): ProcessBuilder = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(*cmd))
+
     /** Page count and the pages that carry a text layer, read by poppler; null when poppler is absent. */
     private fun layeredPages(f: File): Pair<Int, Set<Int>>? = runCatching {
-        val proc = ProcessBuilder("pdftotext", "-enc", "UTF-8", f.absolutePath, "-").start()
+        val proc = tool("pdftotext", "-enc", "UTF-8", f.absolutePath, "-").start()
         val layer = proc.inputStream.readAllBytes().decodeToString().also { proc.errorStream.readAllBytes(); proc.waitFor() }
         // pdftotext closes every page with a form feed, blank pages included: the page count is the feed count.
         val pages = layer.split('\u000c').dropLast(1)
@@ -122,7 +125,7 @@ class ProjectMiner(
             "ingested" to (pdb.store.get("$id.extract.md") != null), "notes" to (pdb.store.get("$id${borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX}") != null))
         if (ext == "pdf" && onDisk != null) {
             val info = runCatching {
-                val proc = ProcessBuilder("pdfinfo", onDisk.absolutePath).start()
+                val proc = tool("pdfinfo", onDisk.absolutePath).start()
                 proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() }
             }.getOrDefault("")
             fun field(k: String) = Regex("(?m)^$k:[ \\t]+(.+)$").find(info)?.groupValues?.get(1)?.trim()
@@ -138,7 +141,7 @@ class ProjectMiner(
                 val sample = listOf(pages / 10, pages / 2, pages - pages / 20).map { it.coerceIn(1, pages) }.distinct()
                 out["columns"] = sample.associate { pg ->
                     val html = runCatching {
-                        val proc = ProcessBuilder("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", onDisk.absolutePath, "-").start()
+                        val proc = tool("pdftotext", "-bbox", "-enc", "UTF-8", "-f", "$pg", "-l", "$pg", onDisk.absolutePath, "-").start()
                         proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() }
                     }.getOrDefault("")
                     val words = Regex("<word xMin=\"([\\d.]+)\" yMin=\"([\\d.]+)\" xMax=\"([\\d.]+)\" yMax=\"([\\d.]+)\">").findAll(html)
@@ -162,7 +165,7 @@ class ProjectMiner(
      */
     private suspend fun ocrPages(name: String, id: String, f: File): borg.trikeshed.narsese.PageStreams.Book? = coroutineScope {
         val pages = runCatching {
-            val proc = ProcessBuilder("pdfinfo", f.absolutePath).start()
+            val proc = tool("pdfinfo", f.absolutePath).start()
             Regex("Pages:[ \\t]+(\\d+)").find(proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() })?.groupValues?.get(1)?.toInt()
         }.getOrNull() ?: return@coroutineScope null
         val dir = File(filesRoot ?: File(System.getProperty("java.io.tmpdir")), ".ocr/$name/${id.replace('/', '_')}").apply { mkdirs() }
@@ -177,12 +180,12 @@ class ProjectMiner(
                 gate.acquire()
                 try {
                     val png = File(dir, "p$pg")
-                    ProcessBuilder("pdftoppm", "-f", "$pg", "-l", "$pg", "-r", "300", "-gray", "-png", "-singlefile", f.absolutePath, png.absolutePath)
+                    tool("pdftoppm", "-f", "$pg", "-l", "$pg", "-r", "300", "-gray", "-png", "-singlefile", f.absolutePath, png.absolutePath)
                         .redirectErrorStream(true).start().also { it.inputStream.readAllBytes(); it.waitFor() }
                     val img = File(png.absolutePath + ".png")
                     // One read, two renderings: the page text and its word boxes.
                     val part = File(dir, "part-$pg")
-                    val proc = ProcessBuilder("tesseract", img.absolutePath, part.absolutePath, "--psm", "3", "txt", "tsv").redirectErrorStream(true).start()
+                    val proc = tool("tesseract", img.absolutePath, part.absolutePath, "--psm", "3", "txt", "tsv").redirectErrorStream(true).start()
                     proc.inputStream.readAllBytes(); proc.waitFor()
                     img.delete()
                     File(part.path + ".txt").renameTo(File(base.path + ".txt"))
@@ -226,7 +229,6 @@ class ProjectMiner(
         runs[name] = prog
         val kind = scopes.list().firstOrNull { it.name == name }?.kind ?: pdb.kind
 
-        // ⚡ Bolt: Use store.ids() instead of store.all() to avoid materializing full Document instances in memory.
         val storeIds = pdb.store.ids()
         val ids = mutableListOf<String>()
         val already = mutableSetOf<String>()

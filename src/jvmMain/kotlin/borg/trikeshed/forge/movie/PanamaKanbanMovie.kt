@@ -230,12 +230,12 @@ object PanamaKanbanMovie {
         }
         
         // Encode to MP4 via ffmpeg
-        val process = ProcessBuilder(
+        val process = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(
             "ffmpeg", "-y", "-framerate", "2",
             "-i", "temp-frames/frame%04d.png",
             "-c:v", "libx264", "-pix_fmt", "yuv420p",
             "-crf", "23", outputFile.absolutePath
-        ).directory(File(".")).redirectErrorStream(true).start()
+        ).directory(File(".")).redirectErrorStream(true)).start()
         
         val future = java.util.concurrent.CompletableFuture.supplyAsync { process.inputStream.bufferedReader().readText() }
         val finished = process.waitFor(10, java.util.concurrent.TimeUnit.MINUTES)

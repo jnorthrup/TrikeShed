@@ -282,7 +282,7 @@ class ProjectScopes(
         )
         for (cmd in attempts) {
             val ok = runCatching {
-                val p = ProcessBuilder(cmd).redirectErrorStream(true).start()
+                val p = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(cmd).redirectErrorStream(true)).start()
                 val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.readBytes() }
                 val finished = p.waitFor(5, java.util.concurrent.TimeUnit.MINUTES)
                 if (!finished) {
@@ -990,7 +990,6 @@ class PatchWire(
         att.getAttachment("keymux/endpoints")?.let { (_, bytes) ->
             runCatching {
                 (reify(bytes) as? List<*>)?.mapNotNull { it as? Map<String, Any?> }
-                // ⚡ Bolt: Prevent intermediate List allocations with filterIsInstance<T>()
             }.getOrNull()
         } ?: emptyList()
 

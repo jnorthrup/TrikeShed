@@ -52,7 +52,6 @@ class InMemoryFileOperations(
 
     override fun listDir(path: String): List<String> {
         val prefix = path.trimEnd('/') + "/"
-        // ⚡ Bolt: Avoid intermediate sequence, filter, and map allocations.
         // Use a direct loop with LinkedHashSet to preserve order and distinctness with zero intermediate object overhead.
         val result = LinkedHashSet<String>()
         for (key in files.keys) {

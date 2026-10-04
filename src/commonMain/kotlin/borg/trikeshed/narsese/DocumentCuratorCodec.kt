@@ -186,9 +186,9 @@ internal object DocumentCuratorCodec {
             capturedAt = (r["capturedAt"] as Number).toLong(),
         ) }
         return DocumentCurationRecord(source, nlp, model, m.str("modelId"), proposals,
-            m.array("reasons").let { arr -> arr.size j { i: Int -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
+            m.array("reasons").let { arr -> arr.size j { i: Int -> arr[i] as String } },
             m.cids("reserved"), m.cids("submitted"), m.cids("duplicates"),
-            m.array("observerFailures").let { arr -> arr.size j { i: Int -> arr[i] as String } } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
+            m.array("observerFailures").let { arr -> arr.size j { i: Int -> arr[i] as String } },
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
             m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
             m.optionalStrings("toolOntology").toSeries(), receipt = receipt,

@@ -58,6 +58,9 @@ object GuestEnvironment {
     /** The complete env a fresh guest gets. Never reads the host's actual environment. */
     fun curated(): Map<String, String> = FIXED
 
+    /** [builder] with its inherited copy of the host environment replaced by [curated]: the one way a child process starts. */
+    fun curate(builder: ProcessBuilder): ProcessBuilder = builder.apply { environment().apply { clear(); putAll(FIXED) } }
+
     /**
      * Diagnostic only: classify the CURRENT host environment against [deliberate] so a naive
      * full-inherit's blast radius is visible once, not assumed safe by never looking. Nothing

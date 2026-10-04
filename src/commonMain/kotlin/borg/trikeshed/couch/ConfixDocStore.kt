@@ -39,7 +39,6 @@ class ConfixDocStore(
 
     val entries: Series<ConfixDocStoreEntry>
         get() {
-            // ⚡ Bolt: Cache values to array to avoid calling .toList() (O(N) allocation) repeatedly inside the Series lambda mapper.
             val cachedValues = byId.values.toTypedArray()
             return cachedValues.size j { i -> cachedValues[i] }
         }
@@ -91,7 +90,6 @@ class ConfixDocStore(
         filter { it.id.startsWith(prefix) }
 
     fun toBlackboardEntries(): Series<BlackBoardEntry> {
-        // ⚡ Bolt: Hoist the values snapshot out of the Series O(1) mapper lambda.
         // Previously, `byId.values.toList()[i]` created a full new List<V> on EVERY index lookup.
         // This turns an O(N) lookup loop into O(1).
         val cachedValues = byId.values.toTypedArray()

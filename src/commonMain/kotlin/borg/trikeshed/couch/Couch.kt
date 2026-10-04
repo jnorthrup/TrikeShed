@@ -62,13 +62,11 @@ class Couch(
         }
 
     fun info(): Map<String, Any?> {
-        // ⚡ Bolt: Using store.ids() for zero-allocation ID scanning instead of store.all().
         // Avoiding materializing full documents in memory just to count them reduces GC pressure.
         var docCount = 0
         val ids = store.ids()
         for (i in 0 until ids.a) {
             val id = ids.b(i)
-            // ⚡ Bolt: Using store.head.isDeleted(id) directly is faster than loading the doc and checking for a tombstone flag.
             if (!store.head.isDeleted(id) && !id.startsWith("_design/")) {
                 docCount++
             }

@@ -47,7 +47,6 @@ class ConfixIsamStoreBuilder {
 
         // This index aligns with the "Stringpools + index" requirement, using optimal linear hashing.
         val hashIndex = mutableMapOf<String, Int>() // CID/ID -> Row Index (or Stringpool Offset)
-        // ⚡ Bolt: Avoid creating an intermediate list by iterating over the map entries directly when creating a Series. This prevents unnecessary allocations and O(N) operations.
         val indexCursorEntries = hashIndex.entries.toList()
         val indexCursor = indexCursorEntries.size j { i: Int -> indexCursorEntries[i].key to indexCursorEntries[i].value }
 

@@ -224,7 +224,6 @@ object StructuredParserSupport {
         }
 }
 
-// ⚡ Bolt: Optimized normalizeCrLf by using native String.replace for faster execution and less allocation overhead.
 private fun String.normalizeCrLf(): String = replace("\r\n", "\n")
 
 fun DescriptorFragment.toTreeCursor(path: String = "$"): TreeCursor =

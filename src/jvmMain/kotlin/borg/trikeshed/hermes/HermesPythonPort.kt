@@ -92,7 +92,6 @@ data class HermesPortInventory(
         val facts = ArrayList<HermesOntologyFact>(modules.size * 2)
         val orderedModules = modules.values.toTypedArray().apply { sortBy { it.name } }
         for (module in orderedModules) {
-            // ⚡ Bolt: Replaced `.asSequence().filter { ... }.toSortedSet()` and chained sequence operations with direct iteration.
             // Avoids O(N) intermediate wrapper allocations (Sequence, Iterator, lambda instances) per module,
             // significantly reducing garbage collection pressure during frequent ontology regeneration.
             val roots = sortedSetOf<String>()

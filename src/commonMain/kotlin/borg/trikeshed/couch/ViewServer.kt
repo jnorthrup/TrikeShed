@@ -67,7 +67,6 @@ data class ViewResult(
 
     /** _count reducer: group by key, count emissions per key. */
     fun reduceCount(): ViewResult {
-        // ⚡ Bolt: Accumulate count directly instead of allocating a List<ViewRow> per key
         val counts = mutableMapOf<Any?, Long>()
         for (row in rows) {
             val key = row.key
@@ -83,7 +82,6 @@ data class ViewResult(
 
     /** _sum reducer: group by key, sum numeric values per key. */
     fun reduceSum(): ViewResult {
-        // ⚡ Bolt: Accumulate sum directly instead of allocating a List<ViewRow> per key
         val sums = mutableMapOf<Any?, Double>()
         for (row in rows) {
             val key = row.key
@@ -153,7 +151,6 @@ data class ViewResult(
     )
 
     fun reduceStats(): ViewResult {
-        // ⚡ Bolt: Accumulate stats directly instead of allocating a List<ViewRow> per key
         val statsMap = mutableMapOf<Any?, StatsAcc>()
         for (row in rows) {
             val key = row.key

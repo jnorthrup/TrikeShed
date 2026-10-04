@@ -149,7 +149,6 @@ class CouchHeadProjection {
             indexQueryCache[cacheKey] = matchedIndices
         }
 
-        // ⚡ Bolt: Return a Series utilizing buildSeries via buildCursorFromSeries mapping to original docs to prevent ArrayList overhead
         return QueryResult(buildCursorFromSeries(count j { docs[matchedIndices!![it]] }), count.toLong())
     }
 

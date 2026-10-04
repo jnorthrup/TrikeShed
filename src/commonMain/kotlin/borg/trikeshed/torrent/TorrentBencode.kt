@@ -41,7 +41,7 @@ object TorrentBencode {
         return reader.read(0) j reader.position
     }
     fun dictionary(vararg entries: Pair<String, BencodeValue>): BencodeValue.Dictionary =
-        BencodeValue.Dictionary(entries.size j { i -> entries[i].first.encodeToByteArray() j entries[i].second }) /* ⚡ Bolt: Use direct array mapped projection instead of .map { ... }.toSeries() */
+        BencodeValue.Dictionary(entries.size j { i -> entries[i].first.encodeToByteArray() j entries[i].second })
 
     fun encode(value: BencodeValue): ByteArray {
         val chunks = mutableListOf<ByteArray>()

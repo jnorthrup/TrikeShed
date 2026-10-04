@@ -30,7 +30,6 @@ class CausalWal(private val path: File) {
     suspend fun append(causalKey: String, payload: ByteArray): Long = withContext(Dispatchers.IO) {
         val keyBytes = causalKey.encodeToByteArray()
 
-        // ⚡ Bolt Optimization: Pre-allocate a single ByteBuffer outside the synchronized block.
         // By copying the header lengths and payload into this single buffer, we reduce
         // 4 separate JNI / disk `write` calls into 1, vastly reducing disk I/O overhead
         // and minimizing the lock duration on the RandomAccessFile.

@@ -60,13 +60,13 @@ object FutonPage {
         if (folder.isNotEmpty() && startkey == null) {
             val up = document.createElement("tr") as HTMLElement
             up.innerHTML = "<td>\u2191 ..</td><td class=\"rev\"></td>"
-            up.onclick = { enter(folder.removeSuffix("/").substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }) }
+            opens(up) { enter(folder.removeSuffix("/").substringBeforeLast('/', "").let { if (it.isEmpty()) "" else "$it/" }) }
             t.appendChild(up)
         }
         for (f in folders) {
             val tr = document.createElement("tr") as HTMLElement
             tr.innerHTML = "<td>\uD83D\uDCC1 " + f.removePrefix(folder).esc() + "</td><td class=\"rev\">folder</td>"
-            tr.onclick = { enter(f) }
+            opens(tr) { enter(f) }
             t.appendChild(tr)
         }
         for (r in rows.take(LIMIT)) {
@@ -74,7 +74,7 @@ object FutonPage {
             val rev = if (truthy(r.value) && truthy(r.value.rev)) str(r.value.rev) else ""
             tr.innerHTML = "<td>" + str(r.id).removePrefix(folder).esc() + "</td><td class=\"rev\">" + rev.take(18) + "…</td>"
             val id = str(r.id)
-            tr.onclick = { launchPage { loadDoc(id) } }
+            opens(tr) { launchPage { loadDoc(id) } }
             t.appendChild(tr)
         }
         (byId("nextB") as HTMLButtonElement).disabled = rows.size <= LIMIT
@@ -90,6 +90,15 @@ object FutonPage {
         folder = prefix
         input("prefix").value = ""
         firstPage()
+    }
+
+    /** A listing row that opens by click, and by Enter or Space once Tab has reached it. */
+    private fun opens(row: HTMLElement, open: () -> Unit) {
+        row.tabIndex = 0
+        row.onclick = { open() }
+        row.onkeydown = { e ->
+            if (e.key == "Enter" || e.key == " ") { e.preventDefault(); open() }
+        }
     }
 
     /** The path as links: the db, then each folder segment; a click climbs to it. */
@@ -281,7 +290,7 @@ object FutonPage {
                 val tr = document.createElement("tr") as HTMLElement
                 val id = if (row.id == null) "" else str(row.id)
                 tr.innerHTML = "<td>" + JSON.stringify(row.key).esc() + "</td><td>" + JSON.stringify(row.value).esc() + "</td><td>" + id.esc() + "</td>"
-                if (id.isNotEmpty()) tr.onclick = { launchPage { loadDoc(id) } }
+                if (id.isNotEmpty()) opens(tr) { launchPage { loadDoc(id) } }
                 t.appendChild(tr)
             }
             byId("viewinfo").textContent = rows.size.toString() + " rows" + (if (d.total_rows != null) " of " + str(d.total_rows) else "") +

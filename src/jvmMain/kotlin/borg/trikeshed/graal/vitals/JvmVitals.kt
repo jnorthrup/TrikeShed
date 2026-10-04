@@ -282,8 +282,8 @@ class JvmVitals {
                 val javaExe = ProcessHandle.current().info().command().orElse("java")
                 val dir = javaExe.substringBeforeLast('/', "")
                 val jcmd = if (dir.isNotEmpty()) "$dir/jcmd" else "jcmd"
-                val p = ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
-                    .redirectErrorStream(true).start()
+                val p = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
+                    .redirectErrorStream(true)).start()
                 val out = java.util.concurrent.atomic.AtomicReference("")
                 val reader = Thread { runCatching { out.set(p.inputStream.bufferedReader().readText()) } }
                 reader.isDaemon = true

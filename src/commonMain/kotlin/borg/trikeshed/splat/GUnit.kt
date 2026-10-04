@@ -199,8 +199,8 @@ data class LocalAffine(
 
         fun toImmutable(): LocalAffine = LocalAffine(
             weightDiag = weightDiag.toSeries(),
-            weightLowRankU = weightLowRankU.size j { i -> weightLowRankU[i].toSeries() } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
-            weightLowRankV = weightLowRankV.size j { i -> weightLowRankV[i].toSeries() } /* ⚡ Bolt: Use zero-allocation 'j' mapped projection instead of intermediate ArrayList allocation via .map { ... }.toSeries() */,
+            weightLowRankU = weightLowRankU.size j { i -> weightLowRankU[i].toSeries() },
+            weightLowRankV = weightLowRankV.size j { i -> weightLowRankV[i].toSeries() },
             bias = bias.toSeries(),
         )
     }
