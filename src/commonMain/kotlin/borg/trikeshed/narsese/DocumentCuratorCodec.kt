@@ -170,7 +170,7 @@ internal object DocumentCuratorCodec {
             obj = p["object"] as? String, confidence = (p["confidence"] as? Number)?.toDouble(),
             quote = p["quote"] as? String, begin = (p["begin"] as? Number)?.toInt(),
             end = (p["end"] as? Number)?.toInt(), polarity = p["polarity"] as? Boolean,
-            modality = p["modality"] as? String, reasons = p.array("reasons").map { it as String }.toSeries(),
+            modality = p["modality"] as? String, reasons = p.array("reasons").let { arr -> arr.size j { i: Int -> arr[i] as String } },
             receiptCid = (p["receiptCid"] as? String)?.let(::ContentId),
             quotationReceiptCid = (p["quotationReceiptCid"] as? String)?.let(::ContentId),
             quotationBegin = (p["quotationBegin"] as? Number)?.toInt(),
@@ -192,7 +192,7 @@ internal object DocumentCuratorCodec {
             if (m.containsKey("instructions")) m.str("instructions") else DocumentCuratorGrounding.previousInstructions,
             m.optionalCids("quotationReserved"), m.optionalCids("quotationSubmitted"), m.optionalCids("quotationDuplicates"),
             m.optionalStrings("toolOntology").toSeries(), receipt = receipt,
-            toolReceipts = ((m["toolReceipts"] as? List<*>) ?: emptyList<Any?>()).map { toolReceipt(it as Map<*, *>) }.toSeries(),
+            toolReceipts = ((m["toolReceipts"] as? List<*>) ?: emptyList<Any?>()).let { lst -> lst.size j { i: Int -> toolReceipt(lst[i] as Map<*, *>) } },
             axioms = (m["axioms"] as? List<*>)?.map { axiom(it as Map<*, *>) }?.toSeries())
     }
 
@@ -203,9 +203,9 @@ internal object DocumentCuratorCodec {
     private fun Map<*, *>.int(key: String) = (this[key] as Number).toInt()
     private fun Map<*, *>.array(key: String) = this[key] as List<*>
     private fun Map<*, *>.obj(key: String) = (this[key] as Map<*, *>).entries.associate { it.key as String to it.value }
-    private fun Map<*, *>.cids(key: String) = array(key).map { ContentId(it as String) }.toSeries()
+    private fun Map<*, *>.cids(key: String) = array(key).let { arr -> arr.size j { i: Int -> ContentId(arr[i] as String) } }
     private fun Map<*, *>.optionalCids(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
-        .map { ContentId(it as String) }.toSeries()
+        .let { lst -> lst.size j { i: Int -> ContentId(lst[i] as String) } }
     private fun Map<*, *>.optionalStrings(key: String) = ((this[key] as? List<*>) ?: emptyList<Any?>())
         .map { it as String }
 }
