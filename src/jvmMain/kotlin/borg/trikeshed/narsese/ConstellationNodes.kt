@@ -31,7 +31,7 @@ import java.io.File
  * constellation is its member list, `<stateDir>/constellations/<name>.members`.
  */
 class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboard, private val bank: KifKnowledgeBase? = null,
-                         /** The daemon's live rete: myelinated sense rules are admitted into it as well as into [senseRete]. */
+                         /** The daemon's live rete: sense rules minted before the rows replaced them are retracted from it. */
                          private val liveRete: CausalityReteElement? = null) {
     private val wiki = File(stateDir, "wiki")
     val root = File(stateDir, "constellations").apply { mkdirs() }
@@ -53,19 +53,22 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * are typed without it, so they are loaded again once it stands.
      */
     private fun memory(): SenseMemory = if (!SENSES_ENABLED) SenseMemory() else mem ?: synchronized(memLock) {
-        // Loaded or primed, the memory is put through one push-pull pass: the rules always answer to the beliefs as they stand.
+        // Loaded or primed, the memory is traced once: the caps always answer to the rows as they stand.
         mem ?: (if (senseFile.isFile) senseFile.bufferedReader().useLines { SenseMemory.read(it) } else SenseMemory().also { prime(it); save(it) })
-            .also { myelinate(it) }
+            .also { trace(it) }
             .also { mem = it; replant(); senseEpoch++; synchronized(loaded) { loaded.clear() }; live.clear() }
     }
     private val forge = borg.trikeshed.common.Path(stateDir.absolutePath)
-    /** Sense beliefs myelinated into eternal rules, as the rules ledger holds them across restarts. */
-    private val senseRules = ArrayList(if (SENSES_ENABLED) NarsDurableLedger.readRules(forge).filter { it.provenanceCid == SENSES } else emptyList())
-    /** The local tree over SUMO's: the myelinated productions and the sense memory, rebuilt whenever either changes. */
-    @Volatile private var tree = ConceptTree(senseRules.toList(), null)
+    /** The caps the rows stood in at the last trace, condition → class, as [capsFile] holds them across restarts. */
+    private val caps = HashMap<String, String>()
+    private val capsFile = File(root, "senses.caps")
+    /** Every cap a row entered, rolled to or left, in trace order. */
+    private val traceFile = File(root, "senses.trace")
+    /** The local tree over SUMO's: where the sense rows come to focus, rebuilt whenever the rows change. */
+    @Volatile private var tree = ConceptTree(null)
 
-    /** The overlay as of now: rebuilt from [senseRules] and the sense memory. */
-    private fun replant() { tree = ConceptTree(senseRules.toList(), mem) }
+    /** The overlay as of now. */
+    private fun replant() { tree = ConceptTree(mem) }
 
     fun register(runners: MutableMap<String, LcncNodeRunner>) {
         runners[CURATE] = curate
@@ -427,8 +430,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 val more = posited[lemma].orEmpty().filter { it !in lexical }
                 val options = lexical + more
                 if (options.size < 2 && (options.isEmpty() || read != null)) continue
-                // A sense the rete holds where this book was crafted is not asked again, but for an occasional audit.
-                val audit = rule(lemma, at) != null
+                // A sense a cap holds where this book was crafted is not asked again, but for an occasional audit.
+                val audit = capped(lemma, at) != null
                 if (audit && cid("$lemma\u0000${b.name}\u0000$k\u0000$x").take(4).toInt(16) % AUDIT != 0) continue
                 sensed.add(lemma); out.add(Sense(lemma, read, s["text"].toString(), options, more, audit))
             }
@@ -559,14 +562,15 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             // The book's tables as they stand are its judgments: its rows are read again from them, so a section judged
             // again replaces its earlier judgment rather than counting the same text twice.
             val tabled = tablesOf(name)
-            val rules = synchronized(m) {
+            val traced = synchronized(m) {
                 m.replace(name)
                 for ((k, t) in tabled) observe(m, name, k, at, t)
-                myelinate(m).also { save(m) }
+                trace(m).also { save(m) }
             }
             senseEpoch++
             System.err.println("[JEV] $name: ${ts.size} sections, ${requests.get()} requests, ${questions.get()} questions, ${tokens.get()} tokens, " +
-                "${System.currentTimeMillis() - began}ms; senses at $at: ${m.rows} rows, ${m.judgments} judgments, ${rules.minted.size} minted, ${rules.revised.size} revised, ${rules.retracted.size} retracted")
+                "${System.currentTimeMillis() - began}ms; senses at $at: ${m.rows} rows, ${m.judgments} judgments, ${traced.caps} caps: " +
+                "${traced.entered} entered, ${traced.rolled} rolled, ${traced.left} left")
             scored[name] = progress(ts.size) + ("ms" to System.currentTimeMillis() - began)
             synchronized(loaded) { loaded.remove(name) }
             constellationOf(name)?.let { live.remove(it) }
@@ -1151,8 +1155,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         return ids.map { sumo.className(SumoClassId(it)) }.distinct()
     }
 
-    // ── Senses: CoreNLP proposes the word and the lexicon's senses, NARS remembers per locality, Jev judges what NARS
-    //    has not myelinated, and a belief at ETERNAL confidence becomes a rule the rete types the word with. ──
+    // ── Senses: CoreNLP proposes the word and the lexicon's senses, Jev judges them, the judgments are rows per locality,
+    //    and a row standing in a cap types the word without asking. ──
 
     /** Where a book was crafted, and what placed its year: `notes`, `front` (roman-paged front matter), `jev`, `opening` or `none`. */
     class Located(val at: Locality, val year: Int, val by: String, val unmapped: Int, val nouns: Int)
@@ -1240,62 +1244,75 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     }
 
     /**
-     * Push and pull between the sense rows and the rete. A production stands exactly while its row is in the cap: where
-     * a word is read, its row ([SenseMemory.sense]) at confidence T/(T + K/2) ≥ 49/50 whose leading class, none-of-these
-     * aside, holds a share ≥ 7/10. Both tests are integer planes on the row's counts ([SenseRow.eternal],
-     * [SenseRow.holds]), so K, the classes the judge was offered, sets the evidence a word needs: 24.5 judgments per
-     * class. Push: a row in the cap with no rule is minted an eternal rule `<(&&,lemma,locality) ==> class>`, the
-     * condition sequence it was held under, with that class's evidence as one NARS belief. Pull: a rule whose row has
-     * left the cap (its class no longer leads or holds, the menu grew past what its evidence settles) or whose word is
-     * no longer read there is retracted, and the word is asked again; one whose row is in the cap under other evidence
-     * is revised. Every change is filed in the rules ledger (a revision is a retraction followed by the revised rule)
-     * and swapped into the live rete; the overlay is replanted.
+     * The caps the rows stand in, traced against the last pass. Where a word is read, its row ([SenseMemory.sense]) comes
+     * to focus in the most specific class whose nested cap holds it ([ConceptTree.focus]); at confidence T/(T + K/2) ≥
+     * 49/50 ([SenseRow.eternal]) the word stands in that cap, and a word standing in a menu class's cap is typed without
+     * asking Jev. Every test is an integer plane on the row's counts, so K, the classes the judge was offered, sets the
+     * evidence a word needs: 24.5 judgments per class. Nothing is minted: the caps are a function of the rows, and the
+     * trace records how the points moved between them since the last pass: `+` entered, `-` left, or rolled `up` to a
+     * class above, `down` to one below, or `across` through the narrowest class above both. The first trace records the
+     * move from the sense rules NARS minted before the rows, and retracts them from the rules ledger and the live rete.
      */
-    private fun myelinate(m: SenseMemory): Myelinated {
-        if (!SENSES_ENABLED) return Myelinated(emptyList(), emptyList(), emptyList())
-        val minted = ArrayList<EternalRule>(); val revised = ArrayList<EternalRule>(); val retracted = ArrayList<EternalRule>()
-        val byTerm = senseRules.associateBy { it.antecedent }
-        val read = HashSet<String>()
+    private fun trace(m: SenseMemory): Traced {
+        if (!SENSES_ENABLED) return Traced(0, 0, 0, 0)
+        val now = HashMap<String, String>()
         for ((lemma, at) in m.held()) {
-            val term = condition(lemma, at)
-            read.add(term)
-            val row = m.sense(lemma, at) ?: continue
-            val t = row.top
-            val cls = if (t >= 0) m.className(row.classes[t]) else NONE
-            // A production types its word without asking: only a decisive row earns one. Confidence says how much
-            // evidence there is for K classes; the share says whether it agrees. A row at 98% confidence split 51/49 stays.
-            val holds = t >= 0 && row.holds(t)
-            val decisive = holds && row.eternal()
-            val e = if (t >= 0) row.evidence(t) else EvidenceCoord.EMPTY
-            val old = byTerm[term]
-            when {
-                old == null -> if (decisive) minted.add(EternalRule(term, cls, NalCopula.IMPLICATION, e, SENSES))
-                !decisive || old.consequent != cls -> retracted.add(old)
-                old.evidence != e -> { retracted.add(old); revised.add(EternalRule(term, cls, NalCopula.IMPLICATION, e, SENSES)) }
-            }
+            val row = m.sense(lemma, at)?.takeIf { it.eternal() } ?: continue
+            ConceptTree.answer(row, m)?.let { now[condition(lemma, at)] = it.cls }
         }
-        // A rule whose word is no longer read where it holds (its book was placed elsewhere, its row forgotten) is taken back.
-        for (r in senseRules) if (r.antecedent !in read) retracted.add(r)
-        if (minted.isEmpty() && retracted.isEmpty()) return Myelinated(minted, revised, retracted)
-        val gone = retracted.map { it.antecedent }.toHashSet()
-        for (r in retracted) NarsDurableLedger.appendRetraction(forge, r)
-        for (r in minted + revised) NarsDurableLedger.appendRule(forge, r)
-        senseRules.removeAll { it.antecedent in gone }
-        senseRules.addAll(minted + revised)
-        liveRete?.retract { it.provenanceCid == SENSES && it.antecedent in gone }
-        liveRete?.admit((minted + revised).toSeries())
+        val before = synchronized(caps) {
+            if (caps.isEmpty() && capsFile.isFile) capsFile.forEachLine { l -> l.split('\t').takeIf { it.size == 2 }?.let { caps[it[0]] = it[1] } }
+            HashMap(caps)
+        }
+        val first = before.isEmpty() && !capsFile.isFile
+        if (first) {
+            val minted = NarsDurableLedger.readRules(forge).filter { it.provenanceCid == SENSES }
+            for (r in minted) { before[r.antecedent] = r.consequent; NarsDurableLedger.appendRetraction(forge, r) }
+            liveRete?.retract { it.provenanceCid == SENSES }
+        }
+        val sumo = SumoCorpus.classifier
+        fun id(cls: String) = sumo.classId(cls)?.value ?: -1
+        val log = StringBuilder(); val stamp = System.currentTimeMillis()
+        var entered = 0; var rolled = 0; var left = 0
+        for ((k, cls) in now.entries.sortedBy { it.key }) {
+            val was = before[k]
+            if (was == cls) continue
+            if (was == null) { entered++; log.append(stamp).append("\t+\t").append(k).append('\t').append(cls).append('\n'); continue }
+            rolled++
+            val a = id(was); val b = id(cls)
+            val way = when {
+                a < 0 || b < 0 -> "across"
+                SumoCorpus.closure(a).contains(b) -> "up"
+                SumoCorpus.closure(b).contains(a) -> "down"
+                else -> "across"
+            }
+            log.append(stamp).append('\t').append(way).append('\t').append(k).append('\t').append(was).append('\t').append(cls)
+            if (way == "across" && a >= 0 && b >= 0) {
+                var meet = -1; var ic = -1f
+                (SumoCorpus.closure(a) and SumoCorpus.closure(b)).forEach { c -> val x = SumoCorpus.informationOf(c); if (x > ic) { ic = x; meet = c } }
+                if (meet >= 0) log.append('\t').append(ConceptTree.name(meet))
+            }
+            log.append('\n')
+        }
+        for ((k, cls) in before.entries.sortedBy { it.key }) if (k !in now) { left++; log.append(stamp).append("\t-\t").append(k).append('\t').append(cls).append('\n') }
+        if (log.isNotEmpty()) traceFile.appendText(log.toString())
+        if (first || entered + rolled + left > 0) {
+            val tmp = File(root, "senses.caps.tmp").apply { writeText(now.entries.sortedBy { it.key }.joinToString("") { "${it.key}\t${it.value}\n" }) }
+            java.nio.file.Files.move(tmp.toPath(), capsFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
+        }
+        synchronized(caps) { caps.clear(); caps.putAll(now) }
         replant()
-        return Myelinated(minted, revised, retracted.filter { r -> revised.none { it.antecedent == r.antecedent } })
+        return Traced(now.size, entered, rolled, left)
     }
 
-    /** One push-pull pass: rules minted, rules revised in place, rules retracted outright. */
-    class Myelinated(val minted: List<EternalRule>, val revised: List<EternalRule>, val retracted: List<EternalRule>)
+    /** One trace: the caps standing, and the points that entered one, rolled between two, or left one. */
+    class Traced(val caps: Int, val entered: Int, val rolled: Int, val left: Int)
 
-    /** A sense belief's condition: the word read in a locality. */
+    /** A sense's condition: the word read in a locality. */
     private fun condition(lemma: String, at: Locality) = ConceptTree.condition(lemma, at)
 
-    /** The myelinated rule typing [lemma] in [at], or null. */
-    private fun rule(lemma: String, at: Locality): EternalRule? = if (!SENSES_ENABLED) null else tree.production(lemma, at)
+    /** The menu class a cap types [lemma] as in [at] without asking, or null. */
+    private fun capped(lemma: String, at: Locality): String? = if (!SENSES_ENABLED) null else tree.production(lemma, at)
 
     /** The class [lemma] denotes in [at]; null when neither a rule nor a belief holds one, and the lexicon's sense stands. */
     private fun typed(lemma: String, at: Locality): ConceptTree.Typed? = if (!SENSES_ENABLED) null else tree.typed(lemma, at)
@@ -1310,69 +1327,53 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     }
 
     /**
-     * Classes posited by NAL abduction for the nouns of [c] the lexicon cannot type, or whose offered senses Jev refused:
-     * a head that bears the verbs typed bearers bear is posited to be of their classes. Per verb, `<head --> [v]>` and
-     * `<class --> [v]>` abduce `<head --> class>`; each shared verb's abduction revises the posit, a typed bearer's verb
-     * counts for its class and every class above it, and classes too broad to say anything ([POSIT_INFORMATION]) are
-     * not posited. Ranked by positive evidence, at most [POSITS] per head.
+     * Classes posited for the nouns of [c] the lexicon cannot type, or whose offered senses Jev refused, by transport
+     * ([PositTransport]): each such head's statements pass through the verbs it bears and land on the classes of those
+     * verbs' typed bearers, in proportion, its own typed statements taken out first. The classes it lands on most, each
+     * informative enough to say something ([POSIT_INFORMATION]), at most [POSITS] per head.
      */
     private fun posits(c: Constellation): Map<String, List<String>> {
         if (!SENSES_ENABLED) return emptyMap()
         val sumo = SumoCorpus.classifier
-        val byVerb = HashMap<String, HashMap<Int, Int>>(); val classCount = HashMap<Int, Int>()
-        val headVerb = HashMap<String, HashMap<String, Int>>(); val headCount = HashMap<String, Int>()
+        val wanted = HashMap<String, Boolean>()
+        val t = PositTransport()
         for (s in c.statements) {
-            if (s.bearerClass >= 0) SumoCorpus.closure(s.bearerClass).forEach { a ->
-                byVerb.getOrPut(s.action) { HashMap() }.merge(a, 1, Int::plus); classCount.merge(a, 1, Int::plus)
-            }
             val head = s.bearer.substringAfterLast(' ')
-            if (head.length < 3 || !head.all { it in 'a'..'z' }) continue
-            if (senseOptions(head).isNotEmpty() && !refused(head)) continue
-            headVerb.getOrPut(head) { HashMap() }.merge(s.action, 1, Int::plus); headCount.merge(head, 1, Int::plus)
+            val placed = head.length >= 3 && head.all { it in 'a'..'z' } &&
+                wanted.getOrPut(head) { senseOptions(head).isEmpty() || refused(head) }
+            t.add(s.action, s.bearerClass, if (placed) head else null)
         }
         val out = HashMap<String, List<String>>()
-        for ((head, verbs) in headVerb) {
-            val n = headCount.getValue(head)
-            val posit = HashMap<Int, EvidenceCoord>()
-            for ((v, nv) in verbs) {
-                val own = Nal.truthOf(EvidenceCoord(nv * Nal.UNIT, (n - nv) * Nal.UNIT))
-                for ((cls, ncv) in byVerb[v].orEmpty()) {
-                    if (SumoCorpus.informationOf(cls) < POSIT_INFORMATION) continue
-                    val theirs = Nal.truthOf(EvidenceCoord(ncv * Nal.UNIT, (classCount.getValue(cls) - ncv) * Nal.UNIT))
-                    posit[cls] = revise(posit[cls] ?: EvidenceCoord.EMPTY, Nal.abduce(theirs, own))
-                }
-            }
-            posit.entries.sortedByDescending { it.value.positive }.take(POSITS).map { sumo.className(SumoClassId(it.key)) }
-                .takeIf { it.isNotEmpty() }?.let { out[head] = it }
-        }
+        for (head in t.placed) t.posits(t.land(head), POSITS, POSIT_INFORMATION).takeIf { it.isNotEmpty() }
+            ?.let { ids -> out[head] = ids.map { sumo.className(SumoClassId(it)) } }
         return out
     }
 
-    /** The sense memory as a report: per [lemma] (or the rows nearest myelination when none), its rows where [book] was crafted. */
+    /** The sense memory as a report: per [lemma] (or the rows nearest a cap when none), its rows where [book] was crafted. */
     fun senses(lemma: String?, book: String?): Map<String, Any?> {
         if (!SENSES_ENABLED) return mapOf("enabled" to false)
         val at = book?.takeIf { it.isNotBlank() }?.let { located(it) }
-        fun truth(e: EvidenceCoord) = Nal.truthOf(e).let { mapOf("f" to it.frequency, "c" to it.confidence, "e" to it.expectation()) }
         val books = root.listFiles { x -> x.isFile && x.name.endsWith(".members") }.orEmpty().flatMap { it.readLines() }.filter { it.isNotBlank() }.distinct()
             .associateWith { located(it).let { l -> mapOf("at" to l.at.term, "year" to l.year, "by" to l.by, "unmapped" to l.unmapped, "nouns" to l.nouns) } }
         val memory = memory()
         return synchronized(memory) {
-            // A row as read: its K classes, T judgments and confidence T/(T + K/2), and per class its share, most first.
-            fun row(r: SenseRow) = mapOf("K" to r.width, "T" to r.mass.toDouble() / Nal.UNIT, "c" to r.confidence, "eternal" to r.eternal(),
+            // A row as read: its K classes, T judgments, confidence T/(T + K/2) and spot radius 1/(2√T) in radians, and per
+            // class its share and its margin z, the cap's edge against the spot in spot radii (|z| < 2 straddles), most first.
+            fun row(r: SenseRow) = mapOf("K" to r.width, "T" to r.mass.toDouble() / Nal.UNIT, "c" to r.confidence, "eternal" to r.eternal(), "radius" to r.radius,
                 "classes" to (0 until r.width).sortedByDescending { r.share[it] }.map { i ->
-                    mapOf("class" to memory.className(r.classes[i]), "share" to r.share[i], "holds" to r.holds(i), "offered" to r.everywhere(i)) })
+                    mapOf("class" to memory.className(r.classes[i]), "share" to r.share[i], "z" to r.margin(i), "holds" to r.holds(i), "offered" to r.everywhere(i)) })
             if (lemma.isNullOrBlank()) {
                 val near = memory.held().mapNotNull { (l, a) -> memory.sense(l, a)?.let { r -> Triple(condition(l, a), r, r.top) } }
                     .filter { it.third >= 0 && it.second.holds(it.third) }.sortedByDescending { it.second.confidence }
                 val overlay = tree
-                mapOf("rows" to memory.rows, "judgments" to memory.judgments, "cells" to memory.size, "contexts" to memory.contexts, "rules" to senseRules.size,
+                mapOf("rows" to memory.rows, "judgments" to memory.judgments, "cells" to memory.size, "contexts" to memory.contexts, "caps" to synchronized(caps) { caps.size },
                     "at" to listOf(0.98, 0.9, 0.7, 0.5).associate { t -> "c≥$t" to near.count { it.second.confidence >= t } },
                     "nearest" to near.take(SAMPLE).map { (term, r, t) -> mapOf("condition" to term, "class" to memory.className(r.classes[t]),
                         "share" to r.share[t], "K" to r.width, "T" to r.mass.toDouble() / Nal.UNIT, "c" to r.confidence) },
-                    "myelinated" to senseRules.takeLast(SAMPLE).map { mapOf("condition" to it.antecedent, "class" to it.consequent) + truth(it.evidence) },
+                    "capped" to synchronized(caps) { caps.entries.sortedBy { it.key }.take(SAMPLE).map { mapOf("condition" to it.key, "class" to it.value) } },
                     // Productions agreeing across localities whose rows cannot be told apart: one locality-free production could stand for them all.
                     "factors" to overlay.factors().sortedByDescending { it.localities.size }.take(SAMPLE).map { f ->
-                        mapOf("lemma" to f.lemma, "class" to f.cls, "localities" to f.localities.map { it.term }) + truth(f.evidence) },
+                        mapOf("lemma" to f.lemma, "class" to f.cls, "localities" to f.localities.map { it.term }, "share" to f.share, "c" to f.confidence) },
                     // Productions of one word disagreeing across localities whose rows differ: its sense moved with time or English.
                     "drift" to overlay.drift().take(SAMPLE).map { d ->
                         mapOf("lemma" to d.lemma, "classes" to d.classes.map { (a, cls) -> mapOf("at" to a.term, "class" to cls) }) },
@@ -1382,7 +1383,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 "is" to at?.let { a -> tree.closure(lemma, a.at).toIntArray().sortedByDescending { SumoCorpus.informationOf(it) }.take(6).map { ConceptTree.name(it) } },
                 "sense" to at?.let { memory.sense(lemma, it.at)?.let(::row) },
                 "contexts" to memory.contexts(lemma).map { (a, r) ->
-                    mapOf("at" to a.term, "judgments" to r.judgments, "rule" to rule(lemma, a)?.consequent) + row(r)
+                    mapOf("at" to a.term, "judgments" to r.judgments, "cap" to capped(lemma, a)) + row(r)
                 },
                 "books" to books)
         }
@@ -1557,8 +1558,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             // The ring is in memory: saved constellations stand in it again without waiting for a join.
             Thread({ runCatching { nodes.restore() }.onFailure { System.err.println("[OROBOROS] constellation restore failed: $it") } },
                 "constellation-restore").apply { isDaemon = true }.start()
-            // The sense memory: `?lemma=<noun>&book=<name>` reads a word's beliefs per locality and how it is typed where
-            // the book was crafted; bare, the memory's size, the beliefs nearest myelination and the rules myelinated.
+            // The sense memory: `?lemma=<noun>&book=<name>` reads a word's rows per locality and how it is typed where
+            // the book was crafted; bare, the memory's size, the rows nearest a cap and the caps standing.
             ctx.routes.claim("language", "/api/curation/senses") { method, path, _, _ ->
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
@@ -1666,19 +1667,17 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         const val DATES_ASKED = 12
         /** Ambiguous nouns a Jev table window asks the sense of. */
         const val SENSES_ASKED = 96
-        /** The confidence at which a sense belief is myelinated into an eternal rule: one in fifty. */
-        const val ETERNAL = 0.98f
-        /** One myelinated sense in this many is put to Jev again, an audit of the rule. */
+        /** One capped sense in this many is put to Jev again, an audit of the cap. */
         const val AUDIT = 50
         /** The option a sense question offers for a use none of the listed senses names. */
         const val NONE = ConceptTree.NONE
-        /** Provenance of the eternal rules the sense memory myelinates. */
+        /** Provenance of the sense rules NARS minted before the rows replaced them; the first trace retracts them. */
         const val SENSES = "constellation-senses"
-        /** Sense rules are minted, revised and retracted (see [myelinate]), so the lane runs. */
+        /** The sense lane runs: Jev's tables are read into rows, and the rows are traced into caps (see [trace]). */
         const val SENSES_ENABLED = true
-        /** Classes abduction posits per untyped noun, and the least information content a posited class carries. */
+        /** Classes transport posits per untyped noun, and the least information content a posited class carries. */
         const val POSITS = 4
-        const val POSIT_INFORMATION = 2.5f
+        const val POSIT_INFORMATION = ConceptTree.INFORMATION
         /** Readings a book's register is measured over, spread evenly across its sections. */
         const val REGISTER_SECTIONS = 64
         /** Open premises one table window carries. */

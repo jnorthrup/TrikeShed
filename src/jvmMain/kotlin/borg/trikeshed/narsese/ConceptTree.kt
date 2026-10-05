@@ -1,114 +1,145 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 
 /**
  * Two concept trees, one laid over the other. The super tree is SUMO's: each class's self+ancestor closure, one
- * precomputed Roaring set per class ([SumoCorpus.closure]), the same for every text. The local tree is what induction
- * learned of a word where it was read ([Locality]): the class a myelinated production `<(&&,lemma,locality) ==> class>`
- * types it as ([rules]), else the class the word's sense row in [memory] holds ([SenseRow.holds]). Laid over the super
- * tree, the local class chooses which SUMO closure the word carries in that locality: the productions re-root a word in
- * the shared taxonomy rather than copy the taxonomy per locality.
+ * precomputed Roaring set per class ([SumoCorpus.closure]), the same for every text. The local tree is where a word's
+ * sense row ([SenseMemory.sense]) comes to focus where it was read ([Locality]).
  *
- * Across localities the productions of one word either agree or not. A word typed as one class in two or more
- * localities whose rows cannot be told apart is a [Factor]: its locality condition is redundant, and one locality-free
- * production `lemma ==> class` could stand for all of them. A word typed as different classes in localities whose rows
- * differ is a [Drift]: the sense changed with the time or the English it was read in. Differently typed localities whose
- * rows cannot be told apart are a near tie, not drift.
+ * A row is a point on the sphere of its K classes. Every class, SUMO's classes above them included, is a cap on that
+ * sphere: the classes of the row under it merged as one, holding a share ≥ 7/10 ([SenseRow.holdsAll]), an integer plane
+ * on the row's counts. SUMO's closure makes the caps nested, and the mass under a class is the sum of the masses of its
+ * row classes, so going up the taxonomy loses nothing. The word's focus is the most specific class whose cap holds the
+ * point: its leading class when that holds alone, else the narrowest class above several of its classes that together
+ * hold. A focus at T/(T + K/2) ≥ 49/50 ([SenseRow.eternal]) is a cap the word stands in, typed without asking.
+ *
+ * Across localities the caps of one word either agree or not. A word in one cap in two or more localities whose rows
+ * cannot be told apart is a [Factor]: its locality is redundant there. A word in different caps in localities whose rows
+ * differ is a [Drift]: the sense changed with the time or the English it was read in.
  */
-class ConceptTree(val rules: List<EternalRule>, val memory: SenseMemory?) {
+class ConceptTree(val memory: SenseMemory?) {
 
-    /** The productions by condition: typing a word where it is read is one lookup. */
-    private val byCondition = HashMap<String, EternalRule>(rules.size * 2).also { m -> for (r in rules) m[r.antecedent] = r }
-
-    /** A word's class where it was read, its share there, and what typed it: `rete` (a myelinated production) or `nars` (its row). */
+    /** A word's class where it was read, its share there, and how it was typed: `cap` (eternal) or `row` (holding, not yet eternal). */
     class Typed(val cls: String, val e: Double, val by: String)
 
-    /** The production typing [lemma] in [at], or null. */
-    fun production(lemma: String, at: Locality): EternalRule? = byCondition[condition(lemma, at)]
-
-    /** The class [lemma] denotes in [at]; null when neither tree's overlay types it, and the lexicon's sense stands. */
-    fun typed(lemma: String, at: Locality): Typed? {
-        val m = memory
-        val row = m?.let { synchronized(it) { it.sense(lemma, at) } }
-        production(lemma, at)?.let { r ->
-            val i = row?.let { s -> (0 until s.width).firstOrNull { m.className(s.classes[it]) == r.consequent } }
-            return Typed(r.consequent, if (i != null) row.share[i] else Nal.truthOf(r.evidence).expectation().toDouble(), "rete")
-        }
-        val s = row ?: return null
-        val t = s.top.takeIf { it >= 0 && s.holds(it) } ?: return null
-        return Typed(m.className(s.classes[t]), s.share[t], "nars")
+    /** The menu class a cap types [lemma] as in [at] without asking Jev, or null. */
+    fun production(lemma: String, at: Locality): String? {
+        val m = memory ?: return null
+        val row = synchronized(m) { m.sense(lemma, at) } ?: return null
+        val i = row.production()
+        return if (i >= 0) m.className(row.classes[i]) else null
     }
 
-    /** The super tree's closure of the class [lemma] carries in [at]: the overlay's class, else the lexicon's preferred sense. */
+    /** The class [lemma] denotes in [at]: the answer its row comes to ([answer]); null when there is none, and the lexicon's sense stands. */
+    fun typed(lemma: String, at: Locality): Typed? {
+        val m = memory ?: return null
+        val row = synchronized(m) { m.sense(lemma, at) } ?: return null
+        return answer(row, m)
+    }
+
+    /** The super tree's closure of the class [lemma] carries in [at]: its focus, else the lexicon's preferred sense. */
     fun closure(lemma: String, at: Locality): RoaringSeries {
         val cls = typed(lemma, at)?.let { SumoCorpus.classifier.classId(it.cls)?.value }
             ?: SumoCorpus.nounClassId(lemma).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(lemma.removeSuffix("s"))
         return if (cls >= 0) SumoCorpus.closure(cls) else RoaringSeries.EMPTY
     }
 
-    /**
-     * The classes the local tree has established in [at], with every class above them: the overlay as one super-tree
-     * bitset. A word not yet typed there takes the sense these support, as a sense is read against what is believed.
-     */
-    fun believed(at: Locality): RoaringSeries {
-        var out = RoaringSeries.EMPTY
-        for (r in rules) if (conditionOf(r.antecedent)?.second == at)
-            SumoCorpus.classifier.classId(r.consequent)?.value?.let { out = out or SumoCorpus.closure(it) }
-        return out
-    }
+    /** A word in one cap in every locality it was read in whose rows agree: [cls] across [localities], the least of its shares and confidences. */
+    class Factor(val lemma: String, val cls: String, val localities: List<Locality>, val share: Double, val confidence: Double)
 
-    /** A production holding in every locality its word was read in: [cls] across [localities], the least confident of them as [evidence]. */
-    class Factor(val lemma: String, val cls: String, val localities: List<Locality>, val evidence: EvidenceCoord)
-
-    /** A word typed as different classes in different localities: per locality, its class. */
+    /** A word in different caps in different localities: per locality, its class. */
     class Drift(val lemma: String, val classes: List<Pair<Locality, String>>)
 
-    /** True when [lemma]'s rows in [a] and [b] cannot be told apart; true when either is missing or there is no memory. */
-    private fun agree(lemma: String, a: Locality, b: Locality): Boolean {
-        val m = memory ?: return true
-        val local = synchronized(m) { m.contexts(lemma) }
+    private class Capped(val at: Locality, val cls: String, val share: Double, val confidence: Double)
+
+    /** True when [lemma]'s rows in [a] and [b] cannot be told apart; true when either is missing. */
+    private fun agree(local: List<Pair<Locality, SenseRow>>, a: Locality, b: Locality): Boolean {
         val ra = local.firstOrNull { it.first == a }?.second ?: return true
         val rb = local.firstOrNull { it.first == b }?.second ?: return true
         return ra.homogeneous(rb)
     }
 
-    fun factors(): List<Factor> = byLemma().mapNotNull { (lemma, rs) ->
-        if (rs.size < 2 || rs.map { it.second.consequent }.distinct().size != 1) return@mapNotNull null
-        for (x in rs.indices) for (y in x + 1 until rs.size) if (!agree(lemma, rs[x].first, rs[y].first)) return@mapNotNull null
-        Factor(lemma, rs[0].second.consequent, rs.map { it.first }, rs.minBy { Nal.truthOf(it.second.evidence).confidence }.second.evidence)
+    /** Per word, the localities where its row stands in a cap. */
+    private fun capped(): Map<String, Pair<List<Pair<Locality, SenseRow>>, List<Capped>>> {
+        val m = memory ?: return emptyMap()
+        return synchronized(m) {
+            m.held().groupBy({ it.first }, { it.second }).mapNotNull { (lemma, ats) ->
+                val caps = ats.mapNotNull { a ->
+                    m.sense(lemma, a)?.takeIf { it.eternal() }?.let { r -> answer(r, m)?.let { Capped(a, it.cls, it.e, r.confidence) } }
+                }
+                if (caps.isEmpty()) null else lemma to (m.contexts(lemma) to caps)
+            }.toMap()
+        }
     }
 
-    fun drift(): List<Drift> = byLemma().mapNotNull { (lemma, rs) ->
+    fun factors(): List<Factor> = capped().mapNotNull { (lemma, v) ->
+        val (local, cs) = v
+        if (cs.size < 2 || cs.map { it.cls }.distinct().size != 1) return@mapNotNull null
+        for (x in cs.indices) for (y in x + 1 until cs.size) if (!agree(local, cs[x].at, cs[y].at)) return@mapNotNull null
+        Factor(lemma, cs[0].cls, cs.map { it.at }, cs.minOf { it.share }, cs.minOf { it.confidence })
+    }
+
+    fun drift(): List<Drift> = capped().mapNotNull { (lemma, v) ->
+        val (local, cs) = v
         var moved = false
-        for (x in rs.indices) for (y in x + 1 until rs.size)
-            if (rs[x].second.consequent != rs[y].second.consequent && !agree(lemma, rs[x].first, rs[y].first)) moved = true
-        if (!moved) null else Drift(lemma, rs.sortedBy { it.first.decade }.map { it.first to it.second.consequent })
+        for (x in cs.indices) for (y in x + 1 until cs.size)
+            if (cs[x].cls != cs[y].cls && !agree(local, cs[x].at, cs[y].at)) moved = true
+        if (!moved) null else Drift(lemma, cs.sortedBy { it.at.decade }.map { it.at to it.cls })
     }
-
-    /** The productions grouped by word, each with the locality it holds in. */
-    fun byLemma(): Map<String, List<Pair<Locality, EternalRule>>> = rules.mapNotNull { r ->
-        conditionOf(r.antecedent)?.let { (lemma, at) -> lemma to (at to r) }
-    }.groupBy({ it.first }, { it.second })
 
     companion object {
         /** The option a sense question offers for a use none of the listed senses names. */
         const val NONE = SenseMemory.NONE
 
-        /** A sense production's condition: the word read in a locality. */
+        /** A word read in a locality, as a condition: the key a cap is traced under. */
         fun condition(lemma: String, at: Locality) = "(&&,$lemma,${at.term})"
-
-        /** The word and locality of a production's [condition], or null when it is not a sense condition. */
-        fun conditionOf(term: String): Pair<String, Locality>? {
-            if (!term.startsWith("(&&,") || !term.endsWith(")")) return null
-            val body = term.substring(4, term.length - 1)
-            val cut = body.lastIndexOf(',').takeIf { it > 0 } ?: return null
-            return body.substring(0, cut) to (Locality.parse(body.substring(cut + 1)) ?: return null)
-        }
 
         /** Class [id]'s name. */
         fun name(id: Int): String = SumoCorpus.classifier.className(SumoClassId(id))
+
+        /** The least information content a class carries to say anything of a word: the same floor posits are held to. */
+        const val INFORMATION = 2.5f
+
+        /**
+         * What [row] answers: its [focus] when that is a class it was offered, or a class above them informative enough
+         * to say something ([INFORMATION]). A focus as wide as Entity, Abstract or Physical answers nothing.
+         */
+        fun answer(row: SenseRow, m: SenseMemory): Typed? {
+            val f = focus(row, m) ?: return null
+            if ((0 until row.width).any { m.className(row.classes[it]) == f.cls }) return f
+            val id = SumoCorpus.classifier.classId(f.cls)?.value ?: return f
+            return if (SumoCorpus.informationOf(id) >= INFORMATION) f else null
+        }
+
+        /**
+         * Where [row] comes to focus: the most specific class (by information content, then id) whose nested cap holds
+         * it. Each of the row's classes adds its index to every class of its SUMO closure, so one pass over the row's
+         * classes gives every cap's members, and each cap is one integer plane. A row class SUMO does not name is a cap
+         * of its own. Null when no cap holds the row.
+         */
+        fun focus(row: SenseRow, m: SenseMemory): Typed? {
+            val under = HashMap<Int, IntAccumulator>()
+            var loose = -1
+            for (i in 0 until row.width) {
+                if (i == row.none) continue
+                val id = SumoCorpus.classifier.classId(m.className(row.classes[i]))?.value
+                if (id == null) { if (row.holds(i) && (loose < 0 || row.share[i] > row.share[loose])) loose = i; continue }
+                SumoCorpus.closure(id).forEach { a -> under.getOrPut(a) { IntAccumulator(2) }.add(i) }
+            }
+            var best = -1; var bestIc = -1f; var members = IntArray(0)
+            for ((a, acc) in under) {
+                val ms = acc.toIntArray()
+                if (!row.holdsAll(ms)) continue
+                val ic = SumoCorpus.informationOf(a)
+                if (ic > bestIc || (ic == bestIc && a < best)) { best = a; bestIc = ic; members = ms }
+            }
+            val by = if (row.eternal()) "cap" else "row"
+            if (best >= 0) return Typed(name(best), row.shareOf(members), by)
+            return if (loose >= 0) Typed(m.className(row.classes[loose]), row.share[loose], by) else null
+        }
     }
 }

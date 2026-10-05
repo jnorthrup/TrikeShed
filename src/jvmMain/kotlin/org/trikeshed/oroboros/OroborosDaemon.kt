@@ -2036,9 +2036,8 @@ object OroborosDaemon {
                         )
                     }
                     restored.addAll(borg.trikeshed.narsese.NarsDurableLedger.readRules(forgeHome))
-                    if (!borg.trikeshed.narsese.ConstellationNodes.SENSES_ENABLED) {
-                        restored.removeAll { it.provenanceCid == borg.trikeshed.narsese.ConstellationNodes.SENSES }
-                    }
+                    // Sense productions are caps over the sense rows, not rules: any minted before the rows stay out of the rete.
+                    restored.removeAll { it.provenanceCid == borg.trikeshed.narsese.ConstellationNodes.SENSES }
                     if (restored.isNotEmpty()) ruleCount = liveRete.admit(borg.trikeshed.lib.seriesOf(restored))
                 }
                 HostSystem.err(

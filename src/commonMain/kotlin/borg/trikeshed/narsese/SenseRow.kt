@@ -1,5 +1,6 @@
 package borg.trikeshed.narsese
 
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.sqrt
@@ -109,11 +110,50 @@ class SenseRow internal constructor(
         return if (t >= 0 && eternal() && holds(t)) t else -1
     }
 
-    /** Class [i]'s evidence as one NARS belief: its completed mass for, the rest of the row against. */
-    fun evidence(i: Int): EvidenceCoord {
-        val w = completed[i].toLong()
-        return EvidenceCoord(w, mass - w)
+    /** True when some menu lacked a class and its none mass is shared out ([completed] differs from [positive]). */
+    private val censored: Boolean by lazy {
+        none >= 0 && menuMissing.indices.any { menuMissing[it].isNotEmpty() && menuNone[it] > 0 }
     }
+
+    /**
+     * The classes at indices [members] (ascending, none excluded) merged as one hold a share ≥ num/den. Merging Dirichlet
+     * classes adds their counts and their Jeffreys halves, so the merged share is (Σw + n/2)/(T + K/2) and the test is
+     * the integer plane den·(2Σw + n) ≥ num·(2T + K) in units. One member is [holds]; a SUMO class over several of the
+     * row's classes is a nested cap, decided by the same plane. A censored row reads its members off the fixed point.
+     */
+    fun holdsAll(members: IntArray, num: Long = HOLDS_NUM, den: Long = HOLDS_DEN): Boolean {
+        val n = members.size
+        if (!censored) {
+            var w = 0L
+            for (i in members) w += positive[i]
+            return den * (2 * w + n * Nal.UNIT) >= num * (2 * mass + width * Nal.UNIT)
+        }
+        val c = completed; var w = 0.0
+        for (i in members) w += c[i]
+        return den * (2 * w + n * Nal.UNIT) >= num * (2.0 * mass + width * Nal.UNIT)
+    }
+
+    /** The merged share of the classes at [members]: (Σw + n/2)/(T + K/2). */
+    fun shareOf(members: IntArray): Double {
+        val c = completed; var w = 0.0
+        for (i in members) w += c[i]
+        return (w + members.size * Nal.UNIT / 2.0) / (mass + width * Nal.UNIT / 2.0)
+    }
+
+    /**
+     * The angular radius of the row's evidence on the sphere, in radians: 1/(2√T), T in judgments. In √p coordinates the
+     * Jeffreys prior is the sphere's uniform measure, so the posterior is ∝ Π y_c^(2w_c): it peaks at y_c² = w_c/T and
+     * curves at −4T in every direction among the classes holding mass, a round spot that only T shrinks.
+     */
+    val radius: Double get() = if (mass <= 0) PI / 2 else 0.5 / sqrt(mass.toDouble() / Nal.UNIT)
+
+    /**
+     * Where class [i]'s cap (share ≥ num/den: the angle arccos √(num/den) about the class's corner) stands against the
+     * row's spot: the cap's angle less the angle from the corner to the row's point, in spot radii. Positive inside; a
+     * |z| under 2 is a spot straddling the cap's edge, a point no one flat face answers for.
+     */
+    fun margin(i: Int, num: Long = HOLDS_NUM, den: Long = HOLDS_DEN): Double =
+        (acos(sqrt(num.toDouble() / den)) - acos(sqrt(share[i].coerceIn(0.0, 1.0)))) / radius
 
     /** The classes offered in every judgment of both rows, none excepted, as index pairs (this row's, the other's). */
     private fun common(other: SenseRow): Pair<IntArray, IntArray> {
