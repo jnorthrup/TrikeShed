@@ -183,7 +183,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             bank?.assertKif("(normHeld $className ${q(c.predicationNames[h.predication])} $via ${q("%.2f".format(t.frequency))} ${q("%.2f".format(t.confidence))})")
             mapOf("predication" to c.predicationNames[h.predication], "via" to via,
                 "frequency" to t.frequency, "confidence" to t.confidence,
-                "deduced" to h.deduced?.let { Nal.truthOf(it).let { d -> "%.2f/%.2f".format(d.frequency, d.confidence) } },
+                "inherited" to h.inherited?.let { Nal.truthOf(it).let { d -> "%.2f/%.2f".format(d.frequency, d.confidence) } },
                 "direct" to h.direct?.let { Nal.truthOf(it).let { d -> "%.2f/%.2f".format(d.frequency, d.confidence) } },
                 "norms" to h.statements.map { "constellation/$name/norm/${c.statements[it].id}" })
         }

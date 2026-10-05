@@ -32,8 +32,8 @@ class ClassRuleLane(private val nlp: () -> CoreNlpRuntime = { CoreNlpRuntime() }
     /** One observed candidate: the ledger slot it revised, or the reason it was not observed. */
     class Observed(val source: Int, val line: String, val slot: Int, val miss: String?)
 
-    /** One answer to [ask]: the rule row, the deduced, directly observed (or null) and revised belief. */
-    class Answer(val row: Int, val deduced: EvidenceCoord, val observed: EvidenceCoord?, val belief: EvidenceCoord)
+    /** One answer to [ask]: the rule row, the rule's evidence as read here ([rule]), the class's own (or null), and the pooled belief. */
+    class Answer(val row: Int, val rule: EvidenceCoord, val observed: EvidenceCoord?, val belief: EvidenceCoord)
 
     fun term(id: Int): String = terms[id]
     fun className(id: Int): String = sumo.className(SumoClassId(id))
@@ -71,28 +71,24 @@ class ClassRuleLane(private val nlp: () -> CoreNlpRuntime = { CoreNlpRuntime() }
         return rete
     }
 
-    /** Answers for SUMO class [name], or null when it is not a class. */
+    /**
+     * Answers for SUMO class [name], or null when it is not a class. A rule stated of a class above it is read on the
+     * sphere ([Inheritance.read]): pooled with the class's own evidence when the two rows cannot be told apart, left out
+     * when they can (the class is an exception), and read whole when the class has none of its own.
+     */
     fun ask(name: String): List<Answer>? {
         val self = sumo.classId(name)?.value ?: return null
         val rete = rete
-        return rete.fire(sumo.mask(name, SumoMask.ANCESTORS) or RoaringSeries.singleton(self)).map { r ->
-            val deduced = if (rete.antecedent(r) == self) rete.evidence(r) else Nal.deduce(Nal.truthOf(rete.evidence(r)), IS_A)
-            val ruleBasis = ledger.basis(ledger.slot(rete.key(r)))
+        return rete.fire(sumo.mask(name, SumoMask.ANCESTORS) or RoaringSeries.singleton(self)).toList().mapNotNull { r: Int ->
+            val rule = rete.evidence(r)
+            if (rete.antecedent(r) == self) return@mapNotNull Answer(r, rule, null, rule)
             val direct = ledger.slot(packInts(self, rete.consequent(r)))
             val observed = if (direct < 0) null else ledger.evidence(direct)
-            val belief = when {
-                direct < 0 -> deduced
-                ledger.basis(direct).intersects(ruleBasis) -> observed!!
-                else -> revise(observed!!, deduced)
-            }
-            Answer(r, deduced, observed, belief)
+            val read = Inheritance.read(observed, if (direct < 0) null else ledger.basis(direct),
+                longArrayOf(rule.packed), listOf(ledger.basis(ledger.slot(rete.key(r))))) ?: return@mapNotNull null
+            Answer(r, rule, observed, read.belief)
         }
     }
 
     override fun close() { runtime?.close(); runtime = null }
-
-    companion object {
-        /** SUMO subclass/instance edges are axiomatic: near-certain premises for deduction. */
-        val IS_A = Constellation.IS_A
-    }
 }

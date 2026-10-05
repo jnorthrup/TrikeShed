@@ -203,11 +203,6 @@ class Constellation(val name: String) {
 
     fun bookOrdinal(name: String): Int = books.indexOfFirst { it.name == name }
 
-    companion object {
-        /** SUMO subclass/instance edges are axiomatic: near-certain premises for deduction. */
-        val IS_A = TruthCoord(1f, 0.99f)
-    }
-
     /**
      * Statements that hold for a bearer of the class whose self+ancestor ids are [mask]: those typed
      * by the class or anything it inherits from. One OR per typed ancestor.
@@ -304,44 +299,48 @@ class Constellation(val name: String) {
         return Nal.truthOf(if (s.modality == Modality.MUST_NOT) EvidenceCoord(e.negative, e.positive) else e)
     }
 
-    /** A norm a class holds: its own evidence, or what it inherits from an ancestor class by deduction, revised. */
-    class Held(val predication: Int, val via: Int, val statements: IntArray, val deduced: EvidenceCoord?, val direct: EvidenceCoord?, val belief: EvidenceCoord)
+    /** A norm a class holds: its own evidence ([direct]), what it reads from classes above it ([inherited]), pooled ([belief]). */
+    class Held(val predication: Int, val via: Int, val statements: IntArray, val inherited: EvidenceCoord?, val direct: EvidenceCoord?, val belief: EvidenceCoord)
 
     /**
-     * Norms class [cls] holds, given its self+ancestor ids [lineage]. A norm stated of an ancestor class
-     * is deduced down SUMO is-a (an axiomatic premise, [IS_A]); when [cls] has its own
-     * evidence for the same predication and the two bases are disjoint they revise, so a specific
-     * exception pulls an inherited default down; overlapping bases keep the direct evidence alone.
+     * Norms class [cls] holds, given its self+ancestor ids [lineage]. Per predication stated of the class or a class above
+     * it, the rows are read on the sphere ([Inheritance.read]): the class's own row, with every ancestor's row that cannot
+     * be told apart from it pooled in, so a class stated to differ keeps its exception whole; with no row of its own, the
+     * nearest ancestor's row (highest preorder id first), pooled with the further ones that agree. [via] is the class
+     * whose row the reading starts from.
      */
     fun held(cls: Int, lineage: RoaringSeries): List<Held> {
-        val out = LinkedHashMap<Int, Held>()
+        // predication → the classes above [cls] that state it, each once.
+        val above = HashMap<Int, IntAccumulator>()
         lineage.forEach { a ->
+            if (a == cls) return@forEach
             val stated = bearing[a] ?: return@forEach
             val seen = HashSet<Int>()
-            stated.forEach { id -> seen.add(predicationIds.getValue(statements[id].predication)) }
-            for (p in seen) {
-                val from = predications.slot(packInts(a, p)).takeIf { it >= 0 } ?: continue
-                val ids = predicationStatements[packInts(a, p)]?.toRoaring()?.toIntArray() ?: IntArray(0)
-                val directSlot = predications.slot(packInts(cls, p))
-                val direct = if (directSlot < 0) null else predications.evidence(directSlot)
-                val held = if (a == cls) Held(p, a, ids, null, direct, direct!!) else {
-                    val deduced = Nal.deduce(Nal.truthOf(predications.evidence(from)), IS_A)
-                    val belief = when {
-                        direct == null -> deduced
-                        predications.basis(directSlot).intersects(predications.basis(from)) -> direct
-                        else -> revise(direct, deduced)
-                    }
-                    Held(p, a, ids, deduced, direct, belief)
-                }
-                // Per predication: a revision (own evidence with an inheritance) beats own evidence alone,
-                // which beats a bare inheritance; ties go to the more confident.
-                fun rank(h: Held) = when { h.direct != null && h.deduced != null -> 2; h.direct != null -> 1; else -> 0 }
-                val prior = out[p]
-                if (prior == null || rank(held) > rank(prior) || rank(held) == rank(prior) &&
-                        Nal.truthOf(held.belief).confidence > Nal.truthOf(prior.belief).confidence) out[p] = held
-            }
+            stated.forEach { id -> val p = predicationIds.getValue(statements[id].predication); if (seen.add(p)) above.getOrPut(p) { IntAccumulator(2) }.add(a) }
         }
-        return out.values.toList()
+        bearing[cls]?.forEach { id -> above.getOrPut(predicationIds.getValue(statements[id].predication)) { IntAccumulator(2) } }
+        val out = ArrayList<Held>(above.size)
+        for ((p, acc) in above) {
+            val ancestors = acc.toIntArray(); ancestors.sortDescending()
+            val slots = IntArray(ancestors.size) { predications.slot(packInts(ancestors[it], p)) }
+            val directSlot = predications.slot(packInts(cls, p))
+            val direct = if (directSlot < 0) null else predications.evidence(directSlot)
+            val read = Inheritance.read(direct, if (directSlot < 0) null else predications.basis(directSlot),
+                LongArray(slots.size) { predications.evidence(slots[it]).packed }, slots.map { predications.basis(it) }) ?: continue
+            val via = if (direct != null) cls else ancestors[read.from[0]]
+            fun idsOf(c: Int) = predicationStatements[packInts(c, p)]?.toIntArray() ?: IntArray(0)
+            val ids = if (read.from.isEmpty()) idsOf(cls) else {
+                val all = IntAccumulator(4)
+                if (direct != null) idsOf(cls).forEach(all::add)
+                for (i in read.from) idsOf(ancestors[i]).forEach(all::add)
+                val a = all.toIntArray(); a.sort()
+                var u = 0
+                for (x in a.indices) if (x == 0 || a[x] != a[x - 1]) a[u++] = a[x]
+                a.copyOf(u)
+            }
+            out.add(Held(p, via, ids, read.inherited, direct, read.belief))
+        }
+        return out
     }
 
     /** Statements two or more books state. */

@@ -37,7 +37,7 @@ object CorenlpReteCli {
                     answers == null -> println("[ask] $ask: not a SUMO class")
                     answers.isEmpty() -> println("[ask] $ask: no rule  (${us}µs)")
                     else -> for (a in answers) println(
-                        "[ask] $ask ==> ${lane.term(rete.consequent(a.row))}  via ${lane.className(rete.antecedent(a.row))}  deduced ${show(a.deduced)}" +
+                        "[ask] $ask ==> ${lane.term(rete.consequent(a.row))}  via ${lane.className(rete.antecedent(a.row))}  rule ${show(a.rule)}" +
                             (a.observed?.let { "  observed ${show(it)}" } ?: "") + "  belief ${show(a.belief)}  (${us}µs, model calls 0)")
                 }
             }
