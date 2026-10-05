@@ -360,6 +360,11 @@ object GraalConsole {
     }
 
     private fun keydown(e: KeyboardEvent) {
+        // A span with role=button is focusable, not operable: Enter and Space click it, as a button would.
+        val target = e.target as? HTMLElement
+        if ((e.key == "Enter" || e.key == " ") && target?.getAttribute("role") == "button" && target.classList.contains("x")) {
+            e.preventDefault(); target.click(); return
+        }
         when (e.key) {
             "0" -> fit()
             "p", "P" -> togglePoints()
