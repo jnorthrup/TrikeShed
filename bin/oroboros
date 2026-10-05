@@ -4,7 +4,7 @@
 # Env passes through (TRIKESHED_BELIEF_BAG=1 turns on the belief bag the Curate page needs).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-JAVA="${JAVA_HOME:-$HOME/.sdkman/candidates/java/25.0.4.1-graal}/bin/java"
+JAVA="${JAVA_HOME:-$HOME/.sdkman/candidates/java/current}/bin/java"
 CP="$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar"
 for j in "$ROOT"/build/staging/lib/*.jar; do CP="$CP:$j"; done
 cd "$ROOT"
