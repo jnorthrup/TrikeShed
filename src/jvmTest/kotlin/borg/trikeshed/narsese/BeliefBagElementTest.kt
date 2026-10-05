@@ -85,7 +85,7 @@ class BeliefBagElementTest {
         bag.settle()
         assertEquals(1, bag.size, "same angular must revise, not duplicate")
         val entry = bag.snapshot().values.single()
-        assertEquals(2 * Nal.UNIT, entry.evidence.positive, "evidence bases must union")
+        assertEquals(Nal.UNIT, entry.evidence.positive, "one observation minted twice counts once")
         bag.drain()
         assertEquals(ElementState.CLOSED, bag.state, "full lifecycle must reach CLOSED")
     }

@@ -113,6 +113,12 @@ class BeliefBagElement(
     /** Exact ancestry is retained when supplied; Bloom remains the fast hint. */
     private val basisByAngular = HashMap<Long, EvidenceBasis>()
     private val receiptByAngular = HashMap<Long, ContentId>()
+    /**
+     * Per angular, every receipt whose evidence its cell holds, kept in the WAL (`R:` records) so it survives restarts:
+     * NARS revises only on disjoint evidence, and a receipt is one observation, so its evidence counts once however
+     * often it is minted (the boot seed re-mints every remembered entry on each start).
+     */
+    private val counted = HashMap<Long, HashSet<String>>()
     // angular → the Narsese surface the minter supplied; revisions keep the
     // latest one so a receipt can always show the expression, not a coordinate.
     private val glossByAngular = HashMap<Long, String>()
@@ -242,10 +248,12 @@ class BeliefBagElement(
         val angular = incoming.angular
         if (gloss != null) glossByAngular[angular] = gloss
         val shown = glossByAngular[angular]
-        val revived = if (hijack.get(angular) == null && cas != null) reviveFromCas(incoming) else incoming
+        val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(incoming))
+        // The same observation minted again (a restart's seed, a retried send) renews attention, never evidence.
+        val already = counted[angular]?.contains(incomingReceipt.hex) == true
+        val revived = if (hijack.get(angular) == null && cas != null) reviveFromCas(incoming, already) else incoming
         val existing = hijack.get(angular)
-        val incomingReceipt = receiptCid ?: ContentId.of(SignalCodec.encode(revived))
-        val explicitRevision = existing != null && evidenceBasis != null
+        val explicitRevision = existing != null && evidenceBasis != null && !already
         val prepared = if (explicitRevision) {
             val decision = OverlapSafeRevision.revise(
                 receiptByAngular[angular],
@@ -264,10 +272,18 @@ class BeliefBagElement(
                 angular,
                 inc.budget,
                 inc.signal.copy(
-                    evidence = if (explicitRevision) inc.signal.evidence else revise(existing.signal.evidence, inc.signal.evidence),
+                    evidence = when {
+                        already -> existing.signal.evidence
+                        explicitRevision -> inc.signal.evidence
+                        else -> revise(existing.signal.evidence, inc.signal.evidence)
+                    },
                     basisBloom = existing.signal.basisBloom or inc.signal.basisBloom,
                 ),
             )
+        }
+        if (!already && outcome !is HijackBeliefBag.Put.Rejected) {
+            counted.getOrPut(angular) { HashSet() }.add(incomingReceipt.hex)
+            walAppend("R:$angular:${incomingReceipt.hex}")
         }
         when (outcome) {
             is HijackBeliefBag.Put.Placed -> {
@@ -352,13 +368,13 @@ class BeliefBagElement(
         _events.tryEmit(BeliefEvent.Evicted(slot.angular, spillCid))
     }
 
-    /** A re-mint of a previously spilled angular revives its permanent evidence. */
-    private fun reviveFromCas(incoming: SemanticSignal): SemanticSignal {
+    /** A re-mint of a previously spilled angular revives its permanent evidence; an observation it already holds adds none. */
+    private fun reviveFromCas(incoming: SemanticSignal, already: Boolean): SemanticSignal {
         val spilled = spillCids[incoming.angular] ?: return incoming
         spillCids = spillCids - incoming.angular
         val bytes = cas?.get(spilled) ?: return incoming
         val prior = runCatching { SignalCodec.decode(bytes) }.getOrNull() ?: return incoming
-        return incoming.copy(evidence = revise(prior.evidence, incoming.evidence))
+        return incoming.copy(evidence = if (already) prior.evidence else revise(prior.evidence, incoming.evidence))
     }
 
     @Volatile private var spillCids: Map<Long, ContentId> = emptyMap()
@@ -404,6 +420,11 @@ class BeliefBagElement(
                 if (parts.size == 2 && parts[1].isNotEmpty()) {
                     spillCids = spillCids + (angular to ContentId("sha256:" + parts[1]))
                 }
+            }
+            text.startsWith("R:") -> {
+                val cut = text.indexOf(':', 2)
+                val angular = if (cut > 2) text.substring(2, cut).toLongOrNull() else null
+                if (angular != null) counted.getOrPut(angular) { HashSet() }.add(text.substring(cut + 1))
             }
             // "D:" decay markers are group boundaries; the following B/A records carry state
         }
