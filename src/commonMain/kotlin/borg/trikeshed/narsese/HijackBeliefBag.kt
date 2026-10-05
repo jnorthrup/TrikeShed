@@ -261,8 +261,7 @@ class HijackBeliefBag(
         val maxAttempts = k * 8
         while (out.size < k && attempts++ < maxAttempts) {
             var level = 0
-            while (level < levels - 1 && rng.nextBoolean()) level++
-            level = levels - 1 - level // deepest is rarest; invert so level 0 is most probable
+            while (level < levels - 1 && rng.nextBoolean()) level++ // level 0 with probability 1/2, level 1 with 1/4, …
             val start = levelOffset[level] + rng.nextInt(levelBuckets[level]) * beta
             var total = 0f
             for (i in start until start + beta) slots[i]?.let { total += it.pri + EPSILON }
