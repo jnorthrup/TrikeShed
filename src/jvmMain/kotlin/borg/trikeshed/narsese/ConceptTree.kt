@@ -122,24 +122,38 @@ class ConceptTree(val memory: SenseMemory?) {
          * of its own. Null when no cap holds the row.
          */
         fun focus(row: SenseRow, m: SenseMemory): Typed? {
-            val under = HashMap<Int, IntAccumulator>()
+            val s = scratch.get()
+            val c = row.completed
             var loose = -1
             for (i in 0 until row.width) {
                 if (i == row.none) continue
                 val id = SumoCorpus.classifier.classId(m.className(row.classes[i]))?.value
                 if (id == null) { if (row.holds(i) && (loose < 0 || row.share[i] > row.share[loose])) loose = i; continue }
-                SumoCorpus.closure(id).forEach { a -> under.getOrPut(a) { IntAccumulator(2) }.add(i) }
+                val wi = c[i]
+                SumoCorpus.closure(id).forEach { a -> s.add(a, wi) }
             }
-            var best = -1; var bestIc = -1f; var members = IntArray(0)
-            for ((a, acc) in under) {
-                val ms = acc.toIntArray()
-                if (!row.holdsAll(ms)) continue
+            // Each touched class is a cap: den·(2Σw + n) ≥ num·(2T + K) in units, the plane SenseRow.holdsAll draws.
+            val rhs = SenseRow.HOLDS_NUM * (2.0 * row.mass + row.width * Nal.UNIT)
+            var best = -1; var bestIc = -1f; var bestW = 0.0; var bestN = 0
+            for (x in 0 until s.count) {
+                val a = s.touched[x]; val w = s.w[a]; val n = s.n[a]
+                if (SenseRow.HOLDS_DEN * (2 * w + n * Nal.UNIT) < rhs) continue
                 val ic = SumoCorpus.informationOf(a)
-                if (ic > bestIc || (ic == bestIc && a < best)) { best = a; bestIc = ic; members = ms }
+                if (ic > bestIc || (ic == bestIc && a < best)) { best = a; bestIc = ic; bestW = w; bestN = n }
             }
+            s.clear()
             val by = if (row.eternal()) "cap" else "row"
-            if (best >= 0) return Typed(name(best), row.shareOf(members), by)
+            if (best >= 0) return Typed(name(best), (bestW + bestN * Nal.UNIT / 2.0) / (row.mass + row.width * Nal.UNIT / 2.0), by)
             return if (loose >= 0) Typed(m.className(row.classes[loose]), row.share[loose], by) else null
         }
+
+        /** Per thread, the mass and class count under each SUMO class a row touches, dense over class ids, cleared by the touched list. */
+        private class Caps(size: Int) {
+            val w = DoubleArray(size); val n = IntArray(size); val touched = IntArray(size); var count = 0
+            fun add(a: Int, wi: Double) { if (n[a] == 0) touched[count++] = a; w[a] += wi; n[a]++ }
+            fun clear() { for (x in 0 until count) { val a = touched[x]; w[a] = 0.0; n[a] = 0 }; count = 0 }
+        }
+
+        private val scratch = ThreadLocal.withInitial { Caps(SumoCorpus.classifier.classCount) }
     }
 }

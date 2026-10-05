@@ -115,6 +115,9 @@ class SenseRow internal constructor(
         none >= 0 && menuMissing.indices.any { menuMissing[it].isNotEmpty() && menuNone[it] > 0 }
     }
 
+    /** True when every class was offered in every judgment: [positive] are the counts and every plane is exact in integers. */
+    val exact: Boolean get() = menuMissing.all { it.isEmpty() }
+
     /**
      * The classes at indices [members] (ascending, none excluded) merged as one hold a share ≥ num/den. Merging Dirichlet
      * classes adds their counts and their Jeffreys halves, so the merged share is (Σw + n/2)/(T + K/2) and the test is
