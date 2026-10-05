@@ -1240,15 +1240,16 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     }
 
     /**
-     * Push and pull between the sense rows and the rete. Push: where a word is read, its row ([SenseMemory.sense]) at
-     * confidence T/(T + K/2) ≥ 49/50 whose leading class, none-of-these aside, holds a share ≥ 7/10 is minted an eternal
-     * rule `<(&&,lemma,locality) ==> class>`, the condition sequence it was held under, with that class's evidence as
-     * one NARS belief. Both tests are integer planes on the row's counts ([SenseRow.eternal], [SenseRow.holds]), so K,
-     * the classes the judge was offered, sets the evidence a word needs: 24.5 judgments per class. Pull: a rule whose
-     * row has moved is taken back — retracted when its class no longer leads or no longer holds, or its word is no
-     * longer read there; revised when the class still leads at eternal confidence under other evidence. Every change is
-     * filed in the rules ledger (a revision is a retraction followed by the revised rule) and swapped into the live rete;
-     * the overlay is replanted.
+     * Push and pull between the sense rows and the rete. A production stands exactly while its row is in the cap: where
+     * a word is read, its row ([SenseMemory.sense]) at confidence T/(T + K/2) ≥ 49/50 whose leading class, none-of-these
+     * aside, holds a share ≥ 7/10. Both tests are integer planes on the row's counts ([SenseRow.eternal],
+     * [SenseRow.holds]), so K, the classes the judge was offered, sets the evidence a word needs: 24.5 judgments per
+     * class. Push: a row in the cap with no rule is minted an eternal rule `<(&&,lemma,locality) ==> class>`, the
+     * condition sequence it was held under, with that class's evidence as one NARS belief. Pull: a rule whose row has
+     * left the cap (its class no longer leads or holds, the menu grew past what its evidence settles) or whose word is
+     * no longer read there is retracted, and the word is asked again; one whose row is in the cap under other evidence
+     * is revised. Every change is filed in the rules ledger (a revision is a retraction followed by the revised rule)
+     * and swapped into the live rete; the overlay is replanted.
      */
     private fun myelinate(m: SenseMemory): Myelinated {
         if (!SENSES_ENABLED) return Myelinated(emptyList(), emptyList(), emptyList())
@@ -1269,8 +1270,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             val old = byTerm[term]
             when {
                 old == null -> if (decisive) minted.add(EternalRule(term, cls, NalCopula.IMPLICATION, e, SENSES))
-                !holds || old.consequent != cls -> retracted.add(old)
-                decisive && old.evidence != e -> { retracted.add(old); revised.add(EternalRule(term, cls, NalCopula.IMPLICATION, e, SENSES)) }
+                !decisive || old.consequent != cls -> retracted.add(old)
+                old.evidence != e -> { retracted.add(old); revised.add(EternalRule(term, cls, NalCopula.IMPLICATION, e, SENSES)) }
             }
         }
         // A rule whose word is no longer read where it holds (its book was placed elsewhere, its row forgotten) is taken back.
