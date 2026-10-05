@@ -391,8 +391,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      */
     private suspend fun table(key: String, b: Book, k: Int, body: String, read: List<Map<*, *>>, open: List<Pair<String, NormStatement>>,
                               prior: List<Pair<String, Double>>, gate: kotlinx.coroutines.sync.Semaphore,
-                              at: Locality = Locality.of(0, Register.CURRENT), posited: Map<String, List<String>> = emptyMap()): Map<String, Any?> {
-        val byKey = b.statements.withIndex().associate { it.value.key to it.index }
+                              at: Locality, posited: Map<String, List<String>>, byKey: Map<String, Int>): Map<String, Any?> {
         val era = Regex("\\b(1[5-9]|20)\\d\\d\\b").find(b.date)?.value?.toInt()
         val windows = ArrayList<List<Map<*, *>>>()
         var w = ArrayList<Map<*, *>>(); var chars = 0; var tuples = 0
@@ -537,12 +536,14 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             scored[name] = progress(0)
             // Readings first, one parse at a time: a book curated before readings were kept is parsed here once.
             val read = ts.indices.map { k -> reading(name, k, ts[k]) }
+            // One statement index per book: built per section, every section of a dictionary held its own copy at once.
+            val byKey = b.statements.withIndex().associate { it.value.key to it.index }
             kotlinx.coroutines.coroutineScope { ts.indices.map { k -> async {
                 // A premise this page established joined the facts and left the open set: the rewritten table keeps it.
                 val prior = (tableOf(name, k)?.get("establishes") as? List<*>).orEmpty()
                     .mapNotNull { e -> (e as? Map<*, *>)?.let { it["premise"].toString() to ((it["noul"] as? Number)?.toDouble() ?: 0.0) } }
                     .filter { askable(it.first) }
-                val t = table(key, b, k, ts[k], read[k], open, prior, gate, at, posited)
+                val t = table(key, b, k, ts[k], read[k], open, prior, gate, at, posited, byKey)
                 tokens.addAndGet(t["tokens"] as Long); requests.addAndGet(t["requests"] as Int); questions.addAndGet(t["asked"] as Int)
                 // Whole or not at all: a page read while its table is rewritten sees the old table or the new one, never a torn file.
                 val f = tableFile(name, k).apply { parentFile.mkdirs() }
