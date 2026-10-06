@@ -104,11 +104,23 @@ class SenseRow internal constructor(
         if (everywhere(i)) den * (2 * positive[i] + Nal.UNIT) >= num * (2 * mass + width * Nal.UNIT)
         else share[i] * den >= num
 
-    /** The index of the class a production types the word as: the leading class, when the row is eternal and it holds; else -1. */
+    /**
+     * The index of the class a production types the word as: the leading class, when it holds and the row's spot stands
+     * [MARGIN] radii inside its cap ([margin]); else -1. The share's distance from the cap's edge is weighed against the
+     * spot's radius 1/(2√T), so a large row on the edge is refused and a smaller row deep inside the cap is not.
+     */
     fun production(): Int {
         val t = top
-        return if (t >= 0 && eternal() && holds(t)) t else -1
+        return if (t >= 0 && holds(t) && direct(t) && margin(t) >= MARGIN) t else -1
     }
+
+    /**
+     * Class [i] holds 7/10 on the judgments that named it, before any censored none mass is shared out: the integer plane
+     * den·(2w + 1) ≥ num·(2T + K) on [positive]. For an exact row it is [holds]; a censored row's fixed point can lift a
+     * class with little mass of its own past the cap, and that class is not a production.
+     */
+    private fun direct(i: Int): Boolean =
+        HOLDS_DEN * (2 * positive[i] + Nal.UNIT) >= HOLDS_NUM * (2 * mass + width * Nal.UNIT)
 
     /** True when some menu lacked a class and its none mass is shared out ([completed] differs from [positive]). */
     private val censored: Boolean by lazy {
@@ -249,6 +261,9 @@ class SenseRow internal constructor(
         /** A production holds its class at a share ≥ 7/10. */
         const val HOLDS_NUM = 7L
         const val HOLDS_DEN = 10L
+
+        /** A production's spot stands this many radii inside its cap (|z| < 2 straddles the edge). */
+        const val MARGIN = 2.0
 
         private const val EM_ROUNDS = 500
         private const val EM_TOLERANCE = 1e-12

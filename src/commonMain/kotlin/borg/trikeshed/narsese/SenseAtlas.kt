@@ -1,6 +1,8 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lib.*
+import kotlin.math.acos
+import kotlin.math.sqrt
 
 /**
  * Sense rows ([SenseRow]) as one atlas: each row is a chart on its K-class sphere, and the atlas lays every chart's
@@ -54,15 +56,21 @@ class SenseAtlas private constructor(
 
     /**
      * Per chart the cell index its production types the word as ([SenseRow.production]): its leading class other than
-     * none, when the chart is eternal and that cell holds; else -1. Returns how many charts produce.
+     * none, when that cell holds and the chart's spot stands [SenseRow.MARGIN] radii inside its cap; else -1. Returns how
+     * many charts produce. For an exact chart holds is the integer plane and the margin reads the cell's columns; a censored
+     * chart asks its row.
      */
-    fun productions(out: IntArray, eternal: ByteArray = ByteArray(size).also { eternal(it) }, holds: ByteArray = ByteArray(cells).also { holds(it) }): Int {
+    fun productions(out: IntArray, holds: ByteArray = ByteArray(cells).also { holds(it) }): Int {
+        val edge = acos(sqrt(SenseRow.HOLDS_NUM.toDouble() / SenseRow.HOLDS_DEN))
         var c = 0
         for (r in 0 until size) {
             out[r] = -1
-            if (eternal[r].toInt() == 0) continue
-            val top = if (censored[r]) charts[r].top.let { if (it < 0) -1 else start[r] + it } else leading(r)
-            if (top >= 0 && holds[top].toInt() == 1) { out[r] = top; c++ }
+            if (censored[r]) { val p = charts[r].production(); if (p >= 0) { out[r] = start[r] + p; c++ }; continue }
+            val top = leading(r)
+            if (top < 0 || holds[top].toInt() == 0) continue
+            val tr = t[r].toDouble(); val half = k[r] * UNIT / 2.0
+            val share = (w[top] + UNIT / 2.0) / (tr + half)
+            if ((edge - acos(sqrt(share.coerceIn(0.0, 1.0)))) * 2.0 * sqrt(tr / UNIT) >= SenseRow.MARGIN) { out[r] = top; c++ }
         }
         return c
     }
