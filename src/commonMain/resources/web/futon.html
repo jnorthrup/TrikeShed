@@ -52,8 +52,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <body data-app-page="futon">
 <header><b>Futon</b><span>· trikeshed — the couch, plainly</span><a href="/graal">→ commander console</a></header>
 <div id="bar">
-  <select id="db" onchange="selectDb(this.value)" title="database (from /_all_dbs)"></select>
-  <input id="prefix" placeholder="filter within this folder (id prefix)" size="42">
+  <select id="db" onchange="selectDb(this.value)" title="database (from /_all_dbs)" aria-label="Select database"></select>
+  <input id="prefix" placeholder="filter within this folder (id prefix)" size="42" aria-label="Filter ID prefix">
   <button onclick="firstPage()" title="Apply filter">go</button>
   <button onclick="newDoc()">new document</button>
   <span id="info">…</span>
@@ -66,8 +66,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
     <div id="views">
       <div id="viewbar"><b>views</b>
-        <select id="viewsel"></select>
-        <input id="viewq" placeholder="limit=20&amp;reduce=false" size="24">
+        <select id="viewsel" aria-label="Select view"></select>
+        <input id="viewq" placeholder="limit=20&amp;reduce=false" size="24" aria-label="View query parameters">
         <button onclick="runView()">run</button>
         <button onclick="loadViews()" title="re-read _design/ docs" aria-label="Reload views">↻</button>
         <span id="viewinfo"></span></div>
@@ -76,12 +76,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   </div>
   <div id="edit">
     <div class="head">
-      <input id="docid" placeholder="_id" >
+      <input id="docid" placeholder="_id" aria-label="Document ID">
       <button class="primary" onclick="saveDoc()">save</button>
       <button onclick="deleteDoc()">delete</button>
       <button onclick="loadDoc(document.getElementById('docid').value)">reload</button>
     </div>
-    <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
+    <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below' aria-label="Document JSON body"></textarea>
     <div class="att" id="att"></div>
     <div id="status">select a document, or create one</div>
   </div>
