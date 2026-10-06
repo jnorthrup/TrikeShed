@@ -4,6 +4,7 @@ import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.j
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
@@ -151,7 +152,7 @@ object HermesBaselines {
     ): Series<HermesBaselineScoring.NarsOutcome> {
         val all = pairs(impulses, scenarios)
         if (all.size < 2) return emptySeriesOf()
-        val train = all.filterIndexed { i, _ -> i % 2 == 0 }
+        val train = all.filterIndexed { i, _ -> i % 2 == 0 }.toList()
         val holdout = all.filterIndexed { i, _ -> i % 2 == 1 }
 
         val bag = BeliefBagElement(capacity = 512)
@@ -160,8 +161,9 @@ object HermesBaselines {
         element.open()
         runCatching {
             element.teach(
-                train.map { it.first }.toSeries(),
-                train.map { it.second }.toSeries(),
+                /* ⚡ Bolt: Use zero-allocation j constructor to avoid intermediate List allocations via .map { ... }.toSeries() */
+                train.size j { i -> train[i].first },
+                train.size j { i -> train[i].second },
             )
         }
         settle(bag)
