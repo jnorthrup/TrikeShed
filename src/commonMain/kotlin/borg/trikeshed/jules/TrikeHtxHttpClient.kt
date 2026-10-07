@@ -5,7 +5,6 @@ import borg.trikeshed.htx.HtxHeaders
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.HtxRequest
-import borg.trikeshed.htx.HtxResponse
 import borg.trikeshed.htx.emptyHtxBody
 import borg.trikeshed.htx.emptyHtxHeaders
 import borg.trikeshed.htx.htxHeaders
@@ -15,12 +14,6 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toArray
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeout
-
-/** Typed reactor-HTX response failure with the remote status preserved. */
-class HtxHttpException(val status: Int, message: String) : RuntimeException(message)
-
-/** Jules retains this name for its cycle HTTP-status accounting API. */
-typealias JulesHttpException = HtxHttpException
 
 /**
  * Common outbound HTTP client for Jules/Brain callers.
@@ -54,12 +47,7 @@ class TrikeHtxHttpClient(
             *defaultHeaders.toArray(),
         )).withHeader("Content-Type", "application/json")
             .withHeader("Content-Length", bytes.size.toString())
-        val response: HtxResponse = htx.request(req)
-        val body = response.body.toArray().decodeToString()
-        if (response.status >= 400) {
-            throw HtxHttpException(response.status, "HTTP ${response.status}: ${body.take(300)}")
-        }
-        body
+        htx.requestResult(req).getOrThrow().body.toArray().decodeToString()
     }
 
     private fun normalizePath(path: String): String =

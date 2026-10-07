@@ -328,10 +328,9 @@ fun ForgeBrowser.tikaIngest(f: File, done: (ShapeDoc) -> Unit) {
     setView(ForgeView.Shape)
     scope.launch {
         val doc: ShapeDoc = try {
-            val response = window.fetch("/ingest", org.w3c.fetch.RequestInit(
+            val response = window.fetch("/api/graal/ingest?name=" + urlEncode(f.name), org.w3c.fetch.RequestInit(
                 method = "POST",
                 body = f,
-                headers = org.w3c.fetch.Headers().also { it.append("X-Forge-Name", f.name) },
             )).await()
             if (!response.ok) throw IllegalStateException(response.status.toString())
             val j = reify(response.text().await()) as? Map<String, Any?> ?: emptyMap()
@@ -350,7 +349,7 @@ fun ForgeBrowser.tikaIngest(f: File, done: (ShapeDoc) -> Unit) {
             } catch (browserFailure: Throwable) {
                 ShapeDoc(
                     name = f.name, lines = emptyList(), runs = emptyList(), key = emptyList(), sep = "",
-                    kind = "unsupported here", unit = "lines", via = "./gradlew serveForgePages",
+                    kind = "unsupported here", unit = "lines", via = "bin/oroboros",
                 )
             }
         }

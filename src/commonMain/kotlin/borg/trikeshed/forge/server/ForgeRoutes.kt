@@ -57,7 +57,6 @@ object ForgeRoutes {
         RouteMeta("POST", "/api/submit", Tier.JVM_ONLY, "ingest body → ForgeKanbanIngest.persistMarkdown (Tika actual)"),
         RouteMeta("POST", "/api/donor", Tier.JVM_ONLY, "alias of /api/submit"),
         RouteMeta("POST", "/api/invoke", Tier.PORTABLE, "command queue {commands:[…]} → {accepted,sequence}"),
-        RouteMeta("POST", "/ingest", Tier.JVM_ONLY, "ForgeIngestServer alias — X-Forge-Name + persist + Tika"),
         // ── Blackboard (PORTABLE) ──
         RouteMeta("GET", "/blackboard/facts", Tier.PORTABLE, "ConfixBlackboard.changes SSE (bounded ring 256)"),
         RouteMeta("POST", "/blackboard/assert", Tier.PORTABLE, "blackboard.put(k,v,ide)"),

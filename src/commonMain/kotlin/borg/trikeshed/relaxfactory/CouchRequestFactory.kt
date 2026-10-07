@@ -18,6 +18,10 @@ import borg.trikeshed.job.ContentId
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
+interface RequestFactoryHandler {
+    suspend fun processRequest(payload: String): String
+}
+
 /**
  * Reactor Couch RequestFactory — commonMain. Implements [RequestFactoryHandler].
  *

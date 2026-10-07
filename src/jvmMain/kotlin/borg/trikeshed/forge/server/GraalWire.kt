@@ -571,7 +571,7 @@ class GraalWire(
             val byteSurface: borg.trikeshed.cas.ByteEpistemicSurface? = null
             JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
                 "ok" to true, "id" to docId, "cid" to cid.value, "bytes" to bytes.size,
-                "extracted" to extractId, "chars" to markdown.length, "shape" to shapeKey.take(80),
+                "extracted" to extractId, "chars" to markdown.length, "markdown" to markdown, "shape" to shapeKey.take(80),
                 "plan" to plan, "persisted" to persisted,
                 "code" to docCode, "codeRing8" to ((docCode ushr 8) and 0xFF),
                 // byte schema: organic comprehension without parser

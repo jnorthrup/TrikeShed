@@ -1,7 +1,7 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.htx.HtxHttpError
 import borg.trikeshed.htx.htxHeaders
-import borg.trikeshed.jules.HtxHttpException
 import borg.trikeshed.jules.TrikeHtxHttpClient
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
@@ -33,7 +33,7 @@ object Jev {
         var wait = 1_000L
         while (true) {
             try { return reifyMap(client.post("/v1/systemone", body)) }
-            catch (e: HtxHttpException) { if ((e.status != 429 && e.status != 529) || wait > 2_000L) throw e }
+            catch (e: HtxHttpError) { if ((e.status != 429 && e.status != 529) || wait > 2_000L) throw e }
             delay(wait); wait *= 2
         }
     }

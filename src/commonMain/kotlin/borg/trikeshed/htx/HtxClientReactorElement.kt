@@ -133,22 +133,6 @@ open class HtxClientReactorElement(
         }
     }
 
-    /**
-     * Request that returns [Result] shaped by the 200/non-200 patchpoints.
-     * [Result.success] for 2xx, [Result.failure] with HTTP status + body
-     * snippet for non-2xx. Subscribers still see the RESPONSE_OK /
-     * RESPONSE_ERROR fanout frames — this is the convenience wrapper.
-     */
-    suspend fun requestResult(request: HtxRequest): Result<HtxResponse> {
-        val resp = request(request)
-        return if (resp.status in 200..299) {
-            Result.success(resp)
-        } else {
-            val body = resp.body.toArray().decodeToString().take(500)
-            Result.failure(HtxHttpError(resp.status, body))
-        }
-    }
-
     fun blob(
         url: String,
         contentLength: Long,

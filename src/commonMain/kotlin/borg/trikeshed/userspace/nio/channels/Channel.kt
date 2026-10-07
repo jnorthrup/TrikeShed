@@ -13,7 +13,7 @@ import borg.trikeshed.lib.Closeable
 //   borg.trikeshed.userspace.FunctionalUringFacade — SQE/CQE plumbing
 //   borg.trikeshed.userspace.ByteRegion      — mutable read sink
 //   borg.trikeshed.lib.ByteSeries            — immutable write source
-//   borg.trikeshed.userspace.network.Channel — protocol session surface
+//   borg.trikeshed.userspace.network.SessionChannel — protocol session surface
 //
 // Do not route new IO through these stubs. Implement UserspaceChannelBackend instead.
 public interface Channel : Closeable {

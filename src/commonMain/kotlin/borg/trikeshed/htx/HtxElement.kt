@@ -3,7 +3,6 @@ package borg.trikeshed.htx
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -221,7 +220,7 @@ suspend fun openHtxElement(
     val resolvedService = routeService
         ?: contextRouteService
         ?: activeSupervisor.service<HtxRouteService>()
-        ?: DefaultHtxRouteService
+        ?: error("No HtxRouteService in the coroutine context or the NioSupervisor.")
 
     return HtxElement(
         baseUrl = baseUrl,
@@ -230,42 +229,6 @@ suspend fun openHtxElement(
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
         fanoutSubscribers = subscribers,
     ).also { it.open() }
-}
-
-private object DefaultHtxRouteService : HtxRouteService {
-    override suspend fun exchange(
-        state: HtxExchangeState,
-        request: HtxRequest,
-    ): HtxExchangeResult {
-        val response = when {
-            request.target.requestPath != "/health" -> HtxResponse(404, ByteSeries("not found"))
-            request.method != HtxMethod.GET -> HtxResponse(405, ByteSeries("method not allowed"))
-            else -> HtxResponse(200, ByteSeries("ok"))
-        }
-
-        val responded = state.copy(
-            lifecycle = HtxExchangeLifecycle.RESPONDED,
-            request = request,
-            response = response,
-        )
-
-        return HtxExchangeResult(
-            responded,
-            htxFrames(
-                HtxFrame(
-                    exchangeOrdinal = state.exchangeOrdinal,
-                    stage = HtxFlowStage.REQUEST,
-                    request = request,
-                ),
-                HtxFrame(
-                    exchangeOrdinal = state.exchangeOrdinal,
-                    stage = HtxFlowStage.RESPONSE,
-                    request = request,
-                    response = response,
-                ),
-            ),
-        )
-    }
 }
 
 private fun normalizePath(path: String): String =

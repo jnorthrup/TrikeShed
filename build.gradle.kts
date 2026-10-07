@@ -1155,8 +1155,6 @@ tasks.register<JavaExec>("runKanbanHttpServerJvm") {
 //   ./gradlew generateForgePages                        # stage jvm: JVM-baked index.html + sw/manifest/icons/css/js
 //   ./gradlew generateForgePages -PforgePagesStages=jvm,js,wasm   # + Kotlin/JS and wasmJs bundles under docs/js, docs/wasm
 //   ./gradlew forgePagesProbe                           # is the next stage green? (compiles JS + wasm targets)
-//   ./gradlew serveForgePages [-PforgePort=8765]        # serve docs/ at http://localhost:8765/ + POST /ingest (ForgeIngestServer)
-//   ./gradlew forgePwa                                  # generate + serve
 //   Deploy = generate, commit docs/, push. Pages = branch master, folder /docs; no Actions workflows.
 //
 // Ratchet: gradle/js-target-debt.excludes lists commonMain files cut from the JS-target compiles only;
@@ -1263,30 +1261,9 @@ tasks.register<Sync>("generateForgePages") {
     doLast {
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
         if (!noJekyll.exists()) noJekyll.writeText("\n")
-        println("Forge PWA published to docs/ (stages: $stageStamp). Serve: ./gradlew serveForgePages  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
+        println("Forge PWA published to docs/ (stages: $stageStamp). Live: bin/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
     }
 }
-
-// Local preview of the published tree, served from the JDK's built-in static server — no python, no npm.
-// Binds 127.0.0.1 so the service worker scope matches what GitHub Pages serves under /TrikeShed/… relative urls.
-val forgePort: String = providers.gradleProperty("forgePort").orElse("8765").get()
-
-tasks.register<JavaExec>("serveForgePages") {
-    group = "documentation"
-    description = "Serve docs/ at http://localhost:$forgePort/ plus POST /ingest (Tika; ffmpeg+tesseract for scans) via ForgeIngestServer (Ctrl-C to stop). -PforgePort=N."
-    mainClass.set("borg.trikeshed.forge.server.ForgeIngestServer")
-    useStagedJvmClasspath()
-    val docsDir = project.layout.projectDirectory.dir("docs").asFile
-    doFirst { if (!docsDir.resolve("index.html").isFile) throw GradleException("docs/index.html missing; run ./gradlew generateForgePages first") }
-    args(docsDir.path, forgePort)
-}
-
-tasks.register("forgePwa") {
-    group = "documentation"
-    description = "generateForgePages then serveForgePages (the old `bin/forge-pwa.sh all`)."
-    dependsOn("generateForgePages", "serveForgePages")
-}
-tasks.named("serveForgePages") { mustRunAfter("generateForgePages") }
 
 tasks.register("forgePagesProbe") {
     group = "documentation"

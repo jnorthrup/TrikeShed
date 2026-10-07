@@ -182,7 +182,19 @@ interface TlsCodecBackend : CoroutineContext.Element {
     ): TlsCodecResult
 }
 
-interface TlsFilterCodec {
+/** The TLS codec of a target without a TLS engine binding: every operation is the marked gap. */
+class StubTlsCodecBackend : TlsCodecBackend {
+    override suspend fun handshake(config: TlsConfig, state: TlsFlowState): TlsCodecResult =
+        TODO("TLS codec for this target")
+    override suspend fun upstream(config: TlsConfig, state: TlsFlowState, payload: TlsPayload): TlsCodecResult =
+        TODO("TLS codec for this target")
+    override suspend fun downstream(config: TlsConfig, state: TlsFlowState, payload: TlsPayload): TlsCodecResult =
+        TODO("TLS codec for this target")
+    override suspend fun close(config: TlsConfig, state: TlsFlowState): TlsCodecResult =
+        TODO("TLS codec for this target")
+}
+
+interface TlsEndpoint {
     val route: TlsRoute
     val flowState: TlsFlowState
     val session: TlsSession? get() = flowState.session
@@ -191,9 +203,7 @@ interface TlsFilterCodec {
     suspend fun upstream(payload: TlsPayload): TlsFrames
     suspend fun downstream(payload: TlsPayload): TlsFrames
     suspend fun close(): TlsFrames
-}
 
-interface TlsEndpoint : TlsFilterCodec {
     val role: TlsRole get() = route.a
     val remoteHost: String get() = route.b.a
     val remotePort: Int get() = route.b.b

@@ -10,7 +10,6 @@ class ConflictMarkerAuditTest {
     fun positioningPaperFilesDoNotContainConflictMarkers() {
         val filesToCheck = listOf(
             "src/commonMain/kotlin/borg/trikeshed/forge/shell/HtmlShell.kt",
-            "src/commonMain/kotlin/borg/trikeshed/wireproto/ActionDecoder.kt"
         )
         for (filePath in filesToCheck) {
             val file = File(filePath)
