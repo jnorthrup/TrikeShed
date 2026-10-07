@@ -54,8 +54,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <div id="bar">
   <select id="db" onchange="selectDb(this.value)" title="database (from /_all_dbs)"></select>
   <input id="prefix" placeholder="filter within this folder (id prefix)" size="42">
-  <button onclick="firstPage()" title="Apply filter">go</button>
-  <button onclick="newDoc()">new document</button>
+  <button onclick="firstPage()" title="Apply filter" aria-label="Apply filter">go</button>
+  <button onclick="newDoc()" aria-label="Create new document">new document</button>
   <span id="info">…</span>
   <span style="margin-left:auto;display:flex;gap:12px;font-size:11px"><button onclick="qsInstall()" aria-label="Run quickstart" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="run the quickstart in anger">&#9889; install</button><button onclick="qsFeedback()" aria-label="Provide feedback" style="background:none;border:none;padding:0;font:inherit;color:var(--dim);cursor:pointer;border-bottom:1px dotted var(--dim)" title="GitHub issue prefilled from here">&#9873; feedback</button></span>
 </div>
@@ -63,12 +63,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <div id="list">
     <div id="crumbs"></div>
     <table id="docs"><tr><th style="width:66%">_id</th><th>_rev</th></tr></table>
-    <div id="pager"><button onclick="prevPage()" id="prevB"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
+    <div id="pager"><button onclick="prevPage()" id="prevB" aria-label="Previous page"><span aria-hidden="true">‹</span> prev</button><button onclick="nextPage()" id="nextB" aria-label="Next page">next <span aria-hidden="true">›</span></button><span id="pageinfo"></span></div>
     <div id="views">
       <div id="viewbar"><b>views</b>
         <select id="viewsel"></select>
         <input id="viewq" placeholder="limit=20&amp;reduce=false" size="24">
-        <button onclick="runView()">run</button>
+        <button onclick="runView()" aria-label="Run view">run</button>
         <button onclick="loadViews()" title="re-read _design/ docs" aria-label="Reload views">↻</button>
         <span id="viewinfo"></span></div>
       <table id="viewrows"></table>
@@ -77,9 +77,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <div id="edit">
     <div class="head">
       <input id="docid" placeholder="_id" >
-      <button class="primary" onclick="saveDoc()">save</button>
-      <button onclick="deleteDoc()">delete</button>
-      <button onclick="loadDoc(document.getElementById('docid').value)">reload</button>
+      <button class="primary" onclick="saveDoc()" aria-label="Save document">save</button>
+      <button onclick="deleteDoc()" aria-label="Delete document">delete</button>
+      <button onclick="loadDoc(document.getElementById('docid').value)" aria-label="Reload document">reload</button>
     </div>
     <textarea id="docbody" spellcheck="false" placeholder='{"fields":"…"}  — _rev is preserved on save; MVCC conflicts surface below'></textarea>
     <div class="att" id="att"></div>

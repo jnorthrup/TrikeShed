@@ -29,29 +29,29 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <a id="panelsBreakout" href="/panels" target="_blank" rel="noopener" title="Open selected program in a separate Panels tab" aria-label="Open selected program in a separate Panels tab">↗</a>
   <div id="parentTools" role="group" aria-label="Selected parent controls">
     <button id="parentHandle" title="Selected parent" aria-label="Selected parent">⠿</button>
-    <button id="fdBtn" title="Layout selected parent">↦ fd</button><button id="shakeBtn" title="Shake selected parent">shake</button><button id="fitBtn" title="Fit selected parent">⤢ fit</button>
+    <button id="fdBtn" title="Layout selected parent" aria-label="Layout selected parent">↦ fd</button><button id="shakeBtn" title="Shake selected parent" aria-label="Shake selected parent">shake</button><button id="fitBtn" title="Fit selected parent" aria-label="Fit selected parent">⤢ fit</button>
   </div>
-  <button class="run" id="runBtn">▶ Run</button>
+  <button class="run" id="runBtn" aria-label="Run">▶ Run</button>
   <button id="argumentsBtn" title="Invocation arguments and resolved bindings" aria-label="Invocation arguments">{ }</button>
   <button class="stop" id="cancelRun" title="Cancel selected program run" aria-label="Cancel run" disabled>■</button>
-  <button class="stop" id="stopBtn">■ stop timers</button>
-  <button id="addBtn">+ node</button>
+  <button class="stop" id="stopBtn" aria-label="Stop timers">■ stop timers</button>
+  <button id="addBtn" aria-label="Add node">+ node</button>
   <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
   <button id="storeSaveBtn" title="Publish program changes" aria-label="Publish program">↑ Publish</button>
   <button id="snapshotBtn" title="Take a workspace snapshot: every program version, prompt version, project sequence and latest receipt, named as one cid" aria-label="Take a workspace snapshot">◎ snapshot</button>
-  <button id="storeLoadBtn" title="load a construction from the store">⇩ store</button>
-  <button id="presetsBtn" title="server-authored programs — offered, never installed">▤ presets</button>
-  <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules">⟁ rdf</button>
-  <button id="paletteBtn" title="drag node types and programs onto the canvas">⧉ palette</button>
-  <button id="assetsBtn" title="uploaded assets as a tree — remove a document with its twins, a folder, or a db">⌫ assets</button>
-  <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross">⚿ keys</button>
-  <button id="sheetsBtn" title="every territory as grid-in-cell sheets (CursorSheet) — a container cell drills in, the crumb climbs out">▤ sheets</button>
-  <button id="neighborsBtn" title="Find related nodes across the whole blackboard">↔ neighbors</button>
-  <button id="exportBtn">export</button>
-  <button id="importBtn">import</button>
+  <button id="storeLoadBtn" title="load a construction from the store" aria-label="Load from store">⇩ store</button>
+  <button id="presetsBtn" title="server-authored programs — offered, never installed" aria-label="Presets">▤ presets</button>
+  <button id="rdfBtn" title="the canvas as RDF — graph, ontology, and its alignment with productions and causal rules" aria-label="RDF View">⟁ rdf</button>
+  <button id="paletteBtn" title="drag node types and programs onto the canvas" aria-label="Palette">⧉ palette</button>
+  <button id="assetsBtn" title="uploaded assets as a tree — remove a document with its twins, a folder, or a db" aria-label="Assets">⌫ assets</button>
+  <button id="keysBtn" title="keymux endpoints — names & addresses; key values never cross" aria-label="Manage keys">⚿ keys</button>
+  <button id="sheetsBtn" title="every territory as grid-in-cell sheets (CursorSheet) — a container cell drills in, the crumb climbs out" aria-label="Sheets">▤ sheets</button>
+  <button id="neighborsBtn" title="Find related nodes across the whole blackboard" aria-label="Find neighbors">↔ neighbors</button>
+  <button id="exportBtn" aria-label="Export">export</button>
+  <button id="importBtn" aria-label="Import">import</button>
   <button id="undoBtn" title="undo ⌘Z" aria-label="Undo" disabled>↶</button>
   <button id="redoBtn" title="redo ⇧⌘Z" aria-label="Redo" disabled>↷</button>
-  <button id="clearBtn">clear</button>
+  <button id="clearBtn" aria-label="Clear">clear</button>
   <button id="qsBtn" aria-label="Run quickstart" title="run the quickstart in anger" style="border-color:#3ddc84;color:#3ddc84">⚡</button>
   <button id="fbBtn" aria-label="Provide feedback" title="open a GitHub issue prefilled with this construction's coordinates" style="border-color:var(--warn);color:var(--warn)">⚑</button>
 </div>
@@ -63,7 +63,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <label for="detailLevel">Detail</label><output id="detailValue" for="detailLevel">50%</output>
     <div id="detailTrack"><input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="Snap depth: panels split into their detail once the view reaches this zoom. The tick is the current zoom."><i id="zoomTick" aria-hidden="true"></i></div>
   </div>
-  <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
+  <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity" aria-label="Inspect activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
   <details class="legend-section"><summary>Blobs and heap</summary>
   <div id="topologyCategories" role="group" aria-label="Topology masks"></div>
   <footer><button id="refreshHeap" title="Refresh measured heap data" aria-label="Refresh heap">↻</button><div><p id="heapAvailability" role="status"></p><p id="poolAvailability" role="status"></p></div></footer>
@@ -79,14 +79,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <label>Blackboard node <input id="neighborKey" list="neighborKeys" autocomplete="off"></label><datalist id="neighborKeys"></datalist>
     <p id="neighborStatus" role="status"></p><div id="neighborResults"></div>
   </section>
-  <div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>
+  <div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false" aria-label="Raw JSON view">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>
 <div id="blip"></div>
 <dialog id="argumentInspector" aria-labelledby="argumentTitle">
   <form method="dialog"><button aria-label="Close arguments">×</button></form>
   <h2 id="argumentTitle">Arguments</h2>
   <h3>Invocation</h3>
   <div class="argument-table"><table><thead><tr><th>Supply</th><th>Name</th><th>Type</th><th>Value (JSON)</th><th>Default</th></tr></thead><tbody id="argumentInputs"></tbody></table></div>
-  <div class="argument-actions"><input id="argumentName" aria-label="New argument name" placeholder="Name"><button id="argumentAdd" aria-label="Add argument" title="Add argument">+</button><button id="argumentRun" class="run">▶ Run</button></div>
+  <div class="argument-actions"><input id="argumentName" aria-label="New argument name" placeholder="Name"><button id="argumentAdd" aria-label="Add argument" title="Add argument">+</button><button id="argumentRun" class="run" aria-label="Run argument">▶ Run</button></div>
   <p id="argumentError" role="alert"></p>
   <h3>Resolved Bindings</h3><p id="argumentReceipt"></p>
   <div class="argument-table"><table><thead><tr><th>Node</th><th>Name</th><th>Type</th><th>Source</th><th>Value</th><th>Status</th></tr></thead><tbody id="argumentResolved"></tbody></table></div>
@@ -95,7 +95,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <dialog id="archiveInspector" aria-labelledby="archiveTitle">
   <form method="dialog"><button aria-label="Close archive">×</button></form>
   <h2 id="archiveTitle">Archives</h2>
-  <div class="archive-actions"><button id="archiveUpload" title="Import ZIP">↑ Import ZIP</button><button id="archiveDemo">Load demo</button><button id="archiveLandscape" title="Fit archive in landscape">⤢ Landscape</button><button id="archiveDownload" title="Download selected files">↓ Download</button><button id="archiveCancel" aria-label="Cancel archive operation" title="Cancel archive operation">■</button></div>
+  <div class="archive-actions"><button id="archiveUpload" title="Import ZIP" aria-label="Import ZIP archive">↑ Import ZIP</button><button id="archiveDemo" aria-label="Load demo">Load demo</button><button id="archiveLandscape" title="Fit archive in landscape" aria-label="Fit landscape">⤢ Landscape</button><button id="archiveDownload" title="Download selected files" aria-label="Download selected files">↓ Download</button><button id="archiveCancel" aria-label="Cancel archive operation" title="Cancel archive operation">■</button></div>
   <div class="archive-actions"><input id="archiveCid" aria-label="Archive content ID" placeholder="sha256:…"><button id="archiveOpen" aria-label="Open archive by content ID" title="Open archive by content ID">→</button></div>
   <p id="archiveStatus" role="status"></p>
   <div class="archive-columns"><ul id="archiveEntries" aria-label="Archive entries"></ul><section><h3 id="archivePreviewTitle"></h3><div id="archivePreview"></div></section></div>
