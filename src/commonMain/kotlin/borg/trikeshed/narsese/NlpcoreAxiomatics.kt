@@ -6,6 +6,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.j
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpToken
 
@@ -221,11 +222,8 @@ object NlpcoreAxiomatics {
         return found.values.toSeries() // Bolt: Use native Collection.toSeries() instead of intermediate list copy
     }
 
-    fun rules(document: NlpDocument, sourceCid: String? = null): Series<EternalRule> {
-        val vals = recognize(document, sourceCid)
-        /* ⚡ Bolt: Use zero-allocation j constructor to avoid intermediate List allocations via .map { ... }.toSeries() */
-        return vals.size j { i -> vals[i].rule }
-    }
+    fun rules(document: NlpDocument, sourceCid: String? = null): Series<EternalRule> =
+        recognize(document, sourceCid).values().map { it.rule }.toSeries()
 
     private fun coversSource(document: NlpDocument): Boolean {
         var sentenceEnd = 0
