@@ -12,6 +12,7 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.lib.packInts
+import borg.trikeshed.lib.view
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitAll
@@ -1256,7 +1257,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     private fun trace(m: SenseMemory): Traced {
         if (!SENSES_ENABLED) return Traced(0, 0, 0, 0)
         val now = HashMap<String, String>()
-        for ((lemma, at) in m.held()) {
+        for ((lemma, at) in m.held().view) {
             val row = m.sense(lemma, at)?.takeIf { it.eternal() } ?: continue
             ConceptTree.answer(row, m)?.let { now[condition(lemma, at)] = it.cls }
         }
@@ -1322,9 +1323,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         if (!SENSES_ENABLED || mem == null) null else located(book).at.let { at -> (typed(lemma, at) ?: typed(lemma.removeSuffix("s"), at))?.cls }
 
     /** True when Jev holds, somewhere the word was read, that none of the senses offered for [lemma] is the one it is used in. */
-    private fun refused(lemma: String): Boolean = (mem?.let { m -> synchronized(m) { m.contexts(lemma) } }).orEmpty().any { (_, r) ->
+    private fun refused(lemma: String): Boolean = mem?.let { m -> synchronized(m) { m.contexts(lemma) } }?.view?.any { (_, r) ->
         r.none >= 0 && r.holds(r.none)
-    }
+    } == true
 
     /**
      * Classes posited for the nouns of [c] the lexicon cannot type, or whose offered senses Jev refused, by transport
@@ -1363,7 +1364,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 "classes" to (0 until r.width).sortedByDescending { r.share[it] }.map { i ->
                     mapOf("class" to memory.className(r.classes[i]), "share" to r.share[i], "z" to r.margin(i), "holds" to r.holds(i), "offered" to r.everywhere(i)) })
             if (lemma.isNullOrBlank()) {
-                val near = memory.held().mapNotNull { (l, a) -> memory.sense(l, a)?.let { r -> Triple(condition(l, a), r, r.top) } }
+                val near = memory.held().view.mapNotNull { (l, a) -> memory.sense(l, a)?.let { r -> Triple(condition(l, a), r, r.top) } }
                     .filter { it.third >= 0 && it.second.holds(it.third) }.sortedByDescending { it.second.confidence }
                 val overlay = tree
                 mapOf("rows" to memory.rows, "judgments" to memory.judgments, "cells" to memory.size, "contexts" to memory.contexts, "caps" to synchronized(caps) { caps.size },
@@ -1376,13 +1377,13 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                         mapOf("lemma" to f.lemma, "class" to f.cls, "localities" to f.localities.map { it.term }, "share" to f.share, "c" to f.confidence) },
                     // Productions of one word disagreeing across localities whose rows differ: its sense moved with time or English.
                     "drift" to overlay.drift().take(SAMPLE).map { d ->
-                        mapOf("lemma" to d.lemma, "classes" to d.classes.map { (a, cls) -> mapOf("at" to a.term, "class" to cls) }) },
+                        mapOf("lemma" to d.lemma, "classes" to d.classes.view.map { (a, cls) -> mapOf("at" to a.term, "class" to cls) }) },
                     "books" to books)
             } else mapOf("lemma" to lemma, "at" to at?.at?.term, "typed" to at?.let { typed(lemma, it.at) }?.let { mapOf("class" to it.cls, "e" to it.e, "by" to it.by) },
                 // The super tree's closure the word carries where the book was crafted: the overlay's class and every class above it.
                 "is" to at?.let { a -> tree.closure(lemma, a.at).toIntArray().sortedByDescending { SumoCorpus.informationOf(it) }.take(6).map { ConceptTree.name(it) } },
                 "sense" to at?.let { memory.sense(lemma, it.at)?.let(::row) },
-                "contexts" to memory.contexts(lemma).map { (a, r) ->
+                "contexts" to memory.contexts(lemma).view.map { (a, r) ->
                     mapOf("at" to a.term, "judgments" to r.judgments, "cap" to capped(lemma, a)) + row(r)
                 },
                 "books" to books)

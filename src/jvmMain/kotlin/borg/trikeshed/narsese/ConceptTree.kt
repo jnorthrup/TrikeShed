@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
+import borg.trikeshed.lib.*
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 
@@ -52,27 +53,29 @@ class ConceptTree(val memory: SenseMemory?) {
     class Factor(val lemma: String, val cls: String, val localities: List<Locality>, val share: Double, val confidence: Double)
 
     /** A word in different caps in different localities: per locality, its class. */
-    class Drift(val lemma: String, val classes: List<Pair<Locality, String>>)
+    class Drift(val lemma: String, val classes: Series<Join<Locality, String>>)
 
     private class Capped(val at: Locality, val cls: String, val share: Double, val confidence: Double)
 
     /** True when [lemma]'s rows in [a] and [b] cannot be told apart; true when either is missing. */
-    private fun agree(local: List<Pair<Locality, SenseRow>>, a: Locality, b: Locality): Boolean {
-        val ra = local.firstOrNull { it.first == a }?.second ?: return true
-        val rb = local.firstOrNull { it.first == b }?.second ?: return true
-        return ra.homogeneous(rb)
+    private fun agree(local: Series<Join<Locality, SenseRow>>, a: Locality, b: Locality): Boolean {
+        var ra: SenseRow? = null; var rb: SenseRow? = null
+        for (x in 0 until local.size) { val c = local[x]; if (c.a == a) ra = c.b; if (c.a == b) rb = c.b }
+        return ra == null || rb == null || ra.homogeneous(rb)
     }
 
     /** Per word, the localities where its row stands in a cap. */
-    private fun capped(): Map<String, Pair<List<Pair<Locality, SenseRow>>, List<Capped>>> {
+    private fun capped(): Map<String, Join<Series<Join<Locality, SenseRow>>, List<Capped>>> {
         val m = memory ?: return emptyMap()
         return synchronized(m) {
-            m.held().groupBy({ it.first }, { it.second }).mapNotNull { (lemma, ats) ->
+            val out = LinkedHashMap<String, Join<Series<Join<Locality, SenseRow>>, List<Capped>>>()
+            for ((lemma, ats) in m.held().view.groupBy({ it.a }, { it.b })) {
                 val caps = ats.mapNotNull { a ->
                     m.sense(lemma, a)?.takeIf { it.eternal() }?.let { r -> answer(r, m)?.let { Capped(a, it.cls, it.e, r.confidence) } }
                 }
-                if (caps.isEmpty()) null else lemma to (m.contexts(lemma) to caps)
-            }.toMap()
+                if (caps.isNotEmpty()) out[lemma] = m.contexts(lemma) j caps
+            }
+            out
         }
     }
 
@@ -88,7 +91,7 @@ class ConceptTree(val memory: SenseMemory?) {
         var moved = false
         for (x in cs.indices) for (y in x + 1 until cs.size)
             if (cs[x].cls != cs[y].cls && !agree(local, cs[x].at, cs[y].at)) moved = true
-        if (!moved) null else Drift(lemma, cs.sortedBy { it.at.decade }.map { it.at to it.cls })
+        if (!moved) null else Drift(lemma, cs.sortedBy { it.at.decade } α { it.at j it.cls })
     }
 
     companion object {

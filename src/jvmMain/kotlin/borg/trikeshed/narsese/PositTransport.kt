@@ -23,7 +23,7 @@ class PositTransport {
     /** Per verb: class id → typed bearers bearing it. */
     private val landing = ArrayList<HashMap<Int, Int>>()
     /** Per verb: typed bearers bearing it, n(v). */
-    private val typed = ArrayList<Int>()
+    private var typed = IntArray(16)
     /** Per head: verb id → statements it bears. */
     private val heads = LinkedHashMap<String, HashMap<Int, Int>>()
     /** Per head: its own typed statements, packInts(verb, class) → count. */
@@ -31,8 +31,8 @@ class PositTransport {
 
     /** One statement: [verb] borne by a bearer typed [bearerClass] (-1 untyped), whose head is [head] when it is placed. */
     fun add(verb: String, bearerClass: Int, head: String?) {
-        val v = verbs.getOrPut(verb) { landing.size.also { landing.add(HashMap()); typed.add(0) } }
-        if (bearerClass >= 0) { landing[v].merge(bearerClass, 1, Int::plus); typed[v] = typed[v] + 1 }
+        val v = verbs.getOrPut(verb) { landing.size.also { landing.add(HashMap()); if (it == typed.size) typed = typed.copyOf(it * 2) } }
+        if (bearerClass >= 0) { landing[v].merge(bearerClass, 1, Int::plus); typed[v]++ }
         if (head == null) return
         heads.getOrPut(head) { HashMap() }.merge(v, 1, Int::plus)
         if (bearerClass >= 0) owns.getOrPut(head) { HashMap() }.merge(pack(v, bearerClass), 1, Int::plus)

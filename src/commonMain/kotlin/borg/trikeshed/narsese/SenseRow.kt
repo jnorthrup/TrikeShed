@@ -1,5 +1,6 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.lib.*
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.acos
@@ -171,15 +172,26 @@ class SenseRow internal constructor(
         (acos(sqrt(num.toDouble() / den)) - acos(sqrt(share[i].coerceIn(0.0, 1.0)))) / radius
 
     /** The classes offered in every judgment of both rows, none excepted, as index pairs (this row's, the other's). */
-    private fun common(other: SenseRow): Pair<IntArray, IntArray> {
-        val a = ArrayList<Int>(); val b = ArrayList<Int>()
+    private fun common(other: SenseRow): Twin<IntArray> {
+        val a = IntArray(minOf(width, other.width)); val b = IntArray(a.size); var n = 0
         var i = 0; var j = 0
         while (i < width && j < other.width) when {
             classes[i] < other.classes[j] -> i++
             classes[i] > other.classes[j] -> j++
-            else -> { if (i != none && everywhere(i) && other.everywhere(j)) { a.add(i); b.add(j) }; i++; j++ }
+            else -> { if (i != none && everywhere(i) && other.everywhere(j)) { a[n] = i; b[n] = j; n++ }; i++; j++ }
         }
-        return a.toIntArray() to b.toIntArray()
+        return a.copyOf(n) j b.copyOf(n)
+    }
+
+    /** How many classes [common] pairs, without building the pairs. */
+    private fun commonCount(other: SenseRow): Int {
+        var i = 0; var j = 0; var n = 0
+        while (i < width && j < other.width) when {
+            classes[i] < other.classes[j] -> i++
+            classes[i] > other.classes[j] -> j++
+            else -> { if (i != none && everywhere(i) && other.everywhere(j)) n++; i++; j++ }
+        }
+        return n
     }
 
     /** Σ √(p_c q_c) over the classes both rows offered everywhere plus the rest merged as one: 1 for one point. */
@@ -205,7 +217,7 @@ class SenseRow internal constructor(
      */
     fun homogeneous(other: SenseRow): Boolean {
         if (mass <= 0 || other.mass <= 0) return true
-        val k = common(other).first.size + 1
+        val k = commonCount(other) + 1
         if (k < 2) return true
         val t1 = mass.toDouble() / Nal.UNIT; val t2 = other.mass.toDouble() / Nal.UNIT
         return 8.0 * t1 * t2 / (t1 + t2) * (1.0 - bhattacharyya(other)) <= chiSquare95(k - 1)
@@ -225,19 +237,19 @@ class SenseRow internal constructor(
             n++
         }
         // A side's menus lack, in the union, what they lacked before and every class only the other side holds.
-        fun lifted(row: SenseRow, into: IntArray): Pair<List<IntArray>, List<Long>> {
+        fun lifted(row: SenseRow, into: IntArray): Join<Array<IntArray>, LongArray> {
             val held = BooleanArray(ids.size); for (x in 0 until row.width) held[into[x]] = true
-            val absent = (0 until ids.size).filter { !held[it] }
-            val missing = ArrayList<IntArray>(); val none = ArrayList<Long>()
-            if (row.menuMissing.isEmpty()) { missing.add(absent.toIntArray()); none.add(if (row.none >= 0) row.positive[row.none] else 0L) }
-            for (g in row.menuMissing.indices) {
-                missing.add((row.menuMissing[g].map { into[it] } + absent).sorted().toIntArray()); none.add(row.menuNone[g])
+            var na = 0; for (h in held) if (!h) na++
+            val absent = IntArray(na); var x = 0; for (c in held.indices) if (!held[c]) absent[x++] = c
+            if (row.menuMissing.isEmpty()) return arrayOf(absent) j longArrayOf(if (row.none >= 0) row.positive[row.none] else 0L)
+            val missing = Array(row.menuMissing.size) { g ->
+                val own = row.menuMissing[g]
+                IntArray(own.size + na).also { m -> for (y in own.indices) m[y] = into[own[y]]; absent.copyInto(m, own.size); m.sort() }
             }
-            return missing to none
+            return missing j row.menuNone.copyOf()
         }
         val (ma, na) = lifted(this, fromA); val (mb, nb) = lifted(other, fromB)
-        return SenseRow(ids, sum, judgments + other.judgments, if (noneClass >= 0) noneClass else other.noneClass,
-            (ma + mb).toTypedArray(), (na + nb).toLongArray())
+        return SenseRow(ids, sum, judgments + other.judgments, if (noneClass >= 0) noneClass else other.noneClass, ma + mb, na + nb)
     }
 
     private fun unionWidth(other: SenseRow): Int {

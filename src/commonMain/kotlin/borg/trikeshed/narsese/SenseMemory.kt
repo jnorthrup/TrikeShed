@@ -1,6 +1,6 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.collections.SeriesBuffer
+import borg.trikeshed.collections.FunnelHashMap
 import borg.trikeshed.lib.*
 import kotlin.math.roundToLong
 
@@ -20,11 +20,11 @@ import kotlin.math.roundToLong
  */
 class SenseMemory(val capacity: Int = CAPACITY) {
     private val lemmas = ArrayList<String>()
-    private val lemmaIds = HashMap<String, Int>()
+    private val lemmaIds = FunnelHashMap<String, Int>()
     private val classNames = ArrayList<String>()
-    private val classIds = HashMap<String, Int>()
+    private val classIds = FunnelHashMap<String, Int>()
     private val bookNames = ArrayList<String>()
-    private val bookIds = HashMap<String, Int>()
+    private val bookIds = FunnelHashMap<String, Int>()
     private var bookAt = IntArray(16)
 
     /** Rows, one per (lemma, book, menu): parallel columns, a dropped row keeps its index with no classes. */
@@ -37,9 +37,8 @@ class SenseMemory(val capacity: Int = CAPACITY) {
     private val rowSources = ArrayList<LongArray>()
     private var rowCount = 0
 
-    /** packInts(lemma, book) → its rows; lemma → its rows. */
-    private val byLemmaBook = HashMap<Long, IntArray>()
-    private val byLemma = HashMap<Int, IntArray>()
+    /** Lemma id → its rows (dense: lemma ids are 0 until lemmas.size); a lemma's rows in one book are the few whose [rowBook] is that book. */
+    private var byLemma = arrayOfNulls<IntArray>(64)
 
     /** Class cells held: Σ K over the live rows. */
     var size = 0
@@ -56,10 +55,10 @@ class SenseMemory(val capacity: Int = CAPACITY) {
     init { intern(classIds, classNames, NONE) }
 
     /** (lemma, locality) contexts holding a row. */
-    val contexts: Int get() = held().size
+    val contexts: Int get() = heldKeys().size
 
-    private fun intern(ids: HashMap<String, Int>, names: ArrayList<String>, s: String): Int =
-        ids.getOrPut(s) { names.size.also { names.add(s) } }
+    private fun intern(ids: FunnelHashMap<String, Int>, names: ArrayList<String>, s: String): Int =
+        ids.get(s) ?: names.size.also { ids.put(s, it); names.add(s) }
 
     private fun place(book: Int, at: Locality) {
         if (book >= bookAt.size) bookAt = bookAt.copyOf(maxOf(book + 1, bookAt.size * 2))
@@ -76,17 +75,18 @@ class SenseMemory(val capacity: Int = CAPACITY) {
         val l = intern(lemmaIds, lemmas, lemma)
         val b = intern(bookIds, bookNames, book)
         place(b, at)
-        val key = packInts(l, b)
         val s = sourceKey(source)
-        val mine = byLemmaBook[key]
-        if (mine != null) for (r in mine) if (rowSources[r].seek(s) >= 0) return false
+        val mine = if (l < byLemma.size) byLemma[l] else null
+        if (mine != null) for (r in mine) if (rowBook[r] == b && rowSources[r].seek(s) >= 0) return false
         val n = judged.size
         val ids = IntArray(n); val ps = LongArray(n)
         var i = 0
         for ((name, p) in judged) { ids[i] = intern(classIds, classNames, name); ps[i] = (p.coerceIn(0.0, 1.0) * Nal.UNIT).roundToLong(); i++ }
-        val order = (0 until n).sortedBy { ids[it] }
+        val order = ascending(ids, n)
         val menu = IntArray(n) { ids[order[it]] }
-        val r = mine?.firstOrNull { rowClasses[it].contentEquals(menu) } ?: newRow(l, b, menu, key)
+        var r = -1
+        if (mine != null) for (x in mine) if (rowBook[x] == b && rowClasses[x].contentEquals(menu)) { r = x; break }
+        if (r < 0) r = newRow(l, b, menu)
         val acc = rowPositive[r]
         for (x in 0 until n) acc[x] += ps[order[x]]
         rowSources[r] = rowSources[r].inserted(s)
@@ -96,14 +96,14 @@ class SenseMemory(val capacity: Int = CAPACITY) {
         return true
     }
 
-    private fun newRow(l: Int, b: Int, menu: IntArray, key: Long): Int {
+    private fun newRow(l: Int, b: Int, menu: IntArray): Int {
         val r = rowCount++
         if (r == rowLemma.size) {
             rowLemma = rowLemma.copyOf(r * 2); rowBook = rowBook.copyOf(r * 2); rowAttention = rowAttention.copyOf(r * 2)
         }
         rowLemma[r] = l; rowBook[r] = b; rowAttention[r] = 1f
         rowClasses.add(menu); rowPositive.add(LongArray(menu.size)); rowSources.add(NO_SOURCES)
-        byLemmaBook[key] = (byLemmaBook[key] ?: NO_ROWS) + r
+        if (l >= byLemma.size) byLemma = byLemma.copyOf(maxOf(l + 1, byLemma.size * 2))
         byLemma[l] = (byLemma[l] ?: NO_ROWS) + r
         size += menu.size; rows++
         return r
@@ -111,17 +111,15 @@ class SenseMemory(val capacity: Int = CAPACITY) {
 
     /** Every row [book] holds, dropped: its judgments are about to be observed again from its tables. */
     fun replace(book: String) {
-        val b = bookIds[book] ?: return
+        val b = bookIds.get(book) ?: return
         for (r in 0 until rowCount) if (rowBook[r] == b && rowClasses[r].isNotEmpty()) drop(r)
     }
 
     private fun drop(r: Int) {
         val l = rowLemma[r]
-        val key = packInts(l, rowBook[r])
         size -= rowClasses[r].size; rows--; judgments -= rowSources[r].size
         rowClasses[r] = NO_ROWS; rowPositive[r] = NO_SOURCES; rowSources[r] = NO_SOURCES
-        byLemmaBook[key]?.let { v -> val w = v.filter { it != r }.toIntArray(); if (w.isEmpty()) byLemmaBook.remove(key) else byLemmaBook[key] = w }
-        byLemma[l]?.let { v -> val w = v.filter { it != r }.toIntArray(); if (w.isEmpty()) byLemma.remove(l) else byLemma[l] = w }
+        byLemma[l]?.let { v -> val w = v.without(r); byLemma[l] = if (w.isEmpty()) null else w }
     }
 
     /** Attention decays by [DECAY]; evidence does not. */
@@ -141,27 +139,17 @@ class SenseMemory(val capacity: Int = CAPACITY) {
     private fun row(r: Int): SenseRow = SenseRow.of(rowClasses[r], rowPositive[r], rowSources[r].size, NONE_ID)
 
     /** [l]'s rows by locality, each locality's rows summed, in locality order. */
-    private fun localRows(l: Int): List<Pair<Locality, SenseRow>> {
-        val mine = byLemma[l] ?: return emptyList()
+    private fun localRows(l: Int): Series<Join<Locality, SenseRow>> {
+        val mine = (if (l < byLemma.size) byLemma[l] else null) ?: return emptySeriesOf()
         val at = IntArray(mine.size) { bookAt[rowBook[mine[it]]] }
-        val out = ArrayList<Pair<Locality, SenseRow>>()
-        for (a in at.distinct().sorted()) {
-            var sum: SenseRow? = null
-            for (i in mine.indices) if (at[i] == a) row(mine[i]).let { sum = sum?.plus(it) ?: it }
-            out.add(Locality(a) to sum!!)
-        }
-        return out
+        val places = at.sortedUnique()
+        val sums = arrayOfNulls<SenseRow>(places.size)
+        for (i in mine.indices) { val x = places.seek(at[i]); val r = row(mine[i]); sums[x] = sums[x]?.plus(r) ?: r }
+        return places.size j { x: Int -> Locality(places[x]) j sums[x]!! }
     }
 
-    /** [lemma]'s row per locality it was read in. */
-    fun contexts(lemma: String): List<Pair<Locality, SenseRow>> = lemmaIds[lemma]?.let(::localRows).orEmpty()
-
-    /** [lemma]'s rows per locality, each joined to its locality. */
-    fun rows(lemma: String): Series<Join<Locality, SenseRow>> {
-        val out = SeriesBuffer<Join<Locality, SenseRow>>()
-        for ((at, r) in contexts(lemma)) out.append(at j r)
-        return out.drain()
-    }
+    /** [lemma]'s row per locality it was read in, each joined to its locality, in locality order. */
+    fun contexts(lemma: String): Series<Join<Locality, SenseRow>> = lemmaIds.get(lemma)?.let(::localRows) ?: emptySeriesOf()
 
     /**
      * [lemma]'s row where it is read in [at]: that locality's row with every other locality's row that cannot be told
@@ -169,25 +157,40 @@ class SenseMemory(val capacity: Int = CAPACITY) {
      * null, as a word whose sense moved between localities says nothing of one it was never read in.
      */
     fun sense(lemma: String, at: Locality): SenseRow? {
-        val local = contexts(lemma).takeIf { it.isNotEmpty() } ?: return null
-        val own = local.firstOrNull { it.first == at }?.second
-        if (own != null) {
-            var out = own
-            for ((a, r) in local) if (a != at && own.homogeneous(r)) out += r
+        val local = contexts(lemma)
+        val n = local.size
+        if (n == 0) return null
+        var own = -1
+        for (x in 0 until n) if (local[x].a == at) { own = x; break }
+        if (own >= 0) {
+            val mine = local[own].b
+            var out = mine
+            for (x in 0 until n) if (x != own) { val r = local[x].b; if (mine.homogeneous(r)) out += r }
             return out
         }
-        for (x in local.indices) for (y in x + 1 until local.size) if (!local[x].second.homogeneous(local[y].second)) return null
-        return local.map { it.second }.reduce { a, b -> a + b }
+        for (x in 0 until n) for (y in x + 1 until n) if (!local[x].b.homogeneous(local[y].b)) return null
+        var out = local[0].b
+        for (x in 1 until n) out += local[x].b
+        return out
     }
 
     /** The class a row's class id names. */
     fun className(id: Int): String = classNames[id]
 
+    /** Every (lemma, locality) holding a row as packInts(lemma id, locality), ascending: by lemma as interned, then locality. */
+    private fun heldKeys(): LongArray {
+        var keys = LongArray(64); var n = 0
+        for (l in byLemma.indices) for (r in byLemma[l] ?: continue) {
+            if (n == keys.size) keys = keys.copyOf(n * 2)
+            keys[n++] = packInts(l, bookAt[rowBook[r]])
+        }
+        return keys.copyOf(n).sortedUnique()
+    }
+
     /** Every (lemma, locality) holding a row, by lemma as interned, then locality. */
-    fun held(): List<Pair<String, Locality>> {
-        val out = ArrayList<Pair<String, Locality>>()
-        for (l in byLemma.keys.sorted()) for (a in byLemma.getValue(l).map { bookAt[rowBook[it]] }.distinct().sorted()) out.add(lemmas[l] to Locality(a))
-        return out
+    fun held(): Series<Join<String, Locality>> {
+        val keys = heldKeys()
+        return keys.size j { i: Int -> keys[i].let { k -> lemmas[(k ushr 32).toInt()] j Locality(k.toInt()) } }
     }
 
     /**
@@ -234,16 +237,16 @@ class SenseMemory(val capacity: Int = CAPACITY) {
         fun read(lines: Sequence<String>, capacity: Int = CAPACITY): SenseMemory {
             val m = SenseMemory(capacity)
             var lemma = -1; var book = -1; var attention = 1f; var sources = NO_SOURCES
-            val ids = ArrayList<Int>(); val ps = ArrayList<Long>()
+            var ids = IntArray(16); var ps = LongArray(16); var k = 0
             fun flush() {
-                if (lemma < 0 || ids.isEmpty()) { ids.clear(); ps.clear(); return }
-                val order = ids.indices.sortedBy { ids[it] }
-                val menu = IntArray(order.size) { ids[order[it]] }
-                val r = m.newRow(lemma, book, menu, packInts(lemma, book))
+                if (lemma < 0 || k == 0) { k = 0; return }
+                val order = ascending(ids, k)
+                val menu = IntArray(k) { ids[order[it]] }
+                val r = m.newRow(lemma, book, menu)
                 val acc = m.rowPositive[r]
-                for (x in order.indices) acc[x] = ps[order[x]]
+                for (x in 0 until k) acc[x] = ps[order[x]]
                 m.rowSources[r] = sources; m.rowAttention[r] = attention; m.judgments += sources.size
-                ids.clear(); ps.clear()
+                k = 0
             }
             for (line in lines) {
                 val f = line.split('\t')
@@ -255,7 +258,10 @@ class SenseMemory(val capacity: Int = CAPACITY) {
                         attention = f[3].toFloat()
                         sources = if (f[4].isEmpty()) NO_SOURCES else f[4].split(',').map { it.toULong(16).toLong() }.toLongArray().also { it.sort() }
                     }
-                    "c" -> { ids.add(m.intern(m.classIds, m.classNames, f[1])); ps.add(f[2].toLong()) }
+                    "c" -> {
+                        if (k == ids.size) { ids = ids.copyOf(k * 2); ps = ps.copyOf(k * 2) }
+                        ids[k] = m.intern(m.classIds, m.classNames, f[1]); ps[k] = f[2].toLong(); k++
+                    }
                 }
             }
             flush()
@@ -281,5 +287,48 @@ private fun LongArray.inserted(x: Long): LongArray {
     while (at < size && this[at] < x) at++
     val out = LongArray(size + 1)
     copyInto(out, 0, 0, at); out[at] = x; copyInto(out, at + 1, at, size)
+    return out
+}
+
+/** The positions of the first [n] of [ids] in ascending order of id (ids distinct): sorted as packInts(id, position). */
+private fun ascending(ids: IntArray, n: Int): IntArray {
+    val keys = LongArray(n) { packInts(ids[it], it) }
+    keys.sort()
+    return IntArray(n) { keys[it].toInt() }
+}
+
+/** This array ascending with duplicates removed. */
+private fun IntArray.sortedUnique(): IntArray {
+    val a = copyOf(); a.sort()
+    var n = 0
+    for (i in a.indices) if (n == 0 || a[i] != a[n - 1]) a[n++] = a[i]
+    return a.copyOf(n)
+}
+
+/** This array ascending with duplicates removed. */
+private fun LongArray.sortedUnique(): LongArray {
+    val a = copyOf(); a.sort()
+    var n = 0
+    for (i in a.indices) if (n == 0 || a[i] != a[n - 1]) a[n++] = a[i]
+    return a.copyOf(n)
+}
+
+/** The index of [x] in this ascending array, or -1. */
+private fun IntArray.seek(x: Int): Int {
+    var lo = 0; var hi = size - 1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        val v = this[mid]
+        if (v < x) lo = mid + 1 else if (v > x) hi = mid - 1 else return mid
+    }
+    return -1
+}
+
+/** This array without [x]. */
+private fun IntArray.without(x: Int): IntArray {
+    var n = 0
+    for (v in this) if (v != x) n++
+    val out = IntArray(n); var i = 0
+    for (v in this) if (v != x) out[i++] = v
     return out
 }
