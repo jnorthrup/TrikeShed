@@ -1,0 +1,3 @@
+## 2024-10-07 - Avoid .map { ... }.toSeries() for primitive construction
+**Learning:** In Trikeshed, mapping a list into a `Series` using `.map { ... }.toSeries()` or concatenating lists before mapping incurs significant intermediate allocations, particularly O(N) allocation per stage and array conversion in tight paths (like graphic projections).
+**Action:** Replace intermediate list mapping sequences with the zero-allocation `j` constructor when making `Series` inline. Specifically, `n j { i: Int -> ... }` acts as a lazy view that avoids intermediate collections altogether. Remember to handle ambiguity in `j` resolution by explicitly typing the lambda parameter `Int` and explicitly importing `import borg.trikeshed.lib.j`.

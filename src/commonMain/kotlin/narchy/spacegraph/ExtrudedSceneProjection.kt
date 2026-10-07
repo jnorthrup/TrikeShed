@@ -1,6 +1,7 @@
 package narchy.spacegraph
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.j
 import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
 
@@ -34,7 +35,10 @@ object ExtrudedSceneProjection {
             for (solid in n.solids.view) for (faceIndex in faceIndices.indices) {
                 if (camera.mode == CameraMode.ORTHOGRAPHIC && faceIndex != 1) continue
                 val p = face(solid, faceIndex, camera, viewport) ?: continue
-                val parts = (listOf<PathPart>(PathPart.Move(p[0])) + p.drop(1).map { PathPart.Line(it) } + PathPart.Close).toSeries()
+                // Use zero-allocation j constructor to avoid three intermediate List allocations
+                val parts = (p.size + 1) j { i: Int ->
+                    if (i == 0) PathPart.Move(p[0]) else if (i == p.size) PathPart.Close else PathPart.Line(p[i])
+                }
                 val fill = if (n.scope) n.color
                     else if (faceIndex == 1) Rgba(30, 33, 39) else n.color
                 items.add(p.sumOf { depth(it, n.level) } / 4 j DrawItem.Path(n.id, parts, fill, outline, if (n.id == selected) 2.0 else .8, clip = ancestorClip))
@@ -88,8 +92,11 @@ object ExtrudedSceneProjection {
             }
             if (p.size < 2) continue
             val cableLevel = scene.nodes.view.maxOfOrNull { it.level } ?: 0
+            val cableParts = p.size j { i: Int ->
+                if (i == 0) PathPart.Move(p[0]) else PathPart.Line(p[i])
+            }
             items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id,
-                (listOf<PathPart>(PathPart.Move(p.first())) + p.drop(1).map { PathPart.Line(it) }).toSeries(), stroke = Rgba(25, 145, 139), width = 1.6))
+                cableParts, stroke = Rgba(25, 145, 139), width = 1.6))
         }
         return FramePlan(viewport, (items.sortedByDescending { it.a }.map { it.b } + labels).toSeries(), Rgba(16, 20, 27))
     }
