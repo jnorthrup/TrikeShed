@@ -161,7 +161,6 @@ object HermesBaselines {
         element.open()
         runCatching {
             element.teach(
-                /* ⚡ Bolt: Use zero-allocation j constructor to avoid intermediate List allocations via .map { ... }.toSeries() */
                 train.size j { i -> train[i].first },
                 train.size j { i -> train[i].second },
             )

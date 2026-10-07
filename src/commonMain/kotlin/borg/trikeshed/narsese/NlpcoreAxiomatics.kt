@@ -1,12 +1,10 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.lib.j
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.j
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpToken
 
