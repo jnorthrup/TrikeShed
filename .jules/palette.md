@@ -1,0 +1,3 @@
+## 2023-10-07 - Avoid Redundant aria-labels on Form Controls
+**Learning:** In custom standalone HTML pages within this project, form controls (`<input>`, `<select>`, `<textarea>`) are often already accessible via implicit HTML wrapping (e.g., `<label>Text <input></label>`). Adding an explicit `aria-label` attribute to these elements overrides the visible text for screen readers, breaking WCAG 2.5.3 (Label in Name) and severely hindering voice-dictation users.
+**Action:** Before attempting to add `aria-label`s to form controls, verify if they are already wrapped in an implicit `<label>`. If they are, do NOT add `aria-label`. Instead, focus on adding missing `:focus-visible` styles to standard CSS files to improve keyboard navigation accessibility.
