@@ -36,7 +36,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <button class="stop" id="cancelRun" title="Cancel selected program run" aria-label="Cancel run" disabled>■</button>
   <button class="stop" id="stopBtn" aria-label="Stop timers">■ stop timers</button>
   <button id="addBtn" aria-label="Add node">+ node</button>
-  <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px">
+  <input id="panelName" placeholder="panel-name" style="background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:4px;padding:4px 8px;font:inherit;width:120px" aria-label="Panel name">
   <button id="storeSaveBtn" title="Publish program changes" aria-label="Publish program">↑ Publish</button>
   <button id="snapshotBtn" title="Take a workspace snapshot: every program version, prompt version, project sequence and latest receipt, named as one cid" aria-label="Take a workspace snapshot">◎ snapshot</button>
   <button id="storeLoadBtn" title="load a construction from the store" aria-label="Load from store">⇩ store</button>
@@ -61,7 +61,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <summary>Topology <span id="topologyCount"></span></summary>
   <div id="detailControl">
     <label for="detailLevel">Detail</label><output id="detailValue" for="detailLevel">50%</output>
-    <div id="detailTrack"><input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="Snap depth: panels split into their detail once the view reaches this zoom. The tick is the current zoom."><i id="zoomTick" aria-hidden="true"></i></div>
+    <div id="detailTrack"><input id="detailLevel" type="range" min="0" max="100" step="1" value="50" title="Snap depth: panels split into their detail once the view reaches this zoom. The tick is the current zoom." aria-label="Detail Level"><i id="zoomTick" aria-hidden="true"></i></div>
   </div>
   <details class="legend-section" open><summary>Activity</summary><button id="activitySelection" title="Inspect selected program activity" aria-label="Inspect activity">No program</button><div id="activityCategories" role="group" aria-label="Activity highlighting"></div></details>
   <details class="legend-section"><summary>Blobs and heap</summary>
@@ -76,7 +76,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <dialog id="factInspector"><form method="dialog"><button aria-label="Close fact inspector">×</button></form><h2 id="factKey"></h2><p id="factActor"></p>
   <section id="factNeighbors" hidden aria-label="Semantic neighbors">
     <header><b>Neighbors</b><span>SUMO · Merge + Mid-level</span></header>
-    <label>Blackboard node <input id="neighborKey" list="neighborKeys" autocomplete="off"></label><datalist id="neighborKeys"></datalist>
+    <label>Blackboard node <input id="neighborKey" list="neighborKeys" autocomplete="off" aria-label="Neighbor Key"></label><datalist id="neighborKeys"></datalist>
     <p id="neighborStatus" role="status"></p><div id="neighborResults"></div>
   </section>
   <div id="sheetBar"><div id="sheetRoots"></div><button id="sheetRawBtn" title="the fact as raw JSON instead of sheets" aria-pressed="false" aria-label="Raw JSON view">{ } raw</button></div><div id="factSheet"></div><pre id="factValue"></pre></dialog>

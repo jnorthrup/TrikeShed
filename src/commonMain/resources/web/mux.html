@@ -42,11 +42,11 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
             <div class="table-wrap"><table><thead><tr><th class="check-cell"></th><th>Model / provider</th><th>Credential</th><th>Calls</th><th>Median latency</th></tr></thead><tbody id="modelRows"></tbody></table></div>
           </div>
           <section class="run-settings" aria-labelledby="runTitle"><div class="section-heading"><h2 id="runTitle">New run</h2><i data-lucide="git-branch"></i></div>
-            <form id="runForm"><label>Run mode<select id="runMode"><option value="chat">Chat</option><option value="compare">Fan-out / collect</option><option value="synthesize">Fan-out / synthesize</option></select></label>
+            <form id="runForm"><label>Run mode<select id="runMode" aria-label="Run mode"><option value="chat">Chat</option><option value="compare">Fan-out / collect</option><option value="synthesize">Fan-out / synthesize</option></select></label>
             <div id="selectionSummary" class="selection-summary">Automatic routing</div>
-            <label>Session<select id="runSession"><option value="">New session</option></select></label>
-            <div class="field-pair"><label>Output token limit<input id="maxTokens" type="number" min="16" max="8192" step="1" value="1024" required></label><label>Temperature<input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" required></label></div>
-            <label>Prompt<textarea id="runPrompt" rows="8" maxlength="32000" placeholder="What are we working on?" required></textarea></label>
+            <label>Session<select id="runSession" aria-label="Run session"><option value="">New session</option></select></label>
+            <div class="field-pair"><label>Output token limit<input id="maxTokens" type="number" min="16" max="8192" step="1" value="1024" required aria-label="Output token limit"></label><label>Temperature<input id="temperature" type="number" min="0" max="2" step="0.1" value="0.2" required aria-label="Temperature"></label></div>
+            <label>Prompt<textarea id="runPrompt" rows="8" maxlength="32000" placeholder="What are we working on?" required aria-label="Prompt"></textarea></label>
             <div class="run-foot"><span id="runAllocation" class="muted">1 lane</span><button type="submit" class="primary"><i data-lucide="arrow-up"></i>Run</button></div></form>
           </section>
         </div>
@@ -68,14 +68,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     </main>
   </div>
   <dialog id="endpointDialog" aria-labelledby="endpointTitle"><form id="endpointForm"><div class="section-heading"><h2 id="endpointTitle">Endpoint</h2><button type="button" data-action="close-dialog" title="Close" aria-label="Close"><i data-lucide="x"></i></button></div>
-    <label>Name<input name="name" pattern="[a-z0-9][a-z0-9._-]*" maxlength="100" required placeholder="my-provider"></label>
-    <label>API address<input name="base" type="url" required placeholder="https://api.provider.com/v1"></label>
-    <label>Model<input name="model" required maxlength="200" placeholder="vendor/model"></label>
-    <label>Credential environment variable<input name="envVar" pattern="[A-Z_][A-Z0-9_]*" required placeholder="PROVIDER_API_KEY" autocomplete="off"></label>
-    <div class="toolbar flags"><label><input type="checkbox" name="enabled" checked>Registry enabled</label><label><input type="checkbox" name="preferred">Preferred</label></div>
+    <label>Name<input name="name" pattern="[a-z0-9][a-z0-9._-]*" maxlength="100" required placeholder="my-provider" aria-label="Name"></label>
+    <label>API address<input name="base" type="url" required placeholder="https://api.provider.com/v1" aria-label="API address"></label>
+    <label>Model<input name="model" required maxlength="200" placeholder="vendor/model" aria-label="Model"></label>
+    <label>Credential environment variable<input name="envVar" pattern="[A-Z_][A-Z0-9_]*" required placeholder="PROVIDER_API_KEY" autocomplete="off" aria-label="Credential environment variable"></label>
+    <div class="toolbar flags"><label><input type="checkbox" name="enabled" checked aria-label="Registry enabled">Registry enabled</label><label><input type="checkbox" name="preferred" aria-label="Preferred">Preferred</label></div>
     <p id="endpointError" role="alert"></p><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button type="submit" class="primary"><i data-lucide="check"></i>Save endpoint</button></div>
   </form></dialog>
-  <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle">Rename session</h2><label>Title<input name="title" required maxlength="100"></label><div class="dialog-actions"><button type="button" data-action="close-rename">Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>
+  <dialog id="renameDialog" aria-labelledby="renameTitle"><form id="renameForm"><h2 id="renameTitle">Rename session</h2><label>Title<input name="title" required maxlength="100" aria-label="Title"></label><div class="dialog-actions"><button type="button" data-action="close-rename">Cancel</button><button type="submit" class="primary">Save</button></div></form></dialog>
   <div id="toast" role="status" hidden></div>
 <script src="/kotlin/pages/pages.js" defer></script>
 </body>
