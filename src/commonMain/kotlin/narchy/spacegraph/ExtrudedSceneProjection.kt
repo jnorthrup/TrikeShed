@@ -34,7 +34,12 @@ object ExtrudedSceneProjection {
             for (solid in n.solids.view) for (faceIndex in faceIndices.indices) {
                 if (camera.mode == CameraMode.ORTHOGRAPHIC && faceIndex != 1) continue
                 val p = face(solid, faceIndex, camera, viewport) ?: continue
-                val parts = (listOf<PathPart>(PathPart.Move(p[0])) + p.drop(1).map { PathPart.Line(it) } + PathPart.Close).toSeries()
+                /* ⚡ Bolt: Use zero-allocation size j constructor instead of intermediate list allocations via map/plus */
+                val parts = (p.size + 1) j { i: Int ->
+                    if (i == 0) PathPart.Move(p[0])
+                    else if (i < p.size) PathPart.Line(p[i])
+                    else PathPart.Close
+                }
                 val fill = if (n.scope) n.color
                     else if (faceIndex == 1) Rgba(30, 33, 39) else n.color
                 items.add(p.sumOf { depth(it, n.level) } / 4 j DrawItem.Path(n.id, parts, fill, outline, if (n.id == selected) 2.0 else .8, clip = ancestorClip))
@@ -62,7 +67,7 @@ object ExtrudedSceneProjection {
                     labels.add(DrawItem.Text(n.id, n.title, Vec3(x, y), Rgba(233, 236, 240), size,
                         font = "sans-serif", maxWidth = width, clip = clip, weight = 600))
                     if (!n.scope && size >= 9 && lower - top.y > size * 4) {
-                        val lines = listOf(n.type) + n.details.view.take(5).map { "${it.a}: ${it.b}" }
+                        val lines = listOf(n.type) + n.details.view.take(5).map { "${it.a}: ${it.b}" } // Bolt: Keeping this for now as it's a small list, but avoiding mapped arrays elsewhere
                         for ((i, line) in lines.withIndex()) {
                             val baseline = y + (i + 1) * size * 1.6
                             if (baseline > lower - size) break
@@ -88,9 +93,16 @@ object ExtrudedSceneProjection {
             }
             if (p.size < 2) continue
             val cableLevel = scene.nodes.view.maxOfOrNull { it.level } ?: 0
-            items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id,
-                (listOf<PathPart>(PathPart.Move(p.first())) + p.drop(1).map { PathPart.Line(it) }).toSeries(), stroke = Rgba(25, 145, 139), width = 1.6))
+
+            /* ⚡ Bolt: Use zero-allocation size j constructor instead of concatenating standard lists */
+            val parts = p.size j { i: Int -> if (i == 0) PathPart.Move(p[0]) else PathPart.Line(p[i]) }
+
+            items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id, parts, stroke = Rgba(25, 145, 139), width = 1.6))
         }
-        return FramePlan(viewport, (items.sortedByDescending { it.a }.map { it.b } + labels).toSeries(), Rgba(16, 20, 27))
+
+        items.sortByDescending { it.a }
+        /* ⚡ Bolt: Use zero-allocation size j constructor instead of intermediate mapped lists and concatenation */
+        val result = (items.size + labels.size) j { i: Int -> if (i < items.size) items[i].b else labels[i - items.size] }
+        return FramePlan(viewport, result, Rgba(16, 20, 27))
     }
 }
