@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=@includedir@
+
+Name: @NAME@
+Version: @VERSION@
+Description: io_uring FFI library
+URL: https://git.kernel.org/pub/scm/linux/kernel/git/axboe/liburing.git/
+
+Libs: -L${libdir} -luring-ffi
+Cflags: -I${includedir}
