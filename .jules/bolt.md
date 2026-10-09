@@ -1,0 +1,4 @@
+
+## 2025-02-28 - Optimize List allocations in narchy.spacegraph.ExtrudedSceneProjection
+**Learning:** In tight loops like screen projection, using standard `.map { ... }.toSeries()` and `+` (e.g. `listOf(Move) + points.map { Line } + Close`) creates intermediate arrays and wrappers. Also, the `j` constructor requires a type annotation for the index argument (e.g. `i: Int`) otherwise it is evaluated as a completely different `Tuple2` function. Furthermore, when using `(p.size + 1)` it must be properly wrapped in parentheses like `(p.size + 1) j { ... }` or it may misbehave.
+**Action:** Replace `(listOf(...) + p.drop(1).map { ... }).toSeries()` and `(items.sortedBy...map{...} + labels).toSeries()` with the zero-allocation `j` constructor (e.g. `p.size j { i: Int -> ... }`) when generating paths in render loops to eliminate garbage collection pressure and allocation overhead. Always remember to add the type annotation (`: Int`) for the lambda argument.
