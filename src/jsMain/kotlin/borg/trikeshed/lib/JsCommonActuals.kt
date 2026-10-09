@@ -1,17 +1,8 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.lib.longp.LongSeries
 import borg.trikeshed.userspace.ByteRegion
-import kotlin.random.Random
-import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.common.Files
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.SeekFileBufferCommon
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Series2
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toSeries
-
 
 
 fun streamByteLines(bytes: ByteArray): Sequence<Join<Long, ByteArray>> = sequence {

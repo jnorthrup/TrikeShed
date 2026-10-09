@@ -152,7 +152,7 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
         if (params != null && num(params.children.length) > 0) {
             val s = section("Parameters"); val r = params.getBoundingClientRect(); val scale = num(n.el.getBoundingClientRect().width) / num(n.el.offsetWidth)
             val placeholder = el("div", "sg-params-placeholder"); placeholder.style.height = "${num(r.height) / maxOf(scale, .00001)}px"
-            params.replaceWith(placeholder); s.append(params); heldParams = params to placeholder.asDynamic()
+            params.replaceWith(placeholder); s.append(params); heldParams = Pair(params, placeholder.asDynamic())
         }
         val ports = section("Ports")
         val gp = arr(geometry?.ports)

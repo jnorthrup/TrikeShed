@@ -112,7 +112,7 @@ class PatchShake(private val s: PatchSurface, private val camera: PatchCamera) {
     /** Re-anchor on redraw — rebuilding here would restart every animation on every pointermove. */
     fun positionVerdicts() {
         if (verdicts.isEmpty()) return
-        val positions = verdicts.map { v -> v to (if (v.el != null) s.portCenter(v.nodeId, v.dir, v.port) else null) }
+        val positions = verdicts.map { v -> Pair(v, if (v.el != null) s.portCenter(v.nodeId, v.dir, v.port) else null) }
         for (pair in positions) { val v = pair.first; if (v.el == null) continue; v.point = pair.second }
         projectVerdicts()
     }

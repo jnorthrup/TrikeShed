@@ -173,7 +173,7 @@ object MuxPage {
         }
         jobs.forEach { it.await() }
         if (catalog) lastCatalog = nowMs()
-        if (page == "sessions" && selected == null) selected = list(sessions).firstOrNull { !truthy(it.archived) }.let { f -> if (f == null) null else num(f.id) }
+        if (page == "sessions" && selected == null) { val f = list(sessions).firstOrNull { !truthy(it.archived) }; selected = if (f == null) null else num(f.id) }
         val id = selected
         if (page == "sessions" && id != null) {
             try {

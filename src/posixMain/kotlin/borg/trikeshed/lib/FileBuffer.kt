@@ -1,7 +1,7 @@
 @file:OptIn(ExperimentalForeignApi::class, ExperimentalForeignApi::class)
 
 package borg.trikeshed.lib
-import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.lib.longp.LongSeries
 import kotlinx.cinterop.*
 import platform.posix.munmap
 import platform.posix.PROT_READ

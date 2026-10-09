@@ -2,7 +2,7 @@
 
 package borg.trikeshed
 
-import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.lib.longp.LongSeries
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.userspace.ByteRegion
 import kotlinx.cinterop.*

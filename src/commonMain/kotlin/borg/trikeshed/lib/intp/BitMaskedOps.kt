@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.int
+package borg.trikeshed.lib.intp
 
 import borg.trikeshed.lib.BitMasked
 

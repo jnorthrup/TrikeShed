@@ -1,4 +1,4 @@
-package borg.trikeshed.lib.ulong
+package borg.trikeshed.lib.ulongp
 
 import borg.trikeshed.lib.BitMasked
 

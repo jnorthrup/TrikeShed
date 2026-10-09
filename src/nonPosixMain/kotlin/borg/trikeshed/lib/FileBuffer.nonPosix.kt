@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.lib.longp.LongSeries
 
 actual class FileBuffer actual constructor(
     actual val filename: String,

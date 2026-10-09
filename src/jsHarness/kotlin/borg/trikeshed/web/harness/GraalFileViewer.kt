@@ -37,7 +37,7 @@ object GraalFileViewer {
     }
 
     suspend fun readBytes(response: Response, limit: Int = FileViewerRules.LIMIT): Uint8Array {
-        val reader: dynamic = response.body?.asDynamic()?.getReader() ?: throw Error("Response stream unavailable")
+        val reader: dynamic = response.body?.getReader() ?: throw Error("Response stream unavailable")
         var size = 0
         val chunks = ArrayList<Uint8Array>()
         try {

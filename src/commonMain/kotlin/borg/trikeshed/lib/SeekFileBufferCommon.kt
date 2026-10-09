@@ -1,6 +1,6 @@
 package borg.trikeshed.lib
 
-import borg.trikeshed.lib.long.LongSeries
+import borg.trikeshed.lib.longp.LongSeries
 import borg.trikeshed.userspace.ByteRegion
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.nio.channels.UringChannels
