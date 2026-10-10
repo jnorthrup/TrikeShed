@@ -206,19 +206,10 @@ object HeatSoak {
         zones.map { z -> ZoneHeat(z.key, calls.getValue(z.key).get(), lat.getValue(z.key).pct(0.5), lat.getValue(z.key).pct(0.99), hv.trainer(z.isolate)?.profiles?.get(z.root)?.phase?.name ?: "-", hv.trainer(z.isolate)?.profiles?.get(z.root)?.memo?.size ?: 0) }
             .sortedByDescending { it.calls }
 
-    /** `jcmd <pid> GC.class_histogram` top [n] lines — the evidence behind any heap claim (-Dsubvm.soak.histo=true). */
+    /** `GC.class_histogram` top [n] rows — the evidence behind any heap claim (-Dsubvm.soak.histo=true). */
     fun classHistogram(n: Int): String = runCatching {
-        val jcmd = java.io.File(System.getProperty("java.home"), "bin/jcmd").path
-        val p = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(jcmd, ProcessHandle.current().pid().toString(), "GC.class_histogram").redirectErrorStream(true)).start()
-        val future = java.util.concurrent.CompletableFuture.supplyAsync { p.inputStream.bufferedReader().readLines() }
-        val finished = p.waitFor(1, java.util.concurrent.TimeUnit.MINUTES)
-        if (!finished) {
-            p.destroyForcibly()
-            p.waitFor()
-            throw RuntimeException("jcmd timed out")
-        }
-        val lines = future.get(30, java.util.concurrent.TimeUnit.SECONDS)
-        "\n── class histogram (live, top $n) ──\n" + lines.take(n + 3).joinToString("\n") { it.take(140) }
+        val lines = borg.trikeshed.graal.vitals.JvmVitals.classHistogramText().lines()
+        "\n── class histogram (live, top $n) ──\n" + lines.take(n + 2).joinToString("\n") { it.take(140) }
     }.getOrElse { "\n── class histogram unavailable: $it" }
 
     /** Per-isolate threads only: leaf hosts, process readers, drivers. `subvm-watchdog` is a JVM-wide idle singleton and is excluded. */

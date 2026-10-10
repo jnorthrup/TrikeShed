@@ -226,32 +226,37 @@ class JvmVitals {
     data class HeapRow(val className: String, val count: Long, val bytes: Long)
 
     /**
-     * Live-set continent: per-class `(class, count, bytes)` from
-     * `jcmd <pid> GC.class_histogram` (parsed — HeatSoak's shell-out returned
-     * unparsed text and stayed demo-gated). JMX `MemoryMXBean` scalar heap usage
-     * remains in [snapshot]; this adds the per-class shape the treemap renders.
-     *
-     * The live-set source is a seam (production-test-seams pattern); the gate swaps in a
-     * fixture. jcmd GC.class_histogram self-attach stops the ENTIRE target JVM at a
-     * safepoint, and if any target thread cannot reach the safepoint the attach never
-     * completes: the whole JVM freezes, INCLUDING the daemon watchdog thread that would
-     * kill jcmd — unrecoverable from inside. PROVEN LIVE 2026-08-27: one GET
-     * /api/graal/heap wedged the daemon at 0% CPU (graal.html fetches it on every boot).
-     * Therefore NOBODY self-attaches by default — not gates, not production. The jcmd
-     * live-set is explicit opt-in (`-Dtrikeshed.vitals.jcmd=true`, for operators who
-     * accept the freeze risk); the default heap answer carries the JFR
-     * allocation-attributed continent, which needs no attach.
+     * Live set per class: the table `jcmd <pid> GC.class_histogram` prints, read in this
+     * process through the DiagnosticCommand MBean, so no attach, no child process and no
+     * environment for one. It runs a full GC at a safepoint, so one caller at a time
+     * retakes it, at most once per [LIVE_SET_INTERVAL_MS]; every other caller reads the
+     * last snapshot. Tests swap the seam.
      */
-    internal var liveSetSource: () -> List<HeapRow> = {
-        if (System.getProperty("trikeshed.vitals.jcmd") == "true") classHistogram() else emptyList()
+    internal var liveSetSource: () -> List<HeapRow> = { parseClassHistogram(classHistogramText()) }
+
+    @Volatile private var liveSet: List<HeapRow> = emptyList()
+    private val liveSetAt = AtomicLong(0L)
+    private val liveSetTaker = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun liveSet(): List<HeapRow> {
+        if (System.currentTimeMillis() - liveSetAt.get() >= LIVE_SET_INTERVAL_MS && liveSetTaker.compareAndSet(false, true)) {
+            try {
+                liveSet = runCatching { liveSetSource() }.getOrDefault(liveSet)
+                liveSetAt.set(System.currentTimeMillis())
+            } finally {
+                liveSetTaker.set(false)
+            }
+        }
+        return liveSet
     }
 
     fun heapHistogram(): Map<String, Any?> {
-        val rows = runCatching { liveSetSource() }.getOrDefault(emptyList())
+        val rows = liveSet()
         val totalInstances = rows.sumOf { it.count }
         val totalBytes = rows.sumOf { it.bytes }
         return mapOf(
             "atMs" to System.currentTimeMillis(),
+            "liveSetAtMs" to liveSetAt.get(),
             "classes" to rows.size,
             "instances" to totalInstances,
             "bytes" to totalBytes,
@@ -260,53 +265,6 @@ class JvmVitals {
             // second terrain source beside the live-set rows, same treemap component.
             "allocation" to allocationByClass(),
         )
-    }
-
-    /**
-     * jcmd GC.class_histogram parsed into rows; empty when jcmd is unavailable.
-     *
-     * The main (calling) thread does EXACTLY ONE bounded join and never touches the process.
-     * A daemon worker spawns jcmd, a second daemon drains its stdout, and the worker — not
-     * the caller — kills the child on the timeout. This matters because jcmd can wedge in
-     * attach (uninterruptible kernel state) and a `readText()`/`waitFor()` on the main thread
-     * would hang /api/graal/heap — and the whole Gradle test worker — for minutes. The join
-     * always returns after [JCMD_TIMEOUT_MS]; the live-set continent degrades to the
-     * allocation-attributed one and the daemon thread leaks at worst (a JVM-exit cleanup, not
-     * a request-thread stall).
-     */
-    private fun classHistogram(): List<HeapRow> {
-        val result = java.util.concurrent.atomic.AtomicReference<List<HeapRow>>(emptyList())
-        val worker = Thread {
-            try {
-                val pid = ProcessHandle.current().pid()
-                val javaExe = ProcessHandle.current().info().command().orElse("java")
-                val dir = javaExe.substringBeforeLast('/', "")
-                val jcmd = if (dir.isNotEmpty()) "$dir/jcmd" else "jcmd"
-                val p = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(jcmd, pid.toString(), "GC.class_histogram")
-                    .redirectErrorStream(true)).start()
-                val out = java.util.concurrent.atomic.AtomicReference("")
-                val reader = Thread { runCatching { out.set(p.inputStream.bufferedReader().readText()) } }
-                reader.isDaemon = true
-                reader.name = "jvmvitals-class-histogram-reader"
-                reader.start()
-                reader.join(JCMD_TIMEOUT_MS)
-                // The worker kills the child on timeout — the main thread never calls waitFor/destroy.
-                if (reader.isAlive) {
-                    p.destroy()
-                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
-                    if (runCatching { p.isAlive }.getOrDefault(false)) p.destroyForcibly()
-                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
-                } else {
-                    runCatching { p.waitFor(2, java.util.concurrent.TimeUnit.SECONDS) }
-                }
-                result.set(parseClassHistogram(out.get()))
-            } catch (_: Throwable) { /* degraded: empty live-set */ }
-        }
-        worker.isDaemon = true
-        worker.name = "jvmvitals-class-histogram"
-        worker.start()
-        worker.join(JCMD_TIMEOUT_MS + 5_000)
-        return runCatching { result.get() }.getOrDefault(emptyList())
     }
 
     /** The histogram text's `num: #instances #bytes class` table → rows. */
@@ -488,7 +446,13 @@ class JvmVitals {
 
     companion object {
         private const val RING = 40
-        /** Max wait for a jcmd class-histogram read; a wedged jcmd degrades the live-set, never the caller. */
-        private const val JCMD_TIMEOUT_MS = 8_000L
+        /** A live-set snapshot runs a full GC; it is retaken at most this often. */
+        private const val LIVE_SET_INTERVAL_MS = 60_000L
+
+        /** This JVM's `GC.class_histogram` table, from its DiagnosticCommand MBean. */
+        fun classHistogramText(): String = ManagementFactory.getPlatformMBeanServer().invoke(
+            javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"),
+            "gcClassHistogram", arrayOf<Any>(emptyArray<String>()), arrayOf(Array<String>::class.java.name),
+        ) as String
     }
 }

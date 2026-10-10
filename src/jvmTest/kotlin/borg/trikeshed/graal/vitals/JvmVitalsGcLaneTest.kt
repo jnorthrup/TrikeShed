@@ -118,8 +118,7 @@ class JvmVitalsGcLaneTest {
     @Test
     fun snapshotCarriesTheGcLaneAndHeapCarriesAllocation() {
         val v = JvmVitals()
-        // Gates must never self-attach jcmd: GC.class_histogram stops the whole target JVM
-        // at a safepoint and a wedged attach freezes the watchdog thread too. Swap the seam.
+        // The live set runs a full GC in this JVM; swap the seam.
         v.liveSetSource = {
             listOf(
                 JvmVitals.HeapRow("java.lang.String", 10, 240),
@@ -136,6 +135,12 @@ class JvmVitalsGcLaneTest {
         assertTrue(heap.containsKey("allocation"), "heapHistogram carries the allocation continent")
         assertEquals(2, heap["classes"], "live-set rows come from the seam")
         assertEquals(1240L, heap["bytes"], "240 + 1000")
+    }
+
+    @Test
+    fun liveSetReadsThisJvmsClassHistogram() {
+        val rows = JvmVitals().parseClassHistogram(JvmVitals.classHistogramText())
+        assertTrue(rows.any { it.className == "java.lang.String" && it.count > 0 }, "String is in the live set: ${rows.take(5)}")
     }
 
     @Test
