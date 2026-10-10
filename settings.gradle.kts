@@ -23,6 +23,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TrikeShed"
+include(":tools")
 
 // libs/ is forbidden. All code lives in src/ source sets. The historical
 // libs/ tree was deleted at 7afd1e055, deep-cleaned at e9d65f870, and purged

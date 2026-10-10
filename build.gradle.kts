@@ -420,6 +420,19 @@ kotlin {
     // here cannot resolve at configuration time.
 }
 
+// The JVM library as class directories, so :tools compiles, tests and runs against compileKotlinJvm
+// output: jvmJar and jvmMainClasses also run stageKotlinJs (the browser webpack builds) and fetchSumoCorpus.
+val jvmMainClassesDirs = kotlin.jvm().compilations.getByName("main").output.classesDirs
+for (elements in listOf("jvmApiElements", "jvmRuntimeElements")) configurations.named(elements) {
+    outgoing.variants.create("classes") {
+        attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
+        for (dir in jvmMainClassesDirs.files) artifact(dir) {
+            type = ArtifactTypeDefinition.JVM_CLASS_DIRECTORY
+            builtBy("compileKotlinJvm", "compileJvmMainJava")
+        }
+    }
+}
+
 // Shared Kotlin -> app compilation -> webpack -> staging -> JVM resources.
 val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
     group = "forge"
