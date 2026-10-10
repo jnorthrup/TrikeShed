@@ -73,7 +73,7 @@ class IpnsNodeTest {
     @Test fun failedStartupReleasesPersistentIdentityLease(): Unit = runBlocking {
         val directory = Files.createTempDirectory("ipns-node-failure-")
         val path = directory.resolve("identity")
-        val crypto = JvmIpnsCrypto()
+        val crypto = Ed25519
         val peers = IpnsDhtAddresses.bootstrap(IpnsDhtAddresses.PUBLIC_BOOTSTRAP.split(',').toSeries())
         val node = IpnsNode(path.toString(), crypto, peers, { error("TLS factory failure") }, coroutineContext)
         try {

@@ -1,5 +1,5 @@
 package = borg.trikeshed.userspace.nio.posix
-headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h sys/random.h
 
 ---
 

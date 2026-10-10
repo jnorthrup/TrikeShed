@@ -19,7 +19,7 @@ import kotlin.time.Instant
 import kotlin.time.Duration.Companion.seconds
 
 class IpnsJournalTest {
-    private val crypto = JvmIpnsCrypto()
+    private val crypto = Ed25519
     private val now = Instant.parse("2026-09-11T00:00:00Z")
     private val value = "/ipfs/${IpnsCid.raw(byteArrayOf(1))}"
 
