@@ -259,11 +259,13 @@ object JvmLitebikeBindAdapter {
                             supervisor?.releaseIo()
                             // The registry closes the socket after the worker's
                             // reply (Connection: close); the pending read then
-                            // fails with AsynchronousCloseException. That is the
-                            // normal end of an exchange, not an error.
-                            if (t is java.nio.channels.AsynchronousCloseException ||
-                                t is java.nio.channels.ClosedChannelException
-                            ) done.complete(Unit) else done.completeExceptionally(t)
+                            // fails with AsynchronousCloseException. A peer reset
+                            // (a browser dropping an SSE stream or aborting a fetch)
+                            // ends the exchange the same way. Neither is an error.
+                            if (t is java.io.IOException) {
+                                if (t !is java.nio.channels.ClosedChannelException) System.err.println("[BIND] conn=$connId peer reset: ${t.message}")
+                                done.complete(Unit)
+                            } else done.completeExceptionally(t)
                         }
                     }
                 )

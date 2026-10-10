@@ -92,6 +92,30 @@ class LitebikeFragmentFramingTest {
     }
 
     @Test
+    fun peerResetEndsTheConnectionWithoutAnUncaughtException() = runBlocking {
+        val uncaught = java.util.concurrent.CopyOnWriteArrayList<Throwable>()
+        val prior = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { _, e -> uncaught.add(e) }
+        val served = serveEcho()
+        try {
+            repeat(3) {
+                Socket("127.0.0.1", served.port).use { s ->
+                    // No header boundary yet, so the adapter keeps a read pending on the socket.
+                    s.getOutputStream().apply { write("GET /stream HTTP/1.1\r\nHost: x\r\n".encodeToByteArray()); flush() }
+                    Thread.sleep(60)
+                    s.setSoLinger(true, 0) // close() now sends RST, as a browser dropping a stream does
+                }
+            }
+            Thread.sleep(300)
+            assertTrue(uncaught.isEmpty(), "uncaught: $uncaught")
+            assertEquals(0, served.requests.get())
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(prior)
+            served.close()
+        }
+    }
+
+    @Test
     fun cancellingBindTerminatesAsyncChannelGroupThreads() = runBlocking {
         val before = asyncChannelGroupThreads().size
         val port = ServerSocket(0).use { it.localPort }
