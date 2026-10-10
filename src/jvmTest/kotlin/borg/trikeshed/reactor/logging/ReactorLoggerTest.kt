@@ -2,17 +2,24 @@ package borg.trikeshed.reactor.logging
 
 import borg.trikeshed.couch.isam.FileBackedStringpool
 import borg.trikeshed.job.JobLog
-import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import borg.trikeshed.couch.isam.DurableAppendLog
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ReactorLoggerTest {
+    /** A pool in a fresh directory, removed when the JVM exits. */
+    private fun pool(): FileBackedStringpool {
+        val directory = Files.createTempDirectory("reactor-logger-").toFile().apply { deleteOnExit() }
+        val location = directory.resolve("pool").apply { deleteOnExit() }
+        directory.resolve("pool.meta").deleteOnExit()
+        return FileBackedStringpool(location.path)
+    }
 
     @Test
     fun testLogCasFormatting() {
-        val stringpool = FileBackedStringpool("test", InMemoryFileOperations())
+        val stringpool = pool()
         val wal = JobLog.inMemory()
 
         val logger = ReactorLogger("test-logger", stringpool, wal)
@@ -67,7 +74,7 @@ class ReactorLoggerTest {
 
     @Test
     fun testDurabilityFlush() {
-        val stringpool = FileBackedStringpool("test", InMemoryFileOperations())
+        val stringpool = pool()
         val wal = JobLog.inMemory()
 
         var flushed = false
@@ -92,7 +99,7 @@ class ReactorLoggerTest {
 
     @Test
     fun testDecodingSupportRoundTrip() {
-        val stringpool = FileBackedStringpool("test", InMemoryFileOperations())
+        val stringpool = pool()
         val wal = JobLog.inMemory()
 
         val logger = ReactorLogger("test-logger", stringpool, wal)

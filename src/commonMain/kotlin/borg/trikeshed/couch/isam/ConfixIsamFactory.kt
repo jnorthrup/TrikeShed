@@ -7,14 +7,12 @@ import borg.trikeshed.isam.*
 import borg.trikeshed.parse.confix.ConfixIndex
 import borg.trikeshed.parse.confix.scan
 import borg.trikeshed.lib.*
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.couch.isam.ConfixIsamIsomorphism
 import borg.trikeshed.isam.RecordMeta
 
 class ConfixIsamStoreBuilder {
     var dataFileLocation: String = ""
     var stringpoolLocation: String = ""
-    var fileOps: FileOperations? = null
     private var exemplarIndex: ConfixIndex? = null
 
     /**
@@ -42,8 +40,7 @@ class ConfixIsamStoreBuilder {
             keyNames = emptyMap(),
         )
 
-        val resolvedFileOps = fileOps ?: throw IllegalStateException("fileOps must be configured")
-        val stringpool = FileBackedStringpool(stringpoolLocation, resolvedFileOps)
+        val stringpool = FileBackedStringpool(stringpoolLocation)
 
         // This index aligns with the "Stringpools + index" requirement, using optimal linear hashing.
         val hashIndex = mutableMapOf<String, Int>() // CID/ID -> Row Index (or Stringpool Offset)

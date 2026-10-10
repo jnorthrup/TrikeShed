@@ -1,5 +1,6 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.couch.isam.FileBackedStringpool
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
@@ -40,6 +41,9 @@ class RecordMeta(
 
     /** Group name for column grouping (from DSL) */
     var groupName: String = "0"
+
+    /** Dictionary column: the pool, named in the metafile, whose dense ids this column holds; `pool[id]` is the key. */
+    var pool: FileBackedStringpool? = null
 
     override fun toString(): String = "RecordMeta(name='$name', type=$type, begin=$begin, end=$end, decoder=$decoder, encoder=$encoder, child=$child)"
 

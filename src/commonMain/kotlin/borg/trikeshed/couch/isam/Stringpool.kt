@@ -1,140 +1,65 @@
 package borg.trikeshed.couch.isam
 
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.collections.FunnelHashMap
-import borg.trikeshed.couch.isam.WalFrame
+import borg.trikeshed.collections.associative.FunnelHashIndex
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.isam.*
+import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.lib.*
 
-/**
- * A basic stringpool for storing and retrieving variable-length strings via integer offsets.
- * Conceptually identical to a blob store for varchars and JSON blobs.
- */
+/** Dense ids 0 until size over string keys: the id space of dictionary-coded ISAM columns and log templates. */
 interface Stringpool {
-    /** Appends a string to the pool and returns its byte offset/identifier. */
+    /** Id of [value]: its id when present, else the next dense id, assigned as [value] is appended. */
     fun put(value: String): Int
 
-    /** Retrieves a string from the pool given its byte offset/identifier. */
-    fun get(offset: Int): String?
+    /** Key of [id]; null outside 0 until size. */
+    operator fun get(id: Int): String?
 }
 
 /**
- * An in-memory/file-backed stringpool implementation.
+ * Keys persisted at [location] as a one-column meta-v2 ISAM file of zstd leaves (`zstd -d` yields the plain
+ * fixed-width column); a key's id is its row. Lookup is a [FunnelHashIndex] over the rows present at open, then a
+ * [FunnelHashMap] of the keys put since; [put] appends one row. [width] fixes the key bytes when the pool is created.
  */
-class FileBackedStringpool(
-    val location: String,
-    val fileOps: FileOperations
-) : Stringpool {
-    // In a full implementation, this uses functional uring or NIO byte channels to append
-    // to a memory-mapped file or WAL block.
-
-    private val memoizedStrings = FunnelHashMap<String, Int>()
-    private var fd: Int = -1
-    private var currentOffset: Int = 0
-    private var isCorrupted: Boolean = false
-    private var fileExists: Boolean = false
+class FileBackedStringpool(val location: String, width: Int = 64) : Stringpool {
+    val operations = UringIsamOperations(leafBytes = ISAM_LEAF_BYTES)
+    val column: RecordMeta
+    var keys: Array<String?>
+    var size: Int
+    val index: FunnelHashIndex<String>
+    val added = FunnelHashMap<String, Int>()
 
     init {
-        fileExists = fileOps.exists(location)
-        // Recover from location if it exists
-        if (fileExists) {
-            val bytes = fileOps.readAllBytes(location)
-            var offset = 0
-            while (offset < bytes.size) {
-                // Read frame
-                if (offset + WalFrame.HEADER_SIZE + 4 > bytes.size) {
-                    isCorrupted = true
-                    break
-                }
-
-                // Read payload length
-                var len = 0
-                for (i in 0 until 4) {
-                    len = (len shl 8) or (bytes[offset + 14 + i].toInt() and 0xFF)
-                }
-
-                if (offset + WalFrame.HEADER_SIZE + len + 4 > bytes.size) {
-                    isCorrupted = true
-                    break
-                }
-
-                val frame = bytes.sliceArray(offset until offset + WalFrame.HEADER_SIZE + len + 4)
-                if (WalFrame.validate(frame)) {
-                    val payload = frame.sliceArray(WalFrame.HEADER_SIZE until WalFrame.HEADER_SIZE + len)
-                    val str = payload.decodeToString()
-                    memoizedStrings.put(str, offset)
-                    offset += frame.size
-                    currentOffset = offset
-                } else {
-                    isCorrupted = true
-                    break // Stop recovery on corruption
-                }
-            }
-
-            // Truncate if there was corruption
-            if (isCorrupted && offset < bytes.size) {
-                fileOps.write(location, bytes.sliceArray(0 until offset))
-            }
+        if (IsamFileOperations().exists("$location.meta")) {
+            val isam = IsamDataFile(location)
+            isam.open()
+            try {
+                column = isam.metafile.constraints[0]
+                size = isam.size
+                keys = arrayOfNulls(maxOf(16, size))
+                for (id in 0 until size) keys[id] = isam[id][0].a as String
+            } finally { isam.close() }
+        } else {
+            column = RecordMeta("key", IOMemento.IoString, 0, width)
+            size = 0
+            keys = arrayOfNulls(16)
         }
-
-        // Open for appending later
-    }
-
-    private fun ensureOpen() {
-        if (fd == -1) {
-            if (!fileExists) {
-                fileOps.write(location, ByteArray(0))
-                fileExists = true
-            }
-            fd = fileOps.open(location, readOnly = false)
-        }
+        val present = keys
+        index = FunnelHashIndex.build(size j { id: Int -> present[id]!! }, 0L)
     }
 
     override fun put(value: String): Int {
-        val existingOffset = memoizedStrings.get(value)
-        if (existingOffset != null) {
-            return existingOffset
-        }
-
-        // Bounded record size - let's say max 10MB as in JvmDurableAppendLog?
-        val payload = value.encodeToByteArray()
-        require(payload.size <= 10 * 1024 * 1024) { "String payload exceeds maximum size" }
-
-        val offset = currentOffset
-        val frame = WalFrame.encode(offset.toLong(), payload)
-
-        // Append to file
-        val bytes = if (fileExists) fileOps.readAllBytes(location) else ByteArray(0)
-        val newBytes = ByteArray(bytes.size + frame.size)
-        bytes.copyInto(newBytes)
-        frame.copyInto(newBytes, bytes.size)
-        fileOps.write(location, newBytes)
-        fileExists = true
-
-        memoizedStrings.put(value, offset)
-        currentOffset += frame.size
-        return offset
+        index.get(value)?.let { return it }
+        added.get(value)?.let { return it }
+        val id = size
+        val row: RowVec = 1 j { _: Int -> value j column.`↺` }
+        operations.append(listOf(row), location, emptyMap(), null, false)
+        if (id == keys.size) keys = keys.copyOf(id * 2)
+        keys[id] = value
+        added.put(value, id)
+        size = id + 1
+        return id
     }
 
-    override fun get(offset: Int): String? {
-        if (!fileExists) return null
-        val bytes = fileOps.readAllBytes(location)
-        if (offset >= bytes.size) return null
-
-        // Check if there's enough space for header + crc
-        if (offset + WalFrame.HEADER_SIZE + 4 > bytes.size) return null
-
-        // Read length
-        var len = 0
-        for (i in 0 until 4) {
-            len = (len shl 8) or (bytes[offset + 14 + i].toInt() and 0xFF)
-        }
-
-        if (offset + WalFrame.HEADER_SIZE + len + 4 > bytes.size) return null
-
-        val frame = bytes.sliceArray(offset until offset + WalFrame.HEADER_SIZE + len + 4)
-        if (WalFrame.validate(frame)) {
-            val payload = frame.sliceArray(WalFrame.HEADER_SIZE until WalFrame.HEADER_SIZE + len)
-            return payload.decodeToString()
-        }
-        return null
-    }
+    override fun get(id: Int): String? = if (id in 0 until size) keys[id] else null
 }

@@ -149,7 +149,12 @@ enum class IOMemento(override val networkSize: Int? = null, val fromChars: (Seri
         val readByteArray: (ByteArray) -> ByteArray = { value: ByteArray -> value }
         val writeByteArray: (Any?) -> ByteArray = { value: Any? -> value as ByteArray }
 
-        val readString: (ByteArray) -> String = { value: ByteArray -> value.decodeToString() }
+        /** Row writers zero-pad a string to its column width; the padding is not part of the value. */
+        val readString: (ByteArray) -> String = { value: ByteArray ->
+            var end = value.size
+            while (end > 0 && value[end - 1] == 0.toByte()) end--
+            value.decodeToString(0, end)
+        }
         val writeString: (Any?) -> ByteArray = { value: Any? -> (value as String).encodeToByteArray() }
 
         val readBool: (ByteArray) -> Boolean = { value: ByteArray -> value[0] == 1.toByte() }
