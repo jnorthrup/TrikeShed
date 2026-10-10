@@ -84,7 +84,7 @@ sealed interface Item {
     data class Flt(val value: Double) : Item
     data class Bool(val value: Boolean) : Item
     object Nil : Item
-    data class Tag(val tag: UInt, val item: Item) : Item
+    data class Tag(val tag: ULong, val item: Item) : Item
 }
 
 fun itemMapOf(vararg pairs: Pair<String, Item>): Item.Map =
