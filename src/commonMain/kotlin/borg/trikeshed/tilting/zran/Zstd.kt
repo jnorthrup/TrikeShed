@@ -1,5 +1,6 @@
 package borg.trikeshed.tilting.zran
 
+import borg.trikeshed.userspace.nio.platform.spi.*
 import kotlin.math.log2
 
 /*
@@ -15,11 +16,11 @@ fun ByteArray.u8(i: Int): Int = this[i].toInt() and 0xFF
 fun ByteArray.le16(i: Int): Int = u8(i) or (u8(i + 1) shl 8)
 fun ByteArray.le24(i: Int): Int = le16(i) or (u8(i + 2) shl 16)
 fun ByteArray.le32(i: Int): Int = le16(i) or (le16(i + 2) shl 16)
-fun ByteArray.le64(i: Int): Long = (le32(i).toLong() and 0xFFFFFFFFL) or (le32(i + 4).toLong() shl 32)
+fun ByteArray.le64(i: Int): Long = littleEndianGetLongAt(i)
 fun ByteArray.put16(i: Int, v: Int) { this[i] = v.toByte(); this[i + 1] = (v ushr 8).toByte() }
 fun ByteArray.put24(i: Int, v: Int) { put16(i, v); this[i + 2] = (v ushr 16).toByte() }
 fun ByteArray.put32(i: Int, v: Int) { put16(i, v); put16(i + 2, v ushr 16) }
-fun ByteArray.put64(i: Int, v: Long) { put32(i, v.toInt()); put32(i + 4, (v ushr 32).toInt()) }
+fun ByteArray.put64(i: Int, v: Long) = littleEndianSetLongAt(i, v)
 
 /** Index of the highest set bit; -1 for 0. */
 fun highbit(v: Int): Int = 31 - v.countLeadingZeroBits()

@@ -85,4 +85,19 @@ class PlatformEndiannessTest {
             assertEquals(value, codec.readLong(codec.writeLong(value)))
         }
     }
+
+    @Test
+    fun `little-endian long access is LSB first at an unaligned index`() {
+        // 0x84 and 0xF8 set the sign bit of each 32-bit half.
+        val bytes = byteArrayOf(0x11, 0x01, 0x02, 0x03, 0x84.toByte(), 0x05, 0x06, 0x07, 0xF8.toByte(), 0x22)
+        val value = 0xF807060584030201uL.toLong()
+        assertEquals(value, bytes.littleEndianGetLongAt(1))
+        assertEquals(value, bytes.littleEndianGetLongAtCommonImpl(1))
+        val stored = byteArrayOf(0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0x22)
+        stored.littleEndianSetLongAt(1, value)
+        assertContentEquals(bytes, stored)
+        val storedCommon = byteArrayOf(0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0x22)
+        storedCommon.littleEndianSetLongAtCommonImpl(1, value)
+        assertContentEquals(bytes, storedCommon)
+    }
 }
