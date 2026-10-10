@@ -11,3 +11,7 @@ private external fun endianProbe(): Int
 
 internal actual fun platformNativeByteOrder(): ByteOrder =
     if (endianProbe() == 0x04) ByteOrder.LITTLE_ENDIAN else ByteOrder.BIG_ENDIAN
+
+actual fun ByteArray.littleEndianGetLongAt(index: Int): Long = littleEndianGetLongAtCommonImpl(index)
+
+actual fun ByteArray.littleEndianSetLongAt(index: Int, value: Long) = littleEndianSetLongAtCommonImpl(index, value)
