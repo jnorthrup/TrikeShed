@@ -91,6 +91,7 @@ object ExtrudedSceneProjection {
             items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id,
                 (listOf<PathPart>(PathPart.Move(p.first())) + p.drop(1).map { PathPart.Line(it) }).toSeries(), stroke = Rgba(25, 145, 139), width = 1.6))
         }
-        return FramePlan(viewport, (items.sortedByDescending { it.a }.map { it.b } + labels).toSeries(), Rgba(16, 20, 27))
+        items.sortByDescending { it.a }
+        return FramePlan(viewport, (items.size + labels.size) j { i: Int -> if (i < items.size) items[i].b else labels[i - items.size] }, Rgba(16, 20, 27))
     }
 }
