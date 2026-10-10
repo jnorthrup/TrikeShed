@@ -1,17 +1,14 @@
 package borg.trikeshed.hook
 
 import borg.trikeshed.htx.htxHeaders
+import borg.trikeshed.job.hmacSha256
 import borg.trikeshed.jules.TrikeHtxHttpClient
 import borg.trikeshed.lib.j
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
-/** JVM HmacSHA256 implementation shared by inbound verification and outbound signing. */
+/** HMAC-SHA-256 hex signature shared by inbound verification and outbound signing. */
 object JvmHookSigner : HookSigner {
     override fun sign(secret: String, body: String): String {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(secret.encodeToByteArray(), "HmacSHA256"))
-        val bytes = mac.doFinal(body.encodeToByteArray())
+        val bytes = hmacSha256(secret.encodeToByteArray(), body.encodeToByteArray())
         return buildString(bytes.size * 2) {
             for (b in bytes) append((b.toInt() and 0xff).toString(16).padStart(2, '0'))
         }
