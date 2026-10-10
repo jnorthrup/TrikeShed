@@ -4,6 +4,7 @@ import borg.trikeshed.common.Usable
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.meta.IsamMetaFileReader
+import borg.trikeshed.lib.j
 
 class IsamDataFile(
     val datafileFilename: String,
@@ -29,6 +30,12 @@ class IsamDataFile(
     override fun close() {
         reader.close()
     }
+
+    /** Leaf fence of [column] (see [IsamDataReader.fence]). */
+    fun fence(column: String) = reader.fence(column)
+
+    /** `isam["a", "b"]`: the named columns, reading only their groups (shadows the generic Cursor projection). */
+    operator fun get(vararg names: CharSequence): Cursor = reader.recordCount j reader.projection(names.toList())
 
     companion object {
         fun write(

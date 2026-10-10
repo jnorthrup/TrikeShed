@@ -199,6 +199,23 @@ kotlin {
             binaries {
                 executable("canary") {
                     entryPoint = "borg.trikeshed.canary.main"
+                    // K/N 2.4.20/2.4.21 ship macos_arm64 system caches tagged iOS (LC_BUILD_VERSION platform 2,
+                    // e.g. CoreFoundationBase); Xcode 26 ld refuses to link them into a macOS binary.
+                    @OptIn(org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCacheApi::class)
+                    disableNativeCache(
+                        org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.`2_4_21`,
+                        "K/N macos_arm64 system caches are tagged iOS; Xcode 26 ld rejects them",
+                    )
+                }
+                // Ledger head-to-head with the Rust contender (cocaine-rats loom-isam): same events, same files.
+                // ./gradlew linkLedgerReleaseExecutableMacos → build/bin/macos/ledgerReleaseExecutable/ledger.kexe
+                executable("ledger") {
+                    entryPoint = "borg.trikeshed.userspace.benchmark.ledgerBenchmarkMain"
+                    @OptIn(org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCacheApi::class)
+                    disableNativeCache(
+                        org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion.`2_4_21`,
+                        "K/N macos_arm64 system caches are tagged iOS; Xcode 26 ld rejects them",
+                    )
                 }
             }
         }
