@@ -29,7 +29,7 @@ fun main(args: Array<String>) {
         require((args.size - 1) % 2 == 0) { "Options require --name value pairs" }
         for (i in 1 until args.size step 2) { require(args[i].startsWith("--")); options[args[i].drop(2)] = args[i + 1] }
         require(options.keys.all { it in setOf("state", "value", "name", "bootstrap", "quorum", "replicas", "allow-private", "trace", "timeout", "rpc-timeout", "lifetime", "republish-interval", "retry-interval", "ttl", "duration") }) { "Unknown option" }
-        val crypto = JvmIpnsCrypto()
+        val crypto = Ed25519
         val trace = options["trace"]?.let { IpnsIoTrace() }
         var journal: IpnsJournal? = null
         var publisher: IpnsPublisher? = null

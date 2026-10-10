@@ -35,7 +35,7 @@ class IpnsWireRouterTest {
         assertEquals(503, request("GET", "/api/v0/name/status").status)
         assertEquals(503, request("POST", "/api/v0/name/publish?arg=$value").status)
         assertEquals(503, request("POST", "/api/v0/name/republish").status)
-        val name = JvmIpnsCrypto().generate().name
+        val name = Ed25519.generate().name
         assertEquals(503, request("GET", "/api/v0/name/resolve?arg=$name").status)
         assertEquals(400, request("POST", "/api/v0/name/publish").status)
         assertEquals(400, request("POST", "/api/v0/name/publish?arg=/ipfs/not-a-cid").status)
@@ -124,7 +124,7 @@ class IpnsWireRouterTest {
                 assertEquals(400, node.request("POST", "/api/v0/name/publish?arg=$argument").status)
             assertEquals(0, node.puts)
             assertNull(node.publisher.latest)
-            val target = JvmIpnsCrypto().generate().name
+            val target = Ed25519.generate().name
             val linked = node.request("POST", "/api/v0/name/publish?arg=/ipns/$target/child")
             assertEquals(200, linked.status)
             assertEquals("/ipns/$target/child", json(linked)["Value"])
@@ -173,7 +173,7 @@ class IpnsWireRouterTest {
         // Temporary-directory creation/cleanup is test harness setup; journal I/O uses the common uring facade.
         val directory = Files.createTempDirectory("ipns-router-")
         val path = directory.resolve("identity")
-        val crypto = JvmIpnsCrypto()
+        val crypto = Ed25519
         val journal = IpnsJournal.open(path.toString(), crypto)
         val router = router()
         var puts = 0

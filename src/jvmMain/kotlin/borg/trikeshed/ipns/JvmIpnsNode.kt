@@ -9,7 +9,7 @@ fun jvmIpnsNode(path: String, context: CoroutineContext,
     limits: IpnsDhtLimits = IpnsDhtLimits(),
     policy: IpnsPublicationPolicy = IpnsPublicationPolicy(),
 ): IpnsNode {
-    val crypto = JvmIpnsCrypto()
+    val crypto = Ed25519
     return IpnsNode(path, crypto,
         IpnsDhtAddresses.bootstrap(bootstrap.split(',').toSeries(), limits.allowPrivateAddresses),
         { identity -> JvmLibp2pTls(identity, crypto)::backend }, context, limits, policy,

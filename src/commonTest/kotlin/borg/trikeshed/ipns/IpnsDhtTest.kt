@@ -240,7 +240,7 @@ class IpnsDhtTest {
         replication = replication, parallelism = parallelism, minValidResponses = quorum,
         allowPrivateAddresses = true, rpcTimeoutMillis = 1000, operationTimeoutMillis = 10_000)
 
-    /** Test-only signature oracle; cryptographic interoperability is covered by JvmIpnsCrypto/Go tests. */
+    /** Test-only signature oracle; cryptographic interoperability is covered by Ed25519/Go tests. */
     class CodecCrypto : IpnsCrypto {
         override fun generate() = ByteArray(32) { (it + 37).toByte() }.let { IpnsKeyPair(it, it) }
         override fun sign(privateKey: ByteArray, payload: ByteArray): ByteArray = IpnsEncoding.sha256(privateKey + payload).let { it + it }

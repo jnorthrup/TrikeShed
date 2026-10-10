@@ -6,7 +6,7 @@ import kotlin.time.Instant
 import kotlin.test.*
 
 class IpnsRecordTest {
-    private val crypto = JvmIpnsCrypto()
+    private val crypto = Ed25519
     private val now = Instant.parse("2026-09-11T00:00:00Z")
     private val eol = Instant.parse("2026-09-12T00:00:00.000000001Z")
     private fun hex(text: String): ByteArray = text.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
