@@ -320,8 +320,8 @@ class AffineNielsPoint(
     val yplusx: FieldElement = FieldElement(), val yminusx: FieldElement = FieldElement(),
     val xy2d: FieldElement = FieldElement(),
 ) {
-    fun set(p: EdwardsPoint) {
-        val recip = FieldElement().also { it.invert(p.Z) }
+    /** x = X/Z, y = Y/Z from [recip] = 1/Z. */
+    fun set(p: EdwardsPoint, recip: FieldElement) {
         val x = FieldElement().also { it.mul(p.X, recip) }
         val y = FieldElement().also { it.mul(p.Y, recip) }
         yplusx.add(y, x)
@@ -530,36 +530,50 @@ class EdwardsPoint(
         /** row i, entry j: (j + 1) 256^i B (ref10 base[32][8]). */
         val BASE_TABLE: Array<Array<AffineNielsPoint>> by lazy {
             val p = EdwardsPoint().also { it.set(BASEPOINT) }
-            val q = EdwardsPoint()
             val c = ProjectiveNielsPoint()
             val r = CompletedPoint()
-            Array(32) {
+            val points = Array(256) { EdwardsPoint() }
+            for (i in 0..31) {
                 c.set(p)
-                q.set(p)
-                val row = Array(8) { j ->
-                    if (j > 0) {
-                        r.add(q, c); q.extended(r)
-                    }
-                    AffineNielsPoint().also { it.set(q) }
+                points[8 * i].set(p)
+                for (j in 1..7) {
+                    r.add(points[8 * i + j - 1], c); points[8 * i + j].extended(r)
                 }
                 repeat(8) { r.double(p); p.extended(r) }
-                row
             }
+            val affine = affineNiels(points)
+            Array(32) { i -> Array(8) { j -> affine[8 * i + j] } }
         }
 
         /** B, 3B, 5B, ..., 15B (ref10 Bi). */
         val BASE_ODD: Array<AffineNielsPoint> by lazy {
             val r = CompletedPoint()
-            val q = EdwardsPoint().also { it.set(BASEPOINT) }
             val twice = ProjectiveNielsPoint()
             r.double(BASEPOINT)
             twice.set(EdwardsPoint().also { it.extended(r) })
-            Array(8) { i ->
-                if (i > 0) {
-                    r.add(q, twice); q.extended(r)
-                }
-                AffineNielsPoint().also { it.set(q) }
+            val points = Array(8) { EdwardsPoint() }
+            points[0].set(BASEPOINT)
+            for (i in 1..7) {
+                r.add(points[i - 1], twice); points[i].extended(r)
             }
+            affineNiels(points)
+        }
+
+        /** [points] in affine Niels form through one inversion of the product of their Z (Montgomery's batch inversion). */
+        fun affineNiels(points: Array<EdwardsPoint>): Array<AffineNielsPoint> {
+            val prefix = Array(points.size) { FieldElement() }
+            prefix[0].set(points[0].Z)
+            for (k in 1 until points.size) prefix[k].mul(prefix[k - 1], points[k].Z)
+            val inverse = FieldElement().also { it.invert(prefix[points.size - 1]) }
+            val recip = FieldElement()
+            val affine = Array(points.size) { AffineNielsPoint() }
+            for (k in points.size - 1 downTo 0) {
+                if (k > 0) {
+                    recip.mul(inverse, prefix[k - 1]); inverse.mul(inverse, points[k].Z)
+                } else recip.set(inverse)
+                affine[k].set(points[k], recip)
+            }
+            return affine
         }
 
         /** ref10 slide: signed width-5 window digits (odd, -15..15) of a 256-bit little-endian scalar. */
