@@ -1,7 +1,7 @@
 package borg.trikeshed.loom
 
 import borg.trikeshed.collections.associative.*
-import borg.trikeshed.ipns.IpnsCrypto
+import borg.trikeshed.ipns.*
 import borg.trikeshed.lib.*
 import kotlin.test.*
 
@@ -9,7 +9,9 @@ import kotlin.test.*
 fun pattern(length: Int, mul: Int, add: Int): ByteArray = ByteArray(length) { (it * mul + add).toByte() }
 
 /** segment.rs and custody.rs (with auth.rs Receipt) against LoomVectors. */
-abstract class LoomCustodyTest(val crypto: IpnsCrypto) {
+class LoomCustodyTest {
+    val crypto: IpnsCrypto = Ed25519
+
     val id = LoomVectors.SEGMENT_ID.hexToByteArray()
     val challenge = LoomVectors.CHALLENGE.hexToByteArray()
     val t = LoomVectors.T

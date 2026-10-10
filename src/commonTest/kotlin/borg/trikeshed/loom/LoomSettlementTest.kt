@@ -1,7 +1,7 @@
 package borg.trikeshed.loom
 
 import borg.trikeshed.collections.associative.*
-import borg.trikeshed.ipns.IpnsCrypto
+import borg.trikeshed.ipns.*
 import borg.trikeshed.job.sha256
 import borg.trikeshed.lib.*
 import kotlin.test.*
@@ -10,7 +10,9 @@ import kotlin.test.*
 fun config(id: String = "replica-a", gcs: GcsConfig = GcsConfig("loom-archive")): Config = Config(id, members(), "authority", gcs)
 
 /** completion.rs, settlement.rs (Settlement, Handoff, bundle) and gcs.rs GcsReceipt against LoomVectors. */
-abstract class LoomSettlementTest(val crypto: IpnsCrypto) {
+class LoomSettlementTest {
+    val crypto: IpnsCrypto = Ed25519
+
     val id = LoomVectors.SEGMENT_ID.hexToByteArray()
     val nonce = LoomVectors.NONCE_3.hexToByteArray()
     val t = LoomVectors.T

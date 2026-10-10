@@ -172,6 +172,12 @@ object LoomVectors {
         "url_number" j ("{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"url\":7,\"roles\":[\"admin\"]}" j "error"),
         "duplicate_id" j ("{\"id\":\"x\",\"id\":\"y\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"roles\":[\"admin\"]}" j "error"),
         "not_object" j ("[\"x\"]" j "error"),
+        "trailing_comma" j ("{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"roles\":[\"admin\"],}" j "error"),
+        "trailing_junk" j ("{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"roles\":[\"admin\"]} x" j "error"),
+        "missing_colon" j ("{\"id\" \"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"roles\":[\"admin\"]}" j "error"),
+        "array_form" j ("[\"x\",\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"d\",null,[\"admin\"]]" j "ok:{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"domain\":\"d\",\"url\":null,\"roles\":[\"admin\"]}"),
+        "array_form_long" j ("[\"x\",\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"d\",null,[\"admin\"],1]" j "error"),
+        "role_object_form" j ("{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"roles\":[{\"admin\":null}]}" j "ok:{\"id\":\"x\",\"public_key\":\"8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394\",\"domain\":\"\",\"url\":null,\"roles\":[\"admin\"]}"),
     ]
     /** membership.rs Member::key: name j (public_key j "ok" or the error). */
     val memberKey: Series<Join<String, Twin<String>>> = s_[
@@ -362,5 +368,7 @@ object LoomVectors {
         "missing_scope" j ("{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"vast\",\"purpose\":\"management\",\"enforcement\":\"revocation\",\"issued_at\":1790000000,\"not_after\":1790000060,\"key_id\":\"1\"}" j "error"),
         "negative_time" j ("{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"vast\",\"purpose\":\"management\",\"enforcement\":\"revocation\",\"scope\":\"s\",\"issued_at\":-1,\"not_after\":1,\"key_id\":\"1\"}" j "error"),
         "u64_max_time" j ("{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"vast\",\"purpose\":\"management\",\"enforcement\":\"revocation\",\"scope\":\"s\",\"issued_at\":18446744073709551615,\"not_after\":1,\"key_id\":\"1\"}" j "ok:{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"vast\",\"purpose\":\"management\",\"enforcement\":\"revocation\",\"scope\":\"s\",\"issued_at\":18446744073709551615,\"not_after\":1,\"key_id\":\"1\"}"),
+        "float_time" j ("{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"google\",\"purpose\":\"archive\",\"enforcement\":\"provider\",\"scope\":\"s\",\"issued_at\":1.5,\"not_after\":1790000060}" j "error"),
+        "array_form" j ("[\"loom-lease-receipt/v1\",\"google\",\"archive\",\"provider\",\"s\",1790000000,1790000060]" j "ok:{\"format\":\"loom-lease-receipt/v1\",\"provider\":\"google\",\"purpose\":\"archive\",\"enforcement\":\"provider\",\"scope\":\"s\",\"issued_at\":1790000000,\"not_after\":1790000060,\"key_id\":null}"),
     ]
 }

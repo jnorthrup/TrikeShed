@@ -1,8 +1,6 @@
 package borg.trikeshed.loom
 
-import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.confix.*
 
 /*
  * cocaine-rats crates/loom-mesh/src/lease.rs, the receipt: non-secret evidence of one time-bounded
@@ -66,17 +64,17 @@ class LeaseReceipt(
         /** serde_json with deny_unknown_fields: `key_id` defaults to null. */
         fun from_json(bytes: ByteArray): LeaseReceipt {
             val fields = s_["format", "provider", "purpose", "enforcement", "scope", "issued_at", "not_after", "key_id"]
-            val cells = deserialize_struct(bytes, fields)
-            fun cell(at: Int) = cells[at] ?: error("missing field `${fields[at]}`")
+            val values = deserialize_struct(bytes, fields)
+            fun value(at: Int) = values[at] ?: error("missing field `${fields[at]}`")
             return LeaseReceipt(
-                cell(0).deserialize_string("format"),
-                cell(1).deserialize_enum("provider", Provider.entries),
-                cell(2).deserialize_enum("purpose", Purpose.entries),
-                cell(3).deserialize_enum("enforcement", Enforcement.entries),
-                cell(4).deserialize_string("scope"),
-                cell(5).deserialize_u64("issued_at"),
-                cell(6).deserialize_u64("not_after"),
-                cells[7]?.let { if (it.row.tag == IOMemento.IoNothing) null else it.deserialize_string("key_id") },
+                value(0).deserialize_string("format"),
+                value(1).deserialize_enum("provider", Provider.entries),
+                value(2).deserialize_enum("purpose", Purpose.entries),
+                value(3).deserialize_enum("enforcement", Enforcement.entries),
+                value(4).deserialize_string("scope"),
+                value(5).deserialize_u64("issued_at"),
+                value(6).deserialize_u64("not_after"),
+                values[7]?.let { if (it == Null) null else it.deserialize_string("key_id") },
             )
         }
     }

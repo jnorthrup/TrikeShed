@@ -40,8 +40,6 @@ class LoomMembershipTest {
     @Test
     fun keyAgreesWithEd25519Dalek() {
         for ((name, case) in LoomVectors.memberKey.view) {
-            // point decompression ("public key") is the hermetic Ed25519's; see Member.key
-            if (name == "off_curve") continue
             val (public_key, expected) = case
             val result = try {
                 assertEquals(public_key, Member("x", public_key, roles = s_[Role.Admin]).key().toHexString(), name)

@@ -1,8 +1,7 @@
 package borg.trikeshed.loom
 
-import borg.trikeshed.cursor.*
+import borg.trikeshed.ipns.*
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.confix.*
 import kotlin.enums.EnumEntries
 
 /** cocaine-rats crates/loom-mesh/src/membership.rs: trust roles, serde snake_case on the wire. */
@@ -19,16 +18,13 @@ class Member(
 ) {
     fun has(role: Role): Boolean = role in roles.view
 
-    /**
-     * The 32-byte Ed25519 key. Like ed25519-dalek's VerifyingKey::is_weak, the small-order points
-     * are refused in every encoding; ed25519-dalek's point decompression ("public key") is not here,
-     * so an encoding off the curve passes this check and fails at [IpnsCrypto.verify].
-     */
+    /** The 32-byte Ed25519 key: ed25519-dalek VerifyingKey::from_bytes ("public key"), then is_weak ("weak public key"). */
     fun key(): ByteArray {
         if (public_key.length != 64 || !public_key.all { it in '0'..'9' || it in 'a'..'f' }) error("public key encoding")
         val key = public_key.hexToByteArray()
-        if (SMALL_ORDER.view.any { point -> (0 until 32).all { i -> (key[i].toInt() xor point[i].toInt()) and (if (i == 31) 0x7f else 0xff) == 0 } })
-            error("weak public key")
+        val point = EdwardsPoint()
+        if (!point.decode(key)) error("public key")
+        if (point.isSmallOrder()) error("weak public key")
         return key
     }
 
@@ -40,30 +36,15 @@ class Member(
                 id = (id ?: error("missing field `id`")).deserialize_string("id"),
                 public_key = (public_key ?: error("missing field `public_key`")).deserialize_string("public_key"),
                 domain = domain?.deserialize_string("domain") ?: "",
-                url = url?.let { if (it.row.tag == IOMemento.IoNothing) null else it.deserialize_string("url") },
-                roles = (roles ?: error("missing field `roles`")).let { cell ->
-                    if (cell.row.tag != IOMemento.IoArray) error("invalid type: `roles`, expected a sequence")
-                    val kids = cell.row.kids
-                    Array(kids.size) { (kids[it] j cell.src).deserialize_enum("roles", Role.entries) }.toSeries()
+                url = url?.let { if (it == Null) null else it.deserialize_string("url") },
+                roles = (roles ?: error("missing field `roles`")).let { value ->
+                    if (value !is List<*>) error("invalid type: `roles`, expected a sequence")
+                    Array(value.size) { value[it].deserialize_enum("roles", Role.entries) }.toSeries()
                 },
             )
         }
     }
 }
-
-/**
- * The small-order Ed25519 points as encoded y with the sign bit clear (libsodium's
- * ge25519_has_small_order list): 0, 1, the two order-8 points, p - 1, p and p + 1.
- */
-val SMALL_ORDER: Series<ByteArray> = s_[
-    "0000000000000000000000000000000000000000000000000000000000000000",
-    "0100000000000000000000000000000000000000000000000000000000000000",
-    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
-    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
-    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
-] α { it.hexToByteArray() }
 
 /** Exact RunPod serverless origin grammar: identity syntax only, not DNS, permission or custody. */
 fun valid_runpod_endpoint_origin(value: String): Boolean {
@@ -91,37 +72,38 @@ fun validate_custody_members(members: Series<Member>) {
 }
 
 /**
- * serde_json's struct with deny_unknown_fields over the Confix JSON scan: one object whose keys are
- * each one of [fields] at most once. The value cells return in [fields] order, null where absent.
+ * serde's derived struct with deny_unknown_fields, read as serde_json reads it ([json]): an object whose
+ * keys are each one of [fields] at most once, or an array of the fields in declaration order. The values
+ * return in [fields] order, null where absent and [Null] where JSON null.
  */
-fun deserialize_struct(bytes: ByteArray, fields: Series<String>): Array<ConfixCell?> {
-    val doc = confixDoc(bytes, Syntax.JSON)
-    val root = doc.root
-    if (root == null || root.tag != IOMemento.IoObject || root.kids.size % 2 != 0) error("invalid type: expected a struct")
-    val cells = arrayOfNulls<ConfixCell>(fields.size)
-    for (k in 0 until root.kids.size step 2) {
-        val name = (root.kids[k] j doc.src).deserialize_string("key")
-        val at = (0 until fields.size).firstOrNull { fields[it] == name } ?: error("unknown field `$name`")
-        if (cells[at] != null) error("duplicate field `$name`")
-        cells[at] = root.kids[k + 1] j doc.src
+fun deserialize_struct(bytes: ByteArray, fields: Series<String>): Array<Any?> {
+    val values = arrayOfNulls<Any>(fields.size)
+    when (val value = json(bytes, unique = true) ?: error("invalid JSON")) {
+        is Map<*, *> -> for ((name, field) in value) {
+            val at = (0 until fields.size).firstOrNull { fields[it] == name } ?: error("unknown field `$name`")
+            values[at] = field
+        }
+        is List<*> -> {
+            if (value.size > fields.size) error("invalid length ${value.size}, expected ${fields.size} elements")
+            for (at in value.indices) values[at] = value[at]
+        }
+        else -> error("invalid type: expected a struct")
     }
-    return cells
+    return values
 }
 
-fun ConfixCell.deserialize_string(field: String): String =
-    if (row.tag == IOMemento.IoString) reify() as String else error("invalid type: `$field`, expected a string")
+fun Any.deserialize_string(field: String): String = this as? String ?: error("invalid type: `$field`, expected a string")
 
-/** A unit variant by its serde snake_case name; every variant here is one word. */
-fun <E : Enum<E>> ConfixCell.deserialize_enum(field: String, entries: EnumEntries<E>): E {
-    val name = deserialize_string(field)
+/** A unit variant by its serde snake_case name, as a string or an object holding it to null; every variant here is one word. */
+fun <E : Enum<E>> Any?.deserialize_enum(field: String, entries: EnumEntries<E>): E {
+    val value = this
+    val name = when {
+        value is String -> value
+        value is Map<*, *> && value.size == 1 && value.values.single() == Null -> value.keys.single() as String
+        else -> error("invalid type: `$field`, expected a unit variant")
+    }
     return entries.firstOrNull { it.name.lowercase() == name } ?: error("unknown variant `$name`")
 }
 
-/** A JSON integer 0..=u64::MAX, digits only, as serde_json reads u64. */
-fun ConfixCell.deserialize_u64(field: String): ULong {
-    val digits = ByteArray(row.close - row.open + 1) { src[row.open + it] }.decodeToString()
-    if (row.tag != IOMemento.IoDouble && row.tag != IOMemento.IoLong && row.tag != IOMemento.IoInt ||
-        digits.isEmpty() || !digits.all { it in '0'..'9' } || (digits.length > 1 && digits[0] == '0')
-    ) error("invalid type: `$field`, expected u64")
-    return digits.toULongOrNull() ?: error("invalid value: `$field`, expected u64")
-}
+/** A JSON integer 0..=u64::MAX as serde_json reads u64. */
+fun Any.deserialize_u64(field: String): ULong = asU64(this) ?: error("invalid type: `$field`, expected u64")

@@ -1,11 +1,13 @@
 package borg.trikeshed.loom
 
-import borg.trikeshed.ipns.IpnsCrypto
+import borg.trikeshed.ipns.*
 import borg.trikeshed.lib.*
 import kotlin.test.*
 
 /** ledger.rs LedgerVersion against LoomVectors. */
-abstract class LoomLedgerTest(val crypto: IpnsCrypto) {
+class LoomLedgerTest {
+    val crypto: IpnsCrypto = Ed25519
+
     val key = LoomVectors.SEED_AUTHORITY.hexToByteArray()
     val authority = members()[0]
     val t = LoomVectors.T

@@ -1,12 +1,14 @@
 package borg.trikeshed.loom
 
-import borg.trikeshed.ipns.IpnsCrypto
+import borg.trikeshed.ipns.*
 import borg.trikeshed.job.sha256
 import borg.trikeshed.lib.*
 import kotlin.test.*
 
-/** auth.rs against LoomVectors; [crypto] is the platform's Ed25519 until commonMain has its own. */
-abstract class LoomAuthTest(val crypto: IpnsCrypto) {
+/** auth.rs against LoomVectors */
+class LoomAuthTest {
+    val crypto: IpnsCrypto = Ed25519
+
     val producer = members()[4]
     val replicaA = members()[1]
     val authority = members()[0]
