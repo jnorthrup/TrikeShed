@@ -1,6 +1,7 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.common.Usable
+import borg.trikeshed.couch.isam.FileBackedStringpool
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.isam.RecordMeta
 import borg.trikeshed.isam.IsamFileOperations
@@ -63,7 +64,7 @@ class IsamMetaFileReader private constructor(
     override fun open() {
         constraints1 = null
         val lines = readLines(metafileFilename).filterNot { it.isBlank() || it.trim().startsWith('#') }
-        require(lines.size in 3..4) { "ISAM metadata requires coordinates, names, types and optional groups" }
+        require(lines.size in 3..5) { "ISAM metadata requires coordinates, names, types, then optional groups and pools" }
 
         val coords: Series<String> = CharSeries(lines[0]).trim.splitWs() α CharSeries::asString
         val names: Series<String> = CharSeries(lines[1]).trim.splitWs() α CharSeries::asString
@@ -72,11 +73,28 @@ class IsamMetaFileReader private constructor(
         require(names.size > 0 && types.size == names.size && coords.size.toLong() == names.size.toLong() * 2) {
             "ISAM metadata column counts disagree"
         }
-        val groupsLine = if (lines.size > 3) lines[3].trim() else ""
+        var tail = 3
+        val groupsLine = if (lines.size > tail && !pooled(lines[tail])) lines[tail++].trim() else ""
+        val poolsLine = if (lines.size > tail) lines[tail++].trim() else ""
+        require(tail == lines.size && (poolsLine.isEmpty() || pooled(poolsLine))) { "ISAM metadata lists groups before pools" }
         val groupSeries: Series<Join<Int, String>> = if (groupsLine.isNotEmpty()) {
             parseGroupsLine(groupsLine, names.size)
         } else {
             names.size j { _: Int -> 0 j "0" }
+        }
+        val pools = arrayOfNulls<FileBackedStringpool>(names.size)
+        if (poolsLine.isNotEmpty()) {
+            val directory = directoryOf(metafileFilename)
+            val opened = mutableMapOf<String, FileBackedStringpool>()
+            for (token in CharSeries(poolsLine).trim.splitWs()) {
+                val text = token.asString()
+                val eq = text.indexOf('=')
+                require(eq > 0) { "Invalid ISAM pool token" }
+                val index = text.substring(0, eq).toInt()
+                val name = text.substring(eq + 1)
+                require(index in 0 until names.size && pools[index] == null && nameable(name)) { "Invalid ISAM pool token" }
+                pools[index] = opened.getOrPut(name) { FileBackedStringpool(directory + name) }
+            }
         }
 
         val parsed = Array(names.size) { index ->
@@ -90,6 +108,7 @@ class IsamMetaFileReader private constructor(
             val recordMeta = RecordMeta(names[index], ioMemento, begin, end, decoder, encoder)
             recordMeta.groupId = groupId
             recordMeta.groupName = groupName
+            recordMeta.pool = pools[index]
             recordMeta
         }.toSeries()
         validate(parsed)
@@ -209,6 +228,15 @@ class IsamMetaFileReader private constructor(
                 }
                 if (groupTokens.isNotEmpty()) lines.add(groupTokens.joinToString(" "))
             }
+            val directory = directoryOf(metafilename)
+            val poolTokens = result.view.mapIndexedNotNull { idx, rm ->
+                rm.pool?.location?.let { location ->
+                    val name = location.removePrefix(directory)
+                    require(location.startsWith(directory) && nameable(name)) { "ISAM pool $location must be a file beside $metafilename" }
+                    "$idx=$name"
+                }
+            }
+            if (poolTokens.isNotEmpty()) lines.add(poolTokens.joinToString(" "))
 
             writeLines(metafilename, lines)
             return result
@@ -264,6 +292,7 @@ class IsamMetaFileReader private constructor(
                     ).also {
                         it.groupId = groupId
                         it.groupName = groupName
+                        it.pool = (columnMeta as? RecordMeta)?.pool
                     }
                     offset += len
                     recordMeta
@@ -273,10 +302,20 @@ class IsamMetaFileReader private constructor(
             return result
         }
 
+        /** Group and pool names name files beside the data file. */
+        fun nameable(name: String): Boolean = name.isNotEmpty() && name.none { it.isWhitespace() || it <= ' ' || it in ":/\\" }
+
+        /** A pools line maps dictionary columns to their pool files (`1=key.pool`); a groups token starts `0-3:` or `0,2:`. */
+        fun pooled(line: String): Boolean {
+            val text = line.trim()
+            val k = text.indexOfFirst { !it.isDigit() }
+            return k > 0 && text[k] == '='
+        }
+
+        fun directoryOf(path: String): String = path.substring(0, maxOf(path.lastIndexOf('/'), path.lastIndexOf('\\')) + 1)
+
         private fun validateGroupName(name: String) {
-            require(name.isNotEmpty() && name.none { it.isWhitespace() || it <= ' ' || it in ":/\\" }) {
-                "Invalid ISAM group name"
-            }
+            require(nameable(name)) { "Invalid ISAM group name" }
         }
 
         private fun validate(metadata: Series<RecordMeta>) {
