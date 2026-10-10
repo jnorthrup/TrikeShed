@@ -66,16 +66,18 @@ object Cbor {
         }
     }
 
-	   fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
+    /** [value] is the u64 argument; a tag above Long.MAX_VALUE arrives as its two's-complement Long. */
+    fun encodeHead(buf: ByteBuf, major: Int, value: Long) {
         val mt = major shl 5
+        val argument = value.toULong()
         when {
-            value < 24 -> buf.write(mt or value.toInt())
-            value <= 0xFF -> { buf.write(mt or 24); buf.write(value.toInt()) }
-            value <= 0xFFFF -> { buf.write(mt or 25); buf.writeShort(value.toInt()) }
-            value <= 0xFFFFFFFFL -> { buf.write(mt or 26); buf.writeInt(value.toInt()) }
+            argument < 24uL -> buf.write(mt or value.toInt())
+            argument <= 0xFFuL -> { buf.write(mt or 24); buf.write(value.toInt()) }
+            argument <= 0xFFFFuL -> { buf.write(mt or 25); buf.writeShort(value.toInt()) }
+            argument <= 0xFFFFFFFFuL -> { buf.write(mt or 26); buf.writeInt(value.toInt()) }
             else -> { buf.write(mt or 27); buf.writeLong(value) }
-	        }
-	    }
+        }
+    }
 
         private data class EncodedMapEntry(val keyBytes: ByteArray, val value: Item)
 
@@ -115,17 +117,20 @@ object Cbor {
             val argument = readArgument(additional)
 
             return when (major) {
-                0 -> Item.Num(argument)
-                1 -> Item.Num(-(argument + 1))
-                2 -> Item.Bin(readBytes(argument.toInt()))
-                3 -> Item.Str(readUtf8(argument.toInt()))
-                4 -> readArray(argument.toInt())
-                5 -> readMap(argument.toInt())
-                6 -> Item.Tag(argument.toUInt(), readItem())
+                0, 1 -> if (argument < 0) error("u64 too large") else Item.Num(if (major == 0) argument else -1 - argument)
+                2 -> Item.Bin(readBytes(length(argument)))
+                3 -> Item.Str(readUtf8(length(argument)))
+                4 -> readArray(length(argument))
+                5 -> readMap(length(argument))
+                6 -> Item.Tag(argument.toULong(), readItem())
                 7 -> readSimple(additional, argument)
                 else -> error("Invalid CBOR major type: $major at pos ${pos - 1}")
             }
         }
+
+       /** Lengths and counts never exceed the bytes left: each byte, item and entry takes at least one. */
+       fun length(argument: Long): Int =
+           if (argument < 0 || argument > data.size - pos) error("unexpected end of input") else argument.toInt()
 
        fun readArgument(additional: Int): Long = when (additional) {
             in 0..23 -> additional.toLong()
@@ -203,13 +208,13 @@ object Cbor {
             21 -> Item.Bool(true)
             22 -> Item.Nil
             23 -> Item.Nil
-            25 -> Item.Flt(readFloat16())
+            25 -> Item.Flt(readFloat16(argument.toInt()))
             26 -> Item.Flt(Float.fromBits(argument.toInt()).toDouble())
             27 -> Item.Flt(Double.fromBits(argument))
             else -> error("Unknown CBOR simple value: $additional")
         }
 
-       fun u8(): Int = data[pos++].toInt() and 0xFF
+       fun u8(): Int = if (pos < data.size) data[pos++].toInt() and 0xFF else error("unexpected end of input")
        fun u16(): Int = (u8() shl 8) or u8()
        fun u32(): Long = ((u8().toLong() shl 24) or (u8().toLong() shl 16) or (u8().toLong() shl 8) or u8().toLong()) and 0xFFFFFFFFL
        fun u64(): Long = (u32() shl 32) or u32()
@@ -221,13 +226,12 @@ object Cbor {
         }
 
        fun readUtf8(n: Int): String {
-            val result = data.decodeToString(pos, pos + n)
+            val result = data.decodeToString(pos, pos + n, throwOnInvalidSequence = true)
             pos += n
             return result
         }
 
-       fun readFloat16(): Double {
-            val bits = u16()
+       fun readFloat16(bits: Int): Double {
             val sign = (bits shr 15) and 1
             val exp = (bits shr 10) and 0x1F
             val frac = bits and 0x3FF
@@ -265,6 +269,7 @@ fun concat(chunks: List<ByteArray>): ByteArray {
     return result
 }
 fun pow(base: Double, exp: Int): Double {
+    if (exp < 0) return 1.0 / pow(base, -exp)
     var result = 1.0
     var b = base
     var e = exp
