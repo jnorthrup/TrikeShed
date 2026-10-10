@@ -17,7 +17,7 @@ val enableLinuxX64Target = (linuxHost && !arm64Host) || providers.gradleProperty
 val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradleProperty("enableLinuxArm64").orNull == "true"
 
 /** One native executable per Rust binary: Gradle binary name to Rust binary name, entry `borg.trikeshed.loom.<binary>Main`. */
-val executables = mapOf("loomMesh" to "loom-mesh", "loomRegistry" to "loom-registry")
+val executables = mapOf("loomMesh" to "loom-mesh", "loomRegistry" to "loom-registry", "loomKoboldStage" to "loom-kobold-stage")
 
 kotlin {
     jvmToolchain(25)
