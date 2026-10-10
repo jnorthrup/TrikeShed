@@ -34,56 +34,27 @@ class PlatformEndiannessTest {
     }
 
     @Test
-    fun `wire codec always writes big endian`() {
-        val wireInt = PlatformCodec.wireCodec.writeInt(0x01020304)
-        val wireLong = PlatformCodec.wireCodec.writeLong(0x0102030405060708L)
-
-        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03, 0x04), wireInt)
+    fun `assumed codec is network endian on every host`() {
+        val codec = PlatformCodec.currentPlatformCodec
+        assertContentEquals(byteArrayOf(0x01, 0x02, 0x03, 0x04), codec.writeInt(0x01020304))
         assertContentEquals(
             byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08),
-            wireLong
+            codec.writeLong(0x0102030405060708L)
         )
-    }
-
-    @Test
-    fun `native codec int roundtrips`() {
-        val value = 0x01020304
-        val bytes = PlatformCodec.currentPlatformCodec.writeInt(value)
-        assertEquals(value, PlatformCodec.currentPlatformCodec.readInt(bytes))
-    }
-
-    @Test
-    fun `native codec long roundtrips`() {
-        val value = 0x0102030405060708L
-        val bytes = PlatformCodec.currentPlatformCodec.writeLong(value)
-        assertEquals(value, PlatformCodec.currentPlatformCodec.readLong(bytes))
-    }
-
-    @Test
-    fun `native and wire codecs diverge on little endian hosts`() {
-        if (PlatformCodec.isLittleEndian) {
-            val native = PlatformCodec.currentPlatformCodec.writeInt(0x01020304)
-            val network = PlatformCodec.wireCodec.writeInt(0x01020304)
-
-            assertTrue(
-                !native.contentEquals(network),
-                "On LE host, native and network byte order must differ"
-            )
-            assertEquals(0x04, native[0].toInt() and 0xFF)
-            assertEquals(0x01, network[0].toInt() and 0xFF)
-        }
-        // On BE host native == network — nothing to assert
-    }
-
-    @Test
-    fun `wire codec read and write are inverse`() {
-        val codec = PlatformCodec.wireCodec
         for (value in listOf(0, 1, -1, Int.MAX_VALUE, Int.MIN_VALUE, 0x01020304)) {
             assertEquals(value, codec.readInt(codec.writeInt(value)))
         }
         for (value in listOf(0L, 1L, -1L, Long.MAX_VALUE, Long.MIN_VALUE, 0x0102030405060708L)) {
             assertEquals(value, codec.readLong(codec.writeLong(value)))
         }
+    }
+
+    @Test
+    fun `little endian is selected and never assumed`() {
+        val codec = PlatformCodec.codec(ByteOrder.LITTLE_ENDIAN)
+        assertContentEquals(byteArrayOf(0x04, 0x03, 0x02, 0x01), codec.writeInt(0x01020304))
+        assertEquals(0x0102030405060708L, codec.readLong(byteArrayOf(0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02, 0x01)))
+        assertTrue(PlatformCodec.codec(ByteOrder.BIG_ENDIAN) === PlatformCodec.currentPlatformCodec)
     }
 
     @Test

@@ -5,10 +5,10 @@
 package borg.trikeshed.tilting.zran
 
 import borg.trikeshed.collections.binarySearch
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUShort
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeUShort
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUShort
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeUShort
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CZero.nz
 import borg.trikeshed.lib.CZero.z

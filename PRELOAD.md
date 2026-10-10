@@ -366,6 +366,9 @@ completion. This file is the implementation contract.
 ## platform codec / endian framing
 - `platformCodec` expresses the major runtime invariants and the endian
   uptake, and frames IO.
+- Network endian, NIO compatible, when an order is assumed; selectable when
+  not, as a java.nio.ByteBuffer is BIG_ENDIAN until `order()` selects. Host
+  order is reported, never assumed.
 - NIO IO must not assert endian translation when Kotlin does not. The
   ByteBuffer/uring framing is endian-honest: it does not inject a byte order
   the JVM/JDK NIO layer would not, and it matches what the uring kernel

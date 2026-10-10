@@ -136,7 +136,7 @@ class JvmIsamOperationsTest {
         val path = directory.resolve("rows.bin").toString()
         operations.write(cursor(0x01020304 to 9, 0x11223344 to 7), path, emptyMap(), true)
         channels.assertClosed()
-        assertContentEquals(byteArrayOf(4, 3, 2, 1, 0x44, 0x33, 0x22, 0x11), Files.readAllBytes(Path.of(path)))
+        assertContentEquals(byteArrayOf(1, 2, 3, 4, 0x11, 0x22, 0x33, 0x44), Files.readAllBytes(Path.of(path)))
         assertContentEquals(byteArrayOf(9, 7), Files.readAllBytes(directory.resolve("rows.IoByte.bin")))
         Files.list(directory).use { paths ->
             assertEquals(setOf("rows.bin", "rows.bin.meta", "rows.IoByte.bin"), paths.map { it.fileName.toString() }.toList().toSet())

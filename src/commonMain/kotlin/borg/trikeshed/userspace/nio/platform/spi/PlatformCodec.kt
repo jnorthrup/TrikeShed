@@ -22,17 +22,19 @@ interface PlatformCodec {
     val writeULong: (ULong) -> ByteArray
 
     companion object {
+        /** Host order, reported as java.nio.ByteOrder.nativeOrder() reports it; never the assumed order. */
         val nativeByteOrder: ByteOrder by lazy(::platformNativeByteOrder)
-        val wireByteOrder: ByteOrder = ByteOrder.BIG_ENDIAN
+        val networkByteOrder: ByteOrder = ByteOrder.BIG_ENDIAN
         val isLittleEndian: Boolean get() = nativeByteOrder == ByteOrder.LITTLE_ENDIAN
-        val isWireEndian: Boolean get() = nativeByteOrder == wireByteOrder
+        val isNetworkEndian: Boolean get() = nativeByteOrder == networkByteOrder
 
-        val currentPlatformCodec: PlatformCodec by lazy {
-            CommonPlatformCodec(isLittleEndian)
-        }
-        val wireCodec: PlatformCodec by lazy {
-            CommonPlatformCodec(false)
-        }
+        /** The assumed order is network endian, as a java.nio.ByteBuffer is until order() selects another. */
+        val currentPlatformCodec: PlatformCodec by lazy { CommonPlatformCodec(false) }
+        private val littleEndianCodec: PlatformCodec by lazy { CommonPlatformCodec(true) }
+
+        /** The codec of a selected [order], as java.nio.ByteBuffer.order(order) selects. */
+        fun codec(order: ByteOrder): PlatformCodec =
+            if (order == ByteOrder.LITTLE_ENDIAN) littleEndianCodec else currentPlatformCodec
 
         // Top-level convenience references
         val readShort: (ByteArray) -> Short get() = currentPlatformCodec.readShort

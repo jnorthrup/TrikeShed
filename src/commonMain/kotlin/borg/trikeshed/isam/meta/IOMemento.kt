@@ -3,15 +3,15 @@
 package borg.trikeshed.isam.meta
 
 import borg.trikeshed.cursor.TypeMemento
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readLong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readUInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.readULong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeLong
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeUInt
-import borg.trikeshed.isam.meta.PlatformCodec.Companion.currentPlatformCodec.writeULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.currentPlatformCodec
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readLong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readUInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.readULong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeLong
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeUInt
+import borg.trikeshed.userspace.nio.platform.spi.PlatformCodec.Companion.writeULong
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.CharSeries
 import kotlinx.datetime.*
