@@ -215,8 +215,10 @@ private fun parseHttpTarget(
 ): HtxTarget {
     val withoutScheme = url.substringAfter("://")
     val authority = withoutScheme.substringBefore("/")
-    val host = authority.substringBefore(":")
-    val port = authority.substringAfter(":", "").toIntOrNull() ?: defaultPort
+    // An IPv6 literal keeps its brackets, as the url crate's host_str and the Host header write it.
+    val hostEnd = if (authority.startsWith('[')) authority.indexOf(']') + 1 else authority.indexOf(':').takeIf { it >= 0 } ?: authority.length
+    val host = authority.substring(0, hostEnd)
+    val port = authority.substring(hostEnd).removePrefix(":").toIntOrNull() ?: defaultPort
     val pathSuffix = withoutScheme.substringAfter("/", "")
     val requestPath = if (pathSuffix.isEmpty()) "/" else "/$pathSuffix"
     return HtxTarget(

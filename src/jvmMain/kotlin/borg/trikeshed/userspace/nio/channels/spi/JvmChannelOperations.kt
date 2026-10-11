@@ -21,9 +21,9 @@ class JvmChannelOperations : ChannelOperations {
     override fun openChannel(entries: Int): ChannelOperations.ChannelHandle =
         JvmChannelHandle(entries)
 
-    /** sockaddr octets for a CONNECT/BIND SQE; null when resolution fails. */
+    /** sockaddr octets for a CONNECT/BIND SQE: the first IPv4 address, else the first IPv6; null when resolution fails. */
     override fun resolve(host: String): ByteArray? = try {
-        java.net.InetAddress.getAllByName(host).firstOrNull { it.address.size == 4 }?.address
+        java.net.InetAddress.getAllByName(host).let { all -> all.firstOrNull { it.address.size == 4 } ?: all.firstOrNull() }?.address
     } catch (_: Exception) { null }
 }
 

@@ -49,8 +49,8 @@ interface ChannelOperations : CoroutineContext.Element {
     fun close(fd: Int): Int = settleOne { it.prepClose(fd) }
 
     /**
-     * Resolve a host to IPv4 octets for a CONNECT/BIND SQE sockaddr.
-     * DNS has no ring opcode; resolution is control-plane, the address it
+     * Resolve a host for a CONNECT/BIND SQE sockaddr: its first IPv4 address's 4 octets, else its first IPv6
+     * address's 16. DNS has no ring opcode; resolution is control-plane, the address it
      * yields rides the SQE. Returns null when the host cannot be resolved.
      */
     fun resolve(host: String): ByteArray? = null

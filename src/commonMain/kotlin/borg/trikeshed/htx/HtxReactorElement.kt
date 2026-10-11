@@ -18,9 +18,7 @@ import borg.trikeshed.reactor.TlsFlowStage
 import borg.trikeshed.reactor.TlsFrames
 import borg.trikeshed.reactor.openTlsElement
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.channels.SocketDomain
-import borg.trikeshed.userspace.nio.channels.SocketProtocol
-import borg.trikeshed.userspace.nio.channels.SocketType
+import borg.trikeshed.userspace.nio.channels.*
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.currentCoroutineContext
@@ -180,7 +178,8 @@ class HtxReactorElement(
                 backend = backend,
                 parentJob = supervisor,
             )
-            val endpoint = tls.clientEndpoint(request.target.host, request.target.port)
+            // An IPv6 literal names the TLS peer by its address, without the URL's brackets.
+            val endpoint = tls.clientEndpoint(request.target.host.removeSurrounding("[", "]"), request.target.port)
             try {
                 performTlsHandshake(connection.handle, connection.fd, endpoint, request.timeoutMs)
                 // renderWireRequest() is head-only — append the body bytes to
@@ -222,10 +221,10 @@ class HtxReactorElement(
         }
     }
 
-    /** Encoded IPv4 sockaddr for a CONNECT SQE; null when DNS resolution fails. */
+    /** Encoded sockaddr for a CONNECT SQE, IPv4 when [host] resolves to one, else IPv6; null when DNS resolution fails. */
     private fun connectAddress(ops: ChannelOperations, host: String, port: Int): ByteBuffer? =
-        ops.resolve(host)?.let { octets ->
-            ByteBuffer(borg.trikeshed.userspace.nio.channels.sockaddrIpv4(octets, port))
+        ops.resolve(host.removeSurrounding("[", "]"))?.let { octets ->
+            ByteBuffer(if (octets.size == 16) sockaddrIpv6(octets, port) else sockaddrIpv4(octets, port))
         }
 
     private fun openConnection(request: HtxRequest): HtxConnection {
@@ -237,7 +236,7 @@ class HtxReactorElement(
         var fd = -1
         try {
             // Non-blocking, as the EAGAIN loops below read and write it; close-on-exec, as a supervised program holds none.
-            check(handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.withFlags(SocketType.SOCK_STREAM, SocketType.SOCK_NONBLOCK,
+            check(handle.prepSocket(sockaddrFamily(address.array()), SocketType.withFlags(SocketType.SOCK_STREAM, SocketType.SOCK_NONBLOCK,
                 SocketType.SOCK_CLOEXEC), SocketProtocol.IPPROTO_TCP.posix) >= 0)
             check(handle.submit() == 1) { "HTX SOCKET SQE was not submitted" }
             fd = handle.wait(1).single().res

@@ -278,7 +278,6 @@ class Client(
         } catch (failure: IllegalStateException) {
             throw SendFailure.Invalid(failure.message ?: "unsafe URL")
         }
-        if (base.host?.startsWith('[') == true) TODO("loom client: IPv6 peer literals (the HTX reactor connects over AF_INET only)")
         if (request.target != peer.id || request.source != id) throw SendFailure.Invalid("request identity")
         if (!request.path.startsWith('/') || request.path.any { it.code <= 0x20 || it.code >= 0x7f })
             throw SendFailure.Invalid("request URL")
