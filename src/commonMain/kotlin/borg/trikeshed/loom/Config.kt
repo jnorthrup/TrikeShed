@@ -363,6 +363,19 @@ class Url(
     /** `Display`: [serialization]. */
     override fun toString(): String = serialization
 
+    /**
+     * `Url::join`: [input] parsed with this URL as its base, as url 2.5.8 resolves a reference against a special,
+     * non-file base; null where it refuses the reference.
+     */
+    fun join(input: String): Url? {
+        if (default_port(scheme) == null) TODO("Url::join against a $scheme base")
+        return try {
+            Parser(input.trim { it <= ' ' }, this).parse_url()
+        } catch (refused: IllegalArgumentException) {
+            null
+        }
+    }
+
     companion object {
         /** percent-encoding sets beyond CONTROLS (C0, DEL and every non-ASCII byte). */
         const val CONTROLS = ""
@@ -405,8 +418,8 @@ class Url(
             s.isNotEmpty() && s[0] in "/\\?#" && starts_with_windows_drive_letter(s.substring(1))
     }
 
-    /** parser.rs `Parser` over `Input`: [next] skips ASCII tab and newline as `Input::next` does. */
-    class Parser(val input: String) {
+    /** parser.rs `Parser` over `Input`, against [base] when there is one: [next] skips ASCII tab and newline as `Input::next` does. */
+    class Parser(val input: String, val base: Url? = null) {
         var at = 0
         val serialization = StringBuilder()
 
@@ -424,21 +437,22 @@ class Url(
         fun code_point(c: Char): String = if (c.isHighSurrogate()) "$c${next() ?: ""}" else c.toString()
 
         fun parse_url(): Url {
-            if (input.isEmpty() || !(input[0] in 'a'..'z' || input[0] in 'A'..'Z')) refuse()
-            while (true) {
-                when (val c = next() ?: refuse()) {
-                    in 'a'..'z', in '0'..'9', '+', '-', '.' -> serialization.append(c)
-                    in 'A'..'Z' -> serialization.append(c.lowercaseChar())
-                    ':' -> break
-                    else -> refuse()
-                }
-            }
-            val scheme = serialization.toString()
+            val scheme = parse_scheme() ?: return parse_relative(base ?: refuse())
             serialization.append(':')
             return when (scheme) {
                 "http", "https", "ws", "wss", "ftp" -> {
-                    while (peek().let { it == '/' || it == '\\' }) next()
-                    after_double_slash(scheme, special = true)
+                    // special relative or authority state
+                    val after_colon = at
+                    var slashes = 0
+                    while (peek().let { it == '/' || it == '\\' }) {
+                        next()
+                        slashes++
+                    }
+                    if (base != null && slashes < 2 && base.scheme == scheme) {
+                        at = after_colon
+                        serialization.setLength(0)
+                        parse_relative(base)
+                    } else after_double_slash(scheme, special = true)
                 }
                 "file" -> parse_file()
                 else -> {
@@ -448,6 +462,78 @@ class Url(
                         at = saved
                         parse_non_special(scheme)
                     }
+                }
+            }
+        }
+
+        /** parser.rs parse_scheme: the scheme before the first `:`, lowercased, or null with nothing read. */
+        fun parse_scheme(): String? {
+            if (input.isEmpty() || !(input[0] in 'a'..'z' || input[0] in 'A'..'Z')) return null
+            while (true) {
+                val c = next()
+                when {
+                    c == null || !(c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c in "+-.:") -> {
+                        serialization.setLength(0)
+                        at = 0
+                        return null
+                    }
+                    c == ':' -> return serialization.toString()
+                    else -> serialization.append(c.lowercaseChar())
+                }
+            }
+        }
+
+        /** parser.rs parse_relative: the reference at [at] against the special, non-file [base]. */
+        fun parse_relative(base: Url): Url {
+            val end = base.serialization.length
+            val fragment_start = base.fragment?.let { end - it.length - 1 }
+            val query_start = base.query?.let { (fragment_start ?: end) - it.length - 1 }
+            val path_start = (query_start ?: fragment_start ?: end) - base.path.length
+            val saved = at
+            return when (next()) {
+                null -> Url(base.serialization.substring(0, fragment_start ?: end), base.scheme, base.username, base.password,
+                    base.host, base.port, base.path, base.query, null)
+                '?' -> {
+                    at = saved
+                    serialization.append(base.serialization, 0, query_start ?: fragment_start ?: end)
+                    with_query_and_fragment(base.scheme, base.username, base.password, base.host, base.port, path_start)
+                }
+                '#' -> {
+                    val fragment = parse_fragment()
+                    serialization.append(base.serialization, 0, fragment_start ?: end).append('#').append(fragment)
+                    Url(serialization.toString(), base.scheme, base.username, base.password, base.host, base.port, base.path, base.query, fragment)
+                }
+                '/', '\\' -> {
+                    at = saved
+                    var slashes = 0
+                    while (peek().let { it == '/' || it == '\\' }) {
+                        next()
+                        slashes++
+                    }
+                    if (slashes >= 2) {
+                        serialization.append(base.scheme).append(':')
+                        at = saved
+                        if (!(next() == '/' && next() == '/')) {
+                            at = saved
+                            repeat(slashes) { next() }
+                        }
+                        after_double_slash(base.scheme, special = true)
+                    } else {
+                        serialization.append(base.serialization, 0, path_start).append('/')
+                        at = saved
+                        next()
+                        parse_path(special = true, path_start = path_start)
+                        with_query_and_fragment(base.scheme, base.username, base.password, base.host, base.port, path_start)
+                    }
+                }
+                else -> {
+                    at = saved
+                    serialization.append(base.serialization, 0, query_start ?: fragment_start ?: end)
+                    // pop_path: the base's last segment goes.
+                    if (serialization.length > path_start) serialization.setLength(serialization.lastIndexOf("/") + 1)
+                    if (serialization.length == path_start) serialization.append('/')
+                    parse_path(special = true, path_start = path_start)
+                    with_query_and_fragment(base.scheme, base.username, base.password, base.host, base.port, path_start)
                 }
             }
         }

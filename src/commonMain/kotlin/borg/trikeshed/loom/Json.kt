@@ -1,5 +1,7 @@
 package borg.trikeshed.loom
 
+import borg.trikeshed.lib.*
+
 /**
  * JSON as serde_json 1.0 (default features, no `preserve_order` or `float_roundtrip`) reads and
  * writes it for the cocaine-rats loom tools. A value is [Null], Boolean, Long (serde `NegInt`, and
@@ -12,10 +14,12 @@ object Null {
 
 /**
  * `serde_json::from_slice` into a `Value`, or null where serde_json refuses the bytes. [unique]
- * refuses a repeated object key at any depth (loomctl `strict::Strict`); otherwise the last wins.
+ * refuses a repeated object key at any depth (loomctl `strict::Strict`); otherwise the last wins, and
+ * [repeated] collects each object a key repeated in with the value it replaced: a derived struct refuses
+ * the object, a map still deserializes the replaced value.
  */
-fun json(bytes: ByteArray, unique: Boolean): Any? = try {
-    JsonReader(bytes, unique).run {
+fun json(bytes: ByteArray, unique: Boolean, repeated: MutableList<Join<Map<String, Any>, Any>>? = null): Any? = try {
+    JsonReader(bytes, unique, repeated).run {
         value().also {
             whitespace()
             require(at == bytes.size)
@@ -110,7 +114,7 @@ fun codePointOrder(a: String, b: String): Int {
 fun utf16Rank(c: Char): Int = c.code.let { if (it < 0xD800) it else if (it < 0xE000) it + 0x2000 else it - 0x800 }
 
 /** serde_json `Deserializer<SliceRead>` reduced to `deserialize_any` into a `Value`. */
-class JsonReader(val bytes: ByteArray, val unique: Boolean) {
+class JsonReader(val bytes: ByteArray, val unique: Boolean, val repeated: MutableList<Join<Map<String, Any>, Any>>? = null) {
     var at = 0
     var remainingDepth = 128
     var scratch = ByteArray(64)
@@ -176,7 +180,7 @@ class JsonReader(val bytes: ByteArray, val unique: Boolean) {
             require(!unique || key !in entries)
             whitespace()
             require(next() == ':'.code)
-            entries[key] = value()
+            entries.put(key, value())?.let { replaced -> repeated?.add(entries j replaced) }
             whitespace()
             when (next()) {
                 ','.code -> {}
