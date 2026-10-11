@@ -17,7 +17,9 @@ val enableLinuxX64Target = (linuxHost && !arm64Host) || providers.gradleProperty
 val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradleProperty("enableLinuxArm64").orNull == "true"
 
 /** One native executable per Rust binary: Gradle binary name to Rust binary name, entry `borg.trikeshed.loom.<binary>Main`. */
-val executables = mapOf("loomMesh" to "loom-mesh", "loomRegistry" to "loom-registry", "loomKoboldStage" to "loom-kobold-stage")
+val executables = mapOf(
+    "loomMesh" to "loom-mesh", "loomRegistry" to "loom-registry", "loomKoboldStage" to "loom-kobold-stage", "loomLease" to "loom-lease",
+)
 
 kotlin {
     jvmToolchain(25)
@@ -48,6 +50,8 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 implementation(project(":"))
+                // The keeper's entry runs the library's suspend HTTP client.
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:${rootProject.extra["versions.kotlinx-coroutines-core"]}")
             }
         }
         val commonTest = getByName("commonTest") {
