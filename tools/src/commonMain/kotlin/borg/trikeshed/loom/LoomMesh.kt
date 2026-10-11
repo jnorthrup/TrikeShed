@@ -7,8 +7,8 @@ import kotlinx.coroutines.selects.select
 
 /**
  * cocaine-rats `crates/loom-mesh/src/main.rs`. Failures exit 1 behind `loom-mesh: `. Ported: `--config`, `--serverless`,
- * `--confix-check` and `--settle-release`; each other mode is a TODO naming what it waits on. [supervisor] is the
- * platform's seam for the serving modes; the result is the process's exit status.
+ * `--confix-check`, `--settle-release` and `--uring-self-test`; each other mode is a TODO naming what it waits on.
+ * [supervisor] is the platform's seam for the serving modes; the result is the process's exit status.
  */
 fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
     when (args.firstOrNull()) {
@@ -17,7 +17,12 @@ fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
         "--customer-legacy-preview", "--customer-legacy-import" ->
             TODO("loom-mesh ${args[0]} waits on customer::migration: the legacy customer book and the GCS client")
         "--confix-check" -> confixCheck(args.copyOfRange(1, args.size))
-        "--uring-self-test" -> TODO("loom-mesh --uring-self-test waits on loom_mesh::uring::self_test over the userspace NIO uring facade")
+        "--uring-self-test" -> {
+            val name = args.getOrNull(1) ?: "auto"
+            if (args.size > 2) error("unexpected self-test arguments")
+            println(jsonText(runBlocking(Dispatchers.Default) { self_test(policy(name)) }))
+            return 0
+        }
         "--inference-worker" -> TODO("loom-mesh --inference-worker waits on inference::worker: the HTTP listener and HMAC-SHA256")
         "--inn" -> TODO("loom-mesh --inn waits on inn::serve: the HTTP listener, the sealed customer book (HKDF, ChaCha20-Poly1305) and the HTTPS client")
         "--settle", "--settle-public", "--settle-host" ->
