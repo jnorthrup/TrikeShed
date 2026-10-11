@@ -20,5 +20,8 @@ fun hmac(hash: (ByteArray) -> ByteArray, blockSize: Int, key: ByteArray, text: B
 /** RFC 4231 HMAC-SHA-256. */
 fun hmacSha256(key: ByteArray, text: ByteArray): ByteArray = hmac(Sha256Pure::digest, 64, key, text)
 
+/** RFC 4231 HMAC-SHA-384. */
+fun hmacSha384(key: ByteArray, text: ByteArray): ByteArray = hmac({ Sha384Pure.digest(it) }, 128, key, text)
+
 /** RFC 4231 HMAC-SHA-512. */
 fun hmacSha512(key: ByteArray, text: ByteArray): ByteArray = hmac({ Sha512Pure.digest(it) }, 128, key, text)

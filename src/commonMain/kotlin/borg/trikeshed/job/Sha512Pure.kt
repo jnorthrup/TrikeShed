@@ -25,12 +25,18 @@ object Sha512Pure {
         0x4cc5d4becb3e42b6, 0x597f299cfc657e2a, 0x5fcb6fab3ad6faec, 0x6c44198c4a475817,
     )
 
+    /** FIPS 180-4 5.3.5: the SHA-512 initial hash value H(0). */
+    val H0 = longArrayOf(
+        0x6a09e667f3bcc908, -0x4498517a7b3558c5, 0x3c6ef372fe94f82b, -0x5ab00ac5a0e2c90f,
+        0x510e527fade682d1, -0x64fa9773d4c193e1, 0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
+    )
+
     /** SHA-512 of the concatenation of [input], without copying it. */
-    fun digest(vararg input: ByteArray): ByteArray {
-        val h = longArrayOf(
-            0x6a09e667f3bcc908, -0x4498517a7b3558c5, 0x3c6ef372fe94f82b, -0x5ab00ac5a0e2c90f,
-            0x510e527fade682d1, -0x64fa9773d4c193e1, 0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
-        )
+    fun digest(vararg input: ByteArray): ByteArray = digest(H0, 64, input)
+
+    /** The leftmost [digestSize] bytes of the SHA-512 computation from [h0] over the concatenation of [input]. */
+    fun digest(h0: LongArray, digestSize: Int, input: Array<out ByteArray>): ByteArray {
+        val h = h0.copyOf()
         val w = LongArray(80)
         val block = ByteArray(128)
         var buffered = 0
@@ -53,7 +59,7 @@ object Sha512Pure {
         putLong(block, 112, length ushr 61)
         putLong(block, 120, length shl 3)
         compress(h, w, block, 0)
-        return ByteArray(64).also { for (i in 0..7) putLong(it, i * 8, h[i]) }
+        return ByteArray(digestSize).also { for (i in 0 until digestSize / 8) putLong(it, i * 8, h[i]) }
     }
 
     fun compress(h: LongArray, w: LongArray, bytes: ByteArray, offset: Int) {
@@ -89,4 +95,16 @@ object Sha512Pure {
     fun putLong(bytes: ByteArray, offset: Int, value: Long) {
         for (i in 0..7) bytes[offset + i] = (value ushr (56 - 8 * i)).toByte()
     }
+}
+
+/** FIPS 180-4 6.5 SHA-384: the SHA-512 computation from its own H(0), truncated to the leftmost 384 bits. */
+object Sha384Pure {
+    /** FIPS 180-4 5.3.4. */
+    val H0 = longArrayOf(
+        -0x344462a23efa6128, 0x629a292a367cd507, -0x6ea6fea5cf8f22e9, 0x152fecd8f70e5939,
+        0x67332667ffc00b31, -0x714bb57897a7eaef, -0x24f3d1f29b067059, 0x47b5481dbefa4fa4,
+    )
+
+    /** SHA-384 of the concatenation of [input], without copying it. */
+    fun digest(vararg input: ByteArray): ByteArray = Sha512Pure.digest(H0, 48, input)
 }

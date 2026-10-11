@@ -2,7 +2,7 @@ package borg.trikeshed.job
 
 import kotlin.test.*
 
-/** FIPS 180-4 SHA-512 example vectors. */
+/** FIPS 180-4 SHA-512 and SHA-384 example vectors. */
 class Sha512Test {
     val vectors = listOf(
         "abc".encodeToByteArray() to
@@ -20,6 +20,22 @@ class Sha512Test {
 
     @Test fun fips180Vectors() {
         for ((message, digest) in vectors) assertEquals(digest, Sha512Pure.digest(message).toHexString())
+    }
+
+    val vectors384 = listOf(
+        "abc".encodeToByteArray() to
+            "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7",
+        ByteArray(0) to
+            "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b",
+        ("abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno" +
+            "ijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu").encodeToByteArray() to
+            "09330c33f71147e83d192fc782cd1b4753111b173b3b05d22fa08086e3b0f712fcc7c71a557e2db966c3e9fa91746039",
+        ByteArray(1_000_000) { 'a'.code.toByte() } to
+            "9d0e1809716474cb086e834e310a4a1ced149e9c00f248527972cec5704c2a5b07b8b3dc38ecc4ebae97ddd87f3d8985",
+    )
+
+    @Test fun fips180Sha384Vectors() {
+        for ((message, digest) in vectors384) assertEquals(digest, Sha384Pure.digest(message).toHexString())
     }
 
     @Test fun partsHashAsTheirConcatenation() {

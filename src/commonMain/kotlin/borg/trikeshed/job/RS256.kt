@@ -107,27 +107,11 @@ object RS256 {
     }
 
     /** RSASSA-PKCS1-v1_5-VERIFY: false for a wrong length, a representative not below n, or another encoding. */
-    fun verify(key: RSAPublicKey, message: ByteArray, signature: ByteArray): Boolean {
-        val k = key.modulus.size
-        if (k == 0 || signature.size != k) return false
-        val ring = Montgomery(os2ip(key.modulus, (k + 3) / 4))
-        val s = os2ip(signature, ring.n.size)
-        if (!ring.below(s)) return false
-        val e = os2ip(key.publicExponent, (key.publicExponent.size + 3) / 4)
-        return i2osp(ring.pow(s, e), k).contentEquals(emsa(message, k))
-    }
+    fun verify(key: RSAPublicKey, message: ByteArray, signature: ByteArray): Boolean =
+        RSASSA_PKCS1_v1_5.verify(key, DIGEST_INFO, Sha256Pure.digest(message), signature)
 
     /** EMSA-PKCS1-v1_5-ENCODE: 0x00 0x01 FF..FF 0x00 DigestInfo(SHA-256(message)), [k] bytes. */
-    fun emsa(message: ByteArray, k: Int): ByteArray {
-        val t = DIGEST_INFO + Sha256Pure.digest(message)
-        require(k >= t.size + 11) { "intended encoded message length too short" }
-        val em = ByteArray(k) { 0xFF.toByte() }
-        em[0] = 0
-        em[1] = 1
-        em[k - t.size - 1] = 0
-        t.copyInto(em, k - t.size)
-        return em
-    }
+    fun emsa(message: ByteArray, k: Int): ByteArray = RSASSA_PKCS1_v1_5.encode(DIGEST_INFO + Sha256Pure.digest(message), k)
 
     /** OS2IP into [size] little-endian 32-bit limbs. */
     fun os2ip(bytes: ByteArray, size: Int): IntArray {
@@ -149,6 +133,102 @@ object RS256 {
             val bit = 8 * (k - 1 - i)
             if (bit < 32 * limbs.size) (limbs[bit / 32] ushr (bit % 32)).toByte() else 0
         }
+    }
+}
+
+/**
+ * RFC 8017 5.2.2 RSAVP1 with OS2IP and I2OSP around it: s^e mod n as k octets, k the length of n; null for a
+ * signature that is not k octets or whose representative is not below n (8.1.2 and 8.2.2 step 1).
+ */
+fun RSAPublicKey.rsavp1(signature: ByteArray): ByteArray? {
+    val k = modulus.size
+    if (k == 0 || signature.size != k) return null
+    val ring = Montgomery(RS256.os2ip(modulus, (k + 3) / 4))
+    val s = RS256.os2ip(signature, ring.n.size)
+    if (!ring.below(s)) return null
+    val e = RS256.os2ip(publicExponent, (publicExponent.size + 3) / 4)
+    return RS256.i2osp(ring.pow(s, e), k)
+}
+
+/** RFC 8017 8.2 RSASSA-PKCS1-v1_5 over any hash, named by its DER DigestInfo prefix (9.2 note 1, NULL parameters). */
+object RSASSA_PKCS1_v1_5 {
+    val SHA256 = RS256.DIGEST_INFO
+    val SHA384 = byteArrayOf(
+        0x30, 0x41, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86.toByte(), 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02, 0x05, 0x00, 0x04, 0x30,
+    )
+    val SHA512 = byteArrayOf(
+        0x30, 0x51, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86.toByte(), 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03, 0x05, 0x00, 0x04, 0x40,
+    )
+
+    /** 8.2.2 RSASSA-PKCS1-V1_5-VERIFY of [signature] over the message whose hash is [digest]. */
+    fun verify(key: RSAPublicKey, digestInfo: ByteArray, digest: ByteArray, signature: ByteArray): Boolean {
+        val em = key.rsavp1(signature) ?: return false
+        val t = digestInfo + digest
+        return em.size >= t.size + 11 && encode(t, em.size).contentEquals(em)
+    }
+
+    /** 9.2 EMSA-PKCS1-v1_5-ENCODE steps 3-5 from T: 0x00 0x01 PS 0x00 T in [k] octets, PS at least eight 0xFF. */
+    fun encode(t: ByteArray, k: Int): ByteArray {
+        require(k >= t.size + 11) { "intended encoded message length too short" }
+        val em = ByteArray(k) { 0xFF.toByte() }
+        em[0] = 0
+        em[1] = 1
+        em[k - t.size - 1] = 0
+        t.copyInto(em, k - t.size)
+        return em
+    }
+}
+
+/**
+ * RFC 8017 8.1 RSASSA-PSS with MGF1 over the message hash and a salt as long as the hash: the parameters
+ * RFC 8446 4.2.3 fixes for rsa_pss_rsae_* and RFC 4055 names for certificates.
+ */
+object RSASSA_PSS {
+    /** 8.1.2 RSASSA-PSS-VERIFY. */
+    fun verify(key: RSAPublicKey, hash: (ByteArray) -> ByteArray, message: ByteArray, signature: ByteArray): Boolean {
+        val em = key.rsavp1(signature) ?: return false
+        val first = key.modulus.indexOfFirst { it != 0.toByte() }
+        if (first < 0) return false
+        val modBits = 8 * (key.modulus.size - first - 1) + 32 - (key.modulus[first].toInt() and 0xFF).countLeadingZeroBits()
+        val emBits = modBits - 1
+        val emLen = (emBits + 7) / 8
+        // I2OSP(m, emLen) fails when m needs the octets above emLen.
+        for (i in 0 until em.size - emLen) if (em[i] != 0.toByte()) return false
+        return verifyEncoding(hash, message, em.copyOfRange(em.size - emLen, em.size), emBits)
+    }
+
+    /** 9.1.2 EMSA-PSS-VERIFY with sLen = hLen: true for "consistent". */
+    fun verifyEncoding(hash: (ByteArray) -> ByteArray, message: ByteArray, em: ByteArray, emBits: Int): Boolean {
+        val mHash = hash(message)
+        val hLen = mHash.size
+        val sLen = hLen
+        val emLen = em.size
+        if (emLen < hLen + sLen + 2 || em[emLen - 1] != 0xbc.toByte()) return false
+        val maskedDb = em.copyOf(emLen - hLen - 1)
+        val h = em.copyOfRange(emLen - hLen - 1, emLen - 1)
+        val zeroBits = 8 * emLen - emBits
+        if ((maskedDb[0].toInt() and 0xFF) ushr (8 - zeroBits) != 0) return false
+        val dbMask = mgf1(hash, h, maskedDb.size)
+        val db = ByteArray(maskedDb.size) { (maskedDb[it].toInt() xor dbMask[it].toInt()).toByte() }
+        db[0] = (db[0].toInt() and (0xFF ushr zeroBits)).toByte()
+        val psLength = emLen - hLen - sLen - 2
+        for (i in 0 until psLength) if (db[i] != 0.toByte()) return false
+        if (db[psLength] != 1.toByte()) return false
+        return hash(ByteArray(8) + mHash + db.copyOfRange(db.size - sLen, db.size)).contentEquals(h)
+    }
+
+    /** B.2.1 MGF1: the first [length] octets of Hash(seed | C) for the 4-octet big-endian counters C = 0, 1, ... */
+    fun mgf1(hash: (ByteArray) -> ByteArray, seed: ByteArray, length: Int): ByteArray {
+        val mask = ByteArray(length)
+        var counter = 0
+        var at = 0
+        while (at < length) {
+            val block = hash(seed + byteArrayOf((counter ushr 24).toByte(), (counter ushr 16).toByte(), (counter ushr 8).toByte(), counter.toByte()))
+            block.copyInto(mask, at, 0, minOf(block.size, length - at))
+            at += block.size
+            counter++
+        }
+        return mask
     }
 }
 
@@ -202,6 +282,46 @@ class Montgomery(val n: IntArray) {
             x[i] = d.toInt()
             borrow = (d ushr 63)
         }
+    }
+
+    /** x + y mod n for x, y below n, the reduction chosen by a mask. */
+    fun add(x: IntArray, y: IntArray): IntArray {
+        val t = IntArray(n.size)
+        var carry = 0L
+        for (i in n.indices) {
+            val v = (x[i].toLong() and MASK) + (y[i].toLong() and MASK) + carry
+            t[i] = v.toInt()
+            carry = v ushr 32
+        }
+        val u = IntArray(n.size)
+        var borrow = 0L
+        for (i in n.indices) {
+            val d = (t[i].toLong() and MASK) - (n[i].toLong() and MASK) - borrow
+            u[i] = d.toInt()
+            borrow = d ushr 63
+        }
+        // The sum stays when it is below n: no carry out and t - n borrowed.
+        val keep = -((borrow and (carry xor 1L)).toInt())
+        return IntArray(n.size) { (t[it] and keep) or (u[it] and keep.inv()) }
+    }
+
+    /** x - y mod n for x, y below n, n added back under a mask. */
+    fun sub(x: IntArray, y: IntArray): IntArray {
+        val t = IntArray(n.size)
+        var borrow = 0L
+        for (i in n.indices) {
+            val d = (x[i].toLong() and MASK) - (y[i].toLong() and MASK) - borrow
+            t[i] = d.toInt()
+            borrow = d ushr 63
+        }
+        val mask = -borrow
+        var carry = 0L
+        for (i in n.indices) {
+            val v = (t[i].toLong() and MASK) + (n[i].toLong() and MASK and mask) + carry
+            t[i] = v.toInt()
+            carry = v ushr 32
+        }
+        return t
     }
 
     /** a b R^-1 mod n for a, b below n. */
