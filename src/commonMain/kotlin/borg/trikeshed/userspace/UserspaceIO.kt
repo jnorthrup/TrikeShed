@@ -37,4 +37,5 @@ internal expect object ChannelsImpl {
     fun socket(domain: Int, type: Int, protocol: Int): FileImpl
 }
 
-expect fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend
+/** A ring of [entries] on the backend [mode] requests as TRIKESHED_URING_MODE would; null requests the process's mode. */
+expect fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode? = null): UserspaceChannelBackend

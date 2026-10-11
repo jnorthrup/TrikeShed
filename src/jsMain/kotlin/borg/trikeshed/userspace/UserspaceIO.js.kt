@@ -312,10 +312,11 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
     }
 }
 
-actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend {
+actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): UserspaceChannelBackend {
     require(entries > 0)
-    val discovery = discoverNodeUringBackend(entries)
-    check(nodeUringMode() != UringBackendMode.NATIVE || discovery.backend != null) {
+    val requested = mode ?: nodeUringMode()
+    val discovery = discoverNodeUringBackend(entries, requested)
+    check(requested != UringBackendMode.NATIVE || discovery.backend != null) {
         "Native Node io_uring required: ${discovery.report.description}"
     }
     val selected = discovery.backend ?: JsUserspaceChannelBackend()

@@ -16,17 +16,20 @@ import java.nio.file.Path
  */
 internal const val JVM_NATIVE_URING_LEVEL: Int = 1
 
-/** Discovery of the repo's JNI execution module. No process or IO CLI bridge. */
-fun discoverJvmUringBackend(entries: Int): UringBackendDiscovery {
-    val mode = UringBackendMode.parse(System.getProperty("trikeshed.uring.mode") ?: System.getenv("TRIKESHED_URING_MODE"))
-    val discovery = discoverJvmUringBackend(entries, mode)
+/**
+ * Discovery of the repo's JNI execution module for [requested], by default the process's (the trikeshed.uring.mode
+ * property, else TRIKESHED_URING_MODE). No process or IO CLI bridge.
+ */
+fun discoverJvmUringBackend(entries: Int, requested: UringBackendMode? = null): UringBackendDiscovery {
+    val mode = requested ?: UringBackendMode.parse(System.getProperty("trikeshed.uring.mode") ?: System.getenv("TRIKESHED_URING_MODE"))
+    val discovery = probeJvmUringBackend(entries, mode)
     check(mode != UringBackendMode.NATIVE || discovery.backend != null) {
         "Native JVM io_uring required: ${discovery.report.description}"
     }
     return discovery
 }
 
-private fun discoverJvmUringBackend(entries: Int, mode: UringBackendMode): UringBackendDiscovery {
+private fun probeJvmUringBackend(entries: Int, mode: UringBackendMode): UringBackendDiscovery {
     require(entries > 0)
     val host = loadPlatformHost().descriptor
     if (JVM_NATIVE_URING_LEVEL < 1 || mode == UringBackendMode.EMULATED) {

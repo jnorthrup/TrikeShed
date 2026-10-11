@@ -23,11 +23,11 @@ fun policy(name: String): UringBackendMode = when (name) {
  * uring.rs `self_test`: a synthetic bidirectional transport check; no keys, stores, billing or GPU. The peer writes
  * 262144 bytes in 997-byte chunks and reads each one back; the mesh end echoes them through a ring of [policy]'s
  * backend, each of its reads and writes one completion. The fixture is a connected UNIX stream pair made by ring
- * operations (liburing has no socketpair); a stream end waits for readiness before each transfer, and every wait
- * ends at the 5 s fixture deadline. The report as serde_json's object.
+ * operations (liburing has no socketpair) on the emulation, as std's blocking sockets are; a stream end waits for
+ * readiness before each transfer, and every wait ends at the 5 s fixture deadline. The report as serde_json's object.
  */
 suspend fun self_test(policy: UringBackendMode): Map<String, Any> {
-    val fixture = FunctionalUringFacade(256, openUserspaceChannelBackend(256))
+    val fixture = FunctionalUringFacade(256, openUserspaceChannelBackend(256, UringBackendMode.EMULATED))
     val (mesh, peer) = try {
         val path = (HostSystem.getenv("TMPDIR") ?: "/tmp").trimEnd('/') + "/loom-uring-" + Random.nextLong().toULong().toString(16)
         // sockaddr_un in the facade's Linux layout: sun_family AF_UNIX, then the NUL-terminated path.
@@ -50,16 +50,18 @@ suspend fun self_test(policy: UringBackendMode): Map<String, Any> {
     } catch (failed: Exception) {
         error("fixture sockets unavailable")
     }
-    val backend = openUserspaceChannelBackend(256)
+    val backend = try {
+        openUserspaceChannelBackend(256, policy)
+    } catch (unavailable: Exception) {
+        error("requested completion backend unavailable")
+    }
     val native = backend.nativeCapabilities != 0L
     val fallback: Int? = when {
-        native && policy == UringBackendMode.EMULATED ->
-            TODO("an emulated ring beside an available kernel ring waits on openUserspaceChannelBackend taking a mode (TRIKESHED_URING_MODE selects one per process)")
         native || policy == UringBackendMode.EMULATED -> null
         policy == UringBackendMode.NATIVE -> error("requested completion backend unavailable")
         // Rust has no ring off Linux and falls back on libc::ENOSYS, Darwin's and the BSDs' 78.
         PlatformHost.default.descriptor.os != "linux" -> 78
-        else -> (backend.probeReport?.errno ?: TODO("the setup errno of a posix backend that fell back to emulation"))
+        else -> (backend.probeReport?.errno ?: TODO("a Linux backend in emulation without a failed setup: the JVM without the trikeshed_uring JNI module, or a ring past setup whose NOP execution probe failed"))
             .also { if (it !in setOf(38, 1, 13, 95, 22)) error("requested completion backend unavailable") }
     }
     val ring = FunctionalUringFacade(256, backend)

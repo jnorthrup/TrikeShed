@@ -6,9 +6,9 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import kotlinx.cinterop.*
 
 /** One ring, no ambient descriptor table or completion consumer. */
-internal actual class NativeUringAdapter actual constructor(entries: Int) {
+internal actual class NativeUringAdapter actual constructor(entries: Int, mode: UringBackendMode?) {
     private val ring = LinuxLiburingFacade()
-    private val mode = UringBackendMode.parse(platform.posix.getenv("TRIKESHED_URING_MODE")?.toKString())
+    private val mode = mode ?: UringBackendMode.parse(platform.posix.getenv("TRIKESHED_URING_MODE")?.toKString())
     private val opened: Result<Unit> = when {
         mode == UringBackendMode.EMULATED -> Result.failure(UnsupportedOperationException("TRIKESHED_URING_MODE=emulated"))
         LINUX_NATIVE_URING_LEVEL == 0 -> Result.failure(UnsupportedOperationException("LINUX_NATIVE_URING_LEVEL=0"))
@@ -33,6 +33,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
         }
     }
     actual val capabilities: Long get() = discoveredCapabilities
+    actual val setupErrno: Int? get() = ring.setupErrno
     actual val availability: String get() = transportFailure?.let { "native: io_uring transport failed: $it" }
         ?: if (opened.isSuccess) "native: io_uring setup, register and NOP execution probes succeeded; features=${ring.features}"
         else "emulated: ${opened.exceptionOrNull()?.message}"

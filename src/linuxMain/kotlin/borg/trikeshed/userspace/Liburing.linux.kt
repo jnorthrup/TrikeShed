@@ -55,6 +55,9 @@ internal class LinuxLiburingFacade : LiburingFacade {
     private var probe: CPointer<zlinux_uring.io_uring_probe>? = null
     var features: UInt = 0u
         private set
+    /** The errno io_uring_queue_init or the probe registration of [open] failed with. */
+    var setupErrno: Int? = null
+        private set
     fun supports(op: UringOp): Boolean = op.code >= 0 && probe?.let {
         zlinux_uring.io_uring_opcode_supported(it, op.code) != 0
     } == true
@@ -68,6 +71,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
         val rc = io_uring_queue_init(entries.toUInt(), allocated.ptr, flags.toUInt())
         if (rc < 0) {
             nativeHeap.free(allocated.ptr)
+            setupErrno = -rc
             return failure("io_uring_queue_init failed", rc)
         }
         ring = allocated.ptr
@@ -76,6 +80,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
         if (probe == null) {
             val probeError = platform.posix.errno
             close()
+            setupErrno = probeError
             return failure("io_uring_register probe failed", -probeError)
         }
         return Result.success(Unit)

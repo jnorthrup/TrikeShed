@@ -7,6 +7,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.j
+import borg.trikeshed.platform.loadPlatformHost
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
@@ -19,9 +20,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import platform.posix.*
 
-private class PosixUserspaceChannelBackend(private val entries: Int) : UserspaceChannelBackend {
+private class PosixUserspaceChannelBackend(private val entries: Int, mode: UringBackendMode?) : UserspaceChannelBackend {
     private val lock = SynchronizedObject()
-    private val native = NativeUringAdapter(entries)
+    private val native = NativeUringAdapter(entries, mode)
     private val queued = ArrayDeque<UringSubmission>()
     private val pending = mutableMapOf<Long, UringSubmission>()
     private val completed = ArrayDeque<UringCompletion>()
@@ -41,6 +42,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     override val nativeCapabilities: Long get() = native.capabilities
     override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
+    /** A kernel ring whose setup failed: the errno, in Linux numbering. Null when no setup failed. */
+    override val probeReport: UringProbeReport? get() = native.setupErrno?.let {
+        UringProbeReport(loadPlatformHost().descriptor, uringErrnoState(it), UringProbePhase.SETUP, null, availability, it)
+    }
 
     override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = synchronized(lock) {
         if (closed) Result.failure(IllegalStateException("ring is closed")) else native.registerBuffers(buffers)
@@ -629,9 +634,9 @@ internal fun linuxErrno(value: Int): Int = when (value) {
     else -> 5
 }
 
-actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend {
+actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): UserspaceChannelBackend {
     require(entries > 0)
-    return PosixUserspaceChannelBackend(entries)
+    return PosixUserspaceChannelBackend(entries, mode)
 }
 
 actual class FileImpl actual constructor(actual val id: Int) {

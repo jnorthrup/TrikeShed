@@ -611,9 +611,9 @@ internal class JvmUserspaceChannelBackend(
 
 internal fun openJvmEmulatedChannelBackend(): UserspaceChannelBackend = JvmUserspaceChannelBackend()
 
-actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend {
+actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): UserspaceChannelBackend {
     require(entries > 0)
-    val discovery = discoverJvmUringBackend(entries)
+    val discovery = discoverJvmUringBackend(entries, mode)
     val selected = discovery.backend ?: JvmUserspaceChannelBackend(discovery.report.description)
     return object : UserspaceChannelBackend by selected {
         override val probeReport = discovery.report

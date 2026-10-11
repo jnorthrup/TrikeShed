@@ -23,10 +23,10 @@ internal const val JS_NATIVE_URING_LEVEL: Int = 1
 internal fun nodeUringMode(process: dynamic = processObj): UringBackendMode =
     UringBackendMode.parse(process?.env?.TRIKESHED_URING_MODE as? String)
 
-/** Resolve the configured Node module through Node's loader, then probe its shared uring backend. */
-fun discoverNodeUringBackend(entries: Int): UringBackendDiscovery = discoverNodeUringBackend(
+/** Resolve the configured Node module through Node's loader, then probe its shared uring backend for [mode]. */
+fun discoverNodeUringBackend(entries: Int, mode: UringBackendMode = nodeUringMode()): UringBackendDiscovery = discoverNodeUringBackend(
     entries, loadPlatformHost().descriptor, processObj,
-    { nodeUringRequire(processObj) }, ::nodeNativeChannelBackend,
+    { nodeUringRequire(processObj) }, mode, ::nodeNativeChannelBackend,
 )
 
 internal fun discoverNodeUringBackend(
@@ -34,13 +34,14 @@ internal fun discoverNodeUringBackend(
     host: HostDescriptor,
     process: dynamic,
     requireModule: () -> dynamic,
+    mode: UringBackendMode = nodeUringMode(process),
     backendFactory: (dynamic, dynamic) -> UserspaceChannelBackend = ::nodeNativeChannelBackend,
 ): UringBackendDiscovery {
     require(entries > 0)
     fun unavailable(state: UringProbeState, detail: String, module: String? = null,
                     phase: UringProbePhase = UringProbePhase.DISCOVERY, errno: Int? = null) =
         UringBackendDiscovery(UringProbeReport(host, state, phase, module, detail, errno))
-    if (nodeUringMode(process) == UringBackendMode.EMULATED)
+    if (mode == UringBackendMode.EMULATED)
         return unavailable(UringProbeState.MODULE_ABSENT, "TRIKESHED_URING_MODE=emulated bypasses native module loading and setup")
     if (JS_NATIVE_URING_LEVEL < 1)
         return unavailable(UringProbeState.MODULE_ABSENT,

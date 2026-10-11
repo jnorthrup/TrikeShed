@@ -43,7 +43,7 @@ private class WasmUserspaceChannelBackend : UserspaceChannelBackend {
     override fun close() { closed = true }
 }
 
-actual fun openUserspaceChannelBackend(entries: Int): UserspaceChannelBackend {
+actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): UserspaceChannelBackend {
     require(entries > 0)
     return WasmUserspaceChannelBackend()
 }
