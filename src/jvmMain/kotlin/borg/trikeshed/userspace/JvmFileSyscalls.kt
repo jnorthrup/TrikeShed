@@ -99,13 +99,31 @@ internal object JvmFileSyscalls {
         return path(path) { name -> val state = errnoState.get(); status(state, openatCall.invokeExact(state, dirfd(dfd), name, host, mode) as Int) }
     }
 
+    /**
+     * The calling thread's native window for heap transfers, grown by doubling and kept for its next transfer, as the
+     * JDK channel keeps its temporary direct buffer; a transfer past [WINDOW_CAP] takes a window of its own.
+     */
+    val windows = ThreadLocal<MemorySegment>()
+    const val WINDOW_CAP = 1 shl 20
+
+    fun window(length: Int): MemorySegment {
+        windows.get()?.let { if (it.byteSize() >= length) return it }
+        var size = 4096L
+        while (size < length) size = size shl 1
+        return Arena.ofAuto().allocate(size, 8).also { windows.set(it) }
+    }
+
     /** pread/pwrite through a native copy of the heap window; offset -1 uses the descriptor position. */
-    fun transfer(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int = Arena.ofConfined().use { arena ->
-        val native = arena.allocate(maxOf(1, length).toLong())
+    fun transfer(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int {
+        if (length > WINDOW_CAP) return Arena.ofConfined().use { arena -> transfer(fd, arena.allocate(length.toLong()), bytes, start, length, offset, read) }
+        return transfer(fd, window(length), bytes, start, length, offset, read)
+    }
+
+    fun transfer(fd: Int, native: MemorySegment, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int {
         if (!read) MemorySegment.copy(MemorySegment.ofArray(bytes), start.toLong(), native, 0, length.toLong())
         val count = transfer(fd, native, length, offset, read)
         if (read && count > 0) MemorySegment.copy(native, 0, MemorySegment.ofArray(bytes), start.toLong(), count.toLong())
-        count
+        return count
     }
 
     fun transfer(fd: Int, native: MemorySegment, length: Int, offset: Long, read: Boolean): Int {
