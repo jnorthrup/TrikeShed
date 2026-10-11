@@ -775,11 +775,7 @@ class Url(
                 if (!input.endsWith(']')) refuse()
                 return "[" + ipv6(input.substring(1, input.length - 1)) + "]"
             }
-            val bytes = percent_decode(input.encodeToByteArray())
-            if (bytes.any { it < 0 }) TODO("UTS 46 mapping of a non-ASCII host (idna 1.1.0 domain_to_ascii)")
-            val domain = bytes.decodeToString().lowercase()
-            if (domain.split('.').any { it.startsWith("xn--") }) TODO("UTS 46 Punycode label check (idna 1.1.0 domain_to_ascii)")
-            if (domain.any { it <= ' ' || it == '\u007f' || it in "%#/:<>?@[\\]^|" }) refuse()
+            val domain = domain_to_ascii_cow(percent_decode(input.encodeToByteArray())) ?: refuse()
             if (domain.isEmpty()) refuse()
             return if (ends_in_a_number(domain)) ipv4(domain) else domain
         }

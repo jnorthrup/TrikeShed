@@ -5,7 +5,7 @@ import kotlin.test.*
 /**
  * config.rs validate_url (cocaine-rats e4898291) against the url crate 2.5.8 it parses with, captured by a scratch crate
  * running the Rust function verbatim: each input under (allow_loopback_http, insecure_local_test_only) = (false, false),
- * (true, false), (true, true). IPv6 literals and IDNA hosts are the marked gaps and are not listed.
+ * (true, false), (true, true). IPv6 literals are not listed, and IDNA hosts are [LoomIdnaTest]'s.
  */
 class LoomConfigTest {
     val vectors = listOf(
