@@ -46,8 +46,11 @@ class CredentialsError(val is_transient: Boolean, message: String) : Exception(m
 /** build_errors.rs Error: credentials a builder refuses. */
 class BuilderError(message: String) : Exception(message)
 
-/** reqwest::Error from `send`: a request reqwest refuses to build, else a failed transport (connect or request). */
-class SendError(val is_builder: Boolean) : Exception(if (is_builder) "request builder" else "transport")
+/** reqwest::Error from `send`: a request reqwest refuses to build, a redirect its policy refuses, else a failed transport (connect or request). */
+class SendError(val is_builder: Boolean, val is_redirect: Boolean = false) : Exception(if (is_builder) "request builder" else if (is_redirect) "redirect" else "transport") {
+    /** errors.rs is_retryable: a connect or request failure. */
+    fun is_retryable(): Boolean = !is_builder && !is_redirect
+}
 
 /** token.rs Token; [expires_at] is a monotonic mark (tokio Instant), null for a token that never expires. */
 class Token(val token: String, val token_type: String, val expires_at: ValueTimeMark?)
@@ -197,9 +200,20 @@ fun header_name(text: String): Boolean = text.isNotEmpty() && text.all { it in '
 fun is_retryable_code(status: Int): Boolean = status in 500..599 || status == 408 || status == 429
 
 /**
+ * errors.rs from_http_response for a response that is no success: retryable as [is_retryable_code]. Its
+ * `error_for_status_ref().expect_err(..)` panics where the status is no client or server error either, as an
+ * unfollowed 1xx or 3xx is.
+ */
+fun from_http_response(status: Int, msg: String): CredentialsError {
+    if (status !in 400..599) throw Error("this function is only called on errors")
+    return CredentialsError(is_retryable_code(status), msg)
+}
+
+/**
  * A request from google-cloud-auth's own reqwest client: the URL as the url crate parses it (a refusal or a scheme other
- * than http and https is reqwest's builder error), no timeout unless [timeout]. Throws [SendError] where reqwest's `send`
- * fails. reqwest's environment proxy and its default redirect policy are not ported: each is a TODO where it would act.
+ * than http and https is reqwest's builder error), no timeout unless [timeout], which spans the redirects. Redirects
+ * follow reqwest's default policy, `Policy::limited(10)` ([follow_redirect]). Throws [SendError] where reqwest's `send`
+ * fails. reqwest's environment proxy is not ported: a TODO where it would act, on each request of the chain.
  */
 suspend fun HtxClientReactorElement.token_request(
     method: HtxMethod,
@@ -210,13 +224,13 @@ suspend fun HtxClientReactorElement.token_request(
 ): HtxResponse {
     val parsed = Url.parse(url)?.takeIf { (it.scheme == "http" || it.scheme == "https") && !it.host.isNullOrEmpty() } ?: throw SendError(true)
     if (!headers.all { header_name(it.a) && header_value(it.b) }) throw SendError(true)
-    system_proxy(parsed.scheme)
-    val millis = timeout?.inWholeMilliseconds?.coerceIn(1L, Int.MAX_VALUE.toLong()) ?: Int.MAX_VALUE.toLong()
-    val response = send(method, parsed.serialization.substringBefore('#'), headers.toSeries(), body, millis.toULong()) ?: throw SendError(false)
-    if (response.status in setOf(301, 302, 303, 307, 308) && response.headers.headerValue("location") != null) {
-        TODO("reqwest's default redirect policy (follow up to 10, 301-303 as GET, sensitive headers dropped across origins) for a google-cloud-auth token request")
+    if (parsed.username.isNotEmpty() || parsed.password != null) TODO("reqwest's basic authorization from a token URL's userinfo (RequestBuilder::new extract_authority)")
+    val deadline = timeout?.let { TimeSource.Monotonic.markNow() + it }
+    return follow_redirect(parsed, method, headers, body, 10, false) { current, hop, hop_headers, hop_body ->
+        system_proxy(current.scheme)
+        val millis = deadline?.let { -it.elapsedNow().inWholeMilliseconds }?.also { if (it <= 0) throw SendError(false) } ?: Int.MAX_VALUE.toLong()
+        send(hop, Registry.target(current), hop_headers.toSeries(), hop_body, millis.coerceAtMost(Int.MAX_VALUE.toLong()).toULong()) ?: throw SendError(false)
     }
-    return response
 }
 
 /**
@@ -337,7 +351,7 @@ suspend fun mds_credentials(scopes: List<String>?, http: HtxClientReactorElement
         val response = try {
             http.token_request(HtxMethod.GET, "$endpoint$MDS_DEFAULT_URI/token$query", listOf(METADATA_FLAVOR j METADATA_FLAVOR_VALUE))
         } catch (e: SendError) {
-            throw CredentialsError(!e.is_builder, "failed to fetch access token")
+            throw CredentialsError(e.is_retryable(), "failed to fetch access token")
         }
         if (response.status !in 200..299) throw CredentialsError(is_retryable_code(response.status), "failed to fetch access token")
         decode(response, listOf("access_token", "expires_in", "token_type")) {
@@ -376,9 +390,9 @@ suspend fun user_account_credentials(json: Any?, scopes: List<String>?, http: Ht
         val response = try {
             http.token_request(HtxMethod.POST, endpoint, listOf("content-type" j "application/json"), body)
         } catch (e: SendError) {
-            throw CredentialsError(!e.is_builder, "failed to refresh user access token")
+            throw CredentialsError(e.is_retryable(), "failed to refresh user access token")
         }
-        if (response.status !in 200..299) throw CredentialsError(is_retryable_code(response.status), "failed to refresh user access token")
+        if (response.status !in 200..299) throw from_http_response(response.status, "failed to refresh user access token")
         decode(response, listOf("access_token", "id_token", "scope", "expires_in", "token_type", "refresh_token")) {
             it[1].serde_option_string()
             it[2].serde_option_string()
@@ -485,7 +499,7 @@ suspend fun generate_access_token(http: HtxClientReactorElement, source_headers:
                 val response = try {
                     http.token_request(HtxMethod.POST, url, headers, body)
                 } catch (e: SendError) {
-                    throw GaxError.Io(e.is_builder)
+                    throw GaxError.Io(e)
                 }
                 if (response.status !in 200..299) throw GaxError.Http(response.status)
                 response
@@ -515,8 +529,8 @@ fun replace_headers(dst: List<HtxHeader>, src: HtxHeaders): List<HtxHeader> {
 
 /** google-cloud-gax Error as impersonated.rs's retry loop produces it. */
 sealed class GaxError(message: String) : Exception(message) {
-    /** GaxError::io: reqwest's send failed, building ([is_builder]) or in transport. */
-    class Io(val is_builder: Boolean) : GaxError("io")
+    /** GaxError::io: reqwest's send failed with [source]. */
+    class Io(val source: SendError) : GaxError("io")
     class Http(val status: Int) : GaxError("http $status")
     class Timeout : GaxError("timeout")
     class Exhausted(val prev: GaxError) : GaxError("exhausted")
@@ -524,7 +538,7 @@ sealed class GaxError(message: String) : Exception(message) {
     /** errors.rs is_gax_error_retryable. */
     fun is_retryable(): Boolean = when (this) {
         is Http -> is_retryable_code(status)
-        is Io -> !is_builder
+        is Io -> source.is_retryable()
         is Timeout, is Exhausted -> false
     }
 

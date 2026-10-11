@@ -227,9 +227,6 @@ class Registry(
         /** reqwest `redirect::Policy::limited(3)`. */
         const val MAX_REDIRECTS: Int = 3
 
-        /** The statuses tower-http FollowRedirect follows. */
-        val REDIRECTS = setOf(301, 302, 303, 307, 308)
-
         /** Production: every origin must be public HTTPS. */
         suspend fun load(config: RegistryConfig, routeService: HtxRouteService): Registry {
             config.check(false)
@@ -326,33 +323,27 @@ class Registry(
         }
 
         /**
-         * reqwest's `get(url).send()` on registry.rs's client: tower-http FollowRedirect under reqwest's policy (301, 302,
-         * 303, 307 and 308 to a Location that resolves to an http `Uri`, each followed request with a `referer`, the
-         * fourth redirect an error, never to a scheme but http(s), nor to http when [https_only]), within [timeout_ms]
-         * from the first connect to the end of the last body. Every reqwest error is "registry manifest fetch failed".
-         * [stub]: the reactor's TLS backend is StubTlsCodecBackend.
+         * reqwest's `get(url).send()` on registry.rs's client: [follow_redirect] with reqwest's policy (the fourth
+         * redirect an error, no redirect to http when [https_only]), within [timeout_ms] from the first connect to the
+         * end of the last body. Every reqwest error is "registry manifest fetch failed". [stub]: the reactor's TLS
+         * backend is StubTlsCodecBackend.
          */
         suspend fun send(client: HtxClientReactorElement, url: Url, timeout_ms: ULong, https_only: Boolean, stub: Boolean): HtxResponse {
             val deadline = TimeSource.Monotonic.markNow() + timeout_ms.toLong().milliseconds
-            var current = url
-            var referer: String? = null
-            var redirects = 0
-            while (true) {
-                if (current.scheme == "https" && stub) TODO("registry manifests over https on this target, whose platform registers StubTlsCodecBackend")
-                if (current.host?.startsWith('[') == true) TODO("registry origins at IPv6 literals (the HTX reactor connects over AF_INET only)")
-                val remaining = -deadline.elapsedNow().inWholeMilliseconds
-                if (remaining <= 0) error("registry manifest fetch failed")
-                val headers = referer?.let { htxHeaders("referer" j it) } ?: emptyHtxHeaders()
-                val response = client.send(HtxMethod.GET, target(current), headers, ByteArray(0), remaining.toULong())
-                // Status 0: the peer closed or answered no HTTP response.
-                if (response == null || response.status == 0) error("registry manifest fetch failed")
-                content_length(response)
-                if (response.status !in REDIRECTS) return response
-                val next = response.headers.headerValue("location")?.let { current.join(it) }?.takeIf { uri(it.serialization) } ?: return response
-                if (++redirects > MAX_REDIRECTS || (next.scheme != "http" && next.scheme != "https") || (https_only && next.scheme != "https"))
-                    error("registry manifest fetch failed")
-                referer = if (next.scheme == "http" && current.scheme == "https") null else target(current)
-                current = next
+            return try {
+                follow_redirect(url, HtxMethod.GET, emptyList(), ByteArray(0), MAX_REDIRECTS, https_only) { current, method, headers, body ->
+                    if (current.scheme == "https" && stub) TODO("registry manifests over https on this target, whose platform registers StubTlsCodecBackend")
+                    if (current.host?.startsWith('[') == true) TODO("registry origins at IPv6 literals (the HTX reactor connects over AF_INET only)")
+                    val remaining = -deadline.elapsedNow().inWholeMilliseconds
+                    if (remaining <= 0) error("registry manifest fetch failed")
+                    val response = client.send(method, target(current), headers.toSeries(), body, remaining.toULong())
+                    // Status 0: the peer closed or answered no HTTP response.
+                    if (response == null || response.status == 0) error("registry manifest fetch failed")
+                    content_length(response)
+                    response
+                }
+            } catch (refused: SendError) {
+                error("registry manifest fetch failed")
             }
         }
 

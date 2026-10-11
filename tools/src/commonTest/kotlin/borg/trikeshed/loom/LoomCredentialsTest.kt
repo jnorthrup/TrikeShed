@@ -39,8 +39,8 @@ class LoomCredentialsTest {
 
     /**
      * The harness's loopback fake as a route service: requests and their arrival (ms) in order, each answered by the
-     * next template (`status|content-type|body`, `EXPIRE_TIME` as now + 1 h, `HANG` never), unscripted ones by a 500.
-     * Storage requests are the sandbox's refused connection and are kept apart.
+     * next template (`status|content-type|body`, `EXPIRE_TIME` as now + 1 h, `HANG` never, `status|location|LOCATION` a
+     * redirect), unscripted ones by a 500. Storage requests are the sandbox's refused connection and are kept apart.
      */
     class Routes(templates: Series<String>) : HtxRouteService {
         val replies = ArrayDeque(templates.toList())
@@ -62,6 +62,12 @@ class LoomCredentialsTest {
             } ?: "500|text/plain|unscripted request"
             if (template == "HANG") awaitCancellation()
             val (status, type, body) = template.split('|', limit = 3)
+            if (type == "location") {
+                // A redirect: its Location, `BASE/` and `OTHER/` being the fake's two origins.
+                val location = body.replace("BASE/", "http://127.0.0.1:9/").replace("OTHER/", "http://127.0.0.1:10/")
+                val headers = htxHeaders("location" j location, "content-length" j "0", "connection" j "close")
+                return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, response = HtxResponse(status.toInt(), ByteSeries(ByteArray(0)), headers)))
+            }
             val bytes = body.replace("EXPIRE_TIME", InstantShim.ofEpochMilli((now().toLong() + 3600) * 1000).substring(0, 19) + "Z").encodeToByteArray()
             val headers = htxHeaders("content-type" j type, "content-length" j bytes.size.toString(), "connection" j "close")
             return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, response = HtxResponse(status.toInt(), ByteSeries(bytes), headers)))
@@ -456,6 +462,51 @@ class LoomCredentialsTest {
         assertJwt(minted.log[0].headerValue("authorization")!!, key(input), CLOUD, before - 1..now().toLong() + 1, "keeperServiceAccount")
         val ours = minted.log[0]
         assertSameRequest(sa.a[0], ours.copy(headers = ours.headers.toList().map { if (it.a == "authorization") it.a j bearer else it }.toSeries()), "keeperServiceAccount request")
+    }
+
+    /**
+     * reqwest 0.13's default redirect policy on google-cloud-auth's token requests ([token_request], [follow_redirect])
+     * against the harness's two-origin fakes (`<name>Origins`, here 127.0.0.1:9 and 127.0.0.1:10): methods, bodies and
+     * headers of each followed request, the chain limit and the refusals. A response that is neither a success nor an
+     * error panics a user-account or STS refresh task, then its caller ("panic").
+     */
+    @Test
+    fun redirects() = session {
+        suspend fun redirect(name: String, mds: Boolean = false) {
+            val (rust, at, replies) = vectors(name)
+            val (a, b) = GcsAdcVectors.inputs.getValue("${name}Origins").split(' ')
+            val origins = (rust.a α { it.hexToByteArray().decodeToString().replace(a, "127.0.0.1:9").replace(b, "127.0.0.1:10").encodeToByteArray().toHexString() }) j rust.b
+            val files = dir(name)
+            write("$files/subject.jwt", "eyJ.subject-capture.jwt\n".encodeToByteArray(), "600")
+            GcsAdcVectors.inputs["${name}Input"]?.let { write("$files/credentials.json", fill(it, files).encodeToByteArray(), "600") }
+            val routes = Routes(replies)
+            val reactor = HtxClientReactorElement(routes, HtxClientOptions(maxRedirects = 0)).also { it.open() }
+            // A refresh task's panic, as tokio reports a task's.
+            val panics = mutableListOf<Throwable>()
+            val env = mapOf("HOME" to "$root/home") + if (mds) mapOf(GCE_METADATA_HOST_ENV_VAR to "127.0.0.1:9") else emptyMap()
+            val result = withContext(Environment(env) + CoroutineExceptionHandler { _, panic -> panics += panic }) {
+                val credentials = if (mds) mds_credentials(listOf(STORAGE), reactor) else source_credentials("$files/credentials.json", STORAGE, reactor)
+                try {
+                    val text = try {
+                        headers(credentials)
+                    } catch (panic: Error) {
+                        "panic"
+                    }
+                    delay(300)
+                    text
+                } finally {
+                    credentials.close()
+                }
+            }
+            reactor.close()
+            assertCase(name, origins, at, routes, result)
+            assertEquals(if (result == "panic") listOf("this function is only called on errors") else emptyList(), panics.map { it.message }, name)
+        }
+        for (name in listOf("redirectUser301", "redirectUser302", "redirectUser303", "redirectUser307", "redirectUser308Other", "redirectUserRelative",
+            "redirectUserTen", "redirectUserEleven", "redirectUserNoLocation", "redirectUser300", "redirectUserUnresolved", "redirectUserScheme",
+            "redirectImpNoLocation", "redirectExtNoLocation", "redirectImpOther", "redirectImpSame", "redirectImpReturn", "redirectImpSeeOther",
+            "redirectExtClientAuth")) redirect(name)
+        redirect("redirectMds", mds = true)
     }
 
     @Test

@@ -118,9 +118,9 @@ suspend fun exchange_token(
     val response = try {
         http.token_request(HtxMethod.POST, url, headers, form_urlencoded(params).encodeToByteArray())
     } catch (e: SendError) {
-        throw CredentialsError(!e.is_builder, "failed to exchange token")
+        throw CredentialsError(e.is_retryable(), "failed to exchange token")
     }
-    if (response.status !in 200..299) throw CredentialsError(is_retryable_code(response.status), "failed to exchange token")
+    if (response.status !in 200..299) throw from_http_response(response.status, "failed to exchange token")
     return decode(response, listOf("access_token", "issued_token_type", "token_type", "expires_in", "scope", "refresh_token")) {
         it[1].serde_string()
         it[4].serde_option_string()
@@ -217,9 +217,9 @@ class UrlSourcedCredentials(val url: String, val headers: List<HtxHeader>, val f
         val response = try {
             http.token_request(HtxMethod.GET, url, headers, timeout = 10.seconds)
         } catch (e: SendError) {
-            throw CredentialsError(!e.is_builder, "failed to request subject token")
+            throw CredentialsError(e.is_retryable(), "failed to request subject token")
         }
-        if (response.status !in 200..299) throw CredentialsError(is_retryable_code(response.status), "failed to request subject token")
+        if (response.status !in 200..299) throw from_http_response(response.status, "failed to request subject token")
         val text = response.body.toArray().decodeToString()
         return if (format == "json") json_subject_token(text, subject_token_field_name) else text
     }
@@ -309,9 +309,9 @@ class AwsSourcedCredentials(
         val response = try {
             http.token_request(method, url, headers)
         } catch (e: SendError) {
-            throw CredentialsError(!e.is_builder, "failed to fetch AWS credentials for subject token")
+            throw CredentialsError(e.is_retryable(), "failed to fetch AWS credentials for subject token")
         }
-        if (response.status !in 200..299) throw CredentialsError(is_retryable_code(response.status), "failed to fetch AWS credentials for subject token")
+        if (response.status !in 200..299) throw from_http_response(response.status, "failed to fetch AWS credentials for subject token")
         return response
     }
 

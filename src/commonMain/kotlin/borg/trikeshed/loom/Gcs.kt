@@ -467,6 +467,76 @@ suspend fun HtxClientReactorElement.send(method: HtxMethod, url: String, headers
     null
 }
 
+/** reqwest's default header, which reqwest's HeaderMap holds last and HTX does not send. */
+val DEFAULT_ACCEPT: HtxHeader = "accept" j "*/*"
+
+/**
+ * tower-http 0.6.11 `FollowRedirect` under reqwest's `TowerRedirectPolicy` with `Policy::limited(limit)` and referer
+ * on, reqwest 0.12.28 and 0.13.5 alike but where marked: [send] makes each request of the chain. A 301 or 302 to a
+ * POST, and a 303 to anything but a HEAD, continue as a GET with no body and without content-type, content-length,
+ * content-encoding and transfer-encoding; a 307 or 308 repeats the method and body; any other status is the response,
+ * as is a redirect whose Location does not resolve against the request URL to an http `Uri`. The redirect after
+ * [limit] of them, or to http when [https_only], fails with reqwest's redirect error, one to a scheme but http and
+ * https with its builder error ([SendError]). Each followed request carries [headers] as http's `HeaderMap` held them,
+ * [DEFAULT_ACCEPT] last, less authorization, cookie, cookie2, proxy-authorization and www-authenticate where its scheme
+ * (reqwest 0.13; 0.12 compares host and port only), host or port differs from the request it follows, and with a
+ * `referer` naming that request unless it was https and this one is http. A `HeaderMap` removal swap_removes: its last
+ * entry takes the removed one's place.
+ */
+suspend fun follow_redirect(
+    url: Url,
+    method: HtxMethod,
+    headers: List<HtxHeader>,
+    body: ByteArray,
+    limit: Int,
+    https_only: Boolean,
+    send: suspend (Url, HtxMethod, List<HtxHeader>, ByteArray) -> HtxResponse,
+): HtxResponse {
+    fun MutableList<HtxHeader>.swap_remove(name: String) {
+        val at = indexOfFirst { it.a.equals(name, ignoreCase = true) }
+        if (at < 0) return
+        val last = removeAt(lastIndex)
+        if (at < size) this[at] = last
+    }
+    val map = headers.toMutableList()
+    if (map.none { it.a.equals("accept", ignoreCase = true) }) map += DEFAULT_ACCEPT
+    var current = url
+    var method = method
+    var body = body
+    var request: List<HtxHeader> = map.toList()
+    var redirects = 0
+    while (true) {
+        val response = send(current, method, request.filter { it !== DEFAULT_ACCEPT }, body)
+        val payload = when (response.status) {
+            301, 302 -> method == HtxMethod.POST
+            303 -> true
+            307, 308 -> false
+            else -> return response
+        }
+        if (payload) {
+            if (method != HtxMethod.HEAD) method = HtxMethod.GET
+            body = ByteArray(0)
+            for (name in listOf("content-type", "content-length", "content-encoding", "transfer-encoding")) map.swap_remove(name)
+        }
+        val next = response.headers.headerValue("location")?.let { current.join(it) }?.takeIf { Registry.uri(it.serialization) } ?: return response
+        if (++redirects > limit) throw SendError(false, is_redirect = true)
+        if (next.scheme != "http" && next.scheme != "https") throw SendError(true)
+        if (https_only && next.scheme != "https") throw SendError(false, is_redirect = true)
+        request = map.toMutableList().apply {
+            val port = { u: Url -> u.port ?: Url.default_port(u.scheme) }
+            if (next.scheme != current.scheme || next.host != current.host || port(next) != port(current)) {
+                for (name in listOf("authorization", "cookie", "cookie2", "proxy-authorization", "www-authenticate")) swap_remove(name)
+            }
+            if (!(next.scheme == "http" && current.scheme == "https")) {
+                val referer = "referer" j Registry.target(current)
+                val at = indexOfFirst { it.a.equals("referer", ignoreCase = true) }
+                if (at < 0) add(referer) else this[at] = referer
+            }
+        }
+        current = next
+    }
+}
+
 fun safe_name(name: String, cap: Int): Boolean =
     name.isNotEmpty() && name.length <= cap && name.split('/').all { part ->
         part.isNotEmpty() && part != "." && part != ".." &&
