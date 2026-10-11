@@ -15,11 +15,11 @@ import kotlin.test.*
  * axum's router did, and the registry's own listener answers each raw request with the bytes hyper wrote.
  */
 abstract class RegistryParity {
-    /** Serves [listener] on 127.0.0.1:[port] until cancelled; binds before its first suspension. */
-    abstract suspend fun bind(listener: LitebikeListenerElement, port: Int)
+    /** Serves [listener] on [host]:[port] until cancelled; binds before its first suspension. */
+    abstract suspend fun bind(listener: LitebikeListenerElement, host: String, port: Int)
 
-    /** A loopback port free when asked. */
-    abstract fun port(): Int
+    /** A port free on loopback [host] when asked. */
+    abstract fun port(host: String): Int
 
     /** [request] on a new connection to 127.0.0.1:[port], then every byte answered until the peer closes. */
     abstract fun exchange(port: Int, request: ByteArray): ByteArray
@@ -37,9 +37,9 @@ abstract class RegistryParity {
         return Registry.load_for_loopback_test(config, routes)
     }
 
-    /** [rust]'s load case against an origin answering its replies, then [after] over the registry it loaded. */
-    suspend fun case(name: String, rust: RegistryCase, after: suspend (Registry, OriginFake) -> Unit = { _, _ -> }) {
-        val origin = OriginFake(this).start()
+    /** [rust]'s load case against an origin on [host] answering its replies, then [after] over the registry it loaded. */
+    suspend fun case(name: String, rust: RegistryCase, host: String = "127.0.0.1", after: suspend (Registry, OriginFake) -> Unit = { _, _ -> }) {
+        val origin = OriginFake(this, host).start()
         val reactor = reactor()
         try {
             for (reply in rust.replies.view) origin.replies.add(reply.replace("{base}", origin.base).encodeToByteArray())
@@ -64,6 +64,11 @@ abstract class RegistryParity {
         for ((name, rust) in RegistryVectors.cases.view) case(name, rust)
     }
 
+    /** The load cases whose origin is the IPv6 literal [::1]. */
+    suspend fun load6_cases() {
+        for ((name, rust) in RegistryVectors.cases6.view) case(name, rust, "::1")
+    }
+
     /** The routes through [Registry.serve], then the wire through the registry's listener on a platform bind. */
     suspend fun serve_cases() = case("routeLoad", RegistryVectors.routeLoad) { registry, origin ->
         for (route in RegistryVectors.routes.view) {
@@ -73,11 +78,11 @@ abstract class RegistryParity {
             assertEquals(route.headers.view.map { it.replace("{base}", origin.base) }, response.headers.view.map { "${it.a}: ${it.b}" }, name)
             assertEquals(route.body, response.body.toArray().decodeToString(), name)
         }
-        val port = port()
+        val port = port("127.0.0.1")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         registry.open()
         try {
-            scope.launch(start = CoroutineStart.UNDISPATCHED) { bind(registry.listener, port) }
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { bind(registry.listener, "127.0.0.1", port) }
             for (wire in RegistryVectors.wire.view) {
                 val request = wire.request.hexToByteArray()
                 val reply = withContext(Dispatchers.Default) { exchange(port, request) }
@@ -101,7 +106,7 @@ abstract class RegistryParity {
         val (ourLine, ourHeaders, ourBody) = parse(ours)
         assertEquals(rustLine, ourLine, name)
         assertContentEquals(rustBody, ourBody, name)
-        assertEquals("127.0.0.1", ourHeaders.single { it.first == "host" }.second.substringBefore(':'), name)
+        assertEquals(base.removePrefix("http://").removeSuffix("/"), ourHeaders.single { it.first == "host" }.second, name)
         val expected = rustHeaders.filterNot { it.first == "host" || it == ("accept" to "*/*") }.toMutableList()
         if (expected.none { it.first == "accept-encoding" }) expected += "accept-encoding" to "identity"
         val actual = ourHeaders.filterNot { it.first == "host" || it == ("connection" to "close") }
@@ -117,10 +122,10 @@ abstract class RegistryParity {
     }
 }
 
-/** A loopback origin on the litebike listener through [parity]'s bind: logs each request's bytes and answers it with the next scripted reply. */
-class OriginFake(val parity: RegistryParity) {
-    val port = parity.port()
-    val base = "http://127.0.0.1:$port/"
+/** A loopback origin on [host] on the litebike listener through [parity]'s bind: logs each request's bytes and answers it with the next scripted reply. */
+class OriginFake(val parity: RegistryParity, val host: String = "127.0.0.1") {
+    val port = parity.port(host)
+    val base = if (':' in host) "http://[$host]:$port/" else "http://$host:$port/"
     val replies = ArrayDeque<ByteArray>()
     val log = mutableListOf<ByteArray>()
     val listener = LitebikeListenerElement()
@@ -137,7 +142,7 @@ class OriginFake(val parity: RegistryParity) {
                 message.respond?.invoke(reply)
             }
         }
-        scope.launch(start = CoroutineStart.UNDISPATCHED) { parity.bind(listener, port) }
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { parity.bind(listener, host, port) }
         return this
     }
 

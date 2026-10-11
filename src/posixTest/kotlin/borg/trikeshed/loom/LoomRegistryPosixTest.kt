@@ -9,12 +9,13 @@ import kotlin.test.*
 
 /** [RegistryParity] on POSIX targets: PosixLitebikeBindAdapter, the userspace facade's sockets for raw requests, the platform's HTX reactor. */
 class LoomRegistryPosixTest : RegistryParity() {
-    override suspend fun bind(listener: LitebikeListenerElement, port: Int) = PosixLitebikeBindAdapter.bindAndServe(listener, port, "127.0.0.1")
+    override suspend fun bind(listener: LitebikeListenerElement, host: String, port: Int) = PosixLitebikeBindAdapter.bindAndServe(listener, port, host)
 
-    override fun port(): Int {
-        val server = ServerSocketChannel.open("INET")
+    override fun port(host: String): Int {
+        val ipv6 = ':' in host
+        val server = ServerSocketChannel.open(if (ipv6) "INET6" else "INET")
         try {
-            server.bind("127.0.0.1:0", 1)
+            server.bind(if (ipv6) "[$host]:0" else "$host:0", 1)
             return server.getLocalAddress().substringAfterLast(':').toInt()
         } finally {
             server.close()
@@ -42,6 +43,8 @@ class LoomRegistryPosixTest : RegistryParity() {
     override suspend fun reactor(): HtxReactorElement = openHtxReactorElement()
 
     @Test fun load() = runBlocking { load_cases() }
+
+    @Test fun load6() = runBlocking { load6_cases() }
 
     @Test fun serve() = runBlocking { serve_cases() }
 }

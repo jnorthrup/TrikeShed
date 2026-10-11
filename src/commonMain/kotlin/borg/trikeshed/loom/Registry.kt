@@ -333,7 +333,6 @@ class Registry(
             return try {
                 follow_redirect(url, HtxMethod.GET, emptyList(), ByteArray(0), MAX_REDIRECTS, https_only) { current, method, headers, body ->
                     if (current.scheme == "https" && stub) TODO("registry manifests over https on this target, whose platform registers StubTlsCodecBackend")
-                    if (current.host?.startsWith('[') == true) TODO("registry origins at IPv6 literals (the HTX reactor connects over AF_INET only)")
                     val remaining = -deadline.elapsedNow().inWholeMilliseconds
                     if (remaining <= 0) error("registry manifest fetch failed")
                     val response = client.send(method, target(current), headers.toSeries(), body, remaining.toULong())
