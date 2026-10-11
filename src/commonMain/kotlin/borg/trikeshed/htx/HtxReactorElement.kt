@@ -12,6 +12,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.reactor.TlsApplicationProtocol
 import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.reactor.TlsConfig
+import borg.trikeshed.reactor.TlsConnectionState
 import borg.trikeshed.reactor.TlsEndpoint
 import borg.trikeshed.reactor.TlsFlowStage
 import borg.trikeshed.reactor.TlsFrames
@@ -324,7 +325,8 @@ class HtxReactorElement(
             val frames = endpoint.downstream(chunk)
             plaintext.append(extractPlaintext(frames))
             flushTlsFrames(handle, fd, frames, timeoutMs)
-            if (plaintext.isComplete()) break
+            // RFC 8446 6.1: nothing after the peer's close_notify is data, so a close-delimited body ends there.
+            if (plaintext.isComplete() || endpoint.flowState.lifecycle == TlsConnectionState.CLOSED) break
         }
         return plaintext.toByteSeries()
     }
