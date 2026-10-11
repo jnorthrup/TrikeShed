@@ -15,7 +15,7 @@ import kotlinx.atomicfu.locks.synchronized
  * The common facade owns admissions and terminal CQEs. This handle only maps
  * ring tokens to caller identities, which may repeat. CQE results are verbatim:
  * EOF is zero, EAGAIN is -11, and unavailable backend opcodes settle as -95.
- * Staging socket SQEs does not imply that this backend supports live sockets.
+ * Socket SQEs carry the io_uring_prep_* encoding; the backend's capabilities decide whether they execute.
  */
 internal class PosixChannelHandle(
     private val capacity: Int,

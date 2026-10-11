@@ -34,6 +34,6 @@ internal object UringSelectorProvider : SelectorProvider() {
     override fun openServerSocketChannel(): ServerSocketChannel = ServerSocketChannel.open()
     override fun openSocketChannel(): SocketChannel = SocketChannel.open()
     override fun inheritedChannel(): Channel = throw UnsupportedOperationException("inheritedChannel")
-    override fun openSocketChannel(protocolFamily: String): SocketChannel = SocketChannel.open()
-    override fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = ServerSocketChannel.open()
+    override fun openSocketChannel(protocolFamily: String): SocketChannel = SocketChannel.openWithProtocolFamily(protocolFamily)
+    override fun openServerSocketChannel(protocolFamily: String): ServerSocketChannel = ServerSocketChannel.open(protocolFamily)
 }

@@ -34,4 +34,10 @@ class MacosUringConformanceTest {
             unlink(path)
         }
     }
+
+    @Test
+    fun selected_backend_socket_contract() {
+        UringSocketConformance.loopback("INET", "127.0.0.1:0")
+        UringSocketConformance.loopback("INET6", "[::1]:0")
+    }
 }

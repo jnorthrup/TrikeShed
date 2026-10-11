@@ -321,6 +321,13 @@ internal class LinuxLiburingFacade : LiburingFacade {
                 UringOp.CLOSE -> io_uring_prep_close(sqe, sub.fd)
                 UringOp.FSYNC -> io_uring_prep_fsync(sqe, sub.fd, sub.operationFlags.toUInt())
                 UringOp.FTRUNCATE -> io_uring_prep_ftruncate(sqe, sub.fd, sub.offset)
+                UringOp.SOCKET -> io_uring_prep_socket(sqe, sub.fd, sub.offset.toInt(), sub.len, 0u)
+                UringOp.BIND -> io_uring_prep_bind(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
+                UringOp.LISTEN -> io_uring_prep_listen(sqe, sub.fd, sub.len)
+                UringOp.ACCEPT -> io_uring_prep_accept(sqe, sub.fd, null, null, sub.operationFlags)
+                UringOp.CONNECT -> io_uring_prep_connect(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
+                UringOp.SHUTDOWN -> io_uring_prep_shutdown(sqe, sub.fd, sub.len)
+                UringOp.POLL_ADD -> io_uring_prep_poll_add(sqe, sub.fd, sub.operationFlags.toUInt())
                 else -> error("No native encoder for ${sub.opcode}")
             }
         }

@@ -157,9 +157,12 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
 
     private companion object {
         val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+        // POLL_REMOVE and URING_CMD stay with the common backend: it holds the requests a removal names, and the
+        // probe reports URING_CMD without its socket commands.
         val encoded = setOf(UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
             UringOp.SEND, UringOp.RECV, UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE,
             UringOp.READ_FIXED, UringOp.WRITE_FIXED, UringOp.FADVISE, UringOp.MADVISE,
-            UringOp.STATX, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+            UringOp.STATX, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.SOCKET, UringOp.BIND,
+            UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.POLL_ADD)
     }
 }

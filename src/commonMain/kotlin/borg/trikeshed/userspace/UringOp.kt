@@ -125,6 +125,13 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val LOCK_NB: Int = 4
         /** sizeof(struct statx). */
         const val STATX_SIZE: Int = 256
+        // Linux poll, socket-option and socket-command values, translated by each backend like the O_* flags.
+        const val POLLIN: Int = 0x1
+        const val POLLOUT: Int = 0x4
+        const val SOL_SOCKET: Int = 1
+        const val SO_REUSEADDR: Int = 2
+        const val SOCKET_URING_OP_SETSOCKOPT: Int = 3
+        const val SOCKET_URING_OP_GETSOCKNAME: Int = 5
 
         /**
          * Common submission contract crossing [FunctionalUringFacade].
@@ -217,6 +224,51 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
 
             fun connect(fd: Int, addrBuf: Long, addrLen: Int, userData: Long): UringSubmission =
                 UringSubmission(CONNECT, fd, addrBuf, addrLen, 0, 0, userData)
+
+            /** io_uring_prep_socket(domain, type, protocol, 0): the domain rides in fd, the protocol in len, the type in offset. */
+            fun socket(domain: Int, type: Int, protocol: Int, userData: Long): UringSubmission =
+                UringSubmission(SOCKET, domain, 0, protocol, type.toLong(), userData = userData)
+
+            /** io_uring_prep_bind(fd, sockaddr, len) over an encoded sockaddr. */
+            fun bind(fd: Int, address: ByteArray, userData: Long): UringSubmission =
+                UringSubmission(BIND, fd, 0, address.size, 0, userData = userData, buffer = ByteBuffer(address))
+
+            /** io_uring_prep_listen(fd, backlog). */
+            fun listen(fd: Int, backlog: Int, userData: Long): UringSubmission =
+                UringSubmission(LISTEN, fd, 0, backlog, 0, userData = userData)
+
+            /** io_uring_prep_accept(fd, NULL, NULL, flags): accept4's SOCK_NONBLOCK and SOCK_CLOEXEC. */
+            fun accept(fd: Int, flags: Int, userData: Long): UringSubmission =
+                UringSubmission(ACCEPT, fd, 0, 0, 0, userData = userData, operationFlags = flags)
+
+            /** io_uring_prep_connect(fd, sockaddr, len) over an encoded sockaddr. */
+            fun connect(fd: Int, address: ByteArray, userData: Long): UringSubmission =
+                UringSubmission(CONNECT, fd, 0, address.size, 0, userData = userData, buffer = ByteBuffer(address))
+
+            /** io_uring_prep_shutdown(fd, how). */
+            fun shutdown(fd: Int, how: Int, userData: Long): UringSubmission =
+                UringSubmission(SHUTDOWN, fd, 0, how, 0, userData = userData)
+
+            /** io_uring_prep_poll_add(fd, mask): the CQE carries the ready events. */
+            fun pollAdd(fd: Int, mask: Int, userData: Long): UringSubmission =
+                UringSubmission(POLL_ADD, fd, 0, 0, 0, userData = userData, operationFlags = mask)
+
+            /** io_uring_prep_poll_remove(target): the target settles -ECANCELED, this request 0 or -ENOENT. */
+            fun pollRemove(target: Long, userData: Long): UringSubmission =
+                UringSubmission(POLL_REMOVE, -1, target, 0, 0, userData = userData)
+
+            /**
+             * io_uring_prep_cmd_sock(SOCKET_URING_OP_SETSOCKOPT, fd, level, optname, optval, optlen): level and optname in
+             * addr's low and high halves, where the SQE overlays them, the option value in the buffer.
+             */
+            fun setsockopt(fd: Int, level: Int, optname: Int, value: ByteArray, userData: Long): UringSubmission =
+                UringSubmission(URING_CMD, fd, (optname.toLong() shl 32) or (level.toLong() and 0xffffffffL), value.size,
+                    SOCKET_URING_OP_SETSOCKOPT.toLong(), userData = userData, buffer = ByteBuffer(value))
+
+            /** io_uring_prep_cmd_getsockname(fd, sockaddr, len, peer): the encoded sockaddr written into [address]'s window. */
+            fun getsockname(fd: Int, address: ByteBuffer, peer: Boolean, userData: Long): UringSubmission =
+                UringSubmission(URING_CMD, fd, 0, address.remaining(), SOCKET_URING_OP_GETSOCKNAME.toLong(),
+                    userData = userData, buffer = address, operationFlags = if (peer) 1 else 0)
 
             fun send(fd: Int, bufAddr: Long, len: Int, userData: Long): UringSubmission =
                 UringSubmission(SEND, fd, bufAddr, len, 0, 0, userData)

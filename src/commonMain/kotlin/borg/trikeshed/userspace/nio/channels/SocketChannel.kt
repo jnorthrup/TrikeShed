@@ -3,8 +3,13 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.UringOp.Companion.Submissions
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.execute
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
 
@@ -29,23 +34,52 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
     public abstract override fun getLocalAddress(): String
 
     companion object {
-        fun open(): SocketChannel {
-            val file = UringChannels.socket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix)
-            val channel = UringChannels.open()
-            return UringSocketChannel(file, channel)
+        fun open(): SocketChannel = openWithProtocolFamily("INET")
+
+        /** [protocolFamily] names a java.net.StandardProtocolFamily: INET or INET6. */
+        fun openWithProtocolFamily(protocolFamily: String): SocketChannel {
+            val channel = UringChannels.open(4)
+            return UringSocketChannel(File.fromFd(stream(channel, protocolFamily)), channel)
         }
-        fun openWithProtocolFamily(protocolFamily: String): SocketChannel = open()
-        fun openWithRemote(address: String): SocketChannel { val ch = open(); ch.connect(address); return ch }
+
+        fun openWithRemote(address: String): SocketChannel {
+            val ch = openWithProtocolFamily(if (address.startsWith('[')) "INET6" else "INET")
+            try {
+                ch.connect(address)
+            } catch (failure: Throwable) {
+                ch.close()
+                throw failure
+            }
+            return ch
+        }
     }
 }
 
+/**
+ * A stream socket on its own ring. CONNECT settles once the connection is made or refused, in either mode. READ and
+ * WRITE meet a non-blocking socket: non-blocking mode answers 0 when they would block, blocking mode waits on POLL_ADD
+ * and retries; no request outlives the call that made it.
+ */
 internal class UringSocketChannel(
     private val file: File,
     private val channel: FunctionalUringFacade,
 ) : SocketChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true
+    private var blocking: Boolean = true
     private val lock = Any()
+
+    /** [submission]'s result through this channel's ring. */
+    private fun io(submission: UringSubmission): Int {
+        if (!open) throw ClosedChannelException()
+        return channel.execute(submission.copy(userData = nextToken++))
+    }
+
+    /** Blocks until the socket reports [mask] (or an error or hangup) through POLL_ADD. */
+    private fun await(mask: Int) {
+        val ready = io(Submissions.pollAdd(file.id, mask, 0))
+        if (ready < 0) throw IOException("poll: $ready")
+    }
 
     override fun begin() {}
     override fun end(completed: Boolean) {}
@@ -54,24 +88,44 @@ internal class UringSocketChannel(
     override fun keyFor(sel: Selector): SelectionKey = throw IllegalStateException("not registered")
     override fun register(sel: Selector, ops: Int, att: Any): SelectionKey = throw UnsupportedOperationException("selector not supported")
     override fun register(sel: Selector, ops: Int): SelectionKey = register(sel, ops, Unit)
-    override fun isBlocking(): Boolean = true
+    override fun isBlocking(): Boolean = blocking
     override fun blockingLock(): Any = lock
-    override fun configureBlocking(block: Boolean): SelectableChannel = this
+    override fun configureBlocking(block: Boolean): SelectableChannel = also { blocking = block }
     override fun validOps(): Int = SelectionKey.OP_READ or SelectionKey.OP_WRITE or SelectionKey.OP_CONNECT
-    override fun bind(address: String): SocketChannel = this
-    override fun <T> setOption(option: String, value: T): SocketChannel = this
+    override fun bind(address: String): SocketChannel {
+        val bound = io(Submissions.bind(file.id, sockaddr(address), 0))
+        if (bound < 0) throw IOException("bind $address: $bound")
+        return this
+    }
+    override fun <T> setOption(option: String, value: T): SocketChannel = throw UnsupportedOperationException("'$option' not supported")
     override fun <T> getOption(option: String): T = throw UnsupportedOperationException("options not supported")
     override fun supportedOptions(): Set<String> = emptySet()
 
-    override fun shutdownInput(): SocketChannel = throw UnsupportedOperationException("shutdown not supported")
-    override fun shutdownOutput(): SocketChannel = throw UnsupportedOperationException("shutdown not supported")
-    override fun connect(address: String): Boolean = false
+    override fun shutdownInput(): SocketChannel = shutdown(0)
+    override fun shutdownOutput(): SocketChannel = shutdown(1)
 
+    private fun shutdown(how: Int): SocketChannel {
+        val result = io(Submissions.shutdown(file.id, how, 0))
+        if (result < 0) throw IOException("shutdown: $result")
+        return this
+    }
+
+    override fun connect(address: String): Boolean {
+        val result = io(Submissions.connect(file.id, sockaddr(address), 0))
+        if (result < 0) throw IOException("connect $address: $result")
+        return true
+    }
+
+    /** Bytes read into [dst]; -1 at end of stream, 0 when non-blocking and none are ready. */
     override fun read(dst: ByteBuffer): Int {
-        val token = nextToken++
-        channel.read(file, dst, 0L, token)
-        channel.submit()
-        return channel.wait(1).firstOrNull()?.res ?: -1
+        while (true) {
+            val count = io(Submissions.read(file.id, 0, dst.remaining(), -1, 0).copy(buffer = dst))
+            if (count > 0) return count
+            if (count == 0) return if (dst.hasRemaining()) -1 else 0
+            if (count != -11) throw IOException("read: $count")
+            if (!blocking) return 0
+            await(UringOp.POLLIN)
+        }
     }
 
     override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long {
@@ -82,11 +136,15 @@ internal class UringSocketChannel(
 
     override fun read(dsts: Array<out ByteBuffer>): Long = read(dsts, 0, dsts.size)
 
+    /** Bytes written from [src]; 0 when non-blocking and the socket buffer is full. */
     override fun write(src: ByteBuffer): Int {
-        val token = nextToken++
-        channel.write(file, src, 0L, token)
-        channel.submit()
-        return channel.wait(1).firstOrNull()?.res ?: -1
+        while (true) {
+            val count = io(Submissions.write(file.id, 0, src.remaining(), -1, 0).copy(buffer = src))
+            if (count >= 0) return count
+            if (count != -11) throw IOException("write: $count")
+            if (!blocking) return 0
+            await(UringOp.POLLOUT)
+        }
     }
 
     override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long {
@@ -96,9 +154,27 @@ internal class UringSocketChannel(
     }
 
     override fun write(srcs: Array<out ByteBuffer>): Long = write(srcs, 0, srcs.size)
-    override fun getLocalAddress(): String = "0.0.0.0:0"
-    override fun close() { open = false }
+
+    /** The local address, `a.b.c.d:port` or `[ipv6]:port`, from the GETSOCKNAME socket command. */
+    override fun getLocalAddress(): String {
+        val address = ByteBuffer(128)
+        val named = io(Submissions.getsockname(file.id, address, false, 0))
+        if (named < 0) throw IOException("getsockname: $named")
+        return sockaddrText(address.array())
+    }
+
+    override fun close() {
+        if (!open) return
+        try {
+            val closed = io(Submissions.close(file.id, 0))
+            if (closed < 0) throw IOException("close: $closed")
+        } finally {
+            open = false
+            channel.closeNow()
+        }
+    }
+
     override fun isOpen(): Boolean = open
-    override fun implCloseSelectableChannel() { open = false }
-    override fun implConfigureBlocking(block: Boolean) {}
+    override fun implCloseSelectableChannel() = close()
+    override fun implConfigureBlocking(block: Boolean) { blocking = block }
 }

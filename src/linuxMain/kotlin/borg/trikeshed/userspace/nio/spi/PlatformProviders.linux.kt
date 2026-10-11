@@ -1,6 +1,6 @@
 package borg.trikeshed.userspace.nio.spi
 
-import borg.trikeshed.userspace.nio.channels.spi.LinuxChannelOperations
+import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.LinuxFileOperations
@@ -12,7 +12,7 @@ import kotlin.coroutines.CoroutineContext
 actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val report = currentNioCapabilityReport()
 
-    val channelOperations = LinuxChannelOperations()
+    val channelOperations = PosixChannelOperations()
     val tlsBackend = StubTlsCodecBackend()
     return listOf(
         report,

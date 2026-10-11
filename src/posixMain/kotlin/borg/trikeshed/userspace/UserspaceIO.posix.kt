@@ -31,9 +31,13 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
         UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE,
         UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
-        UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.GETDENTS)
+        UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.GETDENTS, UringOp.SOCKET, UringOp.BIND,
+        UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.POLL_ADD, UringOp.POLL_REMOVE,
+        UringOp.URING_CMD)
     /** Directory streams GETDENTS continues, by descriptor; CLOSE of the descriptor ends one. */
     private val directories = mutableMapOf<Int, CPointer<DIR>>()
+    /** CONNECTs whose connect(2) is in progress: writable or failed, SO_ERROR settles them. */
+    private val connecting = mutableSetOf<Long>()
     override val nativeCapabilities: Long get() = native.capabilities
     override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
@@ -60,6 +64,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         for (submission in submissions) {
             val invalid = validate(submission)
             if (invalid != null) publish(UringCompletion(submission.userData, invalid, 0))
+            else if (submission.opcode == UringOp.POLL_REMOVE) publish(UringCompletion(submission.userData, removePoll(submission.addr), 0))
             else queued.add(submission)
         }
         dispatch()
@@ -93,6 +98,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
             val submission = iterator.next()
             if (tokens == null || submission.userData in tokens) {
                 iterator.remove()
+                connecting.remove(submission.userData)
                 publish(UringCompletion(submission.userData, -125, 0))
             }
         }
@@ -207,7 +213,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
                 nativeBatch.add(submission)
             } else {
                 val result = emulate(submission)
-                if (result == -11 && (submission.opcode == UringOp.SEND || submission.opcode == UringOp.RECV)) {
+                if (result == -11 && submission.opcode in waits) {
                     blocked.add(submission)
                 } else {
                     iterator.remove()
@@ -313,11 +319,21 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
                 if (sub.opcode == UringOp.READ) PosixUringIO.readAt(sub.fd, bytes, start, sub.len, sub.offset)
                 else PosixUringIO.writeAt(sub.fd, bytes, start, sub.len, sub.offset)
             }
+            UringOp.SOCKET -> socket(sub)
+            UringOp.BIND -> address(sub) { addr, size -> posixCompletion(bind(sub.fd, addr, size.convert())) }
+            UringOp.LISTEN -> posixCompletion(listen(sub.fd, sub.len))
+            UringOp.ACCEPT -> accept(sub)
+            UringOp.CONNECT -> connect(sub)
+            UringOp.SHUTDOWN -> if (sub.len !in 0..2) -22 else posixCompletion(shutdown(sub.fd, sub.len))
+            // Ready events of the mask, as the kernel's poll wakeup reports them; none yet waits.
+            UringOp.POLL_ADD -> if (sub.len != 0 || sub.operationFlags and 0x3f.inv() != 0) -95 else
+                poll(sub.fd, sub.operationFlags).let { if (it == 0) -11 else if (it > 0 && it and POLLNVAL != 0) -9 else it }
+            UringOp.URING_CMD -> socketCommand(sub)
             UringOp.SEND, UringOp.RECV -> {
                 buffer!!.array().usePinned { pinned ->
                     val ptr = if (sub.len == 0) null else pinned.addressOf(buffer.arrayOffset() + buffer.position())
                     posixCompletion(if (sub.opcode == UringOp.SEND)
-                        send(sub.fd, ptr, sub.len.convert(), MSG_DONTWAIT).toInt()
+                        send(sub.fd, ptr, sub.len.convert(), MSG_DONTWAIT or if (linux) MSG_NOSIGNAL else 0).toInt()
                     else recv(sub.fd, ptr, sub.len.convert(), MSG_DONTWAIT).toInt())
                 }
             }
@@ -360,6 +376,148 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
             UringOp.CLOSE -> {
                 directories.remove(sub.fd)?.let { closedir(it) }
                 PosixUringIO.closeFd(sub.fd)
+            }
+            else -> -95
+        }
+    }
+
+    /** IORING_OP_SOCKET: the domain in fd, the type with Linux's SOCK_NONBLOCK and SOCK_CLOEXEC in offset, the protocol in len. */
+    private fun socket(sub: UringSubmission): Int {
+        if (sub.offset !in 0L..Int.MAX_VALUE.toLong() || sub.offset.toInt() and (0xf or SOCKET_FLAGS).inv() != 0) return -22
+        val domain = hostFamily(sub.fd) ?: return -97
+        val fd = platform.posix.socket(domain, sub.offset.toInt() and 0xf, sub.len)
+        if (fd < 0) return posixCompletion(fd)
+        return configure(fd, sub.offset.toInt()).also { if (it < 0) close(fd) }
+    }
+
+    /**
+     * accept4/socket flags of a new descriptor: O_NONBLOCK exactly as SOCK_NONBLOCK says (Darwin's accept inherits the
+     * listener's), FD_CLOEXEC for SOCK_CLOEXEC, and on Darwin SO_NOSIGPIPE, as the JVM backend configures its sockets.
+     */
+    private fun configure(fd: Int, flags: Int): Int {
+        val status = fcntl(fd, F_GETFL)
+        val blocking = if (flags and 0x800 != 0) status or O_NONBLOCK else status and O_NONBLOCK.inv()
+        if (status < 0 || fcntl(fd, F_SETFL, blocking) < 0) return posixCompletion(-1)
+        if (flags and 0x80000 != 0 && fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) return posixCompletion(-1)
+        if (!linux) memScoped {
+            val enabled = alloc<IntVar>().apply { value = 1 }
+            if (setsockopt(fd, SOL_SOCKET, 0x1022, enabled.ptr, sizeOf<IntVar>().convert()) < 0) return posixCompletion(-1)
+        }
+        return fd
+    }
+
+    /**
+     * The facade's Linux sockaddr in [sub]'s window as the host's, to [action]: Darwin leads with sa_len and an 8-bit
+     * family, and its sun_path ends at the NUL.
+     */
+    private inline fun address(sub: UringSubmission, action: (CPointer<sockaddr>, Int) -> Int): Int {
+        val buffer = sub.buffer!!
+        val start = buffer.arrayOffset() + buffer.position()
+        val bytes = buffer.array().copyOfRange(start, start + sub.len)
+        if (bytes.size < 2) return -22
+        val family = (bytes[0].toInt() and 255) or ((bytes[1].toInt() and 255) shl 8)
+        var size = bytes.size
+        when (family) {
+            2 -> if (size != 16) return -22
+            10 -> if (size != 28) return -22
+            1 -> {
+                if (size !in 3..110) return -22
+                if (!linux) {
+                    if (bytes[2] == 0.toByte()) return -95 // Darwin has no abstract UNIX namespace.
+                    val end = (2 until size).firstOrNull { bytes[it] == 0.toByte() } ?: size
+                    if (end > 105) return -36
+                    size = minOf(end + 1, size)
+                }
+            }
+            else -> return -97
+        }
+        if (!linux) {
+            bytes[0] = size.toByte()
+            bytes[1] = hostFamily(family)!!.toByte()
+        }
+        return bytes.usePinned { action(it.addressOf(0).reinterpret(), size) }
+    }
+
+    /** IORING_OP_ACCEPT waits for a connection, as the kernel's poll-armed accept does; accept4's flags in operationFlags. */
+    private fun accept(sub: UringSubmission): Int {
+        if (sub.operationFlags and SOCKET_FLAGS.inv() != 0) return -22
+        val ready = poll(sub.fd, POLLIN)
+        if (ready <= 0) return if (ready == 0) -11 else ready
+        if (ready and POLLNVAL != 0) return -9
+        val fd = platform.posix.accept(sub.fd, null, null)
+        if (fd < 0) return posixCompletion(fd)
+        return configure(fd, sub.operationFlags).also { if (it < 0) close(fd) }
+    }
+
+    /** IORING_OP_CONNECT settles once the connection is made or refused, also for a non-blocking socket. */
+    private fun connect(sub: UringSubmission): Int {
+        if (sub.userData in connecting) {
+            val ready = poll(sub.fd, POLLOUT)
+            if (ready == 0) return -11
+            connecting.remove(sub.userData)
+            return if (ready < 0) ready else if (ready and POLLNVAL != 0) -9 else memScoped {
+                val error = alloc<IntVar>()
+                val length = alloc<socklen_tVar>().apply { value = sizeOf<IntVar>().convert() }
+                if (getsockopt(sub.fd, SOL_SOCKET, SO_ERROR, error.ptr, length.ptr) < 0) posixCompletion(-1)
+                else -linuxErrno(error.value)
+            }
+        }
+        val result = address(sub) { addr, size -> posixCompletion(platform.posix.connect(sub.fd, addr, size.convert())) }
+        if (result != -115 && result != -4) return result
+        connecting.add(sub.userData)
+        return -11
+    }
+
+    /** poll(2) without waiting: the ready events among [mask], POLLERR, POLLHUP and POLLNVAL, 0 when none, or -errno. */
+    private fun poll(fd: Int, mask: Int): Int = memScoped {
+        val record = alloc<pollfd>()
+        record.fd = fd
+        record.events = mask.toShort()
+        record.revents = 0
+        val ready = platform.posix.poll(record.ptr, 1.convert(), 0)
+        if (ready < 0) posixCompletion(ready) else record.revents.toInt() and 0xffff
+    }
+
+    /** POLL_REMOVE: a POLL_ADD of [target] still waiting here or in the kernel ring settles -ECANCELED; -ENOENT otherwise. */
+    private fun removePoll(target: Long): Int {
+        val waiting = queued.any { it.userData == target && it.opcode == UringOp.POLL_ADD } ||
+            pending[target]?.opcode == UringOp.POLL_ADD
+        if (!waiting) return -2
+        cancel(setOf(target))
+        return 0
+    }
+
+    /**
+     * IORING_OP_URING_CMD's socket commands, the command in offset: SETSOCKOPT with level and optname in addr's halves
+     * and the value in the window; GETSOCKNAME (getpeername when operationFlags is 1) writing the facade sockaddr into
+     * the window. The kernel probe reports URING_CMD, not which socket commands a kernel has, so every target emulates them.
+     */
+    private fun socketCommand(sub: UringSubmission): Int {
+        val buffer = sub.buffer!!
+        val start = buffer.arrayOffset() + buffer.position()
+        return when (sub.offset) {
+            UringOp.SOCKET_URING_OP_SETSOCKOPT.toLong() -> {
+                val level = (sub.addr and 0xffffffffL).toInt()
+                val name = (sub.addr ushr 32).toInt()
+                if (level != UringOp.SOL_SOCKET || name != UringOp.SO_REUSEADDR) return -92
+                buffer.array().usePinned {
+                    posixCompletion(setsockopt(sub.fd, SOL_SOCKET, SO_REUSEADDR, if (sub.len == 0) null else it.addressOf(start), sub.len.convert()))
+                }
+            }
+            UringOp.SOCKET_URING_OP_GETSOCKNAME.toLong() -> memScoped {
+                if (buffer.isReadOnly() || sub.operationFlags !in 0..1) return -22
+                val storage = alloc<sockaddr_storage>()
+                val length = alloc<socklen_tVar>().apply { value = sizeOf<sockaddr_storage>().convert() }
+                val status = if (sub.operationFlags == 0) getsockname(sub.fd, storage.ptr.reinterpret(), length.ptr)
+                    else getpeername(sub.fd, storage.ptr.reinterpret(), length.ptr)
+                if (status < 0) return posixCompletion(status)
+                val bytes = storage.ptr.reinterpret<ByteVar>().readBytes(length.value.toInt())
+                if (!linux) {
+                    bytes[0] = when (bytes[1].toInt()) { AF_INET -> 2; AF_INET6 -> 10; AF_UNIX -> 1; else -> return -97 }.toByte()
+                    bytes[1] = 0
+                }
+                bytes.copyInto(buffer.array(), start, 0, minOf(bytes.size, sub.len))
+                0
             }
             else -> -95
         }
@@ -426,7 +584,18 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
             UringOp.O_DIRECTORY or UringOp.O_NOFOLLOW or UringOp.O_CLOEXEC
         val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.GETDENTS)
         val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
-        val bufferOps = pathOps + setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.GETDENTS)
+        val bufferOps = pathOps + setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.GETDENTS,
+            UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD)
+        /** Operations the kernel ring completes only when ready: their emulation leaves them queued while it reports -EAGAIN. */
+        val waits = setOf(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD)
+        /** Linux SOCK_NONBLOCK | SOCK_CLOEXEC. */
+        const val SOCKET_FLAGS = 0x800 or 0x80000
+        val linux = Platform.osFamily == OsFamily.LINUX
+        /** Linux MSG_NOSIGNAL: a send to a closed peer reports EPIPE without SIGPIPE. */
+        const val MSG_NOSIGNAL = 0x4000
+
+        /** A Linux address family as the host's. */
+        fun hostFamily(family: Int): Int? = when (family) { 2 -> AF_INET; 10 -> AF_INET6; 1 -> AF_UNIX; else -> null }
         val barriers = setOf(UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.STATX)
         val positioned = setOf(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
         val memoryOps = positioned + UringOp.MADVISE
@@ -443,13 +612,20 @@ internal fun UringSubmission.paths(): List<String> {
 }
 
 /** Translate host errno values to Linux CQE values, including Darwin's differing numbers. */
-internal fun posixCompletion(result: Int): Int = if (result >= 0) result else -when (errno) {
+internal fun posixCompletion(result: Int): Int = if (result >= 0) result else -linuxErrno(errno)
+
+/** A host errno in Linux numbering. */
+internal fun linuxErrno(value: Int): Int = when (value) {
+    0 -> 0
     EPERM -> 1; ENOENT -> 2; EINTR -> 4; EIO -> 5; EBADF -> 9; EAGAIN -> 11
     ENOMEM -> 12; EACCES -> 13; EFAULT -> 14; EBUSY -> 16; EEXIST -> 17
     ENOTDIR -> 20; EISDIR -> 21; EINVAL -> 22; ENFILE -> 23; EMFILE -> 24
     EFBIG -> 27; ENOSPC -> 28; ESPIPE -> 29; EROFS -> 30; EPIPE -> 32
-    ENOSYS -> 38; ENOTEMPTY -> 39; ELOOP -> 40; EOPNOTSUPP -> 95
-    ECONNRESET -> 104; ENOTCONN -> 107; ETIMEDOUT -> 110; ECONNREFUSED -> 111
+    ENAMETOOLONG -> 36; ENOSYS -> 38; ENOTEMPTY -> 39; ELOOP -> 40
+    ENOTSOCK -> 88; EDESTADDRREQ -> 89; EMSGSIZE -> 90; EPROTOTYPE -> 91; ENOPROTOOPT -> 92; EPROTONOSUPPORT -> 93
+    EOPNOTSUPP -> 95; EAFNOSUPPORT -> 97; EADDRINUSE -> 98; EADDRNOTAVAIL -> 99; ENETDOWN -> 100; ENETUNREACH -> 101
+    ECONNABORTED -> 103; ECONNRESET -> 104; ENOBUFS -> 105; EISCONN -> 106; ENOTCONN -> 107; ETIMEDOUT -> 110
+    ECONNREFUSED -> 111; EHOSTUNREACH -> 113; EALREADY -> 114; EINPROGRESS -> 115
     else -> 5
 }
 

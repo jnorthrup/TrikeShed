@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 class PosixChannelHandleTest {
     private class Backend : UserspaceChannelBackend {
-        override val capabilities = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.CLOSE)
+        override var capabilities = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.CLOSE)
         override var deferredCapabilities = 0L
         var effect: (UringSubmission) -> Int = { 0 }
         val seen = mutableListOf<UringSubmission>()
@@ -63,19 +63,27 @@ class PosixChannelHandleTest {
         assertEquals(1, backend.closes)
     }
 
-    @Test fun unavailable_socket_opcodes_settle_as_unsupported_without_backend_effects() {
-        val backend = Backend()
+    @Test fun socket_opcodes_reach_the_backend_in_the_liburing_encoding() {
+        val backend = Backend().apply {
+            capabilities = capabilities or UringOp.caps(UringOp.SOCKET, UringOp.BIND, UringOp.LISTEN, UringOp.CONNECT, UringOp.ACCEPT)
+        }
         val handle = PosixChannelHandle(7, backend = backend)
-        assertEquals(0, handle.prepSocket(2, 1, 0, 7))
-        assertEquals(0, handle.prepBind(10, ByteBuffer(16), 7))
+        val address = ByteBuffer(16)
+        assertEquals(0, handle.prepSocket(10, 0x80801, 6, 7))
+        assertEquals(0, handle.prepBind(10, address, 7))
         assertEquals(0, handle.prepListen(10, 128, 7))
-        assertEquals(0, handle.prepConnect(10, ByteBuffer(16), 7))
+        assertEquals(0, handle.prepConnect(11, address, 7))
         assertEquals(0, handle.prepAccept(10, 7))
         assertEquals(0, handle.sendmsg(10, 0, 7))
         assertEquals(0, handle.recvmsg(10, 0, 7))
-        assertEquals(7, handle.submit())
-        assertEquals(List(7) { -95 }, handle.wait(7).map { it.res })
-        assertTrue(backend.seen.isEmpty())
+        assertEquals(5, handle.submit(), "submit counts the admissions the backend received")
+        assertEquals(listOf(-95, -95, 0, 0, 0, 0, 0), handle.wait(7).map { it.res }.sorted(), "the backend has no msghdr operations")
+        assertEquals(listOf(UringOp.SOCKET, UringOp.BIND, UringOp.LISTEN, UringOp.CONNECT, UringOp.ACCEPT), backend.seen.map { it.opcode })
+        // io_uring_prep_socket(domain, type, protocol): domain in fd, type in off, protocol in len.
+        backend.seen[0].let { assertEquals(Triple(10, 0x80801L, 6), Triple(it.fd, it.offset, it.len)) }
+        // io_uring_prep_bind/connect(fd, sockaddr, len) and io_uring_prep_listen(fd, backlog).
+        assertTrue(backend.seen[1].buffer === address && backend.seen[1].len == 16 && backend.seen[3].buffer === address && backend.seen[3].fd == 11)
+        assertEquals(128, backend.seen[2].len)
         handle.close()
     }
 
