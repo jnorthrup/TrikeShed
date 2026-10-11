@@ -40,6 +40,12 @@ class Custody(
             return Custody(id, nodes.sorted().toSeries(), nodes.size < 3, challenge, receipts, domains.sorted().toSeries())
         }
 
+        fun verified(id: Id, challenge: ByteArray, receipts: Series<Receipt>, members: Series<Member>, crypto: IpnsCrypto): Custody =
+            verified_at(id, challenge, receipts, members, now(), crypto)
+
+        fun from_bytes(data: ByteArray, id: Id, challenge: ByteArray, members: Series<Member>, crypto: IpnsCrypto): Custody =
+            from_bytes_at(data, id, challenge, members, now(), crypto)
+
         fun from_bytes_at(data: ByteArray, id: Id, challenge: ByteArray, members: Series<Member>, now: ULong, crypto: IpnsCrypto): Custody {
             trusted_time(now)
             val a = array(decode(data), 4)

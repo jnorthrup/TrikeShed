@@ -3,11 +3,15 @@ package borg.trikeshed.loom
 import borg.trikeshed.collections.associative.*
 import borg.trikeshed.ipns.IpnsCrypto
 import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.platform.spi.*
 
 /** cocaine-rats crates/loom-mesh/src/auth.rs: identity per message, Ed25519 over canonical CBOR. */
 const val CLOCK_SKEW: ULong = 30uL
 
 fun ULong.abs_diff(other: ULong): ULong = if (this > other) this - other else other - this
+
+/** 32 bytes from the OS CSPRNG. */
+fun nonce(): ByteArray = ByteArray(32).also(::platformGetRandom)
 
 /** A signed request or response. Time and nonce come from the trusted runtime, never from wire input. */
 class Message(
@@ -66,6 +70,10 @@ class Message(
         if (!crypto.verify(key, Cbor.encode(unsigned()), signature)) error("message signature")
     }
 
+    fun verify(key: ByteArray, response: Boolean, crypto: IpnsCrypto) = verify_at(key, response, now(), crypto)
+
+    fun verify_response(request: Message, peer: Member, crypto: IpnsCrypto) = verify_response_at(request, peer, now(), crypto)
+
     companion object {
         fun request_at(
             source: String,
@@ -85,6 +93,12 @@ class Message(
             return Message(request.target, request.source, request.method, request.path, time, request.nonce, payload, true)
                 .also { it.sign(key, crypto) }
         }
+
+        fun request(source: String, target: String, method: String, path: String, payload: ByteArray, key: ByteArray, crypto: IpnsCrypto): Message =
+            request_at(source, target, method, path, payload, key, now() j nonce(), crypto)
+
+        fun response(request: Message, payload: ByteArray, key: ByteArray, crypto: IpnsCrypto): Message =
+            response_at(request, payload, key, now(), crypto)
 
         fun from_bytes(data: ByteArray): Message {
             val outer = array(decode(data), 2)
@@ -135,6 +149,8 @@ class Receipt(
         ) error("receipt binding or role")
         if (!crypto.verify(peer.key(), Cbor.encode(unsigned()), signature)) error("receipt signature")
     }
+
+    fun verify_fresh(peer: Member, id: Id, nonce: ByteArray, crypto: IpnsCrypto) = verify_fresh_at(peer, id, nonce, now(), crypto)
 
     companion object {
         fun issue_at(signer: String, id: Id, nonce: ByteArray, archival: Boolean, key: ByteArray, time: ULong, crypto: IpnsCrypto): Receipt {

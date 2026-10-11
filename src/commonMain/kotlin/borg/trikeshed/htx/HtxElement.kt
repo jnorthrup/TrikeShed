@@ -72,6 +72,8 @@ data class HtxExchangeState(
     val request: HtxRequest? = null,
     val response: HtxResponse? = null,
     val failure: String? = null,
+    /** The exception behind [failure], so a caller can tell a TLS codec failure from an outage. */
+    val cause: Throwable? = null,
 )
 
 data class HtxFrame(

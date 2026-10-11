@@ -236,8 +236,9 @@ open class HtxClientReactorElement(
             request,
         )
 
-        val response = result.state.response ?: error(
+        val response = result.state.response ?: throw IllegalStateException(
             result.state.failure ?: "HTX client route service did not produce a response.",
+            result.state.cause,
         )
 
         val location = response.headers.headerValue("Location")
