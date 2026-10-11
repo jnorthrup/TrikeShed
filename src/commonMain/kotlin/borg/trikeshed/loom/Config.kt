@@ -363,12 +363,15 @@ class Url(
     /** `Display`: [serialization]. */
     override fun toString(): String = serialization
 
+    /** `Url::cannot_be_a_base`: no `/` after the scheme's `:`, as a non-special URL without authority or path root. */
+    fun cannot_be_a_base(): Boolean = !serialization.startsWith("/", scheme.length + 1)
+
     /**
-     * `Url::join`: [input] parsed with this URL as its base, as url 2.5.8 resolves a reference against a special,
-     * non-file base; null where it refuses the reference.
+     * `Url::join`: [input] parsed with this URL as its base, as url 2.5.8 resolves a reference against a base other than
+     * `file:`; null where it refuses the reference. A `file:` reference parses as [Parser.parse_file] reduces it.
      */
     fun join(input: String): Url? {
-        if (default_port(scheme) == null) TODO("Url::join against a $scheme base")
+        if (scheme == "file") TODO("Url::join against a file base")
         return try {
             Parser(input.trim { it <= ' ' }, this).parse_url()
         } catch (refused: IllegalArgumentException) {
@@ -437,7 +440,12 @@ class Url(
         fun code_point(c: Char): String = if (c.isHighSurrogate()) "$c${next() ?: ""}" else c.toString()
 
         fun parse_url(): Url {
-            val scheme = parse_scheme() ?: return parse_relative(base ?: refuse())
+            val scheme = parse_scheme() ?: run {
+                // No-scheme state: a fragment against any base, anything else against a base that can be one.
+                val base = base ?: refuse()
+                if (peek() != '#' && base.cannot_be_a_base()) refuse()
+                return parse_relative(base)
+            }
             serialization.append(':')
             return when (scheme) {
                 "http", "https", "ws", "wss", "ftp" -> {
@@ -483,8 +491,9 @@ class Url(
             }
         }
 
-        /** parser.rs parse_relative: the reference at [at] against the special, non-file [base]. */
+        /** parser.rs parse_relative: the reference at [at] against the non-file [base], special or not. */
         fun parse_relative(base: Url): Url {
+            val special = default_port(base.scheme) != null
             val end = base.serialization.length
             val fragment_start = base.fragment?.let { end - it.length - 1 }
             val query_start = base.query?.let { (fragment_start ?: end) - it.length - 1 }
@@ -517,12 +526,12 @@ class Url(
                             at = saved
                             repeat(slashes) { next() }
                         }
-                        after_double_slash(base.scheme, special = true)
+                        after_double_slash(base.scheme, special)
                     } else {
                         serialization.append(base.serialization, 0, path_start).append('/')
                         at = saved
                         next()
-                        parse_path(special = true, path_start = path_start)
+                        parse_path(special, path_start)
                         with_query_and_fragment(base.scheme, base.username, base.password, base.host, base.port, path_start)
                     }
                 }
@@ -532,7 +541,7 @@ class Url(
                     // pop_path: the base's last segment goes.
                     if (serialization.length > path_start) serialization.setLength(serialization.lastIndexOf("/") + 1)
                     if (serialization.length == path_start) serialization.append('/')
-                    parse_path(special = true, path_start = path_start)
+                    parse_path(special, path_start)
                     with_query_and_fragment(base.scheme, base.username, base.password, base.host, base.port, path_start)
                 }
             }
@@ -738,7 +747,19 @@ class Url(
         }
 
         fun with_query_and_fragment(scheme: String, username: String, password: String?, host: String?, port: Int?, path_start: Int): Url {
-            val path = serialization.substring(path_start)
+            // A URL without authority whose path begins with an empty segment keeps a "/." before it, so that the
+            // path's "//" never reads as an authority; a path that no longer begins so loses the base's "/.".
+            var start = path_start
+            if (start == scheme.length + 1) {
+                if (serialization.startsWith("//", start)) {
+                    serialization.insert(start, "/.")
+                    start += 2
+                }
+            } else if (start == scheme.length + 3 && serialization.startsWith(":/.", scheme.length) && serialization.getOrNull(start + 1) != '/') {
+                serialization.setRange(scheme.length, start, ":")
+                start -= 2
+            }
+            val path = serialization.substring(start)
             var query: String? = null
             var fragment: String? = null
             when (next()) {
