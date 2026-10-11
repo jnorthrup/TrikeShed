@@ -30,7 +30,7 @@ internal val jvmUringOperations = UringOp.caps(
     // Advisory, and answered rather than refused: the emulation must not differ from a native
     // ring in what it CAN do, only in how fast it does it.
     UringOp.FADVISE, UringOp.MADVISE,
-    UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT,
+    UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.GETDENTS,
 )
 
 /** One descriptor record shared by FileImpl and submission execution. */
@@ -120,7 +120,16 @@ internal fun jvmSocket(domain: Int, protocol: Int, type: Int): Int {
     return if (fd < 0) fd else JvmFileTable.register(JvmSocketDescriptor(fd))
 }
 
+/**
+ * OPENAT. On Linux and Darwin the descriptor is the operating system's, opened with every Linux O_*
+ * flag the facade carries; elsewhere a JDK channel serves READ, WRITE, CREAT, EXCL and TRUNC.
+ */
 internal fun jvmOpen(path: String, flags: Long, permissions: Int = 438): Int {
+    if (JvmFileSyscalls.posix) {
+        if (flags < 0 || flags > Int.MAX_VALUE || permissions !in 0..4095) return -22
+        val fd = JvmFileSyscalls.openat(UringOp.AT_FDCWD, path, flags.toInt(), permissions)
+        return if (fd < 0) fd else JvmFileTable.register(JvmNativeDescriptor(fd))
+    }
     require(flags >= 0 && flags and (3L or 64L or 128L or 512L).inv() == 0L)
     val mode = flags.toInt() and 3
     require(mode != 3)
@@ -334,19 +343,36 @@ internal class JvmUserspaceChannelBackend(
                 // Path syscalls. The path rides in the submission buffer, and renameat carries
                 // both halves NUL-separated -- one buffer, because an SQE has one address field
                 // and inventing a second channel for the second path would be a shape only this
-                // backend understands.
-                UringOp.UNLINKAT -> { Files.delete(Paths.get(sub.path())); 0 }
-                UringOp.MKDIRAT -> { Files.createDirectories(Paths.get(sub.path())); 0 }
+                // backend understands. Paths resolve from the working directory (AT_FDCWD).
+                UringOp.UNLINKAT -> when {
+                    sub.fd != UringOp.AT_FDCWD -> -95
+                    JvmFileSyscalls.posix -> JvmFileSyscalls.unlinkat(sub.fd, sub.path(), sub.operationFlags)
+                    else -> { Files.delete(Paths.get(sub.path())); 0 }
+                }
+                UringOp.MKDIRAT -> when {
+                    sub.fd != UringOp.AT_FDCWD -> -95
+                    sub.operationFlags !in 0..4095 -> -22
+                    JvmFileSyscalls.posix -> JvmFileSyscalls.mkdirat(sub.fd, sub.path(), sub.operationFlags)
+                    else -> { Files.createDirectory(Paths.get(sub.path())); 0 }
+                }
                 UringOp.RENAMEAT -> {
-                    val both = sub.path()
+                    val bytes = sub.buffer ?: return -22
+                    if (sub.len <= 0 || sub.len > bytes.remaining()) return -22
+                    val both = bytes.array().decodeToString(bytes.arrayOffset() + bytes.position(),
+                        bytes.arrayOffset() + bytes.position() + sub.len, throwOnInvalidSequence = true)
                     val split = both.indexOf('\u0000')
+                    if (both.indexOf('\u0000', split + 1) >= 0) return -22
                     if (split <= 0 || split == both.length - 1) return -22
+                    if (sub.fd != UringOp.AT_FDCWD || sub.offset != UringOp.AT_FDCWD.toLong()) return -95
+                    if (sub.operationFlags != 0) return -22
+                    if (JvmFileSyscalls.posix) return JvmFileSyscalls.renameat(sub.fd, both.substring(0, split), sub.offset.toInt(), both.substring(split + 1))
                     Files.move(
                         Paths.get(both.substring(0, split)), Paths.get(both.substring(split + 1)),
                         StandardCopyOption.REPLACE_EXISTING,
                     )
                     0
                 }
+                UringOp.STATX -> statx(sub)
                 UringOp.CLOSE -> {
                     JvmFileTable.close(sub.fd)
                 }
@@ -383,12 +409,14 @@ internal class JvmUserspaceChannelBackend(
                         else socketExecute(descriptor.fd, sub)
                     }
                     if (sub.opcode in setOf(UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN)) return -88
+                    if (descriptor is JvmNativeDescriptor) return synchronized(descriptor) {
+                        if (!descriptor.isOpen()) -9 else descriptorExecute(descriptor.fd, sub)
+                    }
                     val channel = (descriptor as? JvmChannelDescriptor)?.channel ?: return -95
                     when (sub.opcode) {
                         UringOp.READ, UringOp.WRITE -> transfer(channel, sub)
                         UringOp.READ_FIXED, UringOp.WRITE_FIXED -> transfer(channel,
                             sub.copy(opcode = if (sub.opcode == UringOp.READ_FIXED) UringOp.READ else UringOp.WRITE))
-                        UringOp.STATX -> statx(channel, sub)
                         UringOp.FALLOCATE -> {
                             // Grow to offset+len without writing the interior; a hole is the point.
                             val want = sub.offset + sub.len
@@ -432,18 +460,79 @@ internal class JvmUserspaceChannelBackend(
     }
 
     /**
-     * statx into the caller's buffer. Three little-endian longs -- size, mtime millis, mode bits
-     * (1 regular, 2 directory) -- which is what this backend can answer without inventing the
-     * rest of struct statx.
+     * statx(dfd, path, flags, mask): the path's len bytes, its NUL, then the struct statx the call
+     * writes. An empty path with AT_EMPTY_PATH reads the descriptor; a path resolves from AT_FDCWD.
      */
-    private fun statx(channel: FileChannel, sub: UringSubmission): Int {
+    private fun statx(sub: UringSubmission): Int {
         val buffer = sub.buffer ?: return -22
-        if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.offset != 0L || sub.addr != 0L || sub.operationFlags != 0) return -22
-        val nio = java.nio.ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + buffer.position(), 24)
-            .order(java.nio.ByteOrder.LITTLE_ENDIAN)
-        nio.putLong(channel.size()); nio.putLong(0L); nio.putLong(1L)
-        buffer.position(buffer.position() + 24)
-        return 24
+        val start = buffer.arrayOffset() + buffer.position()
+        if (buffer.isReadOnly() || sub.len < 0 || sub.addr != 0L || sub.offset !in 0..0xffffffffL ||
+            buffer.remaining() - sub.len < 1 + UringOp.STATX_SIZE || buffer.array()[start + sub.len] != 0.toByte()) return -22
+        if (!JvmFileSyscalls.posix) return -95
+        if (sub.operationFlags and (UringOp.AT_SYMLINK_NOFOLLOW or UringOp.AT_EMPTY_PATH or 0x800).inv() != 0) return -22
+        val out = start + sub.len + 1
+        if (sub.len == 0) {
+            if (sub.operationFlags and UringOp.AT_EMPTY_PATH == 0) return -2
+            val descriptor = JvmFileTable.descriptor(sub.fd) as? JvmNativeDescriptor ?: return -9
+            return synchronized(descriptor) {
+                if (!descriptor.isOpen()) -9
+                else JvmFileSyscalls.statx(descriptor.fd, "", sub.operationFlags, sub.offset.toInt(), buffer.array(), out)
+            }
+        }
+        if (sub.fd != UringOp.AT_FDCWD) return -95
+        return JvmFileSyscalls.statx(sub.fd, sub.path(), sub.operationFlags, sub.offset.toInt(), buffer.array(), out)
+    }
+
+    /** File effects on an operating-system descriptor: the same results the kernel ring reports. */
+    private fun descriptorExecute(fd: Int, sub: UringSubmission): Int = when (sub.opcode) {
+        UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED -> {
+            val read = sub.opcode == UringOp.READ || sub.opcode == UringOp.READ_FIXED
+            val buffer = sub.buffer
+            when {
+                sub.len < 0 || sub.offset < -1L -> -22
+                buffer != null -> if (sub.len > buffer.remaining() || read && buffer.isReadOnly()) -22
+                    else JvmFileSyscalls.transfer(fd, buffer.array(), buffer.arrayOffset() + buffer.position(), sub.len, sub.offset, read)
+                        .also { if (it > 0) buffer.position(buffer.position() + it) }
+                sub.addr == 0L && sub.len != 0 -> -14
+                sub.memory?.let { !it.isOpen || sub.addr < it.address || sub.addr - it.address > it.length - sub.len } == true -> -22
+                else -> JvmFileSyscalls.transfer(fd, java.lang.foreign.MemorySegment.ofAddress(sub.addr).reinterpret(sub.len.toLong()), sub.len, sub.offset, read)
+            }
+        }
+        UringOp.GETDENTS -> {
+            val buffer = sub.buffer
+            if (buffer == null || buffer.isReadOnly() || sub.len < 0 || sub.len > buffer.remaining()) -22
+            else JvmFileSyscalls.getdents(fd, buffer.array(), buffer.arrayOffset() + buffer.position(), sub.len)
+                .also { if (it > 0) buffer.position(buffer.position() + it) }
+        }
+        UringOp.FSYNC -> if (sub.operationFlags and 1.inv() != 0) -22 else JvmFileSyscalls.fsync(fd, sub.operationFlags and 1 != 0)
+        UringOp.FTRUNCATE -> if (sub.offset < 0) -22 else JvmFileSyscalls.ftruncate(fd, sub.offset)
+        UringOp.FALLOCATE -> {
+            // Grow to offset+len without writing the interior, as the JDK-channel path does.
+            val want = sub.offset + sub.len
+            if (sub.offset < 0 || sub.len < 0) -22
+            else JvmFileSyscalls.size(fd).let { size ->
+                if (size < 0) size.toInt()
+                else if (want > size) JvmFileSyscalls.transfer(fd, byteArrayOf(0), 0, 1, want - 1, false).coerceAtMost(0)
+                else 0
+            }
+        }
+        UringOp.FADVISE -> when {
+            sub.offset < 0 || sub.len < 0 || sub.operationFlags !in 0..5 -> -22
+            sub.operationFlags != ADVICE_WILLNEED -> 0
+            else -> {
+                // WILLNEED reads the range through, as the JDK-channel path does; no residency is claimed.
+                val end = if (sub.len == 0) JvmFileSyscalls.size(fd) else sub.offset + sub.len
+                val scratch = ByteArray(4096)
+                var at = sub.offset
+                while (at < end) {
+                    val n = JvmFileSyscalls.transfer(fd, scratch, 0, minOf(4096L, end - at).toInt(), at, true)
+                    if (n <= 0) break
+                    at += n
+                }
+                0
+            }
+        }
+        else -> -95
     }
 
     /** JDK fallback: valid cache-policy hints are accepted; WILLNEED reads the requested range.
@@ -539,7 +628,11 @@ actual class FileImpl actual constructor(actual val id: Int) {
 }
 
 internal actual object FilesImpl {
-    actual fun open(path: String, readOnly: Boolean): FileImpl = FileImpl(jvmOpen(path, if (readOnly) 0L else 2L))
+    actual fun open(path: String, readOnly: Boolean): FileImpl {
+        val fd = jvmOpen(path, if (readOnly) 0L else 2L)
+        check(fd >= 0) { "open failed: $fd" }
+        return FileImpl(fd)
+    }
 }
 
 internal actual object ChannelsImpl {

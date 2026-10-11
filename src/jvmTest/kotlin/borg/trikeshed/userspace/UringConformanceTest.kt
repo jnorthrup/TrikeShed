@@ -29,25 +29,28 @@ class UringConformanceTest {
         val fd = UringFileConformance.one(facade, Submissions.openat(path.toString(), 0, 81)).res
         assertTrue(fd >= 0)
         try {
-            val storage = ByteArray(32) { 99 }
-            val buffer = ByteBuffer(storage).slice(2, 30).position(1)
-            val request = UringOp.Companion.UringSubmission(UringOp.STATX, fd, 0, 24, 0,
-                userData = 82, buffer = buffer)
-            assertEquals(24, UringFileConformance.one(facade, request).res)
-            assertEquals(25, buffer.position())
-            assertEquals(4L, buffer.order(borg.trikeshed.userspace.nio.ByteOrder.LITTLE_ENDIAN).getLong(1))
-            assertTrue(storage.take(3).all { it == 99.toByte() })
-            assertTrue(storage.drop(27).all { it == 99.toByte() })
-            val short = ByteBuffer(23)
-            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = short, userData = 83)).res)
-            assertEquals(0, short.position())
-            val readOnly = ByteBuffer(24).asReadOnlyBuffer()
-            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = readOnly, userData = 84)).res)
-            assertEquals(0, readOnly.position())
-            val invalid = ByteBuffer(24)
-            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = invalid, offset = 1, userData = 86)).res)
-            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = invalid, addr = 1, userData = 87)).res)
-            assertEquals(0, invalid.position())
+            // statx(fd, "", AT_EMPTY_PATH): the empty path's NUL, then struct statx.
+            val request = Submissions.statx(fd, "", UringOp.AT_EMPTY_PATH, UringOp.STATX_BASIC_STATS, 82)
+            assertEquals(0, UringFileConformance.one(facade, request).res)
+            val metadata = Statx.of(request)
+            assertEquals(4uL, metadata.stx_size)
+            assertEquals(UringOp.S_IFREG, metadata.stx_mode and UringOp.S_IFMT)
+            // The JDK's unix attribute view of the same file is the oracle for the other fields.
+            val unix = Files.readAttributes(path, "unix:mode,nlink,uid,ino,dev")
+            assertEquals(unix["mode"] as Int, metadata.stx_mode)
+            assertEquals((unix["nlink"] as Int).toUInt(), metadata.stx_nlink)
+            assertEquals((unix["uid"] as Int).toUInt(), metadata.stx_uid)
+            assertEquals((unix["ino"] as Long).toULong(), metadata.stx_ino)
+            val byPath = Submissions.statx(UringOp.AT_FDCWD, path.toString(), UringOp.AT_SYMLINK_NOFOLLOW, UringOp.STATX_BASIC_STATS, 83)
+            assertEquals(0, UringFileConformance.one(facade, byPath).res)
+            assertEquals(metadata.stx_ino, Statx.of(byPath).stx_ino)
+            assertEquals(metadata.stx_dev_major to metadata.stx_dev_minor, Statx.of(byPath).stx_dev_major to Statx.of(byPath).stx_dev_minor)
+            val short = request.copy(buffer = ByteBuffer(UringOp.STATX_SIZE), userData = 84)
+            assertEquals(-22, UringFileConformance.one(facade, short).res)
+            val readOnly = request.copy(buffer = ByteBuffer(1 + UringOp.STATX_SIZE).asReadOnlyBuffer(), userData = 85)
+            assertEquals(-22, UringFileConformance.one(facade, readOnly).res)
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = ByteBuffer(1 + UringOp.STATX_SIZE), addr = 1, userData = 86)).res)
+            assertEquals(-22, UringFileConformance.one(facade, request.copy(buffer = ByteBuffer(1 + UringOp.STATX_SIZE), operationFlags = 0x40000000, userData = 87)).res)
         } finally {
             try { UringFileConformance.one(facade, Submissions.close(fd, 85)) } finally {
                 backend.close()
@@ -240,6 +243,72 @@ class UringConformanceTest {
             backend.close()
             observer.close()
             Files.deleteIfExists(path)
+        }
+    }
+
+    /** MKDIRAT, OPENAT with a mode, RENAMEAT, UNLINKAT and GETDENTS, each checked against the JDK's view of the same tree. */
+    @Test
+    fun path_operations_and_getdents_agree_with_the_jdk() = runBlocking {
+        val root = Files.createTempDirectory("trikeshed-dirops-")
+        val backend = openUserspaceChannelBackend(8)
+        val facade = FunctionalUringFacade(8, backend)
+        suspend fun run(submission: UringOp.Companion.UringSubmission) = UringFileConformance.one(facade, submission).res
+        try {
+            val sub = root.resolve("sub")
+            assertEquals(0, run(Submissions.mkdirat(UringOp.AT_FDCWD, sub.toString(), 0x1c0, 1)))
+            assertEquals(-17, run(Submissions.mkdirat(UringOp.AT_FDCWD, sub.toString(), 0x1c0, 2)))
+            assertEquals("rwx------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(sub)))
+            val fd = run(Submissions.openat(root.resolve("a").toString(), UringOp.O_WRONLY or UringOp.O_CREAT or UringOp.O_EXCL, 3, 0x180))
+            assertTrue(fd >= 0, "OPENAT failed: $fd")
+            assertEquals(0, run(Submissions.close(fd, 4)))
+            assertEquals(-17, run(Submissions.openat(root.resolve("a").toString(), UringOp.O_WRONLY or UringOp.O_CREAT or UringOp.O_EXCL, 5, 0x180)))
+            assertEquals("rw-------", java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(root.resolve("a"))))
+            Files.write(root.resolve("b"), byteArrayOf(1))
+            assertEquals(0, run(Submissions.renameat(UringOp.AT_FDCWD, root.resolve("a").toString(), UringOp.AT_FDCWD, root.resolve("c").toString(), 0, 6)))
+            assertTrue(!Files.exists(root.resolve("a")) && Files.exists(root.resolve("c")))
+            assertEquals(-2, run(Submissions.renameat(UringOp.AT_FDCWD, root.resolve("a").toString(), UringOp.AT_FDCWD, root.resolve("d").toString(), 0, 7)))
+            Files.createSymbolicLink(root.resolve("link"), root.resolve("c"))
+            assertEquals(-40, run(Submissions.openat(root.resolve("link").toString(), UringOp.O_RDONLY or UringOp.O_NOFOLLOW, 8)))
+
+            // linux_dirent64 records: d_ino at 0, d_reclen at 16, d_type at 18, the NUL-terminated name at 19.
+            val dir = run(Submissions.openat(root.toString(), UringOp.O_RDONLY or UringOp.O_DIRECTORY, 9))
+            assertTrue(dir >= 0, "OPENAT failed: $dir")
+            val listed = mutableMapOf<String, Pair<Long, Int>>()
+            val bytes = ByteArray(64)
+            while (true) {
+                val count = run(Submissions.getdents(dir, ByteBuffer.wrap(bytes, 0, bytes.size), 10))
+                assertTrue(count >= 0, "GETDENTS failed: $count")
+                if (count == 0) break
+                val records = java.nio.ByteBuffer.wrap(bytes, 0, count).order(java.nio.ByteOrder.nativeOrder())
+                var at = 0
+                while (at < count) {
+                    var end = at + 19
+                    while (bytes[end] != 0.toByte()) end++
+                    listed[bytes.decodeToString(at + 19, end)] = records.getLong(at) to (bytes[at + 18].toInt() and 0xff)
+                    at += records.getShort(at + 16).toInt() and 0xffff
+                }
+            }
+            assertEquals(0, run(Submissions.close(dir, 11)))
+            listed.remove("."); listed.remove("..")
+            val expected = Files.list(root).use { names -> names.toList() }.associate { path ->
+                val type = when {
+                    Files.isSymbolicLink(path) -> 10
+                    Files.isDirectory(path) -> 4
+                    else -> 8
+                }
+                path.fileName.toString() to ((Files.getAttribute(path, "unix:ino", java.nio.file.LinkOption.NOFOLLOW_LINKS) as Long) to type)
+            }
+            assertEquals(expected, listed)
+
+            assertEquals(0, run(Submissions.unlinkat(UringOp.AT_FDCWD, root.resolve("b").toString(), 0, 12)))
+            assertTrue(!Files.exists(root.resolve("b")))
+            // unlink(2) of a directory: EISDIR on Linux, EPERM on Darwin.
+            assertEquals(if (JvmFileSyscalls.linux) -21 else -1, run(Submissions.unlinkat(UringOp.AT_FDCWD, sub.toString(), 0, 13)))
+            assertEquals(0, run(Submissions.unlinkat(UringOp.AT_FDCWD, sub.toString(), UringOp.AT_REMOVEDIR, 14)))
+            assertTrue(!Files.exists(sub))
+        } finally {
+            backend.close()
+            Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }
         }
     }
 }

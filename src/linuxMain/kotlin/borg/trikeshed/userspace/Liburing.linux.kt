@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(kotlin.experimental.ExperimentalNativeApi::class, kotlinx.cinterop.ExperimentalForeignApi::class)
 
 package borg.trikeshed.userspace
 
@@ -297,7 +297,19 @@ internal class LinuxLiburingFacade : LiburingFacade {
             val ptr = address.toCPointer<ByteVar>()
             when (sub.opcode) {
                 UringOp.NOP -> zlinux_uring.io_uring_prep_nop(sqe)
-                UringOp.OPENAT -> zlinux_uring.io_uring_prep_openat(sqe, sub.fd, ptr, sub.offset.toInt(), 438u)
+                UringOp.OPENAT -> zlinux_uring.io_uring_prep_openat(sqe, sub.fd, ptr, openFlags(sub.offset.toInt()), sub.operationFlags.toUInt())
+                UringOp.STATX -> zlinux_uring.io_uring_prep_statx(sqe, sub.fd, ptr, sub.operationFlags, sub.offset.toUInt(),
+                    (address + sub.len + 1).toCPointer<zlinux_uring.statx>())
+                UringOp.MKDIRAT -> zlinux_uring.io_uring_prep_mkdirat(sqe, sub.fd, ptr, sub.operationFlags.toUInt())
+                UringOp.UNLINKAT -> zlinux_uring.io_uring_prep_unlinkat(sqe, sub.fd, ptr, sub.operationFlags)
+                UringOp.RENAMEAT -> {
+                    // Both paths ride NUL-separated in the one copied buffer.
+                    val window = requireNotNull(sub.buffer)
+                    val start = window.arrayOffset() + window.position()
+                    val split = (0 until sub.len).first { window.array()[start + it] == 0.toByte() }
+                    zlinux_uring.io_uring_prep_renameat(sqe, sub.fd, ptr, sub.offset.toInt(),
+                        (address + split + 1).toCPointer<ByteVar>(), sub.operationFlags.toUInt())
+                }
                 UringOp.READ -> io_uring_prep_read(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
                 UringOp.WRITE -> io_uring_prep_write(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
                 UringOp.READ_FIXED -> zlinux_uring.io_uring_prep_read_fixed(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong(), sub.bufferIndex)
@@ -313,6 +325,11 @@ internal class LinuxLiburingFacade : LiburingFacade {
             }
         }
     }
+
+    /** The facade's asm-generic O_* values in this kernel ABI's numbering: arm64 moves O_DIRECTORY and O_NOFOLLOW. */
+    fun openFlags(flags: Int): Int = if (Platform.cpuArchitecture != CpuArchitecture.ARM64) flags
+        else (flags and (UringOp.O_DIRECTORY or UringOp.O_NOFOLLOW).inv()) or
+            (if (flags and UringOp.O_DIRECTORY != 0) 0x4000 else 0) or (if (flags and UringOp.O_NOFOLLOW != 0) 0x8000 else 0)
 
     private inline fun prepare(userData: Long, block: (CPointer<zlinux_uring.io_uring_sqe>) -> Unit): Result<Unit> {
         val currentRing = ring ?: return failure("liburing ring is not open")

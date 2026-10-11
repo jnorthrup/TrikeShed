@@ -679,3 +679,13 @@ public class FunctionalUringFacade(
         return admitted.toTypedArray()
     }
 }
+
+/** Settles one [submission] through this ring synchronously: its CQE result, a count or -errno. */
+fun FunctionalUringFacade.execute(submission: UringSubmission): Int {
+    enqueue(submission)
+    submit()
+    val completion = wait(1).singleOrNull()
+    if (completion == null || completion.userData != submission.userData)
+        throw borg.trikeshed.userspace.nio.IOException("Invalid ${submission.opcode} completion for token ${submission.userData}")
+    return completion.res
+}

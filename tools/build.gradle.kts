@@ -77,3 +77,8 @@ for (classpath in listOf("jvmCompileClasspath", "jvmRuntimeClasspath", "jvmTestC
         attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
     }
 }
+
+// File and socket effects reach libc through FFM (JvmFileSyscalls, JvmSocketSyscalls); without native access the
+// JDK writes its restricted-method warning to stderr, which the tools' stderr parity with the Rust binaries forbids.
+tasks.withType<Test>().configureEach { jvmArgs("--enable-native-access=ALL-UNNAMED") }
+tasks.withType<JavaExec>().configureEach { jvmArgs("--enable-native-access=ALL-UNNAMED") }

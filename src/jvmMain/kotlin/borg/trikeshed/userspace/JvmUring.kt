@@ -21,15 +21,16 @@ internal object JvmUring {
     external fun size(fd: Int): Long
 }
 
+/** An operating-system descriptor, opened by the kernel ring or by [JvmFileSyscalls]. */
 internal class JvmNativeDescriptor(val fd: Int) : JvmDescriptor {
     @Volatile private var open = true
     @Synchronized
     override fun close() {
-        if (open) { open = false; JvmUring.closeFd(fd) }
+        if (open) { open = false; JvmFileSyscalls.close(fd) }
     }
     fun completedClose() { open = false }
     override fun isOpen(): Boolean = open
-    override fun size(): Long = if (open) JvmUring.size(fd) else -1L
+    override fun size(): Long = if (open) JvmFileSyscalls.size(fd) else -1L
 }
 
 internal fun jvmNativeChannelBackend(handle: Long): UserspaceChannelBackend = JvmNativeChannelBackend(handle)
@@ -69,16 +70,19 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         if (sub.len < 0) return -22
-        if (sub.opcode in setOf(UringOp.SOCKET, UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.POLL_REMOVE))
+        if (sub.opcode in setOf(UringOp.SOCKET, UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.GETDENTS, UringOp.POLL_REMOVE))
             return legacy.execute(sub)
         // MADVISE addresses the process VM and remains valid after the originating fd closes.
         if (sub.opcode == UringOp.MADVISE) return nativeExecute(sub, -1)
+        // A STATX path resolves from AT_FDCWD; only AT_EMPTY_PATH reads a descriptor.
+        val pathStatx = sub.opcode == UringOp.STATX && sub.fd == UringOp.AT_FDCWD && sub.len > 0
         val descriptor = JvmFileTable.descriptor(sub.fd)
         if (descriptor is JvmChannelDescriptor || descriptor is JvmSocketDescriptor) return legacy.execute(sub)
-        if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && descriptor !is JvmNativeDescriptor) return -9
+        if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && !pathStatx && descriptor !is JvmNativeDescriptor) return -9
         val buffer = sub.buffer
-        if (sub.opcode == UringOp.STATX &&
-            (buffer == null || buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.offset != 0L || sub.addr != 0L)) return -22
+        if (sub.opcode == UringOp.STATX && (buffer == null || buffer.isReadOnly() || sub.addr != 0L || sub.offset !in 0..0xffffffffL ||
+                buffer.remaining() - sub.len < 1 + UringOp.STATX_SIZE ||
+                buffer.array()[buffer.arrayOffset() + buffer.position() + sub.len] != 0.toByte())) return -22
         if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.OPENAT) {
             if (sub.opcode == UringOp.OPENAT && buffer == null) return -22
             if (buffer != null && sub.len > buffer.remaining()) return -22
@@ -101,7 +105,7 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
                 (descriptor as JvmNativeDescriptor).completedClose()
                 JvmFileTable.close(sub.fd)
             }
-            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.STATX)) {
+            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE)) {
                 buffer.position(buffer.position() + result)
             }
         }

@@ -6,6 +6,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
 import kotlin.js.jsTypeOf
 import kotlin.coroutines.resume
@@ -90,19 +91,47 @@ private fun UringSubmission.nodePath(): String {
 }
 
 /** Encode the facade metadata payload without changing the caller's byte order. */
-private fun jsStatxResult(sub: UringSubmission, size: Long, mtime: Long, kind: Long): Int {
-    if (size < 0) return if (size >= Int.MIN_VALUE.toLong()) size.toInt() else -5
+/**
+ * The descriptor form of STATX (an empty path with AT_EMPTY_PATH): the path's NUL, then struct statx
+ * in host order. A path is -EOPNOTSUPP here.
+ */
+private fun jsStatxInvalid(sub: UringSubmission): Int? {
     val buffer = sub.buffer ?: return -22
-    if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
-    buffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).putLong(size).putLong(mtime).putLong(kind)
-    buffer.position(buffer.position() + 24)
-    return 24
+    if (buffer.isReadOnly() || sub.addr != 0L || sub.offset !in 0L..0xffffffffL || buffer.remaining() - sub.len < 1 + UringOp.STATX_SIZE ||
+        buffer.array()[buffer.arrayOffset() + buffer.position() + sub.len] != 0.toByte() ||
+        sub.operationFlags and (UringOp.AT_SYMLINK_NOFOLLOW or UringOp.AT_EMPTY_PATH or 0x800).inv() != 0) return -22
+    if (sub.len != 0 || sub.operationFlags and UringOp.AT_EMPTY_PATH == 0) return -95
+    return null
 }
 
-private fun jsStatxResult(sub: UringSubmission, metadata: dynamic): Int = jsStatxResult(
-    sub, metadata.size.toString().toLong(), (metadata.mtimeMs as Double).toLong(),
-    if (metadata.isFile() as Boolean) 1L else if (metadata.isDirectory() as Boolean) 2L else 0L,
-)
+private fun jsStatxResult(sub: UringSubmission, mask: Int, fill: (ByteBuffer) -> Unit): Int {
+    jsStatxInvalid(sub)?.let { return it }
+    val buffer = sub.buffer!!
+    val statx = ByteBuffer.wrap(buffer.array(), buffer.arrayOffset() + buffer.position() + 1, UringOp.STATX_SIZE).order(ByteOrder.nativeOrder())
+    for (at in 0 until UringOp.STATX_SIZE step 8) statx.putLong(at, 0L)
+    statx.putInt(0x00, mask)
+    fill(statx)
+    return 0
+}
+
+private fun jsStatxResult(sub: UringSubmission, metadata: dynamic): Int = jsStatxResult(sub, 0x71f) { statx ->
+    fun field(name: String): Long = metadata[name].toString().toLong()
+    val linux = js("typeof process !== 'undefined' && process.platform === 'linux'") as Boolean
+    fun major(dev: Long): Int = if (linux) (((dev ushr 8) and 0xfff) or ((dev ushr 32) and 0xfffff000L)).toInt() else ((dev ushr 24) and 0xff).toInt()
+    fun minor(dev: Long): Int = if (linux) ((dev and 0xff) or ((dev ushr 12) and 0xffffff00L)).toInt() else (dev and 0xffffff).toInt()
+    statx.putInt(0x04, field("blksize").toInt())
+    statx.putInt(0x10, field("nlink").toInt())
+    statx.putInt(0x14, field("uid").toInt())
+    statx.putInt(0x18, field("gid").toInt())
+    statx.putShort(0x1c, field("mode").toShort())
+    statx.putLong(0x20, field("ino"))
+    statx.putLong(0x28, field("size"))
+    statx.putLong(0x30, field("blocks"))
+    statx.putInt(0x80, major(field("rdev")))
+    statx.putInt(0x84, minor(field("rdev")))
+    statx.putInt(0x88, major(field("dev")))
+    statx.putInt(0x8c, minor(field("dev")))
+}
 
 actual class FileImpl actual constructor(actual val id: Int) {
     actual fun isOpen(): Boolean = JsFileTable.descriptor(id) != null
@@ -152,10 +181,7 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
             if (sub.len < 0 || sub.len > buffer.remaining() || sub.offset < -1 || sub.offset > 9007199254740991L) return -22
             if (sub.opcode == UringOp.READ && buffer.isReadOnly()) return -22
         }
-        if (sub.opcode == UringOp.STATX) {
-            val buffer = sub.buffer ?: return -22
-            if (buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
-        }
+        if (sub.opcode == UringOp.STATX) jsStatxInvalid(sub)?.let { return it }
         if (sub.opcode == UringOp.FTRUNCATE && (sub.offset < 0 || sub.offset > 9007199254740991L)) return -22
         return 0
     }
@@ -324,17 +350,20 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
         if (closed) return -9
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         // ABI1 fixes OPENAT's creation mode at 0666 and carries no raw address.
-        if (sub.addr != 0L || sub.operationFlags != (if (sub.opcode == UringOp.OPENAT) 438 else 0)) return -95
+        if (sub.addr != 0L || sub.operationFlags != (if (sub.opcode == UringOp.OPENAT) 438 else if (sub.opcode == UringOp.STATX) sub.operationFlags else 0)) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         val descriptor = JsFileTable.descriptor(sub.fd)
         if (descriptor != null && descriptor.module == null) return emulated.execute(sub)
         if (sub.opcode != UringOp.NOP && sub.opcode != UringOp.OPENAT && descriptor == null) return -9
         val buffer = sub.buffer
         if (sub.opcode == UringOp.STATX) {
-            if (buffer == null || buffer.isReadOnly() || sub.len < 24 || sub.len > buffer.remaining() || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L) return -22
+            jsStatxInvalid(sub)?.let { return it }
             return try {
-                if (jsTypeOf(module.size) == "function") jsStatxResult(sub, module.size(descriptor!!.fd).toString().toLong(), 0L, 0L)
-                else jsStatxResult(sub, nodeFs.fstatSync(descriptor!!.fd))
+                if (jsTypeOf(module.size) == "function") {
+                    val size = module.size(descriptor!!.fd).toString().toLong()
+                    if (size < 0) (if (size >= Int.MIN_VALUE.toLong()) size.toInt() else -5)
+                    else jsStatxResult(sub, 0x200) { it.putLong(0x28, size) }
+                } else jsStatxResult(sub, nodeFs.fstatSync(descriptor!!.fd))
             } catch (failure: dynamic) { jsIoError(failure) }
         }
         if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE || sub.opcode == UringOp.OPENAT) {

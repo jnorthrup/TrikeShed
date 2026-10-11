@@ -1,13 +1,14 @@
 package borg.trikeshed.userspace.nio.channels
 
 import borg.trikeshed.userspace.FunctionalUringFacade
+import borg.trikeshed.userspace.Statx
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.execute
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.UringIOException
-import borg.trikeshed.userspace.nio.ByteOrder
 
 internal class UringFileChannel(
     private val file: File,
@@ -100,9 +101,11 @@ internal class UringFileChannel(
     override fun position(): Long { checkOpen(); return pos }
     override fun position(newPosition: Long): FileChannel { checkOpen(); require(newPosition >= 0); pos = newPosition; return this }
     override fun size(): Long {
-        val metadata = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)
-        if (execute(UringOp.STATX, metadata) != 24) throw IOException("Invalid STATX metadata width")
-        return metadata.getLong(0).also { if (it < 0) throw IOException("File size unavailable") }
+        checkOpen()
+        val statx = UringOp.Companion.Submissions.statx(file.id, "", UringOp.AT_EMPTY_PATH, UringOp.STATX_BASIC_STATS, nextToken++)
+        val result = channel.execute(statx)
+        if (result != 0) throw UringIOException(UringOp.STATX, result)
+        return Statx.of(statx).stx_size.toLong().also { if (it < 0) throw IOException("File size unavailable") }
     }
 
     override fun truncate(size: Long): FileChannel {

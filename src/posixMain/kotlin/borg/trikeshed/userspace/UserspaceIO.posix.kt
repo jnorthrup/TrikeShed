@@ -1,4 +1,4 @@
-@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class)
+@file:OptIn(kotlinx.cinterop.ExperimentalForeignApi::class, kotlin.experimental.ExperimentalNativeApi::class)
 
 package borg.trikeshed.userspace
 
@@ -8,6 +8,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
+import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -29,7 +30,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     private var closed = false
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
         UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.FSYNC, UringOp.FTRUNCATE,
-        UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
+        UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
+        UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.GETDENTS)
+    /** Directory streams GETDENTS continues, by descriptor; CLOSE of the descriptor ends one. */
+    private val directories = mutableMapOf<Int, CPointer<DIR>>()
     override val nativeCapabilities: Long get() = native.capabilities
     override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
@@ -159,16 +163,23 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
         if (sub.opcode in bufferOps) {
             if (buffer == null) return -22
             if (sub.len > buffer.remaining()) return -22
-            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX) && buffer.isReadOnly()) return -22
+            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX ||
+                    sub.opcode == UringOp.GETDENTS) && buffer.isReadOnly()) return -22
         }
         if (sub.opcode in positioned && sub.offset < -1) return -22
-        if (sub.opcode == UringOp.STATX && (sub.len < 24 || sub.operationFlags != 0 || sub.offset != 0L || sub.addr != 0L)) return -22
+        if (sub.opcode == UringOp.STATX) {
+            // The path's len bytes, its NUL, then the struct statx this call writes.
+            val start = buffer!!.arrayOffset() + buffer.position()
+            if (sub.addr != 0L || sub.offset !in 0L..0xffffffffL || buffer.remaining() - sub.len < 1 + UringOp.STATX_SIZE ||
+                buffer.array()[start + sub.len] != 0.toByte() || (start until start + sub.len).any { buffer.array()[it] == 0.toByte() } ||
+                sub.operationFlags and (UringOp.AT_SYMLINK_NOFOLLOW or UringOp.AT_EMPTY_PATH or 0x800).inv() != 0) return -22
+        }
+        if (sub.opcode in pathOps && (sub.len == 0 || sub.addr != 0L)) return -22
         if (sub.opcode == UringOp.FTRUNCATE && sub.offset < 0) return -22
         if (sub.opcode == UringOp.OPENAT) {
             if (sub.len == 0 || sub.offset < 0 || sub.offset > Int.MAX_VALUE || sub.offset.toInt() and OPEN_FLAGS.inv() != 0) return -22
             val flags = sub.offset.toInt()
-            if (flags and 3 == 3 || flags and 128 != 0 && flags and 64 == 0 ||
-                flags and (64 or 128 or 512) != 0 && flags and 3 == 0) return -22
+            if (flags and 3 == 3 || sub.operationFlags !in 0..4095) return -22
             val start = buffer!!.arrayOffset() + buffer.position()
             if ((start until start + sub.len).any { buffer.array()[it] == 0.toByte() }) return -22
         }
@@ -271,16 +282,31 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
             UringOp.FADVISE -> native.fadvise(sub.fd, sub.offset, sub.len, sub.operationFlags)
             UringOp.MADVISE -> adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
             UringOp.OPENAT -> {
-                val start = buffer!!.arrayOffset() + buffer.position()
-                val path = buffer.array().decodeToString(start, start + sub.len)
+                val path = sub.paths().single()
                 val flags = sub.offset.toInt()
                 val mode = when (flags and 3) { 0 -> O_RDONLY; 1 -> O_WRONLY; 2 -> O_RDWR; else -> return -22 }
-                val hostFlags = mode or (if (flags and 64 != 0) O_CREAT else 0) or
-                    (if (flags and 128 != 0) O_EXCL else 0) or (if (flags and 512 != 0) O_TRUNC else 0) or
-                    (if (flags and 1024 != 0) O_APPEND else 0)
-                if (sub.fd != -100) return -95
-                posixCompletion(open(path, hostFlags, 438u))
+                fun bit(flag: Int, host: Int) = if (flags and flag != 0) host else 0
+                val hostFlags = mode or bit(UringOp.O_CREAT, O_CREAT) or bit(UringOp.O_EXCL, O_EXCL) or bit(UringOp.O_TRUNC, O_TRUNC) or
+                    bit(UringOp.O_APPEND, O_APPEND) or bit(UringOp.O_NONBLOCK, O_NONBLOCK) or bit(UringOp.O_DIRECTORY, O_DIRECTORY) or
+                    bit(UringOp.O_NOFOLLOW, O_NOFOLLOW) or bit(UringOp.O_CLOEXEC, O_CLOEXEC)
+                if (sub.fd != UringOp.AT_FDCWD) return -95
+                posixCompletion(open(path, hostFlags, sub.operationFlags.toUInt()))
             }
+            // Path syscalls resolve from the working directory (AT_FDCWD); renameat's two paths are
+            // NUL-separated in the one buffer, as an SQE has one address.
+            UringOp.MKDIRAT -> if (sub.fd != UringOp.AT_FDCWD) -95 else if (sub.operationFlags !in 0..4095) -22
+                else posixCompletion(mkdir(sub.paths().single(), sub.operationFlags.convert()))
+            UringOp.UNLINKAT -> if (sub.fd != UringOp.AT_FDCWD) -95 else when (sub.operationFlags) {
+                0 -> posixCompletion(unlink(sub.paths().single()))
+                UringOp.AT_REMOVEDIR -> posixCompletion(rmdir(sub.paths().single()))
+                else -> -22
+            }
+            UringOp.RENAMEAT -> {
+                val paths = sub.paths()
+                if (paths.size != 2) -22 else if (sub.fd != UringOp.AT_FDCWD || sub.offset != UringOp.AT_FDCWD.toLong()) -95
+                else if (sub.operationFlags != 0) -22 else posixCompletion(rename(paths[0], paths[1]))
+            }
+            UringOp.GETDENTS -> getdents(sub.fd, buffer!!.array(), buffer.arrayOffset() + buffer.position(), sub.len)
             UringOp.READ, UringOp.WRITE -> {
                 val bytes = buffer!!.array()
                 val start = buffer.arrayOffset() + buffer.position()
@@ -296,24 +322,88 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
                 }
             }
             UringOp.STATX -> memScoped {
+                // statx(2) where the host has it is the kernel ring's; here fstat, stat or lstat
+                // fill struct statx in host order, without timestamps (stx_mask says which fields).
                 val metadata = alloc<stat>()
-                val status = posixCompletion(fstat(sub.fd, metadata.ptr))
+                val path = if (sub.len == 0) "" else sub.paths().single()
+                val status = when {
+                    path.isEmpty() && sub.operationFlags and UringOp.AT_EMPTY_PATH == 0 -> -2
+                    path.isEmpty() -> posixCompletion(fstat(sub.fd, metadata.ptr))
+                    sub.fd != UringOp.AT_FDCWD -> -95
+                    sub.operationFlags and UringOp.AT_SYMLINK_NOFOLLOW != 0 -> posixCompletion(lstat(path, metadata.ptr))
+                    else -> posixCompletion(stat(path, metadata.ptr))
+                }
                 if (status < 0) status else {
-                    val kind = when (metadata.st_mode.toInt() and S_IFMT.toInt()) {
-                        S_IFREG.toInt() -> 1L
-                        S_IFDIR.toInt() -> 2L
-                        else -> 0L
-                    }
-                    // The portable payload is size, mtime millis (unavailable here), and file kind.
-                    buffer!!.duplicate().order(ByteOrder.LITTLE_ENDIAN)
-                        .putLong(metadata.st_size).putLong(0L).putLong(kind)
-                    24
+                    val dev = metadata.st_dev.toLong()
+                    val rdev = metadata.st_rdev.toLong()
+                    val statx = buffer!!.array().let { ByteBuffer.wrap(it, buffer.arrayOffset() + buffer.position() + sub.len + 1, UringOp.STATX_SIZE) }
+                        .order(ByteOrder.nativeOrder())
+                    for (at in 0 until UringOp.STATX_SIZE step 8) statx.putLong(at, 0L)
+                    statx.putInt(0x00, 0x71f)
+                    statx.putInt(0x04, metadata.st_blksize.toInt())
+                    statx.putInt(0x10, metadata.st_nlink.toInt())
+                    statx.putInt(0x14, metadata.st_uid.toInt())
+                    statx.putInt(0x18, metadata.st_gid.toInt())
+                    statx.putShort(0x1c, metadata.st_mode.toShort())
+                    statx.putLong(0x20, metadata.st_ino.toLong())
+                    statx.putLong(0x28, metadata.st_size)
+                    statx.putLong(0x30, metadata.st_blocks)
+                    statx.putInt(0x80, major(rdev))
+                    statx.putInt(0x84, minor(rdev))
+                    statx.putInt(0x88, major(dev))
+                    statx.putInt(0x8c, minor(dev))
+                    0
                 }
             }
             UringOp.FSYNC -> PosixUringIO.fsync(sub.fd)
             UringOp.FTRUNCATE -> PosixUringIO.ftruncate(sub.fd, sub.offset)
-            UringOp.CLOSE -> PosixUringIO.closeFd(sub.fd)
+            UringOp.CLOSE -> {
+                directories.remove(sub.fd)?.let { closedir(it) }
+                PosixUringIO.closeFd(sub.fd)
+            }
             else -> -95
+        }
+    }
+
+    /** dev_t halves: Darwin's 8-bit major over 24-bit minor, glibc's split 12/20 and 32/32 layout. */
+    private fun major(dev: Long): Int = if (Platform.osFamily == OsFamily.LINUX)
+        (((dev ushr 8) and 0xfff) or ((dev ushr 32) and 0xfffff000L)).toInt()
+    else ((dev ushr 24) and 0xff).toInt()
+
+    private fun minor(dev: Long): Int = if (Platform.osFamily == OsFamily.LINUX)
+        ((dev and 0xff) or ((dev ushr 12) and 0xffffff00L)).toInt()
+    else (dev and 0xffffff).toInt()
+
+    /**
+     * getdents64 over the host's directory stream: linux_dirent64 records (d_ino, d_off, d_reclen,
+     * d_type, d_name) into [length] bytes at [start]; 0 at the end. An entry that does not fit is
+     * read again by the next call.
+     */
+    private fun getdents(fd: Int, bytes: ByteArray, start: Int, length: Int): Int {
+        val dir = directories[fd] ?: run {
+            val copy = dup(fd)
+            if (copy < 0) return posixCompletion(copy)
+            fdopendir(copy)?.also { directories[fd] = it } ?: return posixCompletion(-1).also { close(copy) }
+        }
+        val records = ByteBuffer.wrap(bytes, start, length).order(ByteOrder.nativeOrder())
+        var written = 0
+        while (true) {
+            val position = telldir(dir)
+            set_posix_errno(0)
+            val entry = readdir(dir)?.pointed ?: return if (posix_errno() != 0) posixCompletion(-1) else written
+            val name = entry.d_name.toKString().encodeToByteArray()
+            val size = (19 + name.size + 1 + 7) and 7.inv()
+            if (written + size > length) {
+                seekdir(dir, position)
+                return if (written == 0) -22 else written
+            }
+            records.putLong(written, entry.d_ino.toLong())
+            records.putLong(written + 8, 0L)
+            records.putShort(written + 16, size.toShort())
+            records.put(written + 18, entry.d_type.toByte())
+            name.copyInto(bytes, start + written + 19)
+            for (pad in written + 19 + name.size until written + size) records.put(pad, 0.toByte())
+            written += size
         }
     }
 
@@ -332,15 +422,24 @@ private class PosixUserspaceChannelBackend(private val entries: Int) : Userspace
     }
 
     private companion object {
-        const val OPEN_FLAGS = 3 or 64 or 128 or 512 or 1024
-        val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
-        val bufferOps = setOf(UringOp.OPENAT, UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX)
+        const val OPEN_FLAGS = 3 or UringOp.O_CREAT or UringOp.O_EXCL or UringOp.O_TRUNC or UringOp.O_APPEND or UringOp.O_NONBLOCK or
+            UringOp.O_DIRECTORY or UringOp.O_NOFOLLOW or UringOp.O_CLOEXEC
+        val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.GETDENTS)
+        val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+        val bufferOps = pathOps + setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.GETDENTS)
         val barriers = setOf(UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.STATX)
         val positioned = setOf(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
         val memoryOps = positioned + UringOp.MADVISE
         val reads = setOf(UringOp.READ, UringOp.READ_FIXED, UringOp.RECV)
         val writes = setOf(UringOp.WRITE, UringOp.WRITE_FIXED, UringOp.SEND)
     }
+}
+
+/** The submission's NUL-separated paths, each without a NUL of its own. */
+internal fun UringSubmission.paths(): List<String> {
+    val bytes = requireNotNull(buffer)
+    val start = bytes.arrayOffset() + bytes.position()
+    return bytes.array().decodeToString(start, start + len).split('\u0000')
 }
 
 /** Translate host errno values to Linux CQE values, including Darwin's differing numbers. */

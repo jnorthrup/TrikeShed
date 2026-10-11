@@ -46,13 +46,16 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
             val token = ++nextUserData
             check(token > 0) { "io_uring request identifiers exhausted" }
             val buffer = submission.buffer
-            val bytes = if (submission.opcode == UringOp.OPENAT && buffer != null) {
+            // Path operations get their own NUL-terminated copy; STATX keeps the caller's window,
+            // which already holds the path's NUL and the struct statx the kernel writes.
+            val copied = submission.opcode in pathOps
+            val bytes = if (copied && buffer != null) {
                 ByteArray(submission.len + 1).also {
                     buffer.array().copyInto(it, 0, buffer.arrayOffset() + buffer.position(),
                         buffer.arrayOffset() + buffer.position() + submission.len)
                 }
             } else buffer?.array()
-            val start = if (submission.opcode == UringOp.OPENAT) 0 else
+            val start = if (copied) 0 else
                 (buffer?.arrayOffset() ?: 0) + (buffer?.position() ?: 0)
             val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
             val prepared = runCatching {
@@ -153,8 +156,10 @@ internal actual class NativeUringAdapter actual constructor(entries: Int) {
     }
 
     private companion object {
+        val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
         val encoded = setOf(UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
             UringOp.SEND, UringOp.RECV, UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE,
-            UringOp.READ_FIXED, UringOp.WRITE_FIXED, UringOp.FADVISE, UringOp.MADVISE)
+            UringOp.READ_FIXED, UringOp.WRITE_FIXED, UringOp.FADVISE, UringOp.MADVISE,
+            UringOp.STATX, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
     }
 }

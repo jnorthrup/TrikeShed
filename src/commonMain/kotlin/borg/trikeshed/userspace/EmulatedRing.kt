@@ -118,10 +118,10 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         stage(UringSubmission(UringOp.MADVISE, -1, addr, length, 0L, userData = userData, operationFlags = advice))
 
     override fun prepRenameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.RENAMEAT, oldDfd, 0L, oldPath.length, newDfd.toLong(), userData = userData, buffer = paths(oldPath, newPath), operationFlags = flags))
+        runCatching { UringOp.Companion.Submissions.renameat(oldDfd, oldPath, newDfd, newPath, flags, userData) }.mapCatching { stage(it).getOrThrow() }
 
     override fun prepUnlinkat(dfd: Int, path: String, flags: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.UNLINKAT, dfd, 0L, path.length, 0L, userData = userData, buffer = paths(path), operationFlags = flags))
+        runCatching { UringOp.Companion.Submissions.unlinkat(dfd, path, flags, userData) }.mapCatching { stage(it).getOrThrow() }
 
     private var registeredBuffers: Series<ByteBuffer>? = null
     private var registeredMemory: Series<MemoryMapping>? = null
@@ -207,7 +207,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     }
 
     override fun prepMkdirat(dfd: Int, path: String, mode: Int, userData: Long): Result<Unit> =
-        stage(UringSubmission(UringOp.MKDIRAT, dfd, 0L, path.length, 0L, userData = userData, buffer = paths(path), operationFlags = mode))
+        runCatching { UringOp.Companion.Submissions.mkdirat(dfd, path, mode, userData) }.mapCatching { stage(it).getOrThrow() }
 
     override fun submit(): Result<Int> = runCatching {
         check(capacity > 0 && !closed && !executing) { "ring is not available for submission" }

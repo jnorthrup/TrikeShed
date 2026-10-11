@@ -4,7 +4,11 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.context.BitMasked
 import borg.trikeshed.context.or
+import borg.trikeshed.userspace.UringOp.Companion.STATX_SIZE
+import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteOrder
+import kotlin.jvm.JvmInline
 
 /**
  * Supported portable subset of linux/io_uring.h IORING_OP_* codes (liburing 2.15).
@@ -94,6 +98,34 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
 
         fun caps(vararg ops: UringOp): Long = ops.fold(0L) { acc: Long, op: UringOp -> op or acc }
 
+        // Linux asm-generic open, *at and statx values: the flag vocabulary of every backend,
+        // which translates them to its host's numbering.
+        const val O_RDONLY: Int = 0
+        const val O_WRONLY: Int = 1
+        const val O_RDWR: Int = 2
+        const val O_CREAT: Int = 0x40
+        const val O_EXCL: Int = 0x80
+        const val O_TRUNC: Int = 0x200
+        const val O_APPEND: Int = 0x400
+        const val O_NONBLOCK: Int = 0x800
+        const val O_DIRECTORY: Int = 0x10000
+        const val O_NOFOLLOW: Int = 0x20000
+        const val O_CLOEXEC: Int = 0x80000
+        const val AT_FDCWD: Int = -100
+        const val AT_SYMLINK_NOFOLLOW: Int = 0x100
+        const val AT_REMOVEDIR: Int = 0x200
+        const val AT_EMPTY_PATH: Int = 0x1000
+        const val STATX_BASIC_STATS: Int = 0x7ff
+        const val S_IFMT: Int = 0xf000
+        const val S_IFDIR: Int = 0x4000
+        const val S_IFREG: Int = 0x8000
+        const val DT_UNKNOWN: Int = 0
+        const val DT_REG: Int = 8
+        const val LOCK_EX: Int = 2
+        const val LOCK_NB: Int = 4
+        /** sizeof(struct statx). */
+        const val STATX_SIZE: Int = 256
+
         /**
          * Common submission contract crossing [FunctionalUringFacade].
          * [flags] holds IOSQE flags; [operationFlags] holds the opcode-specific
@@ -116,12 +148,12 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
 
         /** Convenience constructors. */
         object Submissions {
-            /** Portable OPENAT path bytes; flags use Linux O_RDONLY/O_RDWR/O_CREAT/O_TRUNC. */
-            fun openat(path: String, flags: Int = 0, userData: Long = 0): UringSubmission {
+            /** Portable OPENAT path bytes; flags use the Linux O_* values above, [mode] the creation permissions. */
+            fun openat(path: String, flags: Int = 0, userData: Long = 0, mode: Int = 438): UringSubmission {
                 require(path.isNotEmpty() && '\u0000' !in path)
                 val bytes = path.encodeToByteArray()
-                return UringSubmission(OPENAT, -100, 0, bytes.size, flags.toLong(),
-                    userData = userData, buffer = ByteBuffer(bytes), operationFlags = 438)
+                return UringSubmission(OPENAT, AT_FDCWD, 0, bytes.size, flags.toLong(),
+                    userData = userData, buffer = ByteBuffer(bytes), operationFlags = mode)
             }
 
             fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =
@@ -137,8 +169,39 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
                     userData = userData, operationFlags = advice, memory = memory)
             }
 
-            fun statx(fd: Int, bufAddr: Long, userData: Long): UringSubmission =
-                UringSubmission(STATX, fd, bufAddr, 256, 0, 0, userData)
+            /**
+             * io_uring_prep_statx(dfd, path, flags, mask, statxbuf): the window holds the path's
+             * [UringSubmission.len] bytes, its NUL and the [STATX_SIZE] bytes the kernel writes, so one
+             * pinned buffer carries both of liburing's pointers. An empty path with AT_EMPTY_PATH
+             * reads [dfd] itself. Read the result with [Statx.of].
+             */
+            fun statx(dfd: Int, path: String, flags: Int, mask: Int, userData: Long): UringSubmission {
+                require('\u0000' !in path)
+                val bytes = path.encodeToByteArray()
+                return UringSubmission(STATX, dfd, 0, bytes.size, mask.toLong(), userData = userData,
+                    buffer = ByteBuffer(bytes.copyOf(bytes.size + 1 + STATX_SIZE)), operationFlags = flags)
+            }
+
+            /** io_uring_prep_mkdirat(dfd, path, mode). */
+            fun mkdirat(dfd: Int, path: String, mode: Int, userData: Long): UringSubmission = paths(MKDIRAT, dfd, 0, mode, userData, path)
+
+            /** io_uring_prep_unlinkat(dfd, path, flags). */
+            fun unlinkat(dfd: Int, path: String, flags: Int, userData: Long): UringSubmission = paths(UNLINKAT, dfd, 0, flags, userData, path)
+
+            /** io_uring_prep_renameat(olddfd, oldpath, newdfd, newpath, flags): both paths NUL-separated in one buffer. */
+            fun renameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String, flags: Int, userData: Long): UringSubmission =
+                paths(RENAMEAT, oldDfd, newDfd.toLong(), flags, userData, oldPath, newPath)
+
+            /** getdents64(fd, dirp, count) into [buffer]'s remaining window: linux_dirent64 records, 0 at the end. */
+            fun getdents(fd: Int, buffer: ByteBuffer, userData: Long): UringSubmission =
+                UringSubmission(GETDENTS, fd, 0, buffer.remaining(), 0, userData = userData, buffer = buffer)
+
+            fun paths(opcode: UringOp, fd: Int, offset: Long, operationFlags: Int, userData: Long, vararg paths: String): UringSubmission {
+                require(paths.all { it.isNotEmpty() && '\u0000' !in it })
+                val bytes = paths.joinToString(0.toChar().toString()).encodeToByteArray()
+                return UringSubmission(opcode, fd, 0, bytes.size, offset, userData = userData,
+                    buffer = ByteBuffer(bytes), operationFlags = operationFlags)
+            }
 
             fun openat(dirFd: Int, pathAddr: Long, len: Int, flags: Int, userData: Long) =
                 UringSubmission(OPENAT, dirFd, pathAddr, len, flags.toLong(), 0, userData)
@@ -177,6 +240,30 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
 
             fun nop(userData: Long): UringSubmission =
                 UringSubmission(NOP, -1, 0, 0, 0, 0, userData)
+        }
+    }
+}
+
+/**
+ * linux/stat.h `struct statx` as STATX writes it: [STATX_SIZE] bytes in host order, the order the
+ * kernel writes and every emulation reproduces.
+ */
+@JvmInline
+value class Statx(val buffer: ByteBuffer) {
+    val stx_nlink: UInt get() = buffer.getInt(0x10).toUInt()
+    val stx_uid: UInt get() = buffer.getInt(0x14).toUInt()
+    val stx_mode: Int get() = buffer.getShort(0x1c).toInt() and 0xffff
+    val stx_ino: ULong get() = buffer.getLong(0x20).toULong()
+    val stx_size: ULong get() = buffer.getLong(0x28).toULong()
+    val stx_dev_major: UInt get() = buffer.getInt(0x88).toUInt()
+    val stx_dev_minor: UInt get() = buffer.getInt(0x8c).toUInt()
+
+    companion object {
+        /** The struct a completed [UringOp.Companion.Submissions.statx] wrote behind its path. */
+        fun of(submission: UringSubmission): Statx {
+            val window = requireNotNull(submission.buffer)
+            return Statx(ByteBuffer.wrap(window.array(), window.arrayOffset() + window.position() + submission.len + 1, STATX_SIZE)
+                .order(ByteOrder.nativeOrder()))
         }
     }
 }

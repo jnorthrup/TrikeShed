@@ -43,7 +43,15 @@ static int implemented(int op) {
 
 JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_abiVersion(JNIEnv *env, jobject self) {
     (void)env; (void)self;
-    return 3;
+    return 4;
+}
+
+/* The facade's Linux asm-generic O_* values in this host's numbering (arm64 moves two bits). */
+#define FACADE_OPEN_FLAGS (3L | 0x40L | 0x80L | 0x200L | 0x400L | 0x800L | 0x10000L | 0x20000L | 0x80000L)
+static int open_flags(jlong flags) {
+    return (int)(flags & 3) | (flags & 0x40 ? O_CREAT : 0) | (flags & 0x80 ? O_EXCL : 0) |
+        (flags & 0x200 ? O_TRUNC : 0) | (flags & 0x400 ? O_APPEND : 0) | (flags & 0x800 ? O_NONBLOCK : 0) |
+        (flags & 0x10000 ? O_DIRECTORY : 0) | (flags & 0x20000 ? O_NOFOLLOW : 0) | (flags & 0x80000 ? O_CLOEXEC : 0);
 }
 
 JNIEXPORT jlong JNICALL Java_borg_trikeshed_userspace_JvmUring_open(JNIEnv *env, jobject self, jint entries) {
@@ -127,7 +135,7 @@ static int posix_execute(int op, int fd, void *bytes, unsigned len, jlong offset
         case 0: return 0;
         case 3: result = operation_flags & IORING_FSYNC_DATASYNC ? fdatasync(fd) : fsync(fd); break;
         case 17: result = fallocate(fd, (int)operation_flags, offset, len); break;
-        case 18: result = openat(fd, bytes, (int)offset, (mode_t)operation_flags); break;
+        case 18: result = openat(fd, bytes, open_flags(offset), (mode_t)operation_flags); break;
         case 19: result = close(fd); break;
         case 4: case 22: result = offset == -1 ? (int)read(fd, bytes, len) : (int)pread(fd, bytes, len, offset); break;
         case 5: case 23: result = offset == -1 ? (int)write(fd, bytes, len) : (int)pwrite(fd, bytes, len, offset); break;
@@ -150,6 +158,8 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     if (len < 0) return -EINVAL;
     if (op == IORING_OP_FSYNC) {
         if ((unsigned)operation_flags & ~IORING_FSYNC_DATASYNC) return -EOPNOTSUPP;
+    } else if (op == IORING_OP_STATX) {
+        if ((unsigned)operation_flags & ~(unsigned)(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | AT_NO_AUTOMOUNT)) return -EINVAL;
     } else if (op != IORING_OP_MADVISE && op != IORING_OP_FADVISE && op != IORING_OP_OPENAT &&
                op != IORING_OP_FALLOCATE && operation_flags != 0) {
         return -EOPNOTSUPP;
@@ -157,8 +167,10 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     int fixed = op == IORING_OP_READ_FIXED || op == IORING_OP_WRITE_FIXED;
     int transfer = fixed || op == IORING_OP_READ || op == IORING_OP_WRITE;
     int has_bytes = op == IORING_OP_OPENAT || op == IORING_OP_STATX || ((op == IORING_OP_READ || op == IORING_OP_WRITE) && array);
-    if (op == IORING_OP_STATX && (!array || len < 24 || offset != 0 || address != 0)) return -EINVAL;
-    if (has_bytes && (!array || start < 0 || len < 0 || (jlong)start + len > (*env)->GetArrayLength(env, array)))
+    /* STATX: the path's len bytes, its NUL, then the struct statx the kernel writes. */
+    jlong window = op == IORING_OP_STATX ? (jlong)len + 1 + (jlong)sizeof(struct statx) : len;
+    if (op == IORING_OP_STATX && (!array || offset < 0 || offset > 0xffffffffL || address != 0)) return -EINVAL;
+    if (has_bytes && (!array || start < 0 || len < 0 || (jlong)start + window > (*env)->GetArrayLength(env, array)))
         return -EINVAL;
     if (transfer && offset < -1) return -EINVAL;
     if (fixed) {
@@ -170,13 +182,13 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
             (size_t)len > registered->iov_len - (submitted - base)) return -EFAULT;
     }
     if (op == 55 && offset < 0) return -EINVAL;
-    if (op == 18 && (len == 0 || offset < 0 || (offset & ~(3L | 64L | 128L | 512L | 1024L)) || (offset & 3) == 3))
+    if (op == 18 && (len == 0 || offset < 0 || (offset & ~FACADE_OPEN_FLAGS) || (offset & 3) == 3))
         return -EINVAL;
     jbyte *elements = has_bytes ? (*env)->GetByteArrayElements(env, array, NULL) : NULL;
     if (has_bytes && !elements) return -ENOMEM;
     void *bytes = elements ? elements + start : (void *)(uintptr_t)address;
     char *path = NULL;
-    struct statx metadata = {0};
+    struct statx *metadata = op == IORING_OP_STATX ? (struct statx *)((char *)bytes + len + 1) : NULL;
     int result = -ENOMEM;
     if (op == 18) {
         if (memchr(bytes, 0, len)) { result = -EINVAL; goto finish; }
@@ -186,9 +198,10 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         path[len] = 0;
         bytes = path;
     }
+    if (op == IORING_OP_STATX && (memchr(bytes, 0, len) || ((char *)bytes)[len] != 0)) { result = -EINVAL; goto finish; }
     if (!io_uring_opcode_supported(state->probe, op)) {
         result = op == IORING_OP_STATX
-            ? (statx(fd, "", AT_EMPTY_PATH, STATX_SIZE | STATX_MODE | STATX_MTIME, &metadata) == 0 ? 0 : -errno)
+            ? (statx(fd, bytes, (int)operation_flags, (unsigned)offset, metadata) == 0 ? 0 : -errno)
             : posix_execute(op, fd, bytes, (unsigned)len, offset, (unsigned)operation_flags);
         goto finish;
     }
@@ -200,9 +213,9 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         case 17: io_uring_prep_fallocate(sqe, fd, operation_flags, offset, (uint64_t)len); break;
         case 4: io_uring_prep_read_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
         case 5: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
-        case 18: io_uring_prep_openat(sqe, fd, bytes, (int)offset, (mode_t)operation_flags); break;
+        case 18: io_uring_prep_openat(sqe, fd, bytes, open_flags(offset), (mode_t)operation_flags); break;
         case 19: io_uring_prep_close(sqe, fd); break;
-        case 21: io_uring_prep_statx(sqe, fd, "", AT_EMPTY_PATH, STATX_SIZE | STATX_MODE | STATX_MTIME, &metadata); break;
+        case 21: io_uring_prep_statx(sqe, fd, bytes, (int)operation_flags, (unsigned)offset, metadata); break;
         case 22: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); break;
         case 23: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); break;
         case 24: io_uring_prep_fadvise(sqe, fd, (uint64_t)offset, len, operation_flags); break;
@@ -254,19 +267,6 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         state->exited = 1;
     }
 finish:
-    if (op == IORING_OP_STATX && result == 0) {
-        /* Existing userspace metadata ABI: three little-endian longs. The kernel
-         * CQE returns zero; the facade reports the 24 bytes materialized here. */
-        uint64_t fields[3] = {
-            metadata.stx_size,
-            (uint64_t)metadata.stx_mtime.tv_sec * 1000 + metadata.stx_mtime.tv_nsec / 1000000,
-            S_ISREG(metadata.stx_mode) ? 1 : S_ISDIR(metadata.stx_mode) ? 2 : 0
-        };
-        for (unsigned field = 0; field < 3; field++)
-            for (unsigned byte = 0; byte < 8; byte++)
-                ((unsigned char *)bytes)[field * 8 + byte] = (unsigned char)(fields[field] >> (byte * 8));
-        result = 24;
-    }
     free(path);
     if (elements) (*env)->ReleaseByteArrayElements(env, array, elements, op == 22 || op == 21 ? 0 : JNI_ABORT);
     return result;

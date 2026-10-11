@@ -9,7 +9,6 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
@@ -54,20 +53,13 @@ class PosixUserspaceChannelBackendTest {
             assertEquals(0, submit(Submissions.read(fd, 0, 1, 2, 4).copy(buffer = target)))
             assertEquals(0, submit(Submissions.read(fd, 0, 0, 0, 5).copy(buffer = target)))
             assertEquals(3, target.position())
-            val metadataBytes = ByteArray(30) { 9 }
-            val metadata = ByteBuffer(metadataBytes, 1, 28).position(1)
-            val stat = UringSubmission(UringOp.STATX, fd, 0, 24, 0, userData = 60, buffer = metadata)
-            assertEquals(24, submit(stat))
-            assertEquals(25, metadata.position())
-            assertEquals(2L, metadata.order(ByteOrder.LITTLE_ENDIAN).getLong(1))
-            assertTrue(metadataBytes.take(2).all { it == 9.toByte() })
-            assertTrue(metadataBytes.drop(26).all { it == 9.toByte() })
-            val readOnlyMetadata = ByteBuffer(24).asReadOnlyBuffer()
-            assertEquals(-22, submit(stat.copy(buffer = readOnlyMetadata)))
-            assertEquals(0, readOnlyMetadata.position())
-            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(23))))
-            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(24), offset = 1)))
-            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(24), addr = 1)))
+            val stat = Submissions.statx(fd, "", UringOp.AT_EMPTY_PATH, UringOp.STATX_BASIC_STATS, 60)
+            assertEquals(0, submit(stat))
+            assertEquals(2uL, Statx.of(stat).stx_size)
+            assertEquals(UringOp.S_IFREG, Statx.of(stat).stx_mode and UringOp.S_IFMT)
+            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(1 + UringOp.STATX_SIZE).asReadOnlyBuffer())))
+            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(UringOp.STATX_SIZE))))
+            assertEquals(-22, submit(stat.copy(buffer = ByteBuffer(1 + UringOp.STATX_SIZE), addr = 1)))
             assertEquals(0, submit(Submissions.fsync(fd, 6)))
             assertEquals(0, submit(UringSubmission(UringOp.FTRUNCATE, fd, 0, 0, 1, userData = 7)))
             assertEquals(1L, PosixUringIO.fileSize(fd))
