@@ -175,7 +175,7 @@ class Node(
             val now = now()
             replay.entries.removeAll { it.value < now }
             val k = request.source to request.nonce.toHexString()
-            if (k in replay || replay.size >= config.replay_capacity) error("replay or replay capacity")
+            if (k in replay || replay.size.toULong() >= config.replay_capacity) error("replay or replay capacity")
             replay[k] = request.time + CLOCK_SKEW
             val rows = Item.Arr(
                 replay.entries.sortedWith(compareBy({ it.key.first }, { it.key.second })).toSeries() α {
@@ -204,9 +204,10 @@ suspend fun operation(request: Message): ByteArray = when (request.path) {
 fun rejected(status: Int): WireHttpResponse =
     WireHttpResponse(status, "", "application/cbor", Cbor.encode(itemArrayOf(Item.Str("loom-error/v1"), Item.Num(1))))
 
-/** network.rs load_replay over the bytes Store::load_replay returns, null when nothing was persisted. */
-fun load_replay(data: ByteArray?, config: Config): Replay {
+/** network.rs load_replay: the table [Store.load_replay] persisted, expired rows dropped. */
+fun load_replay(store: Store, config: Config): Replay {
     val result: Replay = mutableMapOf()
+    val data = store.load_replay()
     if (data != null) {
         val a = array(decode(data), 3)
         tag(a[0], "loom-replay/v1")
@@ -221,7 +222,7 @@ fun load_replay(data: ByteArray?, config: Config): Replay {
             val expiry = number(r[2])
             if (expiry >= now() && result.put(id to n.toHexString(), expiry) != null) error("duplicate stored nonce")
         }
-        if (result.size > config.replay_capacity) error("replay capacity reduced")
+        if (result.size.toULong() > config.replay_capacity) error("replay capacity reduced")
     }
     return result
 }

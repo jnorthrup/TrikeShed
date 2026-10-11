@@ -1,6 +1,7 @@
 package borg.trikeshed.loom
 
 import borg.trikeshed.htx.*
+import borg.trikeshed.ipns.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.reactor.*
 import borg.trikeshed.userspace.nio.*
@@ -148,8 +149,35 @@ object Keeper {
     }
 
     /** Revoke every Vast lease whose window has closed, renaming each `*.receipt.json` to `*.revoked.json`; the number revoked. */
-    suspend fun sweep_vast(http: Http, base: String, master_key: String, receipts: String, now: ULong): Int =
-        TODO("sweep_vast waits on opendir/readdir and rename in the NIO facade (Files.list, Files.move) and on config.rs protected_file for each receipt")
+    suspend fun sweep_vast(http: Http, base: String, master_key: String, receipts: String, now: ULong): Int {
+        var revoked = 0
+        val ring = Config.ring()
+        try {
+            val entries = runCatching { ring.read_dir(receipts) }.getOrElse { error("receipt directory") }
+            for ((raw, _) in entries) {
+                val name = runCatching { raw.decodeToString(throwOnInvalidSequence = true) }.getOrNull() ?: continue
+                if (!name.endsWith(".receipt.json")) continue
+                val stem = name.removeSuffix(".receipt.json")
+                val path = join(receipts, name)
+                val bytes = ring.protected_file(path, 16 * 1024)
+                val receipt = try {
+                    LeaseReceipt.from_json(bytes)
+                } catch (refused: IllegalStateException) {
+                    error("invalid lease receipt")
+                }
+                if (receipt.format != RECEIPT_FORMAT || receipt.provider != Provider.Vast || receipt.not_after > now) continue
+                // u64::from_str: one optional '+', then ASCII digits.
+                val key_id = receipt.key_id?.removePrefix("+")?.takeIf { k -> k.isNotEmpty() && k.all { it in '0'..'9' } }?.toULongOrNull()
+                    ?: error("invalid lease receipt")
+                revoke_vast(http, base, master_key, key_id)
+                runCatching { ring.rename(path, join(receipts, "$stem.revoked.json")) }.getOrElse { error("receipt rename") }
+                revoked++
+            }
+        } finally {
+            ring.closeNow()
+        }
+        return revoked
+    }
 
     /** Create an owner-only file that did not exist before. O_CREAT|O_EXCL never follows a final symlink, which is what O_NOFOLLOW adds in Rust. */
     fun write_new(path: String, bytes: ByteArray) {
@@ -172,12 +200,15 @@ object Keeper {
         }
     }
 
-    /** config.rs protected_file: at most [max] bytes of a regular file owned by the effective uid, mode & 0o077 == 0, one link, opened O_NOFOLLOW. */
-    fun protected_file(path: String, max: Int): ByteArray =
-        TODO(
-            "config.rs protected_file needs the opened file's type, owner, mode and link count, which the NIO facade's STATX does not report " +
-                "(UserspaceIO.jvm.kt statx: size, mtime, type) and Files.kt refuses by policy, and an O_NOFOLLOW open, which FileChannel.open does not pass",
-        )
+    /** config.rs protected_file ([FunctionalUringFacade.protected_file]) over a ring of its own. */
+    fun protected_file(path: String, max: Int): ByteArray {
+        val ring = Config.ring()
+        try {
+            return ring.protected_file(path, max)
+        } finally {
+            ring.closeNow()
+        }
+    }
 
     fun secret_file(path: String): String {
         val bytes = protected_file(path, 16 * 1024)
@@ -262,7 +293,16 @@ non-secret receipt to --out.receipt.json; prints the receipt."""
                     val lease = Lease.from_json(protected_file(flags.need("lease"), 32 * 1024))
                     if (lease.provider() != provider) error("lease provider mismatch")
                     lease.check_usable(now)
-                    TODO("loom-lease install waits on config.rs Config::read and client.rs Client (call over the signed Admin route, install_invocation_lease)")
+                    val config = Config.read(flags.need("mesh-config"))
+                    val raw = protected_file(flags.need("admin-key-file"), 32)
+                    try {
+                        if (raw.size < 32) error("admin key must be 32 raw bytes")
+                        val admin = config.member(flags.need("admin-id"))
+                        if (!admin.key().contentEquals(Ed25519.publicKey(raw)) || !admin.has(Role.Admin)) error("admin identity mismatch")
+                    } finally {
+                        raw.fill(0)
+                    }
+                    TODO("loom-lease install waits on client.rs Client::install_invocation_lease and an opened Client (its NioSupervisor services) in the keeper, to call /v1/lease on each Replica")
                 }
                 verb != "mint" -> error(USAGE)
             }

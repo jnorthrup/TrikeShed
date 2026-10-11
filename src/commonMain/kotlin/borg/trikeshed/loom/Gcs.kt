@@ -35,6 +35,24 @@ data class GcsConfig(
             (service_account != null && (credentials_file != null || allow_gcloud_cli_test_only))
         ) error("invalid GCS configuration")
     }
+
+    companion object {
+        val fields = s_["bucket", "prefix", "credentials_file", "allow_gcloud_cli_test_only", "timeout_ms", "service_account"]
+
+        /** serde's derived `Deserialize`, `default` and `deny_unknown_fields`. */
+        fun deserialize(value: Any): GcsConfig {
+            val f = deserialize_struct(value, fields)
+            val d = GcsConfig()
+            return GcsConfig(
+                bucket = f[0]?.deserialize_string("bucket") ?: d.bucket,
+                prefix = f[1]?.deserialize_string("prefix") ?: d.prefix,
+                credentials_file = f[2]?.deserialize_option { it.deserialize_string("credentials_file") },
+                allow_gcloud_cli_test_only = f[3]?.deserialize_bool("allow_gcloud_cli_test_only") ?: d.allow_gcloud_cli_test_only,
+                timeout_ms = f[4]?.deserialize_u64("timeout_ms") ?: d.timeout_ms,
+                service_account = f[5]?.deserialize_option { it.deserialize_string("service_account") },
+            )
+        }
+    }
 }
 
 /** A held, generation-pinned GCS object. */

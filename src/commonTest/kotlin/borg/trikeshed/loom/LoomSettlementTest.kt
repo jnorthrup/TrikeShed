@@ -7,7 +7,7 @@ import borg.trikeshed.lib.*
 import kotlin.test.*
 
 /** The capture harness's config: replica-a, settled by the authority, archiving to loom-archive. */
-fun config(id: String = "replica-a", gcs: GcsConfig = GcsConfig("loom-archive")): Config = Config(id, members(), "authority", gcs)
+fun config(id: String = "replica-a", gcs: GcsConfig = GcsConfig("loom-archive")): Config = Config(id = id, members = members(), settlement_authority = "authority", gcs = gcs)
 
 /** completion.rs, settlement.rs (Settlement, Handoff, bundle) and gcs.rs GcsReceipt against LoomVectors. */
 class LoomSettlementTest {

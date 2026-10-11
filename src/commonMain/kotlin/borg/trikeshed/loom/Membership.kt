@@ -30,8 +30,11 @@ class Member(
 
     companion object {
         /** serde_json with deny_unknown_fields: `domain` defaults to "", `url` to null. */
-        fun from_json(bytes: ByteArray): Member {
-            val (id, public_key, domain, url, roles) = deserialize_struct(bytes, s_["id", "public_key", "domain", "url", "roles"])
+        fun from_json(bytes: ByteArray): Member = deserialize(json(bytes, unique = true) ?: error("invalid JSON"))
+
+        /** serde's derived `Deserialize` from a JSON value. */
+        fun deserialize(value: Any): Member {
+            val (id, public_key, domain, url, roles) = deserialize_struct(value, s_["id", "public_key", "domain", "url", "roles"])
             return Member(
                 id = (id ?: error("missing field `id`")).deserialize_string("id"),
                 public_key = (public_key ?: error("missing field `public_key`")).deserialize_string("public_key"),
@@ -76,9 +79,12 @@ fun validate_custody_members(members: Series<Member>) {
  * keys are each one of [fields] at most once, or an array of the fields in declaration order. The values
  * return in [fields] order, null where absent and [Null] where JSON null.
  */
-fun deserialize_struct(bytes: ByteArray, fields: Series<String>): Array<Any?> {
+fun deserialize_struct(bytes: ByteArray, fields: Series<String>): Array<Any?> =
+    deserialize_struct(json(bytes, unique = true) ?: error("invalid JSON"), fields)
+
+fun deserialize_struct(value: Any, fields: Series<String>): Array<Any?> {
     val values = arrayOfNulls<Any>(fields.size)
-    when (val value = json(bytes, unique = true) ?: error("invalid JSON")) {
+    when (value) {
         is Map<*, *> -> for ((name, field) in value) {
             val at = (0 until fields.size).firstOrNull { fields[it] == name } ?: error("unknown field `$name`")
             values[at] = field

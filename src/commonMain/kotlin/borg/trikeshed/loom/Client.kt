@@ -182,7 +182,7 @@ class Client(
                 label(member.domain)
                 if (!domains.add(member.domain) || member.has(Role.Replica) && member.has(Role.Archive))
                     error("duplicate domain or mixed custody role")
-                if (!urls.add(validate_url(member.url ?: error("peer URL missing"), loopback, private_test))) error("duplicate peer URL")
+                if (!urls.add(validate_url(member.url ?: error("peer URL missing"), loopback, private_test).toString())) error("duplicate peer URL")
             } else if (member.url != null || member.domain.isNotEmpty()) error("storage fields without storage role")
             if (member.has(Role.Producer)) producers[member.id] = key
         }
@@ -262,12 +262,13 @@ class Client(
         } catch (failure: IllegalStateException) {
             throw SendFailure.Invalid(failure.message ?: "unsafe URL")
         }
+        if (base.host?.startsWith('[') == true) TODO("loom client: IPv6 peer literals (the HTX reactor connects over AF_INET only)")
         if (request.target != peer.id || request.source != id) throw SendFailure.Invalid("request identity")
         if (!request.path.startsWith('/') || request.path.any { it.code <= 0x20 || it.code >= 0x7f })
             throw SendFailure.Invalid("request URL")
         val method = HtxMethod.entries.firstOrNull { it.name == request.method } ?: throw SendFailure.Invalid("method")
-        if (base.startsWith("https:") && tls is StubTlsCodecBackend) TODO("loom client: https peers on this target wait on the TLS 1.3 client")
-        return parseHtxRequest(base + request.path.substring(1), method = method, body = ByteSeries(request.to_bytes()))
+        if (base.scheme == "https" && tls is StubTlsCodecBackend) TODO("loom client: https peers on this target wait on the TLS 1.3 client")
+        return parseHtxRequest(base.serialization + request.path.substring(1), method = method, body = ByteSeries(request.to_bytes()))
             .copy(headers = htxHeaders("content-type" j "application/cbor"), timeoutMs = timeout_ms.toLong())
     }
 

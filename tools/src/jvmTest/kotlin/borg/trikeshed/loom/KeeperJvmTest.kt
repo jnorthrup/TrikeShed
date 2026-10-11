@@ -101,6 +101,44 @@ class KeeperJvmTest {
         text(Keeper.wrap_runpod("https://abc123.api.runpod.ai/", "rpa_capture_key_0123456789abcdefghijklmnop", 600uL, now))
     }
 
+    /**
+     * sweep_vast over a receipt directory: only the closed Vast window is revoked, with the request Rust's revoke_vast
+     * sent ([KeeperVectors.revokeVast]), and renamed `*.revoked.json`; an open window, another provider and other
+     * names stay; a receipt readable by others is refused as config.rs protected_file refuses it.
+     */
+    @Test
+    fun sweepVastRevokesClosedWindows() {
+        val dir = Files.createTempDirectory("keeper-sweep")
+        fun receipt(name: String, lease: Lease, mode: String = "rw-------") {
+            val path = dir.resolve(name)
+            Files.write(path, lease.receipt().to_json())
+            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString(mode))
+        }
+        try {
+            val vast = Credential.Vast(4242uL, "vast_scoped_key_0123456789abcdef")
+            receipt("closed.receipt.json", Lease(FORMAT, "operator-a-keeper", now - 7200uL, now, vast))
+            receipt("open.receipt.json", Lease(FORMAT, "operator-a-keeper", now - 7200uL, now + 1uL, Credential.Vast(4343uL, "vast_scoped_key_0123456789abcdef")))
+            receipt("google.receipt.json", Lease(FORMAT, sa, now - 7200uL, now - 1uL, Credential.Google("ya29.minted-capture-token")))
+            Files.write(dir.resolve("notes.txt"), byteArrayOf(1))
+            case("sweepVast", KeeperVectors.revokeVast.a j "ok:1", listOf(LoopbackFake.json(200, """{"success":true}"""))) { http, base ->
+                "ok:" + Keeper.sweep_vast(http, base, master, dir.toString(), now)
+            }
+            assertEquals(
+                setOf("closed.revoked.json", "open.receipt.json", "google.receipt.json", "notes.txt"),
+                Files.list(dir).use { names -> names.map { it.fileName.toString() }.toList().toSet() },
+            )
+            receipt("public.receipt.json", Lease(FORMAT, "operator-a-keeper", now - 7200uL, now, vast), "rw-r--r--")
+            case("sweepVastPublic", emptySeriesOf<String>() j "error:unprotected configuration or key file", emptyList()) { http, base ->
+                "ok:" + Keeper.sweep_vast(http, base, master, dir.toString(), now)
+            }
+            case("sweepVastMissing", emptySeriesOf<String>() j "error:receipt directory", emptyList()) { http, base ->
+                "ok:" + Keeper.sweep_vast(http, base, master, dir.resolve("absent").toString(), now)
+            }
+        } finally {
+            Files.walk(dir).sorted(Comparator.reverseOrder()).forEach(Files::delete)
+        }
+    }
+
     /** `loom-lease` refuses the same arguments with the same message, before any file read or provider call, and exits 2. */
     @Test
     fun cliAgrees() = runBlocking {
