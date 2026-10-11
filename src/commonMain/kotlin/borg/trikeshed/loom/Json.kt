@@ -59,7 +59,8 @@ fun jsonPretty(value: Any): String = StringBuilder().also { it.jsonValue(value, 
 fun StringBuilder.jsonValue(value: Any, indent: String?) {
     when (value) {
         Null, is Boolean, is Long, is ULong -> append(value.toString())
-        is Double -> TODO("serde_json writes f64 through ryu; a shortest round-trip f64 formatter is not ported")
+        // Serializer::serialize_f64: NaN and the infinities as null, every other value through zmij.
+        is Double -> append(if (value.isFinite()) zmij.format_finite(value) else "null")
         is String -> quoted(value)
         is List<*> -> container('[', ']', value.size, indent) { i, inner -> jsonValue(value[i]!!, inner) }
         is Map<*, *> -> {
@@ -100,6 +101,199 @@ fun StringBuilder.quoted(text: String) {
         else -> append(c)
     }
     append('"')
+}
+
+/**
+ * zmij 1.0.23, the float formatter serde_json 1.0.151's `write_f64` prints every finite f64 with: the shortest decimal
+ * that rounds back to the value, by Schubfach with Xiang JunBo's extra-digit scaling. The portable path of `write` and
+ * its compressed power-of-ten table; the SIMD digit paths print the same bytes.
+ */
+object zmij {
+    /**
+     * `Buffer::format_finite` for an f64: fixed notation for decimal exponents -5..=15 ("0.0", "-0.0", "0.00001",
+     * "1000000000000000.0"), otherwise `d.ddde±x` ("1e+16", "1.5e-7", "5e-324").
+     */
+    fun format_finite(value: Double): String {
+        val bits = value.toRawBits().toULong()
+        val bin_exp = (bits shl 1 shr 53).toLong()
+        val bin_sig = bits and (IMPLICIT_BIT - 1uL)
+        val out = StringBuilder(24)
+        if (bits shr 63 != 0uL) out.append('-')
+        var dec: ToDecimalResult
+        if (bin_exp == 0L) {
+            if (bin_sig == 0uL) return out.append("0.0").toString()
+            dec = to_decimal(bin_sig, 1, true)
+            var dec_sig = dec.sig * 10 + if (dec.has_last_digit) dec.last_digit else 0
+            var dec_exp = dec.exp
+            while (dec_sig < THRESHOLD) {
+                dec_sig *= 10
+                dec_exp -= 1
+            }
+            val last_digit = (dec_sig % 10).toInt()
+            dec = ToDecimalResult(dec_sig / 10, dec_exp, last_digit, last_digit != 0)
+        } else dec = to_decimal(bin_sig or IMPLICIT_BIT, bin_exp, bin_sig != 0uL)
+        val has_extra_digit = dec.sig >= THRESHOLD
+        var dec_exp = dec.exp + 17 - 2 + if (has_extra_digit) 1 else 0
+        // The significand's 16-digit BCD, written one place early when it has 15 digits, then the last digit or none.
+        val bcd = dec.sig.toString().padStart(16, '0').let { if (has_extra_digit) it else it.substring(1) }
+        val digits = if (dec.has_last_digit) bcd + ('0' + dec.last_digit) else bcd.trimEnd('0')
+        val length = digits.length
+        if (dec_exp in -5..15) {
+            when {
+                // 1234e7 -> 12340000000.0
+                length - 1 <= dec_exp -> out.append(digits).append("0".repeat(dec_exp + 1 - length)).append(".0")
+                // 1234e-2 -> 12.34
+                0 <= dec_exp -> out.append(digits.substring(0, dec_exp + 1)).append('.').append(digits.substring(dec_exp + 1))
+                // 1234e-6 -> 0.001234
+                else -> out.append("0.").append("0".repeat(-dec_exp - 1)).append(digits)
+            }
+            return out.toString()
+        }
+        // 1234e30 -> 1.234e+33
+        out.append(digits[0])
+        if (length > 1) out.append('.').append(digits.substring(1))
+        out.append('e').append(if (dec_exp >= 0) '+' else '-')
+        if (dec_exp < 0) dec_exp = -dec_exp
+        return out.append(dec_exp.toString()).toString()
+    }
+
+    /** f64 `IMPLICIT_BIT`, 2^52. */
+    const val IMPLICIT_BIT: ULong = 0x10000000000000uL
+
+    /** f64 `EXP_OFFSET`, the exponent bias plus the 52 significand bits. */
+    const val EXP_OFFSET: Long = 1075
+
+    /** `Data::threshold`: a significand at least this large has the extra (16th) digit. */
+    const val THRESHOLD: Long = 1_000_000_000_000_000
+
+    /** `ExpShiftTable::EXTRA_SHIFT`. */
+    const val EXTRA_SHIFT: Int = 6
+
+    /** zmij `uint128`. */
+    class uint128(val hi: ULong, val lo: ULong)
+
+    /** zmij `ToDecimalResult`: [sig] and, when [has_last_digit], one more digit, times 10^([exp] + 1 - 17 + 2). */
+    class ToDecimalResult(val sig: Long, val exp: Int, val last_digit: Int, val has_last_digit: Boolean)
+
+    /** The high 64 bits of the 128-bit product of [x] and [y]. */
+    fun umul128_hi64(x: ULong, y: ULong): ULong {
+        val x0 = x and 0xffffffffuL
+        val x1 = x shr 32
+        val y0 = y and 0xffffffffuL
+        val y1 = y shr 32
+        val p01 = x0 * y1
+        val p10 = x1 * y0
+        val middle = (x0 * y0 shr 32) + (p01 and 0xffffffffuL) + (p10 and 0xffffffffuL)
+        return x1 * y1 + (p01 shr 32) + (p10 shr 32) + (middle shr 32)
+    }
+
+    /** ([x] * [y] + [c]) >> 64. */
+    fun umul128_add_hi64(x: ULong, y: ULong, c: ULong): ULong {
+        val lo = x * y
+        return umul128_hi64(x, y) + if (lo + c < lo) 1uL else 0uL
+    }
+
+    fun umul192_hi128(x_hi: ULong, x_lo: ULong, y: ULong): uint128 {
+        val p_lo = x_hi * y
+        val lo = p_lo + umul128_hi64(x_lo, y)
+        return uint128(umul128_hi64(x_hi, y) + if (lo < p_lo) 1uL else 0uL, lo)
+    }
+
+    /** floor(log10(2^[bin_exp])) if [regular], else floor(log10(3/4 * 2^[bin_exp])). */
+    fun compute_dec_exp(bin_exp: Int, regular: Boolean): Int = (bin_exp * 315_653 - (if (regular) 0 else 131_072)) shr 20
+
+    /** The shift that gives the scaled significand a fixed 128-bit fractional part, as zmij's u8 arithmetic wraps it. */
+    fun compute_exp_shift(bin_exp: Int, dec_exp: Int): Int = (bin_exp + ((-dec_exp * 217_707) shr 16) + 1) and 0xff
+
+    val POW10_MINOR: ULongArray = ulongArrayOf(
+        0x8000000000000000uL, 0xa000000000000000uL, 0xc800000000000000uL,
+        0xfa00000000000000uL, 0x9c40000000000000uL, 0xc350000000000000uL,
+        0xf424000000000000uL, 0x9896800000000000uL, 0xbebc200000000000uL,
+        0xee6b280000000000uL, 0x9502f90000000000uL, 0xba43b74000000000uL,
+        0xe8d4a51000000000uL, 0x9184e72a00000000uL, 0xb5e620f480000000uL,
+        0xe35fa931a0000000uL, 0x8e1bc9bf04000000uL, 0xb1a2bc2ec5000000uL,
+        0xde0b6b3a76400000uL, 0x8ac7230489e80000uL, 0xad78ebc5ac620000uL,
+        0xd8d726b7177a8000uL, 0x878678326eac9000uL, 0xa968163f0a57b400uL,
+        0xd3c21bcecceda100uL, 0x84595161401484a0uL, 0xa56fa5b99019a5c8uL,
+        0xcecb8f27f4200f3auL,
+    )
+
+    /** `POW10_MAJOR`: hi, lo of every 28th power of ten from 10^-303. */
+    val POW10_MAJOR: ULongArray = ulongArrayOf(
+        0xaf8e5410288e1b6fuL, 0x07ecf0ae5ee44ddauL, 0xb1442798f49ffb4auL, 0x99cd11cfdf41779duL,
+        0xb2fe3f0b8599ef07uL, 0x861fa7e6dcb4aa15uL, 0xb4bca50b065abe63uL, 0x0fed077a756b53aauL,
+        0xb67f6455292cbf08uL, 0x1a3bc84c17b1d543uL, 0xb84687c269ef3bfbuL, 0x3d5d514f40eea742uL,
+        0xba121a4650e4ddebuL, 0x92f34d62616ce413uL, 0xbbe226efb628afeauL, 0x890489f70a55368cuL,
+        0xbdb6b8e905cb600fuL, 0x5400e987bbc1c921uL, 0xbf8fdb78849a5f96uL, 0xde98520472bdd034uL,
+        0xc16d9a0095928a27uL, 0x75b7053c0f178294uL, 0xc350000000000000uL, 0x0000000000000000uL,
+        0xc5371912364ce305uL, 0x6c28000000000000uL, 0xc722f0ef9d80aad6uL, 0x424d3ad2b7b97ef6uL,
+        0xc913936dd571c84cuL, 0x03bc3a19cd1e38eauL, 0xcb090c8001ab551cuL, 0x5cadf5bfd3072cc6uL,
+        0xcd036837130890a1uL, 0x36dba887c37a8c10uL, 0xcf02b2c21207ef2euL, 0x94f967e45e03f4bcuL,
+        0xd106f86e69d785c7uL, 0xe13336d701beba52uL, 0xd31045a8341ca07cuL, 0x1ede48111209a051uL,
+        0xd51ea6fa85785631uL, 0x552a74227f3ea566uL, 0xd732290fbacaf133uL, 0xa97c177947ad4096uL,
+        0xd94ad8b1c7380874uL, 0x18375281ae7822bcuL,
+    )
+
+    val POW10_FIXUPS: UIntArray = uintArrayOf(
+        0x0a4e363fu, 0x00001840u, 0x00006400u, 0x24200040u, 0x00000000u,
+        0x0c000000u, 0x82c81380u, 0x5e4ce01fu, 0xd730f60fu, 0x0000001bu,
+        0x00000000u, 0xcdf7fffcu, 0x6e8201d8u, 0x40cd3fd1u, 0xdb642501u,
+        0x00000d0du, 0x14042400u, 0x53713840u, 0x11781db4u, 0x00000000u,
+    )
+
+    /**
+     * `Pow10SignificandTable::get_unchecked`: the 128-bit significand of 10^[dec_exp] rounded down, computed from the
+     * minor and major powers by Dougall Johnson's method as the compressed table does (the full table holds these values).
+     */
+    fun pow10_significand(dec_exp: Int): uint128 {
+        val i = dec_exp + 293
+        val m = POW10_MINOR[(i + 10) % POW10_MINOR.size]
+        val h_hi = POW10_MAJOR[(i + 10) / POW10_MINOR.size * 2]
+        val h_lo = POW10_MAJOR[(i + 10) / POW10_MINOR.size * 2 + 1]
+        val h1 = umul128_hi64(h_lo, m)
+        val c0 = h_lo * m
+        val c1 = h1 + h_hi * m
+        val c2 = (if (c1 < h1) 1uL else 0uL) + umul128_hi64(h_hi, m)
+        val fixup = ((POW10_FIXUPS[i shr 5] shr (i and 31)) and 1u).toULong()
+        return if (c2 shr 63 != 0uL) uint128(c2, c1 - fixup)
+        else uint128((c2 shl 1) or (c1 shr 63), ((c1 shl 1) or (c0 shr 63)) - fixup)
+    }
+
+    /** zmij `to_decimal` for an f64 significand [bin_sig] and biased exponent [raw_exp]. */
+    fun to_decimal(bin_sig: ULong, raw_exp: Long, regular: Boolean): ToDecimalResult {
+        val bin_exp = (raw_exp - EXP_OFFSET).toInt()
+        if (!regular) {
+            val dec_exp = compute_dec_exp(bin_exp, false)
+            val shift = (compute_exp_shift(bin_exp, dec_exp + 1) + EXTRA_SHIFT) and 0xff
+            val pow10 = pow10_significand(-dec_exp - 1)
+            val p = umul192_hi128(pow10.hi, pow10.lo, bin_sig shl shift)
+            var integral = p.hi shr EXTRA_SHIFT
+            val fractional = (p.hi shl (64 - EXTRA_SHIFT)) or (p.lo shr EXTRA_SHIFT)
+            val half_ulp = pow10.hi shr (EXTRA_SHIFT + 1 - shift)
+            val round_up = half_ulp > ULong.MAX_VALUE - fractional
+            val round_down = (half_ulp shr 1) > fractional
+            if (round_up) integral += 1uL
+            var digit = umul128_add_hi64(fractional, 10uL, (1uL shl 63) - 1uL).toInt()
+            val lo = umul128_add_hi64(fractional - (half_ulp shr 1), 10uL, ULong.MAX_VALUE).toInt()
+            if (digit < lo) digit = lo
+            return ToDecimalResult(integral.toLong(), dec_exp, digit, !(round_up || round_down))
+        }
+        val dec_exp = compute_dec_exp(bin_exp, true)
+        val shift = (compute_exp_shift(bin_exp, dec_exp + 1) + EXTRA_SHIFT) and 0xff
+        val even = 1uL - (bin_sig and 1uL)
+        val pow10 = pow10_significand(-dec_exp - 1)
+        val p = umul192_hi128(pow10.hi, pow10.lo, bin_sig shl shift)
+        var integral = p.hi shr EXTRA_SHIFT
+        val fractional = (p.hi shl (64 - EXTRA_SHIFT)) or (p.lo shr EXTRA_SHIFT)
+        val half_ulp = (pow10.hi shr (EXTRA_SHIFT + 1 - shift)) + even
+        val round_up = fractional + half_ulp < fractional
+        val round_down = half_ulp > fractional
+        if (round_up) integral += 1uL
+        // Data::biased_half: +6 for boundary cases found by verify.py.
+        var digit = umul128_add_hi64(fractional, 10uL, (1uL shl 63) + 6uL).toInt()
+        if (fractional == 1uL shl 62) digit = 2 // Round 2.5 to 2.
+        return ToDecimalResult(integral.toLong(), dec_exp, digit, !(round_up || round_down))
+    }
 }
 
 /** UTF-8 byte order of two strings (Rust `String: Ord`), from their UTF-16 chars. */
