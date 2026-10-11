@@ -28,6 +28,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.tilting.zran.zstdCompress
 import borg.trikeshed.tilting.zran.zstdDecompress
+import borg.trikeshed.userspace.openUserspaceChannelBackend
 import kotlinx.coroutines.runBlocking
 import kotlin.native.Platform
 import kotlin.system.exitProcess
@@ -116,6 +117,12 @@ fun main(args: Array<String>) {
         val ours = zstdCompress(text.encodeToByteArray())
         require(zstdDecompress(ours).decodeToString() == text) { "own frame round trip lost bytes" }
         linkedMapOf("reference" to reference.size, "ours" to ours.size)
+    }
+    check("uring") {
+        // The ring each file channel opens: on Linux the liburing binding's setup, register and NOP probes.
+        val backend = openUserspaceChannelBackend(8)
+        try { linkedMapOf("availability" to backend.availability, "nativeCapabilities" to backend.nativeCapabilities) }
+        finally { backend.close() }
     }
     check("ledger") {
         val path = "/tmp/trikeshed-canary-ledger.bin"
