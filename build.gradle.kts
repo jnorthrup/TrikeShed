@@ -509,6 +509,13 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
         binaries.executable("uringBenchmark") {
             entryPoint = "borg.trikeshed.userspace.benchmark.main"
         }
+        // The canary and the ledger head-to-head, as on macOS: build/bin/<target>/{canary,ledger}ReleaseExecutable/.
+        binaries.executable("canary") {
+            entryPoint = "borg.trikeshed.canary.main"
+        }
+        binaries.executable("ledger") {
+            entryPoint = "borg.trikeshed.userspace.benchmark.ledgerBenchmarkMain"
+        }
         compilations.getByName("main").cinterops.create("zlinux_uring") {
             defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
             packageName("zlinux_uring")

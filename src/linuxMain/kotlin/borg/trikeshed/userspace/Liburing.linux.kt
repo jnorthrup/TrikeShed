@@ -274,7 +274,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
     override fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> {
         val current = ring ?: return failure("ring is not open", -9)
         return memScoped {
-            val vectors = allocArray<zlinux_uring.iovec>(buffers.size)
+            val vectors = allocArray<platform.posix.iovec>(buffers.size)
             for (index in 0 until buffers.size) {
                 vectors[index].iov_base = buffers[index].address.toCPointer<ByteVar>()
                 vectors[index].iov_len = buffers[index].length.toULong()
@@ -299,7 +299,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
                 UringOp.NOP -> zlinux_uring.io_uring_prep_nop(sqe)
                 UringOp.OPENAT -> zlinux_uring.io_uring_prep_openat(sqe, sub.fd, ptr, openFlags(sub.offset.toInt()), sub.operationFlags.toUInt())
                 UringOp.STATX -> zlinux_uring.io_uring_prep_statx(sqe, sub.fd, ptr, sub.operationFlags, sub.offset.toUInt(),
-                    (address + sub.len + 1).toCPointer<zlinux_uring.statx>())
+                    (address + sub.len + 1).toCPointer<cnames.structs.statx>())
                 UringOp.MKDIRAT -> zlinux_uring.io_uring_prep_mkdirat(sqe, sub.fd, ptr, sub.operationFlags.toUInt())
                 UringOp.UNLINKAT -> zlinux_uring.io_uring_prep_unlinkat(sqe, sub.fd, ptr, sub.operationFlags)
                 UringOp.RENAMEAT -> {
