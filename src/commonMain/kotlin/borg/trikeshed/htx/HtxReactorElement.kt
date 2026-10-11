@@ -119,6 +119,7 @@ class HtxReactorElement(
                     lifecycle = HtxExchangeLifecycle.FAILED,
                     request = request,
                     failure = failure,
+                    cause = t,
                 ),
                 htxFrames(
                     HtxFrame(
