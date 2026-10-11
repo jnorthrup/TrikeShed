@@ -30,3 +30,10 @@ fun tag(item: Item, expected: String) {
 fun trusted_time(time: ULong) {
     if (time > Long.MAX_VALUE.toULong()) error("clock range")
 }
+
+/** The wall clock in Unix seconds, refused before the epoch ("clock") and past [trusted_time]. */
+fun now(): ULong {
+    val seconds = kotlin.time.Clock.System.now().epochSeconds
+    if (seconds < 0) error("clock")
+    return seconds.toULong().also(::trusted_time)
+}
