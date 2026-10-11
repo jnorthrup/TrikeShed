@@ -6,12 +6,13 @@ import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.PosixFileOperations
 import borg.trikeshed.userspace.nio.file.spi.PosixSystemOperations
 import borg.trikeshed.htx.HtxReactorElement
-import borg.trikeshed.reactor.StubTlsCodecBackend
+import borg.trikeshed.reactor.Tls13CodecBackend
 import kotlin.coroutines.CoroutineContext
 
 actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val channelOperations = PosixChannelOperations()
-    val tlsBackend = StubTlsCodecBackend()
+    val fileOperations = PosixFileOperations()
+    val tlsBackend = Tls13CodecBackend(fileOperations)
     return listOf(
     NioCapabilityReport(
         backendName = "kqueue",
@@ -20,7 +21,7 @@ actual fun platformNioProviders(): List<CoroutineContext.Element> {
         kernelHint = "",
         checkedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
     ),
-    PosixFileOperations(),
+    fileOperations,
     PosixSystemOperations(),
     channelOperations,
         tlsBackend,

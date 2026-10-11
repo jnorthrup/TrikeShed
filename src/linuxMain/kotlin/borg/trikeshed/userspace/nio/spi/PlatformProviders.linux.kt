@@ -6,17 +6,18 @@ import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.LinuxFileOperations
 import borg.trikeshed.userspace.nio.file.spi.LinuxSystemOperations
 import borg.trikeshed.htx.HtxReactorElement
-import borg.trikeshed.reactor.StubTlsCodecBackend
+import borg.trikeshed.reactor.Tls13CodecBackend
 import kotlin.coroutines.CoroutineContext
 
 actual fun platformNioProviders(): List<CoroutineContext.Element> {
     val report = currentNioCapabilityReport()
 
     val channelOperations = PosixChannelOperations()
-    val tlsBackend = StubTlsCodecBackend()
+    val fileOperations = LinuxFileOperations()
+    val tlsBackend = Tls13CodecBackend(fileOperations)
     return listOf(
         report,
-        LinuxFileOperations(),
+        fileOperations,
         LinuxSystemOperations(),
         channelOperations,
         tlsBackend,
