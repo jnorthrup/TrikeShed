@@ -2,6 +2,7 @@ package borg.trikeshed.loom
 
 import borg.trikeshed.litebike.LitebikeListenerElement
 import borg.trikeshed.litebike.PosixLitebikeBindAdapter
+import borg.trikeshed.platform.HostSystem
 import borg.trikeshed.userspace.nio.channels.inet_ntop
 import borg.trikeshed.userspace.nio.posix.trikeshed_signal_pipe
 import borg.trikeshed.userspace.nio.posix.trikeshed_spawn_group
@@ -11,19 +12,22 @@ import kotlinx.coroutines.channels.*
 import platform.posix.*
 import kotlin.system.exitProcess
 
-fun loomMeshMain(args: Array<String>) = status("loom-mesh", args)
+fun loomMeshMain() = status("loom-mesh")
 
-fun loomRegistryMain(args: Array<String>) = status("loom-registry", args)
+fun loomRegistryMain() = status("loom-registry")
 
-fun loomKoboldStageMain(args: Array<String>) = status("loom-kobold-stage", args)
+fun loomKoboldStageMain() = status("loom-kobold-stage")
 
-fun loomLeaseMain(args: Array<String>) = status("loom-lease", args)
+fun loomLeaseMain() = status("loom-lease")
 
-/** Runs the binary [name]: an [IllegalStateException] goes to stderr behind `<name>: ` and exits with its status. */
-fun status(name: String, args: Array<String>) {
+/**
+ * Runs the binary [name] on the process's arguments as their bytes: an [IllegalStateException] goes to stderr behind
+ * `<name>: ` and exits with its status.
+ */
+fun status(name: String) {
     val binary = binaries(NativeSupervisor).getValue(name)
     val status = try {
-        binary.b(args)
+        binary.b(HostSystem.args_os()!!.drop(1))
     } catch (failure: IllegalStateException) {
         fflush(stdout)
         fputs("$name: ${failure.message}\n", stderr)

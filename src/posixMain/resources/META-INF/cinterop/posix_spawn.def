@@ -6,6 +6,19 @@ headers.osx = sys/random.h
 
 extern char **environ;
 
+// std::env::args_os on glibc: argc and argv kept by an initializer, which glibc's .init_array (and dyld) calls with
+// argc, argv and envp, so arguments that are not UTF-8 reach Kotlin as their bytes.
+static int trikeshed_argc;
+static char **trikeshed_argv;
+__attribute__((constructor)) static void trikeshed_args_init(int argc, char **argv, char **envp) {
+    trikeshed_argc = argc;
+    trikeshed_argv = argv;
+}
+static inline char **trikeshed_args(int *argc) {
+    *argc = trikeshed_argc;
+    return trikeshed_argv;
+}
+
 // Keep the platform's opaque pointer/struct ABI inside the C boundary.
 static inline int trikeshed_spawn(pid_t *pid, const char *input,
         const char *output, const char *error, char *const argv[]) {

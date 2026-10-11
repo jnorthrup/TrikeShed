@@ -10,7 +10,9 @@ import kotlinx.coroutines.selects.select
  * `--confix-check`, `--settle-release` and `--uring-self-test`; each other mode is a TODO naming what it waits on.
  * [supervisor] is the platform's seam for the serving modes; the result is the process's exit status.
  */
-fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
+fun loomMesh(args_os: List<ByteArray>, supervisor: Supervisor): Int {
+    // A path or program argument goes on as its lossy text; Rust passes its bytes.
+    val args = Array(args_os.size) { args_os[it].decodeToString() }
     when (args.firstOrNull()) {
         "--runpod-identity-diagnostic-stdin", "--runpod-identity-diagnostic" ->
             TODO("loom-mesh ${args[0]} waits on the Runpod API client (customer::provider_cost::runpod_api) over an HTTPS client")
@@ -20,6 +22,7 @@ fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
         "--uring-self-test" -> {
             val name = args.getOrNull(1) ?: "auto"
             if (args.size > 2) error("unexpected self-test arguments")
+            if (args.size > 1 && Bootstrap.utf8(args_os[1]) == null) error("invalid I/O mode")
             println(jsonText(runBlocking(Dispatchers.Default) { self_test(policy(name)) }))
             return 0
         }

@@ -12,6 +12,7 @@ object HostSystem {
 
     fun getenv(name: String): String? = sysOps.getenv(name)
     fun var_os(name: String): ByteArray? = sysOps.var_os(name)
+    fun args_os(): List<ByteArray>? = sysOps.args_os()
     fun getProperty(name: String): String? = sysOps.getProperty(name)
 
     fun currentTimeMillis(): Long = PlatformHost.default.clock.nowMillis()

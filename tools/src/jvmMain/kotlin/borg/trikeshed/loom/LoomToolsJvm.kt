@@ -24,7 +24,8 @@ fun main(args: Array<String>) {
         exitProcess(2)
     }
     val status = try {
-        binary.b(args.copyOfRange(1, args.size))
+        // The java launcher hands main decoded text: an argument that is not UTF-8 never reaches it as its bytes.
+        binary.b(List(args.size - 1) { args[it + 1].encodeToByteArray() })
     } catch (failure: IllegalStateException) {
         System.out.flush()
         System.err.write("$name: ${failure.message}\n".encodeToByteArray())

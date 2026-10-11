@@ -25,6 +25,9 @@ interface SystemOperations : CoroutineContext.Element {
 
     /** std::env::var_os: the variable's bytes as the process environment holds them, null when unset. */
     fun var_os(name: String): ByteArray? = getenv(name)?.encodeToByteArray()
+
+    /** std::env::args_os: the program's arguments, its name first, as their bytes; null where main gets only text. */
+    fun args_os(): List<ByteArray>? = null
 }
 
 /**
