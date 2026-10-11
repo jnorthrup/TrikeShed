@@ -12,12 +12,14 @@ import kotlin.io.encoding.*
 import borg.trikeshed.userspace.*
 import borg.trikeshed.userspace.nio.platform.spi.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.*
 
 /*
  * cocaine-rats crates/loom-mesh/src/gcs.rs: the insert-only GCS settlement archive. Provider JSON is
- * transport, not mesh wire. The bearer is a keeper-installed `loom-lease/v1` Google token or the self-signed
- * JWT of an explicitly injected service-account key; requests go through [HtxClientReactorElement] (JDK TLS
- * on the JVM, [Tls13CodecBackend] natively; https stops at StubTlsCodecBackend on js and wasmJs).
+ * transport, not mesh wire. The bearer is a keeper-installed `loom-lease/v1` Google token, the self-signed
+ * JWT of an explicitly injected service-account key, or Application Default Credentials ([Credentials]);
+ * requests go through [HtxClientReactorElement] (JDK TLS on the JVM, [Tls13CodecBackend] natively; https stops
+ * at StubTlsCodecBackend on js and wasmJs).
  */
 const val MAX_METADATA: Int = 32 * 1024
 
@@ -78,10 +80,11 @@ class GcsReceipt(
  */
 class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientReactorElement, var auth: Auth) {
     sealed class Auth {
-        /** Service-account credentials, their JWT reused until [NORMAL_REFRESH_SLACK] before it expires; null for [new]. */
-        class Google(val key: ServiceAccountKey?) : Auth() {
-            @Volatile var token: String? = null
-            @Volatile var refresh_at: ULong = 0uL
+        /** google-cloud-auth credentials: the injected service account's from construction, else [load_credentials]'s on first use. */
+        class Google(credentials: Credentials?) : Auth() {
+            @Volatile var credentials: Credentials? = credentials
+            /** gcs.rs's `OnceCell::get_or_try_init`: a failed load leaves the cell empty. */
+            val cell = Mutex()
         }
 
         /** Short-lived token installed by the keeper; refused once expired. */
@@ -129,7 +132,10 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
     /** Expiry of the installed lease, if any. */
     fun lease_not_after(): ULong? = (auth as? Auth.Lease)?.lease?.not_after
 
-    suspend fun close() = client.close()
+    suspend fun close() {
+        (auth as? Auth.Google)?.credentials?.close()
+        client.close()
+    }
 
     /** `url` path_segments_mut: bucket and object as single segments; safe_bucket and safe_name leave `/` the only character the segment set encodes. */
     fun object_url(`object`: String, generation: ULong?, media: Boolean): String {
@@ -138,40 +144,38 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
             (if (query.isEmpty()) "" else "?" + query.joinToString("&"))
     }
 
-    /** The `authorization` header value. */
-    suspend fun authorized(): String = when (val auth = auth) {
-        Auth.Loopback -> "Bearer loom-gcs-loopback-test-only"
-        is Auth.Lease -> {
-            val lease = auth.lease ?: error("GCS lease absent")
-            val now = now()
-            try {
-                lease.check_usable(now)
-            } catch (expired: IllegalStateException) {
-                error("GCS lease expired")
+    /**
+     * The request's credential headers within `timeout_ms` ("GCS authentication timeout"): the fixture bearer, the
+     * installed lease, the gcloud CLI's token, or [Credentials.headers] (every header they carry).
+     */
+    suspend fun authorized(): HtxHeaders = withTimeoutOrNull(config.timeout_ms.toLong()) {
+        when (val auth = auth) {
+            Auth.Loopback -> htxHeaders("authorization" j "Bearer loom-gcs-loopback-test-only")
+            is Auth.Lease -> {
+                val lease = auth.lease ?: error("GCS lease absent")
+                val now = now()
+                try {
+                    lease.check_usable(now)
+                } catch (expired: IllegalStateException) {
+                    error("GCS lease expired")
+                }
+                htxHeaders("authorization" j lease.bearer())
             }
-            lease.bearer()
-        }
-        is Auth.Google -> {
-            val key = auth.key ?: TODO(
-                "GcsArchive::new loads Application Default Credentials (credentials_file or GOOGLE_APPLICATION_CREDENTIALS through " +
-                    "protected_credentials; else ~/.config/gcloud or the metadata server; user, impersonated and external accounts each need their OAuth exchange) " +
-                    "or the gcloud CLI; only from_service_account_json and leased are ported",
-            )
-            val now = now()
-            auth.token?.takeIf { now < auth.refresh_at } ?: try {
-                "Bearer " + key.generate(STORAGE_SCOPE, now)
-            } catch (refused: Exception) {
-                error("GCS authentication failed")
-            }.also {
-                auth.token = it
-                auth.refresh_at = now + CLOCK_SKEW_FUDGE + DEFAULT_TOKEN_TIMEOUT - NORMAL_REFRESH_SLACK
+            is Auth.Google -> {
+                if (config.allow_gcloud_cli_test_only) return@withTimeoutOrNull gcloud_headers()
+                val credentials = auth.cell.withLock { auth.credentials ?: load_credentials(config, client).also { auth.credentials = it } }
+                try {
+                    credentials.headers()
+                } catch (refused: CredentialsError) {
+                    error("GCS authentication failed")
+                }
             }
         }
-    }
+    } ?: error("GCS authentication timeout")
 
     suspend fun send(url: String, vararg headers: HtxHeader): HtxResponse {
         val authorization = authorized()
-        return client.send(HtxMethod.GET, url, htxHeaders(*headers, "authorization" j authorization), ByteArray(0), config.timeout_ms)
+        return client.send(HtxMethod.GET, url, (headers.toList() + authorization.toList()).toSeries(), ByteArray(0), config.timeout_ms)
             ?: error("GCS transport failure")
     }
 
@@ -218,7 +222,7 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
         val body = "--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n$metadata\r\n--$boundary\r\nContent-Type: application/cbor\r\n\r\n"
             .encodeToByteArray() + data + "\r\n--$boundary--\r\n".encodeToByteArray()
         val url = base + "upload/storage/v1/b/" + config.bucket + "/o?uploadType=multipart&ifGenerationMatch=0"
-        val headers = htxHeaders("content-type" j "multipart/related; boundary=$boundary", "authorization" j authorized())
+        val headers = (listOf("content-type" j "multipart/related; boundary=$boundary") + authorized().toList()).toSeries()
         val upload = client.send(HtxMethod.POST, url, headers, body, config.timeout_ms)
         // Never replay a write blindly. Ambiguous completion and precondition failure both require an independent read of the extant object.
         val uploaded = when {
@@ -241,12 +245,11 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
         /** The storage origin; configuration cannot override it. */
         const val ORIGIN: String = "https://storage.googleapis.com/"
 
-        /** google-cloud-auth 1.16 token_cache.rs: a token is replaced this long before it expires. */
-        const val NORMAL_REFRESH_SLACK: ULong = 240uL
-
         /** Explicit serverless identity, supplied in the protected bootstrap document. No filesystem, ambient ADC, metadata identity or gcloud fallback. */
-        suspend fun from_service_account_json(config: GcsConfig, source: String, routeService: HtxRouteService): GcsArchive =
-            build(config, ORIGIN, Auth.Google(service_account_key(config, source)), routeService)
+        suspend fun from_service_account_json(config: GcsConfig, source: String, routeService: HtxRouteService): GcsArchive {
+            val key = service_account_key(config, source)
+            return build(config, ORIGIN, Auth.Google(key.credentials(listOf(STORAGE_SCOPE))), routeService)
+        }
 
         /** [from_service_account_json]'s checks before any client exists: the key google-cloud-auth's service-account builder accepts. */
         fun service_account_key(config: GcsConfig, source: String): ServiceAccountKey {
@@ -268,7 +271,7 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
             )
         }
 
-        /** Synchronous and offline in Rust: credentials load only when a request is made (here a TODO in [authorized]). */
+        /** Offline: credentials load ([load_credentials]) only when a request is made. The storage origin cannot be configured. */
         suspend fun new(config: GcsConfig, routeService: HtxRouteService): GcsArchive {
             config.validate()
             return build(config, ORIGIN, Auth.Google(null), routeService)
@@ -339,6 +342,34 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
     }
 }
 
+/**
+ * gcs.rs load_credentials: the ADC file precedence (credentials_file, GOOGLE_APPLICATION_CREDENTIALS, then
+ * `$HOME/.config/gcloud/application_default_credentials.json` when it exists, symlink or not) read through
+ * [protected_credentials], else the metadata server with the storage scope.
+ */
+suspend fun load_credentials(config: GcsConfig, http: HtxClientReactorElement): Credentials {
+    val path = config.credentials_file ?: var_os("GOOGLE_APPLICATION_CREDENTIALS")?.decodeToString() ?: var_os("HOME")?.decodeToString()?.let { home ->
+        val candidate = if (home.isEmpty() || home.endsWith('/')) "$home.config/gcloud/application_default_credentials.json"
+        else "$home/.config/gcloud/application_default_credentials.json"
+        val ring = Config.ring()
+        try {
+            if (ring.symlink_metadata(candidate) != null) candidate else null
+        } catch (failed: IllegalStateException) {
+            error("GCS credential file open")
+        } finally {
+            ring.closeNow()
+        }
+    }
+    if (path == null) {
+        return try {
+            mds_credentials(listOf(STORAGE_SCOPE), http)
+        } catch (refused: BuilderError) {
+            error("GCS credentials unsupported or invalid")
+        }
+    }
+    return source_credentials(path, STORAGE_SCOPE, http)
+}
+
 /** gcs.rs source_credentials: a protected ADC-format file as credentials for one scope, by `type`. The lease keeper's source identity too. */
 suspend fun source_credentials(path: String, scope: String, http: HtxClientReactorElement): Credentials {
     val json = protected_credentials(path)
@@ -392,6 +423,31 @@ fun protected_credentials(path: String): Any {
         }
     } finally {
         ring.closeNow()
+    }
+}
+
+/** gcs.rs gcloud_headers: `gcloud auth print-access-token --quiet` from PATH with prompts disabled, on every request. */
+suspend fun gcloud_headers(): HtxHeaders =
+    command_headers("gcloud", listOf("auth", "print-access-token", "--quiet"), mapOf("CLOUDSDK_CORE_DISABLE_PROMPTS" to "1"))
+
+/** gcs.rs command_headers: empty stdin, at most 16 KiB of stdout, a zero exit, and one line of bearer-safe characters. */
+suspend fun command_headers(command: String, args: List<String>, env: Map<String, String>): HtxHeaders {
+    fun failed(): Nothing = error("GCS test CLI authentication failed")
+    val output = try {
+        process { it.exec(command, args, ByteArray(0), env) }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (refused: Exception) {
+        failed()
+    }
+    val bytes = output.stdout
+    try {
+        if (bytes.size > 16 * 1024 || output.exitCode != 0) failed()
+        val token = (Bootstrap.utf8(bytes) ?: failed()).trimEnd('\r', '\n')
+        if (token.isEmpty() || !token.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "-._~+/=" }) failed()
+        return htxHeaders("authorization" j "Bearer $token")
+    } finally {
+        bytes.fill(0)
     }
 }
 

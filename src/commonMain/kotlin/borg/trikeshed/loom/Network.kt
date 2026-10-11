@@ -88,7 +88,7 @@ class Node(
                 client.open()
                 try {
                     val archive = gcs ?: config.gcs?.let {
-                        if (credentials != null) GcsArchive.build(it, GcsArchive.ORIGIN, GcsArchive.Auth.Google(credentials), client.reactor)
+                        if (credentials != null) GcsArchive.build(it, GcsArchive.ORIGIN, GcsArchive.Auth.Google(credentials.credentials(listOf(STORAGE_SCOPE))), client.reactor)
                         else if (it.service_account != null) GcsArchive.leased(it, client.reactor) else GcsArchive.new(it, client.reactor)
                     }
                     return Node(config, keys, store, replay, client, archive, crypto)

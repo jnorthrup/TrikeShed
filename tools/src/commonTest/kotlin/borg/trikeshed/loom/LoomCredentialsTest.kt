@@ -31,6 +31,12 @@ class LoomCredentialsTest {
         override val homedir: String get() = values["HOME"] ?: ""
     }
 
+    /** `PATH=<bin>:$PATH` for a bare command name, over the platform's processes. */
+    class PathLookup(val bin: String, val platform: ProcessOperations) : ProcessOperations {
+        override suspend fun exec(command: String, args: List<String>, stdin: ByteArray?, env: Map<String, String>): ProcessResult =
+            platform.exec(if ('/' in command) command else "$bin/$command", args, stdin, env)
+    }
+
     /**
      * The harness's loopback fake as a route service: requests and their arrival (ms) in order, each answered by the
      * next template (`status|content-type|body`, `EXPIRE_TIME` as now + 1 h, `HANG` never), unscripted ones by a 500.
@@ -320,6 +326,100 @@ class LoomCredentialsTest {
             assertEquals(aws.signed(region, creds, second(oursToken)), oursToken, "$name our subject token")
             assertEquals(form(rustBody).filterNot { it.startsWith("subject_token=") }, form(routes.log.last().body.toArray()).filterNot { it.startsWith("subject_token=") }, name)
             assertEquals(at.size, routes.at.size)
+        }
+    }
+
+    /** The harness's GcsArchive::new then one commit; the storage request is refused as the sandbox refused Rust's. */
+    suspend fun adc(name: String, config: GcsConfig, routes: Routes, env: Map<String, String>): String = withContext(Environment(env)) {
+        val archive = try {
+            GcsArchive.new(config, routes)
+        } catch (refused: IllegalStateException) {
+            return@withContext "error:${refused.message}"
+        }
+        try {
+            "ok:" + archive.commit("bundle-0001.cbor", ByteArray(37) { (it * 29 + 0x80).toByte() }).generation
+        } catch (refused: IllegalStateException) {
+            "error:${refused.message}"
+        } finally {
+            archive.close()
+        }
+    }
+
+    @Test
+    fun applicationDefaultCredentials() = session {
+        val bucket = GcsConfig("operator-a-ledger")
+        val user = GcsAdcVectors.inputs.getValue("adcFileInput")
+        val sa = GcsAdcVectors.inputs.getValue("saStorageInput")
+        // name, how the file is reached (file, env, well-known), its content and mode.
+        val cases = listOf(
+            Triple("adcFile", "file", user to "600"), Triple("adcEnv", "env", user to "600"), Triple("adcWellKnown", "known", user to "600"),
+            Triple("adcFileMode", "file", user to "644"), Triple("adcFileOwnerExec", "file", user to "700"), Triple("adcFileReadOnly", "file", user to "400"),
+            Triple("adcWellKnownMode", "known", user to "640"), Triple("adcFileMissing", "file", null), Triple("adcEnvMissing", "env", null),
+            Triple("adcFileNotJson", "file", "{\"type\":" to "600"), Triple("adcFileUnknownType", "file", """{"type":"api_key"}""" to "600"),
+            Triple("adcFileRefused", "file", user to "600"), Triple("adcFileServiceAccount", "file", sa to "600"),
+        )
+        for ((name, via, file) in cases) {
+            val (rust, at, replies) = vectors(name)
+            val files = dir(name)
+            run("/bin/mkdir", "-p", "$files/home/.config/gcloud")
+            val target = if (via == "known") "$files/home/.config/gcloud/application_default_credentials.json" else "$files/credentials.json"
+            file?.let { (template, mode) -> write(target, fill(template, files).encodeToByteArray(), mode) }
+            val routes = Routes(replies)
+            val env = mapOf("HOME" to "$files/home") + if (via == "env") mapOf("GOOGLE_APPLICATION_CREDENTIALS" to target) else emptyMap()
+            val result = adc(name, if (via == "file") bucket.copy(credentials_file = target) else bucket, routes, env)
+            assertCase(name, rust, at, routes, result)
+            if (name == "adcFile") {
+                // Every credential header rides the storage request after its own.
+                val upload = routes.storage.first()
+                assertEquals(listOf("content-type", "authorization", QUOTA_PROJECT_KEY), upload.headers.toList().map { it.a })
+                assertEquals("Bearer ya29.user-capture", upload.headerValue("authorization"))
+                assertEquals("operator-a-quota", upload.headerValue(QUOTA_PROJECT_KEY))
+            }
+        }
+        suspend fun special(name: String, env: (String) -> Map<String, String>, config: (String) -> GcsConfig = { bucket }, setup: suspend (String) -> Unit) {
+            val (rust, at, replies) = vectors(name)
+            val files = dir(name)
+            setup(files)
+            val routes = Routes(replies)
+            val started = TimeSource.Monotonic.markNow()
+            val result = adc(name, config(files), routes, env(files))
+            assertCase(name, rust, at, routes, if (name == "adcTimeout") "$result after ${started.elapsedNow().inWholeSeconds}s" else result)
+        }
+        val home = { files: String -> mapOf("HOME" to "$files/home") }
+        val file = { files: String -> bucket.copy(credentials_file = "$files/credentials.json") }
+        special("adcFileSymlink", home, file) {
+            write("$it/real.json", fill(user, it).encodeToByteArray(), "600")
+            run("/bin/ln", "-s", "$it/real.json", "$it/credentials.json")
+        }
+        special("adcFileDirectory", home, file) { run("/bin/mkdir", "$it/credentials.json") }
+        for ((name, size) in listOf("adcFileOversize" to 64 * 1024 + 1, "adcFileLimit" to 64 * 1024)) special(name, home, file) {
+            val body = fill(user, it).dropLast(1)
+            write("$it/credentials.json", (body + " ".repeat(size - body.length - 1) + "}").encodeToByteArray(), "600")
+        }
+        special("adcWellKnownDangling", home) {
+            run("/bin/mkdir", "-p", "$it/home/.config/gcloud")
+            run("/bin/ln", "-s", "$it/absent.json", "$it/home/.config/gcloud/application_default_credentials.json")
+        }
+        special("adcEnvEmpty", { mapOf("HOME" to "$it/home", "GOOGLE_APPLICATION_CREDENTIALS" to "") }) {}
+        special("adcMetadataServer", { mapOf("HOME" to "$it/home", GCE_METADATA_HOST_ENV_VAR to "127.0.0.1:9") }) {}
+        special("adcHomeUnset", { mapOf(GCE_METADATA_HOST_ENV_VAR to "127.0.0.1:9") }) {}
+        special("adcTimeout", { mapOf("HOME" to "$it/home", GCE_METADATA_HOST_ENV_VAR to "127.0.0.1:9") }, { bucket.copy(timeout_ms = 1500uL) }) {}
+    }
+
+    @Test
+    fun gcloudTestOnly() = session {
+        for (name in listOf("adcGcloud", "adcGcloudFails", "adcGcloudBadToken", "adcGcloudEmpty", "adcGcloudLarge")) {
+            val (rust, at, replies) = vectors(name)
+            val files = dir(name)
+            run("/bin/mkdir", "-p", "$files/bin")
+            write("$files/bin/gcloud", "#!/bin/sh\nprintf '%s|%s\\n' \"\$*\" \"\$CLOUDSDK_CORE_DISABLE_PROMPTS\" > \"$files/gcloud.args\"\n${GcsAdcVectors.inputs.getValue("${name}Script")}\n".encodeToByteArray(), "700")
+            val routes = Routes(replies)
+            val result = withContext(PathLookup("$files/bin", platform)) {
+                adc(name, GcsConfig("operator-a-ledger", allow_gcloud_cli_test_only = true), routes, mapOf("HOME" to "$files/home"))
+            }
+            assertCase(name, rust, at, routes, result)
+            assertEquals(GcsAdcVectors.inputs.getValue("${name}Args"), read_to_string("$files/gcloud.args") ?: "", "$name arguments")
+            if (name == "adcGcloud") assertEquals("Bearer ya29.gcloud-capture", routes.storage.first().headerValue("authorization"))
         }
     }
 
