@@ -6,6 +6,7 @@ import borg.trikeshed.collections.associative.itemArrayOf
 import borg.trikeshed.collections.associative.itemMapOf
 import borg.trikeshed.collections.associative.toItem
 import borg.trikeshed.collections.associative.toAny
+import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.parse.confix.ConfixDoc
@@ -13,6 +14,8 @@ import borg.trikeshed.parse.confix.ConfixCell
 import borg.trikeshed.parse.confix.cellKids
 import borg.trikeshed.parse.confix.rootCell
 import borg.trikeshed.parse.confix.reify
+import borg.trikeshed.parse.confix.row
+import borg.trikeshed.parse.confix.tag
 import borg.trikeshed.parse.confix.value
 
 /**
@@ -28,20 +31,16 @@ import borg.trikeshed.parse.confix.value
 object CanonicalCbor {
 
     /** Canonical encode a ConfixDoc to canonical CBOR (sorted-key, definite-length). */
-    fun encode(doc: ConfixDoc): ByteArray {
-        val rootCell = doc.rootCell ?: return Cbor.encode(itemMapOf())
-        val pairs = mutableMapOf<String, Any?>()
-        val kids = rootCell.cellKids
-        // Confix flat-kid order: (value, key) pairs.
-        var i = 0
-        while (i + 1 < kids.size) {
-            val valCell = kids[i]
-            val keyCell = kids[i + 1]
-            val key = keyCell.reify()?.toString() ?: ""
-            pairs[key] = valCell.reify()
-            i += 2
+    fun encode(doc: ConfixDoc): ByteArray = Cbor.encode(toCanonical(doc.rootCell?.let { item(it) } ?: itemMapOf()))
+
+    /** [cell] as an [Item]: an object from its flat (key, value) kid pairs, an array from its kids, a scalar reified. */
+    fun item(cell: ConfixCell): Item {
+        val kids = cell.cellKids
+        return when (cell.row.tag) {
+            IOMemento.IoObject -> itemMapOf(*Array(kids.size / 2) { (kids[2 * it].reify()?.toString() ?: "") to item(kids[2 * it + 1]) })
+            IOMemento.IoArray -> itemArrayOf(List(kids.size) { item(kids[it]) })
+            else -> cell.reify().toItem()
         }
-        return encodeSortedMap(pairs)
     }
 
     /** Canonical encode a JobCommand to canonical CBOR. */

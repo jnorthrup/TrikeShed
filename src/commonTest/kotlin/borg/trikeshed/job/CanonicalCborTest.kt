@@ -1,5 +1,7 @@
 package borg.trikeshed.job
 
+import borg.trikeshed.parse.confix.confixDoc
+import borg.trikeshed.util.toLowerHex
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -114,5 +116,15 @@ class CanonicalCborTest {
             ContentId.of(CanonicalCbor.encode(moveB)),
             "different toColumn values must yield different CIDs",
         )
+    }
+
+    @Test
+    fun confixDocEncodesKeysValuesAndNesting() {
+        // Python cbor2.dumps(json.loads(text), canonical=True) of the first text (numbers left out: Confix reads JSON numbers as doubles).
+        val expected = "a4616162c3a96162a26178f4617981a1617af66165a0646c69737484f5f4617380"
+        val doc = confixDoc("""{"b":{"y":[{"z":null}],"x":false},"a":"é","list":[true,false,"s",[]],"e":{}}""")
+        assertEquals(expected, CanonicalCbor.encode(doc).toLowerHex())
+        val reordered = confixDoc("""{ "list": [true, false, "s", []], "e": {}, "a": "é", "b": { "x": false, "y": [ { "z": null } ] } }""")
+        assertEquals(expected, CanonicalCbor.encode(reordered).toLowerHex())
     }
 }
