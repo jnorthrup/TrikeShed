@@ -34,7 +34,8 @@ fun transport_failure(error: Throwable, message: String): SendFailure =
 
 /**
  * The signed-message client toward enrolled peers, over the HTX client reactor: http to loopback peers when allowed,
- * https through the platform TLS codec (the JDK's on the JVM). One request per connection, no proxy, no redirects.
+ * https through the platform TLS codec (the JDK's on the JVM, [Tls13CodecBackend] natively). One request per connection,
+ * no proxy, no redirects.
  * Each exchange and each replication fan-out is admitted work under the client's supervisor; [drain] stops admission,
  * joins them and closes the HTTP stack.
  */
@@ -267,7 +268,7 @@ class Client(
         if (!request.path.startsWith('/') || request.path.any { it.code <= 0x20 || it.code >= 0x7f })
             throw SendFailure.Invalid("request URL")
         val method = HtxMethod.entries.firstOrNull { it.name == request.method } ?: throw SendFailure.Invalid("method")
-        if (base.scheme == "https" && tls is StubTlsCodecBackend) TODO("loom client: https peers on this target wait on the TLS 1.3 client")
+        if (base.scheme == "https" && tls is StubTlsCodecBackend) TODO("loom client: https peers on this target, whose platform registers StubTlsCodecBackend")
         return parseHtxRequest(base.serialization + request.path.substring(1), method = method, body = ByteSeries(request.to_bytes()))
             .copy(headers = htxHeaders("content-type" j "application/cbor"), timeoutMs = timeout_ms.toLong())
     }

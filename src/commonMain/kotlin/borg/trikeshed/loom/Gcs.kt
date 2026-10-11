@@ -15,7 +15,7 @@ import kotlinx.coroutines.*
  * cocaine-rats crates/loom-mesh/src/gcs.rs: the insert-only GCS settlement archive. Provider JSON is
  * transport, not mesh wire. The bearer is a keeper-installed `loom-lease/v1` Google token or the self-signed
  * JWT of an explicitly injected service-account key; requests go through [HtxClientReactorElement] (JDK TLS
- * on the JVM; elsewhere https stops at StubTlsCodecBackend until a TLS 1.3 client codec exists).
+ * on the JVM, [Tls13CodecBackend] natively; https stops at StubTlsCodecBackend on js and wasmJs).
  */
 const val MAX_METADATA: Int = 32 * 1024
 
@@ -319,7 +319,7 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
 
         suspend fun build(config: GcsConfig, base: String, auth: Auth, routeService: HtxRouteService): GcsArchive {
             if (base.startsWith("https://") && routeService is HtxReactorElement && routeService.tlsBackend is StubTlsCodecBackend) {
-                TODO("GCS over https on this target waits on a TLS 1.3 client codec behind TlsCodecBackend; the platform registers StubTlsCodecBackend")
+                TODO("GCS over https on this target, whose platform registers StubTlsCodecBackend")
             }
             return GcsArchive(config, base, HtxClientReactorElement(routeService, HtxClientOptions(maxRedirects = 0)).also { it.open() }, auth)
         }

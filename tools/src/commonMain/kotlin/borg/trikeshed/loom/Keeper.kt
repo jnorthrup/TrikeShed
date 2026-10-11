@@ -36,7 +36,7 @@ object Keeper {
 
             suspend fun build(routeService: HtxRouteService, https_only: Boolean): Http {
                 if (https_only && routeService is HtxReactorElement && routeService.tlsBackend is StubTlsCodecBackend) {
-                    TODO("lease provider https on this target waits on a TLS 1.3 client codec behind TlsCodecBackend; the platform registers StubTlsCodecBackend")
+                    TODO("lease provider https on this target, whose platform registers StubTlsCodecBackend")
                 }
                 return Http(HtxClientReactorElement(routeService, HtxClientOptions(maxRedirects = 0)).also { it.open() }, https_only)
             }
