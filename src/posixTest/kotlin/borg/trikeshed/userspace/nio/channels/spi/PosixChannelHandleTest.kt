@@ -31,8 +31,9 @@ class PosixChannelHandleTest {
                 } else SelectionResult(effect(it), it.userData)
             }
         }
-        override fun cancelPending() {
-            ready.addAll(pending.map { SelectionResult(-125, it.userData) })
+        override fun cancelPending() = complete(-125)
+        fun complete(res: Int) {
+            ready.addAll(pending.map { SelectionResult(res, it.userData) })
             pending.clear()
         }
         override fun reapCompletions(minComplete: Int) = ready.toList().also { ready.clear() }
@@ -104,7 +105,7 @@ class PosixChannelHandleTest {
         assertTrue(backend.seen.none { it.opcode == UringOp.CLOSE })
     }
 
-    @Test fun close_preserves_deferred_cancellation_and_can_retry_backend_close() {
+    @Test fun close_drains_deferred_requests_and_can_retry_backend_close() {
         val backend = Backend().apply {
             deferredCapabilities = UringOp.READ.mask
             failClose = true
@@ -114,9 +115,11 @@ class PosixChannelHandleTest {
         assertEquals(1, handle.submit())
         assertTrue(handle.wait(0).isEmpty())
         assertEquals(-11, handle.prepClose(10, 9))
+        // Close drains (PRELOAD): the in-flight read completes before the backend closes; only abort cancels.
+        backend.complete(1)
         assertFailsWith<IllegalStateException> { handle.close() }
         assertEquals(-9, handle.prepClose(10, 9))
-        assertEquals(listOf(ChannelResult(10, -125, 9)), handle.wait(0))
+        assertEquals(listOf(ChannelResult(10, 1, 9)), handle.wait(0))
         backend.failClose = false
         handle.close()
         assertEquals(2, backend.closes)
