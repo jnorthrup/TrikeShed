@@ -142,7 +142,7 @@ class KeeperJvmTest {
     /** `loom-lease` refuses the same arguments with the same message, before any file read or provider call, and exits 2. */
     @Test
     fun cliAgrees() = runBlocking {
-        assertEquals(2, binaries.getValue("loom-lease").a)
+        assertEquals(2, binaries(JvmSupervisor).getValue("loom-lease").a)
         val reactor = HtxReactorElement(JvmChannelOperations()).also { it.open() }
         try {
             for ((args, message) in KeeperVectors.cli) {

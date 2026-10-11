@@ -46,6 +46,6 @@ class LoomToolsTest {
             "[" + List(2048) { "0" }.joinToString(",") + "]" to "configuration complexity limit",
         )
         for ((input, message) in failures) assertEquals(message, failure { assertConfix(input.encodeToByteArray()) })
-        assertEquals("configuration paths required", failure { loomMesh(arrayOf("--confix-check")) })
+        assertEquals("configuration paths required", failure { confixCheck(arrayOf()) })
     }
 }

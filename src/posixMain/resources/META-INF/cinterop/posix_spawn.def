@@ -1,5 +1,5 @@
 package = borg.trikeshed.userspace.nio.posix
-headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h
 headers.osx = sys/random.h
 
 ---
@@ -22,6 +22,67 @@ static inline int trikeshed_spawn(pid_t *pid, const char *input,
         status = posix_spawnp(pid, argv[0], &actions, NULL, argv, environ);
     posix_spawn_file_actions_destroy(&actions);
     return status;
+}
+
+// std::process::Command's spawn for a supervised child: stdio and environment inherited, a process group of its own
+// (process_group(0)), an empty signal mask and SIGPIPE at its default. The child keeps stdio alone, as from a Rust parent
+// whose descriptors are all O_CLOEXEC: Darwin's POSIX_SPAWN_CLOEXEC_DEFAULT; ENOSYS where the platform has no such action.
+static inline int trikeshed_spawn_group(pid_t *pid, char *const argv[]) {
+    posix_spawnattr_t attributes;
+    posix_spawn_file_actions_t actions;
+    sigset_t mask, defaults;
+    short flags = POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF;
+    int status = posix_spawnattr_init(&attributes);
+    if (status != 0) return status;
+    status = posix_spawn_file_actions_init(&actions);
+    if (status != 0) {
+        posix_spawnattr_destroy(&attributes);
+        return status;
+    }
+#ifdef POSIX_SPAWN_CLOEXEC_DEFAULT
+    flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
+    for (int fd = 0; fd < 3 && status == 0; fd++) status = posix_spawn_file_actions_addinherit_np(&actions, fd);
+#else
+    status = ENOSYS;
+#endif
+    sigemptyset(&mask);
+    sigemptyset(&defaults);
+    sigaddset(&defaults, SIGPIPE);
+    if (status == 0) status = posix_spawnattr_setflags(&attributes, flags);
+    if (status == 0) status = posix_spawnattr_setpgroup(&attributes, 0);
+    if (status == 0) status = posix_spawnattr_setsigmask(&attributes, &mask);
+    if (status == 0) status = posix_spawnattr_setsigdefault(&attributes, &defaults);
+    if (status == 0) status = posix_spawnp(pid, argv[0], &actions, &attributes, argv, environ);
+    posix_spawn_file_actions_destroy(&actions);
+    posix_spawnattr_destroy(&attributes);
+    return status;
+}
+
+// SIGTERM, SIGINT and SIGHUP, each delivery written as one byte by an async-signal-safe handler to a pipe.
+static int trikeshed_signal_fds[2] = {-1, -1};
+
+static void trikeshed_signal_write(int signum) {
+    int saved = errno;
+    unsigned char value = (unsigned char) signum;
+    (void) write(trikeshed_signal_fds[1], &value, 1);
+    errno = saved;
+}
+
+/** The pipe's read end once the handlers are installed, or -1. */
+static inline int trikeshed_signal_pipe(void) {
+    struct sigaction action;
+    if (trikeshed_signal_fds[0] >= 0) return trikeshed_signal_fds[0];
+    if (pipe(trikeshed_signal_fds) != 0) return -1;
+    // A full pipe drops a delivery rather than block the handler; neither end reaches an exec'd program.
+    if (fcntl(trikeshed_signal_fds[1], F_SETFL, O_NONBLOCK) != 0 || fcntl(trikeshed_signal_fds[0], F_SETFD, FD_CLOEXEC) != 0 ||
+        fcntl(trikeshed_signal_fds[1], F_SETFD, FD_CLOEXEC) != 0) return -1;
+    memset(&action, 0, sizeof action);
+    action.sa_handler = trikeshed_signal_write;
+    sigemptyset(&action.sa_mask);
+    action.sa_flags = SA_RESTART;
+    if (sigaction(SIGTERM, &action, NULL) != 0 || sigaction(SIGINT, &action, NULL) != 0 || sigaction(SIGHUP, &action, NULL) != 0)
+        return -1;
+    return trikeshed_signal_fds[0];
 }
 
 static inline long long trikeshed_last_modified(const char *path) {
