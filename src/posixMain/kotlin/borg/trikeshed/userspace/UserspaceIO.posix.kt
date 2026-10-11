@@ -11,6 +11,7 @@ import borg.trikeshed.platform.loadPlatformHost
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
+import borg.trikeshed.userspace.nio.posix.trikeshed_open
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
@@ -293,7 +294,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             UringOp.FADVISE -> native.fadvise(sub.fd, sub.offset, sub.len, sub.operationFlags)
             UringOp.MADVISE -> adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
             UringOp.OPENAT -> {
-                val path = sub.paths().single()
+                // The path's bytes as submitted, NUL-terminated: one that is not UTF-8 opens as given.
+                val bytes = requireNotNull(buffer)
+                val start = bytes.arrayOffset() + bytes.position()
+                val path = bytes.array().copyOfRange(start, start + sub.len) + 0.toByte()
                 val flags = sub.offset.toInt()
                 val mode = when (flags and 3) { 0 -> O_RDONLY; 1 -> O_WRONLY; 2 -> O_RDWR; else -> return -22 }
                 fun bit(flag: Int, host: Int) = if (flags and flag != 0) host else 0
@@ -301,7 +305,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                     bit(UringOp.O_APPEND, O_APPEND) or bit(UringOp.O_NONBLOCK, O_NONBLOCK) or bit(UringOp.O_DIRECTORY, O_DIRECTORY) or
                     bit(UringOp.O_NOFOLLOW, O_NOFOLLOW) or bit(UringOp.O_CLOEXEC, O_CLOEXEC)
                 if (sub.fd != UringOp.AT_FDCWD) return -95
-                posixCompletion(open(path, hostFlags, sub.operationFlags.toUInt()))
+                posixCompletion(path.usePinned { trikeshed_open(it.addressOf(0), hostFlags, sub.operationFlags) })
             }
             // Path syscalls resolve from the working directory (AT_FDCWD); renameat's two paths are
             // NUL-separated in the one buffer, as an SQE has one address.

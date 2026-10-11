@@ -156,11 +156,14 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         /** Convenience constructors. */
         object Submissions {
             /** Portable OPENAT path bytes; flags use the Linux O_* values above, [mode] the creation permissions. */
-            fun openat(path: String, flags: Int = 0, userData: Long = 0, mode: Int = 438): UringSubmission {
-                require(path.isNotEmpty() && '\u0000' !in path)
-                val bytes = path.encodeToByteArray()
-                return UringSubmission(OPENAT, AT_FDCWD, 0, bytes.size, flags.toLong(),
-                    userData = userData, buffer = ByteBuffer(bytes), operationFlags = mode)
+            fun openat(path: String, flags: Int = 0, userData: Long = 0, mode: Int = 438): UringSubmission =
+                openat(path.encodeToByteArray(), flags, userData, mode)
+
+            /** OPENAT of a path as its bytes, which need not be UTF-8 (a path from `args_os`). */
+            fun openat(path: ByteArray, flags: Int = 0, userData: Long = 0, mode: Int = 438): UringSubmission {
+                require(path.isNotEmpty() && 0.toByte() !in path)
+                return UringSubmission(OPENAT, AT_FDCWD, 0, path.size, flags.toLong(),
+                    userData = userData, buffer = ByteBuffer(path.copyOf()), operationFlags = mode)
             }
 
             fun read(fd: Int, bufAddr: Long, len: Int, offset: Long, userData: Long): UringSubmission =

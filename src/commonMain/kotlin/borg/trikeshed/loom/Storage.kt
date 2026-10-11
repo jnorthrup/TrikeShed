@@ -504,7 +504,10 @@ fun FunctionalUringFacade.io(submission: () -> UringSubmission): Int =
     errno(submission).also { if (it < 0) error("storage I/O failure") }
 
 /** `OpenOptions::open`, with O_CLOEXEC as std always adds it. */
-fun FunctionalUringFacade.open(path: String, flags: Int, mode: Int): Int = io { Submissions.openat(path, flags or UringOp.O_CLOEXEC, 1, mode) }
+fun FunctionalUringFacade.open(path: String, flags: Int, mode: Int): Int = open(path.encodeToByteArray(), flags, mode)
+
+/** `OpenOptions::open` of a path as its bytes (an `OsStr`'s). */
+fun FunctionalUringFacade.open(path: ByteArray, flags: Int, mode: Int): Int = io { Submissions.openat(path, flags or UringOp.O_CLOEXEC, 1, mode) }
 
 fun FunctionalUringFacade.close(fd: Int) {
     io { Submissions.close(fd, 1) }

@@ -115,10 +115,15 @@ object JvmSupervisor : Supervisor {
         return delivered
     }
 
-    override fun spawn(program: String, args: List<String>): Int = Arena.ofConfined().use { arena ->
+    override fun spawn(program: ByteArray, args: List<ByteArray>): Int = Arena.ofConfined().use { arena ->
         val inherit = inheritCall
-        fun strings(values: List<String>): MemorySegment = arena.allocate(pointer, values.size + 1L).also { array ->
-            values.forEachIndexed { i, value -> array.setAtIndex(pointer, i.toLong(), arena.allocateFrom(value)) }
+        // A C string of [bytes] as they are; main's arguments reached the JVM as text, so here they are UTF-8.
+        fun c(bytes: ByteArray): MemorySegment = arena.allocate(bytes.size + 1L).also {
+            MemorySegment.copy(bytes, 0, it, ValueLayout.JAVA_BYTE, 0L, bytes.size)
+            it.set(ValueLayout.JAVA_BYTE, bytes.size.toLong(), 0)
+        }
+        fun strings(values: List<ByteArray>): MemorySegment = arena.allocate(pointer, values.size + 1L).also { array ->
+            values.forEachIndexed { i, value -> array.setAtIndex(pointer, i.toLong(), c(value)) }
             array.setAtIndex(pointer, values.size.toLong(), MemorySegment.NULL)
         }
         // posix_spawnattr_t, posix_spawn_file_actions_t and sigset_t are a pointer, a pointer and 4 bytes on Darwin,
@@ -146,8 +151,8 @@ object JvmSupervisor : Supervisor {
                 if (status == 0) status = setMaskCall.invokeExact(attributes, mask) as Int
                 if (status == 0) status = setDefaultsCall.invokeExact(attributes, defaults) as Int
                 if (status == 0) status = spawnpCall.invokeExact(
-                    pid, arena.allocateFrom(program), actions, attributes, strings(listOf(program) + args),
-                    strings(System.getenv().map { (k, v) -> "$k=$v" }),
+                    pid, c(program), actions, attributes, strings(listOf(program) + args),
+                    strings(System.getenv().map { (k, v) -> "$k=$v".encodeToByteArray() }),
                 ) as Int
                 if (status != 0) error("cannot start supervised program")
                 pid.get(int, 0)

@@ -14,7 +14,7 @@ class LoomToolsTest {
     val unbound = object : Supervisor {
         override suspend fun bind(listener: LitebikeListenerElement, listen: SocketAddr): suspend () -> Unit = error("bind")
         override fun signals(): ReceiveChannel<Int> = error("signals")
-        override fun spawn(program: String, args: List<String>): Int = error("spawn")
+        override fun spawn(program: ByteArray, args: List<ByteArray>): Int = error("spawn")
         override suspend fun wait(pid: Int): Int? = error("wait")
         override fun kill(pid: Int, signal: Int): Int = error("kill")
     }

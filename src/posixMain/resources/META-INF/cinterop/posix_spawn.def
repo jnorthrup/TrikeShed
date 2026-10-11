@@ -19,6 +19,12 @@ static inline char **trikeshed_args(int *argc) {
     return trikeshed_argv;
 }
 
+// open(2) of a path as its bytes: cinterop hands a `const char *` parameter a Kotlin String, which a path that is not
+// UTF-8 (one from args_os) cannot be.
+static inline int trikeshed_open(char *path, int flags, int mode) {
+    return open(path, flags, mode);
+}
+
 // Keep the platform's opaque pointer/struct ABI inside the C boundary.
 static inline int trikeshed_spawn(pid_t *pid, const char *input,
         const char *output, const char *error, char *const argv[]) {

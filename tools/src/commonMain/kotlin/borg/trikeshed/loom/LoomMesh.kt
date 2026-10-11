@@ -8,10 +8,11 @@ import kotlinx.coroutines.selects.select
 /**
  * cocaine-rats `crates/loom-mesh/src/main.rs`. Failures exit 1 behind `loom-mesh: `. Ported: `--config`, `--serverless`,
  * `--confix-check`, `--settle-release` and `--uring-self-test`; each other mode is a TODO naming what it waits on.
- * [supervisor] is the platform's seam for the serving modes; the result is the process's exit status.
+ * [supervisor] is the platform's seam for the serving modes; the result is the process's exit status. `--config` takes
+ * its path, program and arguments as their bytes ([args_os]); the `--confix-check` paths go on as their lossy text,
+ * where Rust opens them by their bytes.
  */
 fun loomMesh(args_os: List<ByteArray>, supervisor: Supervisor): Int {
-    // A path or program argument goes on as its lossy text; Rust passes its bytes.
     val args = Array(args_os.size) { args_os[it].decodeToString() }
     when (args.firstOrNull()) {
         "--runpod-identity-diagnostic-stdin", "--runpod-identity-diagnostic" ->
@@ -38,7 +39,7 @@ fun loomMesh(args_os: List<ByteArray>, supervisor: Supervisor): Int {
         // Quiescence alone does not prove a zero-cost outcome; no hold is released without reconciliation.
         "--settle-release" -> error("provider-cost reconciliation required; automatic hold release is disabled")
         "--serverless" -> return serverless(args, supervisor)
-        "--config" -> return config(args, supervisor)
+        "--config" -> return config(args_os, supervisor)
         else -> error(
             "usage: loom-mesh --config PATH [-- PROGRAM ARGS...] | --serverless | --inference-worker PATH | --inn PATH | --inn-proxy PATH | --settle PATH | --settle-public PATH POLICY | --settle-host PATH POLICY | --settle-init PATH | --settle-held PATH | --settle-recovery-page PATH [AFTER] | --settle-reconcile PATH BUNDLE | --settle-pod-reconcile PATH POD_CONFIG RESERVATION | --runpod-identity-diagnostic RECONCILE_CONFIG | --settle-release PATH RESERVATION | --customer-legacy-preview MIGRATION | --customer-legacy-import MIGRATION GCS | --uring-self-test [auto|native|emulated]",
         )
@@ -75,10 +76,10 @@ interface Supervisor {
     fun signals(): ReceiveChannel<Int>
 
     /**
-     * `Command::new(program).args(args).process_group(0).spawn()`, stdio and environment inherited: the child's pid,
-     * which is also its process group. Refused: "cannot start supervised program".
+     * `Command::new(program).args(args).process_group(0).spawn()` of `OsStr`s, as their bytes, stdio and environment
+     * inherited: the child's pid, which is also its process group. Refused: "cannot start supervised program".
      */
-    fun spawn(program: String, args: List<String>): Int
+    fun spawn(program: ByteArray, args: List<ByteArray>): Int
 
     /** `Child::wait`: the exit code, null when a signal ended the child. */
     suspend fun wait(pid: Int): Int?
@@ -99,10 +100,10 @@ sealed class End {
  * program, that program in its own process group; when it exits the node stops and its exit code is the status (1
  * when a signal ended it). The node and the program are stopped together, the program by [stop_child].
  */
-fun config(args: Array<String>, supervisor: Supervisor): Int = runBlocking(Dispatchers.Default) {
-    val path = args.getOrNull(1) ?: error("configuration path required")
-    val rest = args.drop(2)
-    if (rest.isNotEmpty() && (rest[0] != "--" || rest.size < 2)) error("invalid supervisor arguments")
+fun config(args_os: List<ByteArray>, supervisor: Supervisor): Int = runBlocking(Dispatchers.Default) {
+    val path = args_os.getOrNull(1) ?: error("configuration path required")
+    val rest = args_os.drop(2)
+    if (rest.isNotEmpty() && (!rest[0].contentEquals("--".encodeToByteArray()) || rest.size < 2)) error("invalid supervisor arguments")
     val (config, key) = Config.load(path)
     serve(Node.open(config, key), config.listen, rest, supervisor)
 }
@@ -115,7 +116,7 @@ fun serverless(args: Array<String>, supervisor: Supervisor): Int = runBlocking(D
 }
 
 /** main.rs after the mode: [node] on [listen] beside the program [rest] names, until either ends or a shutdown signal. */
-suspend fun serve(node: Node, listen: SocketAddr, rest: List<String>, supervisor: Supervisor): Int = coroutineScope {
+suspend fun serve(node: Node, listen: SocketAddr, rest: List<ByteArray>, supervisor: Supervisor): Int = coroutineScope {
     node.open()
     val serve = supervisor.bind(node.listener, listen)
     val signals = supervisor.signals()

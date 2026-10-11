@@ -75,11 +75,12 @@ object NativeSupervisor : Supervisor {
         return delivered
     }
 
-    override fun spawn(program: String, args: List<String>): Int = memScoped {
+    override fun spawn(program: ByteArray, args: List<ByteArray>): Int = memScoped {
         val pid = alloc<pid_tVar>()
         val argv = allocArray<CPointerVar<ByteVar>>(args.size + 2)
-        argv[0] = program.cstr.ptr
-        args.forEachIndexed { i, arg -> argv[i + 1] = arg.cstr.ptr }
+        // Each argument as its bytes and a NUL, as posix_spawn's char * takes them.
+        argv[0] = (program + 0.toByte()).toCValues().ptr
+        args.forEachIndexed { i, arg -> argv[i + 1] = (arg + 0.toByte()).toCValues().ptr }
         argv[args.size + 1] = null
         if (trikeshed_spawn_group(pid.ptr, argv) != 0) error("cannot start supervised program")
         pid.value

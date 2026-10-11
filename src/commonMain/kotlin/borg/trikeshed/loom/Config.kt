@@ -96,7 +96,10 @@ class Config(
             "replay_capacity", "min_age_secs", "allow_delete", "allow_loopback_http", "insecure_local_test_only", "runpod_serverless"]
 
         /** Read only the protected configuration, without reading a signing key. */
-        fun read(path: String): Config {
+        fun read(path: String): Config = read(path.encodeToByteArray())
+
+        /** [read] of a path as its bytes, which need not be UTF-8 (`args_os`). */
+        fun read(path: ByteArray): Config {
             val ring = ring()
             try {
                 return config_json(ring.protected_file(path, 131072)).also { it.validate() }
@@ -106,7 +109,10 @@ class Config(
         }
 
         /** The configuration and its local Ed25519 signing key (32 raw bytes) from the protected key file. */
-        fun load(path: String): Join<Config, ByteArray> {
+        fun load(path: String): Join<Config, ByteArray> = load(path.encodeToByteArray())
+
+        /** [load] of a configuration path as its bytes, which need not be UTF-8 (`args_os`). */
+        fun load(path: ByteArray): Join<Config, ByteArray> {
             val config = read(path)
             val ring = ring()
             val bytes = try {
@@ -178,7 +184,10 @@ fun <T> Any.deserialize_option(some: (Any) -> T): T? = if (this == Null) null el
  * The bytes of a regular file owned by the effective user, without group or other permission bits,
  * with one link and at most [max] bytes, opened without following a symlink.
  */
-fun FunctionalUringFacade.protected_file(path: String, max: Int): ByteArray {
+fun FunctionalUringFacade.protected_file(path: String, max: Int): ByteArray = protected_file(path.encodeToByteArray(), max)
+
+/** [protected_file] of a path as its bytes, which need not be UTF-8. */
+fun FunctionalUringFacade.protected_file(path: ByteArray, max: Int): ByteArray {
     val fd = open(path, UringOp.O_RDONLY or UringOp.O_NOFOLLOW, 0)
     try {
         val meta = metadata(fd)
