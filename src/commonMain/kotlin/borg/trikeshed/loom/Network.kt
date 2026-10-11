@@ -310,7 +310,7 @@ class Node(
                 Provider.Google -> (gcs ?: error("GCS missing")).install_lease(lease, now)
                 Provider.Runpod -> {
                     if (config.members.view.none { it.has(Role.Replica) && it.url == lease.scope }) error("invocation lease origin not enrolled")
-                    TODO("network.rs /v1/lease: client.rs Client::install_invocation_lease, the lease keeper's Runpod invocation lease")
+                    client.install_invocation_lease(lease, now)
                 }
                 // Cloudflare R2 and Vast leases are keeper credentials; the charter keeps GCS as the settlement archive.
                 else -> error("lease provider not accepted by mesh")

@@ -357,4 +357,16 @@ class Client(
         invocation_tokens.store(static_invocations(token_headers(tokens)))
         return this
     }
+
+    /** Install or replace a time-bounded Runpod invocation lease for one enrolled endpoint origin. */
+    fun install_invocation_lease(lease: Lease, now: ULong) {
+        if (lease.provider() != Provider.Runpod) error("invocation lease provider")
+        lease.check_usable(now)
+        runpod_origin(lease.scope)
+        val invocation = Invocation(lease.bearer(), lease.not_after)
+        while (true) {
+            val tokens = invocation_tokens.load()
+            if (invocation_tokens.compareAndSet(tokens, tokens + (lease.scope to invocation))) return
+        }
+    }
 }

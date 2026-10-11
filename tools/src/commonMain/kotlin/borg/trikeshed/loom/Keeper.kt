@@ -179,6 +179,20 @@ object Keeper {
         return revoked
     }
 
+    /** Deliver a lease to one enrolled node over the signed Admin route; the node's accepted `not_after`. */
+    suspend fun install(client: Client, node: Member, lease: Lease): ULong {
+        val body = lease.to_json()
+        try {
+            val a = array(decode(client.call(node, "POST", "/v1/lease", body)), 2)
+            tag(a[0], RECEIPT_FORMAT)
+            val accepted = number(a[1])
+            if (accepted != lease.not_after) error("lease install mismatch")
+            return accepted
+        } finally {
+            body.fill(0)
+        }
+    }
+
     /** Create an owner-only file that did not exist before. O_CREAT|O_EXCL never follows a final symlink, which is what O_NOFOLLOW adds in Rust. */
     fun write_new(path: String, bytes: ByteArray) {
         val channel = try {
@@ -295,14 +309,29 @@ non-secret receipt to --out.receipt.json; prints the receipt."""
                     lease.check_usable(now)
                     val config = Config.read(flags.need("mesh-config"))
                     val raw = protected_file(flags.need("admin-key-file"), 32)
-                    try {
+                    val client = try {
                         if (raw.size < 32) error("admin key must be 32 raw bytes")
                         val admin = config.member(flags.need("admin-id"))
                         if (!admin.key().contentEquals(Ed25519.publicKey(raw)) || !admin.has(Role.Admin)) error("admin identity mismatch")
+                        Client.new(admin.id, IpnsKeyPair(Ed25519.publicKey(raw), raw.copyOf()), false, 10_000uL)
                     } finally {
                         raw.fill(0)
                     }
-                    TODO("loom-lease install waits on client.rs Client::install_invocation_lease and an opened Client (its NioSupervisor services) in the keeper, to call /v1/lease on each Replica")
+                    client.open()
+                    try {
+                        flags.get("invocation-lease")?.let { client.install_invocation_lease(Lease.from_json(protected_file(it, 32 * 1024)), now) }
+                        val only = flags.get("node")
+                        var installed = 0
+                        for (node in config.members.view.filter { it.has(Role.Replica) && (only == null || only == it.id) }) {
+                            install(client, node, lease)
+                            installed++
+                        }
+                        if (installed == 0) error("no enrolled node selected")
+                        println("{\"installed\":$installed,\"not_after\":${lease.not_after}}")
+                    } finally {
+                        client.close()
+                    }
+                    return
                 }
                 verb != "mint" -> error(USAGE)
             }
