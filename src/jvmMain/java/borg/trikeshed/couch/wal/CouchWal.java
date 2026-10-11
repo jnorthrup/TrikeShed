@@ -36,7 +36,7 @@ public class CouchWal {
         String javaHome = System.getProperty("java.home");
         builder.environment().clear();
         builder.environment().putAll(borg.trikeshed.agent.AgentEnvironment.INSTANCE.build(
-            System.getenv(),
+            borg.trikeshed.graal.subvm.GuestEnvironment.INSTANCE.curated(),
             java.util.List.of(new File(javaHome, "bin").getPath()),
             java.util.Map.of("JAVA_HOME", javaHome)));
 
