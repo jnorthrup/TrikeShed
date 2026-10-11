@@ -9,6 +9,8 @@ import borg.trikeshed.reactor.*
 import borg.trikeshed.util.*
 import kotlin.concurrent.Volatile
 import kotlin.io.encoding.*
+import borg.trikeshed.userspace.*
+import borg.trikeshed.userspace.nio.platform.spi.*
 import kotlinx.coroutines.*
 
 /*
@@ -337,6 +339,62 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
     }
 }
 
+/** gcs.rs source_credentials: a protected ADC-format file as credentials for one scope, by `type`. The lease keeper's source identity too. */
+suspend fun source_credentials(path: String, scope: String, http: HtxClientReactorElement): Credentials {
+    val json = protected_credentials(path)
+    return try {
+        when ((json as? Map<*, *>)?.get("type") as? String) {
+            "authorized_user" -> user_account_credentials(json, listOf(scope), http)
+            "service_account" -> ServiceAccountKey.from_value(json).credentials(listOf(scope))
+            "impersonated_service_account" -> impersonated_credentials(json, listOf(scope), http)
+            "external_account" -> external_account_credentials(json, listOf(scope), http)
+            else -> error("GCS credentials unsupported or invalid")
+        }
+    } catch (refused: BuilderError) {
+        error("GCS credentials unsupported or invalid")
+    }
+}
+
+/**
+ * gcs.rs protected_credentials: opened without following a symlink and without blocking; a regular file of the effective
+ * user, mode exactly 0600, at most 64 KiB; then serde_json's `Value`.
+ */
+fun protected_credentials(path: String): Any {
+    val ring = Config.ring()
+    try {
+        val fd = try {
+            ring.open(path, UringOp.O_RDONLY or UringOp.O_NOFOLLOW or UringOp.O_NONBLOCK, 0)
+        } catch (failed: IllegalStateException) {
+            error("GCS credential file open")
+        }
+        try {
+            val meta = try {
+                ring.metadata(fd)
+            } catch (failed: IllegalStateException) {
+                error("GCS credential file protection")
+            }
+            if (meta.stx_mode and UringOp.S_IFMT != UringOp.S_IFREG || meta.stx_uid != platformGeteuid() ||
+                meta.stx_mode and 0xfff != 0x180 || meta.stx_size > 64uL * 1024uL
+            ) error("GCS credential file protection")
+            val bytes = try {
+                ring.read_to_end(fd, 64 * 1024 + 1)
+            } catch (failed: IllegalStateException) {
+                error("GCS credential file read")
+            }
+            try {
+                if (bytes.size > 64 * 1024) error("GCS credential file protection")
+                return json(bytes, unique = false) ?: error("GCS credentials unsupported or invalid")
+            } finally {
+                bytes.fill(0)
+            }
+        } finally {
+            ring.close(fd)
+        }
+    } finally {
+        ring.closeNow()
+    }
+}
+
 fun safe_bucket(bucket: String): Boolean =
     bucket.length in 3..63 && bucket.all { it in 'a'..'z' || it in '0'..'9' || it == '-' } &&
         bucket.first() != '-' && bucket.last() != '-'
@@ -395,5 +453,15 @@ class ServiceAccountKey(val client_email: String, val private_key_id: String, va
     companion object {
         /** RFC 7515 base64url without padding. */
         val JWS = Base64.UrlSafe.withPadding(Base64.PaddingOption.ABSENT)
+
+        /** serde_json::from_value: client_email, private_key_id, private_key and project_id required, universe_domain optional. */
+        fun from_value(json: Any?): ServiceAccountKey = try {
+            val key = serde_struct(json, listOf("client_email", "private_key_id", "private_key", "project_id", "universe_domain"))
+            key[3].serde_string()
+            key[4].serde_option_string()
+            ServiceAccountKey(key[0].serde_string(), key[1].serde_string(), key[2].serde_string())
+        } catch (refused: IllegalArgumentException) {
+            throw BuilderError("service_account")
+        }
     }
 }
