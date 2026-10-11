@@ -272,7 +272,7 @@ private fun HtxMethod.wireToken(): String =
         HtxMethod.OPTIONS -> "OPTIONS"
     }
 
-private fun parseHeaderLine(line: String): HtxHeader? {
+fun parseHeaderLine(line: String): HtxHeader? {
     val delimiter = line.indexOf(':')
     if (delimiter <= 0) {
         return null
@@ -282,7 +282,7 @@ private fun parseHeaderLine(line: String): HtxHeader? {
     return name.takeIf { it.isNotEmpty() }?.let { it j value }
 }
 
-private fun ByteArray.indexOfHeaderBoundary(): Int {
+fun ByteArray.indexOfHeaderBoundary(): Int {
     if (size < 4) {
         return -1
     }
