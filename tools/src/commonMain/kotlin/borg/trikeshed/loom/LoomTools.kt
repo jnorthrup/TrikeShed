@@ -10,4 +10,5 @@ val binaries: Map<String, Join<Int, (Array<String>) -> Unit>> = mapOf(
     "loom-mesh" to (1 j ::loomMesh),
     "loom-registry" to (2 j ::loomRegistry),
     "loom-kobold-stage" to (1 j ::loomKoboldStage),
+    "loom-lease" to (2 j ::loomLease),
 )

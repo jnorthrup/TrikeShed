@@ -9,6 +9,8 @@ fun loomRegistryMain(args: Array<String>) = status("loom-registry", args)
 
 fun loomKoboldStageMain(args: Array<String>) = status("loom-kobold-stage", args)
 
+fun loomLeaseMain(args: Array<String>) = status("loom-lease", args)
+
 /** Runs the binary [name]: an [IllegalStateException] goes to stderr behind `<name>: ` and exits with its status. */
 fun status(name: String, args: Array<String>) {
     val binary = binaries.getValue(name)
