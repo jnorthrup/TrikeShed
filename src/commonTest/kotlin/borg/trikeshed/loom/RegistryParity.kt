@@ -11,7 +11,8 @@ import kotlin.test.*
 /**
  * registry.rs against what its Rust build did for the same inputs ([RegistryVectors]), through a platform's litebike
  * listener. A load case scripts an [OriginFake] with the replies the Rust harness's fake gave: the requests it records
- * equal Rust's and the result is the same.
+ * equal Rust's and the result is the same. Over the registry [RegistryVectors.routeLoad] loads, each route answers as
+ * axum's router did, and the registry's own listener answers each raw request with the bytes hyper wrote.
  */
 abstract class RegistryParity {
     /** Serves [listener] on 127.0.0.1:[port] until cancelled; binds before its first suspension. */
@@ -19,6 +20,9 @@ abstract class RegistryParity {
 
     /** A loopback port free when asked. */
     abstract fun port(): Int
+
+    /** [request] on a new connection to 127.0.0.1:[port], then every byte answered until the peer closes. */
+    abstract fun exchange(port: Int, request: ByteArray): ByteArray
 
     /** The platform's HTX reactor, open. */
     abstract suspend fun reactor(): HtxReactorElement
@@ -33,20 +37,23 @@ abstract class RegistryParity {
         return Registry.load_for_loopback_test(config, routes)
     }
 
-    /** [rust]'s load case against an origin answering its replies. */
-    suspend fun case(name: String, rust: RegistryCase) {
+    /** [rust]'s load case against an origin answering its replies, then [after] over the registry it loaded. */
+    suspend fun case(name: String, rust: RegistryCase, after: suspend (Registry, OriginFake) -> Unit = { _, _ -> }) {
         val origin = OriginFake(this).start()
         val reactor = reactor()
         try {
             for (reply in rust.replies.view) origin.replies.add(reply.replace("{base}", origin.base).encodeToByteArray())
+            var registry: Registry? = null
             val result = try {
-                "ok:" + load(rust.config.replace("{base}", origin.base), reactor).defaults().view.joinToString("\n") { (source, default) -> "serving ${source.a}:${default.a} ${default.b} from ${source.b}" }
+                registry = load(rust.config.replace("{base}", origin.base), reactor)
+                "ok:" + registry.defaults().view.joinToString("\n") { (source, default) -> "serving ${source.a}:${default.a} ${default.b} from ${source.b}" }
             } catch (refused: IllegalStateException) {
                 "error:${refused.message}"
             }
             assertEquals(rust.result.replace("{base}", origin.base), result, name)
             assertEquals(rust.requests.size, origin.log.size, name)
             for (i in 0 until rust.requests.size) assertSameRequest(rust.requests[i].hexToByteArray(), origin.log[i], origin.base, "$name request $i")
+            registry?.let { after(it, origin) }
         } finally {
             reactor.close()
             origin.stop()
@@ -55,6 +62,31 @@ abstract class RegistryParity {
 
     suspend fun load_cases() {
         for ((name, rust) in RegistryVectors.cases.view) case(name, rust)
+    }
+
+    /** The routes through [Registry.serve], then the wire through the registry's listener on a platform bind. */
+    suspend fun serve_cases() = case("routeLoad", RegistryVectors.routeLoad) { registry, origin ->
+        for (route in RegistryVectors.routes.view) {
+            val response = registry.serve(route.method, Registry.path(route.uri.encodeToByteArray())!!)
+            val name = "${route.method} ${route.uri}"
+            assertEquals(route.status, response.status, name)
+            assertEquals(route.headers.view.map { it.replace("{base}", origin.base) }, response.headers.view.map { "${it.a}: ${it.b}" }, name)
+            assertEquals(route.body, response.body.toArray().decodeToString(), name)
+        }
+        val port = port()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        registry.open()
+        try {
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { bind(registry.listener, port) }
+            for (wire in RegistryVectors.wire.view) {
+                val request = wire.request.hexToByteArray()
+                val reply = withContext(Dispatchers.Default) { exchange(port, request) }
+                assertEquals(wire.reply.replace("{base}", origin.base), reply.decodeToString(), request.decodeToString().substringBefore("\r\n").take(120))
+            }
+        } finally {
+            registry.drain()
+            scope.coroutineContext[Job]!!.cancelAndJoin()
+        }
     }
 
     /**

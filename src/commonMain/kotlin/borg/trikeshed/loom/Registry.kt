@@ -1,13 +1,20 @@
 package borg.trikeshed.loom
 
+import borg.trikeshed.context.*
+import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.*
 import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.litebike.*
+import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.reactor.*
 import borg.trikeshed.userspace.nio.*
 import borg.trikeshed.userspace.nio.channels.*
 import borg.trikeshed.userspace.nio.file.*
 import borg.trikeshed.util.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -15,8 +22,8 @@ import kotlin.time.TimeSource
  * loom-mesh `registry`: the read-only OCI registry role over public object-storage origins
  * (DEC-083). Each served repository names its own operator's public HTTPS origin holding a plain
  * OCI image layout at `<origin>blobs/sha256/<hex>`; [Registry.load] fetches and SHA-256-verifies
- * every manifest its default tags reach. Also the local layout check run before an upload
- * ([verifyLayout]). The OCI routes wait on the HTTP listener.
+ * every manifest its default tags reach, and [Registry] serves those bytes and answers blob GETs
+ * with a 307 to the origin. Also the local layout check run before an upload ([verifyLayout]).
  */
 
 /** `registry::parse_digest`: `sha256:` and 64 lowercase hex digits, the shape of a [ContentId]. */
@@ -199,14 +206,20 @@ fun <T> Any.deserialize_map(field: String, repeated: List<Join<Map<String, Any>,
 
 /**
  * registry.rs Registry: manifests by digest, shared across sources (every repository whose defaults name a digest
- * fetched and verified it from its own origin), and the repositories served.
+ * fetched and verified it from its own origin), and the repositories served. As an element it answers the OCI read
+ * routes ([router]) on its own [listener], fed one complete HTTP request at a time by the platform bind adapter; drain
+ * stops admission at the listener, answers what was admitted, joins, then closes it.
  */
-class Registry(val manifests: Map<String, Manifest>, val repositories: Map<String, Repository>) {
+class Registry(
+    val manifests: Map<String, Manifest>,
+    val repositories: Map<String, Repository>,
+    parentJob: Job? = null,
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
     class Manifest(val media_type: String, val bytes: ByteArray)
 
     class Repository(val origin: Url, val tags: Map<String, String>, val manifests: MutableSet<String>, val blobs: MutableMap<String, ULong>)
 
-    companion object {
+    companion object Key : AsyncContextKey<Registry>() {
         const val MAX_MANIFEST: Int = 4 * 1024 * 1024
         const val MAX_MANIFESTS: Int = 256
         const val MAX_DEPTH: Int = 3
@@ -425,9 +438,233 @@ class Registry(val manifests: Map<String, Manifest>, val repositories: Map<Strin
             }
             return end.takeIf { start_bracket == end_bracket && colons <= 1 && !(end > start && at_sign == end - 1) && !has_percent }
         }
+
+        /** registry.rs oci_error: an OCI distribution error body. */
+        fun oci_error(status: Int, code: String): HtxResponse =
+            HtxResponse(status, ByteSeries("{\"errors\":[{\"code\":\"$code\",\"message\":\"$code\"}]}".encodeToByteArray()), htxHeaders("content-type" j "application/json"))
+
+        /** hyper's reason phrase of the statuses served. */
+        fun reason(status: Int): String = when (status) {
+            200 -> "OK"
+            307 -> "Temporary Redirect"
+            400 -> "Bad Request"
+            404 -> "Not Found"
+            405 -> "Method Not Allowed"
+            414 -> "URI Too Long"
+            else -> "Request Header Fields Too Large"
+        }
+
+        /** httparse's method and header-name bytes. */
+        fun token(b: Byte): Boolean = (b.toInt() and 0xff).let { it < 128 && (it.toChar().let { c -> c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c in "!#$%&'*+-.^_`|~" }) }
+
+        /**
+         * The request line and headers as httparse 1.10 reads them (CRLF lines, the listener having framed the request)
+         * and hyper 1.11's server checks them: (method j path) j version, the path that of http's `Uri`. A refusal throws
+         * the [Parse] hyper answers.
+         */
+        fun request_head(request: ByteArray): Join<Twin<String>, String> {
+            val end = request.indexOfHeaderBoundary()
+            if (end < 0) throw Parse(400)
+            val lines = ArrayList<ByteArray>()
+            var at = 0
+            while (at <= end) {
+                var i = at
+                while (i < end && !(request[i] == '\r'.code.toByte() && request[i + 1] == '\n'.code.toByte())) i++
+                lines.add(request.copyOfRange(at, i))
+                at = i + 2
+            }
+            val line = lines[0]
+            val method_end = line.indexOfFirst { it == ' '.code.toByte() }
+            if (method_end <= 0 || !line.copyOf(method_end).all(::token)) throw Parse(400)
+            val target_end = (method_end + 1 until line.size).firstOrNull { line[it] == ' '.code.toByte() } ?: throw Parse(400)
+            val target = line.copyOfRange(method_end + 1, target_end)
+            if (target.isEmpty() || !target.all { (it.toInt() and 0xff).let { b -> b in 0x21..0x7e || b >= 0x80 } } || !JsonReader.utf8(target, target.size))
+                throw Parse(400)
+            val version = line.copyOfRange(target_end + 1, line.size).decodeToString()
+            if (version != "HTTP/1.0" && version != "HTTP/1.1") throw Parse(400)
+            val headers = lines.drop(1)
+            for ((count, header) in headers.withIndex()) {
+                val colon = header.indexOfFirst { it == ':'.code.toByte() }
+                if (colon <= 0 || !header.copyOf(colon).all(::token)) throw Parse(400)
+                if (!header.copyOfRange(colon + 1, header.size).all { (it.toInt() and 0xff).let { b -> b == 9 || b in 0x20..0x7e || b >= 0x80 } })
+                    throw Parse(400)
+                // DEFAULT_MAX_HEADERS
+                if (count == 100) throw Parse(431)
+            }
+            if (target.size > 65534) throw Parse(414)
+            val path = path(target) ?: throw Parse(400)
+            var te = false
+            var chunked = false
+            var length: ULong? = null
+            for (header in headers) {
+                val colon = header.indexOfFirst { it == ':'.code.toByte() }
+                val value = header.decodeToString(colon + 1, header.size).trim(' ', '\t')
+                when (header.decodeToString(0, colon).lowercase()) {
+                    "transfer-encoding" -> {
+                        if (version == "HTTP/1.0") throw Parse(400)
+                        te = true
+                        chunked = value.substringAfterLast(',').trim().let { it.all { c -> c.code < 128 } && it.lowercase() == "chunked" }
+                    }
+                    "content-length" -> if (!te) {
+                        val n = value.takeIf { it.isNotEmpty() && it.all { c -> c in '0'..'9' } }?.toULongOrNull() ?: throw Parse(400)
+                        if (length != null && n != length) throw Parse(400)
+                        if (n > ULong.MAX_VALUE - 2uL) throw Parse(431)
+                        length = n
+                    }
+                }
+            }
+            if (te && !chunked) throw Parse(400)
+            return (line.decodeToString(0, method_end) j path) j version
+        }
+
+        /** http 1.5.0 `Uri::from_shared` of a request target, reduced to `Uri::path`; null where it refuses the target. */
+        fun path(s: ByteArray): String? {
+            if (s.size > 65534) return null
+            if (s.size == 1 && s[0] == '*'.code.toByte()) return "*"
+            if (s[0] == '/'.code.toByte()) return path_and_query(s, 0)
+            val scheme_end = scheme(s)
+            if (scheme_end < -1) return null
+            val authority_end = authority(s, maxOf(scheme_end, 0)) ?: return null
+            if (scheme_end < 0) return if (authority_end == s.size) "" else null
+            if (authority_end == scheme_end) return null
+            return if (authority_end == s.size) "/" else path_and_query(s, authority_end)
+        }
+
+        /** http's `scan_path_and_query` of [s] from [start]: the path before any query or fragment, `/` when empty. */
+        fun path_and_query(s: ByteArray, start: Int): String? {
+            if (s[start].toInt().toChar() !in "/?#") return null
+            var path_end = s.size
+            var i = start
+            var query = false
+            while (i < s.size) {
+                val b = s[i].toInt() and 0xff
+                if (b == '#'.code) {
+                    if (!query) path_end = i
+                    break
+                }
+                if (!query && b == '?'.code) {
+                    path_end = i
+                    query = true
+                } else if (!(b >= 0x80 || b == 0x21 || b in 0x24..0x3b || b == 0x3d || (if (query) b in 0x3f..0x7e else b in 0x40..0x5f || b in 0x61..0x7e || b == 0x22)))
+                    return null
+                i++
+            }
+            return s.decodeToString(start, path_end).ifEmpty { "/" }
+        }
+    }
+
+    override val key: CoroutineContext.Key<*> get() = Key
+
+    /** The OCI routes' listener, fed one complete HTTP request at a time by the platform bind adapter. */
+    val listener = LitebikeListenerElement(parentJob = supervisor)
+
+    /** The serve loop and every admitted request. */
+    val serving = SupervisorJob(supervisor)
+
+    override suspend fun open() {
+        if (state != ElementState.CREATED) return
+        super.open()
+        listener.open()
+        val requests = listener.register(Protocol.Http)
+        val scope = CoroutineScope(currentCoroutineContext() + serving)
+        scope.launch {
+            while (true) {
+                val message = try {
+                    requests.consume()
+                } catch (_: ClosedReceiveChannelException) {
+                    break
+                }
+                scope.launch { message.respond?.invoke(router(message.payload)) }
+            }
+        }
+        state = ElementState.ACTIVE
+    }
+
+    /** Stops admission at the listener, answers what was admitted, joins, then closes the listener. */
+    override suspend fun drain() {
+        if (state != ElementState.ACTIVE) return
+        state = ElementState.DRAINING
+        listener.unregister(Protocol.Http)
+        serving.complete()
+        serving.join()
+        listener.close()
+        supervisor.complete()
+        supervisor.join()
+        state = ElementState.CLOSED
+    }
+
+    override suspend fun close() {
+        listener.close()
+        super.close()
     }
 
     /** Defaults actually served: (repository j origin) j (tag j digest), in repository then tag order. */
     fun defaults(): Series<Join<Twin<String>, Twin<String>>> =
         repositories.entries.flatMap { (r, repo) -> repo.tags.entries.map { (t, d) -> (r j repo.origin.serialization) j (t j d) } }.toSeries()
+
+    /** registry.rs route: the OCI distribution read routes over the defaults. */
+    fun route(method: String, path: String): HtxResponse {
+        val head = method == "HEAD"
+        if (!head && method != "GET") return oci_error(405, "UNSUPPORTED")
+        if (path == "/v2/" || path == "/v2") return HtxResponse(200, ByteSeries("{}".encodeToByteArray()), htxHeaders("content-type" j "application/json"))
+        if (!path.startsWith("/v2/")) return oci_error(404, "NAME_UNKNOWN")
+        val rest = path.substring(4)
+        val manifest = rsplit_once(rest, "/manifests/")
+        val (name, reference) = manifest ?: rsplit_once(rest, "/blobs/") ?: return oci_error(404, "NAME_UNKNOWN")
+        val repo = repositories[name] ?: return oci_error(404, "NAME_UNKNOWN")
+        if (manifest != null) {
+            val digest = repo.tags[reference] ?: reference.takeIf { it in repo.manifests } ?: return oci_error(404, "MANIFEST_UNKNOWN")
+            val bytes = manifests.getValue(digest)
+            val headers = htxHeaders("content-type" j bytes.media_type, "content-length" j bytes.bytes.size.toString(), "docker-content-digest" j digest)
+            return HtxResponse(200, ByteSeries(if (head) ByteArray(0) else bytes.bytes), headers)
+        }
+        val size = repo.blobs[reference] ?: manifests[reference]?.takeIf { reference in repo.manifests }?.bytes?.size?.toULong()
+        val location = try {
+            blob_url(repo, reference)
+        } catch (refused: IllegalStateException) {
+            null
+        }
+        if (size == null || location == null) return oci_error(404, "BLOB_UNKNOWN")
+        if (head) return HtxResponse(200, emptyHtxBody(), htxHeaders("content-length" j size.toString(), "docker-content-digest" j reference))
+        return HtxResponse(307, emptyHtxBody(), htxHeaders("location" j location.serialization, "docker-content-digest" j reference))
+    }
+
+    /**
+     * registry.rs serve: [route] with `docker-distribution-api-version`, as axum's router answers it: the body's
+     * `content-length` where the route set none, and a HEAD answer without its body.
+     */
+    fun serve(method: String, path: String): HtxResponse {
+        val response = route(method, path)
+        val headers = response.headers.view.toMutableList()
+        headers += "docker-distribution-api-version" j "registry/2.0"
+        if (headers.none { it.a == "content-length" }) headers += "content-length" j response.body.rem.toString()
+        return HtxResponse(response.status, if (method == "HEAD") emptyHtxBody() else response.body, headers.toSeries())
+    }
+
+    /**
+     * One complete HTTP/1.x request to the bytes hyper writes for it, but its `date`. The listener closes the connection
+     * after the answer, which an HTTP/1.1 answer says where hyper puts `connection: close`; an empty body's
+     * `content-length` follows it but on a HEAD answer.
+     */
+    fun router(request: ByteArray): ByteArray {
+        val (line, version) = try {
+            request_head(request)
+        } catch (refused: Parse) {
+            return "HTTP/1.1 ${refused.status} ${reason(refused.status)}\r\nconnection: close\r\ncontent-length: 0\r\n\r\n".encodeToByteArray()
+        }
+        val response = serve(line.a, line.b)
+        val implicit = response.body.rem == 0 && line.a != "HEAD"
+        val head = StringBuilder(version).append(' ').append(response.status).append(' ').append(reason(response.status)).append("\r\n")
+        for ((name, value) in response.headers.view) if (!(implicit && name == "content-length")) head.append(name).append(": ").append(value).append("\r\n")
+        if (version == "HTTP/1.1") head.append("connection: close\r\n")
+        if (implicit) head.append("content-length: 0\r\n")
+        return head.append("\r\n").toString().encodeToByteArray() + response.body.toArray()
+    }
+
+    /** hyper's `Parse` error of a request head, with the status its server answers. */
+    class Parse(val status: Int) : Exception()
 }
+
+/** Rust `str::rsplit_once`: [text] around the last [delimiter]. */
+fun rsplit_once(text: String, delimiter: String): Twin<String>? =
+    text.lastIndexOf(delimiter).takeIf { it >= 0 }?.let { text.substring(0, it) j text.substring(it + delimiter.length) }
