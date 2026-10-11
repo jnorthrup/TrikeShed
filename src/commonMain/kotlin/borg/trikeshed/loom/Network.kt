@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
+
 package borg.trikeshed.loom
 
 import borg.trikeshed.collections.associative.*
@@ -60,8 +62,20 @@ class Node(
             return open_inner(config, key, gcs, crypto)
         }
 
-        /** [gcs] null opens the configured archive (leased when it names a service account) over the client's reactor. */
-        suspend fun open_inner(config: Config, key: ByteArray, gcs: GcsArchive?, crypto: IpnsCrypto): Node {
+        /** network.rs Node::open_serverless: the bootstrap's node, once its store is a direct child of the mounted RunPod volume. */
+        suspend fun open_serverless(bootstrap: Bootstrap, crypto: IpnsCrypto = Ed25519): Node {
+            mounted_store(bootstrap.config.store)
+            return open_inner(bootstrap.config, bootstrap.key, null, crypto, bootstrap.tokens, bootstrap.gcs)
+        }
+
+        /**
+         * [gcs] null opens the configured archive over the client's reactor: with [credentials] when the bootstrap
+         * injected them, else leased when it names a service account. [tokens] are the client's static invocations.
+         */
+        suspend fun open_inner(
+            config: Config, key: ByteArray, gcs: GcsArchive?, crypto: IpnsCrypto,
+            tokens: Map<String, String> = emptyMap(), credentials: ServiceAccountKey? = null,
+        ): Node {
             config.validate()
             val keys = IpnsKeyPair(Ed25519.publicKey(key), key)
             if (!keys.publicKey.contentEquals(config.member(config.id).key())) error("local key mismatch")
@@ -70,10 +84,12 @@ class Node(
             try {
                 val replay = load_replay(store, config)
                 val client = Client(config.id, keys, config.allow_loopback_http, config.insecure_local_test_only, config.request_timeout_ms, crypto)
+                client.invocation_tokens.store(static_invocations(tokens))
                 client.open()
                 try {
                     val archive = gcs ?: config.gcs?.let {
-                        if (it.service_account != null) GcsArchive.leased(it, client.reactor) else GcsArchive.new(it, client.reactor)
+                        if (credentials != null) GcsArchive.build(it, GcsArchive.ORIGIN, GcsArchive.Auth.Google(credentials), client.reactor)
+                        else if (it.service_account != null) GcsArchive.leased(it, client.reactor) else GcsArchive.new(it, client.reactor)
                     }
                     return Node(config, keys, store, replay, client, archive, crypto)
                 } catch (failure: Throwable) {

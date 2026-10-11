@@ -6,9 +6,9 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.selects.select
 
 /**
- * cocaine-rats `crates/loom-mesh/src/main.rs`. Failures exit 1 behind `loom-mesh: `. Ported: `--config`,
+ * cocaine-rats `crates/loom-mesh/src/main.rs`. Failures exit 1 behind `loom-mesh: `. Ported: `--config`, `--serverless`,
  * `--confix-check` and `--settle-release`; each other mode is a TODO naming what it waits on. [supervisor] is the
- * platform's seam for `--config`; the result is the process's exit status.
+ * platform's seam for the serving modes; the result is the process's exit status.
  */
 fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
     when (args.firstOrNull()) {
@@ -29,7 +29,7 @@ fun loomMesh(args: Array<String>, supervisor: Supervisor): Int {
         "--settle-pod-reconcile" -> TODO("loom-mesh --settle-pod-reconcile waits on the Runpod Pod billing client and GCS settlement storage")
         // Quiescence alone does not prove a zero-cost outcome; no hold is released without reconciliation.
         "--settle-release" -> error("provider-cost reconciliation required; automatic hold release is disabled")
-        "--serverless" -> TODO("loom-mesh --serverless waits on bootstrap.rs (Bootstrap::from_environment, mounted_store, the edge tokens) and Node::open_serverless")
+        "--serverless" -> return serverless(args, supervisor)
         "--config" -> return config(args, supervisor)
         else -> error(
             "usage: loom-mesh --config PATH [-- PROGRAM ARGS...] | --serverless | --inference-worker PATH | --inn PATH | --inn-proxy PATH | --settle PATH | --settle-public PATH POLICY | --settle-host PATH POLICY | --settle-init PATH | --settle-held PATH | --settle-recovery-page PATH [AFTER] | --settle-reconcile PATH BUNDLE | --settle-pod-reconcile PATH POD_CONFIG RESERVATION | --runpod-identity-diagnostic RECONCILE_CONFIG | --settle-release PATH RESERVATION | --customer-legacy-preview MIGRATION | --customer-legacy-import MIGRATION GCS | --uring-self-test [auto|native|emulated]",
@@ -96,9 +96,20 @@ fun config(args: Array<String>, supervisor: Supervisor): Int = runBlocking(Dispa
     val rest = args.drop(2)
     if (rest.isNotEmpty() && (rest[0] != "--" || rest.size < 2)) error("invalid supervisor arguments")
     val (config, key) = Config.load(path)
-    val node = Node.open(config, key)
+    serve(Node.open(config, key), config.listen, rest, supervisor)
+}
+
+/** main.rs `--serverless`: the node of the RunPod bootstrap in the environment, until a shutdown signal; no program. */
+fun serverless(args: Array<String>, supervisor: Supervisor): Int = runBlocking(Dispatchers.Default) {
+    if (args.size > 1) error("serverless does not supervise a child")
+    val bootstrap = Bootstrap.from_environment()
+    serve(Node.open_serverless(bootstrap), bootstrap.config.listen, emptyList(), supervisor)
+}
+
+/** main.rs after the mode: [node] on [listen] beside the program [rest] names, until either ends or a shutdown signal. */
+suspend fun serve(node: Node, listen: SocketAddr, rest: List<String>, supervisor: Supervisor): Int = coroutineScope {
     node.open()
-    val serve = supervisor.bind(node.listener, config.listen)
+    val serve = supervisor.bind(node.listener, listen)
     val signals = supervisor.signals()
     val child = if (rest.isEmpty()) null else supervisor.spawn(rest[1], rest.drop(2))
     val status = child?.let { async { runCatching { supervisor.wait(it) } } }

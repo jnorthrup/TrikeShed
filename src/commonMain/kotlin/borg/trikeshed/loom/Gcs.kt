@@ -243,7 +243,11 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
         const val NORMAL_REFRESH_SLACK: ULong = 240uL
 
         /** Explicit serverless identity, supplied in the protected bootstrap document. No filesystem, ambient ADC, metadata identity or gcloud fallback. */
-        suspend fun from_service_account_json(config: GcsConfig, source: String, routeService: HtxRouteService): GcsArchive {
+        suspend fun from_service_account_json(config: GcsConfig, source: String, routeService: HtxRouteService): GcsArchive =
+            build(config, ORIGIN, Auth.Google(service_account_key(config, source)), routeService)
+
+        /** [from_service_account_json]'s checks before any client exists: the key google-cloud-auth's service-account builder accepts. */
+        fun service_account_key(config: GcsConfig, source: String): ServiceAccountKey {
             if (config.credentials_file != null || config.allow_gcloud_cli_test_only || source.encodeToByteArray().size > 64 * 1024) {
                 error("serverless GCS credentials must be explicitly injected")
             }
@@ -255,12 +259,11 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
             ) refused()
             // google-cloud-auth's ServiceAccountKey: four required strings and an optional universe_domain.
             if (json["project_id"] !is String || json["universe_domain"].let { it != null && it != Null && it !is String }) refused()
-            val key = ServiceAccountKey(
+            return ServiceAccountKey(
                 json["client_email"] as String,
                 json["private_key_id"] as? String ?: refused(),
                 json["private_key"] as? String ?: refused(),
             )
-            return build(config, ORIGIN, Auth.Google(key), routeService)
         }
 
         /** Synchronous and offline in Rust: credentials load only when a request is made (here a TODO in [authorized]). */

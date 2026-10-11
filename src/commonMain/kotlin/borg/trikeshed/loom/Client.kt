@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalAtomicApi::class)
+
 package borg.trikeshed.loom
 
 import borg.trikeshed.collections.associative.*
@@ -10,6 +12,7 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlin.concurrent.atomics.*
 import kotlin.coroutines.CoroutineContext
 
 /** cocaine-rats crates/loom-mesh/src/client.rs: at most this many replication pushes in flight. */
@@ -23,6 +26,15 @@ sealed class SendFailure(message: String, cause: Throwable? = null) : IllegalSta
     class Unavailable(message: String) : SendFailure(message)
     class Invalid(message: String, cause: Throwable? = null) : SendFailure(message, cause)
 }
+
+/**
+ * client.rs Invocation: a provider edge credential, the whole `Authorization` value, for one exact endpoint origin.
+ * Bootstrap tokens have no LOOM deadline; lease tokens are refused once [not_after] passes.
+ */
+class Invocation(val header: String, val not_after: ULong?)
+
+/** client.rs static_invocations: bootstrap tokens, without a deadline. */
+fun static_invocations(tokens: Map<String, String>): Map<String, Invocation> = tokens.mapValues { Invocation(it.value, null) }
 
 /**
  * A failure inside the TLS codec is not an ordinary unavailable replica: public errors stay redacted, and trust
@@ -69,6 +81,9 @@ class Client(
 
     /** The NIO supervisor this client opened because its context had none. */
     var nio: NioSupervisor? = null
+
+    /** Each endpoint origin's provider edge credential, read by every request ([outgoing]); replaced whole on change. */
+    val invocation_tokens = AtomicReference<Map<String, Invocation>>(emptyMap())
 
     override suspend fun open() {
         if (state != ElementState.CREATED) return
@@ -253,7 +268,7 @@ class Client(
     /**
      * The HTTP request for [request] to [peer]'s validated URL, the CBOR message as its body. A request path that is
      * not absolute or leaves visible ASCII is refused rather than joined or percent-encoded; the peer would refuse the
-     * rewritten path anyway. The Runpod invocation Authorization header comes with the lease keeper.
+     * rewritten path anyway. An origin with an invocation credential carries it as `Authorization`.
      */
     fun outgoing(peer: Member, request: Message): HtxRequest {
         val base = try {
@@ -268,9 +283,25 @@ class Client(
         if (!request.path.startsWith('/') || request.path.any { it.code <= 0x20 || it.code >= 0x7f })
             throw SendFailure.Invalid("request URL")
         val method = HtxMethod.entries.firstOrNull { it.name == request.method } ?: throw SendFailure.Invalid("method")
+        val authorization = invocation(base)
         if (base.scheme == "https" && tls is StubTlsCodecBackend) TODO("loom client: https peers on this target, whose platform registers StubTlsCodecBackend")
         return parseHtxRequest(base.serialization + request.path.substring(1), method = method, body = ByteSeries(request.to_bytes()))
-            .copy(headers = htxHeaders("content-type" j "application/cbor"), timeoutMs = timeout_ms.toLong())
+            .copy(headers = htxHeaders("content-type" j "application/cbor", *authorization), timeoutMs = timeout_ms.toLong())
+    }
+
+    /** The `Authorization` header of [base]'s invocation credential, if any. A closed lease window is not an outage. */
+    fun invocation(base: Url): Array<HtxHeader> {
+        val token = invocation_tokens.load()[base.serialization] ?: return emptyArray()
+        token.not_after?.let { not_after ->
+            val now = try {
+                now()
+            } catch (failure: IllegalStateException) {
+                throw SendFailure.Invalid(failure.message ?: "clock")
+            }
+            if ((if (now > ULong.MAX_VALUE - CLOCK_SKEW) ULong.MAX_VALUE else now + CLOCK_SKEW) >= not_after)
+                throw SendFailure.Invalid("invocation lease expired")
+        }
+        return arrayOf("authorization" j token.header)
     }
 
     suspend fun call(peer: Member, method: String, path: String, payload: ByteArray): ByteArray =
@@ -321,7 +352,9 @@ class Client(
         return ids.toSeries()
     }
 
-    /** Endpoint-scoped Runpod edge credentials; the signed mesh authorization is unchanged. */
-    fun with_runpod_tokens(tokens: Map<String, String>): Client =
-        TODO("loom client: Runpod edge tokens (bootstrap::token_headers) and invocation leases (the lease keeper)")
+    /** Endpoint-scoped Runpod edge credentials; the signed mesh authorization is unchanged. Keys are exact canonical https endpoint origins, never wildcard domains. */
+    fun with_runpod_tokens(tokens: Map<String, String>): Client {
+        invocation_tokens.store(static_invocations(token_headers(tokens)))
+        return this
+    }
 }

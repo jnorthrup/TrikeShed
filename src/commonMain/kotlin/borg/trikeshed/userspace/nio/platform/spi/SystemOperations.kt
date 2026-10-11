@@ -22,6 +22,9 @@ interface SystemOperations : CoroutineContext.Element {
     fun getenv(name: String, defaultVal: String? = null): String?
     fun getProperty(name: String, defaultVal: String? = null): String?
     val homedir: String
+
+    /** std::env::var_os: the variable's bytes as the process environment holds them, null when unset. */
+    fun var_os(name: String): ByteArray? = getenv(name)?.encodeToByteArray()
 }
 
 /**

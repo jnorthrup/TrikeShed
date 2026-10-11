@@ -11,6 +11,7 @@ object HostSystem {
     private val sysOps by lazy { borg.trikeshed.userspace.nio.platform.spi.SystemOperations.default }
 
     fun getenv(name: String): String? = sysOps.getenv(name)
+    fun var_os(name: String): ByteArray? = sysOps.var_os(name)
     fun getProperty(name: String): String? = sysOps.getProperty(name)
 
     fun currentTimeMillis(): Long = PlatformHost.default.clock.nowMillis()
