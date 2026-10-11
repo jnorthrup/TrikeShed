@@ -5,6 +5,7 @@ package borg.trikeshed.loom
 import borg.trikeshed.htx.*
 import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.reactor.*
 import borg.trikeshed.util.*
 import kotlin.concurrent.Volatile
 import kotlin.io.encoding.*
@@ -149,21 +150,10 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
         }
     }
 
-    /** One exchange; null when the transport fails or times out (reqwest's `send` error). */
-    suspend fun exchange(method: HtxMethod, url: String, headers: HtxHeaders, body: ByteArray = ByteArray(0)): HtxResponse? = try {
-        client.request(parseHtxRequest(url, method = method, body = ByteSeries(body)).copy(headers = headers, timeoutMs = config.timeout_ms.toLong()))
-    } catch (timeout: TimeoutCancellationException) {
-        currentCoroutineContext().ensureActive()
-        null
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (failure: Exception) {
-        null
-    }
-
     suspend fun send(url: String, vararg headers: HtxHeader): HtxResponse {
         val authorization = authorized()
-        return exchange(HtxMethod.GET, url, htxHeaders(*headers, "authorization" j authorization)) ?: error("GCS transport failure")
+        return client.send(HtxMethod.GET, url, htxHeaders(*headers, "authorization" j authorization), ByteArray(0), config.timeout_ms)
+            ?: error("GCS transport failure")
     }
 
     suspend fun read_metadata(`object`: String, generation: ULong?): Metadata =
@@ -210,7 +200,7 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
             .encodeToByteArray() + data + "\r\n--$boundary--\r\n".encodeToByteArray()
         val url = base + "upload/storage/v1/b/" + config.bucket + "/o?uploadType=multipart&ifGenerationMatch=0"
         val headers = htxHeaders("content-type" j "multipart/related; boundary=$boundary", "authorization" j authorized())
-        val upload = exchange(HtxMethod.POST, url, headers, body)
+        val upload = client.send(HtxMethod.POST, url, headers, body, config.timeout_ms)
         // Never replay a write blindly. Ambiguous completion and precondition failure both require an independent read of the extant object.
         val uploaded = when {
             upload == null -> null
@@ -310,8 +300,12 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
             return if (loopback) "http://$authority/" else null
         }
 
-        suspend fun build(config: GcsConfig, base: String, auth: Auth, routeService: HtxRouteService): GcsArchive =
-            GcsArchive(config, base, HtxClientReactorElement(routeService, HtxClientOptions(maxRedirects = 0)).also { it.open() }, auth)
+        suspend fun build(config: GcsConfig, base: String, auth: Auth, routeService: HtxRouteService): GcsArchive {
+            if (base.startsWith("https://") && routeService is HtxReactorElement && routeService.tlsBackend is StubTlsCodecBackend) {
+                TODO("GCS over https on this target waits on a TLS 1.3 client codec behind TlsCodecBackend; the platform registers StubTlsCodecBackend")
+            }
+            return GcsArchive(config, base, HtxClientReactorElement(routeService, HtxClientOptions(maxRedirects = 0)).also { it.open() }, auth)
+        }
 
         fun bounded_body(response: HtxResponse, cap: Int): ByteArray {
             if (response.status != 200) error("GCS HTTP status")
@@ -326,6 +320,18 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
 fun safe_bucket(bucket: String): Boolean =
     bucket.length in 3..63 && bucket.all { it in 'a'..'z' || it in '0'..'9' || it == '-' } &&
         bucket.first() != '-' && bucket.last() != '-'
+
+/** reqwest `RequestBuilder::send`: the response, or null where reqwest fails the request (transport failure or timeout). */
+suspend fun HtxClientReactorElement.send(method: HtxMethod, url: String, headers: HtxHeaders, body: ByteArray, timeout_ms: ULong): HtxResponse? = try {
+    request(parseHtxRequest(url, method = method, body = ByteSeries(body)).copy(headers = headers, timeoutMs = timeout_ms.toLong()))
+} catch (timeout: TimeoutCancellationException) {
+    currentCoroutineContext().ensureActive()
+    null
+} catch (cancelled: CancellationException) {
+    throw cancelled
+} catch (failure: Exception) {
+    null
+}
 
 fun safe_name(name: String, cap: Int): Boolean =
     name.isNotEmpty() && name.length <= cap && name.split('/').all { part ->
