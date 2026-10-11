@@ -1,5 +1,7 @@
 package borg.trikeshed.loom
 
+import borg.trikeshed.litebike.LitebikeListenerElement
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlin.test.*
 
 /** Outputs of the cocaine-rats e4898291 binaries `loom-registry` and `loom-mesh --confix-check` on the same inputs. */
@@ -7,6 +9,15 @@ class LoomToolsTest {
     val oci = "src/commonTest/resources/oci"
 
     fun failure(block: () -> Unit): String? = assertFailsWith<IllegalStateException>(block = block).message
+
+    /** The platform seams loom-registry's usage refusal never reaches. */
+    val unbound = object : Supervisor {
+        override suspend fun bind(listener: LitebikeListenerElement, listen: SocketAddr): suspend () -> Unit = error("bind")
+        override fun signals(): ReceiveChannel<Int> = error("signals")
+        override fun spawn(program: String, args: List<String>): Int = error("spawn")
+        override suspend fun wait(pid: Int): Int? = error("wait")
+        override fun kill(pid: Int, signal: Int): Int = error("kill")
+    }
 
     @Test
     fun verifyLayoutMatchesLoomRegistry() {
@@ -19,7 +30,7 @@ class LoomToolsTest {
         assertEquals("layout blob missing", failure { verifyLayout("$oci/missing-blob") })
         assertEquals("layout json", failure { verifyLayout("$oci/index-not-json") })
         assertEquals("layout read", failure { verifyLayout("$oci/absent") })
-        assertEquals("usage: loom-registry verify <oci-layout-dir> | serve <config.json>", failure { loomRegistry(arrayOf("verify")) })
+        assertEquals("usage: loom-registry verify <oci-layout-dir> | serve <config.json>", failure { loomRegistry(arrayOf("verify"), unbound) })
     }
 
     @Test
