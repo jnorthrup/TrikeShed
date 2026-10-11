@@ -152,8 +152,7 @@ class GcsArchive(var config: GcsConfig, val base: String, val client: HtxClientR
         is Auth.Google -> {
             val key = auth.key ?: TODO(
                 "GcsArchive::new loads Application Default Credentials (credentials_file or GOOGLE_APPLICATION_CREDENTIALS through " +
-                    "protected_credentials, whose O_NOFOLLOW owner and 0600 checks the NIO facade's STATX does not report (Files.kt, M3b); " +
-                    "else ~/.config/gcloud or the metadata server; user, impersonated and external accounts each need their OAuth exchange) " +
+                    "protected_credentials; else ~/.config/gcloud or the metadata server; user, impersonated and external accounts each need their OAuth exchange) " +
                     "or the gcloud CLI; only from_service_account_json and leased are ported",
             )
             val now = now()

@@ -230,7 +230,7 @@ object Keeper {
         }
         flags.need("source")
         TODO(
-            "google_source --source waits on gcs.rs source_credentials: protected_credentials (fstat owner and mode, rejected by the NIO facade's policy) " +
+            "google_source --source waits on gcs.rs source_credentials: protected_credentials " +
                 "and google-cloud-auth's authorized_user, impersonated_service_account and external_account token exchanges",
         )
     }
