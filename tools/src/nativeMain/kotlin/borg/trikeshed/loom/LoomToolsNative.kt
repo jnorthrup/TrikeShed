@@ -77,11 +77,8 @@ object NativeSupervisor : Supervisor {
         argv[0] = program.cstr.ptr
         args.forEachIndexed { i, arg -> argv[i + 1] = arg.cstr.ptr }
         argv[args.size + 1] = null
-        when (trikeshed_spawn_group(pid.ptr, argv)) {
-            0 -> pid.value
-            ENOSYS -> TODO("a supervised program on this target: a spawn file action closing descriptors above stderr (glibc 2.34 posix_spawn_file_actions_addclosefrom_np)")
-            else -> error("cannot start supervised program")
-        }
+        if (trikeshed_spawn_group(pid.ptr, argv) != 0) error("cannot start supervised program")
+        pid.value
     }
 
     override suspend fun wait(pid: Int): Int? = withContext(Dispatchers.IO) {

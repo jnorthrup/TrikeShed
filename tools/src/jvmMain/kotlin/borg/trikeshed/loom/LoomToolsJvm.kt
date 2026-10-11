@@ -4,6 +4,7 @@ import borg.trikeshed.litebike.*
 import borg.trikeshed.platform.PosixSignals
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
+import java.io.File
 import java.io.FileDescriptor
 import java.io.FileOutputStream
 import java.io.PrintStream
@@ -63,6 +64,8 @@ object JvmSupervisor : Supervisor {
     val actionsInitCall by lazy { libc("posix_spawn_file_actions_init", FunctionDescriptor.of(int, pointer)) }
     val actionsDestroyCall by lazy { libc("posix_spawn_file_actions_destroy", FunctionDescriptor.of(int, pointer)) }
 
+    val closeCall by lazy { libc("posix_spawn_file_actions_addclose", FunctionDescriptor.of(int, pointer, int)) }
+
     /** Darwin's posix_spawn_file_actions_addinherit_np: under POSIX_SPAWN_CLOEXEC_DEFAULT, a descriptor the child keeps. */
     val inheritCall: MethodHandle? by lazy {
         linker.defaultLookup().find("posix_spawn_file_actions_addinherit_np").map { linker.downcallHandle(it, FunctionDescriptor.of(int, pointer, int)) }.orElse(null)
@@ -75,6 +78,8 @@ object JvmSupervisor : Supervisor {
 
     /** POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_CLOEXEC_DEFAULT (0x2 | 0x4 | 0x8 | 0x4000, Darwin). */
     const val SPAWN_FLAGS: Short = 16398
+    /** POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK (glibc). */
+    const val GLIBC_SPAWN_FLAGS: Short = 14
     const val SIGPIPE: Int = 13
 
     override suspend fun bind(listener: LitebikeListenerElement, listen: SocketAddr): suspend () -> Unit {
@@ -111,12 +116,12 @@ object JvmSupervisor : Supervisor {
 
     override fun spawn(program: String, args: List<String>): Int = Arena.ofConfined().use { arena ->
         val inherit = inheritCall
-            ?: TODO("a supervised program on this OS: a spawn file action closing descriptors above stderr (glibc 2.34 posix_spawn_file_actions_addclosefrom_np)")
         fun strings(values: List<String>): MemorySegment = arena.allocate(pointer, values.size + 1L).also { array ->
             values.forEachIndexed { i, value -> array.setAtIndex(pointer, i.toLong(), arena.allocateFrom(value)) }
             array.setAtIndex(pointer, values.size.toLong(), MemorySegment.NULL)
         }
-        // posix_spawnattr_t, posix_spawn_file_actions_t and sigset_t are a pointer, a pointer and 4 bytes on Darwin.
+        // posix_spawnattr_t, posix_spawn_file_actions_t and sigset_t are a pointer, a pointer and 4 bytes on Darwin,
+        // 336, 80 and 128 bytes on glibc.
         val attributes = arena.allocate(512, 16)
         val actions = arena.allocate(512, 16)
         val mask = arena.allocate(128, 8)
@@ -130,8 +135,12 @@ object JvmSupervisor : Supervisor {
                 emptySetCall.invokeExact(defaults) as Int
                 addSetCall.invokeExact(defaults, SIGPIPE) as Int
                 var status = 0
-                for (fd in 0..2) if (status == 0) status = inherit.invokeExact(actions, fd) as Int
-                if (status == 0) status = setFlagsCall.invokeExact(attributes, SPAWN_FLAGS) as Int
+                // The child keeps stdio alone. glibc has no closefrom action before 2.34: a close action for every
+                // descriptor above stderr in /proc/self/fd, which one closed meanwhile does not fail.
+                if (inherit != null) for (fd in 0..2) { if (status == 0) status = inherit.invokeExact(actions, fd) as Int }
+                else for (fd in (File("/proc/self/fd").list() ?: error("cannot start supervised program")).mapNotNull { it.toIntOrNull() })
+                    if (status == 0 && fd > 2) status = closeCall.invokeExact(actions, fd) as Int
+                if (status == 0) status = setFlagsCall.invokeExact(attributes, if (inherit != null) SPAWN_FLAGS else GLIBC_SPAWN_FLAGS) as Int
                 if (status == 0) status = setGroupCall.invokeExact(attributes, 0) as Int
                 if (status == 0) status = setMaskCall.invokeExact(attributes, mask) as Int
                 if (status == 0) status = setDefaultsCall.invokeExact(attributes, defaults) as Int

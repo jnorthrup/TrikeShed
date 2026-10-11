@@ -1,5 +1,5 @@
 package = borg.trikeshed.userspace.nio.posix
-headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h dirent.h stdlib.h
 headers.osx = sys/random.h
 
 ---
@@ -26,7 +26,9 @@ static inline int trikeshed_spawn(pid_t *pid, const char *input,
 
 // std::process::Command's spawn for a supervised child: stdio and environment inherited, a process group of its own
 // (process_group(0)), an empty signal mask and SIGPIPE at its default. The child keeps stdio alone, as from a Rust parent
-// whose descriptors are all O_CLOEXEC: Darwin's POSIX_SPAWN_CLOEXEC_DEFAULT; ENOSYS where the platform has no such action.
+// whose descriptors are all O_CLOEXEC: Darwin's POSIX_SPAWN_CLOEXEC_DEFAULT; on glibc, which has no closefrom action
+// before 2.34, a close action for every descriptor above stderr in /proc/self/fd (glibc ignores the action of one
+// closed meanwhile; one opened meanwhile without O_CLOEXEC is inherited).
 static inline int trikeshed_spawn_group(pid_t *pid, char *const argv[]) {
     posix_spawnattr_t attributes;
     posix_spawn_file_actions_t actions;
@@ -43,7 +45,18 @@ static inline int trikeshed_spawn_group(pid_t *pid, char *const argv[]) {
     flags |= POSIX_SPAWN_CLOEXEC_DEFAULT;
     for (int fd = 0; fd < 3 && status == 0; fd++) status = posix_spawn_file_actions_addinherit_np(&actions, fd);
 #else
-    status = ENOSYS;
+    DIR *descriptors = opendir("/proc/self/fd");
+    if (descriptors == NULL) status = errno;
+    else {
+        struct dirent *entry;
+        while (status == 0 && (entry = readdir(descriptors)) != NULL) {
+            char *end;
+            long fd = strtol(entry->d_name, &end, 10);
+            if (end != entry->d_name && *end == 0 && fd > 2 && fd != dirfd(descriptors))
+                status = posix_spawn_file_actions_addclose(&actions, (int) fd);
+        }
+        closedir(descriptors);
+    }
 #endif
     sigemptyset(&mask);
     sigemptyset(&defaults);
