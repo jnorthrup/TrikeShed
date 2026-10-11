@@ -1,6 +1,8 @@
 package borg.trikeshed.loom
 
 import borg.trikeshed.litebike.LitebikeListenerElement
+import borg.trikeshed.litebike.PosixLitebikeBindAdapter
+import borg.trikeshed.userspace.nio.channels.inet_ntop
 import borg.trikeshed.userspace.nio.posix.trikeshed_signal_pipe
 import borg.trikeshed.userspace.nio.posix.trikeshed_spawn_group
 import kotlinx.cinterop.*
@@ -36,11 +38,20 @@ fun status(name: String, args: Array<String>) {
  * posix_spawn cinterop, waitpid and kill(2), and SIGTERM, SIGINT and SIGHUP through the cinterop's signal pipe.
  */
 object NativeSupervisor : Supervisor {
-    override suspend fun bind(listener: LitebikeListenerElement, listen: SocketAddr): suspend () -> Unit = TODO(
-        "loom-mesh --config on this target: the litebike listener's bind adapter, which waits on SOCKET, BIND, LISTEN and " +
-            "ACCEPT in the POSIX userspace channel backend (PosixUserspaceChannelBackend.capabilities), as the node's peer " +
-            "client waits on SOCKET and CONNECT there",
-    )
+    override suspend fun bind(listener: LitebikeListenerElement, listen: SocketAddr): suspend () -> Unit {
+        // The adapter binds before its first suspension, so a refused bind has completed the job on return.
+        val serving = CoroutineScope(Dispatchers.IO + SupervisorJob()).async(start = CoroutineStart.UNDISPATCHED) {
+            PosixLitebikeBindAdapter.bindAndServe(listener, listen.port, inet_ntop(listen.ip))
+        }
+        if (serving.isCompleted) error("cannot bind mesh listener")
+        return {
+            try {
+                serving.await()
+            } finally {
+                serving.cancelAndJoin()
+            }
+        }
+    }
 
     override fun signals(): ReceiveChannel<Int> {
         val fd = trikeshed_signal_pipe()

@@ -235,7 +235,9 @@ class HtxReactorElement(
         val handle = ops.openChannel()
         var fd = -1
         try {
-            check(handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix) >= 0)
+            // Non-blocking, as the EAGAIN loops below read and write it; close-on-exec, as a supervised program holds none.
+            check(handle.prepSocket(SocketDomain.AF_INET.posix, SocketType.withFlags(SocketType.SOCK_STREAM, SocketType.SOCK_NONBLOCK,
+                SocketType.SOCK_CLOEXEC), SocketProtocol.IPPROTO_TCP.posix) >= 0)
             check(handle.submit() == 1) { "HTX SOCKET SQE was not submitted" }
             fd = handle.wait(1).single().res
             check(fd >= 0) { "HTX reactor socket failed: $fd" }
