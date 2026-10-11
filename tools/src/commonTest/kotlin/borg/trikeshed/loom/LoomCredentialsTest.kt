@@ -406,6 +406,58 @@ class LoomCredentialsTest {
         special("adcTimeout", { mapOf("HOME" to "$it/home", GCE_METADATA_HOST_ENV_VAR to "127.0.0.1:9") }, { bucket.copy(timeout_ms = 1500uL) }) {}
     }
 
+    /**
+     * lease.rs keeper `google_source` at `--source` (lease.rs:810-835): [source_credentials] with the cloud-platform
+     * scope, its `authorization` minting through IAM as `loom-lease mint google` does, IAM being the fake. The token
+     * and IAM requests, the lease or the error, against the harness running the Rust functions.
+     */
+    @Test
+    fun keeperSource() = session {
+        suspend fun keeper(name: String, mode: String = "600", input: String = GcsAdcVectors.inputs[name + "Input"] ?: ""): Pair<Routes, String> {
+            val (_, _, replies) = vectors(name)
+            val files = dir(name)
+            write("$files/subject.jwt", "eyJ.subject-capture.jwt\n".encodeToByteArray(), "600")
+            if (input.isNotEmpty()) write("$files/credentials.json", fill(input, files).encodeToByteArray(), mode)
+            val routes = Routes(replies)
+            val result = withContext(Environment(mapOf("HOME" to "$root/home"))) {
+                val http = Keeper.Http.for_loopback_test(routes)
+                try {
+                    val source = Keeper.google_source(Keeper.Flags(mapOf("source" to "$files/credentials.json"), emptyList()), http)
+                    val lease = Keeper.mint_google(http, "http://127.0.0.1:9/", source, SA, 3600uL, false, 1_791_590_400uL)
+                    "ok:" + lease.to_json().decodeToString() + " " + lease.receipt().to_json().decodeToString()
+                } catch (refused: IllegalStateException) {
+                    "error:${refused.message}"
+                } finally {
+                    http.close()
+                }
+            }
+            delay(300)
+            return routes to result
+        }
+        for (name in listOf("keeperUser", "keeperUserQuota", "keeperUserRefused", "keeperUserUnavailable", "keeperMacToken", "keeperBadHeaderValue",
+            "keeperMintRefused", "keeperImpersonated", "keeperExternal", "keeperFileMissing", "keeperUnknownType", "keeperNotJson")) {
+            val (rust, at, _) = vectors(name)
+            val (routes, result) = keeper(name)
+            assertCase(name, rust, at, routes, result)
+        }
+        val (rust, at, _) = vectors("keeperFileMode")
+        val (routes, result) = keeper("keeperFileMode", "644")
+        assertCase("keeperFileMode", rust, at, routes, result)
+        // A service-account source: its self-signed cloud-platform JWT is the bearer IAM receives.
+        val (sa, _, _) = vectors("keeperServiceAccount")
+        val input = GcsAdcVectors.inputs.getValue("saStorageInput")
+        val before = now().toLong()
+        val (minted, minting) = keeper("keeperServiceAccount", input = input)
+        assertEquals(sa.b, minting)
+        assertEquals(1, minted.log.size)
+        val bearer = parse(sa.a[0].hexToByteArray()).second.single { it.first == "authorization" }.second
+        val rustBefore = GcsAdcVectors.times.getValue("keeperServiceAccountBefore")
+        assertJwt(bearer, key(input), CLOUD, rustBefore - 1..rustBefore + 3, "keeperServiceAccount Rust")
+        assertJwt(minted.log[0].headerValue("authorization")!!, key(input), CLOUD, before - 1..now().toLong() + 1, "keeperServiceAccount")
+        val ours = minted.log[0]
+        assertSameRequest(sa.a[0], ours.copy(headers = ours.headers.toList().map { if (it.a == "authorization") it.a j bearer else it }.toSeries()), "keeperServiceAccount request")
+    }
+
     @Test
     fun gcloudTestOnly() = session {
         for (name in listOf("adcGcloud", "adcGcloudFails", "adcGcloudBadToken", "adcGcloudEmpty", "adcGcloudLarge")) {

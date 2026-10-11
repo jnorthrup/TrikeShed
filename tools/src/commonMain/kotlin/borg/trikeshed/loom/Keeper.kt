@@ -236,17 +236,24 @@ object Keeper {
         }
     }
 
-    suspend fun google_source(flags: Flags): String {
+    /** The source bearer: a protected token file's, or the `authorization` of [source_credentials] at --source with the cloud-platform scope. */
+    suspend fun google_source(flags: Flags, http: Http): String {
         flags.get("source-token-file")?.let { path ->
             val token = secret_file(path)
             if (!bearer_token(token, 16 * 1024)) error("invalid Google source token")
             return "Bearer $token"
         }
-        flags.need("source")
-        TODO(
-            "google_source --source waits on gcs.rs source_credentials: protected_credentials " +
-                "and google-cloud-auth's authorized_user, impersonated_service_account and external_account token exchanges",
-        )
+        val credentials = source_credentials(flags.need("source"), CLOUD_PLATFORM, http.client)
+        try {
+            val headers = try {
+                credentials.headers()
+            } catch (refused: CredentialsError) {
+                error("Google source authentication failed")
+            }
+            return headers.headerValue("authorization") ?: error("Google source authentication failed")
+        } finally {
+            credentials.close()
+        }
     }
 
     /** `--name value` flags, each at most once, and the repeatable `--extended` switch. Arguments arrive decoded, so Rust's `str` is [need]. */
@@ -338,7 +345,7 @@ non-secret receipt to --out.receipt.json; prints the receipt."""
             val secs = parse_duration(flags.need("duration"))
             val out = flags.need("out")
             val lease = when (provider) {
-                Provider.Google -> mint_google(http, GOOGLE_IAM, google_source(flags), flags.need("target"), secs, flags.switch("extended"), now)
+                Provider.Google -> mint_google(http, GOOGLE_IAM, google_source(flags, http), flags.need("target"), secs, flags.switch("extended"), now)
                 Provider.Cloudflare -> {
                     val token = secret_file(flags.need("api-token-file"))
                     mint_cloudflare(
