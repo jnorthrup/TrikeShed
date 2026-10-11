@@ -37,7 +37,7 @@ typealias HtxDispatch = Join<Join<HtxExchangeState, HtxRequest>, CompletableDefe
 
 class HtxReactorElement(
     private val channelOperations: ChannelOperations,
-    private val tlsBackend: TlsCodecBackend? = null,
+    val tlsBackend: TlsCodecBackend? = null,
     private val tlsConfig: TlsConfig = TlsConfig(
         alpnProtocols = arrayOf(TlsApplicationProtocol.HTTP_1_1).toSeries(),
     ),
