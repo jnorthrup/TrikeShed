@@ -276,7 +276,7 @@ object KanbanGraphEngine {
         val moved = card.copy(
             lane = chosen.to, state = chosen.to, revision = card.revision + 1,
             io = nextIo,
-            effects = card.effects.view.plus(effect).toSeries(),
+            effects = (card.effects.size + 1) j { i: Int -> if (i < card.effects.size) card.effects[i] else effect }, /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocations and copies via .plus(...).toSeries() */
         )
         val cards = graph.cards.size j { i: Int -> if (graph.cards[i].id == card.id) moved else graph.cards[i] }
 
