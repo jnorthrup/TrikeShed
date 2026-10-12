@@ -34,14 +34,8 @@ object ExtrudedSceneProjection {
             for (solid in n.solids.view) for (faceIndex in faceIndices.indices) {
                 if (camera.mode == CameraMode.ORTHOGRAPHIC && faceIndex != 1) continue
                 val p = face(solid, faceIndex, camera, viewport) ?: continue
-                /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocations */
-                val parts = (p.size + 1) j { i: Int ->
-                    when (i) {
-                        0 -> PathPart.Move(p[0])
-                        p.size -> PathPart.Close
-                        else -> PathPart.Line(p[i])
-                    }
-                }
+                /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocations and copies via .map { ... }.plus(...).toSeries() */
+                val parts = (p.size + 1) j { i: Int -> if (i == 0) PathPart.Move(p[0]) else if (i < p.size) PathPart.Line(p[i]) else PathPart.Close }
                 val fill = if (n.scope) n.color
                     else if (faceIndex == 1) Rgba(30, 33, 39) else n.color
                 items.add(p.sumOf { depth(it, n.level) } / 4 j DrawItem.Path(n.id, parts, fill, outline, if (n.id == selected) 2.0 else .8, clip = ancestorClip))
@@ -96,7 +90,7 @@ object ExtrudedSceneProjection {
             if (p.size < 2) continue
             val cableLevel = scene.nodes.view.maxOfOrNull { it.level } ?: 0
             items.add((p.sumOf { depth(it, cableLevel) } / p.size - .1) j DrawItem.Path(c.id,
-                /* ⚡ Bolt: Use zero-allocation j constructor to prevent intermediate List allocations */
+                /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocations and copies via .map { ... }.plus(...).toSeries() */
                 p.size j { i: Int -> if (i == 0) PathPart.Move(p[0]) else PathPart.Line(p[i]) }, stroke = Rgba(25, 145, 139), width = 1.6))
         }
         items.sortByDescending { it.a }
