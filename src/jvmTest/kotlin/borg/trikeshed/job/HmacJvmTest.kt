@@ -45,4 +45,20 @@ class HmacJvmTest {
             assertContentEquals(kdf.deriveData(HKDFParameterSpec.expandOnly(SecretKeySpec(prk, "HKDF"), info, length)), hkdfExpand(prk, info, length, ::hmacSha384))
         }
     }
+
+    @Test fun jdkHkdfBoundaries() {
+        val prk = ByteArray(64) { it.toByte() }
+        val info = byteArrayOf(3, 1, 4)
+        for (hmac in listOf(::hmacSha256, ::hmacSha384)) {
+            val width = hmac(prk, info).size
+            val kdf = KDF.getInstance("HKDF-SHA${width * 8}")
+            for (length in listOf(1, width - 1, width, width + 1, 255 * width)) {
+                assertContentEquals(
+                    kdf.deriveData(HKDFParameterSpec.expandOnly(SecretKeySpec(prk, "HKDF"), info, length)),
+                    hkdfExpand(prk, info, length, hmac),
+                )
+            }
+            assertFailsWith<IllegalArgumentException> { hkdfExpand(prk, info, Int.MAX_VALUE, hmac) }
+        }
+    }
 }

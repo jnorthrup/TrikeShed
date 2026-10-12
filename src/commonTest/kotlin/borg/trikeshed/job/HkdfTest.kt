@@ -38,4 +38,43 @@ class HkdfTest {
             assertContentEquals(okm, hkdfExpand(prk, info, okm.size))
         }
     }
+
+    @Test fun outputLengthBounds() {
+        val prk = ByteArray(64) { it.toByte() }
+        val info = byteArrayOf(3, 1, 4)
+        for (hmac in listOf(::hmacSha256, ::hmacSha384)) {
+            val width = hmac(prk, info).size
+            var calls = 0
+            val counted = { key: ByteArray, text: ByteArray -> calls++; hmac(key, text) }
+            assertFailsWith<IllegalArgumentException> { hkdfExpand(prk, info, -1, counted) }
+            assertContentEquals(ByteArray(0), hkdfExpand(prk, info, 0, counted))
+            assertEquals(0, calls)
+            for (length in listOf(1, width - 1, width, width + 1, 255 * width)) {
+                calls = 0
+                val output = hkdfExpand(prk, info, length, counted)
+                assertEquals(length, output.size)
+                assertEquals((length + width - 1) / width, calls)
+                assertContentEquals(
+                    hmac(prk, info + 1.toByte()).copyOf(minOf(width, length)),
+                    output.copyOf(minOf(width, length)),
+                )
+            }
+            calls = 0
+            assertFailsWith<IllegalArgumentException> { hkdfExpand(prk, info, 255 * width + 1, counted) }
+            assertEquals(1, calls, "Reject after determining the selected hash width")
+        }
+    }
+
+    @Test fun hmacWidthMustBePositiveAndFixed() {
+        val empty = ByteArray(0)
+        var calls = 0
+        assertFailsWith<IllegalArgumentException> {
+            hkdfExpand(empty, empty, 1) { _, _ -> calls++; empty }
+        }
+        assertEquals(1, calls)
+        calls = 0
+        assertFailsWith<IllegalArgumentException> {
+            hkdfExpand(empty, empty, 33) { _, _ -> ByteArray(if (++calls == 1) 32 else 48) }
+        }
+    }
 }
