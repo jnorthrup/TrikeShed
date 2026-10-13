@@ -282,10 +282,12 @@ class DocumentCuratorTest {
                 assertEquals("AVAILABLE", output["nlpStatus"])
                 assertNotNull(output["sheet"])
                 assertEquals(instructions, sentPrompt!!.messages[0].content)
-                assertEquals(jsonOf(mapOf(
-                    "source" to DocumentCuratorCodec.source(record.source),
-                    "nlp" to DocumentCuratorCodec.nlp(assertNotNull(record.nlp)),
-                )), sentPrompt!!.messages[1].content)
+                val retainedNlp = assertNotNull(record.nlp)
+                assertEquals(DocumentCuratorCodec.nlp(svo(correctedText)), DocumentCuratorCodec.nlp(retainedNlp))
+                assertEquals(reify(jsonOf(mapOf(
+                    "source" to DocumentCuratorCodec.source(corrected),
+                    "nlp" to DocumentCuratorCodec.nlpPrompt(retainedNlp),
+                ))), reify(sentPrompt!!.messages[1].content))
                 assertTrue(curator.receipts().view.any { it.a == cid &&
                     DocumentCuratorCodec.record(it.b) == DocumentCuratorCodec.record(record) })
                 assertEquals(1, record.submittedReceiptCids.size)
@@ -312,6 +314,8 @@ class DocumentCuratorTest {
                     assertEquals(corrected, replayed.source)
                     assertEquals(instructions, replayed.instructions)
                     assertEquals(record.model, replayed.model)
+                    assertEquals(DocumentCuratorCodec.nlp(retainedNlp),
+                        DocumentCuratorCodec.nlp(assertNotNull(replayed.nlp)))
                     assertEquals(1, modelCalls)
                     assertTrue(restored.receipts().view.any { it.a == cid })
                     val legacyMap = DocumentCuratorCodec.record(record) - setOf("instructions", "quotationReserved",
@@ -346,8 +350,8 @@ class DocumentCuratorTest {
                 assertEquals(NalCopula.PRODUCT, attribution.mapped.copula)
                 assertEquals(RelationKind.MATCH, attribution.signal.relation)
                 assertEquals(Nal.UNIT, attribution.signal.evidence.positive)
-                assertEquals(1, attribution.evidenceBasis.leaves.size)
-                assertEquals(f.source.originalCid, attribution.evidenceBasis.leaves[0])
+                assertEquals(listOf(f.source.originalCid) + first.record.readingReceiptCids.values(),
+                    attribution.evidenceBasis.leaves.values())
                 assertNotNull(f.cas.get(attribution.receiptCid))
                 val receipt = CanonicalCbor.decodeMap(f.cas.get(attribution.receiptCid)!!)
                 assertEquals(attribution.expression.toKifString(), receipt["expression"])
@@ -547,9 +551,16 @@ class DocumentCuratorTest {
                 assertTrue(release.isCompleted)
                 val input = reify(it.messages[it.messages.size - 1].content) as Map<*, *>
                 val linguistic = input["nlp"] as Map<*, *>
-                assertEquals("Rain causes floods.", linguistic["text"])
-                val sentence = (linguistic["sentences"] as List<*>).single() as Map<*, *>
-                assertEquals(4, (sentence["tokens"] as List<*>).size)
+                val columns = linguistic["columns"] as Map<*, *>
+                assertEquals(listOf("index", "begin", "end", "tokens", "dependencies"), columns["sentence"])
+                assertEquals(listOf("index", "begin", "end", "word", "lemma", "tag", "ner"), columns["token"])
+                assertEquals(listOf("governor", "dependent", "relation"), columns["dependency"])
+                val sentence = (linguistic["sentences"] as List<*>).single() as List<*>
+                assertEquals(5, sentence.size)
+                assertEquals(listOf(0, 0, 19), sentence.take(3).map { value -> (value as Number).toInt() })
+                assertEquals(4, (sentence[3] as List<*>).size)
+                assertEquals(4, (sentence[4] as List<*>).size)
+                assertFalse(linguistic.containsKey("text"))
                 assertEquals("Rain causes floods.", (input["source"] as Map<*, *>)["text"])
                 modelStarted.complete(Unit); response(envelope(proposal()))
             }, capacity = 1)
@@ -566,6 +577,13 @@ class DocumentCuratorTest {
                 val results = requests.awaitAll()
                 drained.await()
                 assertEquals(6, nlpCalls); assertEquals(6, modelCalls)
+                assertEquals(6, results.size)
+                for (result in results) {
+                    val readings = result.record.toolReceipts.view.filter { it.stage != DocumentToolStage.AXIOMATICS }
+                    assertEquals(3, readings.size)
+                    assertTrue(readings.all { it.status == DocumentToolStatus.SUCCESS &&
+                        it.receiptCid != null && it.completedAt != null })
+                }
                 assertEquals(1, results.sumOf { it.acceptedReceiptCids.size })
                 assertFailsWith<Exception> { curator.curate(f.source) }
             } finally { release.complete(Unit); curator.close(); f.bag.drain(); f.closeSessions() }
@@ -633,17 +651,19 @@ class DocumentCuratorTest {
         withTimeout(10000) {
             val f = fixture(this)
             var raw = envelope(proposal()).replace("\"subject\":\"Rain\"", "\"subject\":\"\\u0052ain\"").replace("0.9", "9e-1")
-            val curator = f.curator(this, model = { response(raw) })
+            var modelCalls = 0
+            val curator = f.curator(this, model = { modelCalls++; response(raw) })
             try {
                 val valid = curator.curate(f.source)
                 assertEquals(1, valid.acceptedReceiptCids.size)
                 assertEquals("Rain", valid.record.proposals[0].subject)
                 assertEquals(raw, valid.record.model!!.content)
                 raw += " trailing"
-                val malformed = curator.curate(f.source)
+                val malformed = curator.curate(f.source.copy(correlation = "strict-json-trailing"))
                 assertEquals(0, malformed.acceptedReceiptCids.size)
                 assertTrue(malformed.pendingReceiptCids.size > 0)
                 assertEquals(raw, malformed.record.model!!.content)
+                assertEquals(2, modelCalls)
             } finally { curator.close(); f.bag.drain(); f.closeSessions() }
         }
     }
@@ -730,14 +750,14 @@ class DocumentCuratorTest {
      * elsewhere in this file; they say nothing about what the real host parser actually
      * emits. These cases run the real installed CoreNLP 4.5.10 guest module (no
      * skip-on-missing-module — the module is expected present) so NlpcoreAxiomatics'
-     * negative/modal/passive/reported-speech exclusions are proven against real parses,
-     * not a canned model answer.
+     * strict negated-causal evidence and modal/passive/reported-speech refusals are checked
+     * against real parses, not a canned model answer.
      */
     @Test fun nlpcoreRecognitionFailsClosedOnRealCoreNlpParses() {
         borg.trikeshed.graal.subvm.CoreNlpRuntime().use { reader ->
             val cases = listOf(
                 "Rain causes floods." to 1,
-                "Rain does not cause floods." to 0,
+                "Rain does not cause floods." to 1,
                 "Rain may cause floods." to 0,
                 "Floods are caused by rain." to 0,
                 // CoreNLP tags "stops" as a noun and roots this sentence at "If".
@@ -760,6 +780,11 @@ class DocumentCuratorTest {
                 for (i in 0 until axioms.size) {
                     assertEquals("case-cid", axioms[i].rule.provenanceCid, "source provenance retained: $text")
                     assertTrue(axioms[i].rule.isEternal)
+                }
+                if (text == "Rain does not cause floods.") {
+                    assertEquals("Rain", axioms[0].rule.antecedent)
+                    assertEquals("floods", axioms[0].rule.consequent)
+                    assertEquals(EvidenceCoord(0L, 900L), axioms[0].rule.evidence)
                 }
             }
 
