@@ -386,7 +386,7 @@ public class FunctionalUringFacade(
     suspend fun submitAwait(): Series<UringCompletion> {
         val batch = synchronous {
             check(!closing) { "Uring is draining or closed" }
-            pending.toSeries().also { submissions ->
+            pending.toTypedArray().toSeries().also { submissions ->
                 pending.clear()
                 for (i in 0 until submissions.size) outstanding.add(submissions[i].userData)
                 active++

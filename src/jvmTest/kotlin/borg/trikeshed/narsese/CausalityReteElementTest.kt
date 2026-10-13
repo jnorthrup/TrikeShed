@@ -6,7 +6,11 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -17,6 +21,42 @@ import kotlin.test.assertTrue
  * bag signals.
  */
 class CausalityReteElementTest {
+
+    @Test
+    fun firingSnapshotRemainsStableAfterTraceEviction() = runBlocking {
+        val bag = BeliefBagElement(capacity = 64)
+        val firstRule = EternalRule("fire", "smoke", NalCopula.IMPLICATION, EvidenceCoord(10 * Nal.UNIT, 0L))
+        val secondRule = EternalRule("rain", "wet", NalCopula.IMPLICATION, EvidenceCoord(10 * Nal.UNIT, 0L))
+        val rete = CausalityReteElement(bag, listOf(firstRule, secondRule).toSeries(), traceCapacity = 1)
+        bag.open()
+        rete.open()
+        try {
+            suspend fun mint(subject: String, obj: String) {
+                val assertion = signal(subject, obj)
+                val landed = async(start = CoroutineStart.UNDISPATCHED) {
+                    bag.beliefEvents.first { it is BeliefEvent.Minted && it.angular == assertion.angular }
+                }
+                rete.register(assertion.angular, subject, obj)
+                bag.intake.send(BeliefIntake.Mint(assertion, BudgetCoord(0.8f, 0.5f, 0.5f)))
+                withTimeout(5_000) { landed.await() }
+            }
+            mint("fire", "flame")
+            assertEquals(1, rete.fireLive().size)
+            val before = rete.snapshot()
+            assertEquals(firstRule.ruleCid, before.firings[0].rule.ruleCid)
+            mint("rain", "cloud")
+            assertEquals(1, rete.fireLive().size)
+            val after = rete.snapshot()
+            assertEquals(secondRule.ruleCid, after.firings[0].rule.ruleCid)
+            assertEquals(1L, before.offered)
+            assertEquals(2L, after.offered)
+            assertEquals(firstRule.ruleCid, before.firings[0].rule.ruleCid,
+                "a published snapshot must retain the firing evicted from the live trace")
+        } finally {
+            rete.drain()
+            bag.drain()
+        }
+    }
 
     private suspend fun BeliefBagElement.settle() {
         var quiet = 0

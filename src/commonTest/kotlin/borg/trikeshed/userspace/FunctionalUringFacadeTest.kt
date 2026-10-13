@@ -24,6 +24,22 @@ class FunctionalUringFacadeTest {
     }
 
     @Test
+    fun submitAwaitSnapshotsPreparedSubmissionsBeforeClearingTheQueue() = runTest {
+        val backend = ReorderedBackend()
+        val facade = FunctionalUringFacade(2, backend)
+        try {
+            facade.enqueue(Submissions.nop(901))
+            facade.enqueue(Submissions.nop(902))
+            val first = facade.submitAwait()
+            assertEquals(listOf(UringCompletion(902, 0, 0), UringCompletion(901, 0, 0)), first.toList())
+            assertEquals(listOf(901L, 902L), backend.admitted.map { it.userData })
+            facade.enqueue(Submissions.nop(901))
+            assertEquals(listOf(UringCompletion(901, 0, 0)), facade.submitAwait().toList())
+            assertEquals(listOf(UringCompletion(902, 0, 0), UringCompletion(901, 0, 0)), first.toList())
+        } finally { facade.drain() }
+    }
+
+    @Test
     fun completions_correlate_by_token_in_backend_arrival_order() = runTest {
         val backend = ReorderedBackend()
         val facade = FunctionalUringFacade(4, backend)

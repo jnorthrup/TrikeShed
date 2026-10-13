@@ -88,7 +88,7 @@ class CausalityReteElement(
     init { require(traceCapacity >= 0) }
 
     suspend fun snapshot(): CausalityReteSnapshot = fireGate.withLock {
-        CausalityReteSnapshot(rules, projectLive(), firingTrace.toSeries(), offeredCount, traceCapacity)
+        CausalityReteSnapshot(rules, projectLive(), firingTrace.toTypedArray().toSeries(), offeredCount, traceCapacity)
     }
 
     // angular → (subject, obj) term registry; the caller owns registration.
