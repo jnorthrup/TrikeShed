@@ -10,7 +10,8 @@ class ProcessWorkerJvm(private val capability: ProcessCapability) : ProcessWorke
         }
         val pb = ProcessBuilder(spec.command, *spec.args.toTypedArray())
         if (spec.cwd != null) pb.directory(java.io.File(spec.cwd))
-        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(spec.env) }
+        val filteredEnv = spec.env.filter { (k, _) -> borg.trikeshed.graal.subvm.GuestEnvironment.deliberate(k) != borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED }
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(filteredEnv) }
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()
             val stdoutDeferred = this.async {

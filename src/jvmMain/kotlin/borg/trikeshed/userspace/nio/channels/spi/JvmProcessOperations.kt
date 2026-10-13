@@ -21,7 +21,8 @@ class JvmProcessOperations : ProcessOperations {
     ): ProcessResult {
         validateCommand(listOf(command) + args)
         val pb = ProcessBuilder(command, *args.toTypedArray())
-        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env) }
+        val filteredEnv = env.filter { (k, _) -> borg.trikeshed.graal.subvm.GuestEnvironment.deliberate(k) != borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED }
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(filteredEnv) }
 
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()
