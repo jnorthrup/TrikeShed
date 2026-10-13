@@ -1,11 +1,11 @@
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.lib.*
 import com.google.web.bindery.requestfactory.shared.*
 import com.google.web.bindery.requestfactory.vm.impl.OperationKey
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
+import java.lang.reflect.WildcardType
 
 /** The shipped Java interface metadata is sufficient for the server; no GWT compiler or APT. */
 interface CouchGwtFactory : RequestFactory {
@@ -42,27 +42,30 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
     val factories: Map<RequestFactoryToken, Class<out RequestFactory>>
     val operations: Map<RequestOperationToken, RequestFactoryOperation>
     val proxies: Map<RequestProxyToken, Class<out BaseProxy>>
-    val propertyTypes: Map<String, Class<*>>
+    val properties: Map<Class<out BaseProxy>, Map<String, Type>>
 
     init {
         val factoryMap = linkedMapOf<RequestFactoryToken, Class<out RequestFactory>>()
         val operationMap = linkedMapOf<RequestOperationToken, RequestFactoryOperation>()
         val proxyMap = linkedMapOf<RequestProxyToken, Class<out BaseProxy>>()
-        val fields = linkedMapOf<String, Class<*>>()
+        val fields = linkedMapOf<Class<out BaseProxy>, Map<String, Type>>()
         fun proxy(type: Type) {
+            if (type is WildcardType) { type.upperBounds.forEach(::proxy); return }
             if (type is ParameterizedType) {
                 type.actualTypeArguments.forEach(::proxy)
                 return
             }
             if (type !is Class<*> || !BaseProxy::class.java.isAssignableFrom(type)) return
-            require(type.isInterface && EntityProxy::class.java.isAssignableFrom(type)) { "A Couch proxy must be an EntityProxy interface" }
+            require(type.isInterface && (EntityProxy::class.java.isAssignableFrom(type) || ValueProxy::class.java.isAssignableFrom(type))) { "A Couch proxy must be an EntityProxy or ValueProxy interface" }
             require(type.getAnnotation(ProxyFor::class.java)?.value == ConfixBean::class.java) { "A Couch proxy must map to ConfixBean" }
             val clazz = type.asSubclass(BaseProxy::class.java)
             if (proxyMap.putIfAbsent(proxyToken(clazz), clazz) != null) return
+            val declared = linkedMapOf<String, Type>()
+            fields[clazz] = declared
             for (method in clazz.methods) {
                 val name = property(method) ?: continue
-                val valueType = if (method.parameterCount == 0) method.returnType else method.parameterTypes.single()
-                val prior = fields.putIfAbsent(name, valueType)
+                val valueType = if (method.parameterCount == 0) method.genericReturnType else method.genericParameterTypes.single()
+                val prior = declared.putIfAbsent(name, valueType)
                 require(prior == null || prior == valueType) { "Conflicting Couch property types for $name" }
                 method.genericParameterTypes.forEach(::proxy)
                 proxy(method.genericReturnType)
@@ -88,7 +91,7 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
         factories = factoryMap
         operations = operationMap
         proxies = proxyMap
-        propertyTypes = fields
+        properties = fields
     }
 
     companion object {
@@ -108,6 +111,13 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
             java.lang.Short.TYPE -> "S"
             java.lang.Void.TYPE -> "V"
             else -> "L${type.name.replace('.', '/')};"
+        }
+
+        fun rawType(type: Type): Class<*> = when (type) {
+            is Class<*> -> type
+            is ParameterizedType -> rawType(type.rawType)
+            is WildcardType -> rawType(type.upperBounds.single())
+            else -> throw IllegalArgumentException("Unsupported RequestFactory property type")
         }
 
         fun property(method: Method): String? {

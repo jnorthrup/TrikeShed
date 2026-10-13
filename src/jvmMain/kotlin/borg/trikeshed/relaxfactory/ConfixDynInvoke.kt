@@ -89,17 +89,18 @@ class ConfixDynInvoke(val statementLimit: Long = 5_000_000L) : AutoCloseable {
         }
     }
 
-    override fun close(): Unit = lock.withLock {
-        if (closed) return
-        closed = true
-        var failure: Throwable? = null
-        for (callable in calls.values + methods.values) try { callable.close() } catch (e: Throwable) {
-            if (failure == null) failure = e else failure.addSuppressed(e)
+    override fun close() {
+        lock.withLock {
+            if (closed) return
+            closed = true
+            var failure: Throwable? = null
+            for (callable in calls.values + methods.values) try { callable.close() } catch (e: Throwable) {
+                if (failure == null) failure = e else failure.addSuppressed(e)
+            }
+            calls.clear()
+            methods.clear()
+            failure?.let { throw it }
         }
-        calls.clear()
-        methods.clear()
-        failure?.let { throw it }
-        Unit
     }
 
     class ReadRoot : RootNode(null) {

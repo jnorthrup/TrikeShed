@@ -519,7 +519,8 @@ object OroborosDaemon {
     ): borg.trikeshed.forge.server.CouchWire {
         val report = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
         launch { report.open() }
-        val processor = borg.trikeshed.relaxfactory.GwtCouchRequestFactory(db)
+        val processor = borg.trikeshed.relaxfactory.GwtCouchRequestFactory(db,
+            viewServer = borg.trikeshed.couch.ViewServer(report))
         val requestFactory = borg.trikeshed.relaxfactory.RequestFactoryReactorElement(
             processor = { payload -> processor.process(payload) },
             closeProcessor = { processor.close() },
