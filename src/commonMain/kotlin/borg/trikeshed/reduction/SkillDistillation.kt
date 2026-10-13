@@ -1,6 +1,6 @@
 package borg.trikeshed.reduction
 
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
@@ -96,7 +96,7 @@ data class SkillFile(
  */
 fun renderTrajectory(
     taskFingerprint: String,
-    causes: Series<JulesCause>,
+    causes: Series<SessionCause>,
     verdict: TrajectoryVerdict,
 ): String = buildString {
     appendLine("# Task: $taskFingerprint")
@@ -111,14 +111,14 @@ fun renderTrajectory(
     }
 }
 
-private fun describeCause(cause: JulesCause): String = when (cause) {
-    is JulesCause.DrainApplied -> "commit=${cause.commitSha}, rejects=${cause.rejects}"
-    is JulesCause.DrainFailed -> "reason=${cause.reason}"
-    is JulesCause.SessionFailed -> "reason=${cause.reason}"
-    is JulesCause.PatchArrived -> "bytes=${cause.bytes}"
-    is JulesCause.WorkQueued -> "workId=${cause.workId}"
-    is JulesCause.WorkDispatched -> "workId=${cause.workId}"
-    is JulesCause.WorkDrained -> "workId=${cause.workId}, commit=${cause.commitSha}"
+private fun describeCause(cause: SessionCause): String = when (cause) {
+    is SessionCause.DrainApplied -> "commit=${cause.commitSha}, rejects=${cause.rejects}"
+    is SessionCause.DrainFailed -> "reason=${cause.reason}"
+    is SessionCause.SessionFailed -> "reason=${cause.reason}"
+    is SessionCause.PatchArrived -> "bytes=${cause.bytes}"
+    is SessionCause.WorkQueued -> "workId=${cause.workId}"
+    is SessionCause.WorkDispatched -> "workId=${cause.workId}"
+    is SessionCause.WorkDrained -> "workId=${cause.workId}, commit=${cause.commitSha}"
     else -> cause.toString()
 }
 
@@ -135,7 +135,7 @@ private fun describeCause(cause: JulesCause): String = when (cause) {
 fun distillAttempt(
     store: MemoryStore,
     verdict: TrajectoryVerdict,
-    causes: Series<JulesCause>,
+    causes: Series<SessionCause>,
     goalFamily: String,
     agentId: String = "distiller",
     sessionId: String? = null,

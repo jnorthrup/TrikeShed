@@ -5,8 +5,18 @@ import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchWireRouter
+import borg.trikeshed.couch.CouchChangesFactElement
+import borg.trikeshed.couch.CouchReportReactorElement
+import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.dag.ReteNetwork
+import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -36,6 +46,9 @@ class ProjectDb(
  */
 class ProjectDbRegistry(val primaryDbName: String) {
     private val dbs = ConcurrentHashMap<String, ProjectDb>()
+    private val owners = ConcurrentHashMap<String, Join<Job, AsyncContextElement>>()
+    private val retiring = ConcurrentHashMap.newKeySet<String>()
+    private val lifecycle = Any()
 
     /** Invoked on every successful mount (daemon wires the per-db Rete tendon here). */
     @Volatile
@@ -52,20 +65,46 @@ class ProjectDbRegistry(val primaryDbName: String) {
         name == primaryDbName -> "'$name' is the primary database"
         name in reserved -> "'$name' shadows a daemon surface"
         dbs.containsKey(name) -> "project db '$name' already mounted"
+        name in retiring -> "project db '$name' is draining"
         else -> null
     }
 
     fun register(pdb: ProjectDb) {
-        refusalFor(pdb.name)?.let { throw IllegalArgumentException(it) }
-        dbs[pdb.name] = pdb
-        onMount?.invoke(pdb)
+        synchronized(lifecycle) {
+            refusalFor(pdb.name)?.let { throw IllegalArgumentException(it) }
+            dbs[pdb.name] = pdb
+            try { onMount?.invoke(pdb) }
+            catch (failure: Throwable) { dbs.remove(pdb.name); throw failure }
+        }
     }
 
-    fun remove(name: String): ProjectDb? = dbs.remove(name)
+    /** Release admission, finish the owned reader, then allow its store to close or its name to remount. */
+    suspend fun remove(name: String): ProjectDb? = withContext(NonCancellable) {
+        val removed = synchronized(lifecycle) {
+            val pdb = dbs.remove(name) ?: return@synchronized null
+            retiring.add(name)
+            pdb j owners.remove(name)
+        } ?: return@withContext null
+        try {
+            removed.b?.let { owner -> owner.a.join(); owner.b.drain() }
+            removed.a
+        } finally { retiring.remove(name) }
+    }
+
+    suspend fun drain() { for (name in dbs.keys.toList()) remove(name) }
 
     fun get(name: String): ProjectDb? = dbs[name]
 
     fun all(): List<ProjectDb> = dbs.values.sortedBy { it.name }
+
+    /** Each mounted database owns its changes reader until registry removal. */
+    fun factPlane(scope: CoroutineScope, rete: ReteNetwork, report: CouchReportReactorElement? = null) {
+        onMount = { pdb ->
+            val tendon = CouchChangesFactElement(pdb.db, rete, report, admit = { true },
+                parentJob = scope.coroutineContext[Job])
+            owners[pdb.name] = scope.launch { tendon.open() } j tendon
+        }
+    }
 }
 
 /**
@@ -98,7 +137,7 @@ class ProjectDbWire(
         if (first == "_project") {
             // Every crossing is LOGGED — a drop that dies client-side leaves silence here,
             // and that silence is itself the diagnosis (nothing reached the daemon).
-            System.err.println("[OROBOROS] _project: $method $p (${payload.size}b)")
+            java.lang.System.err.println("[OROBOROS] _project: $method $p (${payload.size}b)")
             val scopes = uploads ?: return json(503, """{"error":"uploads not wired"}""")
             // DELETE /_project/<name>/doc?path=<rel>: a document (with its twins) or a whole folder leaves the upload.
             if (method == "DELETE" && segments.size >= 3 && segments[2] == "doc") {
@@ -118,7 +157,7 @@ class ProjectDbWire(
             return when (segments[2]) {
                 "begin" -> runCatching { scopes.beginUpload(name, kind) }.fold(
                     onSuccess = {
-                        System.err.println("[OROBOROS] project db upload begun: ${it.name} (${it.kind})")
+                        java.lang.System.err.println("[OROBOROS] project db upload begun: ${it.name} (${it.kind})")
                         json(200, """{"verdict":"ok","name":"${it.name}","kind":"${it.kind}"}""")
                     },
                     onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },

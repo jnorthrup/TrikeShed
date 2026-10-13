@@ -1,7 +1,7 @@
 package borg.trikeshed.reduction
 
 import borg.trikeshed.job.JobSnapshot
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.ws.Sha1Common
@@ -13,16 +13,16 @@ import borg.trikeshed.lib.get
 /**
  * Top-level convenience: fold a list of causes into a verdict without building a
  * full TrajectoryPayload. Used by the CLI and by callers that already have a
- * plain List<JulesCause>. Uses a synthetic empty-deps TrajectoryPayload.
+ * plain List<SessionCause>. Uses a synthetic empty-deps TrajectoryPayload.
  */
 fun verdictFor(
-    cardCauses: List<JulesCause>,
+    cardCauses: List<SessionCause>,
     taskFingerprint: String,
     attemptCount: Int,
     deps: List<String>,
 ): TrajectoryVerdict {
-    val series = emptySeriesOf<JulesCause>().let { empty ->
-        // Build a Series<JulesCause> from a list — uses the same α map mechanism.
+    val series = emptySeriesOf<SessionCause>().let { empty ->
+        // Build a Series<SessionCause> from a list — uses the same α map mechanism.
         var result = empty
         for (c in cardCauses) result = result α { c }
         result
@@ -41,12 +41,12 @@ fun verdictFor(
 data class TrajectoryPayload(
     val title: String,
     val headSha: String,
-    val causes: Series<JulesCause>,
+    val causes: Series<SessionCause>,
     val depJobIds: List<String> = emptyList(),
     val deps: Series<JobSnapshot> = emptySeriesOf()
 )
 
-class TrajectoryCarrier(val payload: TrajectoryPayload) : ReductionCarrier<JulesCause> by SeriesCarrier(payload.causes)
+class TrajectoryCarrier(val payload: TrajectoryPayload) : ReductionCarrier<SessionCause> by SeriesCarrier(payload.causes)
 
 object TrajectoryPhaseAlg : PhaseAlg {
     override val transitions: PhaseTransition = LcncPhaseAlg.forgeTransitions
@@ -70,7 +70,7 @@ object TrajectoryPhaseAlg : PhaseAlg {
     }
 }
 
-class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome, TrajectoryVerdict> {
+class TrajectoryReduction : LcncReduction<String, SessionCause, TrajectoryOutcome, TrajectoryVerdict> {
     override val keyAlg: KeyAlg<String> = object : KeyAlg<String> {
         override val extractor = KeyExtractor<Any, String> { input ->
             val payload = (input as TrajectoryCarrier).payload
@@ -86,9 +86,9 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
         override val order = LcncKeyAlg.naturalKeyOrder<String>()
     }
 
-    override val valueAlg: ValueAlg<JulesCause, TrajectoryOutcome> = object : ValueAlg<JulesCause, TrajectoryOutcome> {
+    override val valueAlg: ValueAlg<SessionCause, TrajectoryOutcome> = object : ValueAlg<SessionCause, TrajectoryOutcome> {
         override val initial = TrajectoryOutcome.NoPatch
-        override val folder = Folder<JulesCause, TrajectoryOutcome> { acc, cause ->
+        override val folder = Folder<SessionCause, TrajectoryOutcome> { acc, cause ->
             parseCause(cause, acc)
         }
         override val merger = Merger<TrajectoryOutcome> { partials ->
@@ -98,8 +98,8 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
 
     override val phaseAlg: PhaseAlg = TrajectoryPhaseAlg
 
-    override val carrierAlg: CarrierAlg<JulesCause> = object : CarrierAlg<JulesCause> {
-        override val carrier: (Any) -> ReductionCarrier<JulesCause> = { input ->
+    override val carrierAlg: CarrierAlg<SessionCause> = object : CarrierAlg<SessionCause> {
+        override val carrier: (Any) -> ReductionCarrier<SessionCause> = { input ->
             if (input is TrajectoryPayload) TrajectoryCarrier(input)
             else SeriesCarrier(emptySeriesOf())
         }
@@ -118,18 +118,18 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
         }
     }
 
-    private fun parseCause(cause: JulesCause, current: TrajectoryOutcome): TrajectoryOutcome = when (cause) {
-        is JulesCause.DrainApplied -> TrajectoryOutcome.Landed
-        is JulesCause.DrainFailed -> parseReason(cause.reason)
-        is JulesCause.SessionFailed -> parseReason(cause.reason)
-        is JulesCause.PatchArrived -> current
+    private fun parseCause(cause: SessionCause, current: TrajectoryOutcome): TrajectoryOutcome = when (cause) {
+        is SessionCause.DrainApplied -> TrajectoryOutcome.Landed
+        is SessionCause.DrainFailed -> parseReason(cause.reason)
+        is SessionCause.SessionFailed -> parseReason(cause.reason)
+        is SessionCause.PatchArrived -> current
         // Work causes map to outcomes:
         //   WorkQueued     → NoPatch (queue position; nothing has happened yet)
         //   WorkDispatched → NoPatch (in-flight, can't judge yet)
         //   WorkDrained    → Landed (success path: work produced a commit)
-        is JulesCause.WorkQueued -> current
-        is JulesCause.WorkDispatched -> current
-        is JulesCause.WorkDrained -> TrajectoryOutcome.Landed
+        is SessionCause.WorkQueued -> current
+        is SessionCause.WorkDispatched -> current
+        is SessionCause.WorkDrained -> TrajectoryOutcome.Landed
         else -> current
     }
 
@@ -144,12 +144,12 @@ class TrajectoryReduction : LcncReduction<String, JulesCause, TrajectoryOutcome,
         val fingerprint = keyAlg.extractor.extract(carrier)
         val depsSatisfied = TrajectoryPhaseAlg.checkDeps(payload.depJobIds, payload.deps)
 
-        val attemptCauses = ArrayList<JulesCause>()
+        val attemptCauses = ArrayList<SessionCause>()
         val mappedSeries = payload.causes α { cause ->
-            if (cause is JulesCause.DrainFailed || cause is JulesCause.DrainApplied ||
-                cause is JulesCause.SessionFailed || cause is JulesCause.PatchArrived ||
-                cause is JulesCause.WorkQueued || cause is JulesCause.WorkDispatched ||
-                cause is JulesCause.WorkDrained) cause else null
+            if (cause is SessionCause.DrainFailed || cause is SessionCause.DrainApplied ||
+                cause is SessionCause.SessionFailed || cause is SessionCause.PatchArrived ||
+                cause is SessionCause.WorkQueued || cause is SessionCause.WorkDispatched ||
+                cause is SessionCause.WorkDrained) cause else null
         }
         for (i in 0 until mappedSeries.size) {
             val cause = mappedSeries[i]

@@ -1,6 +1,6 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.jules.JulesDurableTodoQueue
+import borg.trikeshed.btrfs.DurableTodoQueue
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,7 +25,7 @@ class PolyglotSleeveDispatcherTest {
         assertEquals(result.persisted, result.expanded, "persisted ${result.persisted} != expanded ${result.expanded} — persistence failed")
 
         // 2. persistence verified by reopening — wiring already dispatched, so pending 0, total == expanded
-        val reopened = JulesDurableTodoQueue(queueDir, fileOps)
+        val reopened = DurableTodoQueue(queueDir, fileOps)
         assertEquals(result.expanded, reopened.size(), "reopened size mismatch — not durable")
         assertEquals(0, reopened.pendingSize(), "reopened pending should be 0 after dispatch")
         assertEquals(result.expanded, reopened.listAll().count { it.status == "dispatched" }, "dispatched count mismatch")
@@ -63,17 +63,17 @@ class PolyglotSleeveDispatcherTest {
         val fileOps = JvmFileOperations()
         val tmpRoot = fileOps.createTempDir("jules-queue-durable-")
         val queueDir = fileOps.resolvePath(tmpRoot, "q")
-        val q1 = JulesDurableTodoQueue(queueDir, fileOps)
+        val q1 = DurableTodoQueue(queueDir, fileOps)
         val item = TodoQueueItem(id = "test:1", target = "jvmMain", description = "test durable", source = "test.kt:1", status = "pending")
         assertTrue(q1.enqueue(item))
         assertEquals(1, q1.size())
         // reopen
-        val q2 = JulesDurableTodoQueue(queueDir, fileOps)
+        val q2 = DurableTodoQueue(queueDir, fileOps)
         assertEquals(1, q2.size())
         assertEquals("test durable", q2.listAll().first().description)
         // mark dispatched persists
         assertTrue(q2.markDispatched("test:1"))
-        val q3 = JulesDurableTodoQueue(queueDir, fileOps)
+        val q3 = DurableTodoQueue(queueDir, fileOps)
         assertEquals(0, q3.pendingSize())
         assertEquals("dispatched", q3.listAll().first().status)
         assertTrue((q3.listAll().first().dispatchedAt ?: 0L) > 0L, "dispatchedAt should be >0")

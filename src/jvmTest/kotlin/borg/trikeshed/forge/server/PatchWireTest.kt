@@ -4,7 +4,7 @@ import borg.trikeshed.parse.reify
 
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.memory.CouchIndexBridge

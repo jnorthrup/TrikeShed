@@ -1,8 +1,13 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.couch.CouchStoreFactory
+import borg.trikeshed.couch.CouchReportReactorElement
+import borg.trikeshed.cursor.BlackboardContext
+import borg.trikeshed.dag.*
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.lib.j
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lib.*
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
@@ -11,7 +16,11 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
 import java.io.File
+import java.lang.System
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -223,5 +232,76 @@ class ProjectDbMountTest {
         assertEquals(3, registry2.get(name)?.docCount, "ledger replay rebuilds the project db")
         // idempotent: replaying again mounts nothing new
         assertEquals(0, scopes2.remountLedger())
+    }
+
+    @Test fun unmountReleasesReaderFactsAndKifBeforeRemount(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-owner-${System.nanoTime()}").apply { mkdirs() }
+        val h = harness(File(tmp, "projects.tsv"))
+        val rete = ReteNetwork()
+        val bank = KifKnowledgeBase()
+        val (tee, subscription) = KifTee.attach(rete, bank)
+        rete.assert(FactId("outside", "retained"), mapOf("kind" to "independent"),
+            ContentId.of("outside".encodeToByteArray()), BlackboardContext("outside"))
+        val baseline = bank.size()
+        h.registry.factPlane(this, rete)
+        try {
+            h.scopes.beginUpload("owned")
+            val retired = assertNotNull(h.registry.get("owned"))
+            val first = h.scopes.uploadPut("owned", "a.txt", "first".encodeToByteArray())
+            val latest = h.scopes.uploadPut("owned", "a.txt", "latest".encodeToByteArray())
+            h.scopes.uploadPut("owned", "b.txt", "second document".encodeToByteArray())
+            withTimeout(5_000) {
+                while (rete.snapshot(s_["owned"]).view.none { it.factId.b == "a.txt" && it.fields["contentId"] == latest.value } ||
+                    rete.snapshot(s_["owned"]).size != 2) delay(1)
+            }
+            assertEquals(3, tee.trackedCount(), "Revisions update facts; independent documents remain distinct")
+            assertTrue(first.value !in bank.toKifFile(), "The prior revision's fields have left KIF")
+            assertTrue(h.scopes.unmount("owned"))
+            assertNull(h.registry.get("owned"))
+            assertEquals(0, rete.snapshot(s_["owned"]).size)
+            assertEquals(1, tee.trackedCount())
+            assertEquals(baseline, bank.size(), "Unmount retracts only the removed database's projection")
+            assertEquals(0, coroutineContext[Job]!!.children.count(), "The mounted reader's supervisor must be finished")
+            retired.db.put("ghost", mapOf("kind" to "retired store"), null)
+            delay(20)
+            assertEquals(0, rete.snapshot(s_["owned"]).size, "The retired store no longer has a reader subscription")
+            h.scopes.beginUpload("owned")
+            val replacement = h.scopes.uploadPut("owned", "a.txt", "remounted".encodeToByteArray())
+            withTimeout(5_000) {
+                while (rete.snapshot(s_["owned"]).view.none { it.fields["contentId"] == replacement.value }) delay(1)
+            }
+            assertEquals(1, rete.snapshot(s_["owned"]).size)
+            assertEquals(2, tee.trackedCount())
+        } finally {
+            h.scopes.drain()
+            subscription.close()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test fun immediateUnmountFinishesAdmittedFrames(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-drain-${System.nanoTime()}").apply { mkdirs() }
+        val h = harness(File(tmp, "projects.tsv"))
+        val rete = ReteNetwork()
+        val bank = KifKnowledgeBase()
+        val (tee, subscription) = KifTee.attach(rete, bank)
+        val report = CouchReportReactorElement()
+        report.open()
+        h.registry.factPlane(this, rete, report)
+        try {
+            h.scopes.beginUpload("drain")
+            repeat(100) { h.scopes.uploadPut("drain", "document-$it.txt", "payload-$it".encodeToByteArray()) }
+            assertTrue(h.scopes.unmount("drain"))
+            assertEquals(100L, report.reportState.value.commits, "Every accepted frame completes before removal")
+            assertEquals(0, rete.snapshot(s_["drain"]).size)
+            assertEquals(0, tee.trackedCount())
+            assertEquals(0, bank.size())
+            assertEquals(0, coroutineContext[Job]!!.children.count())
+        } finally {
+            h.scopes.drain()
+            subscription.close()
+            report.close()
+            tmp.deleteRecursively()
+        }
     }
 }

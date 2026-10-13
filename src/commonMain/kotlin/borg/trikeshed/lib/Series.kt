@@ -160,10 +160,14 @@ operator fun <T> Series<T>.contains(element: T): Boolean {
  * fold for Series
  *
  */
-fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B = this.view.fold(z, f)
+fun <A, B> Series<A>.fold(z: B, f: (acc: B, A) -> B): B {
+    var acc = z
+    for (element in view) acc = f(acc, element)
+    return acc
+}
 
 /** Fold a Series using a typed Reducer. */
-fun <T, R> Series<T>.fold(r: Reducer<T, R>): R = toList().fold(r.zero) { acc, element -> r.combine(acc, element) }
+fun <T, R> Series<T>.fold(r: Reducer<T, R>): R = fold(r.zero, r::combine)
 
 /** Typed reducer interface: combines elements of type T into result type R. */
 interface Reducer<in T, R> {

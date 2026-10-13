@@ -20,11 +20,12 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
     public abstract override fun <T> setOption(option: String, value: T): SocketChannel
     public abstract fun shutdownInput(): SocketChannel
     public abstract fun shutdownOutput(): SocketChannel
-    fun isConnected(): Boolean = false
-    fun isConnectionPending(): Boolean = false
+    public abstract fun isConnected(): Boolean
+    public abstract fun isConnectionPending(): Boolean
     public abstract fun connect(address: String): Boolean
-    fun finishConnect(): Boolean = false
-    fun getRemoteAddress(): String = "0.0.0.0:0"
+    public abstract fun finishConnect(): Boolean
+    /** The peer's address, or null before connection; a closed channel throws. */
+    public abstract fun getRemoteAddress(): String?
     public abstract override fun read(dst: ByteBuffer): Int
     public abstract override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long
     public abstract override fun read(dsts: Array<out ByteBuffer>): Long
@@ -63,11 +64,27 @@ public abstract class SocketChannel : AbstractSelectableChannel, ByteChannel, Sc
 internal class UringSocketChannel(
     private val file: File,
     private val channel: FunctionalUringFacade,
+    private var connected: Boolean = false,
 ) : SocketChannel(SelectorProvider.provider()) {
     private var nextToken: Long = 1
     private var open: Boolean = true
     private var blocking: Boolean = true
     private val lock = Any()
+
+    private fun ensureConnected() {
+        if (!open) throw ClosedChannelException()
+        if (!connected) throw NotYetConnectedException()
+    }
+
+    override fun isConnected(): Boolean = open && connected
+    // CONNECT settles in the submitting call; this adapter retains no unfinished CONNECT between calls.
+    override fun isConnectionPending(): Boolean = false
+
+    override fun finishConnect(): Boolean {
+        if (!open) throw ClosedChannelException()
+        if (!connected) throw NoConnectionPendingException()
+        return true
+    }
 
     /** [submission]'s result through this channel's ring. */
     private fun io(submission: UringSubmission): Int {
@@ -105,19 +122,30 @@ internal class UringSocketChannel(
     override fun shutdownOutput(): SocketChannel = shutdown(1)
 
     private fun shutdown(how: Int): SocketChannel {
+        ensureConnected()
         val result = io(Submissions.shutdown(file.id, how, 0))
         if (result < 0) throw IOException("shutdown: $result")
         return this
     }
 
     override fun connect(address: String): Boolean {
-        val result = io(Submissions.connect(file.id, sockaddr(address), 0))
-        if (result < 0) throw IOException("connect $address: $result")
-        return true
+        if (!open) throw ClosedChannelException()
+        if (connected) throw AlreadyConnectedException()
+        val encoded = sockaddr(address)
+        try {
+            val result = io(Submissions.connect(file.id, encoded, 0))
+            if (result < 0) throw IOException("connect $address: $result")
+            connected = true
+            return true
+        } catch (failure: IOException) {
+            try { close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
     }
 
     /** Bytes read into [dst]; -1 at end of stream, 0 when non-blocking and none are ready. */
     override fun read(dst: ByteBuffer): Int {
+        ensureConnected()
         while (true) {
             val count = io(Submissions.read(file.id, 0, dst.remaining(), -1, 0).copy(buffer = dst))
             if (count > 0) return count
@@ -129,6 +157,7 @@ internal class UringSocketChannel(
     }
 
     override fun read(dsts: Array<out ByteBuffer>, offset: Int, length: Int): Long {
+        ensureConnected()
         var total: Long = 0
         for (i in offset until (offset + length).coerceAtMost(dsts.size)) { val n = read(dsts[i]); if (n < 0) return if (total == 0L) -1 else total; total += n }
         return total
@@ -138,6 +167,7 @@ internal class UringSocketChannel(
 
     /** Bytes written from [src]; 0 when non-blocking and the socket buffer is full. */
     override fun write(src: ByteBuffer): Int {
+        ensureConnected()
         while (true) {
             val count = io(Submissions.write(file.id, 0, src.remaining(), -1, 0).copy(buffer = src))
             if (count >= 0) return count
@@ -148,6 +178,7 @@ internal class UringSocketChannel(
     }
 
     override fun write(srcs: Array<out ByteBuffer>, offset: Int, length: Int): Long {
+        ensureConnected()
         var total: Long = 0
         for (i in offset until (offset + length).coerceAtMost(srcs.size)) { val n = write(srcs[i]); if (n < 0) return if (total == 0L) -1 else total; total += n }
         return total
@@ -160,6 +191,15 @@ internal class UringSocketChannel(
         val address = ByteBuffer(128)
         val named = io(Submissions.getsockname(file.id, address, false, 0))
         if (named < 0) throw IOException("getsockname: $named")
+        return sockaddrText(address.array())
+    }
+
+    override fun getRemoteAddress(): String? {
+        if (!open) throw ClosedChannelException()
+        if (!connected) return null
+        val address = ByteBuffer(128)
+        val named = io(Submissions.getsockname(file.id, address, true, 0))
+        if (named < 0) throw IOException("getpeername: $named")
         return sockaddrText(address.array())
     }
 

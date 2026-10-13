@@ -106,6 +106,32 @@ object WikiNodes {
     // ── wiki.consolidate — the Wiki Maintainer ─────────────────────────
 
     /**
+     * Settle one sampled batch in its caller-owned, ordered backlog. An `ok`
+     * report is emitted only after edits and their evolution record are written.
+     * Its resolved traces have completed a pass, including any recorded refusals
+     * or a valid no-op; that does NOT mean every proposed edit was applied.
+     * Missing traces and failed passes remain pending, behind unsampled work.
+     * A null report represents a thrown runner failure; no work is acknowledged.
+     */
+    fun settleConsolidation(
+        pending: LinkedHashSet<String>,
+        cids: List<String>,
+        report: Map<*, *>?,
+    ): Int {
+        val resolved = if (report?.get("ok") == true) report["resolvedCids"] as? List<*> else null
+        val missing = report?.get("unresolvedCids") as? List<*>
+        val retry = ArrayList<String>()
+        var acknowledged = 0
+        for (cid in cids.distinct()) {
+            if (!pending.remove(cid)) continue
+            if (resolved?.contains(cid) == true && missing?.contains(cid) != true) acknowledged++
+            else retry.add(cid)
+        }
+        pending.addAll(retry)
+        return acknowledged
+    }
+
+    /**
      * ONE Maintainer iteration. Inputs (`cids` wire or param) name the sampled
      * transcripts; the prior wiki is read off disk; ONE model call produces a
      * JSON edit script; the edits are staged, gated, and written atomically.

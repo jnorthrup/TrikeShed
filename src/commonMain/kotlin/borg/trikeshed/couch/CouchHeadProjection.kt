@@ -96,10 +96,11 @@ class CouchHeadProjection {
 
     private fun removeFromFieldIndex(doc: Document) {
         for (field in doc.fields) {
-            val innerMap = fieldIndex[field.name]
-            if (innerMap != null) {
-                innerMap[field.value]?.remove(doc.id)
-            }
+            val values = fieldIndex[field.name] ?: continue
+            val ids = values[field.value] ?: continue
+            ids.remove(doc.id)
+            if (ids.isEmpty()) values.remove(field.value)
+            if (values.isEmpty()) fieldIndex.remove(field.name)
         }
     }
 

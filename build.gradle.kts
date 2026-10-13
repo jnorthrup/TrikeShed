@@ -56,6 +56,7 @@ val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradlePropert
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.3.4.1 is the locked runtime (matches the JDK toolchain's bundled Truffle/JVMCI); JDK 25 toolchain.
 val graalVersion = "25.3.4.1"
+val requestFactoryVersion = "2.13.0"
 
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
 extra["versions.kotlinx-coroutines-test"] = "1.11.0"
@@ -288,12 +289,14 @@ kotlin {
                 implementation("org.ow2.asm:asm:9.7")
                 implementation("org.ow2.asm:asm-tree:9.7")
 
-                // GraalVM Polyglot — locked to 25.0.2 (GraalVM CE)
+                // TruffleRuby 40.0.0 uses the same Truffle 25.3.4.1 as graalVersion.
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("dev.truffleruby:truffleruby:40.0.0")
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
+                implementation("org.gwtproject.web.bindery:requestfactory-server:$requestFactoryVersion")
 
                 // Kotlin scripting host: `language: "kotlin"` design-doc views compile
                 // against the daemon's own classpath and evaluate in its classloader.
@@ -303,6 +306,8 @@ kotlin {
 
                 // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
                 implementation("org.xerial:sqlite-jdbc:3.42.0.0")
+                // Opt-in compression dictionaries; ISAM framing and all file I/O remain commonMain.
+                implementation("com.github.luben:zstd-jni:1.5.7-23")
 
                 // Stanford CoreNLP is deliberately NOT here any more. It has no compile-time
                 // reference anywhere in src/ — the vm.corenlp/vm.corenlp.extract legos reach it
@@ -335,6 +340,7 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
                 implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
+                implementation("org.gwtproject.web.bindery:requestfactory-client:$requestFactoryVersion")
                 implementation("junit:junit:4.13.2")
             }
         }
@@ -740,10 +746,10 @@ tasks.register<JavaExec>("corenlpRete") {
     workingDir = rootDir
 }
 
-// TrajectoryReduction CLI — fold JulesCause chains into freeze verdicts
+// TrajectoryReduction CLI — fold SessionCause chains into freeze verdicts
 tasks.register<JavaExec>("trajectoryReduction") {
     group = "oroboros"
-    description = "Run TrajectoryReduction: fold JulesCause trajectory into freeze verdict."
+    description = "Run TrajectoryReduction: fold SessionCause trajectory into freeze verdict."
     dependsOn("jvmJar")
     mainClass.set("borg.trikeshed.lcnc.reduction.TrajectoryReductionCliKt")
     classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))

@@ -10,9 +10,10 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -118,10 +119,10 @@ class ProjectMiner(
     fun recognize(name: String, id: String): Map<String, Any?> {
         val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
         val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
-        val att = pdb.gateway.getAttachment(id) ?: return mapOf("error" to "absent", "id" to id)
+        val att = pdb.gateway.getAttachmentRef(id) ?: return mapOf("error" to "absent", "id" to id)
         val ext = id.substringAfterLast('.', "").lowercase()
-        val out = linkedMapOf<String, Any?>("project" to name, "id" to id, "bytes" to att.first.length,
-            "contentType" to att.first.contentType, "cid" to att.first.contentId.value,
+        val out = linkedMapOf<String, Any?>("project" to name, "id" to id, "bytes" to att.length,
+            "contentType" to att.contentType, "cid" to att.contentId.value,
             "ingested" to (pdb.store.get("$id.extract.md") != null), "notes" to (pdb.store.get("$id${borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX}") != null))
         if (ext == "pdf" && onDisk != null) {
             val info = runCatching {
@@ -172,11 +173,12 @@ class ProjectMiner(
         val gate = pageGate
         val key = "$name/$id"
         ocrDone[key] = dir.listFiles { x -> x.name.endsWith(".tsv") }?.size ?: 0
-        (1..pages).map { pg ->
-            async(Dispatchers.IO) {
+        val queue = Channel<Int>(OCR_PARALLEL)
+        val workers = List(OCR_PARALLEL) {
+            launch(Dispatchers.IO) { for (pg in queue) {
                 val base = File(dir, "%05d".format(pg))
                 val out = File(base.path + ".tsv")
-                if (out.isFile) return@async
+                if (out.isFile) continue
                 gate.acquire()
                 try {
                     val png = File(dir, "p$pg")
@@ -193,8 +195,10 @@ class ProjectMiner(
                     val n = ocrDone.merge(key, 1, Int::plus) ?: 0
                     if (n % 25 == 0) System.err.println("[OROBOROS] OCR $key: $n/$pages pages")
                 } finally { gate.release() }
-            }
-        }.awaitAll()
+            } }
+        }
+        try { for (pg in 1..pages) queue.send(pg) } finally { queue.close() }
+        workers.joinAll()
         val read = (1..pages).map { pg -> borg.trikeshed.narsese.PageStreams.page(pg, File(dir, "%05d.tsv".format(pg)).takeIf { it.isFile }?.readText().orEmpty()) }
         borg.trikeshed.narsese.PageStreams.book(read)
     }
@@ -202,17 +206,19 @@ class ProjectMiner(
     /** Ingest one document, by hand: its text lands as the extract twin. The same reading [mine] does. */
     suspend fun ingest(name: String, id: String): Map<String, Any?> = withContext(Dispatchers.IO) {
         val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
+        if (pdb.gateway.getAttachmentRef(id) == null) return@withContext mapOf("error" to "absent", "id" to id)
         // The uploaded file itself when it is on disk; the attachment bytes are read only when it is not.
         val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
         val src = onDisk ?: run {
             val att = pdb.gateway.getAttachment(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
-            File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second); deleteOnExit() }
+            File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second) }
         }
         val began = System.currentTimeMillis()
         val pdf = id.lowercase().endsWith(".pdf")
-        val md = if (pdf) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
+        val md = try {
+            if (pdf) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
             else runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
-        if (onDisk == null) src.delete()
+        } finally { if (onDisk == null) src.delete() }
         val body = md?.trim().orEmpty()
         if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
         putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "ingested")
@@ -249,17 +255,19 @@ class ProjectMiner(
         withContext(Dispatchers.IO) {
             for (id in work) {
                 try {
-                    val att = pdb.gateway.getAttachment(id)
-                    if (att == null) { prog.skipped++; continue }
+                    if (pdb.gateway.getAttachmentRef(id) == null) { prog.skipped++; continue }
                     // Every PDF page is OCR'd (no upstream text layer trusted); Tika is for non-PDF documents.
                     // Prefer the on-disk twin (clone/mirror) — no byte copy for the parser.
                     val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
+                    val att = if (onDisk == null) pdb.gateway.getAttachment(id) else null
+                    if (onDisk == null && att == null) { prog.skipped++; continue }
                     val src = onDisk ?: File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply {
-                        writeBytes(att.second); deleteOnExit()
+                        writeBytes(checkNotNull(att).second)
                     }
-                    val md = if (id.lowercase().endsWith(".pdf")) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
+                    val md = try {
+                        if (id.lowercase().endsWith(".pdf")) pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
                         else runCatching { JvmTikaIngestAdapter.extractToMarkdown(src.toPath()) }.getOrNull()
-                    if (onDisk == null) src.delete()
+                    } finally { if (onDisk == null) src.delete() }
                     val body = md?.trim().orEmpty()
                     if (body.length < 80) { prog.failed++; continue }   // no text worth landing
                     putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "mined")

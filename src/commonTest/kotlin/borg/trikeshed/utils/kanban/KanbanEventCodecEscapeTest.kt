@@ -1,7 +1,7 @@
 package borg.trikeshed.utils.kanban
 
-import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.jules.JulesSnapshot
+import borg.trikeshed.kanban.SessionCause
+import borg.trikeshed.kanban.SessionSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -30,7 +30,7 @@ class KanbanEventCodecEscapeTest {
 
     @Test
     fun snapshotTitleSurvivesEncodeDecode() {
-        val snap = JulesSnapshot(
+        val snap = SessionSnapshot(
             sessionId = "sid-1",
             state = "IN_PROGRESS",
             title = nasty,
@@ -58,7 +58,7 @@ class KanbanEventCodecEscapeTest {
 
     @Test
     fun causeExcerptSurvivesEncodeDecode() {
-        val cause = JulesCause.AgentMessaged(
+        val cause = SessionCause.AgentMessaged(
             excerpt = nasty,
             at = 1_700_000_000_001L,
             activityId = "act-1",
@@ -68,7 +68,7 @@ class KanbanEventCodecEscapeTest {
         assertTrue('\n' !in record, "an encoded WAL record must not contain a raw newline")
 
         val decoded = assertIs<KanbanEventCodec.CauseEvent>(KanbanEventCodec.decode(record))
-        val back = assertIs<JulesCause.AgentMessaged>(decoded.cause)
+        val back = assertIs<SessionCause.AgentMessaged>(decoded.cause)
         assertEquals(nasty, back.excerpt, "the excerpt must come back with real characters, not literal escapes")
         assertEquals("sid-1", decoded.sid)
         assertEquals("act-1", back.activityId)
@@ -80,7 +80,7 @@ class KanbanEventCodecEscapeTest {
         // The degenerate case: nothing but escape sequences, which is where an
         // index-walking unescaper runs off the end of the string.
         val only = "\\\n\t\"\\\\"
-        val snap = JulesSnapshot("s", "S", only, 0L, "", 0, 0, 1L)
+        val snap = SessionSnapshot("s", "S", only, 0L, "", 0, 0, 1L)
         val decoded = assertIs<KanbanEventCodec.SnapEvent>(
             KanbanEventCodec.decode(KanbanEventCodec.encodeSnapshot(snap, drained = true)),
         )

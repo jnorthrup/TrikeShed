@@ -22,10 +22,10 @@ import borg.trikeshed.forge.sheet.confixSheets
 import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.job.schema.loadConfixSchemaBytes
 import borg.trikeshed.parse.confix.confixDoc
-import borg.trikeshed.jules.ui.JulesBlackboardAdapter
-import borg.trikeshed.jules.ui.JulesBlackboardSurface
-import borg.trikeshed.jules.ui.ForgeSurfaceSession
-import borg.trikeshed.jules.ui.ForgeSurfaceActivity
+import borg.trikeshed.forge.blackboard.SessionBlackboardAdapter
+import borg.trikeshed.forge.blackboard.SessionBlackboardSurface
+import borg.trikeshed.forge.blackboard.ForgeSurfaceSession
+import borg.trikeshed.forge.blackboard.ForgeSurfaceActivity
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.CardPriority
 import borg.trikeshed.kanban.ForgeKanbanIngest
@@ -50,7 +50,7 @@ object ForgeApp {
     /** Render the complete Forge HTML shell with seeded state for PWA offline-first hydration. */
     fun renderHtml(
         userId: String = "jim",
-        julesSurface: JulesBlackboardSurface? = null,
+        julesSurface: SessionBlackboardSurface? = null,
         bundles: List<String> = emptyList(),
         vmHost: VmHost = PlatformHost.default.vmHost,
         /**
@@ -68,7 +68,7 @@ object ForgeApp {
     private fun forgeSeedJson(
         userId: String,
         reduction: ForgeKanbanReduction,
-        julesSurface: JulesBlackboardSurface?,
+        julesSurface: SessionBlackboardSurface?,
         vmHost: VmHost,
         docs: List<borg.trikeshed.forge.concept.DocSource> = emptyList(),
     
@@ -272,7 +272,7 @@ object ForgeApp {
     /** Server-rendered gallery HTML for the sidebar. No client-side hydration needed. */
     private fun galleryHtml(): String = runCatching { ForgeGalleryRenderer.renderHtml() }.getOrElse { "" }
 
-    private fun forgeBlackboardSeed(julesSurface: JulesBlackboardSurface?): Map<String, Any?> {
+    private fun forgeBlackboardSeed(julesSurface: SessionBlackboardSurface?): Map<String, Any?> {
         val view = ForgeBlackboardView.DEFAULT
         val cam = view.defaultCamera
         val cam3d = view.mode3D
@@ -379,7 +379,7 @@ object ForgeApp {
                     },
                     "updatedAt" to s.updatedAt,
                     "ttlMs" to s.ttlMs,
-                    "stale" to JulesBlackboardAdapter.isStale(s),
+                    "stale" to SessionBlackboardAdapter.isStale(s),
                 )
             } else null,
         )

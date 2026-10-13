@@ -19,7 +19,7 @@ import kotlin.concurrent.atomics.AtomicBoolean
  * and a [REF] is served only while its file's size and mtime match the stamp it was put with.
  * Appends are forced once per [sync], which the commit store calls before it publishes a root.
  */
-class PackCasStore(private val files: FileOperations, root: String) : CasStore() {
+class PackCasStore(private val files: FileOperations, root: String) : CasStore(), AutoCloseable {
     private val channel: FileChannel
     private val index = SegmentIndex()
     private val header = ByteBuffer.allocate(HEADER)
@@ -48,6 +48,9 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
         }
         if (at < size) channel.truncate(at)
         end = at
+        // Recovery is followed by millions of reads: settle the scanned runs
+        // once instead of rescanning the heap tail and every run for each CID.
+        index.compact()
     }
 
     override fun put(bytes: ByteArray): ContentId {
@@ -90,6 +93,8 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
     }
 
     override fun sync(): Unit = locked { channel.force(false) }
+
+    override fun close(): Unit = locked { channel.close() }
 
     override fun holds(cid: ContentId): Boolean = locked {
         val at = index.get(fold(cid.hex), -1L)

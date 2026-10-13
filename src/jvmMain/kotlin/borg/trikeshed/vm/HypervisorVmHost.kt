@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class HypervisorVmHost(
     val hypervisor: Hypervisor = Hypervisor(),
-    override val languages: Set<VmFacet> = setOf(VmFacet.GRAAL_JS, VmFacet.GRAAL_PYTHON),
+    override val languages: Set<VmFacet> = setOf(VmFacet.GRAAL_JS, VmFacet.GRAAL_PYTHON, VmFacet.GRAAL_RUBY, VmFacet.JVM),
     val terminals: VmTerminalRegistry = VmTerminalRegistry(),
 ) : VmHost {
     override val platform: String get() = "jvm"
@@ -98,9 +98,19 @@ class HypervisorVmHost(
     override fun ids(): List<String> = hypervisor.ids()
 
     override fun revoke(id: String, reason: String) {
-        hypervisor.revoke(id, reason)
-        terminals.close(id, reason)
-        emit(VmEvent.Revoked(id, seq.incrementAndGet(), reason))
+        try {
+            hypervisor.revoke(id, reason)
+        } finally {
+            // Lease interruption can leave an idle Graal context alive. The VM host's
+            // revoke/close boundary owns its resources, while the hypervisor retains receipts.
+            try {
+                try { hypervisor.trainer(id)?.close() }
+                finally { hypervisor.find(id)?.close() }
+            } finally {
+                terminals.close(id, reason)
+                emit(VmEvent.Revoked(id, seq.incrementAndGet(), reason))
+            }
+        }
     }
 
     override fun rows(): Cursor = hypervisor.ids().map { id ->

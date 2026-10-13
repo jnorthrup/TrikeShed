@@ -10,6 +10,7 @@ import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.HttpExchange
 import borg.trikeshed.couch.replicate.HttpReply
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -268,6 +269,21 @@ class RequestFactoryProxyTest {
 
         // ddoc may be spelled with or without the _design/ prefix
         assertEquals(shape(receipt.rows), shape(proxy.view("rf", "by_type", mapOf("group" to true)).rows))
+
+        // Stored-view parameters are decoded Couch parameters, including exact null keys;
+        // omitted group must use the route's ungrouped reduction default.
+        val parameters = s_[
+            "" j emptyMap<String, Any?>(),
+            "?key=%22widget%22&reduce=false" j mapOf<String, Any?>("key" to "widget", "reduce" to false),
+            "?key=null&reduce=false" j mapOf<String, Any?>("key" to null, "reduce" to false),
+        ]
+        for ((query, params) in parameters.view) {
+            val expected = json(a.router.handle("GET", "/trikeshed/_design/rf/_view/by_type$query", ByteArray(0))!!.bytes)
+            val actual = proxy.view("rf", "by_type", params)
+            assertTrue(actual.ok, "stored view failed for $params: $actual")
+            assertEquals(expected["rows"], actual.fields["rows"], "stored view parameters disagree for $params")
+        }
+
         // and a missing view refuses per-operation rather than failing the batch
         val missing = proxy.view("_design/rf", "nope")
         assertTrue(!missing.ok && missing.error == "not_found", "expected a refusal, got $missing")

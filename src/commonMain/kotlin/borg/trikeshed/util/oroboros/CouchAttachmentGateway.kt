@@ -60,6 +60,13 @@ class CouchAttachmentGateway(
     }
 
     fun getAttachment(path: String): Pair<OroborosAttachmentRef, ByteArray>? {
+        val ref = getAttachmentRef(path) ?: return null
+        val bytes = casStore.get(ref.contentId) ?: return null
+        return Pair(ref, bytes)
+    }
+
+    /** Attachment identity and stamp without reading its source bytes. */
+    fun getAttachmentRef(path: String): OroborosAttachmentRef? {
         val doc = couchStore.get(path) ?: return null
         // check for tombstone
         if (doc.fields.any { it.name == "deleted" && it.value == "true" }) return null
@@ -71,19 +78,15 @@ class CouchAttachmentGateway(
         val revision = doc.fields.find { it.name == "revision" }?.value as? String ?: ""
         val sequenceStr = doc.fields.find { it.name == "sequence" }?.value as? String ?: "0"
 
-        val cid = ContentId(contentIdStr)
-        val bytes = casStore.get(cid) ?: return null
-
-        val ref = OroborosAttachmentRef(
+        return OroborosAttachmentRef(
             path = doc.id,
             contentType = contentType,
             length = lengthStr.toLongOrNull() ?: 0L,
-            contentId = cid,
+            contentId = ContentId(contentIdStr),
             agentId = agentId,
             revision = revision,
             sequence = sequenceStr.toLongOrNull() ?: 0L
         )
-        return Pair(ref, bytes)
     }
 
     fun deleteAttachment(path: String, revision: String) {

@@ -15,16 +15,24 @@ import borg.trikeshed.lib.size
  */
 object LcncSheetNodes {
 
+    /** A retained identity is not an empty inline sheet. Reads must be explicit in the graph. */
+    @Suppress("UNCHECKED_CAST")
+    fun sheet(inputs: Map<String, Any?>): Map<String, Any?>? {
+        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return null
+        require(sheet["rows"] is List<*> && sheet["columns"] is List<*>) {
+            "Sheet rows and columns are required; read retained curation with document.sheet first"
+        }
+        return sheet
+    }
+
     /**
      * `sheet.flatten` — takes a SheetSeed (possibly with SheetRef cells) and
      * returns all its flattened row data without the references.
      */
     fun flattenNode(): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         @Suppress("UNCHECKED_CAST")
-        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return@LcncNodeRunner emptyMap()
+        val sheet = sheet(inputs) ?: return@LcncNodeRunner emptyMap()
         val rows = (sheet["rows"] as? List<List<Any?>>) ?: emptyList()
-        val columns = (sheet["columns"] as? List<Map<String, String>>) ?: emptyList()
-
         val flatRows = rows.map { row ->
             row.map { cell ->
                 if (cell is Map<*, *> && cell.containsKey("sheet")) {
@@ -34,12 +42,8 @@ object LcncSheetNodes {
         }
         // Output rides the `sheet` port so the family composes: flatten → filter → count.
         mapOf(
-            "sheet" to mapOf(
-                "id" to (sheet["id"] ?: "flattened"),
-                "title" to (sheet["title"] ?: ""),
-                "columns" to columns,
-                "rows" to flatRows,
-            ),
+            "sheet" to (sheet + mapOf("id" to (sheet["id"] ?: "flattened"),
+                "title" to (sheet["title"] ?: ""), "rows" to flatRows)),
         )
     }
 
@@ -50,7 +54,7 @@ object LcncSheetNodes {
      */
     fun filterNode(): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         @Suppress("UNCHECKED_CAST")
-        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return@LcncNodeRunner emptyMap()
+        val sheet = sheet(inputs) ?: return@LcncNodeRunner emptyMap()
         val rows = (sheet["rows"] as? List<List<Any?>>) ?: emptyList()
         val columns = (sheet["columns"] as? List<Map<String, String>>) ?: emptyList()
         val columnName = node.params["columnName"] ?: return@LcncNodeRunner emptyMap()
@@ -63,12 +67,8 @@ object LcncSheetNodes {
             if (colIdx < row.size) row[colIdx].toString() == columnValue else false
         }
         mapOf(
-            "sheet" to mapOf(
-                "id" to (sheet["id"] ?: "filtered"),
-                "title" to (sheet["title"] ?: ""),
-                "columns" to columns,
-                "rows" to filtered,
-            ),
+            "sheet" to (sheet + mapOf("id" to (sheet["id"] ?: "filtered"),
+                "title" to (sheet["title"] ?: ""), "rows" to filtered)),
         )
     }
 
@@ -78,7 +78,7 @@ object LcncSheetNodes {
      */
     fun countNode(): LcncNodeRunner = LcncNodeRunner { _, inputs ->
         @Suppress("UNCHECKED_CAST")
-        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return@LcncNodeRunner emptyMap()
+        val sheet = sheet(inputs) ?: return@LcncNodeRunner emptyMap()
         val rows = (sheet["rows"] as? List<*>) ?: emptyList<Any>()
         mapOf("count" to rows.size)
     }
@@ -89,7 +89,7 @@ object LcncSheetNodes {
      */
     fun columnsNode(): LcncNodeRunner = LcncNodeRunner { _, inputs ->
         @Suppress("UNCHECKED_CAST")
-        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return@LcncNodeRunner emptyMap()
+        val sheet = sheet(inputs) ?: return@LcncNodeRunner emptyMap()
         val columns = (sheet["columns"] as? List<Map<String, String>>) ?: emptyList()
         mapOf("columns" to columns)
     }
@@ -100,7 +100,7 @@ object LcncSheetNodes {
      */
     fun cellNode(): LcncNodeRunner = LcncNodeRunner { node, inputs ->
         @Suppress("UNCHECKED_CAST")
-        val sheet = inputs["sheet"] as? Map<String, Any?> ?: return@LcncNodeRunner emptyMap()
+        val sheet = sheet(inputs) ?: return@LcncNodeRunner emptyMap()
         val rows = (sheet["rows"] as? List<List<Any?>>) ?: emptyList()
         val rowIdx = node.params["row"]?.toIntOrNull() ?: 0
         val colIdx = node.params["column"]?.toIntOrNull() ?: 0
@@ -128,17 +128,7 @@ fun sheetLcncRegistry(): Map<String, LcncNodeRunner> = mapOf(
  * Convert a [SheetSeed] to the map format LCNC nodes expect for sheet inputs.
  * The result can be wired directly as a node output, or fed into `inputs["sheet"]`.
  */
-fun SheetSeed.toLcncMap(): Map<String, Any?> = mapOf(
-    "id" to id,
-    "title" to title,
-    "parent" to parent,
-    "columns" to columns.map { mapOf("name" to it.name, "type" to it.type) },
-    "rows" to rows.map { row ->
-        row.map { cell ->
-            if (cell is SheetRef) mapOf("sheet" to cell.sheet) else cell
-        }
-    },
-)
+fun SheetSeed.toLcncMap(): Map<String, Any?> = toMap()
 
 /**
  * Convert a map (from LCNC node output) back to a [SheetSeed].
@@ -157,9 +147,9 @@ fun lcncMapToSheetSeed(data: Map<String, Any?>): SheetSeed? {
     val rows = (data["rows"] as? List<List<Any?>>)?.map { row ->
         row.map { cell ->
             if (cell is Map<*, *> && cell.containsKey("sheet")) {
-                SheetRef(cell["sheet"].toString())
+                SheetRef(cell["sheet"].toString(), cell["href"] as? String)
             } else cell
         }
     } ?: emptyList()
-    return SheetSeed(id, title, columns, rows, parent)
+    return SheetSeed(id, title, columns, rows, parent, data["truncated"] == true, data["limit"] as? String)
 }

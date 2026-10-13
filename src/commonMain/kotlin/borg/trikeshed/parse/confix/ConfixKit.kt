@@ -162,9 +162,9 @@ private fun cborHead(src: Series<Byte>, open: Int): CborHead? {
 internal fun decodeCborText(src: Series<Byte>, open: Int): String? {
     val head = cborHead(src, open) ?: return null
     if (head.major != 3 || head.value > Int.MAX_VALUE) return null
-    return CharArray(head.value.toInt()) { offset ->
-        src[head.payloadOpen + offset].toInt().toChar()
-    }.concatToString()
+    return ByteArray(head.value.toInt()) { offset ->
+        src[head.payloadOpen + offset]
+    }.decodeToString(throwOnInvalidSequence = true)
 }
 
 private fun decodeCborBytes(src: Series<Byte>, open: Int): ByteArray? {
@@ -226,23 +226,14 @@ fun ConfixIndex.resolve(parentTokenIdx: Int, arrayIdx: Int): Int? {
 
 fun RowVec.step(key: CharSequence, src: Series<Byte>): RowVec? {
     val ch = kids
+    val name = key.toString()
     // Confix flat-kid order for objects: (key, value) pairs — JSON and CBOR scanners both
     // emit the key token before its value token (see TreeCursor kids in Confix.kt).
     var i = 0
     while (i + 1 < ch.size) {
         val k = ch[i]
         val v = ch[i + 1]
-        if (k.tag == borg.trikeshed.cursor.IOMemento.IoString) {
-            val kOpen  = k.open  + 1
-            val kClose = k.close - 1
-            val kLen   = kClose - kOpen + 1
-            if (kLen == key.length) {
-                var match = true
-                for (d in 0 until kLen)
-                    if (src[kOpen + d].toInt().toChar() != key[d]) { match = false; break }
-                if (match) return v
-            }
-        }
+        if (k.tag == borg.trikeshed.cursor.IOMemento.IoString && k.reify(src) == name) return v
         i += 2
     }
     return null

@@ -9,10 +9,7 @@ import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileLease
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
@@ -22,12 +19,14 @@ import borg.trikeshed.userspace.nio.file.spi.StorageDurability
  * Durable commits add immutable CAS nodes and atomically replace one HEAD root;
  * the filesystem lease excludes another writer until this owner closes.
  * A failed root publication has an uncertain outcome and poisons this owner.
+ * Conversion consumers can require complete history instead of the legacy truncated-history recovery policy.
  */
 class CouchCommitStore(
     private val cas: CasStore,
     val durability: StorageDurability,
     private val fileOps: FileOperations? = null,
     directory: String? = null,
+    private val requireCompleteHistory: Boolean = false,
 ) : AutoCloseable {
     private val gate = Any()
     private val rootPath: String?
@@ -39,7 +38,7 @@ class CouchCommitStore(
     private var frameSequence = -1L
     private var localSequence = 0L
     private val locals = mutableMapOf<String, ByteArray>()
-    private var recovered: List<CouchCommittedFrame> = emptyList()
+    private var recovered: List<Join<CouchCommittedFrame, ContentId?>> = emptyList()
 
     init {
         if (durability == StorageDurability.DURABLE) {
@@ -67,7 +66,13 @@ class CouchCommitStore(
     val recoveredFrames: Series<CouchCommittedFrame>
         get() = synchronizedLock(gate) {
             operational()
-            recovered.size j { index -> capture(recovered[index]) }
+            recovered.size j { index ->
+                val retained = recovered[index]
+                val doc = retained.b?.let { body ->
+                    requireNotNull(CouchStoreFactory.documentFromBody(decode(readVerified(body)))) { "Invalid Couch body" }
+                }
+                retained.a.copy(doc = doc)
+            }
         }
 
     fun checkOpen(): Unit = synchronizedLock(gate) { operational() }
@@ -172,25 +177,30 @@ class CouchCommitStore(
         require(size in 0..Int.MAX_VALUE.toLong()) { "Invalid Couch history size" }
         var cursor = nullableCid(root, "head")
         require((cursor == null) == (size == 0L)) { "Couch root does not identify its history" }
-        val events = mutableListOf<Map<String, Any?>>()
+        val events = mutableListOf<ContentId>()
         var remaining = size
         var truncated = false
         while (remaining > 0) {
             // A home removed under a live writer leaves a HEAD whose older links are gone. Every frame and
             // local event carries its whole body, so the readable newest events are a consistent store.
-            val bytes = cas.get(requireNotNull(cursor))
-            if (bytes == null) { truncated = true; break }
+            val eventCid = requireNotNull(cursor)
+            val bytes = cas.get(eventCid)
+            if (bytes == null) {
+                require(!requireCompleteHistory) { "Missing Couch history object $cursor at index $remaining" }
+                truncated = true; break
+            }
             require(ContentId.of(bytes) == cursor) { "Corrupt Couch object $cursor" }
             val event = decode(bytes)
             require(event["format"] == EVENT_FORMAT && integer(event, "index") == remaining) { "Invalid Couch history order" }
-            events.add(event)
+            events.add(eventCid)
             cursor = nullableCid(event, "previous")
             remaining--
         }
         if (truncated) println("[COUCH] history truncated below index ${remaining + 1}: ${events.size} of $size events readable from ${nullableCid(root, "head")}")
         else require(cursor == null) { "Couch history exceeds its declared root" }
-        val frames = mutableListOf<CouchCommittedFrame>()
-        for (event in events.asReversed()) {
+        val frames = mutableListOf<Join<CouchCommittedFrame, ContentId?>>()
+        for (eventCid in events.asReversed()) {
+            val event = decode(readVerified(eventCid))
             when (event["kind"]) {
                 "frame" -> {
                     require(event.keys == FRAME_KEYS) { "Invalid Couch frame schema" }
@@ -201,12 +211,14 @@ class CouchCommitStore(
                     require(deleted == (bodyCid == null)) { "Invalid Couch frame body" }
                     val doc = bodyCid?.let { body ->
                         val bodyBytes = readVerified(body)
-                        decode(bodyBytes)
-                        requireNotNull(CouchStoreFactory.documentFromBody(bodyBytes)) { "Invalid Couch body" }
+                        requireNotNull(CouchStoreFactory.documentFromBody(decode(bodyBytes))) { "Invalid Couch body" }
                             .also(::validateReferences)
                     }
-                    val frame = capture(CouchCommittedFrame(sequence, string(event, "id"), string(event, "rev"), deleted, doc))
-                    frames.add(frame)
+                    // These values are newly decoded and owned by this recovery. Only
+                    // frames crossing the public boundary need capture's defensive copy.
+                    val frame = CouchCommittedFrame(sequence, string(event, "id"), string(event, "rev"), deleted, doc)
+                    validateFrame(frame)
+                    frames.add(frame.copy(doc = null) j bodyCid)
                     frameSequence = sequence
                 }
                 "local-put" -> {
@@ -238,17 +250,22 @@ class CouchCommitStore(
         }
     }
 
-    private fun capture(frame: CouchCommittedFrame): CouchCommittedFrame {
+    private fun validateFrame(frame: CouchCommittedFrame) {
         require(frame.docId.isNotEmpty() && frame.rev.isNotEmpty()) { "Couch frame identity is empty" }
         require(frame.deleted == (frame.doc == null)) { "Couch frame body does not match its deletion flag" }
-        val doc = frame.doc?.let {
+        frame.doc?.let {
             require(it.id == frame.docId) { "Couch frame document identity mismatch" }
             require(it.fields.none { field -> field.name == "_id" } && it.fields.map { field -> field.name }.distinct().size == it.fields.size) {
                 "Couch body contains an ambiguous field identity"
             }
+        }
+    }
+
+    private fun capture(frame: CouchCommittedFrame): CouchCommittedFrame {
+        validateFrame(frame)
+        val doc = frame.doc?.let {
             val bytes = CouchStoreFactory.canonicalBody(it)
-            decode(bytes)
-            requireNotNull(CouchStoreFactory.documentFromBody(bytes)).also { captured ->
+            requireNotNull(CouchStoreFactory.documentFromBody(decode(bytes))).also { captured ->
                 require(captured.id == frame.docId) { "Canonical Couch body identity mismatch" }
             }
         }

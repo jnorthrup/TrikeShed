@@ -48,6 +48,7 @@ class RouteManifestParityTest {
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/ReteWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/BlackboardWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/HermesConsoleWire.kt",
+        "src/jvmMain/kotlin/borg/trikeshed/forge/server/SleeveWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/WebhookWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/ProjectDbWire.kt",
         "src/jvmMain/kotlin/borg/trikeshed/forge/server/ModuleWire.kt",

@@ -131,14 +131,16 @@ object DocumentCurationFacts {
 
     /**
      * Rows shaped exactly as `nal.rule.admit` reads its `rules` input (`antecedent`, `consequent`,
-     * `copula`), carrying the candidate's identity beside them. No `discount` is set: the
-     * extraction weight is not parser confidence, so the weight is the admitting operator's call.
+     * `copula`), carrying its exact evidence counts and provenance so negative candidates
+     * cannot become positive rules at the JSON boundary. No `discount` is set: the retained
+     * structural weight is not parser confidence, and admission remains the operator's call.
      */
     fun ruleCandidates(record: DocumentCurationRecord): Series<Map<String, Any?>> = record.nlpAxioms α { axiom ->
         val rule = axiom.rule
         mapOf(
             "antecedent" to rule.antecedent, "consequent" to rule.consequent, "copula" to rule.copula.symbol,
             "ruleCid" to rule.ruleCid.value, "provenanceCid" to rule.provenanceCid,
+            "positiveEvidence" to rule.evidence.positive, "negativeEvidence" to rule.evidence.negative,
             "sentenceIndex" to axiom.sentenceIndex, "begin" to axiom.begin, "end" to axiom.end,
             "quote" to quote(record.source.text, axiom.begin, axiom.end),
             "patternWeight" to axiom.confidence.toDouble(), "admission" to RULE_ADMISSION,

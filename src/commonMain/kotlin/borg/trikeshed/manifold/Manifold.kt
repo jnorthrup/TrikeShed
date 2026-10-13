@@ -2,6 +2,7 @@ package borg.trikeshed.manifold
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.BudgetCoord
 
 // ── ManifoldK — NARS3 concept facet keys ────────────────────────
 //

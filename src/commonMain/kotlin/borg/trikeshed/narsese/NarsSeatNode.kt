@@ -83,7 +83,7 @@ object NarsSeatNode {
         val contextId = node.params["contextId"].orEmpty()
         val k = node.params["k"]?.toIntOrNull() ?: 8
         val maxDistance = node.params["maxDistance"]?.toIntOrNull() ?: 16
-        val taxonomy = node.params["taxonomy"]
+        val taxonomy = node.params["taxonomy"]?.takeIf { it.isNotBlank() }
         val minEvidence = (node.params["minEvidence"]?.toFloatOrNull() ?: 1f)
 
         val reviews = choices.map { choice ->

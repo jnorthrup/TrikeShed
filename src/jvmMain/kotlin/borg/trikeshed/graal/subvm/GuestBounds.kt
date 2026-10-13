@@ -4,8 +4,8 @@ import borg.trikeshed.pointcut.VmFacet
 
 /**
  * The GraalVM polyglot bounds this sub-VM is built on, as code rather than lore.
- * Every entry here was probed on GraalVM CE 25.0.2 (see GraalBoundsSmokeTest) — change
- * the table only with a new probe.
+ * Entries are backed by GraalBoundsSmokeTest and facet-specific probes — change
+ * the table only with a new probe. Ruby: TruffleRuby 40.0.0 / Truffle 25.3.4.1.
  *
  *  - SEQUENTIAL: a guest [org.graalvm.polyglot.Context] forbids *concurrent* access; a second
  *    thread may enter once the first has left. One lock per isolate is the whole discipline.
@@ -41,13 +41,15 @@ data class FacetBounds(
     /** Wall budget used when the statement limit cannot be trusted. */
     val defaultWallMillis: Long,
     /**
-     * Whether `ExecutionListener.roots(true)` reports this language's function roots. GraalPy 25.0.2
-     * reports NONE (PythonRootProbeTest), so Python uses binding pointcuts: every top-level callable is
-     * wrapped after eval and observed at the binding instead of by instrumentation.
+     * Whether `ExecutionListener.roots(true)` reports this language's function roots. GraalPy
+     * 25.3.4.1 reports functions, nested functions and methods with source sections (PythonRootProbeTest).
+     * Languages without root events use binding pointcuts instead.
      */
     val rootEventsObservable: Boolean,
     /** [VmFacet.JVM] only — see the class doc's HOST ACCESS note. Every other facet stays HostAccess.NONE. */
     val hostTrusted: Boolean = false,
+    /** False when writing a polyglot binding does not replace guest method dispatch. */
+    val rootBindingsMutable: Boolean = true,
 )
 
 object GuestBounds {
@@ -67,7 +69,18 @@ object GuestBounds {
         statementLimitSafe = false, stop = StopStrategy.INTERRUPT,
         rootNameNoise = { it.isBlank() || it.startsWith("<") || it.startsWith(":") || it.contains("__") },
         defaultWallMillis = DEFAULT_WALL_MILLIS,
-        rootEventsObservable = false,
+        rootEventsObservable = true,
+    )
+    val RUBY = FacetBounds(
+        facet = VmFacet.GRAAL_RUBY, languageId = "ruby",
+        // Count user statements and retain the wall watchdog for core-library calls.
+        statementLimitSafe = true, stop = StopStrategy.INTERRUPT,
+        rootNameNoise = { it.isBlank() || it.startsWith("<") },
+        defaultWallMillis = DEFAULT_WALL_MILLIS,
+        rootEventsObservable = true,
+        // Object#method roots are observable, but putMember creates a local binding;
+        // it does not rebind Ruby's method table. Do not claim a delegated pointcut.
+        rootBindingsMutable = false,
     )
     val LLVM = FacetBounds(
         facet = VmFacet.GRAAL_LLVM, languageId = "llvm",
@@ -89,13 +102,14 @@ object GuestBounds {
     fun of(facet: VmFacet): FacetBounds = when (facet) {
         VmFacet.GRAAL_JS -> JS
         VmFacet.GRAAL_PYTHON -> PYTHON
+        VmFacet.GRAAL_RUBY -> RUBY
         VmFacet.GRAAL_LLVM -> LLVM
         VmFacet.JVM -> JVM
         else -> throw IllegalArgumentException("no in-process guest for facet $facet")
     }
 
     fun ofLanguage(languageId: String): FacetBounds = when (languageId) {
-        "js" -> JS; "python" -> PYTHON; "llvm" -> LLVM
+        "js" -> JS; "python" -> PYTHON; "ruby" -> RUBY; "llvm" -> LLVM
         else -> throw IllegalArgumentException("unknown guest language $languageId")
     }
 }

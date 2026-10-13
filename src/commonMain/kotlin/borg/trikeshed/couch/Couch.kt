@@ -56,10 +56,7 @@ class Couch(
 
     /** 1-based update sequence; 0 for an empty database. */
     val updateSeq: Long
-        get() {
-            val s = store.changes.series()
-            return if (s.size == 0) 0L else s[s.size - 1].sequence + 1
-        }
+        get() = store.changes.lastCommittedSequence + 1
 
     fun info(): Map<String, Any?> {
         // Avoiding materializing full documents in memory just to count them reduces GC pressure.
@@ -170,13 +167,14 @@ class Couch(
     }
 
     /** Frames with external seq > [since], newest last. */
-    suspend fun framesSince(since: Long): List<CouchCommittedFrame> {
+    suspend fun framesSince(since: Long, limit: Int = Int.MAX_VALUE): List<CouchCommittedFrame> {
+        require(limit >= 0) { "Negative Couch changes limit" }
         val s = store.changes.afterSequence(since - 1)
-        return List(s.size) { s[it] }
+        return List(minOf(s.size, limit)) { s[it] }
     }
 
     suspend fun changes(since: Long, limit: Int = Int.MAX_VALUE, includeDocs: Boolean = false): Map<String, Any?> {
-        val frames = framesSince(since).take(limit)
+        val frames = framesSince(since, limit)
         val last = if (frames.isEmpty()) since else frames.last().sequence + 1
         return mapOf("results" to frames.map { changeRow(it, includeDocs) }, "last_seq" to last)
     }

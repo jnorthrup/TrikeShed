@@ -8,6 +8,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.CacheLookup
 import borg.trikeshed.modelmux.ModelResponseReceipt
+import borg.trikeshed.parse.confix.ConfixDoc
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.uuid.ExperimentalUuidApi
@@ -268,7 +269,42 @@ class ModelMux internal constructor(
         expectedBaseUrl: String? = null,
         jsonOutput: Boolean = false,
         thinking: Boolean? = null,
-    ): Result<AcpResponse> {
+    ): Result<AcpResponse> = chatRequest(
+        modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl,
+        encode = { wireModel ->
+            val meta: AcpMeta = wireModel j ("chat" j emptySeriesOf())
+            AcpCodec.encodeRequest(meta j (messages j tools), maxTokens, temperature, jsonOutput, thinking)
+        },
+        decode = AcpCodec::parseResponse,
+    )
+
+    /** Structured, non-streaming chat: preserve tool calls, history and provider metadata. */
+    suspend fun completion(
+        modelId: String,
+        request: ConfixDoc,
+        assessmentId: String? = null,
+        contextId: String? = null,
+        timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
+        expectedBaseUrl: String? = null,
+    ): Result<ConfixDoc> {
+        // Invalid protocol requests are rejected before admission. The catalog, not
+        // a guest-supplied model field, owns the wire model and credential binding.
+        val wireModel = models.view.firstOrNull { it.a == modelId }?.b?.wireName ?: modelId
+        val json = runCatching { AcpCodec.encodeCompletion(request, wireModel) }
+            .getOrElse { return Result.failure(it) }
+        return chatRequest(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl,
+            encode = { json }, decode = AcpCodec::parseCompletion)
+    }
+
+    private suspend fun <T> chatRequest(
+        modelId: String,
+        assessmentId: String?,
+        contextId: String?,
+        timeoutMs: Long,
+        expectedBaseUrl: String?,
+        encode: (String) -> String,
+        decode: (String) -> T,
+    ): Result<T> {
         val attribution = currentCoroutineContext()[MuxCallContext]
         val callActivity = attribution?.activity ?: activity
         val provider = models.view.firstOrNull { it.a == modelId }?.b?.providerTag ?: modelId
@@ -279,7 +315,7 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
-            val result = chatCall(modelId, messages, tools, assessmentId, maxTokens, temperature, contextId, timeoutMs, expectedBaseUrl, jsonOutput, thinking) { r, k ->
+            val result = chatCall(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl, encode, decode) { r, k ->
                 receipt = r
                 keyId = k
             }
@@ -297,8 +333,7 @@ class ModelMux internal constructor(
                 // retain the exact proposed request and its failure provenance.
                 val completed = receipt ?: run {
                     val wireModel = models.view.firstOrNull { it.a == modelId }?.b?.wireName ?: modelId
-                    val meta: AcpMeta = wireModel j ("chat" j emptySeriesOf())
-                    val json = AcpCodec.encodeRequest(meta j (messages j tools), maxTokens, temperature, jsonOutput, thinking)
+                    val json = encode(wireModel)
                     ModelResponseReceipt.mint(
                         modelId = modelId, providerId = modelId,
                         requestHash = cacheCascade.primary(json), action = "chat", httpStatus = 0,
@@ -317,20 +352,16 @@ class ModelMux internal constructor(
         }
     }
 
-    private suspend fun chatCall(
+    private suspend fun <T> chatCall(
         modelId: String,
-        messages: Series<AcpMessage>,
-        tools: Series<AcpTool>,
         assessmentId: String?,
-        maxTokens: Int?,
-        temperature: Double?,
         contextId: String?,
         timeoutMs: Long,
         expectedBaseUrl: String?,
-        jsonOutput: Boolean,
-        thinking: Boolean?,
+        encode: (String) -> String,
+        decode: (String) -> T,
         capture: (ModelResponseReceipt, String?) -> Unit,
-    ): Result<AcpResponse> {
+    ): Result<T> {
         val receiptAssessment = assessmentId ?: contextId
         if (modelId.isEmpty()) return Result.failure(IllegalArgumentException("need(model): modelId must be non-empty"))
         val sessionResult = session(modelId)
@@ -362,11 +393,7 @@ class ModelMux internal constructor(
         var requestHash = ""
         try {
             val card = session.model.b
-            val meta: AcpMeta = card.wireName j ("chat" j session.authHeaders())
-            val body: AcpRequestBody = messages j tools
-            val req: AcpRequest = meta j body
-
-            val json = AcpCodec.encodeRequest(req, maxTokens = maxTokens, temperature = temperature, jsonOutput = jsonOutput, thinking = thinking)
+            val json = encode(card.wireName)
             // Content-address the canonical request bytes. String.hashCode() is a
             // 32-bit truncation: two distinct requests colliding on it returned each
             // other's cached payload verbatim.
@@ -391,9 +418,10 @@ class ModelMux internal constructor(
                 if (hit != null) {
                     cachedHit = true
                     httpStatus = 200
-                    val cached = AcpCodec.parseResponse(hit.entry.payload)
-                    inputTokens = cached.b.a
-                    outputTokens = cached.b.b
+                    val cached = decode(hit.entry.payload)
+                    val usage = AcpCodec.parseResponse(hit.entry.payload).b
+                    inputTokens = usage.a
+                    outputTokens = usage.b
                     session.recordReceipt(
                         ModelResponseReceipt.mint(
                             modelId = modelId, providerId = card.id, requestHash = requestHash,
@@ -411,7 +439,7 @@ class ModelMux internal constructor(
 
             val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
             val url = "${session.baseUrl}/chat/completions"
-            val htxHeaders = htxHeaders(*meta.b.b.toArray())
+            val htxHeaders = htxHeaders(*session.authHeaders().toArray())
             val htxReq = parseHtxRequest(
                 url = url,
                 method = HtxMethod.POST,
@@ -454,9 +482,10 @@ class ModelMux internal constructor(
                 return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
 
-            val parsed = AcpCodec.parseResponse(respBody)
-            inputTokens = parsed.b.a
-            outputTokens = parsed.b.b
+            val parsed = decode(respBody)
+            val usage = AcpCodec.parseResponse(respBody).b
+            inputTokens = usage.a
+            outputTokens = usage.b
             // Provider-measured cache economics only — never synthesized from inputTokens.
             val cacheUse = providerCacheUsage(respBody)
 

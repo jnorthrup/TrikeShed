@@ -130,7 +130,7 @@ internal class UringServerSocketChannel(
             readiness = null
             if (ready.res < 0) throw IOException("accept: ${ready.res}")
             val fd = io(Submissions.accept(file.id, SocketType.withFlags(SocketType.SOCK_NONBLOCK, SocketType.SOCK_CLOEXEC), 0))
-            if (fd >= 0) return UringSocketChannel(File.fromFd(fd), UringChannels.open(4))
+            if (fd >= 0) return UringSocketChannel(File.fromFd(fd), UringChannels.open(4), connected = true)
             // Another acceptor took the connection: watch again.
             if (fd != -11) throw IOException("accept: $fd")
         }

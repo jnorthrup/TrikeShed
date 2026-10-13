@@ -231,29 +231,27 @@ class InProcessIsolateTest {
         }
     }
 
-    /**
-     * GraalPy 25.0.2 reports no function roots to `ExecutionListener.roots(true)` ([GuestBounds.PYTHON]
-     * `rootEventsObservable=false`), so the isolate wraps every top-level callable after each eval
-     * (binding pointcuts): the same frame semantics as the JS listener, minus source characters.
-     */
-    @Test fun pythonRootsAreObservedThroughBindingPointcuts() {
+    /** Python carries the same native source and frame semantics as the JS listener. */
+    @Test fun pythonRootsAreObservedWithSourceSections() {
         val seen = CopyOnWriteArrayList<RootObservation>()
         InProcessIsolate("py-bp", VmFacet.GRAAL_PYTHON, Budget()) { seen += it }.use { iso ->
             iso.eval("def leaf(n): return n*2\ndef outer(n): return leaf(n)+1", "obs.py")
             assertEquals(0, seen.size)
             repeat(5) { assertEquals(Num(it * 2L + 1), iso.call("outer", Num(it.toLong()))) }
-            assertEquals(setOf("leaf", "outer"), seen.map { it.root }.toSet(), "module/dunder bindings must not be wrapped")
+            assertEquals(setOf("leaf", "outer"), seen.map { it.root }.toSet(), "module roots must be filtered")
+            assertTrue(iso.wrappedRoots.isEmpty())
             val leaves = seen.filter { it.root == "leaf" }
             val outers = seen.filter { it.root == "outer" }
             assertEquals(5, leaves.size); assertEquals(5, outers.size)
             assertTrue(leaves.all { it.selfContained }, "leaf enters no foreign root")
-            assertTrue(outers.none { it.selfContained }, "outer enters leaf through the wrapped binding")
-            assertTrue(seen.all { it.characters == null && it.line == -1 && it.sourceName == null }, "binding pointcuts carry no source section")
+            assertTrue(outers.none { it.selfContained }, "outer enters leaf")
+            assertTrue(leaves.all { it.characters == "def leaf(n): return n*2" && it.line == 1 && it.sourceName == "obs.py" })
+            assertTrue(outers.all { it.line == 2 && it.sourceName == "obs.py" })
             assertTrue(seen.all { it.nanos > 0 })
             assertEquals(10L, iso.stats().rootEnters)
             // the program text is what a leaf host re-parses for roots without characters
             assertTrue(iso.program.contains("def leaf(n)") && iso.program.contains("def outer(n)"), iso.program)
-            // wrappers are transparent to guest code and a later eval wraps only the new callables
+            // A later eval's functions participate without installing any wrapper.
             seen.clear()
             iso.eval("def twice(n): return outer(outer(n))")
             assertEquals(Num(7), iso.eval("twice(1)"))
@@ -265,6 +263,96 @@ class InProcessIsolateTest {
             assertEquals(Num(3), iso.call("wraps", Num(3)))
             assertTrue(seen.filter { it.root == "viaHost" }.none { it.selfContained })
             assertTrue(seen.filter { it.root == "wraps" }.none { it.selfContained })
+        }
+    }
+
+    @Test fun pythonNativePointcutsCoverNestedFunctionsMethodsAndRedefinitions() {
+        val seen = ArrayList<RootObservation>()
+        InProcessIsolate("py-source", VmFacet.GRAAL_PYTHON) { seen += it }.use { iso ->
+            iso.eval("""
+                def outer(n):
+                    def inner(*, n): return n * 2
+                    return inner(n=n)
+                class Sample:
+                    def label(self, *, n): return str(n)
+                def render(n): return Sample().label(n=outer(n))
+            """.trimIndent(), "nested.py")
+            seen.clear()
+            assertEquals(Str("6"), iso.call("render", Num(3)))
+            assertEquals(listOf("inner", "outer", "label", "render"), seen.map { it.root })
+            assertEquals(listOf(2, 1, 5, 6), seen.map { it.line })
+            assertTrue(seen.all { it.sourceName == "nested.py" && it.characters != null })
+            assertTrue(seen.filter { it.root == "inner" || it.root == "label" }.all { it.selfContained })
+            assertTrue(seen.filter { it.root == "outer" || it.root == "render" }.none { it.selfContained })
+            iso.eval("def outer(n): return n + 10", "replacement.py")
+            seen.clear()
+            assertEquals(Num(13), iso.call("outer", Num(3)))
+            assertEquals("replacement.py", seen.single().sourceName)
+            assertEquals("def outer(n): return n + 10", seen.single().characters)
+            assertTrue(iso.wrappedRoots.isEmpty())
+        }
+    }
+
+    @Test fun pythonNativePointcutsPreserveKeywordsMetadataAndGuestExceptions() {
+        val seen = ArrayList<RootObservation>()
+        InProcessIsolate("py-keywords", VmFacet.GRAAL_PYTHON) { seen += it }.use { iso ->
+            iso.eval("""
+                def label(value: int, /, *, prefix: str = 'v') -> str:
+                    'Label a value.'
+                    return prefix + str(value)
+                label.unit = 'count'
+                def outer(*, value): return label(value, prefix='n')
+                def failure(*, error): raise error
+                def via_host(*, value): return host.call('echo', value)
+            """.trimIndent())
+            assertEquals(Str("n7"), iso.eval("outer(value=7)"))
+            assertEquals(listOf("label", "outer"), seen.map { it.root })
+            assertTrue(seen.first().selfContained)
+            assertFalse(seen.last().selfContained)
+            assertEquals(Teleported.Bool(true), iso.eval("""
+                import inspect
+                assert inspect.isfunction(label)
+                assert not hasattr(label, '__wrapped__')
+                assert label.__name__ == 'label' and label.__doc__ == 'Label a value.'
+                assert label.unit == 'count' and label.__annotations__['return'] is str
+                signature = inspect.signature(label)
+                assert signature.parameters['value'].kind is inspect.Parameter.POSITIONAL_ONLY
+                assert signature.parameters['prefix'].kind is inspect.Parameter.KEYWORD_ONLY
+                assert signature.parameters['prefix'].default == 'v'
+                try: label(value=1)
+                except TypeError: pass
+                else: raise AssertionError('positional-only constraint lost')
+                error = ValueError('expected')
+                try: failure(error=error)
+                except ValueError as caught: assert caught is error
+                else: raise AssertionError('guest exception lost')
+                True
+            """.trimIndent()))
+            seen.clear()
+            assertEquals(Str("v2"), iso.call("label", Num(2)))
+            assertTrue(seen.single().selfContained, "failed calls must release observation frames")
+            iso.delegate("echo") { it.first() }
+            seen.clear()
+            assertEquals(Num(3), iso.eval("via_host(value=3)"))
+            assertFalse(seen.single().selfContained, "keyword forwarding must retain host-effect attribution")
+        }
+    }
+
+    @Test fun pythonRebindingIsNotGuestWorkButSubsequentLibraryCallsAreObserved() {
+        val seen = ArrayList<RootObservation>()
+        InProcessIsolate("py-rebind", VmFacet.GRAAL_PYTHON) { seen += it }.use { iso ->
+            iso.eval("def score(n): return n*2", "curation.py")
+            seen.clear()
+            iso.onGuestThread {
+                iso.rebind("score", org.graalvm.polyglot.proxy.ProxyExecutable { args -> args[0].asInt() * 2 })
+            }
+            assertTrue(seen.isEmpty(), "rebind setup leaked roots: ${seen.map { it.root }}")
+            assertEquals(Num(6), iso.eval("score(n=3)"))
+            assertEquals(listOf("score"), seen.map { it.root })
+            assertEquals("curation.py", seen.single().sourceName)
+            seen.clear()
+            iso.eval("import functools\nfunctools.update_wrapper(lambda: 0, score)")
+            assertTrue(seen.any { it.root == "update_wrapper" }, "guest library execution must still be observed")
         }
     }
 

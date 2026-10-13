@@ -9,7 +9,7 @@ import borg.trikeshed.graal.subvm.CoreNlpRuntime
 import borg.trikeshed.graal.subvm.CamelCatalog
 import borg.trikeshed.graal.subvm.GuestModules
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.SeriesBuffer
@@ -112,16 +112,10 @@ class DocumentCurationWire private constructor(
 
     private suspend fun attach() {
         for (receipt in curator.receipts().view) publish(receipt.a, receipt.b)
+        ctx.lcncRunners[DocumentCurationLegos.SHEET] = DocumentCurationLegos.sheet(curator)
         ctx.lcncRunners[DocumentCurationLegos.CURATE] = boundLcnc(curator) { owner, node, inputs ->
             val raw = inputs["source"] ?: inputs["source?"]
-            val source = (raw as? Map<*, *>)?.let { fields ->
-                if (fields["text"] != null) fields else {
-                    val cid = ContentId(fields["extractedTextCid"] as? String ?: error("Extracted text CID is required"))
-                    val bytes = ctx.casStore.get(cid) ?: error("Retained extracted text is unavailable")
-                    check(ContentId.of(bytes) == cid) { "Extracted text CID mismatch" }
-                    fields + ("text" to bytes.decodeToString())
-                }
-            } ?: raw
+            val source = DocumentCurationLegos.retainSource(ctx.casStore, raw)
             val output = DocumentCurationLegos.curate(owner, DocumentCurationLegos::reference).execute(node, inputs + ("source" to source))
             val cid = ContentId(output.getValue("receiptCid") as String)
             val record = checkNotNull(owner.record(cid))
@@ -235,7 +229,8 @@ class DocumentCurationWire private constructor(
                         json(if (cid != null && query["view"] == "sheet") {
                             val receipt = ContentId(cid)
                             val record = curator.record(receipt) ?: error("Unknown document curation receipt")
-                            DocumentCurationLegos.output(receipt, record)["sheets"]
+                            if (query.containsKey("cursor")) DocumentCurationLegos.sheet(receipt, record, query)
+                            else DocumentCurationLegos.output(receipt, record)["sheets"]
                         } else if (cid != null) view(ContentId(cid)) else mapOf(
                             "available" to available, "destination" to destination,
                             "records" to (curator.receipts() α { mapOf("receiptCid" to it.a.value,
@@ -245,17 +240,8 @@ class DocumentCurationWire private constructor(
                     method == "POST" && path.substringBefore('?') == "/api/documents/curate" -> {
                         require(text.length <= 4 * 1024 * 1024) { "Document request exceeds 4 MiB" }
                         val input = reifyMap(text.substringAfter("\r\n\r\n", text))
-                        val source = input["source"] as? Map<*, *> ?: error("source is required")
-                        val body = source.entries.associate { it.key as String to it.value }.toMutableMap()
-                        // New text is an original; retained documents must supply both matching CIDs.
-                        if (body["originalCid"] == null) {
-                            val bytes = (body["text"] as? String ?: error("source.text is required")).encodeToByteArray()
-                            val cid = ctx.casStore.put(bytes).value
-                            body["originalCid"] = cid; body["extractedTextCid"] = cid
-                        }
-                        body.putIfAbsent("correlation", java.util.UUID.randomUUID().toString())
-                        body.putIfAbsent("mediaType", "text/plain")
-                        body.putIfAbsent("metadata", emptyMap<String, Any?>())
+                        val source = DocumentCurationLegos.retainSource(ctx.casStore, input["source"])
+                        val body = DocumentCuratorCodec.source(source)
                         val program = input["program"] as? String ?: PROGRAM
                         require(program in setOf(PROGRAM, PROFILE_PROGRAM)) { "Choose a document curation composition" }
                         val run = run(program, body)
@@ -266,6 +252,7 @@ class DocumentCurationWire private constructor(
                 }
             }
         } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: IllegalArgumentException) { json(mapOf("error" to failure.message), 400) }
         catch (failure: Exception) { json(mapOf("error" to (failure.message ?: "Document curation failed")), 503) }
     }
 

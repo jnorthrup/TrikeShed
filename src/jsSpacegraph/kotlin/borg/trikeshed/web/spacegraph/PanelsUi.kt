@@ -317,7 +317,7 @@ suspend fun Panels.openGallery() {
                     val resp = fetchJs("/api/panels/$name")
                     if (truthy(resp.ok)) { load(awaitJs(resp.json())); panelName().value = name; status("loaded panels/$name"); syncBoard(name) }
                 }
-                gal.remove(); armSources(); runAll(null)
+                gal.remove(); armSources(automatic = true); runAll(null, automatic = true)
             }
         })
     } catch (x: CancellationException) { throw x } catch (x: dynamic) { body.textContent = "gallery failed: " + str(x) }
@@ -363,7 +363,7 @@ suspend fun Panels.rdfTab(tab: String) {
                             else {
                                 // load() re-renders this tab (debounced), which would erase the message; park it for that render.
                                 rdfNote = "canvas rebuilt from " + arr(doc.nodes).size + " nodes, " + arr(doc.wires).size + " cables"
-                                load(fromConfix(doc)); save(); armSources(); msg.textContent = rdfNote
+                                load(fromConfix(doc)); save(); armSources(automatic = true); msg.textContent = rdfNote
                             }
                         }
                         "nal" -> {

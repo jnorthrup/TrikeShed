@@ -37,6 +37,7 @@ class Panels : PatchSurface {
     var autosave = true
 
     val history by lazy { PanelsHistory(this) }
+    val facets by lazy { PanelsFacets(this) }
     val shakeOwner by lazy { PanelsShakeOwner(this) }
     val layoutOwner by lazy { PanelsLayoutOwner(this) }
     var workspace: SpaceGraphWorkspace? = null

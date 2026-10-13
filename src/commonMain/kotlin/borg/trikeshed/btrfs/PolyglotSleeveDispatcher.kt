@@ -1,6 +1,6 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.jules.JulesDurableTodoQueue
+import borg.trikeshed.btrfs.DurableTodoQueue
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
 /**
@@ -17,7 +17,7 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
  *  - common (pure Kotlin, no platform)
  */
 class PolyglotSleeveDispatcher(
-    private val queue: JulesDurableTodoQueue,
+    private val queue: DurableTodoQueue,
     private val fileOps: FileOperations,
     private val dispatchDir: String, // e.g. build/dispatch-verify
 ) {

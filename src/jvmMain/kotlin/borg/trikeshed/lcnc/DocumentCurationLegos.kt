@@ -2,23 +2,24 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.CursorScope
 import borg.trikeshed.forge.sheet.SheetRef
+import borg.trikeshed.forge.sheet.SheetColumn
 import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.graal.subvm.DocumentFeed
 import borg.trikeshed.graal.subvm.CamelCatalog
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.narsese.DocumentCurationFacts
 import borg.trikeshed.narsese.DocumentCurationToolset
 import borg.trikeshed.narsese.DocumentCurationIndexK
+import borg.trikeshed.narsese.DocumentCurationIndex
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCuratorElement
@@ -38,6 +39,161 @@ import kotlinx.coroutines.currentCoroutineContext
 /** LCNC admission into the host-owned feed or its existing curator; the host owns their drain. */
 object DocumentCurationLegos {
     const val CURATE = "document.curate"
+    const val SHEET = "document.sheet"
+
+    /** Read-only navigation addresses the same receipt and cursor as the LC node. */
+    fun sheetHref(cid: ContentId, view: String = "sentences", sentence: Int = 0, offset: Int = 0, limit: Int = 32): String =
+        "/api/documents?cid=${cid.value}&view=sheet&cursor=$view&sentence=$sentence&offset=$offset&limit=$limit"
+
+    fun sheet(cid: ContentId, record: DocumentCurationRecord, query: Map<String, String>): Map<String, Any?> {
+        fun ordinal(name: String, default: Int): Int = query[name]?.let {
+            requireNotNull(it.toIntOrNull()) { "$SHEET.$name must be an integer" }
+        } ?: default
+        fun array(name: String): List<*> {
+            val raw = query[name] ?: "[]"
+            require(raw.length <= 4_096) { "$SHEET.$name exceeds query limit" }
+            return requireNotNull(reifyStrict(raw) as? List<*>) { "$SHEET.$name must be an array" }
+        }
+        val axes = array("axes").map { axis ->
+            requireNotNull(axis as? List<*>) { "Each index must list field names" }.map {
+                requireNotNull(it as? String) { "Index field must be a string" }
+            }.toSeries()
+        }.toSeries()
+        val selections = array("selections").map { entry ->
+            val pair = requireNotNull(entry as? List<*>) { "Selection must be [index, group]" }
+            require(pair.size == 2) { "Selection must be [index, group]" }
+            fun integer(value: Any?): Int {
+                val n = requireNotNull(value as? Number) { "Selection must contain integers" }.toDouble()
+                require(n.isFinite() && n >= 0 && n <= Int.MAX_VALUE && n % 1 == 0.0) { "Invalid index selection" }
+                return n.toInt()
+            }
+            integer(pair[0]) j integer(pair[1])
+        }.toSeries()
+        return sheet(cid, record, query["cursor"] ?: "sentences", ordinal("sentence", 0), ordinal("offset", 0),
+            ordinal("limit", 32), axes, selections, ordinal("groupOffset", 0))
+    }
+
+    /** Borrow the retained ledger, never re-enter curation to inspect a completed receipt. */
+    fun sheet(curator: DocumentCuratorElement): LcncNodeRunner = boundLcnc(curator) { owner, node, inputs ->
+        fun value(key: String): Any? = when {
+            key in inputs -> inputs[key]
+            "$key?" in inputs -> inputs["$key?"]
+            else -> node.params[key]
+        }
+        fun ordinal(key: String, default: Int): Int {
+            val raw = value(key) ?: return default
+            val number = when (raw) { is Number -> raw.toDouble(); is String -> raw.toDoubleOrNull(); else -> null }
+            require(number != null && number.isFinite() && number >= 0 && number <= Int.MAX_VALUE && number % 1 == 0.0) {
+                "$SHEET.$key must be a nonnegative integer"
+            }
+            return number.toInt()
+        }
+        val cid = ContentId(requireNotNull(value("receiptCid") as? String) { "$SHEET.receiptCid is required" })
+        val record = requireNotNull(owner.record(cid)) { "Unknown document curation receipt: ${cid.value}" }
+        val result = sheet(cid, record, mapOf("cursor" to (node.params["view"] ?: "sentences"),
+            "sentence" to ordinal("sentence", 0).toString(), "offset" to ordinal("offset", 0).toString(),
+            "limit" to ordinal("limit", 32).toString(), "axes" to (node.params["axes"] ?: "[]"),
+            "selections" to (node.params["selections"] ?: "[]")))
+        if (((result["sheet"] as Map<*, *>)["selections"] as List<*>).isNotEmpty()) {
+            require(node.params["receiptCid"] == cid.value) {
+                "Pin receiptCid to the selected receipt before applying group ordinals; selections cannot follow a changed wired receipt"
+            }
+        }
+        currentCoroutineContext()[LcncConsumedLedger]?.consumed("document-curation", record.source.name, cid.value)
+        result
+    }
+
+    /** A window of one retained cursor. Requested indexes read its key fields only; unrelated children stay lazy. */
+    fun sheet(cid: ContentId, record: DocumentCurationRecord, view: String, sentence: Int, offset: Int, limit: Int,
+              axes: Series<Series<String>> = emptySeriesOf(), selections: Series<Twin<Int>> = emptySeriesOf(),
+              groupOffset: Int = 0): Map<String, Any?> {
+        require(offset >= 0 && limit in 1..128 && sentence >= 0 && groupOffset >= 0) { "Invalid document sheet window" }
+        require(axes.size <= 4 && axes.view.all { it.size in 1..3 && it.view.toSet().size == it.size }) {
+            "At most four indexes, each with one to three distinct fields"
+        }
+        require(selections.size <= axes.size && selections.view.map { it.a }.distinct().size == selections.size) {
+            "At most one group selection per index"
+        }
+        val index = record.curationIndex()
+        val root = "document/${cid.value}"
+        val cursor = when (view) {
+            "sentences" -> sentenceCursor(cid, index)
+            "proposals" -> index.facet(DocumentCurationIndexK.ProposalCursor)
+            "tokens", "dependencies" -> {
+                require(sentence < index.facet(DocumentCurationIndexK.Sentences).size) { "Sentence outside retained document" }
+                if (view == "tokens") index.facet(DocumentCurationIndexK.TokenCursor)(sentence)
+                else index.facet(DocumentCurationIndexK.DependencyCursor)(sentence)
+            }
+            else -> throw IllegalArgumentException("Unknown document sheet view: $view")
+        }
+        val schema = index.facet(when (view) {
+            "sentences" -> DocumentCurationIndexK.SentenceColumns
+            "tokens" -> DocumentCurationIndexK.TokenColumns
+            "dependencies" -> DocumentCurationIndexK.DependencyColumns
+            else -> DocumentCurationIndexK.ProposalColumns
+        })
+        val columns = (schema α {
+            SheetColumn(it.name.toString(), it.type.toString())
+        }).toList()
+        val fields = columns.filter { it.type != "IoArray" && it.type != "IoObject" }.map { it.name }
+        val base = CursorScope(cursor).index()
+        // On demand only. Independent indexes share this receipt/view scope; the cells stay lazy.
+        val ordinals = Array(axes.size) { a -> IntArray(axes[a].size) { c ->
+            val field = axes[a][c]
+            require(field in fields) { "Not an indexable field in $view: $field" }
+            columns.indexOfFirst { it.name == field }
+        } }
+        val indexes = Array(axes.size) { base.groups(*ordinals[it]) }
+        var selected = base
+        for ((a, group) in selections.view) {
+            require(a in indexes.indices && group in 0 until indexes[a].size) { "Index selection outside retained cursor" }
+            selected = selected.intersect(indexes[a][group])
+        }
+        val end = minOf(selected.size.toLong(), offset.toLong() + limit).toInt()
+        val window: Cursor = maxOf(0, end - offset) j { i: Int -> selected.cursor[offset + i] }
+        val axisValues = axes.view.map { it.view.toList() }
+        val selectionValues = selections.view.map { listOf(it.a, it.b) }
+        fun href(row: Int, groups: Int = groupOffset): String = sheetHref(cid, view, sentence, row, limit) +
+            if (axes.size == 0) "" else "&axes=" + java.net.URLEncoder.encode(jsonOf(axisValues), "UTF-8") +
+                "&selections=" + java.net.URLEncoder.encode(jsonOf(selectionValues), "UTF-8") + "&groupOffset=$groups"
+        val seed = sheetSeed(if (view == "sentences") root else if (view == "proposals") "$root/proposals" else "$root/$sentence/$view",
+            if (view == "sentences") record.source.name else view, window,
+            if (view == "sentences") null else root, columns)
+        return mapOf("sheet" to (seed.toMap() + mapOf<String, Any?>("offset" to offset, "sourceRows" to cursor.size,
+            "href" to href(offset), "selectedRows" to selected.size,
+            "sourceOrdinals" to (window.size j { i: Int -> selected.sourceRow(offset + i) }).view.toList(),
+            "indexColumns" to fields, "axes" to axisValues, "selections" to selectionValues,
+            "indexes" to indexes.mapIndexed { a, groups ->
+                val stop = minOf(groups.size.toLong(), groupOffset.toLong() + limit).toInt()
+                mapOf("fields" to axisValues[a], "groupCount" to groups.size, "offset" to groupOffset,
+                    "groups" to (maxOf(0, stop - groupOffset) j { n: Int ->
+                        val group = groups[groupOffset + n]
+                        mapOf("group" to groupOffset + n, "count" to group.size,
+                            "key" to ordinals[a].map { group.cursor[0][it].a })
+                    }).view.toList(), "next" to if (stop < groups.size) stop else null)
+            },
+            "previousGroupsHref" to if (groupOffset > 0) href(offset, maxOf(0, groupOffset - limit)) else null,
+            "nextGroupsHref" to if (indexes.any { groupOffset.toLong() + limit < it.size }) href(offset, groupOffset + limit) else null,
+            "views" to listOf(mapOf("sheet" to root, "title" to "Sentences", "href" to sheetHref(cid)),
+                mapOf("sheet" to "$root/proposals", "title" to "Proposal tuples", "href" to sheetHref(cid, "proposals"))),
+            "notice" to if (view == "proposals") "Model proposals, not verified facts. modelConfidence is the model's score, not parser confidence or approval." else null,
+            "parentHref" to if (view == "sentences") null else sheetHref(cid),
+            "previousHref" to if (offset > 0) href(maxOf(0, offset - limit)) else null,
+            "nextHref" to if (end < selected.size) href(end) else null,
+            "truncated" to (window.size < selected.size), "limit" to if (window.size < selected.size) "row_window" else null)),
+            "rowCount" to cursor.size, "next" to if (end < selected.size) end else null)
+    }
+
+    fun sentenceCursor(cid: ContentId, index: DocumentCurationIndex): Cursor {
+        val sentences = index.facet(DocumentCurationIndexK.SentenceCursor)
+        return sentences.size j { ordinal -> sentences[ordinal] α { cell ->
+            when (cell.b().name.toString()) {
+                "tokens" -> SheetRef("document/${cid.value}/$ordinal/tokens", sheetHref(cid, "tokens", ordinal)) j cell.b
+                "dependencies" -> SheetRef("document/${cid.value}/$ordinal/dependencies", sheetHref(cid, "dependencies", ordinal)) j cell.b
+                else -> cell
+            }
+        } }
+    }
 
     /**
      * Compose and register with explicit storage ownership. No filesystem or volatile volume
@@ -126,10 +282,45 @@ object DocumentCurationLegos {
     /** Consumed-ledger kind for the retained text a curate run read; not a project document, so no staleness fact. */
     const val CONSUMED_DOCUMENT = "document"
 
+    /** Retain new text or resolve an exact retained source before entering the existing curator. */
+    fun retainSource(cas: CasStore, value: Any?): DocumentSource {
+        val retained = if (value is DocumentSource) value else {
+            val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
+            require(fields["base64"] == null) { "File bytes require the document extraction feed" }
+            val name = sourceName(fields)
+            val original = fields["originalCid"]
+            val extracted = fields["extractedTextCid"]
+            require((original == null) == (extracted == null)) { "Retained documents require both source CIDs" }
+            val text = if (fields["text"] != null) requireNotNull(fields["text"] as? String) {
+                "$CURATE.source.text must be a string"
+            } else {
+                val cid = ContentId(requireNotNull(extracted as? String) { "Extracted text CID is required" })
+                val bytes = requireNotNull(cas.get(cid)) { "Retained extracted text is unavailable" }
+                require(ContentId.of(bytes) == cid) { "Extracted text CID mismatch" }
+                bytes.decodeToString(throwOnInvalidSequence = true)
+            }
+            require(text.encodeToByteArray().size <= 4 * 1024 * 1024) { "Document text exceeds 4 MiB" }
+            val cid = ContentId.of(text.encodeToByteArray()).value
+            val source = source(fields + mapOf(
+                "name" to name, "text" to text,
+                "originalCid" to (original ?: cid), "extractedTextCid" to (extracted ?: cid),
+                "mediaType" to (fields["mediaType"] ?: "text/plain"),
+                "correlation" to (fields["correlation"] ?: java.util.UUID.randomUUID().toString()),
+            ))
+            if (original == null) cas.put(text.encodeToByteArray())
+            source
+        }
+        val original = requireNotNull(cas.get(retained.originalCid)) { "Original document is unavailable" }
+        val extracted = requireNotNull(cas.get(retained.extractedTextCid)) { "Extracted text is unavailable" }
+        require(ContentId.of(original) == retained.originalCid && ContentId.of(extracted) == retained.extractedTextCid &&
+            extracted.contentEquals(retained.text.encodeToByteArray())) { "Retained source does not match its content identities" }
+        return retained
+    }
+
     /** LCNC carries immutable identities; the explicit document read projects the retained contents. */
     fun reference(cid: ContentId, record: DocumentCurationRecord): Map<String, Any?> {
         val href = "/api/documents?cid=${cid.value}"
-        val sheet = mapOf("sheet" to "document/${cid.value}", "href" to "$href&view=sheet")
+        val sheet = mapOf("sheet" to "document/${cid.value}", "href" to "$href&view=sheet", "pageHref" to sheetHref(cid))
         return mapOf(
             "receiptCid" to cid.value,
             "record" to mapOf("cid" to cid.value, "href" to href,
@@ -149,13 +340,7 @@ object DocumentCurationLegos {
         val rootId = "document/${cid.value}"
         val sentences = index.facet(DocumentCurationIndexK.SentenceCursor)
         // Nested Cursor facets become ordinary grid-in-cell references at the existing UI boundary.
-        val references: Cursor = sentences.size j { ordinal -> sentences[ordinal] α { cell ->
-            when (cell.b().name.toString()) {
-                "tokens" -> SheetRef("$rootId/$ordinal/tokens") j cell.b
-                "dependencies" -> SheetRef("$rootId/$ordinal/dependencies") j cell.b
-                else -> cell
-            }
-        } }
+        val references = sentenceCursor(cid, index)
         val root = sheetSeed(rootId, record.source.name, references).toMap()
         val sheets = buildList {
             add(root)

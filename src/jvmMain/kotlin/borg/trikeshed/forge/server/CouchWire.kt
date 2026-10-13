@@ -9,6 +9,9 @@ import borg.trikeshed.couch.replicate.CouchReplicator
 import borg.trikeshed.couch.replicate.ReplicationReport
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.relaxfactory.CouchHttpSurface
+import borg.trikeshed.relaxfactory.RequestFactoryReactorElement
+import borg.trikeshed.htx.indexOfHeaderBoundary
+import borg.trikeshed.htx.parseHeaderLine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +41,7 @@ class CouchWire(
     private val scope: CoroutineScope,
     private val defaultHeartbeatMs: Long = 15_000,
     private val ipns: borg.trikeshed.ipns.IpnsNode? = null,
+    val requestFactory: RequestFactoryReactorElement? = null,
 ) {
     val db: Couch get() = router.db
 
@@ -57,14 +61,27 @@ class CouchWire(
             }
             return ByteArray(0)
         }
+
+        fun contentTypeOf(payload: ByteArray): String? {
+            val boundary = payload.indexOfHeaderBoundary()
+            if (boundary < 0) return null
+            return payload.decodeToString(0, boundary).lineSequence().drop(1)
+                .mapNotNull(::parseHeaderLine).firstOrNull { it.a.equals("Content-Type", ignoreCase = true) }?.b
+        }
     }
 
     /** [borg.trikeshed.litebike.RawRoute] entry point. */
     suspend fun route(method: String, path: String, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)?): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
         val query = CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+        val contentType = contentTypeOf(payload)
 
         if (p == "/${db.name}/_replicate" || p == "/_replicate") return replicate(method, bodyOf(payload))
+
+        if (p == "/gwtRequest") {
+            val reply = router.handle(method, path, bodyOf(payload), contentType) ?: return null
+            return JvmKanbanServer.HttpResponse(reply.status, "", reply.contentType, reply.bytes)
+        }
 
         // The IPFS aliases are root-level by protocol shape (Kubo's `/api/v0/block/…`); they are
         // this db's CAS under another name, so they are the ONE non-`/{db}` prefix the wire owns.
@@ -87,13 +104,13 @@ class CouchWire(
         if (respond != null) {
             if (p == "/${db.name}/_changes" && method == "GET") { streamChanges(query, respond); return JvmKanbanServer.HttpResponse(200, "") }
             // A streaming slot we do not own: answer as a normal reply through `respond`.
-            val reply = router.handle(method, path, bodyOf(payload)) ?: return null
+            val reply = router.handle(method, path, bodyOf(payload), contentType) ?: return null
             val head = "HTTP/1.1 ${reply.status} OK\r\nContent-Type: ${reply.contentType}\r\nContent-Length: ${reply.bytes.size}\r\nAccess-Control-Allow-Origin: *\r\n\r\n"
             respond(head.toByteArray(StandardCharsets.UTF_8) + reply.bytes)
             return JvmKanbanServer.HttpResponse(reply.status, "")
         }
 
-        val reply = router.handle(method, path, bodyOf(payload)) ?: return null
+        val reply = router.handle(method, path, bodyOf(payload), contentType) ?: return null
         return JvmKanbanServer.HttpResponse(reply.status, "", reply.contentType, reply.bytes)
     }
 
@@ -111,7 +128,7 @@ class CouchWire(
         try {
             if (feed == "longpoll") {
                 while (true) {
-                    val frames = db.framesSince(since).take(limit)
+                    val frames = db.framesSince(since, limit)
                     if (frames.isNotEmpty()) {
                         val last = frames.last().sequence + 1
                         respond(jsonOf(mapOf("results" to frames.map { db.changeRow(it, includeDocs) }, "last_seq" to last)).toByteArray(StandardCharsets.UTF_8))

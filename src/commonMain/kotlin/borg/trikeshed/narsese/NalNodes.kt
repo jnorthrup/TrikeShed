@@ -3,7 +3,7 @@ package borg.trikeshed.narsese
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner

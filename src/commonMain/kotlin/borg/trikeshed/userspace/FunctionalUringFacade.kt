@@ -433,6 +433,8 @@ public class FunctionalUringFacade(
         } catch (failure: Throwable) {
             // A failed call is terminal for its batch. Preserve every trustworthy CQE
             // already received and account for each remaining admission exactly once.
+            // Deferred effects still need cancellation/reaping during failed-ring cleanup.
+            abortFailure = failure
             closing = true
             input.close()
             capacityChanged.complete(Unit)

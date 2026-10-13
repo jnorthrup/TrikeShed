@@ -6,7 +6,7 @@ import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.htx.*
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway

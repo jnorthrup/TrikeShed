@@ -22,7 +22,7 @@ internal val jvmUringOperations = UringOp.caps(
     // the lifecycle SQEs; their CQEs carry the new fd or 0/-errno like the kernel's.
     UringOp.SOCKET, UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT,
     UringOp.SEND, UringOp.RECV, UringOp.CONNECT, UringOp.SHUTDOWN,
-    UringOp.POLL_ADD, UringOp.POLL_REMOVE,
+    UringOp.POLL_ADD, UringOp.POLL_REMOVE, UringOp.ASYNC_CANCEL, UringOp.URING_CMD,
     // Mapping and the metadata syscalls. Every one of these was previously reached by calling
     // java.nio directly from wherever needed it -- which is the JVM creep: each call site grows
     // its own platform assumptions and the single vocabulary stops being the only way in.
@@ -335,6 +335,16 @@ internal class JvmUserspaceChannelBackend(
                     completions.addLast(SelectionResult(-125, sub.addr))
                     0
                 }
+                // io_uring_prep_cancel64 with flags=0: cancel one admission by userData.
+                // No ring-wide draining and no descriptor close; the original request
+                // and the cancellation each retain their own terminal completion.
+                UringOp.ASYNC_CANCEL -> synchronized(this) {
+                    if (sub.operationFlags != 0) return -95
+                    if (sub.len != 0 || sub.offset != 0L) return -22
+                    if (watches.remove(sub.addr) == null && heldBehindConnect.remove(sub.addr) == null) return -2
+                    completions.addLast(SelectionResult(-125, sub.addr))
+                    0
+                }
                 UringOp.MADVISE -> if (sub.len < 0) -22 else adviseMemory(sub.addr, sub.len.toLong(), sub.operationFlags)
                 UringOp.OPENAT -> {
                     if (sub.fd != -100) return -95
@@ -408,7 +418,7 @@ internal class JvmUserspaceChannelBackend(
                         }
                         else socketExecute(descriptor.fd, sub)
                     }
-                    if (sub.opcode in setOf(UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN)) return -88
+                    if (sub.opcode in setOf(UringOp.BIND, UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.URING_CMD)) return -88
                     if (descriptor is JvmNativeDescriptor) return synchronized(descriptor) {
                         if (!descriptor.isOpen()) -9 else descriptorExecute(descriptor.fd, sub)
                     }
@@ -451,6 +461,11 @@ internal class JvmUserspaceChannelBackend(
         UringOp.BIND -> JvmSocketSyscalls.bind(fd, sub.buffer, sub.len)
         UringOp.LISTEN -> JvmSocketSyscalls.listen(fd, sub.len)
         UringOp.SHUTDOWN -> JvmSocketSyscalls.shutdown(fd, sub.len)
+        UringOp.URING_CMD -> when (sub.offset) {
+            UringOp.SOCKET_URING_OP_GETSOCKNAME.toLong() ->
+                JvmSocketSyscalls.name(fd, sub.buffer, sub.len, sub.operationFlags)
+            else -> -95
+        }
         UringOp.ACCEPT -> {
             val accepted = JvmSocketSyscalls.accept(fd)
             if (accepted < 0) accepted

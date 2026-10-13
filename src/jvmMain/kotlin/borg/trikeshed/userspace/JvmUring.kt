@@ -40,7 +40,9 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
     override val capabilities: Long get() = jvmUringOperations
     override val deferredCapabilities: Long get() = legacy.deferredCapabilities
     override val nativeCapabilities: Long = UringOp.entries.fold(0L) { mask, op ->
-        if (capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
+        // Socket commands are emulated; cancellation addresses the emulation's
+        // deferred admissions, not the separate synchronous JNI ring's tokens.
+        if (op != UringOp.URING_CMD && op != UringOp.ASYNC_CANCEL && capabilities and op.mask != 0L && op.code >= 0 && JvmUring.supports(handle, op.code))
             mask or op.mask else mask
     }
     override val availability = "io_uring: JNI setup and operation probe succeeded; unsupported kernel ops use POSIX emulation"
@@ -70,7 +72,7 @@ private class JvmNativeChannelBackend(private var handle: Long) : UserspaceChann
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         if (sub.len < 0) return -22
-        if (sub.opcode in setOf(UringOp.SOCKET, UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.GETDENTS, UringOp.POLL_REMOVE))
+        if (sub.opcode in setOf(UringOp.SOCKET, UringOp.UNLINKAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.GETDENTS, UringOp.POLL_REMOVE, UringOp.ASYNC_CANCEL, UringOp.URING_CMD))
             return legacy.execute(sub)
         // MADVISE addresses the process VM and remains valid after the originating fd closes.
         if (sub.opcode == UringOp.MADVISE) return nativeExecute(sub, -1)

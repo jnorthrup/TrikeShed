@@ -193,7 +193,9 @@ class TrikeShedGraalVfs(
         val directory = isDirectory(relative)
         val size = if (directory) 0L else btrfs.fetchFile(liveSubvolume, relative)?.size?.toLong()
             ?: throw IOException("missing or corrupt VFS file: $path")
-        val zeroTime = FileTime.fromMillis(0)
+        val times = btrfs.times(liveSubvolume, relative) ?: throw NoSuchFileException(path.toString())
+        fun time(value: kotlin.time.Instant): FileTime =
+            FileTime.from(java.time.Instant.ofEpochSecond(value.epochSeconds, value.nanosecondsOfSecond.toLong()))
         val inode = inodeOf(relative)
         val all = linkedMapOf<String, Any>(
             "isRegularFile" to !directory,
@@ -202,21 +204,40 @@ class TrikeShedGraalVfs(
             "isOther" to false,
             "size" to size,
             "fileKey" to inode,
-            "lastModifiedTime" to zeroTime,
-            "lastAccessTime" to zeroTime,
-            "creationTime" to zeroTime,
+            "lastModifiedTime" to time(times.lastModifiedTime),
+            "lastAccessTime" to time(times.lastAccessTime),
+            "creationTime" to time(times.creationTime),
             "mode" to if (directory) 16877 else 33188, // 040755 | 0100644
             "ino" to inode,
             "dev" to 0L,
             "nlink" to 1,
             "uid" to 0,
             "gid" to 0,
-            "ctime" to zeroTime,
+            "ctime" to time(times.changeTime),
         )
-        val requested = attributes.substringAfter(':', "*")
+        val requested = attributes.substringAfter(':')
         if (requested == "*" || requested.isBlank()) return all
         val names = requested.split(',').toSet()
         return all.filterKeys { it in names }
+    }
+
+    override fun setAttribute(path: Path, attribute: String, value: Any, vararg options: LinkOption) {
+        val view = attribute.substringBefore(':', "basic")
+        val name = attribute.substringAfter(':')
+        if (view !in setOf("basic", "unix") || name !in setOf("lastModifiedTime", "lastAccessTime", "creationTime"))
+            throw UnsupportedOperationException("unsupported VFS attribute: $attribute")
+        val time = (value as? FileTime ?: throw IllegalArgumentException("$attribute requires FileTime")).toInstant()
+        val instant = kotlin.time.Instant.fromEpochSeconds(time.epochSecond, time.nano).also {
+            require(it.epochSeconds == time.epochSecond && it.nanosecondsOfSecond == time.nano) { "VFS time overflow" }
+        }
+        val relative = relativeOf(path)
+        if (!exists(relative)) throw NoSuchFileException(path.toString())
+        if (!btrfs.setTimes(liveSubvolume, relative,
+                lastModifiedTime = instant.takeIf { name == "lastModifiedTime" },
+                lastAccessTime = instant.takeIf { name == "lastAccessTime" },
+                creationTime = instant.takeIf { name == "creationTime" }))
+            throw FileSystemException(path.toString(), null, "VFS timestamp commit rejected")
+        generation.incrementAndGet()
     }
 
     override fun setCurrentWorkingDirectory(currentWorkingDirectory: Path) {

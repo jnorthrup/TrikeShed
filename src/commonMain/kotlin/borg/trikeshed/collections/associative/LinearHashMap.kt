@@ -5,7 +5,6 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
 import borg.trikeshed.collections.SeriesBuffer
-import borg.trikeshed.lib.right
 import borg.trikeshed.collections.MinHeap
 
 /**
@@ -15,7 +14,7 @@ import borg.trikeshed.collections.MinHeap
  * Type parameters:
  *   K — user key type
  *   V — value type
- *   IK — internal key representation (K for LinearHashMap, Join<Int, ULong> for LinkedLinearHashMap)
+ *   IK — internal key representation (K for both provided maps; order is primitive slot metadata)
  */
 abstract class OpenAddressingMap<K : Any, V, IK : Any>(
     initialCapacity: Int = 16
@@ -61,14 +60,17 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
     protected abstract fun makeInternalKey(userKey: K): IK
     protected abstract fun internalKeyEquals(a: IK, b: IK): Boolean
     protected abstract fun internalKeyHash(internalKey: IK): Int
-    protected open fun onInsert(internalKey: IK) { }
-    protected open fun onRemove(internalKey: IK) { }
+    protected open fun onInsert(internalKey: IK, slot: Int) { }
+    protected open fun onRemove(internalKey: IK, slot: Int) { }
+    /** Primitive table-slot movement; rehash does not box one index pair per live key. */
+    protected fun interface SlotRehash { fun move(from: Int, to: Int) }
+    protected open fun onRehash(newCapacity: Int): SlotRehash? = null
 
      // ─── public API ───
     open val count: Int get() = size
+    val totalCapacity: Int get() = capacity
 
     operator fun set(key: K, value: V): V? {
-        if (size + tombstones >= capacity ushr 1) resize()
         val ik = makeInternalKey(key)
         val hash = mix(internalKeyHash(ik))
         var firstTomb = -1
@@ -80,12 +82,16 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
             val k = keys[slot]
             when {
                 isAbsent(k) -> {
+                    if (size + tombstones >= capacity ushr 1) {
+                        rehash(if (size >= capacity ushr 1) capacity shl 1 else capacity)
+                        return set(key, value)
+                    }
                     val ins = if (firstTomb >= 0) firstTomb else slot
                     keys[ins] = ik
                     values[ins] = value as Any?
                     size++
                     if (firstTomb >= 0) tombstones--
-                    onInsert(ik)
+                    onInsert(ik, ins)
                     return null
                 }
                 isDeleted(k) -> {
@@ -135,7 +141,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
                     values[slot] = ABSENT
                     size--
                     tombstones++
-                    onRemove(ik)
+                    onRemove(ik, slot)
                     return old
                 }
             }
@@ -159,13 +165,28 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
         return result.drain()
     }
 
+    /** Frozen selection; nonmatching entries are never materialized. */
+    fun entries(predicate: (K, V) -> Boolean): Series2<K, V> {
+        val result = SeriesBuffer<Join<K, V>>()
+        for (s in 0 until capacity) {
+            val k = keys[s]
+            if (isAbsent(k) || isDeleted(k)) continue
+            @Suppress("UNCHECKED_CAST")
+            val key = extractUserKey(k as IK)
+            @Suppress("UNCHECKED_CAST")
+            val value = values[s] as V
+            if (predicate(key, value)) result += key j value
+        }
+        return result.drain()
+    }
+
     protected abstract fun extractUserKey(internalKey: IK): K
 
-    private fun resize() {
-        val newCap = capacity shl 1
+    private fun rehash(newCap: Int) {
         val oldKeys   = keys
         val oldValues = values
         val oldCap    = capacity
+        val moveMetadata = onRehash(newCap)
         capacity   = newCap
         keys       = newAbsentArray(newCap)
         values     = newAbsentArray(newCap)
@@ -175,15 +196,14 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
             val k = oldKeys[s]
             if (!isAbsent(k) && !isDeleted(k)) {
                 @Suppress("UNCHECKED_CAST")
-                reinsert(k as IK, oldValues[s] as V)
+                val slot = reinsert(k as IK, oldValues[s] as V)
+                moveMetadata?.move(s, slot)
             }
         }
     }
 
-    /** Place an existing internal key into the grown table unchanged — a
-     *  subclass that carries order in its internal key (LinkedLinearHashMap)
-     *  keeps that order across a resize; `set` would mint a new one. */
-    private fun reinsert(ik: IK, value: V) {
+    /** Place an existing key without minting insertion metadata; return its new slot. */
+    private fun reinsert(ik: IK, value: V): Int {
         val hash = mix(internalKeyHash(ik))
         var i = 0
         while (i < capacity) {
@@ -192,7 +212,7 @@ abstract class OpenAddressingMap<K : Any, V, IK : Any>(
                 keys[slot] = ik
                 values[slot] = value as Any?
                 size++
-                return
+                return slot
             }
             i++
         }
@@ -210,47 +230,68 @@ class LinearHashMap<K : Any, V>(initialCapacity: Int = 16)
     override fun extractUserKey(internalKey: K): K = internalKey
 }
 
-/** LinkedLinearHashMap — LinearHashMap preserving insertion order via Join<hash, counter>.
+/** LinkedLinearHashMap — LinearHashMap preserving insertion order in primitive slot metadata.
  *
- *  Delta (2026-09-04): the internal key is now `Join<userKey, counter>` and two
- *  internal keys are equal when their USER keys are equal — the counter only
- *  orders. Before this the counter took part in equality, so `get`/`remove`
- *  minted a fresh counter and never matched a stored key: the map was
- *  write-only and had no callers. It is now the ordered keyed store behind
+ *  Keys are stored directly; reads and removal never allocate or advance an order counter.
+ *  Rehash moves the primitive order with its key. This is the ordered store behind
  *  [borg.trikeshed.kif.KifKnowledgeBase] (assert/retract by exact string,
  *  `toKifFile` in telling order), the same open-addressing shape
  *  [borg.trikeshed.dag.ReteWorkingMemory] keeps its facts in. Re-setting a
  *  present key keeps its position; a key removed and set again goes last. */
 class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
-    : OpenAddressingMap<K, V, Join<K, ULong>>(initialCapacity) {
+    : OpenAddressingMap<K, V, K>(initialCapacity) {
 
     private var sequence: ULong = 0UL
+    private var order = LongArray(capacity)
 
-    override fun makeInternalKey(userKey: K): Join<K, ULong> =
-        userKey j sequence++
+    override fun makeInternalKey(userKey: K): K = userKey
 
-    override fun internalKeyEquals(a: Join<K, ULong>, b: Join<K, ULong>): Boolean =
-        a.a == b.a
+    override fun internalKeyEquals(a: K, b: K): Boolean = a == b
 
-    override fun internalKeyHash(internalKey: Join<K, ULong>): Int = internalKey.a.hashCode()
+    override fun internalKeyHash(internalKey: K): Int = internalKey.hashCode()
 
-    override fun extractUserKey(internalKey: Join<K, ULong>): K = internalKey.a
+    override fun extractUserKey(internalKey: K): K = internalKey
+
+    override fun onInsert(internalKey: K, slot: Int) { order[slot] = sequence++.toLong() }
+
+    override fun onRemove(internalKey: K, slot: Int) { order[slot] = 0L }
+
+    override fun onRehash(newCapacity: Int): SlotRehash {
+        val previous = order
+        order = LongArray(newCapacity)
+        return SlotRehash { from, to -> order[to] = previous[from] }
+    }
 
     /** Iterate entries in insertion order (ascending counter) — frozen Series2. */
     fun entriesInOrder(): Series2<K, V> {
-        // Collect live entries with their sequence counter, sort by counter
-        val live = SeriesBuffer<Join<ULong, Join<K, V>>>(size)
+        val live = SeriesBuffer<Join<K, V>>(size)
+        forEachInOrder { key, value -> live += key j value }
+        return live.drain()
+    }
+
+    /** Select before sorting: allocation and ordering depend on matches, not the whole table. */
+    fun entriesInOrder(predicate: (K, V) -> Boolean): Series2<K, V> {
+        var heap = MinHeap(8)
         for (s in 0 until capacity) {
             val k = keys[s]
-            if (!isAbsent(k) && !isDeleted(k)) {
-                @Suppress("UNCHECKED_CAST")
-                val ik = k as Join<K, ULong>
-                @Suppress("UNCHECKED_CAST")
-                live += ik.b j (ik.a j (values[s] as V))
+            if (isAbsent(k) || isDeleted(k)) continue
+            @Suppress("UNCHECKED_CAST")
+            val key = k as K
+            @Suppress("UNCHECKED_CAST")
+            val value = values[s] as V
+            if (predicate(key, value)) {
+                if (heap.size == heap.capacity) heap = MinHeap(heap.slots.copyOf(1 + 4 * heap.capacity))
+                heap.push(order[s], s.toLong())
             }
         }
-        live.sortWith(compareBy { it.a })
-        return live.drain().right
+        val live = SeriesBuffer<Join<K, V>>(heap.size)
+        while (heap.size > 0) {
+            val s = heap.minPayload.toInt()
+            heap.popMin()
+            @Suppress("UNCHECKED_CAST")
+            live += (keys[s] as K) j (values[s] as V)
+        }
+        return live.drain()
     }
 
     /** Live entries in insertion order straight off the slot arrays: a [MinHeap] keyed by sequence, payload the slot. */
@@ -259,14 +300,13 @@ class LinkedLinearHashMap<K : Any, V>(initialCapacity: Int = 16)
         for (s in 0 until capacity) {
             val k = keys[s]
             if (isAbsent(k) || isDeleted(k)) continue
-            @Suppress("UNCHECKED_CAST")
-            heap.push((k as Join<K, ULong>).b.toLong(), s.toLong())
+            heap.push(order[s], s.toLong())
         }
         while (heap.size > 0) {
             val s = heap.minPayload.toInt()
             heap.popMin()
             @Suppress("UNCHECKED_CAST")
-            block((keys[s] as Join<K, ULong>).a, values[s] as V)
+            block(keys[s] as K, values[s] as V)
         }
     }
 }

@@ -24,7 +24,10 @@ import kotlin.time.TimeSource
 data class SheetColumn(val name: String, val type: String)
 
 /** A cell that nests another sheet (serialized as `{"sheet": id}`). */
-data class SheetRef(val sheet: String)
+data class SheetRef(val sheet: String, val href: String? = null) {
+    fun toMap(): Map<String, Any?> = mapOf("sheet" to sheet) +
+        (href?.let { mapOf("href" to it) } ?: emptyMap())
+}
 
 data class SheetSeed(
     val id: String,
@@ -42,7 +45,7 @@ data class SheetSeed(
         "truncated" to truncated,
         "limit" to limit,
         "columns" to columns.map { mapOf("name" to it.name, "type" to it.type) },
-        "rows" to rows.map { row -> row.map { cell -> if (cell is SheetRef) mapOf("sheet" to cell.sheet) else cell } },
+        "rows" to rows.map { row -> row.map { cell -> if (cell is SheetRef) cell.toMap() else cell } },
     )
 }
 

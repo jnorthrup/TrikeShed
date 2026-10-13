@@ -96,6 +96,9 @@ class PointcutBlackboardAdapter(
         val facet: VmFacet,
         val propertyName: String,
         val value: Any?,
+        val sourcePath: String? = null,
+        val line: Int = -1,
+        val column: Int = -1,
     ) {
         /** The [PointcutMark] byte, unwrapped — the payload's phase ordinal. */
         val markRaw: Byte get() = mark.raw
@@ -116,6 +119,13 @@ class PointcutBlackboardAdapter(
             "threadId" to coordinate.threadId,
         )
 
+        /** Guest source coordinates, omitted where the event has no source location. */
+        fun sourceFields(): Map<String, Any> = buildMap {
+            sourcePath?.let { put("sourcePath", it) }
+            if (line > 0) put("line", line)
+            if (column > 0) put("column", column)
+        }
+
         /**
          * The landing as FLAT fields — the one flattening every projection shares:
          * the couch document ([borg.trikeshed.pointcut.PointcutCouchProjection]) and
@@ -132,6 +142,7 @@ class PointcutBlackboardAdapter(
             fields["property"] = propertyName
             fields["value"] = value?.toString() ?: "null"
             fields.putAll(coordinateFields())
+            fields.putAll(sourceFields())
             return fields
         }
 
@@ -283,6 +294,9 @@ class PointcutBlackboardAdapter(
             facet = event.vmFacet,
             propertyName = event.propertyName,
             value = event.newValue,
+            sourcePath = event.sourcePath,
+            line = event.line,
+            column = event.column,
         )
     }
 
@@ -337,8 +351,11 @@ class PointcutBlackboardAdapter(
         facet: VmFacet,
         propertyName: String,
         value: Any?,
+        sourcePath: String? = null,
+        line: Int = -1,
+        column: Int = -1,
     ): PointcutLanding {
-        val landing = PointcutLanding(key, coordinate, mark, facet, propertyName, value)
+        val landing = PointcutLanding(key, coordinate, mark, facet, propertyName, value, sourcePath, line, column)
         // ConfixBlackboard is not internally synchronized — serialize both the
         // board mutation and the log append under one monitor so concurrent
         // guest accept() and ring onSlab() cannot corrupt either.

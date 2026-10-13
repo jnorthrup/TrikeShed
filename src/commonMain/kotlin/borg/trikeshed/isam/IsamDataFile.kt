@@ -9,9 +9,10 @@ import borg.trikeshed.lib.j
 class IsamDataFile(
     val datafileFilename: String,
     val metafileFilename: String = "$datafileFilename.meta",
-    val metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
+    metafile: IsamMetaFileReader = IsamMetaFileReader(metafileFilename),
     private val operations: IsamOperations = defaultIsamOperations()
 ) : Usable, Cursor {
+    val metafile: IsamMetaFileReader = operations.metadata(metafile)
 
     private val reader by lazy {
         operations.createReader(datafileFilename, metafileFilename, metafile)

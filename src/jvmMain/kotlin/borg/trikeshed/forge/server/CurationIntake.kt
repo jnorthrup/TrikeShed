@@ -4,14 +4,14 @@ import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncTrail
 import borg.trikeshed.lcnc.ProjectNodes
+import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.narsese.ConstellationNodes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * Every document an upload lands is read and curated with no one asking: extracted by the miner
@@ -24,9 +24,9 @@ import java.util.concurrent.ConcurrentHashMap
  * restart or a re-drop costs nothing twice; a failure is logged against its document and the rest go on.
  */
 class CurationIntake(
-    private val corpus: JvmProjectCorpus,
+    private val corpus: ProjectCorpus,
     private val runners: () -> Map<String, LcncNodeRunner>,
-    private val constellations: () -> ConstellationNodes?,
+    val constellations: () -> ConstellationNodes?,
     private val scope: CoroutineScope,
 ) {
     data class Doc(val project: String, val id: String)
@@ -41,14 +41,33 @@ class CurationIntake(
         fun toMap() = mapOf("queued" to queued.get(), "curated" to curated.get(), "failed" to failed.get(), "pending" to pending, "note" to note)
     }
 
-    private val queue = Channel<Doc>(Channel.UNLIMITED)
+    private val queue = Channel<Unit>(Channel.CONFLATED)
+    // Admission retains identifiers only. Fixed consumers bound decoded documents through join.
+    private val pending = ConcurrentLinkedQueue<Doc>()
+    private val admission = Any()
     private val inFlight = ConcurrentHashMap.newKeySet<Doc>()
     private val tallies = ConcurrentHashMap<String, Tally>()
-    private val gate = Semaphore(DOCUMENTS)
     private val reading = kotlinx.coroutines.sync.Mutex()
 
-    init {
-        scope.launch { for (d in queue) launch { read(d) } }
+    private val worker = scope.launch {
+        repeat(DOCUMENTS) {
+            launch {
+                for (unit in queue) {
+                    while (true) {
+                        val d = pending.poll() ?: break
+                        if (pending.isNotEmpty()) queue.trySend(Unit)
+                        read(d)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Finish admitted document readings before their sense encoder and stores are closed. */
+    suspend fun drain() = kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+        synchronized(admission) { queue.close() }
+        worker.join()
+        check(tallies.values.all { it.pending == 0 }) { "Document curation stopped with unfinished admitted work" }
     }
 
     fun status(): Map<String, Any?> = tallies.toSortedMap().mapValues { it.value.toMap() }
@@ -61,7 +80,7 @@ class CurationIntake(
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
     fun forget(project: String, id: String) {
         val d = Doc(project, id)
-        if (inFlight.contains(d)) removed.add(d)
+        synchronized(admission) { if (inFlight.contains(d)) removed.add(d) }
     }
     private val removed = ConcurrentHashMap.newKeySet<Doc>()
 
@@ -70,9 +89,13 @@ class CurationIntake(
         if (id.endsWith(ProjectNodes.EXTRACT_SUFFIX) || id.endsWith(ProjectNodes.NOTES_SUFFIX) || id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
         val d = Doc(project, id)
-        if (!inFlight.add(d)) return
-        tallies.getOrPut(project) { Tally() }.queued.incrementAndGet()
-        queue.trySend(d)
+        synchronized(admission) {
+            check(!queue.isClosedForSend) { "Document curation intake is draining" }
+            if (!inFlight.add(d)) return
+            tallies.computeIfAbsent(project) { Tally() }.queued.incrementAndGet()
+            pending.add(d)
+            queue.trySend(Unit).getOrThrow()
+        }
     }
 
     private suspend fun read(d: Doc) {
@@ -83,8 +106,7 @@ class CurationIntake(
             val nodes = constellations()
             val r = runners()
             fun runner(type: String) = r[type] ?: error("no runner '$type'")
-            // The permit covers extraction only: a document waiting to be read into its constellation holds no OCR slot.
-            val text = gate.withPermit { corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text }
+            val text = corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text
                 ?: error("no text read from ${d.id}")
             // Held only when curated from this very text: a re-read source curates again by itself.
             if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) { t.curated.incrementAndGet(); return }
@@ -111,7 +133,7 @@ class CurationIntake(
             t.failed.incrementAndGet(); t.note = "${d.id}: ${e.message ?: e}"
             System.err.println("[INTAKE] ${d.project}/${d.id} FAILED: ${e.message ?: e}")
         } finally {
-            inFlight.remove(d)
+            synchronized(admission) { inFlight.remove(d); removed.remove(d) }
         }
         if (t.pending == 0) runCatching {
             reading.withLock { runners()[ConstellationNodes.BRIEF]?.run(
@@ -138,7 +160,7 @@ class CurationIntake(
             return intake
         }
 
-        /** Documents extracting at once across all projects; their OCR pages share the miner's page budget. */
+        /** Documents retained from extraction through join; OCR pages share the miner's page budget. */
         const val DOCUMENTS = 3
     }
 }

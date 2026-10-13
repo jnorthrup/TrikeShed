@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.job.JobSnapshot
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.lib.j
 import borg.trikeshed.reduction.TrajectoryCarrier
 import borg.trikeshed.reduction.TrajectoryOutcome
@@ -24,7 +24,7 @@ class TrajectoryReductionTest {
             val payloadA = TrajectoryPayload(
                 title = "Title A",
                 headSha = "shaA",
-                causes = 1 j { JulesCause.DrainApplied("commit", 0, 1L) },
+                causes = 1 j { SessionCause.DrainApplied("commit", 0, 1L) },
                 depJobIds = listOf("job1"),
                 deps = 1 j { JobSnapshot("job1", 1, "k", "complete") }
             )
@@ -38,7 +38,7 @@ class TrajectoryReductionTest {
             val payloadB = TrajectoryPayload(
                 title = "Title B",
                 headSha = "shaB",
-                causes = 3 j { JulesCause.DrainFailed("no patch", 1L) },
+                causes = 3 j { SessionCause.DrainFailed("no patch", 1L) },
                 depJobIds = listOf("job1"),
                 deps = 1 j { JobSnapshot("job1", 1, "k", "complete") }
             )
@@ -52,8 +52,8 @@ class TrajectoryReductionTest {
                 title = "Title C",
                 headSha = "shaC",
                 causes = 3 j { i ->
-                    if (i < 2) JulesCause.DrainFailed("failed", 1L)
-                    else JulesCause.DrainApplied("commit", 0, 1L)
+                    if (i < 2) SessionCause.DrainFailed("failed", 1L)
+                    else SessionCause.DrainApplied("commit", 0, 1L)
                 },
                 depJobIds = listOf("job1"),
                 deps = 1 j { JobSnapshot("job1", 1, "k", "complete") }
@@ -67,7 +67,7 @@ class TrajectoryReductionTest {
             val payloadD = TrajectoryPayload(
                 title = "Title D",
                 headSha = "shaD",
-                causes = 1 j { JulesCause.DrainApplied("commit", 0, 1L) },
+                causes = 1 j { SessionCause.DrainApplied("commit", 0, 1L) },
                 depJobIds = listOf("job1", "job2"),
                 deps = 1 j { JobSnapshot("job1", 1, "k", "complete") } // job2 missing!
             )

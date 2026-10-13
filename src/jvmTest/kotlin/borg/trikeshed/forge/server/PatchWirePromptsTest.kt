@@ -5,7 +5,7 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lcnc.LcncBlackboard
 import borg.trikeshed.lcnc.LcncPublisher
 import borg.trikeshed.lcnc.PromptDocument

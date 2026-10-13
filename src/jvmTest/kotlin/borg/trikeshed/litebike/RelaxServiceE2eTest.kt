@@ -5,6 +5,7 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
 import borg.trikeshed.btrfs.VmWorldTeleport
+import borg.trikeshed.cas.FileTreeManifest
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchReportEvent
 import borg.trikeshed.couch.CouchReportReactorElement
@@ -219,8 +220,8 @@ class RelaxServiceE2eTest {
             assertContentEquals(fromCas, fromIpfs, "the CAS lane and the IPFS alias disagree")
             assertContentEquals(fromCas, fromAttachment, "the attachment route serves different bytes")
 
-            // the stream that crossed really does reconstitute a world
-            assertTrue(fs.receive("vm.e2e.restored", fromCas), "the replicated stream did not receive")
+            // The canonical root that crossed reconstitutes a world over its existing file objects.
+            assertTrue(fs.receiveManifest("vm.e2e.restored", FileTreeManifest.decode(fromCas)), "the replicated manifest did not receive")
             assertEquals("trained", fs.fetchFile("vm.e2e.restored", "workspace/model.txt")?.decodeToString())
         } finally {
             client.close()

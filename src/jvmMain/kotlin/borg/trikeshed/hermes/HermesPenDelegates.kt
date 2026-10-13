@@ -1,15 +1,14 @@
 package borg.trikeshed.hermes
 
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.parse.confix.confixDoc
 
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import borg.trikeshed.memory.GoalCoord
 import borg.trikeshed.memory.SkillRegistry
 import borg.trikeshed.memory.selectSkills
@@ -25,6 +24,7 @@ import borg.trikeshed.ontology.zipper.PlaneAdapters
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.runBlocking
 import modelmux.ModelMux
+import modelmux.acp.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
@@ -36,26 +36,32 @@ import kotlin.coroutines.EmptyCoroutineContext
  * planes, crumbs, leases — aliasing nothing to read_file/exec/fetch), minimal
  * (every verb widens the coordination surface), and TOTALLY receipted:
  *
- * Every crossing lands twice —
+ * Every crossing records its actual verdict, including refusals returned as data —
  *  1. a blackboard landing (`hermes/python/pen/<verb>/<seq>`) that the Rete
  *     tendon sees as a fact: model behavior IS working memory;
- *  2. a SemanticSignal about the tool use itself (CAUSALITY, subject =
+ *  2. when the leased bag admits it, a SemanticSignal about the tool use itself (CAUSALITY, subject =
  *     agent×verb, evidence = Nal.observe(outcome)) — the harness inductively
- *     models its models. Guest self-assertions are CLAMPED to unit evidence.
+ *     models its models. The receipt exposes beliefAdmission; queue admission is
+ *     not a claim that the consumer has processed or persisted the belief.
+ *     Guest self-assertions are CLAMPED to unit evidence.
  *
  * Verbs (≤8, admission per verb):
+ *  - mux_catalog : current model ids/capabilities/default, never credentials or endpoints.
  *  - mux_converse : ModelMux.chat — NEVER a KeyMux+Htx bypass; lease-gated,
  *                   typed refusal {verdict:"lease-exhausted"|"no-mux"}.
+ *  - mux_completion : complete JSON conversation through ModelMux.completion;
+ *                     JSON text crosses without traversing arbitrary guest objects.
  *  - bag_recall   : hamming recall around a goal coordinate.
  *  - bag_assert   : mint a belief (evidence clamped to 1 unit, OBSERVATION receipt).
  *  - crumb_walk   : skill backchain; returns picks WITH their crumb trails.
  *  - skill_scribe : create/patch/archive a skill — confined to the skills root;
  *                   THERE IS NO DELETE VERB.
+ *  - socket       : optional VM-owned TCP lease; never raw descriptors or guest-added egress permits.
  */
 class HermesPen(
     private val blackboard: ConfixBlackboard,
     private val bag: BeliefBagElement? = null,
-    private val modelMux: ModelMux? = null,
+    modelMux: ModelMux? = null,
     private val registry: SkillRegistry? = null,
     private val cards: Series<SkillRegistry.SkillCard>? = null,
     private val planes: PlaneAdapters? = null,
@@ -63,35 +69,34 @@ class HermesPen(
     /** Context carrying MuxReactorElement + Htx for the converse path. */
     private val muxContext: CoroutineContext = EmptyCoroutineContext,
     private val agentId: String = "graal-python",
+    /** Resolve the current lease for each crossing; catalog/KeyMux rotation must not retain an old mux. */
+    private val modelMuxProvider: suspend () -> ModelMux? = { modelMux },
+    /** Host-owned command identity; the guest cannot supply receipt attribution. */
+    private val contextId: () -> String? = { null },
 ) {
     private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
 
-    fun install(guest: GraalBtrfsSupervisor) {
-        guest.delegate("mux_converse") { args -> receipted("mux_converse", args) { muxConverse(args) } }
+    fun install(guest: GraalBtrfsSupervisor, sockets: HermesSocketProvider? = null) {
+        guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
+        guest.delegate("mux_converse") { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
+        guest.delegate("mux_completion") { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { muxCompletion(args, cause) } } }
         guest.delegate("bag_recall") { args -> receipted("bag_recall", args) { bagRecall(args) } }
         guest.delegate("bag_assert") { args -> receipted("bag_assert", args) { bagAssert(args) } }
         guest.delegate("crumb_walk") { args -> receipted("crumb_walk", args) { crumbWalk(args) } }
         guest.delegate("skill_scribe") { args -> receipted("skill_scribe", args) { skillScribe(args) } }
+        if (sockets != null) guest.delegate("socket") { args -> receipted("socket", args) { sockets.call(args) } }
     }
 
     // ── the double landing: blackboard fact + tool-use belief ─────────
 
-    private fun receipted(verb: String, args: List<Teleported>, body: () -> Teleported): Teleported {
+    private fun receipted(verb: String, args: List<Teleported>, body: (String?) -> Join<Boolean, Map<String, Any?>>): Teleported {
         val n = seq.incrementAndGet()
-        val outcome = runCatching(body)
-        blackboard.put(
-            "hermes/python/pen/$verb/$n",
-            mapOf(
-                "verb" to verb,
-                "agent" to agentId,
-                "argShapes" to args.map { it::class.simpleName },
-                "ok" to outcome.isSuccess,
-                "error" to outcome.exceptionOrNull()?.message,
-            ),
-            agentId,
-        )
-        bag?.intake?.trySend(
+        val cause = contextId()
+        // Carry the verdict with the payload; a returned refusal is not a successful effect.
+        val outcome = runCatching { body(cause) }.getOrElse { refusal("error", it.message ?: it::class.simpleName.orEmpty()) }
+        val success = outcome.a
+        val admission = bag?.intake?.trySend(
             BeliefIntake.Mint(
                 SemanticSignal(
                     angular = AngularCodec.encode(
@@ -100,48 +105,90 @@ class HermesPen(
                         subjectTerm = "$agentId $verb",
                         objectTerm = verb,
                     ),
-                    evidence = Nal.observe(outcome.isSuccess),
+                    evidence = Nal.observe(success),
                     relation = RelationKind.CAUSALITY,
                     subjectCid = ContentId.of("$agentId:$verb".encodeToByteArray()).value,
                     provenanceCid = evaluator.value,
                 ),
                 BudgetCoord(0.6f, 0.4f, 0.5f),
-                gloss = "$agentId $verb ==> $verb (${if (outcome.isSuccess) "ok" else "failed"})",
+                gloss = "$agentId $verb ==> $verb (${outcome.b["verdict"]})",
                 receiptCid = DerivationReceipt.observation(
                     subject = TermIdentity(AngularCodec.encode(RelationKind.CAUSALITY, subjectTerm = agentId)),
                     predicate = TermIdentity(AngularCodec.encode(RelationKind.CAUSALITY, subjectTerm = verb)),
                     contextCid = ContentId.of("pen:$verb:$n".encodeToByteArray()),
-                    outcomeCid = ContentId.of(outcome.isSuccess.toString().encodeToByteArray()),
-                    evidence = Nal.observe(outcome.isSuccess),
+                    outcomeCid = ContentId.of(success.toString().encodeToByteArray()),
+                    evidence = Nal.observe(success),
                     evaluatorCid = evaluator,
                 ).canonicalCid,
             ),
         )
-        return outcome.getOrElse { refusal("error", it.message ?: it::class.simpleName.orEmpty()) }
+        val beliefAdmission = when {
+            admission == null -> "unavailable"
+            admission.isSuccess -> "admitted"
+            admission.isClosed -> "closed"
+            else -> "full"
+        }
+        blackboard.put(
+            "hermes/python/pen/$verb/$n",
+            mapOf(
+                "verb" to verb,
+                "agent" to agentId,
+                "contextId" to cause,
+                "argShapes" to args.map { it::class.simpleName },
+                "ok" to success,
+                "verdict" to outcome.b["verdict"],
+                "admitted" to outcome.b["admitted"],
+                "error" to outcome.b["detail"].takeUnless { success },
+                "beliefAdmission" to beliefAdmission,
+            ) + if (verb == "socket") mapOf("operation" to str(args, 0)) else emptyMap(),
+            agentId,
+        )
+        return Teleported.Str(jsonOf(outcome.b + ("beliefAdmission" to beliefAdmission)))
     }
 
     /** Refusals are vocabulary, not exceptions — guest code handles them as data. */
-    private fun refusal(verdict: String, detail: String = ""): Teleported =
-        Teleported.Str(jsonOf(mapOf("verdict" to verdict, "detail" to detail)))
+    private fun refusal(verdict: String, detail: String = ""): Join<Boolean, Map<String, Any?>> =
+        false j mapOf("verdict" to verdict, "detail" to detail)
 
     private fun str(args: List<Teleported>, i: Int): String? = (args.getOrNull(i) as? Teleported.Str)?.v
 
     // ── verbs ─────────────────────────────────────────────────────────
 
-    private fun muxConverse(args: List<Teleported>): Teleported {
-        val mux = modelMux ?: return refusal("no-mux", "model plane not leased to this pen")
+    private suspend fun muxCatalog(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
+        if (args.isNotEmpty()) return refusal("bad-args", "mux_catalog()")
+        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
+        return true j mapOf("verdict" to "ok", "defaultModel" to mux.defaultModel,
+            "models" to mux.listModels().view.map { mapOf("id" to it.id, "capabilities" to it.caps.view.toList()) })
+    }
+
+    private suspend fun muxConverse(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
+        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
         val prompt = str(args, 1) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
-        val result = runBlocking(muxContext) {
-            mux.chat(modelId, 1 j { _: Int -> "user" j prompt })
-        }
+        val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause)
         return result.fold(
-            onSuccess = { Teleported.Str(jsonOf(mapOf("verdict" to "ok", "response" to it.toString()))) },
+            onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
+                "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
             onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
         )
     }
 
-    private fun bagRecall(args: List<Teleported>): Teleported {
+    private suspend fun muxCompletion(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
+        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
+        val modelId = str(args, 0) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
+        val json = str(args, 1) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
+        val timeout = if (args.size == 2) borg.trikeshed.htx.HtxRequest.DEFAULT_TIMEOUT_MS
+            else (args.getOrNull(2) as? Teleported.Num)?.v?.takeIf { args.size == 3 && it > 0 }
+                ?.coerceAtMost(borg.trikeshed.htx.HtxRequest.DEFAULT_TIMEOUT_MS)
+                ?: return refusal("bad-args", "mux_completion timeout must be positive milliseconds")
+        val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = timeout)
+        return result.fold(
+            onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
+            onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
+        )
+    }
+
+    private fun bagRecall(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
         val bag = bag ?: return refusal("no-bag")
         val goalTerm = str(args, 0) ?: return refusal("bad-args", "bag_recall(goalTerm, maxDistance?)")
         val maxDistance = (args.getOrNull(1) as? Teleported.Num)?.v?.toInt() ?: 16
@@ -156,10 +203,10 @@ class HermesPen(
                 "subjectCid" to s.subjectCid,
             )
         }
-        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "beliefs" to rows)))
+        return true j mapOf("verdict" to "ok", "beliefs" to rows)
     }
 
-    private fun bagAssert(args: List<Teleported>): Teleported {
+    private fun bagAssert(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
         val bag = bag ?: return refusal("no-bag")
         val subjectTerm = str(args, 0) ?: return refusal("bad-args", "bag_assert(subject, object, success)")
         val objectTerm = str(args, 1)
@@ -169,7 +216,7 @@ class HermesPen(
             relation = RelationKind.CAUSALITY, taxonomyKey = "guest/$agentId",
             subjectTerm = subjectTerm, objectTerm = objectTerm,
         )
-        bag.intake.trySend(
+        val admission = bag.intake.trySend(
             BeliefIntake.Mint(
                 SemanticSignal(
                     angular = angular,
@@ -183,10 +230,11 @@ class HermesPen(
                 gloss = "$subjectTerm ==> ${objectTerm ?: "?"} (${if (success) "ok" else "failed"})",
             ),
         )
-        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "angular" to angular.toString())))
+        if (admission.isFailure) return refusal(if (admission.isClosed) "bag-closed" else "bag-full", "assertion was not admitted")
+        return true j mapOf("verdict" to "ok", "angular" to angular.toString(), "admitted" to true)
     }
 
-    private fun crumbWalk(args: List<Teleported>): Teleported {
+    private fun crumbWalk(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
         val registry = registry ?: return refusal("no-skills")
         val cards = cards ?: return refusal("no-skills")
         val planes = planes ?: return refusal("no-planes")
@@ -204,10 +252,10 @@ class HermesPen(
                 "trail" to (0 until p.trail.size).map { t -> p.trail[t].a.toString() },
             )
         }
-        return Teleported.Str(jsonOf(mapOf("verdict" to "ok", "picks" to rows)))
+        return true j mapOf("verdict" to "ok", "picks" to rows)
     }
 
-    private fun skillScribe(args: List<Teleported>): Teleported {
+    private fun skillScribe(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
         val root = skillsRoot ?: return refusal("no-scribe")
         val action = str(args, 0) ?: return refusal("bad-args", "skill_scribe(action, category, name, content?)")
         val category = str(args, 1) ?: return refusal("bad-args", "category required")
@@ -225,16 +273,16 @@ class HermesPen(
                 val before = skillMd.takeIf { it.isFile }?.readBytes()?.let { ContentId.of(it).hex }
                 dir.mkdirs()
                 skillMd.writeText(content)
-                Teleported.Str(jsonOf(mapOf(
+                true j mapOf(
                     "verdict" to "ok", "action" to action,
                     "before" to before, "after" to ContentId.of(content.encodeToByteArray()).hex,
-                )))
+                )
             }
             "archive" -> {
                 if (!skillMd.isFile) return refusal("missing", "$category/$name")
                 val archived = File(dir, "SKILL.md.archived")
-                skillMd.renameTo(archived)
-                Teleported.Str(jsonOf(mapOf("verdict" to "ok", "action" to "archive")))
+                if (!skillMd.renameTo(archived)) refusal("archive-failed", "$category/$name")
+                else true j mapOf("verdict" to "ok", "action" to "archive")
             }
             else -> refusal("no-such-action", "create|patch|archive only — there is no delete")
         }

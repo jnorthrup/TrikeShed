@@ -86,6 +86,8 @@ class ModuleContext(
     @Volatile var agentRuns: borg.trikeshed.lcnc.AgentRuns? = null,
     /** The daemon's live NARS Rete; document ingest registers parser/model terms here when present. */
     val narsRete: borg.trikeshed.narsese.CausalityReteElement? = null,
+    /** Host-owned dense Couch projection; imports are explicit and module detach does not close the host owner. */
+    val confixIsam: borg.trikeshed.couch.isam.ConfixIsamElement? = null,
 )
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */

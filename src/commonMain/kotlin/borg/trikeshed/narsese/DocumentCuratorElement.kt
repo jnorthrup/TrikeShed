@@ -7,14 +7,8 @@ import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
 import borg.trikeshed.collections.SeriesBuffer
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.modelmux.ToolOntologyScaffold
@@ -96,7 +90,7 @@ class DocumentCuratorElement private constructor(
     private val ledgerGate = Mutex()
     private var accepting = true
     private var sequence = 0L
-    private val history = linkedMapOf<ContentId, DocumentCurationRecord>()
+    private val history = linkedSetOf<ContentId>()
     private val reserved = mutableSetOf<ContentId>()
     private val submitted = mutableSetOf<ContentId>()
     private val angularReceipts = mutableMapOf<Long, ContentId>()
@@ -159,22 +153,33 @@ class DocumentCuratorElement private constructor(
 
     /** Exact retained records with their original receipt identities; reading never dispatches work. */
     suspend fun receipts(): Series<DocumentCurationReceipt> = ledgerGate.withLock {
-        SeriesBuffer<DocumentCurationReceipt>(history.size).apply {
-            for ((cid, record) in history) add(cid j record)
-        }.drain()
+        historySnapshot() α { cid -> cid j retainedRecord(cid) }
     }
 
-    suspend fun record(cid: ContentId): DocumentCurationRecord? = ledgerGate.withLock { history[cid] }
+    suspend fun record(cid: ContentId): DocumentCurationRecord? = ledgerGate.withLock {
+        if (cid in history) retainedRecord(cid) else null
+    }
 
     suspend fun records(): Series<DocumentCurationRecord> = ledgerGate.withLock {
-        SeriesBuffer<DocumentCurationRecord>(history.size).apply {
-            for (r in history.values) {
-                val uncertain = (r.reservedReceiptCids.values() + r.quotationReservedReceiptCids.values())
-                    .filter { it !in submitted }
-                add(if (uncertain.isEmpty()) r else r.copy(reasons = (r.reasons.values() +
-                    uncertain.map { "submission unconfirmed; automatic retry suppressed: ${it.value}" }).toSeries()))
-            }
-        }.drain()
+        val confirmed = submitted.toSet()
+        historySnapshot() α { cid ->
+            val r = retainedRecord(cid)
+            val uncertain = (r.reservedReceiptCids.values() + r.quotationReservedReceiptCids.values())
+                .filter { it !in confirmed }
+            if (uncertain.isEmpty()) r else r.copy(reasons = (r.reasons.values() +
+                uncertain.map { "submission unconfirmed; automatic retry suppressed: ${it.value}" }).toSeries())
+        }
+    }
+
+    /** Snapshot only identities: a ledger view must not keep the corpus and its annotations resident. */
+    private fun historySnapshot(): Series<ContentId> = SeriesBuffer<ContentId>(history.size).apply {
+        for (cid in history) add(cid)
+    }.drain()
+
+    fun retainedRecord(cid: ContentId): DocumentCurationRecord {
+        val bytes = cas.get(cid) ?: error("missing curation record $cid")
+        check(ContentId.of(bytes) == cid) { "curation record digest mismatch" }
+        return DocumentCuratorCodec.decode(bytes)
     }
 
     suspend fun drain() = draining.withLock {
@@ -476,7 +481,7 @@ class DocumentCuratorElement private constructor(
         reserved.addAll(record.quotationReservedReceiptCids.values())
         // Flush before any intake; a flush failure cannot be mistaken for completed persistence.
         log.flush()
-        history[cid] = record
+        history.add(cid)
         submitted.addAll(record.submittedReceiptCids.values())
         submitted.addAll(record.quotationSubmittedReceiptCids.values())
         cid
@@ -486,10 +491,8 @@ class DocumentCuratorElement private constructor(
         sequence = log.replay { seq, payload ->
             require(seq > sequence) { "non-monotonic curator ledger" }
             val cid = ContentId(payload.decodeToString())
-            val bytes = cas.get(cid) ?: error("missing curation record $cid")
-            check(ContentId.of(bytes) == cid) { "curation record digest mismatch" }
-            val record = DocumentCuratorCodec.decode(bytes)
-            history[cid] = record
+            val record = retainedRecord(cid)
+            history.add(cid)
             reserved.addAll(record.reservedReceiptCids.values())
             submitted.addAll(record.submittedReceiptCids.values())
             reserved.addAll(record.quotationReservedReceiptCids.values())

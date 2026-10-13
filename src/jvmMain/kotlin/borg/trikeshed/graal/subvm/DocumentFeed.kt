@@ -6,7 +6,7 @@ import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view

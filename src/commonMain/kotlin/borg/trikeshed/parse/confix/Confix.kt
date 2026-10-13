@@ -261,34 +261,42 @@ enum class Syntax {
         val depth = IntArray(total); val parent = IntArray(total)
         val stack = IntArray(total); var top = 0
         val start = IntArray(total + 1)
-        var rootCount = 0
         for (k in 0 until total) {
             while (top > 0 && close[stack[top - 1]] < close[k]) top--
             parent[k] = if (top > 0) stack[top - 1] else -1
             depth[k] = top
-            if (top > 0) start[parent[k] + 1]++ else rootCount++
+            if (top > 0) start[parent[k] + 1]++
             stack[top++] = k
         }
         for (k in 0 until total) start[k + 1] += start[k]
         val kid = IntArray(total); val fill = start.copyOf(total)
-        val root = IntArray(rootCount); var r = 0
-        for (k in 0 until total) if (parent[k] >= 0) kid[fill[parent[k]]++] = k else root[r++] = k
+        for (k in 0 until total) if (parent[k] >= 0) kid[fill[parent[k]]++] = k
 
         val spans: Series<Twin<Int>> = total j { k: Int -> open[k] j close[k] }
         @Suppress("UNCHECKED_CAST")
         val tags: Series<IOMemento> = total j { k: Int -> tag[k] as IOMemento }
         val depths: Series<Int> = total j { k: Int -> depth[k] }
         val childOf: (Int) -> Series<Int> = { k: Int -> val a = start[k]; (start[k + 1] - a) j { c: Int -> kid[a + c] } }
+        val flat = FlatIndex(spans, tags, depths, childOf)
+        return tree(flat) j flat
+    }
+
+    /** The same cursor projection for scanned and persisted parse geometry. */
+    fun tree(flat: FlatIndex): Cursor {
+        val total = flat.spans.size
+        val roots = IntArray(total)
+        var rootCount = 0
+        for (index in 0 until total) if (flat.depths[index] == 0) roots[rootCount++] = index
         val rowCache = arrayOfNulls<RowVec>(total)
         fun row(index: Int): RowVec {
             rowCache[index]?.let { return it }
-            val children = childOf(index)
+            val children = flat.childOf(index)
             val cursor: Cursor = children.size j { childIndex: Int -> row(children[childIndex]) }
             val row = (4 j { column: Int ->
                 when (column) {
-                    0 -> (open[index] as Any?) j COL_META[0]
-                    1 -> (close[index] as Any?) j COL_META[1]
-                    2 -> (tag[index] as Any?) j COL_META[2]
+                    0 -> (flat.spans[index].a as Any?) j COL_META[0]
+                    1 -> (flat.spans[index].b as Any?) j COL_META[1]
+                    2 -> (flat.tags[index] as Any?) j COL_META[2]
                     3 -> (cursor as Any?) j COL_META[3]
                     else -> error("4")
                 }
@@ -296,7 +304,7 @@ enum class Syntax {
             rowCache[index] = row
             return row
         }
-        return (rootCount j { rootIndex: Int -> row(root[rootIndex]) }) j FlatIndex(spans, tags, depths, childOf)
+        return rootCount j { rootIndex: Int -> row(roots[rootIndex]) }
     }
 
     /** A growable primitive int list (32-bit lanes): offsets and ordinals never box. */
@@ -420,6 +428,11 @@ enum class Syntax {
             YAML -> scanYaml0(src)
             else -> scan0(src)
         }
+        return indexed(flat, src, tree)
+    }
+
+    /** Assemble existing facets without scanning or changing the source representation. */
+    fun indexed(flat: FlatIndex, src: Series<Byte>, tree: Cursor = tree(flat)): ConfixIndex {
         // Payload bounds must be checked even when neither derived facet is requested.
         for (index in 0 until flat.spans.size) {
             val span = flat.spans[index]

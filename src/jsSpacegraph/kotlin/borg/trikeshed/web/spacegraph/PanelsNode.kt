@@ -145,7 +145,7 @@ fun Panels.buildNode(n: dynamic) {
     el.style.left = "${n.x}px"; el.style.top = "${n.y}px"
     world.appendChild(el)
     on(hd, "dblclick", { e -> e.stopPropagation(); n.collapsed = !truthy(n.collapsed); el.classList.toggle("collapsed", n.collapsed); save() })
-    val sBtn = hd.querySelector("s")
+    val sBtn = hd.querySelector("[aria-label='Delete node']")
     on(sBtn, "click", { removeNode(n.id) })
     on(sBtn, "keydown", { e -> if (e.key == "Enter" || e.key == " ") { e.preventDefault(); removeNode(n.id) } })
     /* The BODY is the handle, not the topline. Everything the node draws that is not a control, a port,

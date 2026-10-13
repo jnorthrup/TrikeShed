@@ -92,9 +92,9 @@ enum class TlsSupportedGroup {
     P521,
 }
 
-enum class TlsApplicationProtocol {
-    H2,
-    HTTP_1_1,
+enum class TlsApplicationProtocol(val wireName: String) {
+    H2("h2"),
+    HTTP_1_1("http/1.1"),
 }
 
 data class TlsPeerCertificate(
@@ -107,6 +107,7 @@ data class TlsSession(
     val cipherSuite: TlsCipherSuite? = null,
     val peerCertificate: TlsPeerCertificate? = null,
     val verified: Boolean = false,
+    val applicationProtocol: TlsApplicationProtocol? = null,
 )
 
 enum class TlsFlowStage {

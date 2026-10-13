@@ -46,6 +46,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private val born = DoubleColumn(); private val lastBegin = DoubleColumn(); private val lastEnd = DoubleColumn()
     private val activeSince = DoubleColumn(); private val spent = DoubleColumn(); private val runs = IntColumn()
     private val lastKind = IntColumn(); private val lastNote = ArrayList<String?>()
+    /** [FORCES] ordinal of the current note; parsed at intake, never in the frame loop. */
+    private val forces = IntColumn()
     private var laidOut = 0
     private var fitted = false
     private var runNames: List<String> = emptyList()
@@ -55,6 +57,11 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private val evT = DoubleArray(cap); private val evKind = IntArray(cap); private val evRun = IntArray(cap)
     private val evNode = IntArray(cap); private val evNote = arrayOfNulls<String>(cap)
     private var evHead = 0L
+    /** Newest-first slots of the bounded ring. Sequence numbers stay Long; slot arithmetic is Int. */
+    private fun history(): Series<Int> {
+        val head = evHead.toInt()
+        return min(evHead, cap.toLong()).toInt() j { (head - 1 - it) and (cap - 1) }
+    }
 
     // ── relations: statement → concept by role or force, section → section by citation or conflict ──
     private val linkFrom = IntColumn(); private val linkTo = IntColumn(); private val linkLabel = ArrayList<String>()
@@ -99,11 +106,15 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             keys.add(nk[i].toString()); types.add(nt[i].toString()); parents.add(num(np[i]).toInt())
             keyIndex[keys[keys.size - 1]] = keys.size - 1
             born.add(localNow); lastBegin.add(-1e18); lastEnd.add(-1e18); activeSince.add(-1.0); spent.add(0.0)
-            runs.add(0); lastKind.add(-1); lastNote.add(null); degree.add(0)
+            runs.add(0); lastKind.add(-1); lastNote.add(null); forces.add(-1); degree.add(0)
             val at = keys.size - 1
             if (types[at] != "book.statement" && types[at] != "program") names.put(nameKey(name(at), at), at.toLong())
         }
-        (value["runs"] as? List<*>)?.let { r -> runNames = r.map { it.toString() } }
+        (value["runs"] as? List<*>)?.let { r ->
+            val names = r.map { it.toString() }
+            if (names != runNames) panelValue = null
+            runNames = names
+        }
         val t = value["t"] as? List<*> ?: emptyList<Any>()
         val kind = value["kind"] as? List<*> ?: emptyList<Any>()
         val run = value["run"] as? List<*> ?: emptyList<Any>()
@@ -111,7 +122,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val note = value["note"] as? List<*> ?: emptyList<Any>()
         for (i in t.indices) {
             val at = num(t[i]) + offset; val k = num(kind[i]).toInt(); val r = num(run[i]).toInt(); val n = num(node[i]).toInt()
-            val s = (evHead % cap).toInt()
+            val s = evHead.toInt() and (cap - 1)
             evT[s] = at; evKind[s] = k; evRun[s] = r; evNode[s] = n; evNote[s] = note[i]?.toString(); evHead++
             lastRun = r
             if (at - lastEventAt > LIVE_MS) burstFrom = at
@@ -139,6 +150,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                     if (first != b) bundle(first, b)[SHARED]++
                 }
                 lastNote[n] = text.toString()
+                forces[n] = FORCES.indexOf(text.toString().split(" · ").getOrNull(1))
             }
             when (k) {
                 BEGIN -> { lastBegin[n] = at; activeSince[n] = at }
@@ -153,7 +165,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         cursor = (value["head"] as? Number)?.toLong() ?: cursor
         dropped += (value["dropped"] as? Number)?.toLong() ?: 0L
         lastDrained = t.size
-        if (t.isNotEmpty() || nk.isNotEmpty()) count()
+        if (t.isNotEmpty() || nk.isNotEmpty()) { panelValue = null; count() }
         if (keys.size != laidOut) layout()
     }
 
@@ -178,8 +190,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private var closer: Rect? = null
 
     /** Whether node [i]'s category is shown. */
-    private fun visible(i: Int): Boolean = when (types[i]) {
-        "book.statement" -> FORCES.indexOf(force(i)).let { it < 0 || hidden and (1 shl it) == 0 }
+    fun visible(i: Int): Boolean = hidden == 0 || when (types[i]) {
+        "book.statement" -> forces[i].let { it < 0 || hidden and (1 shl it) == 0 }
         "concept" -> hidden and (1 shl CONCEPTS) == 0
         "book.section" -> hidden and (1 shl SECTIONS) == 0
         else -> true
@@ -187,7 +199,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private fun count() {
         tally.fill(0)
         for (i in keys.indices) when (types[i]) {
-            "book.statement" -> { tally[4]++; FORCES.indexOf(force(i)).let { if (it >= 0) tally[it]++ } }
+            "book.statement" -> { tally[4]++; forces[i].let { if (it >= 0) tally[it]++ } }
             "concept" -> tally[5]++
             "book.section" -> tally[6]++
         }
@@ -196,11 +208,13 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     /** Forgets every node and event: the daemon's ring restarted ([renewed]: a new epoch), so ordinals mean new
      *  nodes. Only a new epoch re-frames the library; a replay under the same epoch keeps the camera. */
     private fun clear(renewed: Boolean) {
+        panelValue = null
+        trailHead = -1L
         keys.clear(); keyIndex.clear(); types.clear(); lastNote.clear(); linkLabel.clear(); conflicted.clear(); bundles.clear(); statedIn.clear()
         names = SegmentIndex(); target = -1
         readings.clear(); asked.clear(); pageLines.clear()
         for (c in listOf(born, lastBegin, lastEnd, activeSince, spent, linkAt)) c.reset()
-        for (c in listOf(parents, runs, lastKind, degree, linkFrom, linkTo)) c.reset()
+        for (c in listOf(parents, runs, lastKind, forces, degree, linkFrom, linkTo)) c.reset()
 
         evHead = 0; cursor = 0; laidOut = 0; if (renewed) fitted = false; lastRun = -1; lastEventAt = -1e18; burstFrom = -1e18; selected = -1; hovered = -1; runNames = emptyList()
         open = -1; closing = -1; page = 0
@@ -314,7 +328,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     }
 
     /** The deontic force a statement carries, read from its note: must / must-not / may / presumed. */
-    private fun force(i: Int): String? = lastNote[i]?.split(" · ")?.getOrNull(1)
+    private fun force(i: Int): String? = FORCES.getOrNull(forces[i])
     private fun forceColor(f: String?) = when (f) {
         "must" -> Rgba(236, 110, 80); "must-not" -> Rgba(230, 70, 120); "may" -> Rgba(110, 200, 140)
         "presumed" -> Rgba(150, 160, 180); else -> Rgba(206, 214, 226)
@@ -344,6 +358,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private fun kidCount(i: Int) = kidStart[i + 1] - kidStart[i]
 
     private fun layout() {
+        panelValue = null
         val n = keys.size
         kidStart = IntArray(n + 1)
         for (i in 0 until n) { val p = parents[i]; if (p >= 0) kidStart[p + 1]++ }
@@ -612,9 +627,12 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     // ── what the last frame drew, for picking: circles (screen center, radius) and pages (screen quads) ──
     private var drawnId = IntArray(4096); private var drawnX = DoubleArray(4096); private var drawnY = DoubleArray(4096); private var drawnR = DoubleArray(4096)
     private var drawn = 0
+    /** Node ordinals already index the ring; relation visibility needs no per-frame hash table. */
+    private var shown = BooleanArray(0)
     private val drawnPages = ArrayList<Join<Int, Rect>>()
     private fun mark(i: Int, p: Vec3, r: Double) {
         if (drawn == drawnId.size) { drawnId = drawnId.copyOf(drawn * 2); drawnX = drawnX.copyOf(drawn * 2); drawnY = drawnY.copyOf(drawn * 2); drawnR = drawnR.copyOf(drawn * 2) }
+        shown[i] = true
         drawnId[drawn] = i; drawnX[drawn] = p.x; drawnY[drawn] = p.y; drawnR[drawn] = r; drawn++
     }
 
@@ -632,16 +650,29 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     /** The run the camera follows: the pinned [followRun], else the last run that moved. */
     private fun followed() = if (followRun >= 0) followRun else lastRun
 
-    /** The production's recent path: the last [n] nodes the followed run began or ended, oldest first. */
-    private fun trail(n: Int): List<Int> {
-        val run = followed(); val out = ArrayList<Int>(); var seq = evHead - 1
-        while (seq >= 0 && seq >= evHead - cap && out.size < n) {
-            val s = (seq % cap).toInt()
-            if (evRun[s] == run && (evKind[s] == END || evKind[s] == BEGIN || evKind[s] == RING) && evNode[s] >= 0 &&
-                (out.isEmpty() || out.last() != evNode[s])) out.add(evNode[s])
-            seq--
+    private var trailHead = -1L
+    private var trailRun = -1
+    private var trailSize = 0
+    private var trailNodes: Series<Int> = emptySeriesOf()
+
+    /** The production's recent path, oldest first. Intake/run changes invalidate it, not animation frames. */
+    fun trail(n: Int): Series<Int> {
+        require(n >= 0)
+        val run = followed()
+        if (trailHead != evHead || trailRun != run || n > trailSize) {
+            val out = ArrayList<Int>()
+            val limit = max(n, max(TRAIL, FOLLOW))
+            for (s in history().view) {
+                if (out.size >= limit) break
+                if (evRun[s] == run && (evKind[s] == END || evKind[s] == BEGIN || evKind[s] == RING) && evNode[s] >= 0 &&
+                    (out.isEmpty() || out.last() != evNode[s])) out.add(evNode[s])
+            }
+            trailNodes = out.toSeries()
+            trailHead = evHead; trailRun = run; trailSize = limit
         }
-        return out.asReversed()
+        val size = min(n, trailNodes.size)
+        val nodes = trailNodes
+        return size j { nodes[size - 1 - it] }
     }
 
     /** Ancestors of [i] up to its top circle, [i] first. */
@@ -693,12 +724,13 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
 
     /** Advances the camera to [localNow] and plans the frame. */
     fun frame(localNow: Double): FramePlan {
-        now = localNow
+        // A queued animation frame can predate a drain; event age must not run backwards.
+        now = max(now, localNow)
         glide()
         if (closing >= 0 && openness(closing) <= 0) closing = -1
         if (!aim) { target = -1; both = IntArray(0) }
         if (units.isNotEmpty() && (aim || following())) {
-            val focus = if (open >= 0) listOf(open) else if (both.isNotEmpty()) both.toList() else if (target >= 0) listOf(target) else trail(FOLLOW).map { if (types[it] == "book.statement") parents[it] else it }.filter { disc.getOrElse(it) { UNPLACED } != UNPLACED }
+            val focus = if (open >= 0) listOf(open) else if (both.isNotEmpty()) both.toList() else if (target >= 0) listOf(target) else trail(FOLLOW).view.map { if (types[it] == "book.statement") parents[it] else it }.filter { disc.getOrElse(it) { UNPLACED } != UNPLACED }
                 .ifEmpty { if (aim) units.flatMap { it.discs.toList() } else emptyList() }
             if (focus.isNotEmpty()) {
                 val b = frameOf(focus)
@@ -714,10 +746,11 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val labels = ArrayList<DrawItem>()
         /** Loom bands: over every path of the scene, open pages included, under all text. */
         val plates = ArrayList<DrawItem>()
+        if (shown.size < nodes) shown = BooleanArray(nodes)
+        else for (k in 0 until drawn) shown[drawnId[k]] = false
         drawn = 0; drawnPages.clear()
         /** Children show once they would be as large on screen as a section is when the median book snaps. */
         val split = max(MIN_SPLIT_PX, refKid * snap)
-        val shown = HashSet<Int>()
         /** Screen cells a circle's label already covers: a circle is labelled whenever its label lands on free cells. */
         val cols = (vp.width / CELL).toInt() + 1; val rows = (vp.height / CELL).toInt() + 1
         val taken = BooleanArray(cols * rows)
@@ -802,7 +835,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             if (p.x + r < 0 || p.x - r > vp.width || p.y + r < 0 || p.y - r > vp.height || r < MIN_PX) return
             val type = types[i]
             if ((type == "concept" || type == "book.statement") && !visible(i)) return
-            shown.add(i); mark(i, p, r)
+            mark(i, p, r)
             val heat = heat(i)
             val hot = i == hovered || i == selected
             val kids = kidCount(i)
@@ -927,7 +960,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             if (!visible(a0) || !visible(b0)) continue
             val fresh = exp(-(now - linkAt[l]) / GLOW_MS)
             val focused = focus >= 0 && (a0 == focus || b0 == focus || parents[a0] == focus || parents[b0] == focus)
-            val visible = a0 in shown && b0 in shown
+            val visible = shown[a0] && shown[b0]
             if (!focused && !visible && fresh < .35) continue
             val ctl = route(a0, b0); if (ctl.size < 2) continue
             val pts = spline(ctl, cam); if (pts.size < 3) continue
@@ -953,7 +986,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 Rect(t.position.x, t.position.y - t.size, min(t.maxWidth ?: 1e9, t.text.length * t.size * .56), t.size * 1.3).let { b -> loomRects.any { b.intersection(it) != null } } }
         } else { loomHits.clear(); loomRects.clear() }
         // The trail: the followed run's path, older segments fading.
-        val path = trail(TRAIL).mapNotNull { n -> center(n)?.let { cam.project(it, viewport) } }
+        val path = trail(TRAIL).view.mapNotNull { n -> center(n)?.let { cam.project(it, viewport) } }
         for (k in 1 until path.size) {
             val age = (path.size - k).toDouble() / path.size
             over.add(DrawItem.Path("trail-$k", s_[PathPart.Move(path[k - 1]), PathPart.Line(path[k])],
@@ -1047,10 +1080,10 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
 
     // ── the fill/drain sparkline: events per 250 ms over 30 s, a spike is a bin over 3× the mean ──
     private fun spikes(items: MutableList<DrawItem>, labels: MutableList<DrawItem>) {
-        val bins = IntArray(BINS); var seq = evHead - 1
-        while (seq >= 0 && seq >= evHead - cap) {
-            val s = (seq % cap).toInt(); val b = ((now - evT[s]) / BIN_MS).toInt()
-            if (b >= BINS) break; if (b >= 0) bins[BINS - 1 - b]++; seq--
+        val bins = IntArray(BINS)
+        for (s in history().view) {
+            val b = ((now - evT[s]) / BIN_MS).toInt()
+            if (b >= BINS) break; if (b >= 0) bins[BINS - 1 - b]++
         }
         val mean = bins.average().coerceAtLeast(.5); val peak = max(1, bins.max())
         val x0 = 14.0; val y0 = viewport.height - 16.0; val w = 3.0
@@ -1087,16 +1120,22 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             Vec3(x0 + BINS * w + 12, y0 - 4), Rgba(170, 182, 196), 12.0, font = "monospace"))
     }
 
-    /** What the illustrative panel shows for the node in view: hovered, the open book's right-hand page, selected, or the production's head. */
+    private var panelNode = -1
+    private var panelRun = -1
+    private var panelValue: Map<String, Any?>? = null
+
+    /** What the illustrative panel shows for the node in view: hovered, the open book's right-hand page, selected, or the production's head.
+     *  Its history and relations change on intake, not on animation frames. */
     fun panel(): Map<String, Any?>? {
-        val i = when { hovered >= 0 && hovered != open -> hovered; open >= 0 && leaves.isNotEmpty() -> leaves[page]; selected >= 0 -> selected; else -> trail(1).firstOrNull() ?: -1 }
+        val ordinal = when { hovered >= 0 && hovered != open -> hovered; open >= 0 && leaves.isNotEmpty() -> leaves[page]; selected >= 0 -> selected; else -> -1 }
+        if (ordinal == panelNode && (ordinal >= 0 || panelRun == followed())) panelValue?.let { return it }
+        val i = if (ordinal >= 0) ordinal else trail(1).view.firstOrNull() ?: -1
         if (i !in keys.indices) return null
         val m = CuratorMetaphors.of(types[i])
-        val story = ArrayList<String>(); var seq = evHead - 1
-        while (seq >= 0 && seq >= evHead - cap && story.size < 8) {
-            val s = (seq % cap).toInt()
+        val story = ArrayList<String>()
+        for (s in history().view) {
+            if (story.size >= 8) break
             if (evNode[s] == i) story.add("${runNames.getOrNull(evRun[s]) ?: "run ${evRun[s]}"}: ${verbOf(m, evKind[s])}" + (evNote[s]?.let { " — $it" } ?: ""))
-            seq--
         }
         val relations = ArrayList<String>()
         for (l in linkFrom.n - 1 downTo 0) {
@@ -1108,6 +1147,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             "degree" to degree[i], "glyph" to glyph(i), "glyphColor" to tone(i).css,
             "color" to m.color.css, "gloss" to m.gloss, "verb" to verb(i), "runs" to runs[i],
             "meanMs" to if (runs[i] > 0) spent[i] / runs[i] else null, "active" to (activeSince[i] >= 0), "story" to story)
+            .also { panelNode = ordinal; panelRun = followed(); panelValue = it }
     }
 
     private fun verb(i: Int) = verbOf(CuratorMetaphors.of(types[i]), lastKind[i])

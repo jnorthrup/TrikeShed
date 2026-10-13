@@ -1,16 +1,86 @@
 package borg.trikeshed.hermes
 
 import borg.trikeshed.vm.Teleported
+import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
+import borg.trikeshed.graal.subvm.GuestException
+import borg.trikeshed.graal.subvm.PythonWheels
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.toList
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
+import kotlin.test.assertNotNull
 
 class HermesPythonPortTest {
+    // Inspect the actual owned handle without adding a production-only-for-tests factory.
+    private fun isolate(port: HermesPythonPort): GraalBtrfsSupervisor? =
+        HermesPythonPort::class.java.getDeclaredField("isolate").let {
+            it.isAccessible = true
+            it.get(port) as? GraalBtrfsSupervisor
+        }
+
+    @Test
+    fun failedFirstImportClosesTheCandidateVm() {
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(mapOf("entry" to ("entry.py" to "raise RuntimeError('boot failed')")))
+            assertFailsWith<GuestException> { port.importInVm(inventory, "entry") }
+            assertFalse(port.vmStarted, "a failed import must not retain a live VM")
+            assertEquals(null, isolate(port))
+            assertFalse(port.blackboard().has("hermes/python/vfs"), "a failed candidate is not the active VFS")
+            val failure = port.blackboard().get("hermes/python/pointcut/import/entry") as Map<*, *>
+            assertEquals("failed", failure["status"])
+        }
+    }
+
+    @Test
+    fun successfulReplacementClosesThePreviousVm() {
+        HermesPythonPort().use { port ->
+            port.importInVm(port.inventorySources(mapOf("entry" to ("entry.py" to "VALUE = 1"))), "entry")
+            val previous = requireNotNull(isolate(port))
+            try {
+                port.importInVm(port.inventorySources(mapOf("entry" to ("entry.py" to "VALUE = 2"))), "entry")
+                assertFalse(previous.isAlive, "replacement must release the old engine and context")
+                assertTrue(port.vmStarted)
+                assertEquals(Teleported.Num(2), port.evalInVm("import entry\nentry.VALUE"))
+                val active = requireNotNull(isolate(port))
+                port.close()
+                assertFalse(active.isAlive)
+                assertFalse(port.vmStarted)
+            } finally { previous.close() }
+        }
+    }
+
+    @Test
+    fun failedReplacementPreservesThePreviousVmAndItsFiles() {
+        HermesPythonPort().use { port ->
+            port.importInVm(port.inventorySources(mapOf("entry" to ("entry.py" to "VALUE = 41"))), "entry")
+            port.evalInVm("with open('/workspace/retained.txt', 'w') as output:\n    output.write('retained')")
+            assertEquals(Teleported.Str("retained"), port.evalInVm("open('/workspace/retained.txt').read()"))
+            val previous = requireNotNull(isolate(port))
+            val vfs = port.blackboard().get("hermes/python/vfs")
+            try {
+                val failed = port.inventorySources(mapOf("entry" to ("entry.py" to "raise RuntimeError('replacement failed')")))
+                assertFailsWith<GuestException> { port.importInVm(failed, "entry") }
+                assertSame(previous, isolate(port))
+                assertEquals(vfs, port.blackboard().get("hermes/python/vfs"))
+                assertTrue(previous.isAlive)
+                assertEquals(Teleported.Num(41), port.evalInVm("import entry\nentry.VALUE"))
+                assertEquals(Teleported.Str("retained"), port.evalInVm("open('/workspace/retained.txt').read()"))
+                val preludeFailure = port.inventorySources(mapOf(
+                    "entry" to ("entry.py" to "VALUE = 99"),
+                    HermesPythonPort.GUEST_PRELUDE to ("trikeshed_guest_prelude.py" to "raise RuntimeError('prelude failed')"),
+                ))
+                assertFailsWith<GuestException> { port.importInVm(preludeFailure, "entry") }
+                assertSame(previous, isolate(port), "bootstrap failure also leaves the working VM owned")
+                assertEquals(vfs, port.blackboard().get("hermes/python/vfs"))
+                assertEquals(Teleported.Str("retained"), port.evalInVm("open('/workspace/retained.txt').read()"))
+            } finally { previous.close() }
+        }
+    }
+
     @Test
     fun nativeBlocksPropagateAndProjectToBlackboard() {
         HermesPythonPort().use { port ->
@@ -102,25 +172,20 @@ class HermesPythonPortTest {
     }
 
     @Test
-    fun curatedYamlAndDotenvSleevesExecuteInsideBtrfsVfs() {
-        val sleeveRoot = Path.of("graalpy-sleeve/hermes")
-        val yaml = Files.readString(sleeveRoot.resolve("yaml.py"))
-        val dotenv = Files.readString(sleeveRoot.resolve("dotenv/__init__.py"))
+    fun installedYamlAndDotenvLibrariesExecuteInsideBtrfsVfs() {
+        val dependencies = assertNotNull(PythonWheels.installed(), "install the declared hermes-python guest module")
         HermesPythonPort().use { port ->
             val inventory = port.inventorySources(
                 sources = mapOf(
                     "app" to ("app.py" to """
-                        import yaml
+                        from ruamel.yaml import YAML
                         from dotenv import dotenv_values
                         from io import StringIO
-                        assert yaml.safe_load('answer: 42')['answer'] == 42
+                        assert YAML(typ='safe', pure=True).load('answer: 42')['answer'] == 42
                         assert dotenv_values(stream=StringIO('KEY=value\n'))['KEY'] == 'value'
                     """.trimIndent()),
                 ),
-                sleeveSources = mapOf(
-                    "yaml" to ("yaml.py" to yaml),
-                    "dotenv" to ("dotenv/__init__.py" to dotenv),
-                ),
+                dependencies = dependencies,
             )
             assertEquals(Teleported.Bool(true), port.importInVm(inventory, "app"))
             assertTrue(port.blackboard().has("hermes/python/vfs"))
@@ -128,8 +193,13 @@ class HermesPythonPortTest {
     }
 
     private fun sleeveFile(name: String): Pair<String, Pair<String, String>> {
-        val relative = if (name.contains('.')) name.replace('.', '/') + "/__init__.py" else "$name.py"
-        return name to (relative to Files.readString(Path.of("graalpy-sleeve/hermes").resolve(relative)))
+        val source = when (name) {
+            HermesPythonPort.GUEST_PRELUDE -> HermesGuestPrelude.source(logging = true)
+            HermesSocketProvider.MODULE -> HermesSocketProvider.source
+            HermesContextVars.MODULE -> HermesContextVars.source
+            else -> error("No host sleeve for $name")
+        }
+        return name to ("$name.py" to source)
     }
 
     @Test
@@ -204,7 +274,7 @@ class HermesPythonPortTest {
     }
 
     @Test
-    fun contextVarTwinRestoresTheNameAttributeGraalPyOmits() {
+    fun contextVarSleevePreservesNameAndTokenReset() {
         HermesPythonPort().use { port ->
             val inventory = port.inventorySources(
                 sources = mapOf(
@@ -218,7 +288,7 @@ class HermesPythonPortTest {
                         assert contextvars.copy_context() is not None
                     """.trimIndent()),
                 ),
-                sleeveSources = mapOf(sleeveFile("contextvars")),
+                sleeveSources = mapOf(sleeveFile(HermesContextVars.MODULE)),
             )
             assertEquals(Teleported.Bool(true), port.importInVm(inventory, "channels"))
         }
@@ -235,7 +305,8 @@ class HermesPythonPortTest {
                 "entry" to ("entry.py" to """
                     import plugins.platforms.chat
                     assert plugins.platforms.chat.NAME == 'chat'
-                    assert plugins.platforms.__path__ == []
+                    # The namespace is backed by Btrfs; resource readers need its real guest path.
+                    assert list(plugins.platforms.__path__) == ['/workspace/plugins/platforms']
                     assert type(plugins.platforms.__spec__.loader).__name__ == 'NamespaceLoader'
                 """.trimIndent()),
             ))

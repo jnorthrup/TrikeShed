@@ -2,7 +2,7 @@ package borg.trikeshed.hook
 
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.job.hmacSha256
-import borg.trikeshed.jules.TrikeHtxHttpClient
+import borg.trikeshed.htx.TrikeHtxHttpClient
 import borg.trikeshed.lib.j
 
 /** HMAC-SHA-256 hex signature shared by inbound verification and outbound signing. */

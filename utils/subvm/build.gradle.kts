@@ -23,6 +23,15 @@ plugins { base }
 
 /** module name -> coordinates. A module is one mountable guest classpath. */
 val guestModules: Map<String, List<String>> = mapOf(
+    "clojure" to listOf(
+        "org.clojure:clojure:1.12.6",
+        "org.clojure:data.json:2.5.2",
+    ),
+    // Source compiler and data boundary; neither belongs on TrikeShed's library classpath.
+    "groovy" to listOf(
+        "org.apache.groovy:groovy:5.0.2",
+        "org.apache.groovy:groovy-json:5.0.2",
+    ),
     // The curator lane: tokenize/pos/lemma/depparse/ner behind vm.corenlp.
     // GPL v3 or later — see src/commonMain/resources/nlp/lemma/en/ATTRIBUTION.md.
     "corenlp" to listOf(
@@ -152,3 +161,41 @@ tasks.register("install") {
     description = "Alias for installAll"
     dependsOn(installAll)
 }
+
+// Hermes' uv.lock pins this pure wheel. No host Python environment, C accelerator,
+// or Python package installer is executed. Like JVM departments, this is an optional mount.
+val hermesPython = configurations.create("hermesPython") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+dependencies {
+    add(hermesPython.name, "python.wheels:ruamel.yaml:0.18.16:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:python_dotenv:1.2.2:py3-none-any@whl")
+}
+val installHermesPython = tasks.register("installHermesPython") {
+    group = "subvm"
+    description = "Resolve verified pure-Python Hermes dependencies into hermes-python/lib"
+    inputs.files(hermesPython)
+    val directory = layout.projectDirectory.dir("hermes-python").asFile
+    outputs.dir(directory)
+    doLast {
+        val pins = mapOf(
+            "ruamel.yaml-0.18.16-py3-none-any.whl" to "048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba",
+            "python_dotenv-1.2.2-py3-none-any.whl" to "1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a",
+        )
+        val wheels = hermesPython.resolve().sortedBy { it.name }
+        check(wheels.map { it.name }.toSet() == pins.keys) { "Hermes Python artifacts differ from the lockfile" }
+        for (wheel in wheels) check(sha256(wheel) == pins.getValue(wheel.name)) {
+            "Hermes ${wheel.name} does not match the donor lockfile"
+        }
+        val lib = File(directory, "lib").apply { mkdirs() }
+        wheels.forEach { it.copyTo(File(lib, it.name), overwrite = true) }
+        File(directory, "MANIFEST.tsv").writeText(
+            "# guest module\thermes-python\n# declared\truamel.yaml==0.18.16\n# declared\tpython-dotenv==1.2.2\n" +
+                "file\tsize\tsha256\n" + wheels.joinToString("") { "${it.name}\t${it.length()}\t${pins.getValue(it.name)}\n" },
+        )
+        logger.lifecycle("[subvm] hermes-python: ${wheels.sumOf { it.length() }} bytes -> ${lib.path}")
+    }
+}
+installAll.configure { dependsOn(installHermesPython) }

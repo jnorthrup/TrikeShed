@@ -104,6 +104,7 @@ class LeafTrainer(
      * safe point (next eval/call, or [InProcessIsolate.settle]); until then the phase stays SELF_CONTAINED.
      */
     fun promote(root: String): Boolean {
+        if (!isolate.bounds.rootBindingsMutable) return false
         val p = profiles[root] ?: return false
         synchronized(p) {
             if (p.phase != Phase.SELF_CONTAINED || p.promotionQueued) return false
@@ -114,6 +115,17 @@ class LeafTrainer(
                 p.promotionQueued = false
                 if (p.phase != Phase.SELF_CONTAINED) return@onGuestThread
                 val original = isolate.original(root) ?: run { p.demotedReason = "no executable root"; transition(p, Phase.DEMOTED); return@onGuestThread }
+                // Native roots include nested functions and methods whose names need not identify
+                // the global binding. Never rebind a different function on that name alone.
+                if (p.characters != null) {
+                    val source = original.sourceLocation
+                    if (source == null || source.source.name != p.sourceName || source.startLine != p.line ||
+                        source.startColumn != p.column || source.characters.toString() != p.characters) {
+                        p.demotedReason = "root binding differs from observed source"
+                        transition(p, Phase.DEMOTED)
+                        return@onGuestThread
+                    }
+                }
                 // listener pointcuts captured the root's own characters; binding pointcuts did not — the leaf
                 // host then mirrors the whole program, and any dependence on mutable guest state is caught by
                 // the shadow comparison, not assumed away.

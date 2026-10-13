@@ -173,7 +173,7 @@ class CouchRequestFactory(
             ?: return failure(null, "view", "ddoc required")
         val name = op["name"] as? String ?: return failure(null, "view", "name required")
         val params = op["params"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-        val reply = viewRoute.handle(ddoc, name, ViewQuery.fromEnvelope(params))
+        val reply = viewRoute.handle(ddoc, name, ViewQuery.fromEnvelope(mapOf("params" to params, "group" to false)))
         if (reply.status != 200) {
             return failure(ddoc, reply.json["error"] as? String ?: "error", reply.json["reason"] as? String ?: "view refused")
         }

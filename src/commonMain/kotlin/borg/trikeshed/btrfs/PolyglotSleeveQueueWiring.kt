@@ -1,6 +1,6 @@
 package borg.trikeshed.btrfs
 
-import borg.trikeshed.jules.JulesDurableTodoQueue
+import borg.trikeshed.btrfs.DurableTodoQueue
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
 /**
@@ -23,11 +23,11 @@ object PolyglotSleeveQueueWiring {
         val expanded = raw.flatMap { ChokepointTodoScanner.expandTargets(it) }
 
         // 2. enqueue to durable file-backed queue
-        val queue = JulesDurableTodoQueue(queueDir, fileOps)
+        val queue = DurableTodoQueue(queueDir, fileOps)
         val enqueued = queue.enqueueAll(expanded)
 
         // 3. persistence verify: re-open and count
-        val reopened = JulesDurableTodoQueue(queueDir, fileOps)
+        val reopened = DurableTodoQueue(queueDir, fileOps)
         val persisted = reopened.size()
 
         // 4. dispatch per target seam (real handlers, artifacts)

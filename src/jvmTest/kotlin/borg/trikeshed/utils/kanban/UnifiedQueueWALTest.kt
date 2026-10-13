@@ -1,6 +1,6 @@
 package borg.trikeshed.utils.kanban
 
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.LexicalMemory
@@ -21,10 +21,10 @@ import kotlin.test.assertTrue
  */
 class UnifiedQueueWALTest {
 
-    private fun tempStore(): Pair<JulesBoardStore, File> {
+    private fun tempStore(): Pair<SessionBoardStore, File> {
         val dir = Files.createTempDirectory("unified-queue-test").toFile()
         val walFile = File(dir, "test-board.wal")
-        val store = JulesBoardStore(JvmAppendWal(walFile))
+        val store = SessionBoardStore(JvmAppendWal(walFile))
         return store to walFile
     }
 
@@ -34,7 +34,7 @@ class UnifiedQueueWALTest {
         try {
             store.appendWork(
                 workId = "w-1",
-                cause = JulesCause.WorkQueued(
+                cause = SessionCause.WorkQueued(
                     workId = "w-1",
                     tier = "feature",
                     title = "Test work item",
@@ -68,16 +68,16 @@ class UnifiedQueueWALTest {
         val (store, dir) = tempStore()
         try {
             // enqueue
-            store.appendWork("w-2", JulesCause.WorkQueued(
+            store.appendWork("w-2", SessionCause.WorkQueued(
                 workId = "w-2", tier = "task", title = "T2",
                 spec = "do it", at = 100L,
             ))
             // dispatch → jules session
-            store.appendWork("w-2", JulesCause.WorkDispatched(
+            store.appendWork("w-2", SessionCause.WorkDispatched(
                 workId = "w-2", sessionId = "sess-abc", attempt = 1, at = 200L,
             ))
             // drain → merged
-            store.appendWork("w-2", JulesCause.WorkDrained(
+            store.appendWork("w-2", SessionCause.WorkDrained(
                 workId = "w-2", sessionId = "sess-abc",
                 commitSha = "deadbeef", taskId = "abc-task-id",
                 receipt = MergeReceipt(
@@ -126,12 +126,12 @@ class UnifiedQueueWALTest {
         try {
             val prUrl = "https://github.com/jnorthrup/TrikeShed/commit/abc123def456abc123def456abc123def456abcd"
             // loadQueue folds WorkDrained onto a pre-existing WorkQueued key
-            // (JulesBoardStore.loadQueue:127-141); mirror the production pattern.
-            store.appendWork("w-4", JulesCause.WorkQueued(
+            // (SessionBoardStore.loadQueue:127-141); mirror the production pattern.
+            store.appendWork("w-4", SessionCause.WorkQueued(
                 workId = "w-4", tier = "feature", title = "PR bridge",
                 spec = "do it", at = 900L,
             ))
-            store.appendWork("w-4", JulesCause.WorkDrained(
+            store.appendWork("w-4", SessionCause.WorkDrained(
                 workId = "w-4", sessionId = "sess-4",
                 commitSha = "abc123def456abc123def456abc123def456abcd",
                 taskId = "abc-task",
@@ -164,11 +164,11 @@ class UnifiedQueueWALTest {
         // but no PR was opened) must round-trip with prUrl == null, not empty string.
         val (store, dir) = tempStore()
         try {
-            store.appendWork("w-5", JulesCause.WorkQueued(
+            store.appendWork("w-5", SessionCause.WorkQueued(
                 workId = "w-5", tier = "feature", title = "no PR",
                 spec = "do it", at = 1L,
             ))
-            store.appendWork("w-5", JulesCause.WorkDrained(
+            store.appendWork("w-5", SessionCause.WorkDrained(
                 workId = "w-5", sessionId = "sess-5",
                 commitSha = "feedface",
                 taskId = "t5",
@@ -195,16 +195,16 @@ class UnifiedQueueWALTest {
         val (store, dir) = tempStore()
         try {
             // Queue a work item
-            store.appendWork("w-3", JulesCause.WorkQueued(
+            store.appendWork("w-3", SessionCause.WorkQueued(
                 workId = "w-3", tier = "task", title = "T3",
                 spec = "spec", at = 50L,
             ))
             // Dispatch it
-            store.appendWork("w-3", JulesCause.WorkDispatched(
+            store.appendWork("w-3", SessionCause.WorkDispatched(
                 workId = "w-3", sessionId = "sess-3", attempt = 1, at = 100L,
             ))
             // Now record jules activity for that session
-            val snap = borg.trikeshed.jules.JulesSnapshot(
+            val snap = borg.trikeshed.kanban.SessionSnapshot(
                 sessionId = "sess-3",
                 state = "IN_PROGRESS",
                 title = "T3",
@@ -214,7 +214,7 @@ class UnifiedQueueWALTest {
                 awaitingCount = 0,
                 capturedAt = 200L,
             )
-            store.append(snap, drained = false, cause = JulesCause.StateObserved("QUEUED", "IN_PROGRESS", 200L))
+            store.append(snap, drained = false, cause = SessionCause.StateObserved("QUEUED", "IN_PROGRESS", 200L))
 
             // Both projections work from the same WAL
             val queue = store.loadQueue()
@@ -238,11 +238,11 @@ class UnifiedQueueWALTest {
     fun receiptlessDrainIsProjectedAsUnclaimed() = runBlocking {
         val (store, dir) = tempStore()
         try {
-            store.appendWork("w-unclaimed", JulesCause.WorkQueued(
+            store.appendWork("w-unclaimed", SessionCause.WorkQueued(
                 workId = "w-unclaimed", tier = "task", title = "Unclaimed",
                 spec = "must block settlement", at = 100L,
             ))
-            store.appendWork("w-unclaimed", JulesCause.WorkDrained(
+            store.appendWork("w-unclaimed", SessionCause.WorkDrained(
                 workId = "w-unclaimed", sessionId = "sess-unclaimed",
                 commitSha = "deadbeef", taskId = "unclaimed-task",
                 receipt = null,

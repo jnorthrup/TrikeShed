@@ -192,13 +192,33 @@ finally:
         // The concentric treesheet view: board sheet at the center, partitions one ring out,
         // orchestration outermost. SheetRef cells and child rings drill in, the crumb climbs out.
         "sheet.concentric" to Runner({ n, i ->
-            val idx = obj()
-            fun add(sh: dynamic) { if (truthy(sh) && truthy(sh.id)) idx[sh.id] = sh }
-            add(i.board)
-            for (sh in arr(i["byStatus?"])) add(sh)
-            for (sh in arr(i["byPriority?"])) add(sh)
-            n._sheets = idx; n._orch = if (truthy(i["orchestration?"])) i["orchestration?"] else null
-            if (!truthy(n._cur) || !truthy(idx[n._cur])) n._cur = if (truthy(i.board)) i.board.id else i.board
+            val idx = js("Object.create(null)")
+            val fetched = HashSet<String>()
+            suspend fun add(sh: dynamic) {
+                if (!truthy(sh)) return
+                if (truthy(sh.id)) { idx[sh.id] = sh; return }
+                if (!truthy(sh.sheet)) return
+                // Retained document outputs carry identities, not another copy of the parser's rows.
+                // Prefer one bounded page; legacy sheet families remain readable.
+                val href = str(sh.pageHref ?: sh.href)
+                if (fetched.add(href)) {
+                    for (sheet in readSheets(href)) idx[sheet.id] = sheet
+                }
+                require(truthy(idx[sh.sheet])) { "Referenced sheet is absent from its family: ${str(sh.sheet)}" }
+            }
+            try {
+                add(i.board)
+                for (sh in arr(i["byStatus?"])) add(sh)
+                for (sh in arr(i["byPriority?"])) add(sh)
+            } catch (e: dynamic) {
+                n._sheets = null; n._cur = null; n._orch = null
+                p.renderConcentric(n)
+                throw e
+            }
+            n._sheets = idx; n._sheetError = null; n._sheetRequest = null
+            n._orch = if (truthy(i["orchestration?"])) i["orchestration?"] else null
+            if (!truthy(n._cur) || !truthy(idx[n._cur])) n._cur = if (truthy(i.board)) i.board.id ?: i.board.sheet else i.board
+            n.el.querySelector(".result")?.remove()
             obj()
         }, { n, _ -> p.renderConcentric(n) }),
         "graal.heap" to Runner({ n, _ -> val r = api("GET", "/api/graal/heap"); n._heap = r; o("heap" to r) }, { n, _ -> p.renderHeap(n) }),
@@ -207,6 +227,18 @@ finally:
             o("standings" to n._standings)
         }, { n, _ -> p.renderStandings(n) }),
     )
+}
+
+/** Shared read boundary for initial sheet references and navigation. No curation POST. */
+internal suspend fun readSheets(href: String): Array<dynamic> {
+    require(href.startsWith("/") && !href.startsWith("//") &&
+        '\\' !in href && href.none { it.code <= 32 }) { "Sheet reference requires a local path" }
+    val response = api("GET", href)
+    val family = if (isArray(response)) arr(response) else arrayOf(response?.sheet)
+    require(family.isNotEmpty() && family.all { truthy(it?.id) && isArray(it.columns) && isArray(it.rows) }) {
+        str(response?.error ?: "Sheet reference did not return a sheet or family")
+    }
+    return family
 }
 
 /**

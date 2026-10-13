@@ -1,8 +1,10 @@
 package borg.trikeshed.kif
 
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class KifKnowledgeBaseRetractTest {
@@ -52,6 +54,83 @@ class KifKnowledgeBaseRetractTest {
         assertTrue(kb.retractKif("(subclass Mammal Animal)"))
         val after = bindings(kb, "(subclass Dog ?p)").map { it.getValue("?p") }.toSet()
         assertEquals(setOf("Mammal"), after, "the inferred edge goes with its support")
+    }
+
+    @Test
+    fun predicateSnapshotsFollowOnlyTheirOwnMutations() {
+        val kb = KifKnowledgeBase()
+        assertTrue(kb.asserts("inKind").isEmpty())
+        kb.assertKif("(inKind node x TEXT)")
+        val selected = kb.asserts("inKind")
+        kb.assertKif("(heapUsed fact:graal/memory 123)")
+        kb.assertKif("(inKind node x TEXT)")
+        assertSame(selected, kb.asserts("inKind"), "unrelated writes and duplicate assertions retain the view")
+        kb.replace(listOf(KifExpr.parse("(inKind node x TEXT)")), listOf(KifExpr.parse("(inKind node y JSON)")))
+        assertEquals(listOf("(inKind node y JSON)"), kb.asserts("inKind").view.map { it.toKifString() })
+        assertEquals("(inKind node x TEXT)", selected[0].toKifString(), "previous readers retain their immutable snapshot")
+        assertTrue(kb.retractKif("(inKind node y JSON)"))
+        assertTrue(kb.asserts("inKind").isEmpty())
+    }
+
+    @Test
+    fun predicateQueriesPreserveOrderArityBindingsAndVariableHeads() {
+        val kb = KifKnowledgeBase()
+        listOf("(p a a)", "(q b b)", "(p a b)", "(p c c)", "(p short)").forEach(kb::assertKif)
+        assertEquals(listOf(mapOf("?x" to "a"), mapOf("?x" to "c")), bindings(kb, "(p ?x ?x)"))
+        assertEquals(listOf("p", "q", "p"), bindings(kb, "(?head ?x ?x)").map { it.getValue("?head") })
+        assertTrue(kb.retractKif("(p a a)"))
+        kb.assertKif("(p a a)")
+        assertEquals(listOf(mapOf("?x" to "c"), mapOf("?x" to "a")), bindings(kb, "(p ?x ?x)"))
+        assertEquals(5, kb.size(), "selection never removes other predicates")
+    }
+
+    @Test
+    fun coldAndEvictedPredicateViewsDoNotReadUnrelatedExpressions() {
+        val kb = KifKnowledgeBase()
+        var unrelatedReads = 0
+        val elements = listOf(KifExpr.Atom("q"), KifExpr.Atom("unrelated"))
+        kb.assert(KifExpr.ListExpr(object : AbstractList<KifExpr>() {
+            override val size: Int get() = elements.size
+            override fun get(index: Int): KifExpr {
+                unrelatedReads++
+                return elements[index]
+            }
+        }))
+        val first = KifExpr.parse("(p first)")
+        val second = KifExpr.parse("(p second)")
+        kb.assert(first)
+        kb.assert(second)
+        repeat(129) { kb.assertKif("(p$it value)") }
+        unrelatedReads = 0
+
+        val cold = kb.asserts("p")
+        assertEquals(2, cold.size)
+        assertSame(first, cold[0], "index shares the held expression")
+        assertSame(second, cold[1])
+        repeat(129) { assertEquals(1, kb.asserts("p$it").size) }
+        assertEquals(listOf(first, second), kb.asserts("p").view.toList(), "eviction preserves telling order")
+        kb.retract(first)
+        kb.assert(first)
+        assertEquals(listOf(second, first), kb.asserts("p").view.toList())
+        assertEquals(0, unrelatedReads, "cold, evicted and invalidated views must use predicate membership")
+        assertSame(first, cold[0], "retraction does not change a previously returned view")
+    }
+
+    @Test
+    fun retractionUsesTheStoredExpressionForPredicateAndClosureInvalidation() {
+        val kb = KifKnowledgeBase()
+        kb.assertKif("(subclass Dog Mammal)")
+        kb.assertKif("(subclass Mammal Animal)")
+        assertEquals(2, bindings(kb, "(subclass Dog ?p)").size)
+        // Exact serialization is the bank's key, even if the caller uses a different expression shape.
+        assertTrue(kb.retract(KifExpr.Atom("(subclass Mammal Animal)")))
+        assertEquals(listOf("(subclass Dog Mammal)"), kb.asserts("subclass").view.map { it.toKifString() })
+        assertEquals(listOf(mapOf("?p" to "Mammal")), bindings(kb, "(subclass Dog ?p)"))
+        kb.retractKif("(subclass Dog Mammal)")
+        assertTrue(kb.asserts("subclass").isEmpty())
+        kb.assertKif("(subclass Bird Animal)")
+        assertEquals(listOf(mapOf("?x" to "Bird")), bindings(kb, "(subclass ?x Animal)"))
+        assertEquals(1, kb.size())
     }
 }
 

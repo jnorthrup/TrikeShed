@@ -1,0 +1,6 @@
+# guest module	hermes-python
+# declared	ruamel.yaml==0.18.16
+# declared	python-dotenv==1.2.2
+file	size	sha256
+python_dotenv-1.2.2-py3-none-any.whl	22101	1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a
+ruamel.yaml-0.18.16-py3-none-any.whl	119858	048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba

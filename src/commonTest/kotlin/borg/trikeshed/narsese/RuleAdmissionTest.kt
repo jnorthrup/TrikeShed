@@ -13,6 +13,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 /**
  * Rule admission end to end: the daemon boots [CausalityReteElement] over ZERO
@@ -21,6 +22,38 @@ import kotlin.test.assertTrue
  * brings the live rete to fire against the bag as it exists.
  */
 class RuleAdmissionTest {
+
+    @Test
+    fun admissionRetainsNegativeEvidenceAndRejectsInvalidOffersBeforeMutation() = runTest {
+        val (bag, element) = liveElement()
+        val ledger = mutableListOf<EternalRule>()
+        val runner = RuleNodes.ruleAdmitRunner(element) { ledger.add(it) }
+        val rule = EternalRule("fire", "smoke", NalCopula.IMPLICATION, EvidenceCoord(0, 900), "source-negative")
+        val spec = mapOf("antecedent" to "fire", "consequent" to "smoke", "copula" to "==>",
+            "positiveEvidence" to 0, "negativeEvidence" to 900, "provenanceCid" to "source-negative", "ruleCid" to rule.ruleCid.value)
+        try {
+            for (bad in listOf(spec + ("negativeEvidence" to -1), spec + ("negativeEvidence" to 0.5),
+                spec + ("negativeEvidence" to 4_294_967_296L), spec - "negativeEvidence", spec + ("copula" to "unknown"),
+                spec + ("ruleCid" to "sha256:incorrect"), spec + ("discount" to 0.5))) {
+                assertFailsWith<IllegalArgumentException> {
+                    runner.run(node("nal.rule.admit"), mapOf("rules" to listOf(spec, bad)))
+                }
+                assertEquals(0, element.rules.size)
+                assertTrue(ledger.isEmpty())
+            }
+            val temporal = runner.run(node("nal.rule.admit"), mapOf("rules" to listOf(
+                (spec - "ruleCid") + ("copula" to "=/>"))))
+            assertEquals(0, temporal["admitted"])
+            assertEquals(1, temporal["rejected"])
+            assertTrue(ledger.isEmpty())
+            val out = runner.run(node("nal.rule.admit"), mapOf("rules" to listOf(spec)))
+            assertEquals(listOf(rule.ruleCid.value), out["ruleCids"])
+            assertEquals(rule, element.rules[0])
+            assertEquals(listOf(rule), ledger)
+            assertEquals(0, runner.run(node("nal.rule.admit", mapOf("antecedent" to "x", "consequent" to "y")),
+                mapOf("rules" to emptyList<Any?>()))["admitted"])
+        } finally { element.drain(); bag.drain() }
+    }
 
     private fun node(type: String, params: Map<String, String> = emptyMap()) =
         LcncNode(id = "n", type = type, params = params)

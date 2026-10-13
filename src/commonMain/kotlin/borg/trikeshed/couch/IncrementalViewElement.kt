@@ -9,6 +9,8 @@ import borg.trikeshed.lib.cascade.Trie
 import borg.trikeshed.lib.cascade.cascadeWorthCaching
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
+import borg.trikeshed.lib.size
+import borg.trikeshed.lib.view
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -79,9 +81,9 @@ class IncrementalViewElement(
 
     /** Pull only frames after the persisted checkpoint. Safe and idempotent. */
     suspend fun drainFrames() {
-        val frames = db.framesSince(nextSeq)
-        if (frames.isEmpty()) return
-        for (frame in frames) {
+        val frames = db.store.changes.afterSequence(nextSeq - 1)
+        if (frames.size == 0) return
+        for (frame in frames.view) {
             framesDrained++
             if (!frame.docId.startsWith("_design/")) apply(frame)
             nextSeq = frame.sequence + 1

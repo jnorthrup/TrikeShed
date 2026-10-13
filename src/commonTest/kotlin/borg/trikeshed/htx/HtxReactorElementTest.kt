@@ -1,8 +1,8 @@
 package borg.trikeshed.htx
 
 import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.jules.BrainClient
-import borg.trikeshed.jules.BrainNoRoute
+import borg.trikeshed.modelmux.BrainClient
+import borg.trikeshed.modelmux.BrainNoRoute
 import borg.trikeshed.reactor.TlsChannelFrame
 import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.reactor.TlsCodecResult

@@ -124,7 +124,7 @@ class NlpcoreAxiomaticsTest {
     }
 
     @Test
-    fun negatedCausalVerbIsRefused() {
+    fun negatedCausalVerbRetainsNegativeEvidenceAndSource() {
         val text = "Smoke does not cause fire."
         val doc = document(text, listOf(
             Triple("Smoke", "smoke", "NN"), Triple("does", "do", "VBZ"), Triple("not", "not", "RB"),
@@ -133,7 +133,11 @@ class NlpcoreAxiomaticsTest {
             NlpDependency(0, 4, "root"), NlpDependency(4, 1, "nsubj"), NlpDependency(4, 2, "aux"),
             NlpDependency(4, 3, "advmod"), NlpDependency(4, 5, "obj"), NlpDependency(4, 6, "punct"),
         ))
-        assertEquals(0, NlpcoreAxiomatics.recognize(doc).size)
+        val axioms = NlpcoreAxiomatics.recognize(doc, "source-negative")
+        assertEquals(1, axioms.size)
+        assertEquals(EternalRule("Smoke", "fire", NalCopula.IMPLICATION,
+            EvidenceCoord(0L, 900L), "source-negative"), axioms[0].rule)
+        assertEquals(text, text.substring(axioms[0].begin, axioms[0].end))
     }
 
     @Test

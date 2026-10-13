@@ -1,6 +1,7 @@
 package borg.trikeshed.sleeve
 
 import borg.trikeshed.pointcut.VmFacet
+import borg.trikeshed.isam.synchronizedLock
 
 /**
  * The agent sleeves this repo maintains.
@@ -133,18 +134,41 @@ object AgentSleeveRegistry {
         traps = boundTraps("ohmypi"),
     )
 
-    val ALL: List<AgentSleeveManifest> = listOf(HERMES, PI, OHMYPI)
+    private val declared = listOf(HERMES, PI, OHMYPI)
+    private val observed = LinkedHashMap<String, AgentSleeveManifest>()
+    private val gate = Any()
 
-    fun byId(id: String): AgentSleeveManifest? = ALL.firstOrNull { it.id == id }
+    /** One current observation per sleeve; later attempts replace its prior verdict and traps. */
+    fun record(manifest: AgentSleeveManifest) = synchronizedLock(gate) {
+        require(manifest.id.isNotBlank()) { "Sleeve observation requires an identity" }
+        observed[manifest.id] = manifest
+    }
+
+    /** Release an observed override; declared sleeves keep their original manifest. */
+    fun clear(id: String) = synchronizedLock(gate) { observed.remove(id) }
+
+    val ALL: List<AgentSleeveManifest> get() = synchronizedLock(gate) {
+        val all = LinkedHashMap<String, AgentSleeveManifest>()
+        for (manifest in declared) all[manifest.id] = manifest
+        all.putAll(observed)
+        all.values.toList()
+    }
+
+    fun byId(id: String): AgentSleeveManifest? = synchronizedLock(gate) {
+        observed[id] ?: declared.firstOrNull { it.id == id }
+    }
 
     /** Board-level roll-up: one RED sleeve makes the polyglot fleet RED. */
-    fun summarize(): Map<String, Any?> = mapOf(
-        "sleeves" to ALL.map { it.toMap() },
-        "allGreen" to ALL.all { it.isGreen },
-        "anyRed" to ALL.any { it.isRed },
-        "unresolvedTraps" to ALL.sumOf { it.unresolved.size },
-        "uncatchable" to ALL.sumOf { m -> m.unresolved.count { it.catchability == TrapCatchability.HOST_UNCATCHABLE } },
-    )
+    fun summarize(): Map<String, Any?> {
+        val all = ALL
+        return mapOf(
+            "sleeves" to all.map { it.toMap() },
+            "allGreen" to all.all { it.isGreen },
+            "anyRed" to all.any { it.isRed },
+            "unresolvedTraps" to all.sumOf { it.unresolved.size },
+            "uncatchable" to all.sumOf { m -> m.unresolved.count { it.catchability == TrapCatchability.HOST_UNCATCHABLE } },
+        )
+    }
 
     /**
      * The four bounds a guest meets before it meets anything specific to itself. Seeded UNRESOLVED: they

@@ -57,6 +57,10 @@ class JvmFileOperations : FileOperations {
 
     private fun pathOf(filename: String): Path = Paths.get(filename)
 
+    override fun move(source: String, destination: String) {
+        NioFiles.move(pathOf(source), pathOf(destination))
+    }
+
     override fun open(path: String, readOnly: Boolean): Int {
         val flags: Set<OpenOption> = if (readOnly) {
             EnumSet.of(StandardOpenOption.READ)

@@ -519,6 +519,8 @@ class KanbanModule : ForgeModule {
         // the vocabulary tuples come from one network and one bank however many publishers exist.
         val publisher = borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments, ctx.rete, ctx.kifBank)
         val runs = LcncRunService(ctx, store, runFacts, publisher::vocabulary)
+        val workspace = WorkspaceService(ctx, publisher::vocabulary)
+        ctx.routes.claim(id, "/api/lcnc/workspace") { method, _, text, _ -> workspace.route(method, rawBody(text)) }
         val archives = ArchiveService(ctx.casStore)
         // Three literal claims, not a loop over an interpolated path: the route-manifest parity
         // scan reads literals, and an interpolation is a route the gate cannot see.

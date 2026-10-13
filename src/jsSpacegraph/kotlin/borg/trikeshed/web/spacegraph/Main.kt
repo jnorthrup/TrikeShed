@@ -23,6 +23,7 @@ private fun boot() {
     p.camera.install()
     wire(p)
     val ws = SpaceGraphWorkspace(p); p.workspace = ws; ws.install()
+    p.facets.install()
     exposeWindow(p)
     // The BLACKBOARD: a delta on the vocabulary entry re-hydrates the palette from what is on the board.
     try {
@@ -67,9 +68,9 @@ private suspend fun start(p: Panels) {
     if (bookmark != null) p.camera.restoreCameraView(bookmark)
     else if (!qload.isNullOrEmpty()) p.fit()
     p.applyView(); window.requestAnimationFrame { p.redraw() }
-    // arm sources and run once immediately — a freshly loaded panel shows LIVE state on first paint
-    p.armSources()
-    p.runAll(null)
+    // The ops board remains live; constructions requiring oversight wait for Run.
+    p.armSources(automatic = true)
+    p.runAll(null, automatic = true)
 }
 
 /** the default construction is the PRODUCTION OPS BOARD: live system state, not an aspirational plan */
@@ -207,7 +208,7 @@ private fun wire(p: Panels) {
             val resp = fetchJs("/api/panels/$name")
             if (!truthy(resp.ok)) { p.status("load failed: " + str(resp.status)); return@launchJs }
             p.load(awaitJs(resp.json()))
-            p.armSources(); launchJs { p.runAll(null) }
+            p.armSources(automatic = true); launchJs { p.runAll(null, automatic = true) }
             p.status("loaded panels/$name")
             p.syncBoard(name)
         }
@@ -221,7 +222,7 @@ private fun wire(p: Panels) {
     on(byId("importBtn"), "click", { byId("fileIn").click() })
     on(byId("fileIn"), "change", { e ->
         val f = e.target.files[0]
-        if (f != null) launchJs { p.load(JSON.parse(str(awaitJs(f.text())))); p.armSources(); p.runAll(null) }
+        if (f != null) launchJs { p.load(JSON.parse(str(awaitJs(f.text())))); p.armSources(automatic = true); p.runAll(null, automatic = true) }
     })
     on(byId("clearBtn"), "click", { if (window.confirm("clear the panel?")) p.load(objOf { it.nodes = jsArray(); it.wires = jsArray() }) })
     on(byId("paletteBtn"), "click", { byId("palette").classList.toggle("open") })

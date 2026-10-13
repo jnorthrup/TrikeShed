@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import keymux.CouchKeyStore
 import keymux.KeyMux
 import modelmux.ModelMux

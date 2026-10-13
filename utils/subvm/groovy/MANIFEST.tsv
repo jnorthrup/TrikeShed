@@ -1,0 +1,7 @@
+# guest module	groovy
+# declared	org.apache.groovy:groovy:5.0.2
+# declared	org.apache.groovy:groovy-json:5.0.2
+# resolved	2 jars	8196452 bytes
+file	size	sha256
+groovy-5.0.2.jar	8057697	1177a82e357b401a1fcbd401fa2aececbecd65b774f0c29bb517b95e1930a909
+groovy-json-5.0.2.jar	138755	290b871527020d42761ca12820a28dfa823c0883b27b6ace833b9ec17d95f02c

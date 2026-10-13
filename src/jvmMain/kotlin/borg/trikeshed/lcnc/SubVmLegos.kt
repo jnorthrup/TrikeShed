@@ -2,6 +2,9 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyStrict
+import borg.trikeshed.graal.subvm.VmLanguages
+import borg.trikeshed.vm.*
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -33,6 +36,7 @@ object SubVmLegos {
     const val CAMEL = "vm.camel"
     const val CAMEL_CATALOG = "vm.camel.catalog"
     const val GRAALCE = "vm.graalce"
+    const val POLYGLOT = "vm.polyglot"
     const val MODULES = "vm.modules"
 
     /**
@@ -46,6 +50,7 @@ object SubVmLegos {
         ctx.lcncRunners[CORENLP] = corenlp(host)
         ctx.lcncRunners[CAMEL] = camel(host)
         ctx.lcncRunners[GRAALCE] = graalce(host)
+        ctx.lcncRunners[POLYGLOT] = polyglot(host)
         ctx.lcncRunners[CORENLP_EXTRACT] = corenlpExtract(host)
         ctx.lcncRunners[MODULES] = modules()
         ctx.lcncRunners[CAMEL_CATALOG] = camelCatalog()
@@ -371,9 +376,11 @@ object SubVmLegos {
         }
         // Body to dispatch through the route. Without one the lego only proves the context
         // starts; with one it proves the route actually carries a message end to end.
-        val body = inputStrings(node, inputs, key = "body").joinToString("\n")
-            .ifEmpty { node.params["body"] ?: "" }
-        fun q(s: String) = s.replace("\\", "\\\\").replace("'", "\\'")
+        val hasMessages = "messages" in inputs || "messages?" in inputs
+        val body = if (hasMessages) jsonOf(vmLanguageValue(VmRuntimeNodes.value(node, inputs, "messages")).languageValue())
+            else inputStrings(node, inputs, key = "body").joinToString("\n")
+                .ifEmpty { node.params["body"] ?: "" }
+        fun q(s: String) = jsonOf(s)
         val script = buildString {
             // GraalJS, not Groovy. The previous body was Java/Groovy source — bare `new
             // org.apache.camel...` and an anonymous `RouteBuilder(){ void configure() }` subclass —
@@ -389,22 +396,29 @@ object SubVmLegos {
             appendLine("var DefaultCamelContext = Java.type('org.apache.camel.impl.DefaultCamelContext')")
             appendLine("var RouteBuilder = Java.type('org.apache.camel.builder.RouteBuilder')")
             appendLine("var ctx = new DefaultCamelContext()")
-            appendLine("RouteBuilder.addRoutes(ctx, function (rb) { rb.from('${q(from)}').to('${q(to)}') })")
-            appendLine("ctx.start()")
+            appendLine("var tpl = null")
             appendLine("var reply = null")
-            if (body.isNotEmpty()) {
+            appendLine("var RESULT")
+            appendLine("try {")
+            appendLine("RouteBuilder.addRoutes(ctx, function (rb) { rb.from(${q(from)}).to(${q(to)}) })")
+            appendLine("ctx.start()")
+            if (hasMessages || body.isNotEmpty()) {
                 // GUEST_TEXT carries the body as a JSON-quoted literal (see evalInVmText).
-                appendLine("var tpl = ctx.createProducerTemplate()")
-                appendLine("reply = String(tpl.requestBody('${q(from)}', GUEST_TEXT, Java.type('java.lang.String').class))")
+                appendLine("tpl = ctx.createProducerTemplate()")
+                appendLine("reply = String(tpl.requestBody(${q(from)}, GUEST_TEXT, Java.type('java.lang.String').class))")
             }
             appendLine("var names = []")
             appendLine("for (var i = 0; i < ctx.getRoutes().size(); i++) names.push(ctx.getRoutes().get(i).getId())")
-            appendLine("var RESULT = JSON.stringify({ status: String(ctx.getStatus()), routes: names, from: '${q(from)}', to: '${q(to)}', reply: reply })")
-            appendLine("ctx.stop()")
+            appendLine("RESULT = JSON.stringify({ status: String(ctx.getStatus()), routes: names, from: ${q(from)}, to: ${q(to)}, reply: reply })")
+            appendLine("} finally { try { if (tpl !== null) tpl.stop() } finally { ctx.stop() } }")
             appendLine("print(RESULT)")
             appendLine("RESULT")
         }
-        evalInVmText(service.value, node, facet, script, body, inputs, defaultModule = "camel")
+        val result = evalInVmText(service.value, node, facet, script, body, inputs, defaultModule = "camel")
+        val receipt = requireNotNull(reifyStrict(result.getValue("text") as String) as? Map<*, *>) {
+            "Camel did not return a route receipt"
+        }
+        result + mapOf("routed" to (receipt["reply"] ?: ""), "ok" to true, "error" to "")
     }
 
     // ── graalce: any Graal language, source spelled inline ──────────────
@@ -413,6 +427,48 @@ object SubVmLegos {
         val facet = facetOf(node, default = "GRAAL_JS")
         val source = VmRuntimeNodes.string(node, inputs, "source", allowBlank = true)
         evalInVm(service.value, node, facet, source, inputs)
+    }
+
+    /** A typed function invocation owns its guest; reusable workspaces use the vm.* lifecycle nodes. */
+    fun polyglot(host: VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
+        require(listOf("vmId", "keep").none { key ->
+            key in inputs || "$key?" in inputs || key in node.params || "in:$key" in node.params
+        }) { "$POLYGLOT owns a temporary guest; vmId and keep are not supported" }
+        val language = requireNotNull(VmLanguage.of(VmRuntimeNodes.string(node, inputs, "language", "js"))) {
+            "Unknown VM language"
+        }
+        VmLanguages.require(service.value, language)
+        val program = VmLanguageProgram(language, VmRuntimeNodes.string(node, inputs, "source"),
+            VmValueKind.of(VmRuntimeNodes.string(node, inputs, "inputKind", "JSON")),
+            VmValueKind.of(VmRuntimeNodes.string(node, inputs, "outputKind", "JSON")))
+        val trust = VmRuntimeNodes.trust(node, inputs)
+        val budget = VmRuntimeNodes.budget(node, inputs)
+        language.validate(trust, budget)
+        program.declaration(budget, node.id)
+        val raw = if ("input" in inputs || "input?" in inputs) VmRuntimeNodes.value(node, inputs, "input")
+            else (node.params["in:input"] ?: node.params["input"])?.let(::reifyStrict)
+        val input = program.inputKind.validate(vmLanguageValue(raw))
+        val spec = VmSpec("lcnc:${UUID.randomUUID()}", requireNotNull(language.facet),
+            trust = trust, budget = budget, module = language.module)
+        currentCoroutineContext().ensureActive()
+        var failure: Throwable? = null
+        try {
+            val handle = service.value.spawn(spec)
+            val result = program.evaluate(handle, input, node.id, budget)
+            currentCoroutineContext().ensureActive()
+            mapOf("value" to result.languageValue(), "text" to result.canonical(),
+                "language" to language.id, "facet" to handle.facet.id, "vmId" to spec.id, "cid" to result.cid.value)
+        } catch (t: Throwable) {
+            failure = t
+            throw t
+        } finally {
+            try { service.value.revoke(spec.id, "lcnc invocation closed") }
+            catch (cleanup: Throwable) {
+                val original = failure
+                if (original == null) throw cleanup
+                if (cleanup !== original) original.addSuppressed(cleanup)
+            }
+        }
     }
 
     // ── shared eval path ────────────────────────────────────────────────
@@ -453,7 +509,7 @@ object SubVmLegos {
         val world = VmRuntimeNodes.strings(node, inputs, "world")
         // `module` names the guest classpath this lego needs (utils/subvm/<module>). An explicit
         // param wins so a canvas can point a lego at a different build of the same library.
-        val module = node.params["module"] ?: defaultModule
+        val module = node.params["module"]?.takeIf { it.isNotBlank() } ?: defaultModule
         if (module != null && !borg.trikeshed.graal.subvm.GuestModules.isInstalled(module)) {
             // Fail HERE, with the command that fixes it, rather than as a ClassNotFoundException
             // thrown from inside a guest script where the cause is invisible.

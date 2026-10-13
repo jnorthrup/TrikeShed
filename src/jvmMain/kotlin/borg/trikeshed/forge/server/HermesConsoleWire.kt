@@ -4,6 +4,7 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.hermes.HermesVmConsole
+import borg.trikeshed.hermes.HermesConsoleElement
 import borg.trikeshed.lcnc.media.ManualMediaInput
 import borg.trikeshed.lcnc.media.toMap
 import borg.trikeshed.lib.view
@@ -13,25 +14,44 @@ import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /** HTTP/SSE control surface for the real supervised Hermes VM xterm-256color panel. */
 class HermesConsoleWire(
     private val console: HermesVmConsole,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) {
-    private val commands = Channel<ManualMediaInput>(capacity = 64)
+    private val commands = HermesConsoleElement(
+        CoroutineScope(scope.coroutineContext + Dispatchers.IO),
+        open = { console.open() },
+        execute = { console.execute(it, echo = false) },
+        failed = { command, failure ->
+            if (command != null) console.reject(command, failure.message ?: "console execution failed")
+        },
+    )
+    private val draining = Mutex()
+    private var closed = false
 
     init {
-        scope.launch(Dispatchers.IO) {
-            // A typed line has already echoed itself through the panel, so the turn must not echo again.
-            for (command in commands) console.execute(command, echo = false)
-        }
         // The server-side line editor submits here, so a keystroke POST returns before the turn runs.
         console.commandSink = { accepted ->
-            if (commands.trySend(accepted).isFailure) console.reject(accepted, "console command queue full or closed")
+            if (!commands.submit(accepted)) console.reject(accepted, "console command queue full or closed")
+        }
+    }
+
+    fun open(): Boolean = commands.open()
+
+    suspend fun drain() = withContext(NonCancellable) {
+        draining.withLock {
+            commands.drain()
+            if (!closed) {
+                console.close()
+                closed = true
+            }
         }
     }
 
@@ -47,12 +67,15 @@ class HermesConsoleWire(
         respond: (suspend (ByteArray) -> Unit)?,
     ): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
+        if (method == "POST" && p.startsWith("/api/hermes/terminal") && !commands.accepting) {
+            return json(503, mapOf("error" to "console draining or closed"))
+        }
         return when {
             method == "GET" && (p == "/hermes" || p == "/hermes/") -> page()
             method == "GET" && p == "/api/hermes/terminal" -> json(200, console.snapshotMap())
             method == "POST" && p == "/api/hermes/terminal/open" -> {
-                scope.launch(Dispatchers.IO) { console.open() }
-                json(202, mapOf("accepted" to true, "state" to console.state.name.lowercase()))
+                if (open()) json(202, mapOf("accepted" to true, "state" to console.state.name.lowercase()))
+                else json(503, mapOf("error" to "console command queue full or closed"))
             }
             method == "POST" && p == "/api/hermes/terminal/input" -> input(parse(text))
             method == "POST" && p == "/api/hermes/terminal/resize" -> {
@@ -76,7 +99,7 @@ class HermesConsoleWire(
             val accepted = runCatching { console.prepareCommand(command) }.getOrElse {
                 return json(400, mapOf("error" to (it.message ?: "invalid command")))
             }
-            if (commands.trySend(accepted).isFailure) {
+            if (!commands.submit(accepted)) {
                 console.reject(accepted, "console command queue full or closed")
                 return json(503, mapOf("error" to "console command channel closed"))
             }

@@ -71,6 +71,20 @@ object LcncPresets {
             tweakFirst = "The timer's seconds, to poll faster or slower.",
         ),
         LcncPresetInfo(
+            "preset-norms", "Review repeated obligations",
+            does = "Compares obligations across text sections and revises their standing as statements recur or conflict.",
+            needs = "The shared language parser and belief bank; no model provider key.",
+            see = "The obligations extracted from the sample and their revised evidence.",
+            tweakFirst = "The sample paragraphs, then the promotion threshold.",
+        ),
+        LcncPresetInfo(
+            "preset-constellation", "Compare related records",
+            does = "Curates related editions and wiki records together, follows unresolved premises, and routes resulting tasks onto the board.",
+            needs = "The document curator, shared belief bank, wiki and board services; the proposal branch also needs a model provider key.",
+            see = "Shared and conflicting obligations, inherited answers, task changes and a proposal when questions remain open.",
+            tweakFirst = "The source records and named collections. Inspect the task and proposal branches before running.",
+        ),
+        LcncPresetInfo(
             "preset-tribunal", "Three-model debate",
             does = "One model argues a motion, a second rebuts it, a third weighs the record and rules.",
             needs = "A model provider key.",
@@ -215,7 +229,7 @@ object LcncPresets {
             see = "A per-module verdict, and the mismatches if there are any.",
             tweakFirst = "Nothing — read it first; it only reports.",
         ),
-    )
+    ) + LcncWorkspacePresets.catalog
 
     /**
      * TURBOHAUL, AS AN ORG CHART — a STRAWMAN, not a release.
@@ -362,7 +376,7 @@ object LcncPresets {
         "preset-bughunter" to bughunter(),
         "preset-subvm-audit" to subvmAudit(),
         "preset-turbohaul" to turbohaul(),
-    )
+    ) + LcncWorkspacePresets.documents()
 
     // ── legal council: the default 3x5 convening, fully drawn ────────────
     // The can and the atoms are the same substance: this preset IS

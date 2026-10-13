@@ -8,12 +8,14 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.lib.*
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
+import borg.trikeshed.graal.subvm.PythonWheels
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.parse.yaml.YamlParser
 import borg.trikeshed.vm.Teleported
 import java.nio.file.Files
 import java.nio.file.Path
 import java.io.OutputStream
+import kotlinx.coroutines.CoroutineScope
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
@@ -63,6 +65,7 @@ data class HermesPythonModule(
     }
 
     val blockedBy: Set<String> get() = nativeBlocks + transitiveBlocks
+    val origin: String get() = if (sleeved) "sleeve" else if (relativePath.startsWith("wheel:")) "wheel" else "upstream"
     val sourceSpineCid: String get() = LineCas.spineCid(LineCas.spine(source)).hex
 }
 
@@ -83,6 +86,7 @@ data class HermesPortInventory(
     val upstreamSpineCid: String,
     val sleeveSpineCid: String,
     val sleeveRoot: Path? = null,
+    val dependencies: PythonWheels? = null,
 ) {
     val ready: Int get() = modules.values.count { it.status == HermesModuleStatus.READY }
     val blockedNative: Int get() = modules.values.count { it.status == HermesModuleStatus.BLOCKED_NATIVE }
@@ -99,7 +103,7 @@ data class HermesPortInventory(
                 if (blocked in banlist) roots.add(blocked)
             }
             if (roots.isEmpty()) {
-                facts += HermesOntologyFact(HermesOntologyKind.READY, if (module.sleeved) "sleeve" else "upstream", module.name)
+                facts += HermesOntologyFact(HermesOntologyKind.READY, module.origin, module.name)
             } else {
                 for (blocker in roots) {
                     facts += HermesOntologyFact(HermesOntologyKind.BLOCKED, blocker, module.name)
@@ -150,6 +154,9 @@ data class HermesPortInventory(
         "sleeveRoot" to sleeveRoot?.toString(),
         "upstreamSpineCid" to upstreamSpineCid,
         "sleeveSpineCid" to sleeveSpineCid,
+        "dependencies" to dependencies?.manifest?.entries?.map {
+            mapOf("file" to it.file, "bytes" to it.size, "sha256" to it.sha256)
+        }.orEmpty(),
         "summary" to mapOf(
             "modules" to modules.size,
             "ready" to ready,
@@ -165,7 +172,7 @@ data class HermesPortInventory(
                 "name" to module.name,
                 "path" to module.relativePath,
                 "status" to module.status.name.lowercase(),
-                "origin" to if (module.sleeved) "sleeve" else "upstream",
+                "origin" to module.origin,
                 "sourceSpineCid" to module.sourceSpineCid,
                 "imports" to module.imports.sorted(),
                 "deferredImports" to module.deferredImports.sorted(),
@@ -208,14 +215,18 @@ class HermesPythonPort(
     private val error: OutputStream? = output,
     /** THE PEN (HermesPenDelegates): installed beside the import waist when leased. */
     private val pen: HermesPen? = null,
+    private val socketScope: CoroutineScope? = null,
+    /** Host-owned services installed before source imports, under the existing guest bounds. */
+    private val install: (GraalBtrfsSupervisor) -> Unit = {},
 ) : AutoCloseable {
     private var isolate: GraalBtrfsSupervisor? = null
+    private var isolateSockets: HermesSocketProvider? = null
 
     fun inventory(root: Path, sleeveRoot: Path? = null): HermesPortInventory {
         require(Files.isDirectory(root)) { "Hermes source root is not a directory: $root" }
         val upstream = readSources(root)
         val sleeve = sleeveRoot?.takeIf(Files::isDirectory)?.let { readSources(it, "sleeve:") }.orEmpty()
-        return inventorySources(upstream, root, sleeve, sleeveRoot)
+        return inventorySources(upstream, root, sleeve, sleeveRoot, PythonWheels.installed())
     }
 
     private fun readSources(root: Path, displayPrefix: String = ""): Map<String, Pair<String, String>> {
@@ -234,10 +245,37 @@ class HermesPythonPort(
         root: Path? = null,
         sleeveSources: Map<String, Pair<String, String>> = emptyMap(),
         sleeveRoot: Path? = null,
+        dependencies: PythonWheels? = null,
     ): HermesPortInventory {
-        val combined = LinkedHashMap(sources).apply { putAll(sleeveSources) }
+        val dependencySources = dependencies?.sources.orEmpty()
+        require(dependencySources.keys.none { it in sources || it in sleeveSources }) { "Python dependency shadows an upstream or sleeve module" }
+        val supplied = if (pen == null) sleeveSources else LinkedHashMap(sleeveSources).apply {
+            if (HermesContextVars.MODULE !in sources && HermesContextVars.MODULE !in this &&
+                HermesContextVars.MODULE !in dependencySources) {
+                put(HermesContextVars.MODULE, "sleeve:contextvars.py" to HermesContextVars.source)
+            }
+            if (GUEST_PRELUDE !in sources && GUEST_PRELUDE !in this) {
+                require(GUEST_PRELUDE !in dependencySources) { "Hermes guest prelude is host-owned" }
+                put(GUEST_PRELUDE, "sleeve:$GUEST_PRELUDE.py" to HermesGuestPrelude.source(socketScope != null))
+            }
+            require(HermesModelProvider.MODULE !in sources && HermesModelProvider.MODULE !in this && HermesModelProvider.MODULE !in dependencySources) {
+                "Hermes model transport module is host-owned: ${HermesModelProvider.MODULE}"
+            }
+            put(HermesModelProvider.MODULE, "sleeve:${HermesModelProvider.MODULE}.py" to HermesModelProvider.source)
+            if (socketScope != null) {
+                require(HermesSocketProvider.MODULE !in sources && HermesSocketProvider.MODULE !in this && HermesSocketProvider.MODULE !in dependencySources) {
+                    "Hermes socket transport module is host-owned: ${HermesSocketProvider.MODULE}"
+                }
+                put(HermesSocketProvider.MODULE, "sleeve:socket.py" to HermesSocketProvider.source)
+                require(HermesTlsProvider.MODULE !in sources && HermesTlsProvider.MODULE !in this && HermesTlsProvider.MODULE !in dependencySources) {
+                    "Hermes TLS transport module is host-owned: ${HermesTlsProvider.MODULE}"
+                }
+                put(HermesTlsProvider.MODULE, "sleeve:ssl.py" to HermesTlsProvider.source)
+            }
+        }
+        val combined = LinkedHashMap(dependencySources).apply { putAll(sources); putAll(supplied) }
         val names = combined.keys
-        val sleevedNames = sleeveSources.keys
+        val sleevedNames = supplied.keys
         var modules = combined.mapValues { (name, value) ->
             val (relative, source) = value
             val scan = importsOf(name, source, relative.endsWith("/__init__.py"), names)
@@ -277,17 +315,19 @@ class HermesPythonPort(
             modules = modules,
             banlist = banlist,
             upstreamSpineCid = corpusSpineCid(sources),
-            sleeveSpineCid = corpusSpineCid(sleeveSources),
+            sleeveSpineCid = corpusSpineCid(supplied),
             sleeveRoot = sleeveRoot,
+            dependencies = dependencies,
         ).also(::projectInventory)
     }
 
-    /** Import one READY module in a GraalPy isolate with IO, processes, host classes and native access disabled. */
+    /** Replace the owned VM only after a READY module imports successfully; a failed candidate is closed. */
     fun importInVm(inventory: HermesPortInventory, entry: String): Teleported {
         val module = inventory.modules[entry] ?: error("Hermes module not found: $entry")
         require(module.status == HermesModuleStatus.READY) {
             "Hermes module $entry is ${module.status.name.lowercase()}: ${module.blockedBy.sorted().joinToString()}"
         }
+        val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
         val guest = GraalBtrfsSupervisor(
             id = "hermes-python",
             facet = VmFacet.GRAAL_PYTHON,
@@ -295,18 +335,36 @@ class HermesPythonPort(
             output = output,
             error = error,
         )
-        isolate = guest
-        for (candidate in inventory.modules.values) {
-            val modulePath = candidate.name.replace('.', '/') + if (candidate.packageModule) "/__init__.py" else ".py"
-            guest.put("/workspace/$modulePath", candidate.source.encodeToByteArray())
+        var sockets: HermesSocketProvider? = null
+        val result = try {
+            if (pen != null && socketScope != null) sockets = HermesSocketProvider(socketScope)
+            val imported = importInVm(guest, inventory, entry, baseline, sockets)
+            isolate?.close()
+            isolateSockets?.close()
+            imported
+        } catch (failure: Throwable) {
+            try { guest.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
+            try { sockets?.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
+            throw failure
         }
-        val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
-        check(guest.snapshot(baseline)) { "unable to snapshot Hermes Graal VFS baseline $baseline" }
+        isolate = guest
+        isolateSockets = sockets
         blackboard.put(
             "hermes/python/vfs",
             mapOf("backend" to "userspace-btrfs", "subvolume" to "live", "baseline" to baseline, "generation" to guest.vfs.generation()),
             "graal-python",
         )
+        return result
+    }
+
+    private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
+                           sockets: HermesSocketProvider?): Teleported {
+        for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) guest.put("/workspace/$path", bytes)
+        for (candidate in inventory.modules.values) {
+            val modulePath = candidate.name.replace('.', '/') + if (candidate.packageModule) "/__init__.py" else ".py"
+            guest.put("/workspace/$modulePath", candidate.source.encodeToByteArray())
+        }
+        check(guest.snapshot(baseline)) { "unable to snapshot Hermes Graal VFS baseline $baseline" }
         // A directory with no __init__.py is a PEP 420 namespace package on a real filesystem,
         // and Hermes leans on that: `plugins/platforms`, `plugins/browser`, `scripts` and friends
         // carry no __init__.py, so they never enter the inventory and every module beneath them
@@ -344,6 +402,11 @@ class HermesPythonPort(
             val suffix = if (candidate?.packageModule == true) "/__init__.py" else ".py"
             Teleported.Str("/workspace/${name.replace('.', '/')}$suffix")
         }
+        guest.delegate("distributions") {
+            Teleported.Arr(inventory.dependencies?.resources.orEmpty().keys
+                .filter { it.endsWith(".dist-info/METADATA") }
+                .sorted().map { Teleported.Str("/workspace/" + it.removeSuffix("/METADATA")) })
+        }
         guest.delegate("yaml_load") { args ->
             val text = (args.firstOrNull() as? Teleported.Str)?.v
                 ?: throw IllegalArgumentException("yaml_load requires text")
@@ -351,10 +414,15 @@ class HermesPythonPort(
         }
         guest.delegate("land") { args ->
             val name = (args.firstOrNull() as? Teleported.Str)?.v.orEmpty()
-            blackboard.put("hermes/python/pointcut/import/$name", mapOf("module" to name, "status" to "loaded"), "graal-python")
+            val status = (args.getOrNull(1) as? Teleported.Str)?.v ?: "loaded"
+            require(status in setOf("loading", "loaded", "failed", "refused")) { "invalid import status" }
+            val failure = (args.getOrNull(2) as? Teleported.Str)?.v
+            blackboard.put("hermes/python/pointcut/import/$name",
+                mapOf("module" to name, "status" to status, "error" to failure), "graal-python")
             Teleported.Null
         }
-        pen?.install(guest)
+        install(guest)
+        pen?.install(guest, sockets)
         guest.eval(IMPORTER_BOOTSTRAP, "hermes-blackboard-importer.py")
         // The prelude twins the capabilities the polyglot bounds withhold, and it has to run
         // before the guest binds them: stdlib `threading` copies `_thread.start_joinable_thread`
@@ -379,8 +447,10 @@ class HermesPythonPort(
         isolate?.eval(source, name) ?: error("Hermes VM has not been imported")
 
     override fun close() {
-        isolate?.close()
-        isolate = null
+        try { isolate?.close() } finally {
+            isolate = null
+            try { isolateSockets?.close() } finally { isolateSockets = null }
+        }
     }
 
     private fun projectInventory(inventory: HermesPortInventory) {
@@ -390,6 +460,7 @@ class HermesPythonPort(
                 mapOf(
                     "name" to module.name,
                     "path" to module.relativePath,
+                    "origin" to module.origin,
                     "status" to module.status.name.lowercase(),
                     "imports" to module.imports.sorted(),
                     "deferredImports" to module.deferredImports.sorted(),
@@ -530,14 +601,28 @@ class HermesPythonPort(
         private val IMPORTER_BOOTSTRAP = """
             import sys, importlib.abc, importlib.machinery, importlib.util
 
+            # This is the guest Btrfs directory, not a host site-packages path. Standard
+            # distribution discovery reads the verified wheels' .dist-info here.
+            if '/workspace' not in sys.path:
+                sys.path.append('/workspace')
+
             class _HermesBlackboardImporter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+                def namespace_spec(self, fullname, path=None):
+                    spec = importlib.machinery.ModuleSpec(fullname, None, is_package=True)
+                    spec.submodule_search_locations = ['/workspace/' + fullname.replace('.', '/')]
+                    return spec
+
                 def find_spec(self, fullname, path=None, target=None):
                     verdict = host.call('verdict', fullname)
                     if verdict.startswith('ban:'):
+                        host.call('land', fullname, 'refused', verdict[4:])
                         raise ImportError('native module banned in TrikeShed guest: ' + fullname + ': ' + verdict[4:])
                     if verdict == 'namespace':
                         # A directory with no __init__.py: PEP 420 shape, no source to execute.
-                        return importlib.machinery.ModuleSpec(fullname, None, is_package=True)
+                        from importlib._bootstrap_external import _NamespacePath
+                        spec = self.namespace_spec(fullname, path)
+                        spec.submodule_search_locations = _NamespacePath(fullname, spec.submodule_search_locations, self.namespace_spec)
+                        return spec
                     if verdict != 'allow':
                         return None
                     is_package = bool(host.call('is_package', fullname))
@@ -546,13 +631,44 @@ class HermesPythonPort(
                 def create_module(self, spec):
                     return None
 
+                def get_filename(self, fullname):
+                    return host.call('path', fullname)
+
+                def get_resource_reader(self, fullname):
+                    if not host.call('is_package', fullname):
+                        return None
+                    from importlib.resources.readers import FileReader
+                    return FileReader(importlib.machinery.SourceFileLoader(fullname, self.get_filename(fullname)))
+
+                def find_distributions(self, context=None):
+                    # Top-level Btrfs listings mask names. Discover only the verified
+                    # distribution paths, without disabling containment or inventing metadata.
+                    from importlib.metadata import DistributionFinder, PathDistribution
+                    from pathlib import Path
+                    import re
+                    if context is None:
+                        context = DistributionFinder.Context()
+                    if '/workspace' not in context.path:
+                        return
+                    def normalized(name):
+                        return re.sub(r'[-_.]+', '-', name).lower()
+                    for path in host.call('distributions'):
+                        distribution = PathDistribution(Path(path))
+                        if context.name is None or normalized(distribution.metadata['Name']) == normalized(context.name):
+                            yield distribution
+
                 def exec_module(self, module):
                     name = module.__name__
                     source = host.call('source', name)
                     module.__file__ = host.call('path', name)
                     module.__dict__['host'] = host
-                    host.call('land', name)
-                    exec(compile(source, module.__file__, 'exec'), module.__dict__)
+                    host.call('land', name, 'loading')
+                    try:
+                        exec(compile(source, module.__file__, 'exec'), module.__dict__)
+                    except BaseException as failure:
+                        host.call('land', name, 'failed', str(failure))
+                        raise
+                    host.call('land', name, 'loaded')
 
             sys.meta_path.insert(0, _HermesBlackboardImporter())
             True

@@ -2,7 +2,7 @@ package borg.trikeshed.lcnc.reduction
 
 import borg.trikeshed.parse.reify
 
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.reduction.TrajectoryOutcome
 import borg.trikeshed.reduction.TrajectoryReduction
 import borg.trikeshed.reduction.verdictFor
@@ -13,7 +13,7 @@ import kotlin.system.exitProcess
 /**
  * CLI entry point for TrajectoryReduction.
  *
- * Reads a JSON-encoded list of JulesCause from stdin and prints the verdict to stdout.
+ * Reads a JSON-encoded list of SessionCause from stdin and prints the verdict to stdout.
  * Uses reify (the confix JSON scan) for JSON parsing.
  *
  * Input format (stdin):
@@ -63,7 +63,7 @@ fun main(args: Array<String>) {
     }
 
     // Extract causes array
-    val causesList = mutableListOf<JulesCause>()
+    val causesList = mutableListOf<SessionCause>()
     val causesRaw = parsed["causes"]
     if (causesRaw is List<*>) {
         for (causeItem in causesRaw) {
@@ -113,7 +113,7 @@ fun main(args: Array<String>) {
 }
 
 /** Parse a single cause from a Map */
-private fun parseCause(causeItem: Any?): JulesCause? {
+private fun parseCause(causeItem: Any?): SessionCause? {
     if (causeItem !is Map<*, *>) return null
 
     val type = (causeItem["type"] ?: causeItem["kind"]) as? String ?: return null
@@ -123,22 +123,22 @@ private fun parseCause(causeItem: Any?): JulesCause? {
         "DrainApplied" -> {
             val sha = causeItem["commitSha"] as? String ?: ""
             val rejects = (causeItem["rejects"] as? Number)?.toInt() ?: 0
-            JulesCause.DrainApplied(sha, rejects, at)
+            SessionCause.DrainApplied(sha, rejects, at)
         }
         "DrainFailed" -> {
             val reason = causeItem["reason"] as? String ?: ""
-            JulesCause.DrainFailed(reason, at)
+            SessionCause.DrainFailed(reason, at)
         }
         "SessionFailed" -> {
             val reason = causeItem["reason"] as? String ?: ""
-            JulesCause.SessionFailed(reason, at)
+            SessionCause.SessionFailed(reason, at)
         }
         "PatchArrived" -> {
             val bytes = (causeItem["bytes"] as? Number)?.toLong() ?: 0L
-            JulesCause.PatchArrived(bytes, at)
+            SessionCause.PatchArrived(bytes, at)
         }
         "WorkQueued" -> {
-            JulesCause.WorkQueued(
+            SessionCause.WorkQueued(
                 workId = causeItem["workId"] as? String ?: "",
                 tier = causeItem["tier"] as? String ?: "task",
                 title = causeItem["title"] as? String ?: "",
@@ -149,7 +149,7 @@ private fun parseCause(causeItem: Any?): JulesCause? {
             )
         }
         "WorkDispatched" -> {
-            JulesCause.WorkDispatched(
+            SessionCause.WorkDispatched(
                 workId = causeItem["workId"] as? String ?: "",
                 sessionId = causeItem["sessionId"] as? String ?: "",
                 attempt = (causeItem["attempt"] as? Number)?.toInt() ?: 1,
@@ -157,7 +157,7 @@ private fun parseCause(causeItem: Any?): JulesCause? {
             )
         }
         "WorkDrained" -> {
-            JulesCause.WorkDrained(
+            SessionCause.WorkDrained(
                 workId = causeItem["workId"] as? String ?: "",
                 sessionId = causeItem["sessionId"] as? String ?: "",
                 commitSha = causeItem["commitSha"] as? String ?: "",
@@ -204,7 +204,7 @@ private fun renderDashboard(json: String) {
         return
     }
 
-    val causesList = mutableListOf<JulesCause>()
+    val causesList = mutableListOf<SessionCause>()
     val causesRaw = parsed["causes"]
     if (causesRaw is List<*>) {
         for (causeItem in causesRaw) parseCause(causeItem)?.let { causesList.add(it) }
@@ -231,7 +231,7 @@ private fun renderDashboard(json: String) {
     val title = (parsed["title"] as? String)
         ?: run {
             val dir = File(System.getProperty("user.home"), ".local/forge")
-            val store = borg.trikeshed.utils.kanban.JulesBoardStore.forForgeDir(dir)
+            val store = borg.trikeshed.utils.kanban.SessionBoardStore.forForgeDir(dir)
             store.loadQueue().firstOrNull { it.workId == fingerprint }?.title
         }
         ?: fingerprint

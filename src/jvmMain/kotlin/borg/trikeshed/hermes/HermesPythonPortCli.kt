@@ -10,6 +10,7 @@ import borg.trikeshed.lib.view
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
+import kotlinx.coroutines.runBlocking
 
 object HermesPythonPortCli {
     @JvmStatic
@@ -25,16 +26,24 @@ object HermesPythonPortCli {
         if (consoleMode || command != null) {
             val columns = value(options, "--columns")?.toIntOrNull()?.coerceIn(20, 300) ?: 100
             val rows = value(options, "--rows")?.toIntOrNull()?.coerceIn(4, 120) ?: 32
-            HermesVmConsole(root, sleeve, columns, rows).use { console ->
-                console.open()
-                if (command != null) console.submit(command)
-                renderConsole(console)
-                if (consoleMode && command == null) {
-                    while (true) {
-                        val line = readlnOrNull() ?: break
-                        if (line == ":quit" || line == ":exit") break
-                        console.submit(line)
+            runBlocking {
+                HermesVmConsole(root, sleeve, columns, rows, socketScope = this).use { console ->
+                    if (console.open() != HermesVmConsole.State.READY) {
                         renderConsole(console)
+                        error("Hermes console boot failed: ${console.detail}")
+                    }
+                    val submitted = command?.let { console.submit(it) }
+                    renderConsole(console)
+                    if (submitted != null) check(console.panel.signals().view.any {
+                        it.causeSignalId == submitted.id && it.kind == "completed"
+                    }) { "Hermes console command failed; see its causal receipt above" }
+                    if (consoleMode && command == null) {
+                        while (true) {
+                            val line = readlnOrNull() ?: break
+                            if (line == ":quit" || line == ":exit") break
+                            console.submit(line)
+                            renderConsole(console)
+                        }
                     }
                 }
             }

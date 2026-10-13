@@ -48,6 +48,9 @@ class PointcutBlackboardAdapterTest {
                 propertyName = "head",
                 newValue = 42,
                 seq = 0,
+                sourcePath = "curation.py",
+                line = 12,
+                column = 5,
             )
         )
 
@@ -58,6 +61,10 @@ class PointcutBlackboardAdapterTest {
         assertTrue(bb.has(landing.key), "blackboard missing ${landing.key}")
         val stored = bb.get(landing.key) as PointcutBlackboardAdapter.PointcutLanding
         assertEquals(landing, stored)
+        assertEquals(mapOf("sourcePath" to "curation.py", "line" to 12, "column" to 5), stored.sourceFields())
+        assertEquals("curation.py", stored.toFields()["sourcePath"])
+        assertEquals(12, stored.toFields()["line"])
+        assertEquals(5, stored.toFields()["column"])
 
         // provenance language == VmFacet id
         val prov = bb.getProvenance(landing.key)
@@ -93,6 +100,7 @@ class PointcutBlackboardAdapterTest {
 
         assertEquals(PointcutMark.AfterGet.raw, landing.markRaw)
         assertEquals("js", bb.getProvenance(landing.key)?.language)
+        assertTrue(landing.sourceFields().isEmpty(), "unknown locations must not become fabricated source coordinates")
     }
 
     @Test

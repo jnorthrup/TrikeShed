@@ -511,6 +511,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
             cipherSuite = cipherSuite,
             peerCertificate = peerCertificate,
             verified = verified,
+            applicationProtocol = TlsApplicationProtocol.entries.firstOrNull { it.wireName == engine.applicationProtocol },
         )
     }
 
@@ -612,10 +613,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
         }
 
     private fun applicationProtocolNameOf(protocol: TlsApplicationProtocol): String =
-        when (protocol) {
-            TlsApplicationProtocol.H2 -> "h2"
-            TlsApplicationProtocol.HTTP_1_1 -> "http/1.1"
-        }
+        protocol.wireName
 
     private fun packetBufferSize(engine: SSLEngine): Int =
         engine.session?.packetBufferSize ?: 17 * 1024

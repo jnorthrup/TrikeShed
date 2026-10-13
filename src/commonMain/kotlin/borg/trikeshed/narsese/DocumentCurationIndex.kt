@@ -36,6 +36,12 @@ sealed class DocumentCurationIndexK<out R> : OpK<R>() {
     data object SentenceCursor : DocumentCurationIndexK<Cursor>()
     data object TokenCursor : DocumentCurationIndexK<(Int) -> Cursor>()
     data object DependencyCursor : DocumentCurationIndexK<(Int) -> Cursor>()
+    /** Model proposals remain unverified source-linked rows, not asserted facts. */
+    data object ProposalCursor : DocumentCurationIndexK<Cursor>()
+    data object SentenceColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
+    data object TokenColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
+    data object DependencyColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
+    data object ProposalColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
     data object Model : DocumentCurationIndexK<ModelResponse?>()
     data object ModelId : DocumentCurationIndexK<String?>()
     data object Proposals : DocumentCurationIndexK<Series<DocumentProposal>>()
@@ -135,6 +141,28 @@ private fun DocumentSource.curationIndex(
             }
         }
     }
+    val proposalCursor: Cursor = proposals.size j { ordinal: Int ->
+        val proposal = proposals[ordinal]
+        documentRow(proposalColumns) { column ->
+            when (column) {
+                DocumentIndexColumn.ORIGINAL_CID -> originalCid.value
+                DocumentIndexColumn.EXTRACTED_TEXT_CID -> extractedTextCid.value
+                DocumentIndexColumn.SUBJECT -> proposal.subject
+                DocumentIndexColumn.PREDICATE -> proposal.predicate
+                DocumentIndexColumn.OBJECT -> proposal.obj
+                DocumentIndexColumn.CONFIDENCE -> proposal.confidence
+                DocumentIndexColumn.POLARITY -> proposal.polarity
+                DocumentIndexColumn.MODALITY -> proposal.modality
+                DocumentIndexColumn.QUOTE -> proposal.quote
+                DocumentIndexColumn.BEGIN -> proposal.begin
+                DocumentIndexColumn.END -> proposal.end
+                DocumentIndexColumn.RECEIPT_CID -> proposal.receiptCid?.value
+                DocumentIndexColumn.QUOTATION_CID -> proposal.quotationReceiptCid?.value
+                DocumentIndexColumn.RAW -> proposal.raw
+                else -> error("Not a proposal column: $column")
+            }
+        }
+    }
     return sentences.size j { operation: Any ->
         when (operation) {
             DocumentCurationIndexK.Source -> source
@@ -152,6 +180,11 @@ private fun DocumentSource.curationIndex(
             DocumentCurationIndexK.SentenceCursor -> sentenceCursor
             DocumentCurationIndexK.TokenCursor -> tokenCursor
             DocumentCurationIndexK.DependencyCursor -> dependencyCursor
+            DocumentCurationIndexK.ProposalCursor -> proposalCursor
+            DocumentCurationIndexK.SentenceColumns -> sentenceColumns α { ColumnMeta(it.columnName, it.type) }
+            DocumentCurationIndexK.TokenColumns -> tokenColumns α { ColumnMeta(it.columnName, it.type) }
+            DocumentCurationIndexK.DependencyColumns -> dependencyColumns α { ColumnMeta(it.columnName, it.type) }
+            DocumentCurationIndexK.ProposalColumns -> proposalColumns α { ColumnMeta(it.columnName, it.type) }
             DocumentCurationIndexK.Model -> model
             DocumentCurationIndexK.ModelId -> modelId
             DocumentCurationIndexK.Proposals -> proposals
@@ -231,6 +264,16 @@ private enum class DocumentIndexColumn(val columnName: String, val type: IOMemen
     RELATION("relation", IOMemento.IoString),
     TOKENS("tokens", IOMemento.IoArray),
     DEPENDENCIES("dependencies", IOMemento.IoArray),
+    SUBJECT("subject", IOMemento.IoString),
+    PREDICATE("predicate", IOMemento.IoString),
+    OBJECT("object", IOMemento.IoString),
+    CONFIDENCE("modelConfidence", IOMemento.IoDouble),
+    POLARITY("polarity", IOMemento.IoBoolean),
+    MODALITY("modality", IOMemento.IoString),
+    QUOTE("quote", IOMemento.IoString),
+    RECEIPT_CID("receiptCid", IOMemento.IoString),
+    QUOTATION_CID("quotationReceiptCid", IOMemento.IoString),
+    RAW("raw", IOMemento.IoString),
 }
 
 private val sentenceColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
@@ -241,6 +284,11 @@ private val tokenColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexCol
     DocumentIndexColumn.WORD, DocumentIndexColumn.LEMMA, DocumentIndexColumn.TAG, DocumentIndexColumn.NER]
 private val dependencyColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
     DocumentIndexColumn.SENTENCE, DocumentIndexColumn.GOVERNOR, DocumentIndexColumn.DEPENDENT, DocumentIndexColumn.RELATION]
+private val proposalColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
+    DocumentIndexColumn.SUBJECT, DocumentIndexColumn.PREDICATE, DocumentIndexColumn.OBJECT,
+    DocumentIndexColumn.CONFIDENCE, DocumentIndexColumn.POLARITY, DocumentIndexColumn.MODALITY,
+    DocumentIndexColumn.QUOTE, DocumentIndexColumn.BEGIN, DocumentIndexColumn.END,
+    DocumentIndexColumn.RECEIPT_CID, DocumentIndexColumn.QUOTATION_CID, DocumentIndexColumn.RAW]
 
 private fun documentRow(columns: Series<DocumentIndexColumn>, value: (DocumentIndexColumn) -> Any?): RowVec =
     columns.size j { position: Int ->

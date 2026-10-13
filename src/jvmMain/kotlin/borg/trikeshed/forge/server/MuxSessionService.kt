@@ -4,7 +4,7 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
 import borg.trikeshed.litebike.JvmKanbanServer

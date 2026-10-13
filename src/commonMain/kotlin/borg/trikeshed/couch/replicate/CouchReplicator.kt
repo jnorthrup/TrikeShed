@@ -180,7 +180,7 @@ class CouchReplicator(
         var since = start
         var read = 0; var written = 0; var blobs = 0; var conflicts = 0; var undelivered = 0
         while (true) {
-            val frames = local.framesSince(since).take(batch)
+            val frames = local.framesSince(since, batch)
             if (frames.isEmpty()) break
             read += frames.size
             // The store exposes a head-only rev tree. Its historical log is not

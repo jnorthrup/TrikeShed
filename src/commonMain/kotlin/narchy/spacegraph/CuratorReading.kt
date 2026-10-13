@@ -10,6 +10,7 @@ package narchy.spacegraph
 object CuratorReading {
     fun html(v: Map<*, *>): String = buildString {
         fun esc(x: Any?) = (x ?: "").toString().replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace("'", "&#39;").replace("\"", "&quot;")
         fun list(x: Any?) = x as? List<*> ?: emptyList<Any?>()
         fun map(x: Any?) = x as? Map<*, *> ?: emptyMap<Any?, Any?>()
         fun pc(x: Any?) = ((x as? Number)?.toDouble() ?: 0.0).let { (it * 100).toInt() }
@@ -105,10 +106,34 @@ object CuratorReading {
                     val lineage = list(c["is"]).joinToString(" ⊂ ") { it.toString() }
                     append("<span title='").append(esc(lineage)).append("'>").append(esc(c["lemma"]))
                     c["class"]?.let { append(" <b>").append(esc(it)).append("</b>") }
-                    c["read"]?.let { append(" <s>").append(esc(it)).append("</s> <i>Jev ").append(pc(c["jev"])).append("%</i>") }
+                    c["read"]?.let { original ->
+                        if (original != c["class"]) append(" <s>").append(esc(original)).append("</s>")
+                    }
+                    when {
+                        c["by"] == "bert" -> append(" <i>BERT · 7/7 labels</i>")
+                        c["jev"] != null -> append(" <i>").append(esc(c["by"] ?: "Jev")).append(' ')
+                            .append(pc(c["jev"])).append("%</i>")
+                    }
                     append("</span>")
                 }
                 append("</p>")
+                for (c0 in concepts) {
+                    val c = map(c0); val bert = map(c["bert"])
+                    if (bert.isEmpty()) continue
+                    append("<details><summary>BERT · ").append(esc(c["lemma"])).append(" · ")
+                        .append(esc(bert["status"])).append("</summary>")
+                    append("<p>Sense propagation from retained labels, not a new Jev judgment.</p>")
+                    bert["model"]?.let { append("<p>").append(esc(it)).append("</p>") }
+                    bert["error"]?.let { append("<p class='opp'>").append(esc(it)).append("</p>") }
+                    append("<ol>")
+                    for (n0 in list(bert["neighbors"])) {
+                        val n = map(n0)
+                        append("<li>").append(esc(n["sense"])).append(" · cosine ").append(esc(n["cosine"]))
+                            .append("<br><small>").append(esc(n["source"])).append(" · ").append(esc(n["table"]))
+                            .append("</small></li>")
+                    }
+                    append("</ol></details>")
+                }
             }
             val entities = map(s["entities"])
             if (entities.isNotEmpty()) append("<p class='ent'>").append(entities.entries.joinToString(" · ") { (t, ws) -> esc(t) + ": " + esc(list(ws).joinToString(", ")) }).append("</p>")

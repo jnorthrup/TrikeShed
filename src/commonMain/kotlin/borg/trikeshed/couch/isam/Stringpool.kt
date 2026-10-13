@@ -6,6 +6,8 @@ import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.*
 import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.channels.FileChannel
+import kotlinx.coroutines.CoroutineScope
 
 /** Dense ids 0 until size over string keys: the id space of dictionary-coded ISAM columns and log templates. */
 interface Stringpool {
@@ -17,12 +19,21 @@ interface Stringpool {
 }
 
 /**
- * Keys persisted at [location] as a one-column meta-v2 ISAM file of zstd leaves (`zstd -d` yields the plain
- * fixed-width column); a key's id is its row. Lookup is a [FunnelHashIndex] over the rows present at open, then a
+ * Keys persisted at [location] as a one-column meta-v2 ISAM file of zstd leaves. The default is portable;
+ * an optional compression dictionary is named by CID in the file. A key's id is its row.
+ * Lookup is a [FunnelHashIndex] over the rows present at open, then a
  * [FunnelHashMap] of the keys put since; [put] appends one row. [width] fixes the key bytes when the pool is created.
  */
-class FileBackedStringpool(val location: String, width: Int = 64) : Stringpool {
-    val operations = UringIsamOperations(leafBytes = ISAM_LEAF_BYTES)
+class FileBackedStringpool internal constructor(
+    val location: String, width: Int, channels: IsamChannelFactory, leafCodec: IsamLeafCodec,
+) : Stringpool {
+    constructor(location: String, width: Int = 64, leafCodec: IsamLeafCodec = ZstdLeafCodec) :
+        this(location, width, ::openIsamChannel, leafCodec)
+
+    constructor(scope: CoroutineScope, location: String, width: Int = 64, leafCodec: IsamLeafCodec = ZstdLeafCodec) :
+        this(location, width, { path, options -> FileChannel.open(scope, path, options) }, leafCodec)
+
+    val operations = UringIsamOperations(channels, leafBytes = ISAM_LEAF_BYTES, leafCodec = leafCodec)
     val column: RecordMeta
     var keys: Array<String?>
     var size: Int
@@ -30,8 +41,8 @@ class FileBackedStringpool(val location: String, width: Int = 64) : Stringpool {
     val added = FunnelHashMap<String, Int>()
 
     init {
-        if (IsamFileOperations().exists("$location.meta")) {
-            val isam = IsamDataFile(location)
+        if (IsamFileOperations(channels).exists("$location.meta")) {
+            val isam = IsamDataFile(location, operations = operations)
             isam.open()
             try {
                 column = isam.metafile.constraints[0]

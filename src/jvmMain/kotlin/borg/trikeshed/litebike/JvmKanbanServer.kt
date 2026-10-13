@@ -180,9 +180,10 @@ class JvmKanbanServer(
             scope.launch {
                 try {
                     while (true) {
-                        // Workgroup reducers attach at this seam. Drain every
-                        // accepted claim now so production fanout has live workers.
-                        slot.consume()
+                        // Admission notifications only; the protocol worker owns
+                        // request handling below. The offer inbox belongs to the
+                        // dispatcher — consuming it here steals its pending claim.
+                        slot.consumeAccepted()
                     }
                 } catch (_: ClosedReceiveChannelException) {
                     // Fanout closed during structured shutdown.
@@ -440,8 +441,8 @@ class JvmKanbanServer(
                     body = cached.second
                 } else {
                     val surface = runCatching {
-                        borg.trikeshed.jules.ui.JulesBlackboardAdapter.evictExpired()
-                        val (_, surf, _) = borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface(
+                        borg.trikeshed.forge.blackboard.SessionBlackboardAdapter.evictExpired()
+                        val (_, surf, _) = borg.trikeshed.forge.blackboard.SessionBlackboardAdapter.projectFullSurface(
                             sessions = emptyList(),
                             activitiesBySession = emptyMap(),
                         )

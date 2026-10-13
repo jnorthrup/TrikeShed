@@ -1,0 +1,9 @@
+# guest module	clojure
+# declared	org.clojure:clojure:1.12.6
+# declared	org.clojure:data.json:2.5.2
+# resolved	4 jars	4880189 bytes
+file	size	sha256
+clojure-1.12.6.jar	4229040	21b578db389a8e74b286ce79c4a7f86ec641e26d88b12f18d69030916b0e18ca
+core.specs.alpha-0.4.74.jar	4306	eb73ac08cf49ba840c88ba67beef11336ca554333d9408808d78946e0feb9ddb
+data.json-2.5.2.jar	10200	0938c730961d32b331ea7e5cd7c6a822c0a889def79d1c3f2af4dd201fdddeb3
+spec.alpha-0.5.238.jar	636643	94cd99b6ea639641f37af4860a643b6ed399ee5a8be5d717cff0b663c8d75077

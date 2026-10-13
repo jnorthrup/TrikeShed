@@ -3,8 +3,31 @@ package borg.trikeshed.userspace.nio.channels.spi
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runInterruptible
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 
 class JvmProcessOperations : ProcessOperations {
+
+    override suspend fun open(command: String, args: List<String>, env: Map<String, String>): ProcessPipes {
+        validateCommand(listOf(command) + args)
+        var process: Process? = null
+        try {
+            return withContext(Dispatchers.IO) {
+                val builder = ProcessBuilder(command, *args.toTypedArray())
+                builder.environment().apply {
+                    clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env)
+                }
+                JvmProcessPipes(builder.start().also { process = it })
+            }
+        } catch (failure: Throwable) {
+            // withContext can reject delivery after start() succeeds. It still owns that child.
+            process?.let { JvmProcessPipes(it).close() }
+            throw failure
+        }
+    }
 
     private fun validateCommand(command: List<String>) {
         require(command.isNotEmpty()) { "Command list must not be empty" }
@@ -60,5 +83,41 @@ class JvmProcessOperations : ProcessOperations {
                 runCatching { proc.errorStream.close() }
             }
         } }
+    }
+}
+
+class JvmProcessPipes(val process: Process) : ProcessPipes {
+    /** A cancelled native pipe operation must unblock before its coroutine can join. */
+    private suspend fun <T> io(block: () -> T): T = coroutineScope {
+        val operation = async(Dispatchers.IO) { block() }
+        try { operation.await() } catch (cancelled: CancellationException) {
+            process.destroyForcibly()
+            throw cancelled
+        }
+    }
+
+    override suspend fun write(bytes: ByteArray) = io {
+        process.outputStream.write(bytes)
+        process.outputStream.flush()
+    }
+
+    override suspend fun read(output: ProcessOutput, bytes: ByteArray): Int {
+        require(bytes.isNotEmpty())
+        return io { when (output) {
+            ProcessOutput.Stdout -> process.inputStream.read(bytes)
+            ProcessOutput.Stderr -> process.errorStream.read(bytes)
+        } }
+    }
+
+    override suspend fun closeInput() = io { process.outputStream.close() }
+    override suspend fun awaitExit(): Int = io { process.waitFor() }
+
+    override suspend fun close() = withContext(NonCancellable + Dispatchers.IO) {
+        if (process.isAlive) process.destroyForcibly()
+        process.waitFor()
+        runCatching { process.outputStream.close() }
+        runCatching { process.inputStream.close() }
+        runCatching { process.errorStream.close() }
+        Unit
     }
 }

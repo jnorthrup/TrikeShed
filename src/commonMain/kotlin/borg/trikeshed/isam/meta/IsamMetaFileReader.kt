@@ -43,15 +43,18 @@ class IsamMetaFileReader private constructor(
     val metafileFilename: String,
     private val readLines: (String) -> List<String>,
     private val explicitFiles: Boolean,
+    private val pool: (String) -> FileBackedStringpool = { FileBackedStringpool(it) },
 ) : Usable {
     constructor(metafileFilename: String, fileOps: FileOperations? = null) :
         this(metafileFilename, fileOps?.let { it::readAllLines } ?: IsamFileOperations()::readAllLines, fileOps != null)
 
-    internal constructor(metafileFilename: String, files: IsamFileOperations) :
-        this(metafileFilename, files::readAllLines, true)
+    internal constructor(metafileFilename: String, files: IsamFileOperations,
+                         pool: (String) -> FileBackedStringpool = { FileBackedStringpool(it) }) :
+        this(metafileFilename, files::readAllLines, true, pool)
 
-    internal fun withDefaultFiles(files: IsamFileOperations): IsamMetaFileReader =
-        if (explicitFiles) this else IsamMetaFileReader(metafileFilename, files)
+    internal fun withDefaultFiles(files: IsamFileOperations,
+                                  pool: (String) -> FileBackedStringpool = this.pool): IsamMetaFileReader =
+        IsamMetaFileReader(metafileFilename, if (explicitFiles) readLines else files::readAllLines, true, pool)
 
     val recordlen: Int get() = constraints.last().end
     val constraints: Series<RecordMeta> get() {
@@ -93,7 +96,7 @@ class IsamMetaFileReader private constructor(
                 val index = text.substring(0, eq).toInt()
                 val name = text.substring(eq + 1)
                 require(index in 0 until names.size && pools[index] == null && nameable(name)) { "Invalid ISAM pool token" }
-                pools[index] = opened.getOrPut(name) { FileBackedStringpool(directory + name) }
+                pools[index] = opened.getOrPut(name) { pool(directory + name) }
             }
         }
 

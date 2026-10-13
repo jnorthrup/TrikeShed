@@ -9,12 +9,16 @@ import java.net.InetSocketAddress
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -57,9 +61,10 @@ class JvmSocketConnectTest {
     }
 
     @Test
-    fun drainCancelsConnectWithoutWaitingForAFullListenQueue() = runTest {
+    fun ownerCancellationSettlesConnectWithoutDiscardingCallerSocket() = runTest {
         val backend = JvmUserspaceChannelBackend()
         val occupied = mutableListOf<SocketChannel>()
+        var fd = -1
         try {
             ServerSocketChannel.open().use { server ->
                 server.bind(InetSocketAddress("127.0.0.1", 0), 1)
@@ -70,24 +75,91 @@ class JvmSocketConnectTest {
                     client.configureBlocking(false)
                     client.connect(server.localAddress)
                 }
-                val fd = backend.socket()
-                val ring = FunctionalUringFacade.create(this, 2, backend)
+                fd = backend.socket()
+                val owner = SupervisorJob(coroutineContext[Job])
+                val ring = FunctionalUringFacade.create(CoroutineScope(coroutineContext + owner), 2, backend)
                 try {
                     val submission = connect(fd, (server.localAddress as InetSocketAddress).port, 71)
                     val pending = async { ring.batchEnqueue(1 j { _: Int -> submission }) }
                     runCurrent()
                     assertFalse(pending.isCompleted, "the full local listen queue keeps CONNECT pending")
+                    // Cancellation is an explicit abort by the owner, not normal drain semantics.
+                    owner.cancel()
                     val draining = async { ring.drain() }
                     withTimeout(5_000) {
                         draining.await()
                         assertEquals(UringCompletion(71, -125, 0), pending.await()[0])
                     }
-                    assertFalse(FileImpl(fd).isOpen(), "ring drain closes its owned socket after settling CONNECT")
+                    assertTrue(owner.isCompleted, "drain joins the cancelled owner's children")
+                    assertTrue(FileImpl(fd).isOpen(), "the socket belongs to the caller, not the ring")
                     assertTrue(backend.reapCompletions(0).isEmpty(), "cancelled CONNECT cannot complete again")
-                } finally { ring.drain() }
+                } finally { owner.cancel(); ring.drain() }
             }
         } finally {
             occupied.forEach { it.close() }
+            if (fd >= 0) FileImpl(fd).close()
+            backend.close()
+        }
+    }
+
+    @Test
+    fun targetedCancellationSettlesConnectAndHeldIoWithoutAbortingTheRing() = runTest {
+        val backend = JvmUserspaceChannelBackend()
+        val occupied = mutableListOf<SocketChannel>()
+        val descriptors = mutableListOf<Int>()
+        try {
+            ServerSocketChannel.open().use { server ->
+                server.bind(InetSocketAddress("127.0.0.1", 0), 1)
+                repeat(32) {
+                    val client = SocketChannel.open()
+                    occupied.add(client)
+                    client.configureBlocking(false)
+                    client.connect(server.localAddress)
+                }
+                val firstFd = backend.socket().also(descriptors::add)
+                val secondFd = backend.socket().also(descriptors::add)
+                val port = (server.localAddress as InetSocketAddress).port
+                val ring = FunctionalUringFacade.create(this, 4, backend)
+                val destination = mapMemory(0, 65536, 3, 2 or 0x20, -1, 0)
+                suspend fun cancel(target: Long, token: Long) = ring.batchEnqueue(1 j { _: Int ->
+                    UringSubmission(UringOp.ASYNC_CANCEL, -1, target, 0, 0, userData = token)
+                })[0]
+                try {
+                    val first = async { ring.batchEnqueue(1 j { _: Int -> connect(firstFd, port, 71) }) }
+                    val second = async { ring.batchEnqueue(1 j { _: Int -> connect(secondFd, port, 72) }) }
+                    destination[0] = 7
+                    val read = async { ring.batchEnqueue(1 j { _: Int ->
+                        UringSubmission(UringOp.READ, firstFd, destination.address, 1, -1, userData = 73, memory = destination)
+                    }) }
+                    runCurrent()
+                    assertFalse(first.isCompleted)
+                    assertFalse(second.isCompleted)
+                    assertFalse(read.isCompleted, "READ waits behind the pending CONNECT")
+                    assertFailsWith<IllegalStateException> { destination.close() }
+                    assertEquals(UringCompletion(74, 0, 0), cancel(73, 74))
+                    assertEquals(UringCompletion(73, -125, 0), read.await()[0])
+                    assertEquals(7.toByte(), destination[0], "cancelled held IO must not write its destination")
+                    destination.close()
+                    assertFalse(destination.isOpen, "the original CQE releases the memory borrow")
+                    assertEquals(UringCompletion(75, 0, 0), cancel(71, 75))
+                    assertEquals(UringCompletion(71, -125, 0), first.await()[0])
+                    assertFalse(second.isCompleted)
+                    assertTrue(FileImpl(firstFd).isOpen())
+                    assertTrue(FileImpl(secondFd).isOpen())
+                    assertEquals(UringCompletion(76, 0, 0), ring.batchEnqueue(1 j { _: Int ->
+                        UringSubmission(UringOp.NOP, -1, 0, 0, 0, userData = 76)
+                    })[0], "the same ring continues accepting independent work")
+                    assertEquals(UringCompletion(77, 0, 0), cancel(72, 77))
+                    assertEquals(UringCompletion(72, -125, 0), second.await()[0])
+                    assertTrue(ring.peek().isEmpty())
+                } finally {
+                    backend.cancelPending()
+                    try { ring.drain() } finally { destination.close() }
+                }
+            }
+        } finally {
+            occupied.forEach { it.close() }
+            descriptors.forEach { FileImpl(it).close() }
             backend.close()
         }
     }

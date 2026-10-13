@@ -167,6 +167,30 @@ class HypervisorTest {
         }
     }
 
+    @Test fun pythonSourceLocationsSurviveRetePromotionAndBlackboardLanding() {
+        Hypervisor(promoteAfter = 4, trainCalls = 4, shadowCalls = 2).use { hv ->
+            val iso = assertIs<InProcessIsolate>(hv.spawn("python-source", VmFacet.GRAAL_PYTHON))
+            iso.eval("# tuple score\ndef score(n): return n*2", "curation.py")
+            repeat(4) { assertEquals(Num(6), hv.delegateTo("python-source", "score", Num(3))) }
+            await(5_000, "native Python promotion") {
+                iso.settle()
+                hv.trainer("python-source")!!.profiles["score"]?.phase == Phase.SHADOWED
+            }
+            repeat(2) { assertEquals(Num(6), hv.delegateTo("python-source", "score", Num(3))) }
+            assertEquals(Phase.DELEGATED, hv.trainer("python-source")!!.profiles.getValue("score").phase)
+            assertEquals(setOf("score"), hv.trainer("python-source")!!.profiles.keys,
+                "installing a delegation wrapper must not train or promote its standard-library helpers")
+            assertTrue(hv.fires.any { it.ruleName == "leaf-promotion" && it.nodeId == "python-source/score" })
+            val phases = hv.landingsOf("python-source").filter { it.propertyName == "phase" }
+            assertTrue(phases.isNotEmpty())
+            assertTrue(phases.all { it.facet == VmFacet.GRAAL_PYTHON && it.sourcePath == "curation.py" && it.line == 2 && it.column == 1 },
+                "phase sources: ${phases.map { it.toFields() }}")
+            assertTrue(phases.all { it.toFields()["sourcePath"] == "curation.py" && it.toFields()["line"] == 2 })
+            assertTrue(hv.receipts.any { it.root == "score" && it.served == Served.SHADOW })
+            assertTrue(hv.receipts.none { it.refuted })
+        }
+    }
+
     @Test fun leaseBudgetRuleRevokesTheLeaseAndSnapshotListsIsolates() {
         Hypervisor(promoteAfter = 4, trainCalls = 4, shadowCalls = 2).use { hv ->
             hv.spawn("a", VmFacet.GRAAL_JS)

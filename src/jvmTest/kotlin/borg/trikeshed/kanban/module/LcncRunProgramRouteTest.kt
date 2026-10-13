@@ -45,6 +45,60 @@ import kotlin.test.assertTrue
  */
 class LcncRunProgramRouteTest {
 
+    @Test fun failedExecutionRetainsInvocationEvidenceInTheExistingContentStore(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val cas = CasStore.inMemory()
+        val ctx = newContext(routes, tempDir("invocations"), cas)
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        ctx.lcncRunners["test.fail"] = LcncNodeRunner { _, _ -> error("deliberate node failure") }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val response = post(server, "/api/lcnc/run", """{"document":{"nodes":[
+                {"id":"input","type":"scope.in","params":{"name":"text"}},
+                {"id":"failure","type":"test.fail"}],
+                "wires":[{"from":["input","value"],"to":["failure","x"]}]},"inputs":{"text":"retained"}}""")
+            assertEquals(400, response.status, response.body)
+            val run = json(response)
+            val content = server.routeHttp("GET /api/lcnc/content?cid=${run["invocationsCid"]} HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
+            assertEquals(200, content.status, content.body)
+            assertEquals(run["invocationsCid"], borg.trikeshed.job.ContentId.of(content.body.encodeToByteArray()).value)
+            val evidence = json(content)
+            assertEquals(run["runId"], evidence["runId"])
+            assertEquals(run["programCid"], evidence["programCid"])
+            val calls = (evidence["entries"] as List<*>).map { it as Map<*, *> }
+            assertEquals(listOf("completed", "failed"), calls.map { it["status"] })
+            assertEquals(mapOf("x" to "retained"), calls.last()["inputs"])
+            assertEquals("deliberate node failure", calls.last()["reason"])
+            val saved = reify(cas.get(borg.trikeshed.job.ContentId(run["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
+            assertEquals(run["invocationsCid"], (saved["lcncRun"] as Map<*, *>)["invocationsCid"])
+            assertEquals("failed", run["status"])
+        } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
+
+    @Test fun invocationLimitsDoNotConsumeTheExistingOutputBudget(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val cas = CasStore.inMemory()
+        val ctx = newContext(routes, tempDir("invocation-budget"), cas)
+        val value = "x".repeat(120000)
+        ctx.lcncRunners["test.large"] = LcncNodeRunner { _, _ -> mapOf("text" to value) }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val response = post(JvmKanbanServer(moduleRoutes = routes), "/api/lcnc/run",
+                """{"document":{"nodes":[{"id":"n","type":"test.large"}],"wires":[]}}""")
+            assertEquals(200, response.status, response.body.take(1000))
+            val run = json(response)
+            assertEquals("completed", run["status"])
+            assertEquals(value, ((run["outputs"] as Map<*, *>)["n"] as Map<*, *>)["text"])
+            val evidence = reify(cas.get(borg.trikeshed.job.ContentId(run["invocationsCid"].toString()))!!.decodeToString()) as Map<*, *>
+            val call = (evidence["entries"] as List<*>).single() as Map<*, *>
+            assertEquals("completed", call["status"])
+            assertEquals("payload_limit", call["outputsOmitted"])
+            assertFalse(call.containsKey("outputs"))
+        } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
+
     @Test
     fun invocationBindingsAndEffectiveConstructionReachDurableReceipt(): Unit = runBlocking {
         val p = program("factory-args", listOf(
@@ -320,6 +374,9 @@ class LcncRunProgramRouteTest {
             assertEquals("cancelled", body["status"])
             val raw = reify(ctx.casStore.get(borg.trikeshed.job.ContentId(body["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
             assertEquals("cancelled", (raw["lcncRun"] as Map<*, *>)["status"])
+            assertEquals(body["invocationsCid"], (raw["lcncRun"] as Map<*, *>)["invocationsCid"])
+            val evidence = reify(ctx.casStore.get(borg.trikeshed.job.ContentId(body["invocationsCid"].toString()))!!.decodeToString()) as Map<*, *>
+            assertTrue((evidence["entries"] as List<*>).all { (it as Map<*, *>)["status"] != "running" })
         } finally { supervisor.detach("kanban") }
     }
 
@@ -397,6 +454,10 @@ class LcncRunProgramRouteTest {
             assertEquals(original["receiptCid"], recovered["receiptCid"])
             assertEquals("completed", recovered["status"])
             assertEquals(original["returns"], recovered["returns"])
+            assertEquals(original["invocationsCid"], recovered["invocationsCid"])
+            val evidence = reify(cas.get(borg.trikeshed.job.ContentId(recovered["invocationsCid"].toString()))!!.decodeToString()) as Map<*, *>
+            assertEquals(original["runId"], evidence["runId"])
+            assertTrue((evidence["entries"] as List<*>).isNotEmpty())
         } finally { next.detach("kanban") }
     }
 
@@ -409,6 +470,11 @@ class LcncRunProgramRouteTest {
         val server = JvmKanbanServer(moduleRoutes = routes)
         suspend fun get(query: String) = server.routeHttp("GET /api/lcnc/content?$query HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
         try {
+            // Catalog examples are not installed at boot. Explicitly publish this unexecuted
+            // fixture so the content route can locate it without inventing durable CAS bytes.
+            assertEquals(null, ctx.blackboard.get("lcnc/program/preset-scope-inner"))
+            borg.trikeshed.lcnc.LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, ctx.attachments)
+                .publishProgram("preset-scope-inner", ctx.programLoader("preset-scope-inner")!!)
             val entry = ctx.blackboard.get("lcnc/program/preset-scope-inner") as Map<*, *>
             val candidate = get("cid=${entry["programCid"]}&key=lcnc/program/preset-scope-inner")
             assertEquals(200, candidate.status, candidate.body)

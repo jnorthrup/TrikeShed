@@ -2,7 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.parse.reify
 
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lcnc.BrainClientKey
 import borg.trikeshed.lcnc.CasStoreKey

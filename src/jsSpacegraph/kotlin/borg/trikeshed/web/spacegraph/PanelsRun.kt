@@ -33,19 +33,30 @@ fun Panels.topo(): List<dynamic> {
 }
 
 suspend fun Panels.runNode(n: dynamic, cache: dynamic): dynamic {
+    val attempt = objOf {
+        it.node = JSON.stringify(executionNode(n)); it.at = js("new Date().toISOString()")
+        it.state = "waiting for inputs"; it.inputs = "{}"
+    }
+    n._lastAttempt = attempt
+    n._lastOut = undefined // A failed or skipped rerun must not seed a later partial run.
     val t = contract(n.type); val r = runners[str(n.type)]
-    if (t == null || r == null) return undefined
+    if (t == null || r == null) { attempt.state = "unavailable runner"; return undefined }
     val inputs = obj()
     for (w in inputsOf(n.id)) {
         if (!wireKindOk(w)) continue // a mismatched cable feeds nothing
         val src = cache[w.from[0]]
-        if (src === undefined) return undefined // upstream not run
+        if (src === undefined) { attempt.state = "waiting for upstream " + str(w.from[0]); return undefined }
         inputs[w.to[1]] = src[w.from[1]]
     }
-    for (name in arr(t.ins).map { str(it) }) if (!name.endsWith("?") && inputs[name] === undefined) return undefined
+    attempt.inputs = executionPreview(inputs)
+    for (name in arr(t.ins).map { str(it) }) if (!name.endsWith("?") && inputs[name] === undefined) {
+        attempt.state = "missing input $name"; return undefined
+    }
+    attempt.state = "running"
     n.el.classList.remove("ok", "err"); n.el.classList.add("running")
     try {
         val out = r.run(n, inputs)
+        attempt.state = "returned"; attempt.outputs = executionPreview(out)
         n.el.classList.remove("running"); n.el.classList.add("ok")
         n._lastOut = out // memo for partial runs
         val render = r.render
@@ -53,16 +64,34 @@ suspend fun Panels.runNode(n: dynamic, cache: dynamic): dynamic {
         else if (!truthy(t.sink) && n.type != "display" && out !== undefined && keysOf(out).isNotEmpty()) setResult(n, out)
         return out
     } catch (e: CancellationException) {
+        attempt.state = "cancelled"
+        n._lastOut = undefined
+        n.el.classList.remove("running")
         throw e
     } catch (e: dynamic) {
+        attempt.state = "failed"; attempt.error = failureText(e)
+        n._lastOut = undefined
         n.el.classList.remove("running"); n.el.classList.add("err")
         setResult(n, "ERROR: " + failureText(e))
         return undefined
     }
 }
 
-suspend fun Panels.runAll(fromId: String?) {
+/** Bounded display only; never used to feed another node or persisted as a receipt. */
+fun executionNode(n: dynamic): dynamic = objOf {
+    it.id = n.id; it.type = n.type; it.params = n.params; it.subprogram = n.subprogram
+    it.children = arr(n.children).map { child -> executionNode(child) }.toTypedArray()
+}
+
+fun executionPreview(value: dynamic): String {
+    val text = try { if (value === undefined) "undefined" else str(JSON.stringify(value, null, 2)) }
+        catch (e: dynamic) { "Value cannot be rendered as JSON" }
+    return if (text.length <= 32_768) text else text.take(32_768) + "\n… preview truncated at 32768 characters"
+}
+
+suspend fun Panels.runAll(fromId: String?, automatic: Boolean = false) {
     if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
+    if (automatic && truthy(graph.controls?.humanOversight)) { status("Loaded for review — choose Run to execute"); return }
     status("running…")
     for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.live"))) w.classList.add("flow")
     var order: List<dynamic>
@@ -81,12 +110,14 @@ suspend fun Panels.runAll(fromId: String?) {
     for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.flow"))) w.classList.remove("flow")
     resolveTopLevelOverlaps() // result trees grow nodes — keep them clear of each other
     redraw()
-    status("done " + js("new Date().toLocaleTimeString()").unsafeCast<String>())
+    val failures = order.count { truthy(it.el.classList.contains("err")) }
+    status(if (failures > 0) "Run has $failures failed node(s) — inspect the marked nodes"
+        else "done " + js("new Date().toLocaleTimeString()").unsafeCast<String>())
 }
 
-/** arm sources (timers + SSE). Called by ▶ run AND after every load path. */
-fun Panels.armSources() {
-    if (truthy(graph.controls?.inspectionOnly)) return
+/** Loading under human oversight cannot arm timers/SSE; an explicit Run can. */
+fun Panels.armSources(automatic: Boolean = false) {
+    if (truthy(graph.controls?.inspectionOnly) || automatic && truthy(graph.controls?.humanOversight)) return
     for (n in nodes()) {
         if (truthy(n._parentScope)) continue // the daemon owns the frame
         if (truthy(contract(n.type)?.source) && n.type == "timer" && !truthy(n._timer)) {
@@ -144,6 +175,7 @@ fun Panels.serialize(): dynamic {
 private const val STORE_KEY = "trikeshed.panels.v3"
 
 fun Panels.saveDoc() {
+    facets.changed()
     // History first: a ?load= view is ephemeral for the SCRATCH, but undo is not autosave.
     history.record(JSON.stringify(serialize()))
     refreshRdf()
@@ -188,7 +220,7 @@ class PanelsHistory(private val p: Panels) {
         restoring = true
         try { p.load(JSON.parse(json)); lastDoc = JSON.stringify(p.serialize()) } finally { restoring = false }
         if (p.autosave) try { localStorage.setItem(STORE_KEY, lastDoc!!) } catch (e: dynamic) {}
-        buttons(); launchJs { p.runAll(null) }
+        buttons(); launchJs { p.runAll(null, automatic = true) }
     }
 
     fun undo() {
@@ -320,6 +352,9 @@ suspend fun Panels.syncContracts() {
         contracts = m
         // Fallback parity: every hydrated type with no explicit browser runner dispatches to the daemon
         for (t in keysOf(m)) if (!runners.containsKey(t)) runners[t] = serverRun(t)
+        for (t in arrayOf("document.curate", "document.tasks")) runners[t]?.render = { n, out ->
+            renderDocumentReview(n, out)
+        }
         // result.confirm is a SINK whose server runner answers with a ready HTML card (x)
         val confirm = runners["result.confirm"]
         if (confirm != null && confirm.render == null) confirm.render = { n, out ->

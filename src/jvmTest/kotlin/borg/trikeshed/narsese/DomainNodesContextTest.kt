@@ -4,7 +4,7 @@ import borg.trikeshed.context.ElementState
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.BrainClientKey
 import borg.trikeshed.lcnc.CasStoreKey

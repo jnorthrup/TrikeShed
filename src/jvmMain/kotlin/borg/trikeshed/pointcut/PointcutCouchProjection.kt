@@ -87,6 +87,7 @@ class PointcutCouchProjection(
             // `doc.coordinate.className` / `doc.coordinate.timestamp` — same five columns,
             // same author (coordinateFields), different shape.
             fields.add(Field("coordinate", landing.coordinateFields()))
+            for ((name, value) in landing.sourceFields()) fields.add(Field(name, value))
             
             val doc = Document(docId, fields)
             if (store.put(doc, rev)) {

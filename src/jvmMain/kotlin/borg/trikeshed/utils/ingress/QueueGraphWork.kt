@@ -1,17 +1,17 @@
 package borg.trikeshed.utils.ingress
 
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.lib.AppendWal
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
-import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.utils.kanban.SessionBoardStore
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
 fun main() = runBlocking {
     val forgeHome = File(System.getProperty("user.home"), ".local/forge")
-    val walFile = File(forgeHome, JulesBoardStore.WAL_FILENAME)
+    val walFile = File(forgeHome, SessionBoardStore.WAL_FILENAME)
     val wal = JvmAppendWal(walFile)
-    val store = JulesBoardStore(wal)
+    val store = SessionBoardStore(wal)
 
     val workId = "ingest-graphify-pggraph-dry-capabilities"
     val title = "Merge Graphify + pgGraph DRY capabilities into Forge blackboard facade"
@@ -44,7 +44,7 @@ fun main() = runBlocking {
     CONSTRAINTS:
     - No redundant implementations; common path must be shared
     - Preserve both products' distinct strengths (AST precision vs hybrid search)
-    - Compatible with existing JulesSessionCard/JulesBoardStore WAL projection
+    - Compatible with existing SessionCard/SessionBoardStore WAL projection
 
     ACCEPTANCE:
     [ ] Single GraphCapability interface wires both backends
@@ -53,7 +53,7 @@ fun main() = runBlocking {
     [ ] No duplicate parsing/query code in the dual paths
     """.trimIndent()
 
-    val cause = JulesCause.WorkQueued(
+    val cause = SessionCause.WorkQueued(
         workId = workId,
         tier = "trikeshed",
         title = title,

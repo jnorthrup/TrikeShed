@@ -86,7 +86,8 @@ class StatefulNarsContextTest {
                 replacement.budgetOf(11L)!!.pf < 0.4f &&
                     replacement.snapshot().values.single { it.angular == 11L }.evidence.positive == 5 * Nal.UNIT
             }
-            assertEquals(originalSnapshot, original.snapshot())
+            // snapshot creates fresh Join keys; compare both coordinate values, not object identity.
+            assertEquals(originalSnapshot.mapKeys { it.key.pair }, original.snapshot().mapKeys { it.key.pair })
             assertEquals(ElementState.ACTIVE, original.state)
             assertEquals(ElementState.ACTIVE, replacement.state)
             mint(replacement, 33L)
@@ -222,7 +223,8 @@ class StatefulNarsContextTest {
                 thaw.run(node("state.thaw", mapOf("cid" to snapshot["cid"] as String)), emptyMap())
             }["restored"] as Map<*, *>
             await { target.size == 2 }
-            assertEquals(source.snapshot(), target.snapshot(), "signals and budgets reach the replacement bag")
+            assertEquals(source.snapshot().mapKeys { it.key.pair }, target.snapshot().mapKeys { it.key.pair },
+                "signals and budgets reach the replacement bag")
             assertEquals(2, restored["bagRestored"])
             assertEquals(1, restored["kifAssertionsRestored"])
             assertTrue("(instance Freeze RoundTrip)" in restoredKif.toKifFile())

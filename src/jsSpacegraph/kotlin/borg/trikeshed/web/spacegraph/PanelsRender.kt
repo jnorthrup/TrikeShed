@@ -179,27 +179,72 @@ fun Panels.renderConcentric(n: dynamic) {
     var wrap = n.el.querySelector(".csheet")
     if (wrap == null) { wrap = document.createElement("div").asDynamic(); wrap.className = "csheet"; n.el.appendChild(wrap) }
     val idx = if (truthy(n._sheets)) n._sheets else obj(); val cur = idx[n._cur]
-    if (!truthy(cur)) { wrap.innerHTML = "<div class=\"kboard-status\">no sheets yet — wire kanban.activeSheets in and run</div>"; return }
+    if (!truthy(cur)) { wrap.innerHTML = "<div class=\"kboard-status\">no sheets loaded — wire an inline sheet or retained sheet reference and run</div>"; return }
+    fun navigate(id: String, href: String, refresh: Boolean = false) {
+        n._sheetRequest = null; n._sheetError = null
+        if (truthy(idx[id]) && !refresh) { n._cur = id; renderConcentric(n) }
+        else if (href.isEmpty()) { n._sheetError = "Sheet is not loaded: $id"; renderConcentric(n) }
+        else {
+            val request = obj(); n._sheetRequest = request; renderConcentric(n)
+            // Navigation and indexes read only, never re-running the graph or document.curate.
+            launchJs {
+                try {
+                    val family = readSheets(href)
+                    require(family.any { it.id == id }) { "Referenced sheet is absent: $id" }
+                    if (n._sheets !== idx || n._sheetRequest !== request || !truthy(n.el.isConnected)) return@launchJs
+                    for (sheet in family) idx[sheet.id] = sheet
+                    n._cur = id
+                } catch (e: CancellationException) { throw e }
+                catch (e: dynamic) {
+                    if (n._sheets === idx && n._sheetRequest === request) n._sheetError = failureText(e)
+                } finally {
+                    if (n._sheets === idx && n._sheetRequest === request) {
+                        n._sheetRequest = null
+                        if (truthy(n.el.isConnected)) renderConcentric(n)
+                    }
+                }
+            }
+        }
+    }
     val crumb = ArrayList<dynamic>(); var c: dynamic = cur; var guard = 0
     while (truthy(c) && guard++ < 12) { crumb.add(0, c); c = if (truthy(c.parent)) idx[c.parent] else null }
     var html = "<div class=\"crumbrow\">" + crumb.mapIndexed { i, s ->
         "<span class=\"seg" + (if (i == crumb.size - 1) " here" else "") + "\" data-sheet=\"" + escA(s.id) + "\">" + escA(if (truthy(s.title)) s.title else s.id) + "</span>"
     }.joinToString(" ▸ ") + "</div>"
+    if (truthy(cur.parent) && !truthy(idx[cur.parent]) && truthy(cur.parentHref)) html +=
+        "<button data-sheet=\"" + escA(cur.parent) + "\" data-href=\"" + escA(cur.parentHref) + "\">▴ document</button>"
+    if (truthy(n._sheetError)) html += "<div class=\"kboard-status\" role=\"alert\">" + escA(n._sheetError) + "</div>"
+    if (truthy(n._sheetRequest)) html += "<div class=\"kboard-status\" role=\"status\">reading retained sheet…</div>"
+    if (truthy(cur.notice)) html += "<div class=\"kboard-status\">" + escA(cur.notice) + "</div>"
+    for (view in arr(cur.views)) if (view.sheet != cur.id) html +=
+        "<button data-sheet=\"" + escA(view.sheet) + "\" data-href=\"" + escA(view.href) + "\">" + escA(view.title) + "</button>"
+    if (truthy(cur.truncated)) html += "<div class=\"kboard-status\">partial sheet · " + arr(cur.rows).size +
+        " displayed rows" + (if (cur.offset != null) " · view offset " + escA(cur.offset) else "") +
+        (if (cur.sourceRows != null) " of " + escA(cur.sourceRows) else "") +
+        (if (truthy(cur.limit)) " · " + escA(cur.limit) else "") + "</div>"
+    for ((field, label) in listOf("previousHref" to "Previous rows", "nextHref" to "Next rows",
+        "previousGroupsHref" to "Previous index groups", "nextGroupsHref" to "Next index groups")) {
+        if (truthy(cur[field])) html += "<button data-sheet=\"" + escA(cur.id) + "\" data-href=\"" +
+            escA(cur[field]) + "\" data-page=\"true\">" + label + "</button>"
+    }
     val kids = keysOf(idx).map { idx[it] }.filter { it.parent == cur.id }
     if (kids.isNotEmpty()) html += "<div class=\"ringrow\">" + kids.joinToString("") { s ->
         "<span class=\"dagchip\" data-sheet=\"" + escA(s.id) + "\">▤ " + escA(if (truthy(s.title)) s.title else s.id) + " <i>" + arr(s.rows).size + "</i></span>"
     } + "</div>"
     val columns = arr(cur.columns)
     if (arr(cur.rows).isEmpty()) html += "<div class=\"kboard-status\">empty sheet — " + columns.joinToString(" · ") { escA(it.name) } + "</div>"
-    else html += "<div class=\"tablewrap\"><table><tr>" + columns.joinToString("") { col -> "<th title=\"" + escA(col.type ?: "") + "\">" + escA(col.name) + "</th>" } + "</tr>" +
-        arr(cur.rows).joinToString("") { row ->
-            "<tr>" + arr(row).joinToString("") { cell ->
+    else html += "<div class=\"tablewrap\"><table><tr>" + (if (cur.sourceOrdinals != null) "<th>Source row</th>" else "") +
+        columns.joinToString("") { col -> "<th title=\"" + escA(col.type ?: "") + "\">" + escA(col.name) + "</th>" } + "</tr>" +
+        arr(cur.rows).mapIndexed { ordinal, row ->
+            "<tr>" + (if (cur.sourceOrdinals != null) "<td>" + escA(cur.sourceOrdinals[ordinal]) + "</td>" else "") + arr(row).joinToString("") { cell ->
                 if (truthy(cell) && typeOf(cell) == "object" && truthy(cell.sheet)) {
                     val child = idx[cell.sheet]
-                    "<td><span class=\"dagchip\" data-sheet=\"" + escA(cell.sheet) + "\">▤ " + escA(if (truthy(child)) (if (truthy(child.title)) child.title else child.id) else cell.sheet) + "</span></td>"
+                    "<td><button class=\"dagchip\" data-sheet=\"" + escA(cell.sheet) + "\"" +
+                        (if (truthy(cell.href)) " data-href=\"" + escA(cell.href) + "\"" else "") +
+                        ">▤ " + escA(if (truthy(child)) (if (truthy(child.title)) child.title else child.id) else cell.sheet) + "</button></td>"
                 } else "<td class=\"leafcell\" title=\"click to copy\">" + escA(if (cell == null) "" else str(cell)) + "</td>"
             } + "</tr>"
-        } + "</table></div>"
+        }.joinToString("") + "</table></div>"
     val orch = n._orch
     if (truthy(orch) && truthy(orch.lanes)) {
         val odd = arr(orch.edges).filter { truthy(it.mode) && it.mode != "NORMAL" }
@@ -207,7 +252,72 @@ fun Panels.renderConcentric(n: dynamic) {
             (if (odd.isNotEmpty()) " <i>" + odd.joinToString("·") { escA(str(it.mode).lowercase()) } + "</i>" else "") + "</div>"
     }
     wrap.innerHTML = html
-    for (el in arr(wrap.querySelectorAll("[data-sheet]"))) on(el, "click", { e -> e.stopPropagation(); n._cur = el.dataset.sheet; renderConcentric(n) })
+    if (truthy(cur.href) && arr(cur.indexColumns).isNotEmpty()) {
+        val controls = document.createElement("details").asDynamic()
+        controls.setAttribute("aria-label", "Retained cursor indexes")
+        controls.open = arr(cur.axes).isNotEmpty()
+        val summary = document.createElement("summary").asDynamic()
+        summary.textContent = "Y indexes · " + str(cur.selectedRows) + " / " + str(cur.sourceRows) + " rows"
+        controls.appendChild(summary)
+        val note = document.createElement("p").asDynamic()
+        note.textContent = "Select up to three fields for a composite index. Independent indexes intersect (AND). Child sheets have separate row scopes. Reads only; no model call or approval."
+        controls.appendChild(note)
+        val axes = arr(cur.axes).toList()
+        val selections = arr(cur.selections).toList()
+        fun select(nextAxes: List<dynamic>, nextSelections: List<dynamic>) {
+            val href = str(cur.href)
+            val url: dynamic = js("new URL(href, window.location.href)")
+            url.searchParams.set("offset", "0"); url.searchParams.set("groupOffset", "0")
+            url.searchParams.set("axes", JSON.stringify(nextAxes.toTypedArray()))
+            url.searchParams.set("selections", JSON.stringify(nextSelections.toTypedArray()))
+            navigate(str(cur.id), str(url.pathname) + str(url.search), true)
+        }
+        fun button(label: String, action: () -> Unit) {
+            val b = document.createElement("button").asDynamic(); b.textContent = label
+            controls.appendChild(b); on(b, "click", { e -> e.stopPropagation(); action() })
+        }
+        if (axes.size < 4) {
+            val fields = document.createElement("select").asDynamic(); fields.multiple = true; fields.size = 4
+            fields.setAttribute("aria-label", "Fields for new cursor index")
+            for (field in arr(cur.indexColumns)) {
+                val option = document.createElement("option").asDynamic(); option.value = field; option.textContent = field
+                fields.appendChild(option)
+            }
+            controls.appendChild(fields)
+            button("Add field index") {
+                val chosen = arr(fields.selectedOptions).map { str(it.value) }
+                if (chosen.size !in 1..3) { n._sheetError = "Select one to three fields"; renderConcentric(n) }
+                else select(axes + listOf(chosen.toTypedArray().asDynamic()), selections)
+            }
+        }
+        arr(cur.indexes).forEachIndexed { a, descriptor ->
+            val label = document.createElement("label").asDynamic(); label.style.display = "block"
+            label.textContent = arr(descriptor.fields).joinToString(" + ") { str(it) } + " · " + str(descriptor.groupCount) + " groups "
+            val groups = document.createElement("select").asDynamic()
+            groups.setAttribute("aria-label", "Group for retained cursor index $a")
+            fun option(value: Int, text: String) {
+                val o = document.createElement("option").asDynamic(); o.value = value.toString(); o.textContent = text; groups.appendChild(o)
+            }
+            option(-1, "All groups")
+            val selection = selections.firstOrNull { num(it[0]).toInt() == a }
+            val current = if (selection == null) null else num(selection[1]).toInt()
+            if (current != null && arr(descriptor.groups).none { num(it.group).toInt() == current }) option(current, "Group $current (another page)")
+            for (group in arr(descriptor.groups)) option(num(group.group).toInt(), JSON.stringify(group.key) + " · " + str(group.count) + " rows")
+            groups.value = (current ?: -1).toString()
+            label.appendChild(groups); controls.appendChild(label)
+            on(groups, "change", {
+                val group = str(groups.value).toInt()
+                val remaining = selections.filter { num(it[0]).toInt() != a }
+                select(axes, if (group < 0) remaining else remaining + listOf(arrayOf(a, group).asDynamic()))
+            })
+        }
+        if (axes.isNotEmpty()) button("Clear indexes") { select(emptyList(), emptyList()) }
+        wrap.insertBefore(controls, wrap.querySelector(".tablewrap"))
+    }
+    for (el in arr(wrap.querySelectorAll("[data-sheet]"))) on(el, "click", { e ->
+        e.stopPropagation()
+        navigate(str(el.dataset.sheet), str(el.dataset.href ?: ""), el.dataset.page == "true")
+    })
     for (el in arr(wrap.querySelectorAll(".leafcell"))) on(el, "click", { e ->
         e.stopPropagation(); copyText(str(el.textContent))
         el.classList.add("copied"); later(500) { el.classList.remove("copied") }

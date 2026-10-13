@@ -52,6 +52,8 @@ interface FileOperations : CoroutineContext.Element {
     fun isDir(path: String): Boolean
     fun isFile(path: String): Boolean
     fun mkdirs(path: String)
+    /** Move an entry without replacing an existing destination. */
+    fun move(source: String, destination: String): Unit = TODO("Filesystem move is not bound on this target")
     fun deleteRecursively(path: String)
     fun resolvePath(vararg parts: String): String
     fun readZip(path: String): List<Join<String, ByteArray>>

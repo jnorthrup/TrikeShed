@@ -120,21 +120,23 @@ data class GraphCamera(
     val far: Double = 10000.0,
 ) {
     init { require(zoom.isFinite() && zoom > 0 && fieldOfView > 0 && fieldOfView < 180 && near > 0 && far > near) }
-    private val forward get() = (center - position).normalized()
-    private val right get() = forward.cross(Vec3(0.0, 1.0)).let { if (it.length < 1e-10) Vec3(1.0) else it.normalized() }
-    private val up get() = right.cross(forward).normalized()
+    // The camera is immutable; its basis is shared by every projection in a frame.
+    private val forward = (center - position).normalized()
+    private val right = forward.cross(Vec3(0.0, 1.0)).let { if (it.length < 1e-10) Vec3(1.0) else it.normalized() }
+    private val up = right.cross(forward).normalized()
+    private val aperture = 2 * tan(fieldOfView * PI / 360)
     fun project(point: Vec3, viewport: Viewport): Vec3? {
         if (mode == CameraMode.ORTHOGRAPHIC) return Vec3(viewport.width / 2.0 + (point.x - center.x) * zoom,
             viewport.height / 2.0 - (point.y - center.y) * zoom, point.z)
         val delta = point - position; val depth = delta.dot(forward)
         if (depth < near || depth > far) return null
-        val scale = viewport.height / (2 * tan(fieldOfView * PI / 360)) * zoom / depth
+        val scale = viewport.height / aperture * zoom / depth
         return Vec3(viewport.width / 2.0 + delta.dot(right) * scale, viewport.height / 2.0 - delta.dot(up) * scale, depth)
     }
     fun ray(point: Vec3, viewport: Viewport): Ray {
         if (mode == CameraMode.ORTHOGRAPHIC) return Ray(Vec3(center.x + (point.x - viewport.width / 2.0) / zoom,
             center.y - (point.y - viewport.height / 2.0) / zoom, far), Vec3(0.0, 0.0, -1.0))
-        val unit = 2 * tan(fieldOfView * PI / 360) / (viewport.height * zoom)
+        val unit = aperture / (viewport.height * zoom)
         return Ray(position, (forward + right * ((point.x - viewport.width / 2.0) * unit) + up * ((viewport.height / 2.0 - point.y) * unit)).normalized())
     }
     fun unproject(point: Vec3, viewport: Viewport, planeZ: Double = 0.0): Vec3? {

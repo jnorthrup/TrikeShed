@@ -16,13 +16,18 @@ import borg.trikeshed.terminal.VtKey
 import borg.trikeshed.terminal.TerminalOutputStream
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import borg.trikeshed.vm.Teleported
+import borg.trikeshed.graal.ConfixBlackboard
 
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import modelmux.ModelMux
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /** A real xterm-256color session around the supervised no-native Hermes GraalPy sleeve. */
 class HermesVmConsole(
@@ -30,6 +35,10 @@ class HermesVmConsole(
     private val sleeve: Path,
     columns: Int = 100,
     rows: Int = 32,
+    blackboard: ConfixBlackboard = ConfixBlackboard.empty(),
+    modelMuxProvider: suspend () -> ModelMux? = { null },
+    muxContext: CoroutineContext = EmptyCoroutineContext,
+    socketScope: CoroutineScope? = null,
 ) : AutoCloseable {
     enum class State { CLOSED, BOOTING, READY, FAILED }
 
@@ -72,6 +81,7 @@ class HermesVmConsole(
      * once, by whoever finishes.
      */
     @Volatile private var turnInFlight = false
+    @Volatile private var modelId: String? = null
     private val _events = MutableSharedFlow<Event>(replay = 128, extraBufferCapacity = 1024)
     val events: SharedFlow<Event> = _events.asSharedFlow()
     @Volatile var state: State = State.CLOSED; private set
@@ -79,7 +89,12 @@ class HermesVmConsole(
     @Volatile private var inventory: HermesPortInventory? = null
     private val stdout = TerminalOutputStream { text -> causalOutput(text, currentCause.get()) }
     private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
-    private val port = HermesPythonPort(output = stdout, error = stderr)
+    private val port = HermesPythonPort(
+        blackboard = blackboard, output = stdout, error = stderr,
+        pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
+            muxContext = muxContext, contextId = currentCause::get),
+        socketScope = socketScope,
+    )
     internal var inventoryLoader: (HermesPythonPort) -> HermesPortInventory = { p ->
         require(Files.isDirectory(root)) { "Hermes source root missing: $root" }
         p.inventory(root, sleeve.takeIf(Files::isDirectory))
@@ -101,12 +116,16 @@ class HermesVmConsole(
                 timestampMs,
             )
             port.importInVm(scanned, "hermes_cli.main")
+            if ("providers.base" in scanned.modules) {
+                port.evalInVm("import trikeshed_modelmux\ntrikeshed_modelmux.register()\nTrue", "hermes-model-provider.py")
+            }
             port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
             transition(State.READY, "hermes_cli.main imported in no-native GraalPy")
             causalOutput("\u001b[32mready\u001b[0m · :help for console commands\r\n", null, timestampMs)
             if (!turnInFlight) promptAndRedraw(timestampMs)
             State.READY
         } catch (t: Throwable) {
+            try { port.close() } catch (closing: Throwable) { t.addSuppressed(closing) }
             transition(State.FAILED, t.message ?: t.toString())
             causalOutput("\u001b[31mboot failed: ${t.message ?: t}\u001b[0m\r\n", null, timestampMs)
             if (!turnInFlight) promptAndRedraw(timestampMs)
@@ -131,6 +150,7 @@ class HermesVmConsole(
         if (state == State.CLOSED) open(timestampMs)
         if (state != State.READY) {
             causalOutput("\u001b[31mconsole unavailable: $detail\u001b[0m\r\n", manual.signal.id, timestampMs)
+            reject(manual, "console unavailable: $detail", timestampMs)
             currentCause.set(null)
             turnInFlight = false
             promptAndRedraw(timestampMs)
@@ -330,6 +350,7 @@ class HermesVmConsole(
         linkedMapOf(
             "state" to state.name.lowercase(),
             "detail" to detail,
+            "model" to modelId,
             "panel" to mapOf(
                 "id" to panel.descriptor.id.value,
                 "kind" to panel.descriptor.kind,
@@ -386,13 +407,29 @@ class HermesVmConsole(
             command == ":status" -> {
                 val scanned = inventory
                 causalOutput(
-                    "state=${state.name.lowercase()} vm=${port.vmStarted} modules=${scanned?.modules?.size ?: 0} " +
+                    "state=${state.name.lowercase()} vm=${port.vmStarted} model=${modelId ?: "host-default"} modules=${scanned?.modules?.size ?: 0} " +
                         "ready=${scanned?.ready ?: 0} blocked=${(scanned?.blockedNative ?: 0) + (scanned?.blockedTransitive ?: 0)}\r\n",
                     cause,
                     timestampMs,
                 )
             }
             command == ":clear" -> causalOutput("\u001b[2J\u001b[H", cause, timestampMs)
+            command == ":models" -> {
+                val catalog = port.evalInVm("import trikeshed_modelmux as mux\nprint(mux._call('mux_catalog'))\nTrue", "hermes-models.py")
+                check(catalog == Teleported.Bool(true)) { "model catalog unavailable" }
+            }
+            command == ":model" -> {
+                modelId = null
+                causalOutput("model selection follows the host default\r\n", cause, timestampMs)
+            }
+            command.startsWith(":model ") -> {
+                val id = command.removePrefix(":model ").trim()
+                require(id.isNotEmpty()) { "model id is blank" }
+                val selected = port.evalInVm("import trikeshed_modelmux as mux\nmux.select_model(${pythonString(id)})", "hermes-model.py")
+                check(selected is Teleported.Str && selected.v == id) { "model selection failed: $selected" }
+                modelId = id
+                causalOutput("model=$id provider=trikeshed\r\n", cause, timestampMs)
+            }
             command == ":modules" -> {
                 val scanned = inventory ?: return
                 for (module in scanned.modules.values.sortedBy { it.name }.take(200)) {
@@ -424,8 +461,8 @@ class HermesVmConsole(
 
     private fun runHermes(prompt: String) {
         require(prompt.isNotBlank()) { "prompt is blank" }
-        val result = port.evalInVm("__trikeshed_hermes(${pythonString(prompt)})", "hermes-console-turn.py")
-        if ((result as? Teleported.Num)?.v != 0L) causalOutput("\r\nhermes exit $result\r\n", currentCause.get())
+        val result = port.evalInVm("__trikeshed_hermes(${pythonString(prompt)}, ${modelId?.let(::pythonString) ?: "None"})", "hermes-console-turn.py")
+        check(result is Teleported.Num && result.v == 0L) { "hermes exit $result" }
     }
 
     private fun causalOutput(text: String, cause: String?, timestampMs: Long = System.currentTimeMillis()) = synchronized(lock) {
@@ -474,13 +511,15 @@ class HermesVmConsole(
             "${ESC}[1m:eval PYTHON${ESC}[0m   evaluate inside the supervised GraalPy context\r\n" +
             "${ESC}[1m:import MODULE${ESC}[0m  import one module through the sleeve\r\n" +
             "${ESC}[1m:hermes PROMPT${ESC}[0m run a real Hermes one-shot turn\r\n" +
+            "${ESC}[1m:models${ESC}[0m        current host model catalog\r\n" +
+            "${ESC}[1m:model ID${ESC}[0m      select a catalog model; :model follows the host default\r\n" +
             "${ESC}[1m:clear${ESC}[0m         reset the viewport      \r\n" +
             "Any other line is a Hermes prompt.\r\n" +
             "${ESC}[1m:env${ESC}[0m            curated guest environment (diagnostic)\r\n"
         private val CONSOLE_BOOTSTRAP = """
-            def __trikeshed_hermes(prompt):
-                from hermes_cli.oneshot import run_oneshot
-                return run_oneshot(prompt)
+            def __trikeshed_hermes(prompt, model=None):
+                from trikeshed_modelmux import run_oneshot
+                return run_oneshot(prompt, model)
             True
         """.trimIndent()
 

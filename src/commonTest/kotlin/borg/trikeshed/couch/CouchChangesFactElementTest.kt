@@ -4,13 +4,32 @@ import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeout
+import borg.trikeshed.context.ElementState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 import borg.trikeshed.lib.first
 import borg.trikeshed.lib.size
 
 class CouchChangesFactElementTest {
+    @Test fun cancellationBeforeReaderStartsStillCompletesDrain() = runTest {
+        val cas = CasStore.inMemory()
+        val db = Couch("cancelled", CouchStoreFactory.casBacked(cas), cas)
+        val parent = Job()
+        val tendon = CouchChangesFactElement(db, ReteNetwork(), parentJob = parent)
+        parent.cancel()
+        tendon.open()
+        withTimeout(1_000) {
+            assertFailsWith<CancellationException> { tendon.drain() }
+        }
+        assertEquals(ElementState.CLOSED, tendon.state)
+        assertTrue(tendon.supervisor.isCompleted)
+    }
+
     @Test
     fun framesBecomeFactsAndBusEvents() = runTest {
         val cas = CasStore.inMemory()

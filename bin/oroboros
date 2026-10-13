@@ -5,8 +5,37 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 JAVA="${JAVA_HOME:-$HOME/.sdkman/candidates/java/current}/bin/java"
-CP="$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar"
-for j in "$ROOT"/build/staging/lib/*.jar; do CP="$CP:$j"; done
+# Gradle overwrites these jars in place. A running ZipFile retains offsets into
+# the old bytes, so each daemon owns a snapshot until its shutdown has drained.
+RUNTIME="$(mktemp -d "${TMPDIR:-/tmp}/trikeshed-oroboros.XXXXXXXX")"
+RUNTIME_JARS=()
+cleanup() {
+  for artifact in "${RUNTIME_JARS[@]}"; do rm -f -- "$artifact"; done
+  rmdir -- "$RUNTIME"
+}
+trap cleanup EXIT
+CP=""
+for j in "$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar" "$ROOT"/build/staging/lib/*.jar; do
+  target="$RUNTIME/$(basename "$j")"
+  RUNTIME_JARS+=("$target")
+  # APFS clone avoids a second physical copy; other filesystems use ordinary cp.
+  if ! cp -c "$j" "$target" 2>/dev/null; then cp "$j" "$target"; fi
+  CP="${CP:+$CP:}$target"
+done
 cd "$ROOT"
-exec "$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED -cp "$CP" \
-  borg.trikeshed.daemon.OroborosDaemon "$@"
+"$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED -cp "$CP" \
+  borg.trikeshed.daemon.OroborosDaemon "$@" &
+DAEMON_PID=$!
+forward_signal() { kill -s "$1" "$DAEMON_PID" 2>/dev/null || true; }
+trap 'forward_signal TERM' TERM
+trap 'forward_signal INT' INT
+trap 'forward_signal HUP' HUP
+set +e
+wait "$DAEMON_PID"
+result=$?
+# A trapped signal interrupts wait before Java's shutdown hooks have finished.
+while kill -0 "$DAEMON_PID" 2>/dev/null; do
+  wait "$DAEMON_PID"
+  result=$?
+done
+exit "$result"

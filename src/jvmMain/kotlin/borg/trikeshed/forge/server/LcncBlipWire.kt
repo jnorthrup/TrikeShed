@@ -13,6 +13,7 @@ import borg.trikeshed.lib.take
 import borg.trikeshed.lib.isNotEmpty
 import borg.trikeshed.lib.α
 import borg.trikeshed.lib.toList
+import borg.trikeshed.lib.s_
 import borg.trikeshed.litebike.JvmKanbanServer
 /**
  * The hover blip: one node of the LCNC blackboard read across the planes it
@@ -56,7 +57,7 @@ class LcncBlipWire(
         val type = q["type"].orEmpty()
         if (node.isEmpty() && type.isEmpty()) return json(mapOf("error" to "node or type required"), 400)
 
-        val snapshot = network.snapshot()
+        val snapshot = network.snapshot(s_[PlaneFacts.PANELS, PlaneFacts.GRAAL])
         val panels = snapshot.filter { it.factId.a == PlaneFacts.PANELS && it.fields[PlaneFacts.KEY] == program }
         val nodeFacts = panels.filter { f ->
             when (f.fields[PlaneFacts.KIND]) {
@@ -107,7 +108,8 @@ class LcncBlipWire(
         )
     }
 
-    private fun row(f: ReteStoredFact): Map<String, Any?> = linkedMapOf(
+    // The inline α callback is a separate JVM class; its bound reference must be callable there.
+    fun row(f: ReteStoredFact): Map<String, Any?> = linkedMapOf(
         "id" to f.factId.b,
         "fields" to f.fields.mapValues { (_, v) -> if (v == null || v is String || v is Number || v is Boolean) v else v.toString() },
     )

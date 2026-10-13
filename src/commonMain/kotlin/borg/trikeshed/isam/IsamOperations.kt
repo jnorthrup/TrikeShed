@@ -10,6 +10,9 @@ import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.emptySeriesOf
 
 interface IsamOperations {
+    /** Bind public metadata projections to the same I/O and dictionary owner as data reads. */
+    fun metadata(metafile: IsamMetaFileReader): IsamMetaFileReader = metafile
+
     fun createReader(
         datafileFilename: String,
         metafileFilename: String,

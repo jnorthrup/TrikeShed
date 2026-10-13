@@ -29,6 +29,7 @@ class WorktreeCouchGateway(
      * The size is a stat, taken before the read, so the file is never opened for content.
      */
     private val maxFileBytes: Long = MAX_FILE_BYTES,
+    private val excludedPath: (String) -> Boolean = { false },
 ) {
     data class Snapshot(
         val revision: String,
@@ -104,7 +105,7 @@ class WorktreeCouchGateway(
             // and another plane (the Git mirror under `<prefix>.git/`) may own it.
             val relative = path.removePrefix(prefix)
             if (relative.split('/').any { it in excludedSegments } ||
-                excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
+                excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") } || excludedPath(relative)) continue
             attachments.deleteAttachment(path, ref.revision)
             deletedPaths.add(path)
         }
@@ -136,6 +137,7 @@ class WorktreeCouchGateway(
                 if (name in excludedSegments) continue
                 val relative = if (relativeDirectory.isEmpty()) name else "$relativeDirectory/$name"
                 if (excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
+                if (excludedPath(relative)) continue
                 try {
                     val fullPath = fileOps.resolvePath(directory, name)
                     if (fileOps.isDir(fullPath)) {

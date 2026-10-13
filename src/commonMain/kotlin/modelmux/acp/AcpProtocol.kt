@@ -2,6 +2,8 @@ package modelmux.acp
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.`▶`
+import borg.trikeshed.cursor.IOMemento
+import borg.trikeshed.parse.confix.*
 
 // ═══════════════════════════════════════════
 // ACP type algebra — everything is Join/Series
@@ -42,7 +44,7 @@ typealias AcpCapability = String           // "chat", "stream", "tools", "vision
 /**
  * Rich-media capability dimensions (plan step 6): DECLARED now so routes,
  * presets, and contracts can name them; model bindings stay deferred —
- * env-gated exactly like [borg.trikeshed.jules.BrainClient] endpoint
+ * env-gated exactly like [borg.trikeshed.modelmux.BrainClient] endpoint
  * discovery. A card not bound to a rich-media lane simply never advertises
  * these; nothing else in the mux changes shape.
  *
@@ -133,6 +135,49 @@ val AcpModelCard.wireName: String get() = wireModel ?: id
 // ── ACP codec: AcpRequest → HTTP request bytes ──
 
 object AcpCodec {
+
+    /** JSON spans stay intact; only the host-owned wire model is replaced. */
+    fun encodeCompletion(request: ConfixDoc, model: String): String {
+        val root = requireNotNull(request.root) { "completion requires a JSON object" }
+        require(root.tag == IOMemento.IoObject && request.src[root.open] == '{'.code.toByte()) {
+            "completion requires a JSON object"
+        }
+        require(request.getAt("messages")?.tag == IOMemento.IoArray) { "completion requires messages" }
+        require(request.getAt("stream") == null || request.scalar("stream") == false) {
+            "completion is non-streaming; stream must be false or absent"
+        }
+        val fields = root.kids
+        require(fields.size % 2 == 0) { "completion requires object fields" }
+        val names = mutableSetOf<String>()
+        return buildString {
+            append("{\"model\":").append(jsonStr(model))
+            for (i in 0 until fields.size step 2) {
+                val key = fields[i]
+                val name = key.reify(request.src) as? String ?: error("completion field must be a string")
+                require(names.add(name)) { "duplicate completion field: $name" }
+                require(name !in setOf("api_key", "base_url", "headers")) { "completion cannot set transport field: $name" }
+                if (name == "model") continue
+                val value = fields[i + 1]
+                append(',')
+                append(ByteArray(value.close - key.open + 1) { request.src[key.open + it] }.decodeToString())
+            }
+            append('}')
+        }
+    }
+
+    /** Preserve the complete provider envelope, including null content and tool-only turns. */
+    fun parseCompletion(raw: String): ConfixDoc = confixDoc(raw).also { doc ->
+        require(doc.root?.tag == IOMemento.IoObject && raw.trimStart().startsWith('{')) {
+            "completion response must be a JSON object"
+        }
+        val choices = doc.getAt("choices")
+        require(choices?.tag == IOMemento.IoArray && choices.kids.size > 0) {
+            "completion response has no choices"
+        }
+        require(choices.kids.view.all { it.step("message", doc.src)?.tag == IOMemento.IoObject }) {
+            "completion response has no assistant message"
+        }
+    }
 
     fun encodeRequest(
         req: AcpRequest,

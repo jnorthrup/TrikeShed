@@ -1,8 +1,12 @@
 package borg.trikeshed.couch.persistence
 
 import borg.trikeshed.couch.CouchStoreFactory
+import borg.trikeshed.couch.CouchCommittedFrame
 import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
+import borg.trikeshed.job.CanonicalCbor
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import borg.trikeshed.util.oroboros.FileCasStore
@@ -12,6 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 
 /**
  * Durable-heads gate (funding-pack E02): a durableCasBacked store recovers
@@ -22,6 +28,73 @@ class DurableCouchStoreRecoveryTest {
 
     private fun doc(id: String, vararg fields: Pair<String, Any>) =
         Document(id, fields.map { (k, v) -> Field(k, v) })
+
+    @Test
+    fun recoveredBodiesRemainIsolatedFromCallerMutation() {
+        val files = JvmFileOperations()
+        val root = Files.createTempDirectory("couch-recovery-isolation-").toString()
+        try {
+            val cas = FileCasStore(files, files.resolvePath(root, "cas"))
+            val directory = files.resolvePath(root, "couch")
+            val bytes = byteArrayOf(1, 2)
+            val nested = mutableMapOf<String, Any>("values" to mutableListOf("retained"), "bytes" to bytes)
+            CouchCommitStore(cas, StorageDurability.DURABLE, files, directory).use { owner ->
+                owner.commit(CouchCommittedFrame(0, "a", "1-retained", false, doc("a", "nested" to nested)))
+                nested["values"] = listOf("changed after commit")
+                bytes[0] = 9
+            }
+            CouchCommitStore(cas, StorageDurability.DURABLE, files, directory).use { owner ->
+                val frames = owner.recoveredFrames
+                assertEquals(1, frames.size)
+                val first = frames[0]
+                assertEquals("1-retained", first.rev)
+                @Suppress("UNCHECKED_CAST")
+                val firstNested = first.doc!!.fields.single().value as MutableMap<String, Any>
+                assertEquals(listOf("retained"), firstNested["values"])
+                assertContentEquals(byteArrayOf(1, 2), firstNested["bytes"] as ByteArray)
+                firstNested["values"] = listOf("changed after recovery")
+                (firstNested["bytes"] as ByteArray)[0] = 8
+                val secondNested = frames[0].doc!!.fields.single().value as Map<*, *>
+                assertEquals(listOf("retained"), secondNested["values"])
+                assertContentEquals(byteArrayOf(1, 2), secondNested["bytes"] as ByteArray)
+            }
+        } finally { files.deleteRecursively(root) }
+    }
+
+    @Test
+    fun recoveryStillRejectsInvalidBodiesWithoutChangingTheRootOrLeakingItsLease() {
+        val files = JvmFileOperations()
+        val root = Files.createTempDirectory("couch-recovery-validation-").toString()
+        try {
+            val cas = FileCasStore(files, files.resolvePath(root, "cas"))
+            val directory = files.resolvePath(root, "couch")
+            CouchCommitStore(cas, StorageDurability.DURABLE, files, directory).close()
+            val head = files.resolvePath(directory, "HEAD")
+            val empty = files.readAllBytes(head)
+            val valid = CanonicalCbor.encodeMap(mapOf("_id" to "a", "value" to "retained"))
+            val invalid = listOf(
+                CanonicalCbor.encodeMap(mapOf("_id" to "different")),
+                valid + byteArrayOf(0),
+                CanonicalCbor.encodeMap(mapOf("_id" to "a", "contentType" to "text/plain",
+                    "contentId" to ContentId.of(byteArrayOf(99)).value)),
+            )
+            for (body in invalid) {
+                val event = cas.put(CanonicalCbor.encodeMap(mapOf(
+                    "format" to "couch-commit-v1", "index" to 1L, "previous" to null,
+                    "kind" to "frame", "sequence" to 0L, "id" to "a", "rev" to "1-retained",
+                    "deleted" to false, "body" to cas.put(body).value,
+                )))
+                val published = CanonicalCbor.encodeMap(mapOf("format" to "couch-root-v1", "head" to event.value, "count" to 1L))
+                files.writeAtomically(head, published)
+                assertFailsWith<IllegalArgumentException> {
+                    CouchCommitStore(cas, StorageDurability.DURABLE, files, directory)
+                }
+                assertContentEquals(published, files.readAllBytes(head))
+                files.writeAtomically(head, empty)
+                CouchCommitStore(cas, StorageDurability.DURABLE, files, directory).close()
+            }
+        } finally { files.deleteRecursively(root) }
+    }
 
     @Test
     fun headsRevisionsAndDeletionsSurviveReopen() {

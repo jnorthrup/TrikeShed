@@ -1,22 +1,12 @@
 package borg.trikeshed.couch.viewserver
 
 import borg.trikeshed.couch.ViewRow
+import borg.trikeshed.graal.subvm.KotlinSource
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
 import borg.trikeshed.pointcut.PointcutEvent
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.relaxfactory.ViewLanguageHost
 import borg.trikeshed.relaxfactory.ViewLanguages
-import kotlin.script.experimental.api.EvaluationResult
-import kotlin.script.experimental.api.ResultValue
-import kotlin.script.experimental.api.ResultWithDiagnostics
-import kotlin.script.experimental.api.ScriptCompilationConfiguration
-import kotlin.script.experimental.api.ScriptDiagnostic
-import kotlin.script.experimental.api.ScriptEvaluationConfiguration
-import kotlin.script.experimental.host.toScriptSource
-import kotlin.script.experimental.jvm.baseClassLoader
-import kotlin.script.experimental.jvm.dependenciesFromClassloader
-import kotlin.script.experimental.jvm.jvm
-import kotlin.script.experimental.jvmhost.BasicJvmScriptingHost
 
 /** A compiled `language: "kotlin"` map: one document in, emissions through the second argument. */
 typealias KotlinMap = (Map<String, Any?>, (Any?, Any?) -> Unit) -> Unit
@@ -36,31 +26,14 @@ class KotlinViewServer(
     val loader: ClassLoader = KotlinViewServer::class.java.classLoader,
 ) : ViewLanguageHost {
 
-    private val host = BasicJvmScriptingHost()
-
-    private val compilation = ScriptCompilationConfiguration {
-        jvm { dependenciesFromClassloader(classLoader = loader, wholeClasspath = true) }
-    }
-
-    private val evaluation = ScriptEvaluationConfiguration {
-        jvm { baseClassLoader(loader) }
-    }
+    private val compiler = KotlinSource(loader)
 
     private val compiled = HashMap<String, Any?>()
 
     /** Compile and evaluate a script whose value is the function; failures carry the compiler's diagnostics. */
     private fun function(script: String): Any? = synchronized(compiled) {
         compiled.getOrPut(script) {
-            when (val r = host.eval(script.toScriptSource("view.kts"), compilation, evaluation)) {
-                is ResultWithDiagnostics.Success<EvaluationResult> -> when (val v = r.value.returnValue) {
-                    is ResultValue.Value -> v.value
-                    is ResultValue.Error -> throw IllegalArgumentException("view script threw: ${v.error}", v.error)
-                    else -> throw IllegalArgumentException("view script produced no function")
-                }
-                is ResultWithDiagnostics.Failure -> throw IllegalArgumentException(
-                    r.reports.filter { it.severity >= ScriptDiagnostic.Severity.ERROR }
-                        .joinToString("; ") { d -> d.message + (d.location?.start?.let { " @${it.line}:${it.col}" } ?: "") })
-            }
+            compiler.evaluate(script, "view.kts")
         }
     }
 

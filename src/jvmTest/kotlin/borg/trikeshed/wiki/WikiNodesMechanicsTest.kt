@@ -61,6 +61,71 @@ class WikiNodesMechanicsTest {
     @Suppress("UNCHECKED_CAST")
     private fun report(out: Map<String, Any?>): Map<String, Any?> = out["report"] as Map<String, Any?>
 
+    @Test
+    fun backlogDrainsBeyondThirtyTwoWithoutReplayingDuplicateCids() = runBlocking {
+        val root = File(tmp, "backlog")
+        val pending = linkedSetOf<String>()
+        fun cid(index: Int) = ContentId.of("trace-$index".encodeToByteArray()).value
+        repeat(65) { pending.add(cid(it)) }
+        repeat(65) { pending.add(cid(it)) }
+        val observed = ArrayList<String>()
+        val runner = WikiNodes.consolidateRunner(
+            ScriptedDialog("{\"edits\":[]}", "{\"edits\":[]}", "{\"edits\":[]}"),
+            { borg.trikeshed.common.Path(root.absolutePath) },
+            WikiNodes.WikiTraceLoader { cid ->
+                observed.add(cid)
+                WikiNodes.WikiTrace(cid, cid, "fake")
+            },
+            clock = { 1_000L },
+        )
+        for ((iteration, size) in listOf(32, 32, 1).withIndex()) {
+            val batch = pending.take(32)
+            assertEquals(size, batch.size)
+            val r = report(runner.run(node(LcncContracts.WIKI_CONSOLIDATE,
+                mapOf("iteration" to iteration.toString())), mapOf("cids" to batch)))
+            assertEquals(size, WikiNodes.settleConsolidation(pending, batch, r))
+        }
+        assertTrue(pending.isEmpty())
+        assertEquals((0 until 65).map { cid(it) }, observed)
+    }
+
+    @Test
+    fun unresolvedTracesRemainBehindUnsampledWork() = runBlocking {
+        val root = File(tmp, "missing")
+        val missing = ContentId.of("missing".encodeToByteArray()).value
+        val pending = linkedSetOf(missing, cidA, cidB)
+        val batch = pending.take(2)
+        val r = report(WikiNodes.consolidateRunner(ScriptedDialog("{\"edits\":[]}"),
+            { borg.trikeshed.common.Path(root.absolutePath) }, traces, clock = { 1_000L })
+            .run(node(LcncContracts.WIKI_CONSOLIDATE, emptyMap()), mapOf("cids" to batch)))
+        assertEquals(listOf(missing), r["unresolvedCids"])
+        assertEquals(1, WikiNodes.settleConsolidation(pending, batch, r))
+        assertEquals(listOf(cidB, missing), pending.toList())
+    }
+
+    @Test
+    fun failedPassesNeitherDuplicateNorStarveLaterTraces() {
+        val pending = linkedSetOf(cidA, cidB)
+        repeat(100) {
+            assertEquals(0, WikiNodes.settleConsolidation(pending, pending.take(1), null))
+            assertEquals(2, pending.size)
+            assertEquals(if (it % 2 == 0) cidB else cidA, pending.first())
+        }
+        assertEquals(0, WikiNodes.settleConsolidation(pending, listOf(cidA),
+            mapOf("ok" to false, "resolvedCids" to listOf(cidA))))
+        assertTrue(cidA in pending)
+    }
+
+    @Test
+    fun acknowledgmentCannotRetireUnsampledOrExplicitlyUnresolvedTraces() {
+        val pending = linkedSetOf(cidA, cidB)
+        assertEquals(0, WikiNodes.settleConsolidation(pending, listOf(cidA, cidA),
+            mapOf("ok" to true, "resolvedCids" to listOf(cidA, cidB), "unresolvedCids" to listOf(cidA))))
+        assertEquals(listOf(cidB, cidA), pending.toList())
+        assertEquals(0, WikiNodes.settleConsolidation(pending, listOf(cidA), mapOf("ok" to true)))
+        assertEquals(2, pending.size)
+    }
+
     // ── VAL-CROSS-001: both legos are declared vocabulary ──────────────
 
     @Test
@@ -151,6 +216,9 @@ class WikiNodesMechanicsTest {
         assertEquals(3, applied.size, "replace + insert + logs.md append should apply")
         assertEquals(1, refused.size, "the absent span must be reported as refused")
         assertTrue((refused[0]["reason"] as String).contains("not present"))
+        val pending = linkedSetOf(cidB)
+        assertEquals(1, WikiNodes.settleConsolidation(pending, listOf(cidB), r2))
+        assertTrue(pending.isEmpty(), "a recorded refusal must not replay the accepted edits")
 
         // The wiki is NEVER rolled back: iteration 2 saw iteration 1's page.
         assertTrue("Marker-blind verdict" in dialog2.prompts[0], "prior wiki W(k-1) was not fed to iteration 2")
@@ -230,6 +298,9 @@ class WikiNodesMechanicsTest {
             .run(node(LcncContracts.WIKI_CONSOLIDATE, mapOf("cids" to cidA, "contextId" to "ctx-bad")), emptyMap()))
         assertEquals(false, r["ok"])
         assertEquals("unparsable_edit_script", r["error"])
+        val pending = linkedSetOf(cidA, cidB)
+        assertEquals(0, WikiNodes.settleConsolidation(pending, listOf(cidA), r))
+        assertEquals(listOf(cidB, cidA), pending.toList())
         assertEquals(0, File(root, "patterns").listFiles()?.size ?: 0)
         assertTrue(File(root, "raw-responses/ctx-bad.json").isFile, "even a refused turn is captured")
         assertTrue("REFUSED" in File(root, "logs.md").readText())

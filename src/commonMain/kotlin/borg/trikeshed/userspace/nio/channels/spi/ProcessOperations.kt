@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
-import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -34,6 +33,26 @@ interface ProcessOperations : CoroutineContext.Element {
         stdin: ByteArray? = null,
         env: Map<String, String> = emptyMap(),
     ): ProcessResult
+
+    /** Open owned pipes for a persistent worker. The caller must drain, await and close them. */
+    suspend fun open(
+        command: String,
+        args: List<String> = emptyList(),
+        env: Map<String, String> = emptyMap(),
+    ): ProcessPipes = TODO("Persistent process pipes are not bound on this target")
+}
+
+enum class ProcessOutput { Stdout, Stderr }
+
+/** OS effects only; admission, framing and queue ownership belong to commonMain. */
+interface ProcessPipes {
+    suspend fun write(bytes: ByteArray)
+    /** Number of bytes read, or -1 at EOF. Exactly one reader per output. */
+    suspend fun read(output: ProcessOutput, bytes: ByteArray): Int
+    suspend fun closeInput()
+    suspend fun awaitExit(): Int
+    /** Release every pipe and reap the child; terminate only if it has not exited. */
+    suspend fun close()
 }
 
 data class ProcessResult(

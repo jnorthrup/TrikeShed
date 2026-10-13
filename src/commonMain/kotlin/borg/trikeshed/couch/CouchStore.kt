@@ -295,7 +295,7 @@ object CouchStoreFactory {
      */
     fun casBacked(cas: borg.trikeshed.job.CasStore): CouchStore {
         val head = CouchHeadProjection()
-        val changes = CouchChangesProjection()
+        val changes = CouchChangesProjection(cas)
         val ingress = ProductionCouchIngress(
             head,
             { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
@@ -321,7 +321,7 @@ object CouchStoreFactory {
             "durableCasBacked requires a DURABLE commit store"
         }
         val head = CouchHeadProjection()
-        val changes = CouchChangesProjection()
+        val changes = CouchChangesProjection(cas)
         var maxSequence = -1L
         val recovered = commits.recoveredFrames
         for (i in 0 until recovered.size) {
@@ -351,8 +351,11 @@ object CouchStoreFactory {
     }
 
     /** Inverse of [canonicalBody]. */
-    fun documentFromBody(bytes: ByteArray): Document? {
-        val m = borg.trikeshed.job.CanonicalCbor.decodeMap(bytes)
+    fun documentFromBody(bytes: ByteArray): Document? =
+        documentFromBody(borg.trikeshed.job.CanonicalCbor.decodeMap(bytes))
+
+    /** Project an already decoded body without decoding its bytes again. */
+    fun documentFromBody(m: Map<String, Any?>): Document? {
         val id = m["_id"] as? String ?: return null
         return Document(id, m.entries.filter { it.key != "_id" && it.value != null }.map { Field(it.key, it.value!!) })
     }

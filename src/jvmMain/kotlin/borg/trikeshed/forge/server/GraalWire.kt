@@ -993,6 +993,9 @@ class GraalWire(
             "className" to coord["className"],
             "methodName" to coord["methodName"],
             "bci" to coord["bytecodeOffset"],
+            "sourcePath" to f("sourcePath"),
+            "line" to f("line"),
+            "column" to f("column"),
         )
     }.sortedBy { it["route"].toString() }
 

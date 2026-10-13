@@ -1,12 +1,11 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyStrict
 
+import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.boundLcnc
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 /**
  * Rule-admission LCNC nodes — the seam that brings the daemon's LIVE
  * [CausalityReteElement] out of dead spin. The daemon boots the element over
@@ -22,19 +21,53 @@ import borg.trikeshed.lib.toSeries
  */
 object RuleNodes {
 
-    private fun copulaOf(raw: String?): NalCopula = when (raw?.trim()) {
-        "<=>", "EQUIVALENCE" -> NalCopula.EQUIVALENCE
-        else -> NalCopula.IMPLICATION
+    private fun copulaOf(raw: String?): NalCopula {
+        val text = raw?.trim() ?: "==>"
+        return requireNotNull(NalCopula.entries.firstOrNull { it.symbol == text || it.name == text }) {
+            "Unknown rule copula: $text"
+        }
     }
 
-    /** Per-rule discount scales the banked evidence weight (1.0 = one full observation). */
-    private fun rule(antecedent: String, consequent: String, copula: String?, discount: Float?): EternalRule =
-        EternalRule(
-            antecedent = antecedent,
-            consequent = consequent,
-            copula = copulaOf(copula),
-            evidence = EvidenceCoord((Nal.UNIT * (discount ?: 1f)).toLong(), 0L),
-        )
+    /** Shared JSON boundary for hypothetical evaluation and explicit live admission. */
+    fun specifications(node: LcncNode, inputs: Map<String, Any?>): Series<Map<*, *>> {
+        val port = when { "rules" in inputs -> "rules"; "rules?" in inputs -> "rules?"; else -> null }
+        if (port == null) return if (node.params["antecedent"].isNullOrBlank() || node.params["consequent"].isNullOrBlank())
+            emptySeriesOf() else s_[node.params]
+        val raw = inputs[port].let { if (it is String) reifyStrict(it) else it }
+        val rows: Series<Any?> = when (raw) {
+            is List<*> -> raw.toSeries()
+            is Array<*> -> raw.size j { i: Int -> raw[i] }
+            else -> throw IllegalArgumentException("rules must be an array")
+        }
+        return rows α { requireNotNull(it as? Map<*, *>) { "Each rule must be an object" } }
+    }
+
+    /** Explicit evidence retains both polarities. A pattern weight is not a confidence or a vote. */
+    fun rule(spec: Map<*, *>): EternalRule {
+        fun term(key: String) = requireNotNull(spec[key] as? String) { "Rule $key is required" }
+            .also { require(it.isNotBlank()) { "Rule $key is blank" } }
+        fun count(key: String): Long {
+            val n = spec[key]?.toString()?.toDoubleOrNull()
+            require(n != null && n.isFinite() && n in 0.0..4_294_967_295.0 && n % 1.0 == 0.0) {
+                "$key must be an unsigned 32-bit evidence count"
+            }
+            return n.toLong()
+        }
+        val evidence = if ("positiveEvidence" in spec || "negativeEvidence" in spec) {
+            require(spec["discount"] == null) { "Use explicit evidence or discount, not both" }
+            EvidenceCoord(count("positiveEvidence"), count("negativeEvidence"))
+        } else {
+            val weight = spec["discount"]?.toString()?.toFloatOrNull() ?: if (spec["discount"] == null) 1f else Float.NaN
+            require(weight.isFinite() && weight in 0f..1f) { "Rule discount must be in 0..1" }
+            EvidenceCoord((Nal.UNIT * weight).toLong(), 0L)
+        }
+        val provenance = spec["provenanceCid"]?.let { requireNotNull(it as? String) { "provenanceCid must be a string" } }
+        val result = EternalRule(term("antecedent"), term("consequent"), copulaOf(spec["copula"]?.toString()), evidence, provenance)
+        require(spec["ruleCid"] == null || spec["ruleCid"] == result.ruleCid.value) {
+            "ruleCid does not match rule terms, evidence and provenance"
+        }
+        return result
+    }
 
     /**
      * `nal.rule.admit` — admit eternal rules into the live rete. The `rules`
@@ -54,28 +87,18 @@ object RuleNodes {
          */
         ledger: ((EternalRule) -> Unit)? = null,
     ): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
-        val specs: List<Map<*, *>> = when (val raw = inputs["rules"] ?: inputs["rules?"]) {
-            is List<*> -> raw.mapNotNull { it as? Map<*, *> }
-            is String -> (reify(raw) as? List<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
-            else -> emptyList()
-        }
-        val offered: List<EternalRule> = if (specs.isNotEmpty()) specs.mapNotNull { spec ->
-            val antecedent = spec["antecedent"]?.toString() ?: return@mapNotNull null
-            val consequent = spec["consequent"]?.toString() ?: return@mapNotNull null
-            rule(antecedent, consequent, spec["copula"]?.toString(), spec["discount"]?.toString()?.toFloatOrNull())
-        } else {
-            val antecedent = node.params["antecedent"]
-            val consequent = node.params["consequent"]
-            if (antecedent.isNullOrBlank() || consequent.isNullOrBlank()) emptyList()
-            else listOf(rule(antecedent, consequent, node.params["copula"], node.params["discount"]?.toFloatOrNull()))
-        }
-        val admitted = if (offered.isEmpty()) 0 else element.admit(offered.toSeries())
+        // Decode the whole offer before admission: a malformed later row cannot partially admit earlier rows.
+        val specs = specifications(node, inputs)
+        val decoded = Array(specs.size) { rule(specs[it]) }
+        val offered = (decoded.size j decoded::get).filter { it.isEternal }
+        val admitted = if (offered.size == 0) 0 else element.admit(offered)
         // After the live admit, and never able to break it: a durability sink that is down
         // costs durability, not the rule that is already in the rete.
-        if (ledger != null) for (r in offered) runCatching { ledger(r) }
+        if (ledger != null) for (r in offered.view) runCatching { ledger(r) }
         mapOf(
             "admitted" to admitted,
-            "ruleCids" to offered.map { it.ruleCid.value },
+            "ruleCids" to (offered α { it.ruleCid.value }).view.toList(),
+            "rejected" to decoded.size - offered.size,
         )
     }
 

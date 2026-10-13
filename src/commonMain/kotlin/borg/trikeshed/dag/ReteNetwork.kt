@@ -125,6 +125,10 @@ class ReteNetwork(
     /** Every current fact in every partition, ordered by (partition, localId), read under the write lock. */
     suspend fun snapshot(): Series<ReteStoredFact> = writeLock.withLock { workingMemory.all() }
 
+    /** A coherent selection of partitions, under the same lock as the complete snapshot. */
+    suspend fun snapshot(partitions: Series<String>): Series<ReteStoredFact> =
+        writeLock.withLock { workingMemory.all(partitions) }
+
     suspend fun query(board: BlackboardContext, facet: Join<String, Any?>): Series<ReteStoredFact> =
         writeLock.withLock { workingMemory.query(board, facet) }
 

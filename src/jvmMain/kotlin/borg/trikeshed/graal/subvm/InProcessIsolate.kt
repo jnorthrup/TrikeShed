@@ -27,6 +27,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -92,16 +93,15 @@ class InProcessIsolate(
     private val lock = ReentrantLock()
     private val engine: Engine = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build()
     private val context: Context
-    /**
-     * Only for languages whose function roots the listener actually reports. GraalPy reports none —
-     * but it does emit stray roots (generator expressions: `strs.<locals>.<genexpr>`) which would mark
-     * every enclosing binding-pointcut frame "foreign" and block promotion. A partial view is worse than none.
-     */
+    /** Native function roots, where supported; binding pointcuts are only the fallback. */
     private val listener: ExecutionListener?
     private val delegates = ConcurrentHashMap<String, (List<Teleported>) -> Teleported>()
 
     private class Frame(val root: String, val enterNanos: Long) { var foreign = false; var host = false }
     private val stack = ArrayDeque<Frame>()
+    // Rebinding runs under the isolate lock. Its Python metadata/import work is
+    // instrumentation setup, not guest work to train or promote recursively.
+    private var rebinding = false
 
     private val evals = AtomicLong(); private val calls = AtomicLong(); private val hostCalls = AtomicLong()
     private val rootEnters = AtomicLong(); private val interrupted = AtomicLong()
@@ -151,31 +151,38 @@ class InProcessIsolate(
         input?.let { b.`in`(it) }
         output?.let { b.out(it) }
         error?.let { b.err(it) }
-        if (bounds.statementLimitSafe && budget.statements > 0) {
-            b.resourceLimits(ResourceLimits.newBuilder().statementLimit(budget.statements, null).build())
-        }
+        // The per-crossing budget belongs to user execution, not engine bootstrap
+        // (Ruby initializes its core library when bindings are first requested).
+        val initialized = AtomicBoolean(false)
+        if (bounds.statementLimitSafe && budget.statements > 0)
+            b.resourceLimits(ResourceLimits.newBuilder().statementLimit(budget.statements) { initialized.get() }.build())
         context = b.build()
-        listener = if (bounds.rootEventsObservable) ExecutionListener.newBuilder()
-            .roots(true)
-            .collectReturnValue(true)
-            .rootNameFilter { !bounds.rootNameNoise(it) }
-            .onEnter { onEnter(it) }
-            .onReturn { onReturn(it) }
-            .attach(engine) else null
         context.getBindings(bounds.languageId).putMember(HOST_BINDING, ProxyObject.fromMap(mapOf(
             "call" to ProxyExecutable { args -> hostCall(args) },
         )))
+        initialized.set(true)
+        listener = if (bounds.rootEventsObservable) ExecutionListener.newBuilder()
+            .roots(true)
+            .collectReturnValue(true)
+            .rootNameFilter { it != null && !bounds.rootNameNoise(it) }
+            .onEnter { onEnter(it) }
+            .onReturn { onReturn(it) }
+            .attach(engine) else null
     }
 
     // ── listener ──────────────────────────────────────────────────────────
     private fun onEnter(ev: ExecutionEvent) {
+        if (rebinding) return
         val name = ev.rootName ?: return
         stack.lastOrNull()?.let { top -> if (top.root != name) top.foreign = true }
-        stack.addLast(Frame(name, System.nanoTime()))
+        // Java interop does not pass through hostCall(). Until its effects are observed,
+        // roots with host-class access cannot be classified as pure/memoizable leaves.
+        stack.addLast(Frame(name, System.nanoTime()).also { it.host = bounds.hostTrusted || guestModule != null })
         rootEnters.incrementAndGet()
     }
 
     private fun onReturn(ev: ExecutionEvent) {
+        if (rebinding) return
         val name = ev.rootName ?: return
         var frame: Frame? = null
         while (stack.isNotEmpty()) { val f = stack.removeLast(); if (f.root == name) { frame = f; break } }
@@ -208,6 +215,15 @@ class InProcessIsolate(
     // ── binding pointcuts (languages whose roots the listener cannot see) ─
     private val programSource = StringBuilder()
     private val bindingWrapped = HashSet<String>()
+    private val pythonDelegationWrapper: Value by lazy {
+        // The leaf transport is positional. Keyword calls retain guest execution and
+        // observation instead of losing arguments or claiming a memo/host receipt.
+        context.eval(Source.newBuilder("python", """
+            (lambda wraps: lambda original, delegate:
+                wraps(original)(lambda *args, **kwargs:
+                    original(*args, **kwargs) if kwargs else delegate(*args)))(__import__('functools').wraps)
+        """.trimIndent(), "binding-delegation.py").internal(true).buildLiteral())
+    }
 
     /** Everything eval'd so far, in order — what a leaf host re-parses when a root has no captured characters. */
     val program: String get() = programSource.toString()
@@ -238,7 +254,7 @@ class InProcessIsolate(
 
     private fun observedCall(name: String, original: Value, args: Array<Value>): Any? {
         stack.lastOrNull()?.let { top -> if (top.root != name) top.foreign = true }
-        val frame = Frame(name, System.nanoTime())
+        val frame = Frame(name, System.nanoTime()).also { it.host = bounds.hostTrusted || guestModule != null }
         stack.addLast(frame)
         rootEnters.incrementAndGet()
         val result: Value
@@ -327,7 +343,13 @@ class InProcessIsolate(
     internal fun rebind(root: String, proxy: ProxyExecutable) {
         val b = context.getBindings(bounds.languageId)
         if (root in bindingWrapped && root !in bindingOriginals) bindingOriginals[root] = b.getMember(root)
-        b.putMember(root, proxy)
+        val prior = rebinding
+        rebinding = true
+        try {
+            b.putMember(root, if (bounds.languageId == "python") pythonDelegationWrapper.execute(original(root), proxy) else proxy)
+        } finally {
+            rebinding = prior
+        }
     }
 
     internal fun restore(root: String, original: Value) {

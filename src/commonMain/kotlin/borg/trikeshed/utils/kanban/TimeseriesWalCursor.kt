@@ -2,7 +2,7 @@
 
 package borg.trikeshed.utils.kanban
 
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.α
@@ -97,7 +97,7 @@ data class SynonymOps(
 }
 
 /**
- * Cursor over a `JulesBoardStore` projection into the unified timeseries.
+ * Cursor over a `SessionBoardStore` projection into the unified timeseries.
  *
  * Position advances through the WAL in causal order (file offset is
  * monotonic, since each `append` writes a strict tail segment). Each row
@@ -109,7 +109,7 @@ data class SynonymOps(
  * Series-typed everywhere else.
  */
 class TimeseriesWalCursor(
-    private val store: JulesBoardStore,
+    private val store: SessionBoardStore,
 ) {
 
     /**
@@ -174,10 +174,10 @@ class TimeseriesWalCursor(
     ): List<Pair<String, SynonymOps>> {
         val c = event.cause
         return when (c) {
-            is JulesCause.WorkDispatched -> listOf(
+            is SessionCause.WorkDispatched -> listOf(
                 c.sessionId to SynonymOps(sessionUrl = "https://jules.google.com/session/${c.sessionId}")
             )
-            is JulesCause.WorkIdentitySynthesized -> listOf(
+            is SessionCause.WorkIdentitySynthesized -> listOf(
                 c.identity.sessionId to SynonymOps(
                     sessionUrl = c.identity.sessionUrl,
                     gitBranch = c.identity.gitBranch,
@@ -186,7 +186,7 @@ class TimeseriesWalCursor(
                     commitSha = c.identity.commitSha,
                 )
             )
-            is JulesCause.WorkDrained -> listOf(
+            is SessionCause.WorkDrained -> listOf(
                 c.sessionId to SynonymOps(
                     sessionUrl = "https://jules.google.com/session/${c.sessionId}",
                     gitTag = c.receipt?.versionTag,
@@ -194,23 +194,23 @@ class TimeseriesWalCursor(
                     commitSha = c.commitSha,
                 )
             )
-            is JulesCause.DrainApplied -> listOf(
+            is SessionCause.DrainApplied -> listOf(
                 event.sid to SynonymOps(commitSha = c.commitSha)
             )
-            is JulesCause.AgentMessaged,
-            is JulesCause.HumanAnswered,
-            is JulesCause.PatchArrived,
-            is JulesCause.PatchSnapshotObserved,
-            is JulesCause.PatchReviewSelected,
-            is JulesCause.PatchRejected,
-            is JulesCause.AgentReportObserved,
-            is JulesCause.AgentReportReviewSelected,
-            is JulesCause.DrainFailed,
-            is JulesCause.PredicateFlipped,
-            is JulesCause.SessionFailed,
-            is JulesCause.SessionArchived,
-            is JulesCause.StateObserved -> listOf(event.sid to SynonymOps.Empty)
-            is JulesCause.WorkQueued -> listOf(c.workId to SynonymOps.Empty)
+            is SessionCause.AgentMessaged,
+            is SessionCause.HumanAnswered,
+            is SessionCause.PatchArrived,
+            is SessionCause.PatchSnapshotObserved,
+            is SessionCause.PatchReviewSelected,
+            is SessionCause.PatchRejected,
+            is SessionCause.AgentReportObserved,
+            is SessionCause.AgentReportReviewSelected,
+            is SessionCause.DrainFailed,
+            is SessionCause.PredicateFlipped,
+            is SessionCause.SessionFailed,
+            is SessionCause.SessionArchived,
+            is SessionCause.StateObserved -> listOf(event.sid to SynonymOps.Empty)
+            is SessionCause.WorkQueued -> listOf(c.workId to SynonymOps.Empty)
         }
     }
 

@@ -4,6 +4,7 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.parse.confix.ConfixDoc
 import borg.trikeshed.parse.confix.src
+import borg.trikeshed.parse.confix.Syntax
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.userspace.nio.file.Files
 import borg.trikeshed.userspace.nio.file.Path
@@ -12,7 +13,7 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 
 /**
  * Append-only Write-Ahead Log for Confix Documents.
- * Serves as the durability layer before compaction into the ISAM K-V Stringpool layout.
+ * Legacy framing has no syntax marker. Replay retains source bytes and revisions in the dense Confix store.
  */
 class ConfixWal(
     val walFileLocation: String,
@@ -65,33 +66,32 @@ class ConfixWal(
     /**
      * Replays the WAL to rebuild the in-memory or on-disk MemTable/ISAM state.
      */
-    fun replay(bridge: ConfixIsamCursorBridge) {
+    fun replay(bridge: ConfixIsamCursorBridge, syntax: Syntax = Syntax.JSON) {
         if (!fileOps.exists(walFileLocation)) return
         val bytes = fileOps.readAllBytes(walFileLocation)
         val buf = ByteBuffer.wrap(bytes)
-        while (buf.remaining() >= 8 + 4 + 4 + 4) {
-            val seq = buf.getLong()
-            val idLen = buf.getInt()
-            if (buf.remaining() < idLen) break
-            val idBytes = ByteArray(idLen)
-            buf.get(idBytes)
-
-            if (buf.remaining() < 4) break
-            val revLen = buf.getInt()
-            if (buf.remaining() < revLen) break
-            val revBytes = ByteArray(revLen)
-            buf.get(revBytes)
-
-            if (buf.remaining() < 4) break
-            val docLen = buf.getInt()
-            if (buf.remaining() < docLen) break
-            val docBytes = ByteArray(docLen)
-            buf.get(docBytes)
-
-            val offset = bridge.stringpool.put(docBytes.decodeToString())
-            bridge.index.put(idBytes.decodeToString(), offset)
-            sequenceNumber = seq + 1
+        // The legacy format has no syntax marker. Its caller must supply non-JSON syntax explicitly.
+        // Validate the complete snapshot before publishing any conversion; never truncate a partial tail.
+        val frames = mutableListOf<Triple<Long, Pair<String, String>, ByteArray>>()
+        fun field(): ByteArray {
+            require(buf.remaining() >= 4) { "Incomplete Confix WAL field length" }
+            val size = buf.getInt()
+            require(size >= 0 && size <= buf.remaining()) { "Invalid Confix WAL field length" }
+            return ByteArray(size).also { buf.get(it) }
         }
+        var previous = -1L
+        while (buf.hasRemaining()) {
+            require(buf.remaining() >= 20) { "Incomplete Confix WAL frame" }
+            val seq = buf.getLong()
+            require(seq >= 0 && seq > previous && seq < Long.MAX_VALUE) { "Invalid Confix WAL sequence" }
+            val id = field().decodeToString(throwOnInvalidSequence = true)
+            val rev = field().decodeToString(throwOnInvalidSequence = true)
+            require(id.isNotEmpty() && rev.isNotEmpty()) { "Invalid Confix WAL identity" }
+            frames.add(Triple(seq, id to rev, field()))
+            previous = seq
+        }
+        for ((seq, identity, source) in frames) bridge.put(seq, identity.first, identity.second, source, syntax)
+        sequenceNumber = previous + 1
     }
 
     /**

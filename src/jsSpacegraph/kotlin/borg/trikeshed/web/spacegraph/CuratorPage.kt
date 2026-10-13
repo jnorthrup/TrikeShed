@@ -135,6 +135,7 @@ object CuratorPage {
      *  Enter in the find box searches the curated leaves on the daemon, the depth box deep; with the Jev box checked,
      *  what either box found goes to Jev and stands in Jev's order. */
     private var tocAt = -2
+    private var contentsUpdate: () -> Unit = {}
     /** Bumped per search shown: an answer arriving after the next search began is dropped. */
     private var shownAt = 0
     private fun finder() {
@@ -203,9 +204,15 @@ object CuratorPage {
             val row = e.target.closest("[data-node]") ?: return@addEventListener
             scope.goto(str(row.getAttribute("data-node")).toInt())
         })
-        // The library's contents appear once the ring has laid it out.
-        fun wait() { if (tocAt == -2 && scope.contents(-1).isNotEmpty()) contents(-1) else if (tocAt == -2) window.setTimeout({ wait() }, 500) }
-        wait()
+        // Intake can arrive in several batches. Refresh contents, not an operator's search results.
+        var nodes = -1
+        var epoch = 0L
+        contentsUpdate = {
+            if ((nodes != scope.nodes || epoch != scope.epoch) && scope.nodes > 0 && tocAt >= -2) {
+                contents(if (epoch != scope.epoch) -1 else tocAt.coerceAtLeast(-1))
+            }
+            nodes = scope.nodes; epoch = scope.epoch
+        }
         gate(rank)
     }
 
@@ -308,6 +315,7 @@ object CuratorPage {
                 val r = fetchJs("/api/lcnc/trail?since=${scope.cursor}&nodes=${scope.nodes}&epoch=${scope.epoch}")
                 val body = str(awaitJs(r.text()))
                 scope.drain(reify(body) as Map<*, *>, window.performance.now())
+                contentsUpdate()
                 status("live · ${scope.nodes} nodes")
             } catch (e: dynamic) { status("ring unreachable: " + failureText(e)) }
             window.setTimeout({ poll() }, POLL_MS)

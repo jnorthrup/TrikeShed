@@ -6,7 +6,7 @@ import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.graal.subvm.GuestModules
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.j

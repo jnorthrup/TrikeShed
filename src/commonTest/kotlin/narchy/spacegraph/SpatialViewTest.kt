@@ -11,6 +11,23 @@ class SpatialViewTest {
     private fun measured(id: String, x: Double, y: Double, w: Double, h: Double, scale: Double = 1.0) =
         MeasuredNode(id, Rect(x, y, w, h), emptySeriesOf(), scale = scale)
 
+    @Test fun perspectiveCameraCopiesRecomputeTheirBasisAndRoundTrip() {
+        val initial = GraphCamera(mode = CameraMode.PERSPECTIVE, position = Vec3(20.0, 45.0, 500.0))
+        val cameras = listOf(initial,
+            initial.copy(center = Vec3(35.0, -12.0, 0.0), position = Vec3(-15.0, 70.0, 400.0), zoom = 1.7, fieldOfView = 55.0),
+            initial.copy(position = Vec3(0.0, 500.0, 0.0)))
+        val points = listOf(Vec3.ZERO, Vec3(25.0, -30.0, 0.0), Vec3(-45.0, 60.0, 0.0))
+        for (camera in cameras.take(2)) for (point in points) {
+            val screen = assertNotNull(camera.project(point, viewport))
+            assertTrue((assertNotNull(camera.unproject(screen, viewport)) - point).length < 1e-9)
+        }
+        val vertical = cameras.last()
+        val center = assertNotNull(vertical.project(Vec3.ZERO, viewport))
+        assertEquals(500.0, center.x)
+        assertEquals(350.0, center.y)
+        assertEquals(Vec3(0.0, -1.0, 0.0), vertical.ray(center, viewport).direction)
+    }
+
     @Test fun recursionCompoundsDepthAndThicknessWithInheritedScale() {
         val program = LcncProgram("recursive", s_[LcncNode("a", "scope", children = s_[
             LcncNode("b", "scope", children = s_[LcncNode("c", "scope", children = s_[LcncNode("d", "text.value")])])])], emptySeriesOf())

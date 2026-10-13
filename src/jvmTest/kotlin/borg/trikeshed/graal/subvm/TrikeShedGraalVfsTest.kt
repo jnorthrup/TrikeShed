@@ -11,6 +11,59 @@ import kotlin.test.assertTrue
 
 class TrikeShedGraalVfsTest {
     @Test
+    fun graalPythonExplicitUtimeRetainsNanoseconds() {
+        // GraalPy 25.3.4.1 SetUTimeNode.toFileTime(seconds, nanos) currently ignores nanos.
+        // Keep the precision contract visible; the VFS must not be weakened to match that loss.
+        GraalBtrfsSupervisor("vfs-python-times", VmFacet.GRAAL_PYTHON).use { supervisor ->
+            supervisor.put("/workspace/stamp", "retained".encodeToByteArray())
+            val result = supervisor.eval(
+                """
+                import os
+                from pathlib import Path
+                p = Path('/workspace/stamp')
+                os.utime(p, ns=(1234567890123456789, 1234567890987654321))
+                s = p.stat()
+                assert s.st_atime_ns == 1234567890123456789, s.st_atime_ns
+                assert s.st_mtime_ns == 1234567890987654321, s.st_mtime_ns
+                p.read_text()
+                """.trimIndent(), "guest-times-ns.py")
+            assertEquals(Teleported.Str("retained"), result)
+        }
+    }
+
+    @Test
+    fun graalPythonTouchAndWholeSecondUtimePreserveContentAndReportMissingFiles() {
+        GraalBtrfsSupervisor("vfs-python-touch", VmFacet.GRAAL_PYTHON).use { supervisor ->
+            supervisor.put("/workspace/stamp", "retained".encodeToByteArray())
+            val result = supervisor.eval(
+                """
+                import os
+                from pathlib import Path
+                p = Path('/workspace/stamp')
+                os.utime(p, times=(1234567890, 1234567891))
+                s = p.stat()
+                assert s.st_atime_ns == 1234567890000000000, s.st_atime_ns
+                assert s.st_mtime_ns == 1234567891000000000, s.st_mtime_ns
+                p.touch()
+                assert p.stat().st_mtime_ns > s.st_mtime_ns
+                Path('/tmp/new-stamp').touch()
+                assert Path('/tmp/new-stamp').stat().st_size == 0
+                try:
+                    os.utime('/tmp/missing', ns=(0, 0))
+                except FileNotFoundError:
+                    pass
+                else:
+                    raise AssertionError('utime created a missing path')
+                p.read_text()
+                """.trimIndent(), "guest-times.py")
+            assertEquals(Teleported.Str("retained"), result)
+            assertEquals("retained", supervisor.vfs.fetch("/workspace/stamp")?.decodeToString())
+            val times = supervisor.vfs.btrfsForTools().times(supervisor.vfs.liveSubvolumeForTools(), "workspace/stamp")!!
+            assertTrue(times.lastModifiedTime.epochSeconds > 1_234_567_890)
+        }
+    }
+
+    @Test
     fun graalPythonCwdAndFileIoStayInsideUserspaceBtrfs() {
         GraalBtrfsSupervisor("vfs-python", VmFacet.GRAAL_PYTHON).use { supervisor ->
             val result = supervisor.eval(

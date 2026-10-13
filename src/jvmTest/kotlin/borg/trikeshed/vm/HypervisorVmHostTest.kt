@@ -4,6 +4,8 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.pointcut.VmFacet
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertFails
 import kotlin.test.assertTrue
 
 /** The common contract bound to tier 1 (in-process Graal DAG leafs under the Hypervisor). */
@@ -34,6 +36,10 @@ class JvmVmProvidersTest {
         val row = host.rows()[0]
         assertEquals("in-process", row[3].a)
         host.revoke("t", "done")
+        assertFalse(h.isAlive)
+        assertEquals("revoked", host.rows()[0][4].a)
+        assertFails { h.eval("1 + 1") }
+        host.revoke("t", "already closed")
         host.close()
         VmSupervisor.reset()
     }

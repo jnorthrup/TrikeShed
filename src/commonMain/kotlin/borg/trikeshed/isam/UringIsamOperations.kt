@@ -3,6 +3,7 @@ package borg.trikeshed.isam
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.couch.isam.FileBackedStringpool
 import borg.trikeshed.isam.meta.IsamMetaFileReader
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.MemoryMapping
@@ -60,15 +61,19 @@ class UringIsamDataReader internal constructor(
     metafile: IsamMetaFileReader,
     private val channelFactory: IsamChannelFactory,
     private val readMode: IsamReadMode = IsamReadMode.CHANNEL,
+    val leafCodec: IsamLeafCodec = ZstdLeafCodec,
 ) : IsamDataReader {
-    val metafile = metafile.withDefaultFiles(IsamFileOperations(channelFactory))
+    val metafile = metafile.withDefaultFiles(IsamFileOperations(channelFactory)) { path ->
+        FileBackedStringpool(path, 64, channelFactory, leafCodec)
+    }
     constructor(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader,
-                readMode: IsamReadMode = IsamReadMode.CHANNEL) :
-        this(datafileFilename, metafileFilename, metafile, ::openIsamChannel, readMode)
+                readMode: IsamReadMode = IsamReadMode.CHANNEL, leafCodec: IsamLeafCodec = ZstdLeafCodec) :
+        this(datafileFilename, metafileFilename, metafile, ::openIsamChannel, readMode, leafCodec)
 
     constructor(scope: CoroutineScope, datafileFilename: String, metafileFilename: String,
-                metafile: IsamMetaFileReader, readMode: IsamReadMode = IsamReadMode.CHANNEL) :
-        this(datafileFilename, metafileFilename, metafile, { path, options -> FileChannel.open(scope, path, options) }, readMode)
+                metafile: IsamMetaFileReader, readMode: IsamReadMode = IsamReadMode.CHANNEL,
+                leafCodec: IsamLeafCodec = ZstdLeafCodec) :
+        this(datafileFilename, metafileFilename, metafile, { path, options -> FileChannel.open(scope, path, options) }, readMode, leafCodec)
 
     private var constraints: Series<RecordMeta>? = null
     private val groupFiles = mutableMapOf<String, FileChannel>()
@@ -164,7 +169,7 @@ class UringIsamDataReader internal constructor(
                     channel.map(FileChannel.MapMode.READ_ONLY, 0, size).also { groupMappings[name] = it } else null
                 val read: IsamRead = if (mapping != null) { offset, dst -> mapping.read(offset, dst) }
                     else { offset, dst -> transfer(channel, dst, offset, read = true) }
-                val stored = openLeaves(read, size, length, members)
+                val stored = openLeaves(read, size, length, members, leafCodec)
                 val groupCount = if (stored != null) stored.rows.toLong() else {
                     require(size >= 0 && size % length == 0L) { "ISAM group $name contains an incomplete row" }
                     size / length
@@ -246,19 +251,26 @@ class UringIsamOperations internal constructor(
     private val channelFactory: IsamChannelFactory,
     private val readMode: IsamReadMode = IsamReadMode.CHANNEL,
     val leafBytes: Int = 0,
+    val leafCodec: IsamLeafCodec = ZstdLeafCodec,
 ) : IsamOperations {
-    constructor(readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0) : this(::openIsamChannel, readMode, leafBytes)
-    constructor(scope: CoroutineScope, readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0) :
-        this({ path, options -> FileChannel.open(scope, path, options) }, readMode, leafBytes)
+    constructor(readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0,
+                leafCodec: IsamLeafCodec = ZstdLeafCodec) : this(::openIsamChannel, readMode, leafBytes, leafCodec)
+    constructor(scope: CoroutineScope, readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0,
+                leafCodec: IsamLeafCodec = ZstdLeafCodec) :
+        this({ path, options -> FileChannel.open(scope, path, options) }, readMode, leafBytes, leafCodec)
     private val metadataFiles = IsamFileOperations(channelFactory)
     private val lock = Mutex()
 
+    override fun metadata(metafile: IsamMetaFileReader): IsamMetaFileReader =
+        metafile.withDefaultFiles(metadataFiles) { path -> FileBackedStringpool(path, 64, channelFactory, leafCodec) }
+
     override fun createReader(datafileFilename: String, metafileFilename: String, metafile: IsamMetaFileReader): IsamDataReader =
-        UringIsamDataReader(datafileFilename, metafileFilename, metafile, channelFactory, readMode)
+        UringIsamDataReader(datafileFilename, metafileFilename, metafile, channelFactory, readMode, leafCodec)
 
     override fun write(cursor: Cursor, datafilename: String, varChars: Map<String, Int>, useMonocursorGroupings: Boolean): Unit = exclusive {
         require(cursor.size > 0) { "ISAM write needs at least one row to establish its schema" }
         val first = cursor[0]
+        if (leafBytes > 0) leafCodec.prepareWrite()
         val metadata = IsamMetaFileReader.write("$datafilename.meta", rowMetadata(first), varChars,
             metadataFiles = metadataFiles, useMonocursorGroupings = useMonocursorGroupings)
         writeRows(cursor.view, datafilename, metadata, append = false, create = true)
@@ -269,10 +281,13 @@ class UringIsamOperations internal constructor(
         val source = msf.iterator()
         if (!source.hasNext()) return@exclusive
         val first = source.next().let { transform?.invoke(it) ?: it }
+        if (leafBytes > 0) leafCodec.prepareWrite()
         val metafilename = "$datafilename.meta"
         val exists = metadataFiles.exists(metafilename)
         val metadata = if (exists) {
-            val reader = IsamMetaFileReader(metafilename, metadataFiles)
+            val reader = IsamMetaFileReader(metafilename, metadataFiles) { path ->
+                FileBackedStringpool(path, 64, channelFactory, leafCodec)
+            }
             try {
                 reader.open()
                 reader.constraints.also {
@@ -308,7 +323,7 @@ class UringIsamOperations internal constructor(
     }
 
     private fun writeRows(rows: Iterable<RowVec>, filename: String, metadata: Series<RecordMeta>, append: Boolean, create: Boolean) {
-        if (leafBytes > 0) return writeLeafRows(rows, filename, metadata, append, create, channelFactory, leafBytes)
+        if (leafBytes > 0) return writeLeafRows(rows, filename, metadata, append, create, channelFactory, leafBytes, leafCodec)
         val groups = metadata.view.groupBy { it.groupName }
         val primary = metadata.view.maxOf { it.groupId }
         val channels = mutableMapOf<String, FileChannel>()

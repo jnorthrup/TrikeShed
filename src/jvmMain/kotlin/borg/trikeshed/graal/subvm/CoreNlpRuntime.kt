@@ -19,17 +19,29 @@ import borg.trikeshed.parse.reifyMap
  * from a bounded cache, so curation passes that re-read the same sections cost no parse.
  */
 class CoreNlpRuntime : NlpReader, AutoCloseable {
+    private var closed = false
+
+    init { synchronized(ownership) { owners++ } }
+
     override suspend fun read(text: String): NlpDocument = analyze(text)
 
-    /** The pipeline is shared; a reader holds nothing to release. */
-    override fun close() {}
+    /** Shared lanes stay live while a reader owns them; the final reader releases both isolates and cache. */
+    override fun close() = synchronized(this) {
+        if (!closed) {
+            closed = true
+            release()
+        }
+    }
 
-    fun analyze(text: String): NlpDocument = Companion.analyze(text)
+    fun analyze(text: String): NlpDocument = synchronized(this) {
+        check(!closed) { "CoreNLP reader is closed" }
+        Companion.analyze(text)
+    }
 
     companion object {
         const val MODULE = "corenlp"
-        /** Cache bound, in characters of cached text. */
-        const val CACHED_CHARS = 8 shl 20
+        /** Conservative retained-heap estimate, including text, tokens, dependencies and extracted relations. */
+        const val CACHED_BYTES = 64L shl 20
 
         /**
          * natlog + openie read every clause as (subject; relation; object), not only modal ones; kbp is
@@ -41,11 +53,9 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
          */
         val CONFIGURATION = mapOf("annotators" to "tokenize,ssplit,pos,lemma,depparse,ner,natlog,openie,kbp", "threads" to "1", "kbp.maxlen" to "100")
 
-        private var cachedChars = 0L
-        private val parsed = object : LinkedHashMap<String, NlpDocument>(256, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, NlpDocument>): Boolean =
-                (cachedChars > CACHED_CHARS).also { if (it) cachedChars -= eldest.key.length }
-        }
+        private val ownership = Any()
+        private var owners = 0
+        private val parsed = NlpParseCache(CACHED_BYTES)
 
         /**
          * The most text one parse takes. CoreNLP's per-document annotators (the entity matcher above all)
@@ -62,16 +72,30 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
         private val books = Lane()
         private val asks = Lane()
 
+        private fun release() = synchronized(ownership) {
+            check(owners > 0)
+            owners--
+            if (owners == 0) {
+                synchronized(books) { books.guest?.isolate?.close(); books.guest = null }
+                synchronized(asks) { asks.guest?.isolate?.close(); asks.guest = null }
+                synchronized(parsed) { parsed.clear() }
+            }
+        }
+
         private fun analyze(text: String): NlpDocument {
             synchronized(parsed) { parsed[text] }?.let { return it }
             val lane = if (text.length <= ASK_CHARS) asks else books
             val doc = synchronized(lane) {
                 val loader = GuestModules.loaderFor(MODULE)
                     ?: error("CoreNLP module is not installed; run ./gradlew -p utils/subvm installCorenlp")
-                val g = lane.guest?.takeIf { it.loader === loader && it.isolate.isAlive } ?: Guest(loader).also { lane.guest = it }
+                val g = lane.guest?.takeIf { it.loader === loader && it.isolate.isAlive } ?: run {
+                    lane.guest?.isolate?.close()
+                    lane.guest = null
+                    Guest(loader).also { lane.guest = it }
+                }
                 if (text.length <= PARSE_CHARS) g.analyze(text) else stitch(text, pieces(text).map { r -> r.first to g.analyze(text.substring(r.first, r.last + 1)) })
             }
-            synchronized(parsed) { cachedChars += text.length; parsed[text] = doc }
+            synchronized(parsed) { parsed.put(text, doc) }
             return doc
         }
 
@@ -111,10 +135,13 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
 
     /** The isolate and what the host reports of it: the processor class and the jar it resolved from. */
     private class Guest(val loader: ClassLoader) {
-        val isolate = InProcessIsolate("corenlp", borg.trikeshed.pointcut.VmFacet.JVM, Budget(statements = 0, wallMillis = 0), guestModule = MODULE)
         private val pipelineClass = loader.loadClass("edu.stanford.nlp.pipeline.StanfordCoreNLP")
+        val isolate = InProcessIsolate("corenlp", borg.trikeshed.pointcut.VmFacet.JVM, Budget(statements = 0, wallMillis = 0), guestModule = MODULE)
 
-        init { withLoader { isolate.eval(SCRIPT.replace("\$CONFIGURATION", jsonOf(CONFIGURATION)), "corenlp.js") } }
+        init {
+            try { withLoader { isolate.eval(SCRIPT.replace("\$CONFIGURATION", jsonOf(CONFIGURATION)), "corenlp.js") } }
+            catch (failure: Throwable) { isolate.close(); throw failure }
+        }
 
         private inline fun <T> withLoader(block: () -> T): T {
             val previous = Thread.currentThread().contextClassLoader
@@ -165,6 +192,55 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
                 pkg?.implementationVersion?.let { put("packageVersion", it) }
             }
         }
+    }
+}
+
+/** Access-order cache; its caller owns synchronization. Oversized parses stay with their caller. */
+internal class NlpParseCache(private val capacity: Long, private val entries: Int = 256) {
+    private data class Entry(val document: NlpDocument, val bytes: Long)
+    private val parsed = LinkedHashMap<String, Entry>(16, 0.75f, true)
+    var bytes = 0L
+        private set
+    val size: Int get() = parsed.size
+
+    init { require(capacity > 0 && entries > 0) }
+
+    operator fun get(text: String): NlpDocument? = parsed[text]?.document
+
+    fun put(text: String, document: NlpDocument) {
+        parsed.remove(text)?.let { bytes -= it.bytes }
+        val weight = weight(text, document)
+        if (weight > capacity) return
+        val eldest = parsed.entries.iterator()
+        while (bytes > capacity - weight || parsed.size >= entries) {
+            bytes -= eldest.next().value.bytes
+            eldest.remove()
+        }
+        parsed[text] = Entry(document, weight)
+        bytes += weight
+    }
+
+    fun clear() { parsed.clear(); bytes = 0 }
+
+    private fun weight(text: String, document: NlpDocument): Long {
+        fun string(value: String): Long = 40L + value.length.toLong() * 2
+        var total = 256L + string(text) + string(document.text)
+        for (sentence in document.sentences.view) {
+            total += 160L
+            for (token in sentence.tokens.view)
+                total += 96L + string(token.word) + string(token.lemma) + string(token.tag) + string(token.ner)
+            for (dependency in sentence.dependencies.view)
+                total += 64L + string(dependency.relation)
+            for (relations in arrayOf(sentence.relations, sentence.kbp)) for (relation in relations)
+                total += 160L + string(relation.subjectText) + string(relation.relationText) + string(relation.objectText)
+        }
+        for (mention in document.mentions) total += 112L + string(mention.text)
+        document.metadata?.let { metadata ->
+            total += 96L + string(metadata.processor) + string(metadata.implementation)
+            for (fields in arrayOf(metadata.runtime, metadata.configuration))
+                for ((key, value) in fields) total += 64L + string(key) + string(value)
+        }
+        return total
     }
 }
 

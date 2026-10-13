@@ -159,14 +159,74 @@ class LeafTrainerTest {
         }
     }
 
-    /**
-     * Same fib scenario in Python. GraalPy 25.0.2 reports no function roots to the listener
-     * (PythonRootProbeTest), so the trainer learns from binding pointcuts: observations carry no
-     * characters, and [LeafTrainer.promote] materialises the leaf host from the isolate's whole
-     * [InProcessIsolate.program] instead. Guest recursion resolves through the rebound global exactly
-     * as in JS, so the same per-call deltas hold (see the class kdoc).
-     */
-    @Test fun pythonFibTrainsShadowsAndDelegatesThroughBindingPointcuts() {
+    /** Keyword calls keep guest execution; positional calls retain verified delegation. */
+    @Test fun pythonPromotionPreservesKeywordCallsWithoutClaimingDelegation() {
+        Rig(VmFacet.GRAAL_PYTHON).use { rig ->
+            val iso = rig.isolate
+            iso.eval("def scale(n, *, factor=2): return n*factor", "keywords.py")
+            repeat(4) { assertEquals(Num(6), iso.call("scale", Num(3))) }
+            assertTrue(rig.trainer.promote("scale"))
+            repeat(2) { assertEquals(Num(6), iso.call("scale", Num(3))) }
+            assertEquals(Phase.DELEGATED, rig.phase("scale"))
+            assertEquals(Num(6), iso.call("scale", Num(3)))
+            assertEquals(Served.MEMO, rig.receipts.last().served)
+            val receipts = rig.receipts.size
+            val calls = rig.trainer.profiles.getValue("scale").calls
+            assertEquals(Num(15), iso.eval("scale(n=3, factor=5)"))
+            assertEquals(receipts, rig.receipts.size, "keyword calls are still guest executions")
+            assertTrue(rig.trainer.profiles.getValue("scale").calls > calls)
+            assertEquals(Teleported.Bool(true), iso.eval("""
+                import inspect
+                assert inspect.isfunction(scale) and scale.__name__ == 'scale'
+                assert inspect.signature(scale).parameters['factor'].kind is inspect.Parameter.KEYWORD_ONLY
+                True
+            """.trimIndent()))
+            rig.trainer.demote("scale", "test")
+            assertEquals(Num(21), iso.eval("scale(3, factor=7)"))
+            assertEquals(receipts, rig.receipts.size)
+        }
+    }
+
+    @Test fun pythonNestedRootCannotRebindAnUnobservedGlobalOfTheSameName() {
+        Rig(VmFacet.GRAAL_PYTHON).use { rig ->
+            val iso = rig.isolate
+            iso.eval("""
+                def leaf(n): return n + 100
+                original = leaf
+                def outer(n):
+                    def leaf(n): return n * 2
+                    return leaf(n)
+            """.trimIndent(), "scopes.py")
+            repeat(4) { assertEquals(Num(6), iso.call("outer", Num(3))) }
+            assertEquals(Phase.SELF_CONTAINED, rig.phase("leaf"))
+            rig.trainer.promote("leaf")
+            iso.settle()
+            assertEquals(Phase.DEMOTED, rig.phase("leaf"))
+            assertEquals("root binding differs from observed source", rig.trainer.profiles.getValue("leaf").demotedReason)
+            assertEquals(Teleported.Bool(true), iso.eval("leaf is original"),
+                "a nested function's evidence cannot authorize replacing an unrelated global")
+            assertEquals(Num(103), iso.call("leaf", Num(3)))
+            assertTrue(rig.receipts.isEmpty())
+            assertNull(rig.trainer.profiles.getValue("leaf").leafHost)
+        }
+    }
+
+    @Test fun pythonLeafMaterializationDoesNotReplayModuleEffects() {
+        Rig(VmFacet.GRAAL_PYTHON).use { rig ->
+            val iso = rig.isolate
+            var effects = 0
+            iso.delegate("setup") { effects++; Num(effects.toLong()) }
+            iso.eval("host.call('setup')\ndef leaf(n): return n*2", "module.py")
+            repeat(4) { assertEquals(Num(6), iso.call("leaf", Num(3))) }
+            assertTrue(rig.trainer.promote("leaf"))
+            repeat(2) { assertEquals(Num(6), iso.call("leaf", Num(3))) }
+            assertEquals(Phase.DELEGATED, rig.phase("leaf"))
+            assertEquals(1, effects)
+            assertTrue(rig.receipts.none { it.refuted })
+        }
+    }
+
+    @Test fun pythonFibTrainsShadowsAndDelegatesFromNativeSourceSections() {
         Rig(VmFacet.GRAAL_PYTHON).use { rig ->
             val iso = rig.isolate
             val trainer = rig.trainer
@@ -174,14 +234,15 @@ class LeafTrainerTest {
             repeat(4) { assertEquals(Num(144), iso.call("fib", Num(12))) }
             val profile = trainer.profiles["fib"] ?: fail("no profile for fib; roots seen: ${trainer.profiles.keys}")
             assertEquals(Phase.SELF_CONTAINED, profile.phase, "$profile")
-            assertNull(profile.characters, "binding pointcuts carry no source section")
-            assertEquals(-1, profile.line)
+            assertEquals("def fib(n): return n if n<2 else fib(n-1)+fib(n-2)", profile.characters)
+            assertEquals(1, profile.line)
+            assertEquals("leaf.py", profile.sourceName)
             assertTrue(iso.program.startsWith("def fib"), iso.program)
             assertTrue(rig.receipts.isEmpty())
 
             assertTrue(trainer.promote("fib"))
             assertEquals(Phase.SHADOWED, profile.phase)
-            assertNotNull(profile.leafHost, "leaf host materialised from the program: ${iso.program}")
+            assertNotNull(profile.leafHost, "leaf host materialised from the function's own source")
             assertFalse(trainer.promote("fib"))
 
             repeat(2) { assertEquals(Num(144), iso.call("fib", Num(12))) }
@@ -202,7 +263,7 @@ class LeafTrainerTest {
             assertEquals(Phase.DELEGATED, profile.phase, "$profile")
             assertEquals(0L, iso.stats().refutations)
 
-            // demotion restores the observing wrapper, not the bare function: calls are still observed
+            // Demotion restores the function; native observations continue without a wrapper.
             val callsBefore = profile.calls
             val n2 = rig.receipts.size
             trainer.demote("fib", "test")
@@ -210,7 +271,7 @@ class LeafTrainerTest {
             assertEquals("test", profile.demotedReason)
             assertNull(profile.leafHost)
             assertEquals(Num(144), iso.call("fib", Num(12)))
-            assertTrue(profile.calls > callsBefore, "wrapper restored, observations continue: $profile")
+            assertTrue(profile.calls > callsBefore, "function restored, observations continue: $profile")
             assertEquals(n2, rig.receipts.size, "no receipts once the proxy is gone")
         }
     }

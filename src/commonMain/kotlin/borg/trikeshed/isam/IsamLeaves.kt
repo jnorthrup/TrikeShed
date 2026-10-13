@@ -3,6 +3,7 @@
 package borg.trikeshed.isam
 
 import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.tilting.zran.*
 import borg.trikeshed.userspace.nio.channels.FileChannel
@@ -32,9 +33,10 @@ fun width(column: RecordMeta): Int = column.end - column.begin
  * the seek table. A row read decodes one leaf; `zstd -d` of the file yields the plain group file.
  * Reads are idempotent: each decode fills a fresh leaf, published whole and never written after.
  */
-class IsamLeaves(val read: IsamRead, val table: SeekTable, val rowBytes: Int, val columns: List<RecordMeta>, val fence: ByteArray?) {
+class IsamLeaves(val read: IsamRead, val table: SeekTable, val rowBytes: Int, val columns: List<RecordMeta>, val fence: ByteArray?,
+                 val codec: IsamLeafCodec = ZstdLeafCodec) {
     val rows: Int
-    val decoder = ZstdDecoder()
+    val decoder = codec.decoder()
     /** Claimed by one decode at a time; a decode that finds it claimed brings its own decoder. */
     val decoderHeld = AtomicBoolean(false)
     /** The last decoded leaf: its index and content. */
@@ -64,9 +66,9 @@ class IsamLeaves(val read: IsamRead, val table: SeekTable, val rowBytes: Int, va
         read(table.packed[k], packed)
         val leaf = ByteArray(size)
         if (decoderHeld.compareAndSet(false, true)) try {
-            decoder.decodeInto(packed, 0, packed.size, leaf, 0, size)
+            decoder(packed, leaf)
         } finally { decoderHeld.store(false) }
-        else ZstdDecoder().decodeInto(packed, 0, packed.size, leaf, 0, size)
+        else codec.decoder()(packed, leaf)
         image = k j leaf
         return leaf
     }
@@ -96,27 +98,43 @@ class IsamLeaves(val read: IsamRead, val table: SeekTable, val rowBytes: Int, va
 }
 
 /** Opens [size] bytes read through [read] as leaves; null when they are a plain group file. */
-fun openLeaves(read: IsamRead, size: Long, rowBytes: Int, columns: List<RecordMeta>): IsamLeaves? {
+fun openLeaves(read: IsamRead, size: Long, rowBytes: Int, columns: List<RecordMeta>,
+               codec: IsamLeafCodec = ZstdLeafCodec): IsamLeaves? {
     if (size < 8 + SEEK_TABLE_FOOTER) return null
     val footer = ByteArray(SEEK_TABLE_FOOTER).also { read(size - SEEK_TABLE_FOOTER, it) }
     val length = seekTableLength(footer)
     if (length < 0 || length > size) return null
     val table = parseSeekTable(ByteArray(length.toInt()).also { read(size - length, it) }) ?: return null
-    val gap = size - length - table.packedBytes
+    var gap = size - length - table.packedBytes
     if (gap < 0) return null
     if (table.frames > 0) require(ByteArray(4).also { read(0, it) }.le32(0) == ZSTD_MAGIC) { "ISAM leaf 0 is not a zstd frame" }
     var fence: ByteArray? = null
+    var at = table.packedBytes
+    var selected: IsamLeafCodec = ZstdLeafCodec
     if (gap > 0) {
-        fence = ByteArray(gap.toInt()).also { read(table.packedBytes, it) }
+        require(gap in 8..Int.MAX_VALUE.toLong()) { "ISAM leaf metadata size" }
+        val head = ByteArray(8).also { read(at, it) }
+        if (head.le32(0) == LEAF_DICTIONARY_MAGIC) {
+            require(gap >= LEAF_DICTIONARY_BYTES && head.le32(4) == LEAF_DICTIONARY_BYTES - 8) { "ISAM dictionary frame size" }
+            val frame = ByteArray(LEAF_DICTIONARY_BYTES).also { read(at, it) }
+            require(frame[8] == 1.toByte()) { "ISAM dictionary frame version" }
+            val dictionary = ContentId(frame.decodeToString(9, frame.size, throwOnInvalidSequence = true))
+            selected = codec.resolve(dictionary)
+            require(selected.dictionary == dictionary) { "ISAM compression dictionary required: ${dictionary.value}" }
+            at += frame.size
+            gap -= frame.size
+        }
+        fence = ByteArray(gap.toInt()).also { read(at, it) }
         require(gap >= LEAF_FENCE_HEAD && fence.le32(0) == LEAF_FENCE_MAGIC && fence.le32(4).toLong() == gap - 8) {
             "ISAM leaves carry an unknown frame before their seek table"
         }
     }
-    return IsamLeaves(read, table, rowBytes, columns, fence)
+    return IsamLeaves(read, table, rowBytes, columns, fence, selected)
 }
 
 /** Writes one group's columns as leaves; [indexes] place the group's columns in the row. */
-class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val indexes: IntArray, val rowBytes: Int, leafBytes: Int) {
+class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val indexes: IntArray, val rowBytes: Int, leafBytes: Int,
+               val codec: IsamLeafCodec = ZstdLeafCodec) {
     val rowsPerLeaf = maxOf(1, leafBytes / rowBytes)
     val leaf = ByteArray(rowsPerLeaf * rowBytes)
     val offsets = IntArray(columns.size)
@@ -125,7 +143,7 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
     var packedSizes = IntArray(16)
     var contentSizes = IntArray(16)
     var at = 0L
-    val encoder = ZstdEncoder()
+    val encoder = codec.encoder()
     val fenceAt = IntArray(columns.size) { -1 }
     val fenceStride: Int
     var fence: ByteArray
@@ -152,7 +170,8 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
     fun resume(): Long {
         val size = channel.size()
         if (size == 0L) return 0
-        val leaves = requireNotNull(openLeaves(::read, size, rowBytes, columns)) { "ISAM group holds plain rows; leaf writes need a leaf file" }
+        val leaves = requireNotNull(openLeaves(::read, size, rowBytes, columns, codec)) { "ISAM group holds plain rows; leaf writes need a leaf file" }
+        require(leaves.codec.dictionary == codec.dictionary) { "ISAM append cannot change its compression dictionary" }
         val prior = requireNotNull(leaves.fence) { "ISAM leaf file lacks its fence" }
         require(leaves.fenceAt.contentEquals(fenceAt)) { "ISAM leaf fence columns differ from metadata" }
         val t = leaves.table
@@ -205,7 +224,8 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
     fun flush() {
         if (fill == 0) return
         val n = fill * rowBytes
-        val frame = encoder.compress(leaf, 0, n)
+        val frame = encoder(leaf, n)
+        require(frame.size >= 4 && frame.le32(0) == ZSTD_MAGIC) { "ISAM codec did not produce a zstd frame" }
         transfer(channel, frame, at, read = false)
         at += frame.size
         val entry = ByteArray(fenceStride)
@@ -244,7 +264,9 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
         f.put16(12, columns.size)
         for (c in columns.indices) f[LEAF_FENCE_HEAD + c] = if (fenceAt[c] >= 0) 1 else 0
         fence.copyInto(f, head, 0, frames * fenceStride)
-        transfer(channel, f, at, read = false)
+        val dictionary = codec.dictionaryFrame()
+        if (dictionary.isNotEmpty()) transfer(channel, dictionary, at, read = false)
+        transfer(channel, f, at + dictionary.size, read = false)
         val packed = LongArray(frames + 1)
         val content = LongArray(frames + 1)
         for (k in 0 until frames) {
@@ -252,8 +274,8 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
             content[k + 1] = content[k] + contentSizes[k]
         }
         val table = SeekTable(frames, packed, content).bytes()
-        transfer(channel, table, at + f.size, read = false)
-        channel.truncate(at + f.size + table.size)
+        transfer(channel, table, at + dictionary.size + f.size, read = false)
+        channel.truncate(at + dictionary.size + f.size + table.size)
         channel.force(true)
     }
 
@@ -271,7 +293,7 @@ class LeafSink(val channel: FileChannel, val columns: List<RecordMeta>, val inde
 
 /** Leaf counterpart of the plain row writer: every group file becomes leaves + fence + seek table. */
 fun writeLeafRows(rows: Iterable<RowVec>, filename: String, metadata: Series<RecordMeta>, append: Boolean, create: Boolean,
-                  channelFactory: IsamChannelFactory, leafBytes: Int) {
+                  channelFactory: IsamChannelFactory, leafBytes: Int, codec: IsamLeafCodec = ZstdLeafCodec) {
     val groups = metadata.view.groupBy { it.groupName }
     val primary = metadata.view.maxOf { it.groupId }
     val order = metadata.view.toList()
@@ -284,7 +306,12 @@ fun writeLeafRows(rows: Iterable<RowVec>, filename: String, metadata: Series<Rec
             if (create) options.add(StandardOpenOption.CREATE)
             if (!append) options.add(StandardOpenOption.TRUNCATE_EXISTING)
             val channel = channelFactory(groupPath(filename, columns, primary), options)
-            val sink = LeafSink(channel, columns, IntArray(columns.size) { order.indexOf(columns[it]) }, groupLength(columns), leafBytes)
+            val sink = try {
+                LeafSink(channel, columns, IntArray(columns.size) { order.indexOf(columns[it]) }, groupLength(columns), leafBytes, codec)
+            } catch (caught: Throwable) {
+                closeChannels(listOf(channel), caught)
+                throw caught
+            }
             sinks += sink
             val count = if (append) sink.resume() else 0L
             require(count <= Int.MAX_VALUE && (existing == null || existing == count)) { "ISAM group row counts disagree or exceed cursor capacity" }

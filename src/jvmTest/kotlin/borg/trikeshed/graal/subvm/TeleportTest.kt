@@ -155,4 +155,22 @@ class TeleportTest {
         assertEquals(Num(9), Teleported.ofHost(Num(9)))
         assertIs<Opaque>(Teleported.ofHost(Any()))
     }
+
+    @Test fun jvmNumbersAndContainersCrossWithoutReflectingHostObjects() {
+        Context.newBuilder("js").allowHostAccess(HostAccess.ALL)
+            .option("engine.WarnInterpreterOnly", "false").build().use { ctx ->
+                fun project(value: Any?): Teleported = Teleported.of(ctx.asValue(value))
+                assertEquals(Real(1.25), project(java.math.BigDecimal("1.25")))
+                assertEquals(Num(7), project(java.math.BigDecimal("7.00")))
+                assertEquals(Num(7), project(java.math.BigInteger("7")))
+                assertEquals(Obj(mapOf("xs" to Arr(listOf(Real(0.1), Teleported.Null)))),
+                    project(mapOf("xs" to listOf(java.math.BigDecimal("0.1"), null))))
+                assertEquals(Obj(emptyMap()), project(emptyMap<String, Any?>()))
+                assertIs<Opaque>(project(Any()))
+                assertTrue(project(mapOf("nested" to Any())).isOpaque)
+                assertIs<Opaque>(project(java.math.BigDecimal("0.123456789012345678901")))
+                assertIs<Opaque>(project(java.math.BigInteger("9223372036854775808")))
+                assertIs<Opaque>(project(mapOf(1 to "number", "1" to "text")))
+            }
+    }
 }

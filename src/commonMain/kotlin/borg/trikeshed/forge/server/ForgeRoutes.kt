@@ -51,7 +51,7 @@ object ForgeRoutes {
         RouteMeta("GET", "/api/board", Tier.PORTABLE, "ForgeKanbanIngest.loadProjection → {title,userId,items}"),
         RouteMeta("GET", "/api/metrics", Tier.PORTABLE, "retired flywheel metrics stub (?format=json)"),
         // ── Jules (PORTABLE projection, live driver freshens it) ──
-        RouteMeta("GET", "/api/jules/surface", Tier.PORTABLE, "JulesBlackboardAdapter.projectFullSurface (historical board only)"),
+        RouteMeta("GET", "/api/jules/surface", Tier.PORTABLE, "SessionBlackboardAdapter.projectFullSurface (historical board only)"),
         RouteMeta("GET", "/api/jules/events", Tier.PORTABLE, "retired flywheel SSE — answers 410 Gone"),
         // ── Ingest (PORTABLE gate, JVM_ONLY extract actual) ──
         RouteMeta("POST", "/api/submit", Tier.JVM_ONLY, "ingest body → ForgeKanbanIngest.persistMarkdown (Tika actual)"),

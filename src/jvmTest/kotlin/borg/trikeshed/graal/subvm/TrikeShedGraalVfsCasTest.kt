@@ -7,6 +7,8 @@ import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import java.nio.ByteBuffer
 import java.nio.file.StandardOpenOption
 import java.nio.file.NoSuchFileException
+import java.nio.file.attribute.FileTime
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -22,6 +24,61 @@ class TrikeShedGraalVfsCasTest {
     private fun vfs(world: BtrfsWorldStore, guest: String) = TrikeShedGraalVfs(
         world.fileOpsFor(guest), world.root, world.subvolumeFor(guest), guest, world.cas,
     )
+
+    @Test
+    fun timestampAttributesSurviveRemountWithoutChangingCasIdentityOrAnotherGuest() {
+        val world = BtrfsWorldStore.ofMemory()
+        val mounted = vfs(world, "vm.times")
+        val other = vfs(world, "vm.other")
+        val path = mounted.parsePath("/workspace/file")
+        mounted.put(path.toString(), byteArrayOf(7))
+        other.put(path.toString(), byteArrayOf(7))
+        val cid = mounted.btrfsForTools().manifestId("vm.times")
+        val original = mounted.readAttributes(path, "basic:*")
+        val otherTimes = other.readAttributes(path, "basic:lastModifiedTime,lastAccessTime,creationTime")
+        assertTrue(mounted.snapshot("vm.times.snapshot"))
+        val modified = FileTime.from(Instant.ofEpochSecond(-2, 123))
+        val accessed = FileTime.from(Instant.ofEpochSecond(1_700_000_000, 987_654_321))
+        val created = FileTime.fromMillis(42)
+        mounted.setAttribute(path, "basic:lastModifiedTime", modified)
+        mounted.setAttribute(path, "unix:lastAccessTime", accessed)
+        mounted.setAttribute(path, "creationTime", created)
+        val reopened = vfs(world, "vm.times")
+        assertEquals(mapOf("lastModifiedTime" to modified, "lastAccessTime" to accessed, "creationTime" to created),
+            reopened.readAttributes(path, "basic:lastModifiedTime,lastAccessTime,creationTime"))
+        assertEquals(mapOf("creationTime" to created), reopened.readAttributes(path, "creationTime"))
+        assertEquals(otherTimes, other.readAttributes(path, "basic:lastModifiedTime,lastAccessTime,creationTime"))
+        assertEquals(cid, reopened.btrfsForTools().manifestId("vm.times"))
+        val snapshot = reopened.btrfsForTools().times("vm.times.snapshot", "workspace/file")!!
+        assertEquals(original["lastModifiedTime"], FileTime.from(Instant.ofEpochSecond(
+            snapshot.lastModifiedTime.epochSeconds, snapshot.lastModifiedTime.nanosecondsOfSecond.toLong())))
+        assertContentEquals(byteArrayOf(7), reopened.fetch(path.toString()))
+        reopened.setAttribute(reopened.parsePath("/"), "basic:lastModifiedTime", modified)
+        assertEquals(modified, vfs(world, "vm.times").readAttributes(reopened.parsePath("/"), "basic:lastModifiedTime")["lastModifiedTime"])
+    }
+
+    @Test
+    fun invalidOrFailedAttributeMutationsDoNotAdvanceGenerationOrMetadata() {
+        val files = ManifestFiles(InMemoryFileOperations(cwd = "/"))
+        val world = BtrfsWorldStore.ofFiles(files, "/attributes", CasStore.inMemory())
+        val mounted = vfs(world, "vm.attributes")
+        val path = mounted.parsePath("/workspace/file")
+        mounted.put(path.toString(), byteArrayOf(9))
+        val before = mounted.readAttributes(path, "basic:*")
+        val generation = mounted.generation()
+        assertFailsWith<NoSuchFileException> {
+            mounted.setAttribute(mounted.parsePath("/workspace/missing"), "basic:lastModifiedTime", FileTime.fromMillis(1))
+        }
+        assertFailsWith<UnsupportedOperationException> { mounted.setAttribute(path, "unix:mode", 0) }
+        assertFailsWith<IllegalArgumentException> { mounted.setAttribute(path, "basic:creationTime", 1L) }
+        files.reject = true
+        assertFails { mounted.setAttribute(path, "basic:lastModifiedTime", FileTime.fromMillis(1)) }
+        assertEquals(generation, mounted.generation())
+        assertEquals(before, mounted.readAttributes(path, "basic:*"))
+        files.reject = false
+        assertEquals(before["lastModifiedTime"], vfs(world, "vm.attributes").readAttributes(path, "basic:lastModifiedTime")["lastModifiedTime"])
+        assertContentEquals(byteArrayOf(9), mounted.fetch(path.toString()))
+    }
 
     @Test
     fun guestMountsShareCasIdentityWhileMetadataStaysIsolatedAndRemountable() {

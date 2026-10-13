@@ -38,6 +38,8 @@ internal object JvmSocketSyscalls {
     private val pollCall by lazy { function("poll", FunctionDescriptor.of(int, pointer, if (linux) long else int, int)) }
     private val getOptionCall by lazy { function("getsockopt", FunctionDescriptor.of(int, int, int, int, pointer, pointer)) }
     private val setOptionCall by lazy { function("setsockopt", FunctionDescriptor.of(int, int, int, int, pointer, int)) }
+    private val socketNameCall by lazy { function("getsockname", FunctionDescriptor.of(int, int, pointer, pointer)) }
+    private val peerNameCall by lazy { function("getpeername", FunctionDescriptor.of(int, int, pointer, pointer)) }
     private val fcntlCall by lazy { linker.downcallHandle(
         linker.defaultLookup().find("fcntl").orElseThrow(), FunctionDescriptor.of(int, int, int, int),
         Linker.Option.captureCallState("errno"), Linker.Option.firstVariadicArg(2),
@@ -121,6 +123,32 @@ internal object JvmSocketSyscalls {
     fun listen(fd: Int, backlog: Int): Int { val state = errnoState.get(); return status(state, listenCall.invokeExact(state, fd, backlog) as Int) }
     fun close(fd: Int): Int { val state = errnoState.get(); return status(state, closeCall.invokeExact(state, fd) as Int) }
     fun shutdown(fd: Int, how: Int): Int { val state = errnoState.get(); return status(state, shutdownCall.invokeExact(state, fd, how) as Int) }
+
+    /** GETSOCKNAME's borrowed output window, with the same Linux sockaddr framing as BIND/CONNECT. */
+    fun name(fd: Int, buffer: ByteBuffer?, length: Int, peer: Int): Int {
+        if (buffer == null || buffer.isReadOnly() || length < 0 || length > buffer.remaining() || peer !in 0..1) return -22
+        return Arena.ofConfined().use { arena ->
+            val storage = arena.allocate(128, 8)
+            val size = arena.allocate(int).also { it.set(int, 0, 128) }
+            val state = errnoState.get()
+            val result = status(state, (if (peer == 0) socketNameCall else peerNameCall)
+                .invokeExact(state, fd, storage, size) as Int)
+            if (result < 0) return@use result
+            val count = size.get(int, 0)
+            if (count !in 2..128) return@use -75
+            val bytes = storage.asSlice(0, count.toLong()).toArray(ValueLayout.JAVA_BYTE)
+            val family = if (darwin) bytes[1].toInt() and 255 else storage.get(ValueLayout.JAVA_SHORT, 0).toInt() and 65535
+            val portable = when {
+                family == 1 || family == 2 -> family
+                family == (if (darwin) 30 else 10) -> 10
+                else -> return@use -97
+            }
+            bytes[0] = portable.toByte()
+            bytes[1] = 0
+            bytes.copyInto(buffer.array(), buffer.arrayOffset() + buffer.position(), 0, minOf(count, length))
+            0
+        }
+    }
 
     fun accept(fd: Int): Int {
         val state = errnoState.get()

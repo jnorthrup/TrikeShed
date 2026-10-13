@@ -2,8 +2,8 @@ package borg.trikeshed.utils.kanban
 
 import borg.trikeshed.parse.reify
 
-import borg.trikeshed.jules.JulesCause
-import borg.trikeshed.jules.JulesSnapshot
+import borg.trikeshed.kanban.SessionCause
+import borg.trikeshed.kanban.SessionSnapshot
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
@@ -23,7 +23,7 @@ object KanbanEventCodec {
 
     // ---- encode ----
 
-    fun encodeSnapshot(s: JulesSnapshot, drained: Boolean): String = buildString {
+    fun encodeSnapshot(s: SessionSnapshot, drained: Boolean): String = buildString {
         append("{\"t\":\"snap\"")
         field("sid", s.sessionId); field("state", s.state); field("title", s.title)
         append(",\"patchBytes\":").append(s.patchBytes)
@@ -35,7 +35,7 @@ object KanbanEventCodec {
         append('}')
     }
 
-    fun encodeCause(sid: String, c: JulesCause): String = buildString {
+    fun encodeCause(sid: String, c: SessionCause): String = buildString {
         append("{\"t\":\"cause\"")
         field("sid", sid)
         field("kind", c.kind())
@@ -43,10 +43,10 @@ object KanbanEventCodec {
         c.activityId?.let { field("activityId", it) }
         c.activitySeq?.let { append(",\"activitySeq\":").append(it) }
         when (c) {
-            is JulesCause.AgentMessaged -> field("excerpt", c.excerpt)
-            is JulesCause.HumanAnswered -> field("message", c.message)
-            is JulesCause.PatchArrived -> append(",\"bytes\":").append(c.bytes)
-            is JulesCause.PatchSnapshotObserved -> {
+            is SessionCause.AgentMessaged -> field("excerpt", c.excerpt)
+            is SessionCause.HumanAnswered -> field("message", c.message)
+            is SessionCause.PatchArrived -> append(",\"bytes\":").append(c.bytes)
+            is SessionCause.PatchSnapshotObserved -> {
                 field("patchCid", c.patchCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
                 append(",\"artifactSeq\":").append(c.artifactSeq)
@@ -54,7 +54,7 @@ object KanbanEventCodec {
                 stringArray("missingFromCandidate", c.missingFromCandidate)
                 append(",\"reviewCandidate\":").append(c.reviewCandidate)
             }
-            is JulesCause.PatchReviewSelected -> {
+            is SessionCause.PatchReviewSelected -> {
                 field("patchCid", c.patchCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
                 c.latestPatchCid?.let { field("latestPatchCid", it.value) }
@@ -62,7 +62,7 @@ object KanbanEventCodec {
                 field("reviewedBy", c.reviewedBy)
                 field("receiptRef", c.receiptRef)
             }
-            is JulesCause.PatchRejected -> {
+            is SessionCause.PatchRejected -> {
                 field("patchCid", c.patchCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
                 c.latestPatchCid?.let { field("latestPatchCid", it.value) }
@@ -71,13 +71,13 @@ object KanbanEventCodec {
                 field("reviewedBy", c.reviewedBy)
                 field("receiptRef", c.receiptRef)
             }
-            is JulesCause.AgentReportObserved -> {
+            is SessionCause.AgentReportObserved -> {
                 field("reportCid", c.reportCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
                 append(",\"bytes\":").append(c.bytes)
                 field("apiCreateTime", c.apiCreateTime)
             }
-            is JulesCause.AgentReportReviewSelected -> {
+            is SessionCause.AgentReportReviewSelected -> {
                 field("reportCid", c.reportCid.value)
                 append(",\"causalOrdinal\":").append(c.causalOrdinal)
                 c.latestPatchCid?.let { field("latestPatchCid", it.value) }
@@ -86,23 +86,23 @@ object KanbanEventCodec {
                 field("reviewedBy", c.reviewedBy)
                 field("receiptRef", c.receiptRef)
             }
-            is JulesCause.DrainApplied -> { field("commitSha", c.commitSha); append(",\"rejects\":").append(c.rejects) }
-            is JulesCause.DrainFailed -> field("reason", c.reason)
-            is JulesCause.PredicateFlipped -> { field("predicate", c.predicate); append(",\"nowPassing\":").append(c.nowPassing) }
-            is JulesCause.SessionFailed -> field("reason", c.reason)
-            is JulesCause.SessionArchived -> Unit
-            is JulesCause.StateObserved -> { field("from", c.from); field("to", c.to) }
-            is JulesCause.WorkQueued -> {
+            is SessionCause.DrainApplied -> { field("commitSha", c.commitSha); append(",\"rejects\":").append(c.rejects) }
+            is SessionCause.DrainFailed -> field("reason", c.reason)
+            is SessionCause.PredicateFlipped -> { field("predicate", c.predicate); append(",\"nowPassing\":").append(c.nowPassing) }
+            is SessionCause.SessionFailed -> field("reason", c.reason)
+            is SessionCause.SessionArchived -> Unit
+            is SessionCause.StateObserved -> { field("from", c.from); field("to", c.to) }
+            is SessionCause.WorkQueued -> {
                 field("workId", c.workId); field("tier", c.tier); field("title", c.title)
                 field("spec", c.spec)
                 c.parent?.let { field("parent", it) }
                 append(",\"score\":").append(c.score)
             }
-            is JulesCause.WorkDispatched -> {
+            is SessionCause.WorkDispatched -> {
                 field("workId", c.workId); field("sessionId", c.sessionId)
                 append(",\"attempt\":").append(c.attempt)
             }
-            is JulesCause.WorkDrained -> {
+            is SessionCause.WorkDrained -> {
                 field("workId", c.workId); field("sessionId", c.sessionId)
                 field("commitSha", c.commitSha); field("taskId", c.taskId)
                 c.receipt?.let {
@@ -118,7 +118,7 @@ object KanbanEventCodec {
                     it.prUrl?.let { url -> field("receiptPrUrl", url) }
                 }
             }
-            is JulesCause.WorkIdentitySynthesized -> {
+            is SessionCause.WorkIdentitySynthesized -> {
                 field("workId", c.workId)
                 field("identityWorkId", c.identity.workId)
                 field("identitySessionId", c.identity.sessionId)
@@ -135,8 +135,8 @@ object KanbanEventCodec {
     // ---- decode ----
 
     sealed interface KanbanEvent
-    data class SnapEvent(val snapshot: JulesSnapshot, val drained: Boolean) : KanbanEvent
-    data class CauseEvent(val sid: String, val cause: JulesCause) : KanbanEvent
+    data class SnapEvent(val snapshot: SessionSnapshot, val drained: Boolean) : KanbanEvent
+    data class CauseEvent(val sid: String, val cause: SessionCause) : KanbanEvent
 
     fun decode(record: String): KanbanEvent? {
         // Return null (not throw) when a record isn't a JSON object. decode is
@@ -146,7 +146,7 @@ object KanbanEventCodec {
         val m = reify(record) as? Map<*, *> ?: return null
         return when (m["t"]) {
             "snap" -> SnapEvent(
-                JulesSnapshot(
+                SessionSnapshot(
                     sessionId = m.str("sid"),
                     state = m.str("state"),
                     title = m.str("title"),
@@ -163,11 +163,11 @@ object KanbanEventCodec {
                 val at = m.num("at")
                 val actId = m.optStr("activityId")
                 val actSeq = (m["activitySeq"] as? Number)?.toInt()
-                val cause: JulesCause = when (m["kind"]) {
-                    "AgentMessaged" -> JulesCause.AgentMessaged(m.str("excerpt"), at, actId, actSeq)
-                    "HumanAnswered" -> JulesCause.HumanAnswered(m.str("message"), at, actId, actSeq)
-                    "PatchArrived" -> JulesCause.PatchArrived(m.num("bytes"), at, actId, actSeq)
-                    "PatchSnapshotObserved" -> JulesCause.PatchSnapshotObserved(
+                val cause: SessionCause = when (m["kind"]) {
+                    "AgentMessaged" -> SessionCause.AgentMessaged(m.str("excerpt"), at, actId, actSeq)
+                    "HumanAnswered" -> SessionCause.HumanAnswered(m.str("message"), at, actId, actSeq)
+                    "PatchArrived" -> SessionCause.PatchArrived(m.num("bytes"), at, actId, actSeq)
+                    "PatchSnapshotObserved" -> SessionCause.PatchSnapshotObserved(
                         patchCid = ContentId(m.str("patchCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
                         artifactSeq = m.num("artifactSeq").toInt(),
@@ -178,7 +178,7 @@ object KanbanEventCodec {
                         activityId = actId.orEmpty(),
                         activitySeq = actSeq ?: -1,
                     )
-                    "PatchReviewSelected" -> JulesCause.PatchReviewSelected(
+                    "PatchReviewSelected" -> SessionCause.PatchReviewSelected(
                         patchCid = ContentId(m.str("patchCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
                         latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
@@ -187,7 +187,7 @@ object KanbanEventCodec {
                         receiptRef = m.str("receiptRef"),
                         at = at,
                     )
-                    "PatchRejected" -> JulesCause.PatchRejected(
+                    "PatchRejected" -> SessionCause.PatchRejected(
                         patchCid = ContentId(m.str("patchCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
                         latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
@@ -197,7 +197,7 @@ object KanbanEventCodec {
                         receiptRef = m.str("receiptRef"),
                         at = at,
                     )
-                    "AgentReportObserved" -> JulesCause.AgentReportObserved(
+                    "AgentReportObserved" -> SessionCause.AgentReportObserved(
                         reportCid = ContentId(m.str("reportCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
                         bytes = m.num("bytes"),
@@ -206,7 +206,7 @@ object KanbanEventCodec {
                         activityId = actId.orEmpty(),
                         activitySeq = actSeq ?: -1,
                     )
-                    "AgentReportReviewSelected" -> JulesCause.AgentReportReviewSelected(
+                    "AgentReportReviewSelected" -> SessionCause.AgentReportReviewSelected(
                         reportCid = ContentId(m.str("reportCid")),
                         causalOrdinal = m.num("causalOrdinal").toInt(),
                         latestPatchCid = m.optStr("latestPatchCid")?.let(::ContentId),
@@ -216,13 +216,13 @@ object KanbanEventCodec {
                         receiptRef = m.str("receiptRef"),
                         at = at,
                     )
-                    "DrainApplied" -> JulesCause.DrainApplied(m.str("commitSha"), m.num("rejects").toInt(), at)
-                    "DrainFailed" -> JulesCause.DrainFailed(m.str("reason"), at)
-                    "PredicateFlipped" -> JulesCause.PredicateFlipped(m.str("predicate"), m["nowPassing"]?.toString() == "true", at)
-                    "SessionFailed" -> JulesCause.SessionFailed(m.str("reason"), at)
-                    "SessionArchived" -> JulesCause.SessionArchived(at)
-                    "StateObserved" -> JulesCause.StateObserved(m.str("from"), m.str("to"), at)
-                    "WorkQueued" -> JulesCause.WorkQueued(
+                    "DrainApplied" -> SessionCause.DrainApplied(m.str("commitSha"), m.num("rejects").toInt(), at)
+                    "DrainFailed" -> SessionCause.DrainFailed(m.str("reason"), at)
+                    "PredicateFlipped" -> SessionCause.PredicateFlipped(m.str("predicate"), m["nowPassing"]?.toString() == "true", at)
+                    "SessionFailed" -> SessionCause.SessionFailed(m.str("reason"), at)
+                    "SessionArchived" -> SessionCause.SessionArchived(at)
+                    "StateObserved" -> SessionCause.StateObserved(m.str("from"), m.str("to"), at)
+                    "WorkQueued" -> SessionCause.WorkQueued(
                         workId = m.str("workId"),
                         tier = m.str("tier"),
                         title = m.str("title"),
@@ -231,13 +231,13 @@ object KanbanEventCodec {
                         score = m["score"]?.toString()?.toDoubleOrNull() ?: 0.5,
                         at = at,
                     )
-                    "WorkDispatched" -> JulesCause.WorkDispatched(
+                    "WorkDispatched" -> SessionCause.WorkDispatched(
                         workId = m.str("workId"),
                         sessionId = m.str("sessionId"),
                         attempt = m.num("attempt").toInt(),
                         at = at,
                     )
-                    "WorkDrained" -> JulesCause.WorkDrained(
+                    "WorkDrained" -> SessionCause.WorkDrained(
                         workId = m.str("workId"),
                         sessionId = m.str("sessionId"),
                         commitSha = m.str("commitSha"),
@@ -261,9 +261,9 @@ object KanbanEventCodec {
                         },
                         at = at,
                     )
-                    "WorkIdentitySynthesized" -> JulesCause.WorkIdentitySynthesized(
+                    "WorkIdentitySynthesized" -> SessionCause.WorkIdentitySynthesized(
                         workId = m.str("workId"),
-                        identity = borg.trikeshed.jules.WorkIdentity(
+                        identity = borg.trikeshed.kanban.WorkIdentity(
                             workId = m.optStr("identityWorkId") ?: m.str("workId"),
                             sessionId = m.optStr("identitySessionId")
                                 ?: m.optStr("identity")
@@ -289,25 +289,25 @@ object KanbanEventCodec {
         }
     }
 
-    private fun JulesCause.kind(): String = when (this) {
-        is JulesCause.AgentMessaged -> "AgentMessaged"
-        is JulesCause.HumanAnswered -> "HumanAnswered"
-        is JulesCause.PatchArrived -> "PatchArrived"
-        is JulesCause.PatchSnapshotObserved -> "PatchSnapshotObserved"
-        is JulesCause.PatchReviewSelected -> "PatchReviewSelected"
-        is JulesCause.PatchRejected -> "PatchRejected"
-        is JulesCause.AgentReportObserved -> "AgentReportObserved"
-        is JulesCause.AgentReportReviewSelected -> "AgentReportReviewSelected"
-        is JulesCause.DrainApplied -> "DrainApplied"
-        is JulesCause.DrainFailed -> "DrainFailed"
-        is JulesCause.PredicateFlipped -> "PredicateFlipped"
-        is JulesCause.SessionFailed -> "SessionFailed"
-        is JulesCause.SessionArchived -> "SessionArchived"
-        is JulesCause.StateObserved -> "StateObserved"
-        is JulesCause.WorkQueued -> "WorkQueued"
-        is JulesCause.WorkDispatched -> "WorkDispatched"
-        is JulesCause.WorkDrained -> "WorkDrained"
-        is JulesCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
+    private fun SessionCause.kind(): String = when (this) {
+        is SessionCause.AgentMessaged -> "AgentMessaged"
+        is SessionCause.HumanAnswered -> "HumanAnswered"
+        is SessionCause.PatchArrived -> "PatchArrived"
+        is SessionCause.PatchSnapshotObserved -> "PatchSnapshotObserved"
+        is SessionCause.PatchReviewSelected -> "PatchReviewSelected"
+        is SessionCause.PatchRejected -> "PatchRejected"
+        is SessionCause.AgentReportObserved -> "AgentReportObserved"
+        is SessionCause.AgentReportReviewSelected -> "AgentReportReviewSelected"
+        is SessionCause.DrainApplied -> "DrainApplied"
+        is SessionCause.DrainFailed -> "DrainFailed"
+        is SessionCause.PredicateFlipped -> "PredicateFlipped"
+        is SessionCause.SessionFailed -> "SessionFailed"
+        is SessionCause.SessionArchived -> "SessionArchived"
+        is SessionCause.StateObserved -> "StateObserved"
+        is SessionCause.WorkQueued -> "WorkQueued"
+        is SessionCause.WorkDispatched -> "WorkDispatched"
+        is SessionCause.WorkDrained -> "WorkDrained"
+        is SessionCause.WorkIdentitySynthesized -> "WorkIdentitySynthesized"
     }
 
     // NO second unescape pass here. `reify` (confix `decodeTextSpan`)

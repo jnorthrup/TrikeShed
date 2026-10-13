@@ -5,7 +5,7 @@ import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.cursor.BudgetCoord
-import borg.trikeshed.jules.BrainClient
+import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.modelmux.Frame
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -368,8 +368,8 @@ class ProjectScopes(
     suspend fun unmount(name: String): Boolean = mutex.withLock {
         val had = scopes.any { it.name == name }
         if (!had) return false
-        scopes = scopes.filter { it.name != name }
         projectDbs?.remove(name)
+        scopes = scopes.filter { it.name != name }
         ledgerFile?.takeIf { it.exists() }?.let { f ->
             runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
         }
@@ -379,6 +379,12 @@ class ProjectScopes(
         filesRoot?.let { File(it, name).deleteRecursively() }
         System.err.println("[OROBOROS] project db unmounted: $name")
         true
+    }
+
+    /** Stop mounted readers before closing their durable commit owners; saved projects remain on disk. */
+    suspend fun drain() {
+        projectDbs?.drain()
+        for ((name, store) in commits.entries.toList()) if (commits.remove(name, store)) store.close()
     }
 
     /** Append to the mount ledger (name TAB kind TAB path), deduped by name. */

@@ -1,10 +1,13 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.util.io.ContentTypes
 import borg.trikeshed.relaxfactory.CouchHttpSurface
+import borg.trikeshed.relaxfactory.RequestFactoryHandler
+import borg.trikeshed.relaxfactory.RequestFactoryReactorElement
 import borg.trikeshed.ipns.IpnsCid
 import borg.trikeshed.ipns.IpnsDht
 import borg.trikeshed.ipns.IpnsDhtFailure
@@ -40,7 +43,9 @@ data class WireReply(val status: Int, val contentType: String, val bytes: ByteAr
  *   GET    /                                      welcome {couchdb, version:"1.6.2"}
  *   GET    /{db}                                  info
  *   POST   /{db}                                  bare document put, or a RequestFactory envelope
- *   POST   /{db}/_relax                           RequestFactory envelope ({operations:[…]} → {ok,receipts})
+ *   POST   /{db}/_relax                           Couch operations, or an original RequestFactory envelope
+ *   POST   /{db}/_requestfactory                  original RequestFactory wire payload
+ *   POST   /gwtRequest                           original RelaxFactory RequestFactory mount
  *   GET    /{db}/_all_docs[?startkey&endkey&limit&skip&descending&include_docs]   POST with {keys}
  *   GET    /{db}/_changes[?since&limit&include_docs]
  *   POST   /{db}/_revs_diff                       {id:[rev…]} → {id:{missing:[…]}}
@@ -72,6 +77,8 @@ class CouchWireRouter(
     val report: CouchReportReactorElement? = null,
     /** Host-owned Kotlin targets callable through the RequestFactory `rpc` operation. */
     val rpcTargets: Map<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget> = emptyMap(),
+    /** The actual RequestFactory server processor, admitted by its commonMain channel owner. */
+    val requestFactoryHandler: RequestFactoryHandler? = null,
     /** P2 registry seam: null means eager route, preserving every existing caller. */
     val incrementalView: (ddoc: String, view: String) -> IncrementalViewElement? = { _, _ -> null },
 ) {
@@ -88,12 +95,13 @@ class CouchWireRouter(
         borg.trikeshed.relaxfactory.CouchRequestFactory.forDatabase(db, replicator, viewServer, rpcTargets)
     }
 
-    suspend fun handle(method: String, rawPath: String, body: ByteArray): WireReply? {
+    suspend fun handle(method: String, rawPath: String, body: ByteArray, contentType: String? = null): WireReply? {
         val m = method.uppercase()
         val path = rawPath.substringBefore('?')
         val query = CouchHttpSurface.parseQuery(rawPath.substringAfter('?', ""))
         val segments = path.trim('/').split('/').filter { it.isNotEmpty() }.map { CouchHttpSurface.percentDecode(it) }
 
+        if (segments == listOf("gwtRequest")) return requestFactoryWire(m, body, contentType)
         if (segments.isEmpty()) return if (m == "GET") vhost("/") ?: welcome() else WireReply.methodNotAllowed(m)
         if (segments[0] == "api" && segments.getOrNull(1) == "v0") return ipfs(m, segments.drop(2), query, body)
         if (segments[0] != db.name) return if (m == "GET") vhost(path) else null
@@ -107,7 +115,8 @@ class CouchWireRouter(
                 // so a client written against either mounting works against both. The sniff is
                 // narrower than "has the key": `operations` must be a list, which a document
                 // carrying a scalar or object under that name is not.
-                if (Couch.asList(doc["operations"]) != null) envelope(body)
+                if (requestFactoryEnvelope(doc)) requestFactoryWire(m, body, contentType)
+                else if (Couch.asList(doc["operations"]) != null) envelope(body)
                 else {
                     val id = doc["_id"] as? String ?: borg.trikeshed.job.ContentId.of(body).hex
                     val r = db.put(id, doc, doc["_rev"] as? String)
@@ -118,7 +127,11 @@ class CouchWireRouter(
         }
 
         return when (rest[0]) {
-            "_relax" -> if (m != "POST") WireReply.methodNotAllowed(m) else envelope(body)
+            "_requestfactory" -> if (rest.size != 1) WireReply.notFound() else requestFactoryWire(m, body, contentType)
+            "_relax" -> if (m != "POST") WireReply.methodNotAllowed(m) else {
+                if (parseMap(body)?.let(::requestFactoryEnvelope) == true) requestFactoryWire(m, body, contentType)
+                else envelope(body)
+            }
             "_all_docs" -> allDocs(m, query, body)
             "_changes" -> if (m != "GET") WireReply.methodNotAllowed(m) else WireReply.json(
                 200,
@@ -162,6 +175,33 @@ class CouchWireRouter(
      */
     private suspend fun envelope(body: ByteArray): WireReply =
         WireReply.json(200, requestFactory.process(body.decodeToString()))
+
+    private fun requestFactoryEnvelope(root: Map<String, Any?>): Boolean =
+        root["F"] is String &&
+            ("I" !in root || Couch.asList(root["I"]) != null) &&
+            ("O" !in root || Couch.asList(root["O"]) != null)
+
+    /** RF returns its own protocol error envelope; it is never re-encoded as Couch receipts. */
+    private suspend fun requestFactoryWire(method: String, body: ByteArray, contentType: String?): WireReply {
+        if (method != "POST") return WireReply.methodNotAllowed(method)
+        if (contentType != null && contentType.substringBefore(';').trim().lowercase() != "application/json") {
+            return WireReply.json(415, mapOf("error" to "unsupported_media_type", "reason" to "RequestFactory requires application/json"))
+        }
+        val payload = try { body.decodeToString(throwOnInvalidSequence = true) }
+        catch (failure: Exception) { return WireReply.badRequest("invalid UTF-8 body") }
+        val root = try { reifyStrict(payload) }
+        catch (failure: Exception) { return WireReply.badRequest("invalid JSON body") }
+        if (root !is Map<*, *>) return WireReply.badRequest("RequestFactory requires a JSON object")
+        val handler = requestFactoryHandler ?: currentCoroutineContext()[RequestFactoryReactorElement]
+            ?: return WireReply.json(501, mapOf("error" to "requestfactory_unavailable", "reason" to "RequestFactory server processor is not configured"))
+        return try {
+            WireReply(200, "application/json; charset=utf-8", handler.processRequest(payload).encodeToByteArray())
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (failure: Exception) {
+            WireReply.json(500, mapOf("error" to "requestfactory_failure", "reason" to (failure.message ?: "RequestFactory processor failed")))
+        }
+    }
 
     private fun welcome() = WireReply.json(200, mapOf("couchdb" to "Welcome", "version" to CouchHttpSurface.COUCH_VERSION, "vendor" to mapOf("name" to "TrikeShed", "version" to "oroboros")))
 

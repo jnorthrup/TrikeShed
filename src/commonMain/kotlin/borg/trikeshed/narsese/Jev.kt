@@ -2,7 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.htx.HtxHttpError
 import borg.trikeshed.htx.htxHeaders
-import borg.trikeshed.jules.TrikeHtxHttpClient
+import borg.trikeshed.htx.TrikeHtxHttpClient
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap

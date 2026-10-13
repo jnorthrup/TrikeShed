@@ -20,6 +20,8 @@ import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentProposal
+import borg.trikeshed.lib.s_
 import borg.trikeshed.nlp.NlpDependency
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
@@ -29,6 +31,7 @@ import borg.trikeshed.parse.ValueBudget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.coroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,13 +43,111 @@ import kotlin.test.assertTrue
 
 class DocumentCurationLegosTest {
     @Test
+    fun retainedTupleIndexesIntersectWithoutFlatteningOrChangingProposals() {
+        for (name in listOf("synthetic-medical-review", "synthetic-legal-review")) {
+            val text = "λ source"
+            val sourceCid = ContentId.of(text.encodeToByteArray())
+            val source = DocumentSource(sourceCid, sourceCid, text, name, "text/plain", name)
+            val proposals = s_[
+                DocumentProposal("raw-0", "party-a", "reports", null, 0.8, polarity = true),
+                DocumentProposal("raw-1", "party-a", "disputes", "finding", null, polarity = false),
+                DocumentProposal("raw-2", "party-b", "reports", "finding", 0.6, polarity = true),
+                DocumentProposal("raw-3", "party-a", "reports", null, null, polarity = true),
+            ]
+            val record = DocumentCurationRecord(source, null, null, "fixture", proposals, emptySeriesOf())
+            val before = DocumentCuratorCodec.encode(record)
+            val cid = ContentId.of(before)
+            val page = DocumentCurationLegos.sheet(cid, record, "proposals", 0, 0, 1,
+                s_[s_["subject"], s_["predicate", "polarity"], s_["object"]], s_[0 j 0, 1 j 0, 2 j 0])
+            val sheet = page["sheet"] as Map<*, *>
+            assertEquals(4, page["rowCount"])
+            assertEquals(2, sheet["selectedRows"])
+            assertEquals(listOf(0), sheet["sourceOrdinals"])
+            assertTrue((sheet["notice"] as String).contains("not verified facts"))
+            val columns = (sheet["columns"] as List<*>).map { (it as Map<*, *>)["name"] }
+            val row = (sheet["rows"] as List<*>)[0] as List<*>
+            assertEquals(sourceCid.value, row[columns.indexOf("originalCid")])
+            assertNull(row[columns.indexOf("object")])
+            assertEquals(0.8, row[columns.indexOf("modelConfidence")])
+            val indexes = sheet["indexes"] as List<*>
+            val objectGroup = (((indexes[2] as Map<*, *>)["groups"] as List<*>)[0] as Map<*, *>)
+            assertEquals(listOf(null), objectGroup["key"])
+            assertEquals(2, objectGroup["count"])
+            fun read(href: String): Map<*, *> = DocumentCurationLegos.sheet(cid, record,
+                borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(href.substringAfter('?')))["sheet"] as Map<*, *>
+            val next = read(sheet["nextHref"] as String)
+            assertEquals(listOf(3), next["sourceOrdinals"])
+            assertNull(next["nextHref"])
+            assertNull(((next["rows"] as List<*>)[0] as List<*>)[columns.indexOf("modelConfidence")])
+            assertEquals(sheet, read(next["previousHref"] as String))
+            val nextGroups = read(sheet["nextGroupsHref"] as String)
+            assertEquals(listOf(0), nextGroups["sourceOrdinals"])
+            assertEquals(sheet["selections"], nextGroups["selections"])
+            assertEquals(sheet, read(nextGroups["previousGroupsHref"] as String))
+            val noRows = DocumentCurationLegos.sheet(cid, record, "proposals", 0, 0, 32,
+                s_[s_["subject"], s_["polarity"]], s_[0 j 1, 1 j 1])["sheet"] as Map<*, *>
+            assertEquals(0, noRows["selectedRows"])
+            assertEquals(emptyList<Any?>(), noRows["rows"])
+            assertEquals(sheet["columns"], noRows["columns"])
+            val empty = record.copy(proposals = emptySeriesOf())
+            val emptySheet = DocumentCurationLegos.sheet(ContentId.of(DocumentCuratorCodec.encode(empty)), empty,
+                "proposals", 0, 0, 32, s_[s_["subject"]])["sheet"] as Map<*, *>
+            assertEquals(sheet["columns"], emptySheet["columns"])
+            assertEquals(0, emptySheet["sourceRows"])
+            assertEquals(0, ((emptySheet["indexes"] as List<*>)[0] as Map<*, *>)["groupCount"])
+            assertContentEquals(before, DocumentCuratorCodec.encode(record))
+            assertFailsWith<IllegalArgumentException> {
+                DocumentCurationLegos.sheet(cid, record, "proposals", 0, 0, 32, s_[s_["kind"]])
+            }
+            assertFailsWith<IllegalArgumentException> {
+                DocumentCurationLegos.sheet(cid, record, "proposals", 0, 0, 32, s_[s_["subject", "subject"]])
+            }
+            for (bad in listOf("[[0,0.5]]", "[[0,-1]]", "[[1,0]]", "[[0,99]]", "[[0,0],[0,1]]")) {
+                assertFailsWith<IllegalArgumentException> {
+                    DocumentCurationLegos.sheet(cid, record, mapOf("cursor" to "proposals", "axes" to "[[\"subject\"]]", "selections" to bad))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun childIndexesStayInTheirReceiptAndSentenceScope() {
+        val sourceCid = ContentId.of("source".encodeToByteArray())
+        val source = DocumentSource(sourceCid, sourceCid, "source", "hierarchy", "text/plain", "hierarchy")
+        // Retained parser rows, not a parser-behavior fixture. Index 42 is not source row 1.
+        val nlp = NlpDocument("source", s_[
+            NlpSentence(41, 0, 3, s_[NlpToken(1, 0, 3, "one", "one", "NN", "O")], emptySeriesOf()),
+            NlpSentence(42, 3, 6, s_[NlpToken(1, 3, 4, "a", "a", "NN", "O"),
+                NlpToken(2, 4, 5, "b", "b", "VB", "O"), NlpToken(3, 5, 6, "c", "c", "NN", "O")], emptySeriesOf()),
+        ])
+        val record = DocumentCurationRecord(source, nlp, null, "fixture", emptySeriesOf(), emptySeriesOf())
+        val cid = ContentId.of(DocumentCuratorCodec.encode(record))
+        val root = DocumentCurationLegos.sheet(cid, record, "sentences", 0, 0, 32,
+            s_[s_["sentence"]], s_[0 j 1])["sheet"] as Map<*, *>
+        assertEquals(listOf(1), root["sourceOrdinals"])
+        val tokenRef = ((root["rows"] as List<*>)[0] as List<*>).filterIsInstance<Map<*, *>>()
+            .single { (it["sheet"] as String).endsWith("/tokens") }
+        val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery((tokenRef["href"] as String).substringAfter('?'))
+        val tokens = DocumentCurationLegos.sheet(cid, record, query + mapOf("axes" to "[[\"tag\"],[\"ner\"]]", "selections" to "[[0,0],[1,0]]"))["sheet"] as Map<*, *>
+        assertEquals(listOf(0, 2), tokens["sourceOrdinals"])
+        assertEquals(3, tokens["sourceRows"])
+        assertEquals(2, tokens["selectedRows"])
+        assertTrue((tokens["id"] as String).endsWith("/1/tokens"))
+        assertEquals(listOf(42, 42), (tokens["rows"] as List<*>).map { (it as List<*>)[2] })
+        assertFailsWith<IllegalArgumentException> {
+            DocumentCurationLegos.sheet(cid, record, "sentences", 0, 0, 32, s_[s_["tokens"]])
+        }
+    }
+
+    @Test
     fun retainedDocumentReferencesKeepLargeNlpOutOfLcncReporting() {
         val text = "Kotlin ".repeat(1_000).trimEnd()
         val original = ContentId.of("original document bytes".encodeToByteArray())
         val source = DocumentSource(original, ContentId.of(text.encodeToByteArray()), text,
             "synthetic.txt", "text/plain", "large-document")
+        var tokenReads = 0
         val nlp = NlpDocument(text, listOf(NlpSentence(0, 0, text.length,
-            1_000 j { i -> NlpToken(i + 1, i * 7, i * 7 + 6, "Kotlin", "Kotlin", "NN", "O") },
+            1_000 j { i -> tokenReads++; NlpToken(i + 1, i * 7, i * 7 + 6, "Kotlin", "Kotlin", "NN", "O") },
             1_000 j { i -> NlpDependency(0, i + 1, "root") })).toSeries())
         val record = DocumentCurationRecord(source, nlp, null, "fixture", emptySeriesOf(), emptySeriesOf())
         val cid = ContentId.of(DocumentCuratorCodec.encode(record))
@@ -60,10 +161,61 @@ class DocumentCurationLegosTest {
         assertEquals(original.value, ref["originalCid"])
         assertEquals(source.extractedTextCid.value, ref["extractedTextCid"])
         assertEquals("/api/documents?cid=${cid.value}&view=sheet", (retained["sheet"] as Map<*, *>)["href"])
+        assertEquals(DocumentCurationLegos.sheetHref(cid), (retained["sheet"] as Map<*, *>)["pageHref"])
         val full = DocumentCurationLegos.output(cid, record)
         assertNotNull(ValueBudget().violation(full))
         assertEquals(text, ((full["record"] as Map<*, *>)["source"] as Map<*, *>)["text"])
         assertEquals(1_000, (((full["sheets"] as List<*>)[1] as Map<*, *>)["rows"] as List<*>).size)
+        tokenReads = 0
+        val page = DocumentCurationLegos.sheet(cid, record, "tokens", 0, 128, 32)
+        assertTrue(tokenReads in 32..34, "Only the page and metadata exemplars should be read: $tokenReads")
+        assertNull(ValueBudget().violation(page))
+        assertEquals(1_000, page["rowCount"])
+        assertEquals(160, page["next"])
+        val sheet = page["sheet"] as Map<*, *>
+        val rows = sheet["rows"] as List<*>
+        assertEquals(32, rows.size)
+        assertEquals(129, (rows[0] as List<*>)[3])
+        assertEquals(original.value, (rows[0] as List<*>)[0])
+        assertEquals("document/${cid.value}", sheet["parent"])
+        assertEquals(128, sheet["offset"])
+        assertEquals(true, sheet["truncated"])
+        // Follow the actual read URLs: no guessed sheet-ID parsing or reparsing the document.
+        fun read(href: String): Map<String, Any?> = DocumentCurationLegos.sheet(cid, record,
+            borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(href.substringAfter('?')))
+        val next = read(sheet["nextHref"] as String)
+        assertEquals(160, (next["sheet"] as Map<*, *>)["offset"])
+        assertEquals(sheet, read((next["sheet"] as Map<*, *>)["previousHref"] as String)["sheet"])
+        val root = read(sheet["parentHref"] as String)["sheet"] as Map<*, *>
+        assertEquals("document/${cid.value}", root["id"])
+        assertNull(root["previousHref"])
+        assertNull(root["nextHref"])
+        val child = ((root["rows"] as List<*>)[0] as List<*>).filterIsInstance<Map<*, *>>()
+            .single { it["sheet"] == "document/${cid.value}/0/tokens" }
+        tokenReads = 0
+        val opened = read(child["href"] as String)["sheet"] as Map<*, *>
+        assertEquals(child["sheet"], opened["id"])
+        assertEquals(0, opened["offset"])
+        assertEquals(32, (opened["rows"] as List<*>).size)
+        assertTrue(tokenReads in 32..34)
+        val last = read(DocumentCurationLegos.sheetHref(cid, "tokens", 0, 992, 32))["sheet"] as Map<*, *>
+        assertEquals(8, (last["rows"] as List<*>).size)
+        assertNull(last["nextHref"])
+        for (bad in listOf("-1", "1.5", "2147483648", "not-an-index")) {
+            assertFailsWith<IllegalArgumentException> {
+                DocumentCurationLegos.sheet(cid, record, mapOf("offset" to bad))
+            }
+        }
+        val exhausted = DocumentCurationLegos.sheet(cid, record, "tokens", 0, Int.MAX_VALUE, 32)
+        assertEquals(emptyList<Any?>(), (exhausted["sheet"] as Map<*, *>)["rows"])
+        assertEquals(sheet["columns"], (exhausted["sheet"] as Map<*, *>)["columns"])
+        assertNull(exhausted["next"])
+        for (view in listOf("sentences", "tokens", "dependencies")) {
+            assertFailsWith<IllegalArgumentException> { DocumentCurationLegos.sheet(cid, record, view, 0, 0, 129) }
+            assertFailsWith<IllegalArgumentException> { DocumentCurationLegos.sheet(cid, record, view, 0, -1, 32) }
+        }
+        assertFailsWith<IllegalArgumentException> { DocumentCurationLegos.sheet(cid, record, "tokens", 1, 0, 32) }
+        assertFailsWith<IllegalArgumentException> { DocumentCurationLegos.sheet(cid, record, "unknown", 0, 0, 32) }
     }
 
     @Test
@@ -179,6 +331,26 @@ class DocumentCurationLegosTest {
                 assertEquals("AVAILABLE", result.nodeOutputs.getValue("curate")["nlpStatus"])
                 assertEquals(0, record.submittedReceiptCids.size)
                 assertEquals(1, record.quotationSubmittedReceiptCids.size)
+                val ledger = LcncConsumedLedger()
+                val frameCount = frames.size
+                val read = DocumentCurationLegos.sheet(curator)
+                withContext(ledger) {
+                    repeat(2) {
+                        val page = read.run(LcncNode("read", DocumentCurationLegos.SHEET,
+                            mapOf("receiptCid" to cid.value, "view" to "tokens", "axes" to "[[\"tag\"],[\"ner\"]]", "selections" to "[[0,0],[1,0]]")),
+                            mapOf("receiptCid?" to cid.value))
+                        assertEquals(1, page["rowCount"])
+                        assertEquals(1, LcncSheetNodes.countNode().run(LcncNode("count", "sheet.count"), page)["count"])
+                    }
+                }
+                assertEquals(cid.value, ledger.entries().single().cid)
+                assertFailsWith<IllegalArgumentException> {
+                    read.run(LcncNode("read", DocumentCurationLegos.SHEET,
+                        mapOf("view" to "tokens", "axes" to "[[\"tag\"]]", "selections" to "[[0,0]]")),
+                        mapOf("receiptCid?" to cid.value))
+                }
+                assertEquals(1, modelCalls)
+                assertEquals(frameCount, frames.size)
                 curator.drain(); bag.drain()
                 assertEquals(record.quotationSubmittedReceiptCids[0].value, bag.snapshot().values.single().provenanceCid)
             } finally { curator.drain(); bag.drain(); session.close() }
@@ -229,12 +401,15 @@ class DocumentCurationLegosTest {
         val program = LcncProgram("document-sheet", listOf(
             LcncNode("source", "scope.in", mapOf("name" to "extent")),
             LcncNode("curate", DocumentCurationLegos.CURATE),
+            LcncNode("read", DocumentCurationLegos.SHEET),
             LcncNode("count", "sheet.count"),
         ).toSeries(), listOf(
             LcncWire("source", "value", "curate", "extent"),
-            LcncWire("curate", "sheet", "count", "sheet"),
+            LcncWire("curate", "receiptCid", "read", "receiptCid?"),
+            LcncWire("read", "sheet", "count", "sheet"),
         ).toSeries())
         assertEquals(LcncNodeKey.DOCUMENT_CURATE, LcncNodeKey.of(DocumentCurationLegos.CURATE))
+        assertEquals(LcncNodeKey.DOCUMENT_SHEET, LcncNodeKey.of(DocumentCurationLegos.SHEET))
         assertTrue(LcncTypeCheck.check(program).isEmpty())
     }
 }

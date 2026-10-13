@@ -1,7 +1,7 @@
 package borg.trikeshed.kif
 
 import borg.trikeshed.collections.associative.LinkedLinearHashMap
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 
 /**
  * SUO-KIF — Standard Upper Ontology Knowledge Interchange Format (LISP-like S-expressions)
@@ -140,6 +140,10 @@ class KifKnowledgeBase {
     private val held = LinkedLinearHashMap<String, KifExpr>(1024)
     /** [asserts] in telling order, rebuilt lazily after a write. */
     private var snapshot: List<KifExpr>? = null
+    /** Derived views only for queried predicates; unrelated plane churn leaves them intact. */
+    private val predicateSnapshots = LinkedHashMap<String, Series<KifExpr>>()
+    /** Membership shares held keys/expressions; cold predicate reads never scan unrelated facts. */
+    private val predicates = HashMap<String, LinkedLinearHashMap<String, KifExpr>>()
     private var subclassRevision = 0L
 
     fun assert(expr: KifExpr) {
@@ -178,20 +182,45 @@ class KifKnowledgeBase {
         if (key in held) return false
         held[key] = expr
         snapshot = null
+        predicateOf(expr)?.let { predicate ->
+            predicates.getOrPut(predicate) { LinkedLinearHashMap() }[key] = expr
+            predicateSnapshots.remove(predicate)
+        }
         if (subclassEdge(expr) != null) { closureCache = null; subclassRevision++ }
         return true
     }
 
     private fun forget(expr: KifExpr): Boolean {
-        if (held.remove(expr.toKifString()) == null) return false
+        val key = expr.toKifString()
+        val removed = held.remove(key) ?: return false
         snapshot = null
-        if (subclassEdge(expr) != null) { closureCache = null; subclassRevision++ }
+        predicateOf(removed)?.let { predicate ->
+            val members = predicates.getValue(predicate)
+            members.remove(key)
+            if (members.count == 0) predicates.remove(predicate)
+            predicateSnapshots.remove(predicate)
+        }
+        if (subclassEdge(removed) != null) { closureCache = null; subclassRevision++ }
         return true
     }
 
     fun asserts(): List<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) {
         assertsLocked()
     }
+
+    /** Frozen telling order from this predicate's membership, including on cache misses. */
+    fun asserts(predicate: String): Series<KifExpr> = borg.trikeshed.isam.synchronizedLock(gate) {
+        val members = predicates[predicate] ?: return@synchronizedLock emptySeriesOf()
+        predicateSnapshots[predicate] ?: members.entriesInOrder().right
+            .also {
+                // Bound reader-selected cache keys; eviction changes cost, never the held assertions.
+                if (predicateSnapshots.size >= 128) predicateSnapshots.remove(predicateSnapshots.keys.first())
+                predicateSnapshots[predicate] = it
+            }
+    }
+
+    private fun predicateOf(expr: KifExpr): String? =
+        ((expr as? KifExpr.ListExpr)?.elements?.firstOrNull() as? KifExpr.Atom)?.token
 
     private fun assertsLocked(): List<KifExpr> =
         snapshot ?: ArrayList<KifExpr>(held.count).also { out ->
@@ -209,11 +238,12 @@ class KifKnowledgeBase {
     /** Minimal solver: subclass/instance closure + (and ...) grounding. Light effort — not a full FOL prover. */
     fun query(pattern: KifExpr): List<Map<String, String>> {
         // pattern is a KIF list with Vars, e.g. (subclass ?X Physical)
-        // brute-force unify against asserts
+        // Literal heads select a cached predicate view; variable heads still see every assertion.
         // A LinkedHashSet: a direct `subclass` edge is also in the closure, and one binding
         // should come back once (delta 2026-09-04).
         val bindings = LinkedHashSet<Map<String, String>>()
-        for (a in asserts()) {
+        val candidates = predicateOf(pattern)?.let { asserts(it).view } ?: asserts()
+        for (a in candidates) {
             unify(pattern, a)?.let { bindings.add(it) }
         }
         // also transitively chase subclass

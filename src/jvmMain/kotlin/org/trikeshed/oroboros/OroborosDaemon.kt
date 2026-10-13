@@ -18,6 +18,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.α
 import borg.trikeshed.userspace.nio.channels.SocketDomain
 import borg.trikeshed.userspace.nio.channels.SocketType
 import borg.trikeshed.userspace.nio.ByteBuffer
@@ -55,9 +56,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.withLock
-import borg.trikeshed.utils.kanban.JulesBoardStore
+import borg.trikeshed.utils.kanban.SessionBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
-import borg.trikeshed.jules.JulesCause
+import borg.trikeshed.kanban.SessionCause
 import kotlinx.coroutines.withContext
 
 /** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
@@ -319,6 +320,183 @@ object OroborosDaemon {
         return fd
     }
 
+    /** Keep curation drain ordering outside mainImpl's JVM-sized coroutine state machine. */
+    private suspend fun drainCuration(
+        follow: kotlinx.coroutines.Job?,
+        intake: borg.trikeshed.forge.server.CurationIntake,
+        modules: borg.trikeshed.module.ModuleSupervisor,
+    ) {
+        follow?.join()
+        intake.drain()
+        runCatching { modules.drainAll() }
+        intake.constellations()?.drain()
+    }
+
+    /** Belief-field runner registration, kept out of the daemon's JVM-sized boot method. */
+    private fun registerBeliefNodes(
+        ctx: borg.trikeshed.module.ModuleContext,
+        memory: borg.trikeshed.memory.HermesMemoryFiles?,
+        brain: borg.trikeshed.modelmux.BrainClient,
+        kif: borg.trikeshed.kif.KifKnowledgeBase,
+    ) {
+        ctx.beliefBag?.let { bag ->
+            ctx.lcncRunners["nal.mint"] = borg.trikeshed.narsese.NalNodes.mintRunner(
+                brain = brain, muxContext = ctx.muxContext, cas = ctx.casStore, bag = bag, rete = ctx.rete,
+                kifSink = { text ->
+                    val cid = borg.trikeshed.job.ContentId.of(text.encodeToByteArray())
+                    ctx.blackboard.put("nal-kif/${cid.hex}", text, "nal.mint")
+                    runCatching { kif.assertKif(text) }
+                },
+            )
+            ctx.lcncRunners["nal.decay"] = borg.trikeshed.narsese.NalNodes.decayRunner(bag)
+            ctx.lcncRunners["nal.recall"] = borg.trikeshed.narsese.NalNodes.recallRunner(bag)
+            ctx.lcncRunners["skill.decay"] = borg.trikeshed.narsese.NalNodes.skillDecayRunner(bag)
+        }
+        ctx.beliefBag?.let { bag ->
+            ctx.lcncRunners["state.freeze"] = borg.trikeshed.narsese.StateNodes.freezeRunner(
+                bag = bag, kif = kif, cas = ctx.casStore,
+                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { ctx.rete.snapshot() }
+                    .view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view }) },
+            )
+            ctx.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(bag = bag, cas = ctx.casStore, kif = kif)
+        }
+        ctx.beliefBag?.let { bag ->
+            ctx.lcncRunners["beliefs.introspect"] = borg.trikeshed.narsese.BeliefsNodes.introspectRunner(bag)
+            ctx.lcncRunners["beliefs.resonate"] = borg.trikeshed.narsese.BeliefsNodes.resonateRunner(bag) { memory?.glossOf(it) }
+            ctx.lcncRunners["nal.attend"] = borg.trikeshed.narsese.BeliefsNodes.attendRunner(bag)
+            ctx.lcncRunners["nal.reinforce"] = borg.trikeshed.narsese.BeliefsNodes.reinforceRunner(bag)
+            ctx.lcncRunners["nars.seat"] = borg.trikeshed.narsese.NarsSeatNode.seatRunner(bag) { memory?.glossOf(it) }
+        }
+        ctx.turnReview?.let { review ->
+            ctx.lcncRunners["beliefs.review"] = borg.trikeshed.narsese.BeliefsNodes.reviewRunner(review) { angular, gloss ->
+                memory?.gloss(angular, gloss)
+            }
+        }
+        ctx.lcncRunners["nal.encode"] = borg.trikeshed.narsese.BeliefsNodes.encodeRunner()
+    }
+
+    /** Own the Curator/Wiki producer so shutdown can join its current pass. */
+    private fun CoroutineScope.curatorFollow(
+        curatorImpulse: borg.trikeshed.narsese.CuratorImpulseElement?,
+        hermesHomeDir: File,
+        memoryStore: borg.trikeshed.memory.MemoryStore,
+        couchStore: borg.trikeshed.couch.CouchStore,
+        casStore: borg.trikeshed.job.CasStore,
+        daemonBlackboard: borg.trikeshed.graal.ConfixBlackboard,
+        wikiLane: Array<borg.trikeshed.lcnc.LcncNodeRunner?>,
+    ): kotlinx.coroutines.Job? = if (curatorImpulse != null) {
+        val profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) }
+            ?: File(hermesHomeDir.absolutePath)
+        val archiveProfile = HostSystem.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
+            ?: File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes.prev").takeIf { it.isDirectory() }
+        // Wiki Maintainer lane cadence: one pass per N transcript-cid
+        // batches (the arXiv outer loop k); WIKI_CONSOLIDATE_EVERY=0
+        // disables the lane entirely.
+        val wikiEvery = HostSystem.getenv("WIKI_CONSOLIDATE_EVERY")?.toIntOrNull() ?: 1
+        var wikiBatchesSeen = 0
+        var wikiIterationsDone = 0
+        // Transcript cids that landed before the runner was armed; drained
+        // into the first Maintainer pass once it is.
+        val wikiPending = linkedSetOf<String>()
+        launch(Dispatchers.Default) {
+            runCatching {
+                val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(jfile(profileDir), archiveProfile?.let(::jfile), memoryStore)
+                HostSystem.err("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
+            }.onFailure {
+                HostSystem.err("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
+            }
+
+            val feeder = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder(jfile(profileDir))
+            var checkpoint = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowCheckpoint.empty()
+            // I5: baselines are computed once per daemon run, after the first follow has
+            // had a chance to land transcripts — session cids to the blackboard.
+            var baselinesLanded = false
+            while (isActive && isRunning) {
+                var followed: borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowResult? = null
+                runCatching {
+                    val f = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
+                    checkpoint = f.checkpoint
+                    followed = f
+                    if (f.landed.isNotEmpty() || f.transcriptCids.size > 0) {
+                        HostSystem.err(
+                            "[OROBOROS] Curator followed ${f.transcriptCids.size} changed transcripts: ${f.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
+                        )
+                    }
+                }.onFailure {
+                    HostSystem.err("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
+                }
+                // ── the arXiv outer loop (WikiSkill 2608.27454): every time
+                //    the feeder lands NEW transcript cids, the Wiki
+                //    Maintainer runs one consolidation pass over them —
+                //    traces → PATCH edits to wiki/patterns/. Guarded by
+                //    cadence + presence so an idle corpus spends nothing.
+                //    Batches that land BEFORE the runner is armed are
+                //    stashed and processed once it is (a boot's first
+                //    follow races the module registration that wires
+                //    WIKI_CONSOLIDATE); the drain check runs on every
+                //    tick so an armed-then-idle corpus still drains.
+                val freshCids = followed?.transcriptCids
+                if (wikiEvery > 0 && freshCids != null && freshCids.size > 0) {
+                    // Full backlog retained — truncating here silently dropped CID 33+ of a
+                    // large follow, and unchanged sessions never re-report, so the wiki
+                    // stayed stale until restart (curation-uring review, P1).
+                    wikiPending.addAll((freshCids α { it.b.value }).view)
+                }
+                val wikiRunner = wikiLane[0]
+                if (isRunning && wikiEvery > 0 && wikiRunner != null && wikiPending.isNotEmpty()) {
+                    wikiBatchesSeen++
+                    if (wikiBatchesSeen >= wikiEvery) {
+                        wikiBatchesSeen = 0
+                        // Retire resolved traces only after a recorded pass. Refused edits
+                        // remain refusals in that record; replaying the whole batch would
+                        // also repeat accepted edits. Missing/failed work rotates to the
+                        // tail so it cannot starve CID 33+.
+                        val cids = wikiPending.take(32)
+                        wikiIterationsDone++
+                        runCatching {
+                            val wikiNode = borg.trikeshed.lcnc.LcncNode(
+                                id = "wiki-consolidate-lane",
+                                type = borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE,
+                                params = mapOf("iteration" to wikiIterationsDone.toString()),
+                            )
+                            val report = wikiRunner.run(wikiNode, mapOf("cids" to cids))["report"] as? Map<*, *>
+                            val acknowledged = borg.trikeshed.wiki.WikiNodes.settleConsolidation(wikiPending, cids, report)
+                            HostSystem.err(
+                                "[OROBOROS] Wiki Maintainer iteration $wikiIterationsDone: ok=${report?.get("ok")} " +
+                                        "applied=${(report?.get("applied") as? List<*>)?.size ?: "-"} " +
+                                        "refused=${(report?.get("refused") as? List<*>)?.size ?: "-"} " +
+                                        "acknowledged=$acknowledged pending=${wikiPending.size}",
+                            )
+                        }.onFailure {
+                            borg.trikeshed.wiki.WikiNodes.settleConsolidation(wikiPending, cids, null)
+                            HostSystem.err("[OROBOROS] Wiki Maintainer failed (non-fatal, batch retained, pending=${wikiPending.size}): ${it.message}")
+                        }
+                    }
+                }
+                if (!baselinesLanded) {
+                    runCatching {
+                        val impulses = feeder.loadImpulses()
+                        if (impulses.size > 0) {
+                            val scenarios = feeder.loadScenarios(impulses)
+                            val baselines = borg.trikeshed.narsese.HermesBaselines.computeAndLand(
+                                couchStore, casStore, daemonBlackboard, impulses, scenarios,
+                            )
+                            if (baselines != null) {
+                                baselinesLanded = true
+                                HostSystem.err(
+                                    "[OROBOROS] Hermes baselines landed: watermark=${baselines.watermark.size} training=${baselines.training?.sessionCid?.value?.take(18) ?: "-"} corpus=${baselines.corpus.cid.value.take(18)}@${baselines.corpus.seq}",
+                                )
+                            }
+                        }
+                    }.onFailure {
+                        HostSystem.err("[OROBOROS] Hermes baseline computation failed (non-fatal): ${it.message}")
+                    }
+                }
+                if (isRunning) delay(5_000L)
+            }
+        }
+    } else null
+
     private fun CoroutineScope.ipnsNode(
         oroborosDir: File,
         ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
@@ -332,7 +510,7 @@ object OroborosDaemon {
         return node
     }
 
-    private fun CoroutineScope.couchWire(
+    private suspend fun CoroutineScope.couchWire(
         db: borg.trikeshed.couch.Couch,
         replicator: borg.trikeshed.couch.replicate.CouchReplicator,
         targets: Map<String, borg.trikeshed.relaxfactory.RequestFactoryRpcTarget>,
@@ -341,12 +519,20 @@ object OroborosDaemon {
     ): borg.trikeshed.forge.server.CouchWire {
         val report = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
         launch { report.open() }
+        val processor = borg.trikeshed.relaxfactory.GwtCouchRequestFactory(db)
+        val requestFactory = borg.trikeshed.relaxfactory.RequestFactoryReactorElement(
+            processor = { payload -> processor.process(payload) },
+            closeProcessor = { processor.close() },
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+        ).also { it.open() }
         return borg.trikeshed.forge.server.CouchWire(
             router = borg.trikeshed.couch.CouchWireRouter(db, WorktreeCouchGateway.WORKTREE_PREFIX,
-                replicator = replicator, report = report, rpcTargets = targets) { ddoc, view -> views.lookup(ddoc, view) },
+                replicator = replicator, report = report, rpcTargets = targets,
+                requestFactoryHandler = requestFactory) { ddoc, view -> views.lookup(ddoc, view) },
             replicator = replicator,
             scope = CoroutineScope(SupervisorJob(coroutineContext[kotlinx.coroutines.Job]) + Dispatchers.Default),
             ipns = node,
+            requestFactory = requestFactory,
         )
     }
 
@@ -431,6 +617,10 @@ object OroborosDaemon {
             }
             fHome.mkdirs()
             Pair(fHome, rDir)
+        }
+        if (!preflight(repoDir)) {
+            HostSystem.err("[OROBOROS] preflight failed; aborting")
+            return
         }
         // ── health FIRST ───────────────────────────────────────────────────
         // This used to bind 1,600 lines further down, after CAS, wiki, git
@@ -700,11 +890,12 @@ object OroborosDaemon {
         val hermesHomeDir = File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes")
         val hermesHomeGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
-            prefix = "homes/hermes/",
+            prefix = borg.trikeshed.util.oroboros.HermesCorpus.PREFIX,
             excludedSegments = setOf(
                 "hermes-agent", "bin", "cache", "image_cache", "audio_cache", "lsp", "plugins",
                 "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
             ),
+            excludedPath = borg.trikeshed.util.oroboros.HermesCorpus::isTrace,
         )
         val couchDb = borg.trikeshed.couch.Couch(
             COUCH_DB_NAME, couchStore, casStore,
@@ -793,20 +984,9 @@ object OroborosDaemon {
             vmHost, wireScope,
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
-        val hermesConsole = borg.trikeshed.hermes.HermesVmConsole(
-            root = java.nio.file.Paths.get(
-                config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
-                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath
-                ?: error("no hermes root"),
-            ),
-            sleeve = java.nio.file.Paths.get(
-                config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
-                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath
-                ?: error("no hermes sleeve"),
-            ),
-        )
+        val hermesConsole = hermesConsole(config, home, repoDir, daemonBlackboard, htxElement, muxReactor, wireScope)
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
-        if (config.hermesConsole) wireScope.launch(Dispatchers.IO) { hermesConsole.open() }
+        if (config.hermesConsole) check(hermesWire.open()) { "Hermes console did not admit startup" }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
@@ -1041,117 +1221,9 @@ object OroborosDaemon {
         // registration below (which runs after brainClient/moduleContext exist): the
         // registration arms slot 0, the loop polls it — null just means "not wired yet".
         val wikiLane = arrayOf<borg.trikeshed.lcnc.LcncNodeRunner?>(null)
-        if (curatorImpulse != null) {
-            val profileDir = HostSystem.getenv("HERMES_PROFILE")?.let { File(it) }
-                ?: File(hermesHomeDir.absolutePath)
-            val archiveProfile = HostSystem.getenv("HERMES_ARCHIVE_PROFILE")?.let { File(it) }
-                ?: File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes.prev").takeIf { it.isDirectory() }
-            // Wiki Maintainer lane cadence: one pass per N transcript-cid
-            // batches (the arXiv outer loop k); WIKI_CONSOLIDATE_EVERY=0
-            // disables the lane entirely.
-            val wikiEvery = HostSystem.getenv("WIKI_CONSOLIDATE_EVERY")?.toIntOrNull() ?: 1
-            var wikiBatchesSeen = 0
-            var wikiIterationsDone = 0
-            // Transcript cids that landed before the runner was armed; drained
-            // into the first Maintainer pass once it is.
-            var wikiPending = emptyList<String>()
-            launch(Dispatchers.Default) {
-                runCatching {
-                    val distilled = borg.trikeshed.narsese.HermesDesignDistiller.distillTo(jfile(profileDir), archiveProfile?.let(::jfile), memoryStore)
-                    HostSystem.err("[OROBOROS] Hermes design distilled: ${distilled.size} CAS documents")
-                }.onFailure {
-                    HostSystem.err("[OROBOROS] Hermes design distillation failed (non-fatal): ${it.message}")
-                }
-
-                val feeder = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder(jfile(profileDir))
-                var checkpoint = borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowCheckpoint.empty()
-                // I5: baselines are computed once per daemon run, after the first follow has
-                // had a chance to land transcripts — session cids to the blackboard.
-                var baselinesLanded = false
-                while (isActive) {
-                    var followed: borg.trikeshed.narsese.legacy.CuratorImpulseFeeder.FollowResult? = null
-                    runCatching {
-                        val f = feeder.followOnce(curatorImpulse, memoryStore, checkpoint)
-                        checkpoint = f.checkpoint
-                        followed = f
-                        if (f.landed.isNotEmpty() || f.transcriptCids.size > 0) {
-                            HostSystem.err(
-                                "[OROBOROS] Curator followed ${f.transcriptCids.size} changed transcripts: ${f.landed.size} signals; bank ${curatorImpulse.knowledgeBank.asserts().size} axioms",
-                            )
-                        }
-                    }.onFailure {
-                        HostSystem.err("[OROBOROS] CuratorImpulse follow failed (non-fatal): ${it.message}")
-                    }
-                    // ── the arXiv outer loop (WikiSkill 2608.27454): every time
-                    //    the feeder lands NEW transcript cids, the Wiki
-                    //    Maintainer runs one consolidation pass over them —
-                    //    traces → PATCH edits to wiki/patterns/. Guarded by
-                    //    cadence + presence so an idle corpus spends nothing.
-                    //    Batches that land BEFORE the runner is armed are
-                    //    stashed and processed once it is (a boot's first
-                    //    follow races the module registration that wires
-                    //    WIKI_CONSOLIDATE); the drain check runs on every
-                    //    tick so an armed-then-idle corpus still drains.
-                    val freshCids = followed?.transcriptCids
-                    if (wikiEvery > 0 && freshCids != null && freshCids.size > 0) {
-                        // Full backlog retained — truncating here silently dropped CID 33+ of a
-                        // large follow, and unchanged sessions never re-report, so the wiki
-                        // stayed stale until restart (curation-uring review, P1).
-                        wikiPending = wikiPending + (0 until freshCids.size).map { i -> freshCids[i].b.value }
-                    }
-                    val wikiRunner = wikiLane[0]
-                    if (wikiEvery > 0 && wikiRunner != null && wikiPending.isNotEmpty()) {
-                        wikiBatchesSeen++
-                        if (wikiBatchesSeen >= wikiEvery) {
-                            wikiBatchesSeen = 0
-                            // Bounded batch: take from the backlog, retire only what the run
-                            // recorded as applied. A thrown consolidation leaves the batch in
-                            // place for the next tick (curation-uring review, P1).
-                            val cids = wikiPending.take(32)
-                            wikiIterationsDone++
-                            runCatching {
-                                val wikiNode = borg.trikeshed.lcnc.LcncNode(
-                                    id = "wiki-consolidate-lane",
-                                    type = borg.trikeshed.lcnc.LcncContracts.WIKI_CONSOLIDATE,
-                                    params = mapOf("iteration" to wikiIterationsDone.toString()),
-                                )
-                                val report = wikiRunner.run(wikiNode, mapOf("cids" to cids))["report"] as? Map<*, *>
-                                HostSystem.err(
-                                    "[OROBOROS] Wiki Maintainer iteration $wikiIterationsDone: ok=${report?.get("ok")} " +
-                                            "applied=${(report?.get("applied") as? List<*>)?.size ?: "-"} " +
-                                            "refused=${(report?.get("refused") as? List<*>)?.size ?: "-"}",
-                                )
-                            }.onFailure {
-                                // The batch returns to the head of the backlog: failed work is
-                                // pending work, not retired work.
-                                wikiPending = cids + wikiPending
-                                HostSystem.err("[OROBOROS] Wiki Maintainer failed (non-fatal, batch requeued): ${it.message}")
-                            }
-                        }
-                    }
-                    if (!baselinesLanded) {
-                        runCatching {
-                            val impulses = feeder.loadImpulses()
-                            if (impulses.size > 0) {
-                                val scenarios = feeder.loadScenarios(impulses)
-                                val baselines = borg.trikeshed.narsese.HermesBaselines.computeAndLand(
-                                    couchStore, casStore, daemonBlackboard, impulses, scenarios,
-                                )
-                                if (baselines != null) {
-                                    baselinesLanded = true
-                                    HostSystem.err(
-                                        "[OROBOROS] Hermes baselines landed: watermark=${baselines.watermark.size} training=${baselines.training?.sessionCid?.value?.take(18) ?: "-"} corpus=${baselines.corpus.cid.value.take(18)}@${baselines.corpus.seq}",
-                                    )
-                                }
-                            }
-                        }.onFailure {
-                            HostSystem.err("[OROBOROS] Hermes baseline computation failed (non-fatal): ${it.message}")
-                        }
-                    }
-                    delay(5_000L)
-                }
-            }
-        }
+        val curatorFollowJob = curatorFollow(
+            curatorImpulse, hermesHomeDir, memoryStore, couchStore, casStore, daemonBlackboard, wikiLane,
+        )
 
         // ── PatchWire: the ComfyUI patch-panel backend — full KeyMux/ModelMux access
         // (provider-neutral, key-leased, values never cross the wire) + multiproject
@@ -1182,11 +1254,11 @@ object OroborosDaemon {
         // a key that does not resolve → the roster, with the reason logged.
         // (GLM_MODEL was never a Hermes variable; only GLM_BASE_URL is — the
         // zai base-url override — and the session row already reflects it.)
-        val brainErrorSink = borg.trikeshed.jules.JvmBrainErrorSink(forgeHome)
+        val brainErrorSink = borg.trikeshed.modelmux.JvmBrainErrorSink(forgeHome)
         // LIVE: the ladder below runs at boot AND again on the first call after
         // Hermes' state.db / auth.json / .env change (HermesWatch), so the brain
         // follows a `/model` switch or a key rotation without a restart.
-        val hermesWatch = borg.trikeshed.jules.HermesWatch.default()
+        val hermesWatch = borg.trikeshed.hermes.HermesWatch.default()
         // ONE quota legion for every mux in the process, walked back from Hermes' success
         // ledger: a provider's proven limit is the most it ever bore in one day, and what
         // Hermes burned today is already charged — the key is shared, so the pool is.
@@ -1194,9 +1266,9 @@ object OroborosDaemon {
         val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
             val now = HostSystem.currentTimeMillis()
-            borg.trikeshed.jules.legacy.HermesModelUsageJdbc.install()
-            val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
-            quotaLegion.refresh(borg.trikeshed.jules.HermesModelUsage.ledgerRows(db), now)
+            borg.trikeshed.hermes.HermesModelUsageJdbc.install()
+            val db = borg.trikeshed.hermes.HermesModelUsage.stateDb()
+            quotaLegion.refresh(borg.trikeshed.hermes.HermesModelUsage.ledgerRows(db), now)
             HostSystem.err(
                 "[OROBOROS] quota legion from hermes ledger ($db): " +
                         quotaLegion.limitsByProvider.entries.joinToString("; ") { (p, lim) ->
@@ -1212,9 +1284,9 @@ object OroborosDaemon {
         // is the open inspectable answer to "what is the daemon running on".
         launchMuxBlackboardHome(muxReactor, quotaLegion, daemonBlackboard)
 
-        suspend fun buildBrain(): Pair<borg.trikeshed.jules.BrainClient, Map<String, Any?>> {
+        suspend fun buildBrain(): Pair<borg.trikeshed.modelmux.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
-            val hermesSession = borg.trikeshed.jules.legacy.HermesActiveSession.current()
+            val hermesSession = borg.trikeshed.hermes.HermesActiveSession.current()
             val hermesProvider = hermesSession?.runtime?.provider
             // baseKeyMux, not keyMux: this resolves the NEXT pin, so it must not
             // read back through the overlay this same refresh set last time.
@@ -1227,7 +1299,7 @@ object OroborosDaemon {
             val hermesBaseUrl = hermesSession?.runtime?.baseUrl ?: hermesLane("base_url")
             val hermesModel = hermesSession?.model?.takeIf { it.isNotBlank() }
             val hermesPinReason: String = when {
-                hermesSession == null -> "no session row in ${borg.trikeshed.jules.legacy.HermesActiveSession.stateDb()}"
+                hermesSession == null -> "no session row in ${borg.trikeshed.hermes.HermesActiveSession.stateDb()}"
                 hermesModel == null -> "session ${hermesSession.id} carries no model"
                 hermesProvider == null -> "session ${hermesSession.id} has no resolved runtime provider"
                 !hermesSession.runtime.speaksChatCompletions ->
@@ -1243,23 +1315,23 @@ object OroborosDaemon {
             // rung existed the daemon fell from a pin-less row straight to the
             // static roster, and the model Hermes runs in this profile was never
             // the model the daemon ran.
-            val hermesHome = borg.trikeshed.jules.HermesModelUsage.hermesHome()
-            val configOutcome: borg.trikeshed.jules.HermesConfigDefault.Outcome? =
+            val hermesHome = borg.trikeshed.hermes.HermesModelUsage.hermesHome()
+            val configOutcome: borg.trikeshed.hermes.HermesConfigDefault.Outcome? =
                 if (hermesPinReason.isEmpty()) null
-                else borg.trikeshed.jules.HermesConfigDefault.resolve(hermesHome, keyLane = { provider, field ->
+                else borg.trikeshed.hermes.HermesConfigDefault.resolve(hermesHome, keyLane = { provider, field ->
                     kotlinx.coroutines.withContext(Dispatchers.IO) {
                         runCatching { baseKeyMux.get("llm.$provider.$field") }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
                     }
                 })
-            val configLaunch = (configOutcome as? borg.trikeshed.jules.HermesConfigDefault.Outcome.Pinned)?.launch
+            val configLaunch = (configOutcome as? borg.trikeshed.hermes.HermesConfigDefault.Outcome.Pinned)?.launch
                 ?.takeIf { it.apiMode == "chat_completions" }
             val configReason: String? = when (configOutcome) {
                 null -> null
-                is borg.trikeshed.jules.HermesConfigDefault.Outcome.Unavailable -> configOutcome.reason
-                is borg.trikeshed.jules.HermesConfigDefault.Outcome.Pinned ->
+                is borg.trikeshed.hermes.HermesConfigDefault.Outcome.Unavailable -> configOutcome.reason
+                is borg.trikeshed.hermes.HermesConfigDefault.Outcome.Pinned ->
                     if (configLaunch == null) "config default ${configOutcome.launch.model} runs api_mode=${configOutcome.launch.apiMode}, not chat_completions" else null
             }
-            val built: borg.trikeshed.jules.BrainClient = if (hermesPinReason.isEmpty() && hermesSession != null && hermesModel != null && hermesBaseUrl != null && hermesKey != null) {
+            val built: borg.trikeshed.modelmux.BrainClient = if (hermesPinReason.isEmpty() && hermesSession != null && hermesModel != null && hermesBaseUrl != null && hermesKey != null) {
                 val seen = borg.trikeshed.platform.InstantShim.ofEpochMilli((hermesSession.recencyEpochSeconds * 1000).toLong())
                 HostSystem.err(
                     "[OROBOROS] Brain PINNED to hermes session ${hermesSession.id} (${hermesSession.source}, " +
@@ -1274,17 +1346,17 @@ object OroborosDaemon {
                 // down — "egress denied by substrate: opencode.ai:443" — because
                 // that host is Hermes' to know, not the HarnessRegistry's.
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(hermesBaseUrl)
-                borg.trikeshed.jules.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink, quotaLegion = quotaLegion)
+                borg.trikeshed.modelmux.BrainClient(apiKey = hermesKey, base = hermesBaseUrl.trimEnd('/'), model = hermesModel, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else if (configLaunch != null) {
                 HostSystem.err(
                     "[OROBOROS] Brain PINNED to hermes config default (${configLaunch.configFile}; session pin unavailable: $hermesPinReason): " +
                             "${configLaunch.model} @ ${configLaunch.baseUrl} (provider=${configLaunch.provider}, api_mode=${configLaunch.apiMode}, key from ${configLaunch.keySource})",
                 )
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(configLaunch.baseUrl)
-                borg.trikeshed.jules.BrainClient(apiKey = configLaunch.apiKey, base = configLaunch.baseUrl, model = configLaunch.model, errorSink = brainErrorSink, quotaLegion = quotaLegion)
+                borg.trikeshed.modelmux.BrainClient(apiKey = configLaunch.apiKey, base = configLaunch.baseUrl, model = configLaunch.model, errorSink = brainErrorSink, quotaLegion = quotaLegion)
             } else {
                 HostSystem.err("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason; config default unavailable: $configReason")
-                borg.trikeshed.jules.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
+                borg.trikeshed.modelmux.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
             }
             val account: Map<String, Any?> = mapOf(
                 "pin" to when {
@@ -1299,7 +1371,7 @@ object OroborosDaemon {
             )
             return built to account
         }
-        val brainClient = borg.trikeshed.jules.LiveBrainClient(hermesWatch, { buildBrain() }, buildBrain())
+        val brainClient = borg.trikeshed.hermes.LiveBrainClient(hermesWatch, { buildBrain() }, buildBrain())
         // The runner registry is assembled below; the publisher reads it late.
         val lcncRunnersRef = java.util.concurrent.atomic.AtomicReference<Map<String, borg.trikeshed.lcnc.LcncNodeRunner>>(emptyMap())
         // ── The ONE production network and its registry, hoisted above the publisher: the
@@ -1370,6 +1442,10 @@ object OroborosDaemon {
         // then the user's `panels/<name>` attachment — keeps `lcnc/program/<name>`
         // fresh, and the entry is what the run seam obeys.
         val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name -> lcncPublisher.load(name) }
+        val confixIsam = if (casStore.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
+            borg.trikeshed.couch.isam.ConfixIsamElement(moduleScope, couchStore.changes,
+                fileOps.resolvePath(forgeHome.toString(), "confix/couch"), fileOps, casStore)
+        } else null
         val moduleContext = borg.trikeshed.module.ModuleContext(
             couch = couchDb,
             rete = rete,
@@ -1388,6 +1464,7 @@ object OroborosDaemon {
             programLoader = storedProgramLoader,
             kifBank = kifBank,
             narsRete = causalityRete,
+            confixIsam = confixIsam,
         )
         lcncRunnersRef.set(moduleContext.lcncRunners)
         val headhunterWire = borg.trikeshed.forge.server.HeadhunterWire.open(moduleContext, brainClient, patchWire)
@@ -1460,9 +1537,9 @@ object OroborosDaemon {
         // Ledger = $HERMES_HOME/state.db; `session` = the row Hermes would resume
         // (HermesActiveSession) and `brainPin` = what the daemon borrowed from it.
         moduleContext.lcncRunners["hermes.lastUsed"] = borg.trikeshed.lcnc.LcncNodeRunner { _, _ ->
-            val db = borg.trikeshed.jules.HermesModelUsage.stateDb()
-            val recent = borg.trikeshed.jules.HermesModelUsage.recent(db)
-            fun row(u: borg.trikeshed.jules.HermesModelUsage.Usage) = mapOf(
+            val db = borg.trikeshed.hermes.HermesModelUsage.stateDb()
+            val recent = borg.trikeshed.hermes.HermesModelUsage.recent(db)
+            fun row(u: borg.trikeshed.hermes.HermesModelUsage.Usage) = mapOf(
                 "model" to u.model,
                 "provider" to u.provider,
                 "baseUrl" to u.baseUrl,
@@ -1472,7 +1549,7 @@ object OroborosDaemon {
                 "outputTokens" to u.outputTokens,
                 "lastSeenMs" to (u.lastSeenEpochSeconds * 1000).toLong(),
             )
-            val session = borg.trikeshed.jules.legacy.HermesActiveSession.current(jfile(db))
+            val session = borg.trikeshed.hermes.HermesActiveSession.current(jfile(db))
             mapOf(
                 "ledger" to db.absolutePath,
                 "session" to session?.let { s ->
@@ -1495,7 +1572,7 @@ object OroborosDaemon {
                 "brainPinBuiltAtMs" to brainClient.pin["builtAtMs"],
                 "lastUsed" to (recent.firstOrNull()?.let(::row)),
                 "recent" to recent.map(::row),
-                "provenEndpoints" to borg.trikeshed.jules.HermesModelUsage.provenEndpoints(db)
+                "provenEndpoints" to borg.trikeshed.hermes.HermesModelUsage.provenEndpoints(db)
                     .map { mapOf("provider" to it.first, "baseUrl" to it.second) },
             )
         }
@@ -1508,63 +1585,9 @@ object OroborosDaemon {
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.CcekNodes.registry(borg.trikeshed.lcnc.CcekSeams.live(ccekBinding)),
         )
-        // ── NAL belief-bag nodes: nal.mint, nal.decay, nal.recall ────
-        // nal.mint wraps ConstructionBotNode (the only model-spend seam).
-        // nal.decay is a thin timer trigger over AttentionEconomy.decay.
-        // nal.recall exposes BeliefBagElement's read methods as LCNC nodes.
-        beliefBag?.let { bag ->
-            moduleContext.lcncRunners["nal.mint"] = borg.trikeshed.narsese.NalNodes.mintRunner(
-                brain = brainClient,
-                muxContext = htxElement + muxReactor,
-                cas = casStore,
-                bag = bag,
-                rete = rete,
-                kifSink = { kif ->
-                    val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
-                    daemonBlackboard.put("nal-kif/${cid.hex}", kif, "nal.mint")
-                    runCatching { kifBank.assertKif(kif) }
-                },
-            )
-            moduleContext.lcncRunners["nal.decay"] = borg.trikeshed.narsese.NalNodes.decayRunner(bag)
-            moduleContext.lcncRunners["nal.recall"] = borg.trikeshed.narsese.NalNodes.recallRunner(bag)
-            moduleContext.lcncRunners["skill.decay"] = borg.trikeshed.narsese.NalNodes.skillDecayRunner(bag)
-        }
-        // ── State freeze / thaw: persist bag+KB to CAS ─────────────
-        beliefBag?.let { bag ->
-            moduleContext.lcncRunners["state.freeze"] = borg.trikeshed.narsese.StateNodes.freezeRunner(
-                bag = bag,
-                kif = kifBank,
-                // The RDF projection of the whole fact plane at freeze time (was an empty graph).
-                graph = { borg.trikeshed.rdf.RdfGraph(kotlinx.coroutines.runBlocking { rete.snapshot() }.view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view }) },
-                cas = casStore,
-            )
-            moduleContext.lcncRunners["state.thaw"] = borg.trikeshed.narsese.StateNodes.thawRunner(
-                bag = bag,
-                cas = casStore,
-                kif = kifBank,
-            )
-        }
-        // ── Belief-field nodes: the BeliefWire behaviors as runners plus the
-        // attend/reinforce/encode legos. Gloss identity rides HermesMemoryFiles.
-        beliefBag?.let { bag ->
-            moduleContext.lcncRunners["beliefs.introspect"] = borg.trikeshed.narsese.BeliefsNodes.introspectRunner(bag)
-            moduleContext.lcncRunners["beliefs.resonate"] = borg.trikeshed.narsese.BeliefsNodes.resonateRunner(bag) { angular ->
-                hermesMemoryFiles?.glossOf(angular)
-            }
-            moduleContext.lcncRunners["nal.attend"] = borg.trikeshed.narsese.BeliefsNodes.attendRunner(bag)
-            moduleContext.lcncRunners["nal.reinforce"] = borg.trikeshed.narsese.BeliefsNodes.reinforceRunner(bag)
-            // The council's non-model seat: NARS reviews choices over the same bag.
-            moduleContext.lcncRunners["nars.seat"] = borg.trikeshed.narsese.NarsSeatNode.seatRunner(bag) { angular ->
-                hermesMemoryFiles?.glossOf(angular)
-            }
-        }
-        turnReview?.let { review ->
-            moduleContext.lcncRunners["beliefs.review"] = borg.trikeshed.narsese.BeliefsNodes.reviewRunner(review) { angular, gloss ->
-                hermesMemoryFiles?.gloss(angular, gloss)
-            }
-        }
-        moduleContext.lcncRunners["nal.encode"] = borg.trikeshed.narsese.BeliefsNodes.encodeRunner()
-        borg.trikeshed.forge.server.CurationIntake.install(
+        // Belief bag, freeze/thaw and belief-field nodes retain the shared bank, rete and model context.
+        registerBeliefNodes(moduleContext, hermesMemoryFiles, brainClient, kifBank)
+        val curationIntake = borg.trikeshed.forge.server.CurationIntake.install(
             borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete),
             moduleContext, projectCorpus, projectScopes, wireScope,
         )
@@ -1773,7 +1796,7 @@ object OroborosDaemon {
                             keyId = pinKeyId,
                         ),
                     )
-                    borg.trikeshed.jules.BrainClient.EndpointSpec(
+                    borg.trikeshed.modelmux.BrainClient.EndpointSpec(
                         name = "hermes:$pinnedProvider", envVar = "", base = pinnedBase,
                         model = pinnedModel, provider = pinnedProvider,
                     )
@@ -1796,14 +1819,14 @@ object OroborosDaemon {
             // …and only the rows THIS daemon can authenticate: a provider whose
             // `llm.<provider>.key` does not resolve here would be a dead entry in the
             // listbox, so it is reported, not offered.
-            val hermesKnown = borg.trikeshed.jules.HermesInstances.known()
+            val hermesKnown = borg.trikeshed.hermes.HermesInstances.known()
             val hermesKeyed = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 hermesKnown.map { it.provider }.distinct().associateWith { provider ->
                     runCatching { keyMux.get("llm.$provider.key") }.getOrNull()?.isNotBlank() == true
                 }
             }
             val hermesInstances = hermesKnown.filter { hermesKeyed[it.provider] == true }
-            val hermesSpecs = borg.trikeshed.jules.HermesInstances.specs(hermesInstances)
+            val hermesSpecs = borg.trikeshed.hermes.HermesInstances.specs(hermesInstances)
             val hermesClaimed = hermesSpecs.mapTo(HashSet()) { it.provider to it.model }
             val staticSpecs = liveBrain.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
             val discovered = hermesSpecs + staticSpecs
@@ -1811,7 +1834,7 @@ object OroborosDaemon {
                 (it.provider ?: it.name) == pinnedSpec.provider && it.model == pinnedSpec.model
             }
             HostSystem.err(
-                "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.jules.HermesModelUsage.stateDb()}), " +
+                "[OROBOROS] mux cards: ${hermesSpecs.size} from hermes (${borg.trikeshed.hermes.HermesModelUsage.stateDb()}), " +
                         "${staticSpecs.size} from the static roster; configured default=${pinnedSpec?.model ?: "none"}" +
                         hermesInstances.take(3).joinToString(prefix = " — newest: ", separator = ", ") { "${it.model}@${it.provider}" } +
                         hermesKeyed.filterValues { !it }.keys.takeIf { it.isNotEmpty() }
@@ -1847,7 +1870,7 @@ object OroborosDaemon {
                 }
             }
         }
-        val lcncMux = borg.trikeshed.jules.LiveHolder(hermesWatch, buildLcncMux()) { buildLcncMux() }
+        val lcncMux = borg.trikeshed.hermes.LiveHolder(hermesWatch, buildLcncMux()) { buildLcncMux() }
         operatorMux.complete { lcncMux.current() }
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.BrainMuxNodes.registry(
@@ -1878,7 +1901,7 @@ object OroborosDaemon {
                     if (t is kotlinx.coroutines.CancellationException) throw t
                     borg.trikeshed.lcnc.SeatOutcome.Refused(
                         t.message ?: t.toString(),
-                        (t as? borg.trikeshed.jules.BrainNoRoute)?.attempts ?: emptyList(),
+                        (t as? borg.trikeshed.modelmux.BrainNoRoute)?.attempts ?: emptyList(),
                     )
                 },
             )
@@ -2174,19 +2197,7 @@ object OroborosDaemon {
         //    (partition = db name — blackboard subscope seams by project), then
         //    boot mounts: the --project flags and the forge-home mount ledger
         //    (project dbs SURVIVE restarts — the ledger replays them).
-        projectDbRegistry.onMount = { pdb ->
-            val tendon = borg.trikeshed.couch.CouchChangesFactElement(
-                db = pdb.db,
-                rete = rete,
-                report = reportReactorForWires,
-                admit = { true },
-                parentJob = moduleScope.coroutineContext[kotlinx.coroutines.Job],
-            )
-            moduleScope.launch {
-                tendon.open()
-                HostSystem.err("[OROBOROS] project-db tendon: ${pdb.name} — ${tendon.factsApplied} facts")
-            }
-        }
+        projectDbRegistry.factPlane(moduleScope, rete, reportReactorForWires)
         launch(Dispatchers.IO) {
             for (extra in config.projects) {
                 runCatching { projectScopes.mount(extra) }
@@ -2501,7 +2512,8 @@ object OroborosDaemon {
             rete = rete,
             report = reportReactor,
             // pointcut/ docs stay out: the graal tendon below asserts each landing once, on the graal partition.
-            admit = { !it.docId.startsWith("_design/") && !it.docId.startsWith(GitCouchGateway.GIT_PREFIX) && !it.docId.startsWith("pointcut/") },
+            admit = { !it.docId.startsWith("_design/") && !it.docId.startsWith(GitCouchGateway.GIT_PREFIX) &&
+                !it.docId.startsWith("pointcut/") && borg.trikeshed.util.oroboros.HermesCorpus.admits(it.docId) },
             parentJob = kanbanJob,
         )
         launch {
@@ -2554,11 +2566,6 @@ object OroborosDaemon {
                     "intervalMs=$intervalMs maxSlots=$maxSlots mode=${if (watch) "watch" else "once"}"
         )
 
-        if (!preflight(repoDir)) {
-            HostSystem.err("[OROBOROS] preflight failed; aborting")
-            return
-        }
-
         // Hot-swappable telemetry + quarantine guard. Same instance, JVM
         // retransforms the class in place — next call sees new bytecode. The
         // reactive choreography owns all poll/drain/dispatch; CycleBody only
@@ -2575,22 +2582,31 @@ object OroborosDaemon {
             }
         } finally {
             withContext(NonCancellable) {
+                isRunning = false
                 reactiveJob.cancelAndJoin()
                 healthJob.cancel()
                 runCatching { channelOps.close(healthFd) }
                 healthJob.cancelAndJoin()
                 if (healthSock.exists()) healthSock.delete()
+                // Finish accepted guest turns while their blackboard/model/store dependencies are live.
+                hermesWire.drain()
+                couchWire.requestFactory?.drain()
                 // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
                 runCatching { blackboardFacts.close() }
                 runCatching { graalFacts.close() }
                 runCatching { jvmVitals.stop() }
-                runCatching { kifTeeDisposer.close() }
                 // Stop job-agent admission and await accepted writes/model work before their stores close.
                 runCatching { headhunterWire.drain() }
+                // The follow/Wiki producer stops at its admission boundary and settles its
+                // current pass before the runner registry, model clients, or stores close.
+                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor)
+                projectScopes.drain()
+                changesFacts.drain()
                 runCatching { kanbanJob.cancel() }
-                runCatching { moduleSupervisor.drainAll() }
+                runCatching { kifTeeDisposer.close() }
                 runCatching { tribunalHolder.instance?.nexus?.drain() }
                 runCatching { headhunterWire.drainCuration() }
+                runCatching { confixIsam?.drain() }
                 runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
                 runCatching { headhunterWire.close() }
                 runCatching { turnReview?.close() }
@@ -2598,7 +2614,6 @@ object OroborosDaemon {
                 runCatching { curatorImpulse?.close() }
                 runCatching { beliefBag?.close() }
                 runCatching { incrementalViews.closeAll() }
-                runCatching { hermesConsole.close() }
                 runCatching { reportReactor.close() }
                 runCatching { memoryIndex.close() }
                 runCatching { worktreeReconcileElement.close() }
@@ -2614,6 +2629,32 @@ object OroborosDaemon {
             }
         }
     }
+
+    /** The console shares the daemon board and resolves the current reactor-owned model lease per call. */
+    private fun hermesConsole(
+        config: DaemonConfig,
+        home: String,
+        repoDir: File,
+        blackboard: borg.trikeshed.graal.ConfixBlackboard,
+        htxElement: HtxElement,
+        muxReactor: MuxReactorElement,
+        socketScope: CoroutineScope,
+    ) = borg.trikeshed.hermes.HermesVmConsole(
+        root = java.nio.file.Paths.get(
+            config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
+                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath
+                ?: error("no hermes root"),
+        ),
+        sleeve = java.nio.file.Paths.get(
+            config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
+                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath
+                ?: error("no hermes sleeve"),
+        ),
+        blackboard = blackboard,
+        modelMuxProvider = { muxReactor.modelMux() },
+        muxContext = htxElement + muxReactor,
+        socketScope = socketScope,
+    )
 
     /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */
     private fun openCouchStore(
@@ -2723,7 +2764,7 @@ object OroborosDaemon {
  * `cards` projection no longer re-adopts the deleted sessions on next poll.
  *
  * Reads a list of session ids from the path passed as arg[0], emits one
- * `JulesCause.WorkDrained` cause per id (with `commitSha="outbox:<short>"`)
+ * `SessionCause.WorkDrained` cause per id (with `commitSha="outbox:<short>"`)
  * so the session is permanently retired from the live map.
  */
 object ReapAppend {
@@ -2732,7 +2773,7 @@ object ReapAppend {
         val listPath = args.getOrNull(0) ?: error("usage: ReapAppend <sid-list.txt> [wal-path]")
         val walPath = args.getOrNull(1)
             ?: File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".local/forge/jules-board.wal").absolutePath
-        val store = JulesBoardStore(JvmAppendWal(java.io.File(walPath ?: error("no wal-path"))).also {
+        val store = SessionBoardStore(JvmAppendWal(java.io.File(walPath ?: error("no wal-path"))).also {
             java.io.File(walPath!!).parentFile.mkdirs()
         })
         val sids = File(listPath).readLines().filter { it.isNotBlank() }
@@ -2740,7 +2781,7 @@ object ReapAppend {
         var ok = 0
         for (sid in sids) {
             val commitSha = "outbox-${sid.take(7)}"
-            store.appendWork(sid, JulesCause.WorkDrained(
+            store.appendWork(sid, SessionCause.WorkDrained(
                 workId = "reap-${sid}",
                 sessionId = sid,
                 commitSha = commitSha,

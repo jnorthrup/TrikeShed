@@ -10,6 +10,8 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.util.oroboros.FileCasStore
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 /**
  * File trees over an existing CAS and a filesystem publication boundary.
@@ -25,11 +27,13 @@ class UserspaceBtrfs(
     val rootDir: String,
     val fileOps: FileOperations,
     cas: CasStore? = null,
+    private val clock: () -> Instant = { Clock.System.now() },
 ) {
-    private data class Entry(val extent: FileExtent?) {
+    private data class Entry(val extent: FileExtent?, val times: BtrfsFileTimes = BtrfsFileTimes.ZERO) {
         val isDir: Boolean get() = extent == null
     }
-    private class Subvolume(val readOnly: Boolean, val entries: LinearHashMap<String, Entry>)
+    private class Subvolume(val readOnly: Boolean, val entries: LinearHashMap<String, Entry>,
+                            val times: BtrfsFileTimes = BtrfsFileTimes.ZERO)
 
     val cas: CasStore = cas ?: FileCasStore(fileOps, fileOps.resolvePath(rootDir, "extents"))
     private val ownsCas = cas == null
@@ -53,7 +57,7 @@ class UserspaceBtrfs(
     fun createSubvolume(name: String): Boolean {
         operational()
         if (!isValidName(name) || name in subvolumes) return false
-        publish(name, Subvolume(false, LinearHashMap()))
+        publish(name, Subvolume(false, LinearHashMap(), BtrfsFileTimes.at(clock())))
         return true
     }
 
@@ -79,7 +83,7 @@ class UserspaceBtrfs(
         operational()
         val source = subvolumes[sourceName] ?: return false
         if (!isValidName(destName) || destName in subvolumes) return false
-        publish(destName, Subvolume(true, source.entries))
+        publish(destName, Subvolume(true, source.entries, source.times))
         return true
     }
 
@@ -88,10 +92,14 @@ class UserspaceBtrfs(
         val current = subvolumes[subvol] ?: return false
         if (current.readOnly || !isValidPath(file) || current.entries[file]?.isDir == true) return false
         val entries = copyEntries(current.entries)
-        if (!ensureAncestors(entries, file)) return false
+        val now = clock()
+        if (!ensureAncestors(entries, file, now)) return false
         val bytes = content.copyOf()
-        entries[file] = Entry(putVerified(bytes) j bytes.size.toLong())
-        publish(subvol, Subvolume(false, entries))
+        entries[file] = Entry(putVerified(bytes) j bytes.size.toLong(),
+            current.entries[file]?.times?.written(now) ?: BtrfsFileTimes.at(now))
+        if (file !in current.entries) touchParent(entries, file, now)
+        publish(subvol, Subvolume(false, entries,
+            if (file.substringBefore('/') !in current.entries) current.times.written(now) else current.times))
         return true
     }
 
@@ -107,7 +115,9 @@ class UserspaceBtrfs(
         if (current.readOnly || !isValidPath(file) || current.entries[file]?.isDir != false) return false
         val entries = copyEntries(current.entries)
         entries.remove(file)
-        publish(subvol, Subvolume(false, entries))
+        val now = clock()
+        touchParent(entries, file, now)
+        publish(subvol, Subvolume(false, entries, if ('/' !in file) current.times.written(now) else current.times))
         return true
     }
 
@@ -118,9 +128,35 @@ class UserspaceBtrfs(
         if (directory.isEmpty()) return true
         if (!isValidPath(directory) || directory in current.entries) return false
         val entries = copyEntries(current.entries)
-        if (!ensureAncestors(entries, directory)) return false
-        entries[directory] = Entry(null)
-        publish(subvol, Subvolume(false, entries))
+        val now = clock()
+        if (!ensureAncestors(entries, directory, now)) return false
+        entries[directory] = Entry(null, BtrfsFileTimes.at(now))
+        touchParent(entries, directory, now)
+        publish(subvol, Subvolume(false, entries,
+            if (directory.substringBefore('/') !in current.entries) current.times.written(now) else current.times))
+        return true
+    }
+
+    fun times(subvol: String, path: String): BtrfsFileTimes? {
+        operational()
+        val current = subvolumes[subvol] ?: return null
+        return if (path.isEmpty()) current.times else current.entries[path]?.times
+    }
+
+    /** Publish times through the same atomic local root as file bytes; snapshots remain immutable. */
+    fun setTimes(subvol: String, path: String, lastModifiedTime: Instant? = null,
+                 lastAccessTime: Instant? = null, creationTime: Instant? = null): Boolean {
+        operational()
+        val current = subvolumes[subvol] ?: return false
+        if (current.readOnly) return false
+        val previous = if (path.isEmpty()) current.times else current.entries[path]?.times ?: return false
+        if (lastModifiedTime == null && lastAccessTime == null && creationTime == null) return true
+        val times = previous.copy(lastModifiedTime = lastModifiedTime ?: previous.lastModifiedTime,
+            lastAccessTime = lastAccessTime ?: previous.lastAccessTime,
+            creationTime = creationTime ?: previous.creationTime, changeTime = clock())
+        val entries = copyEntries(current.entries)
+        if (path.isNotEmpty()) entries[path] = current.entries[path]!!.copy(times = times)
+        publish(subvol, Subvolume(false, entries, if (path.isEmpty()) times else current.times))
         return true
     }
 
@@ -249,13 +285,21 @@ class UserspaceBtrfs(
             for ((path, entry) in source.entries().view) target[path] = entry
         }
 
-    private fun ensureAncestors(index: LinearHashMap<String, Entry>, path: String): Boolean {
+    private fun touchParent(index: LinearHashMap<String, Entry>, path: String, now: Instant) {
+        val parent = path.substringBeforeLast('/', "")
+        index[parent]?.let { index[parent] = it.copy(times = it.times.written(now)) }
+    }
+
+    private fun ensureAncestors(index: LinearHashMap<String, Entry>, path: String, now: Instant): Boolean {
         var slash = path.indexOf('/')
         while (slash >= 0) {
             val ancestor = path.substring(0, slash)
             val entry = index[ancestor]
             if (entry != null && !entry.isDir) return false
-            if (entry == null) index[ancestor] = Entry(null)
+            if (entry == null) {
+                index[ancestor] = Entry(null, BtrfsFileTimes.at(now))
+                touchParent(index, ancestor, now)
+            }
             slash = path.indexOf('/', slash + 1)
         }
         return true
@@ -295,8 +339,13 @@ class UserspaceBtrfs(
 
     private fun publish(name: String, next: Subvolume) {
         val cid = putVerified(tree(next).encode())
+        fun encoded(times: BtrfsFileTimes) = s_[times.lastModifiedTime, times.lastAccessTime, times.creationTime, times.changeTime]
+            .view.flatMap { listOf(it.epochSeconds, it.nanosecondsOfSecond.toLong()) }
+        val times = mutableMapOf<String, Any?>("" to encoded(next.times))
+        for ((path, entry) in next.entries.entries().view) if (entry.times != BtrfsFileTimes.ZERO)
+            times[path] = encoded(entry.times)
         publishBytes(name, CanonicalCbor.encodeMap(mapOf(
-            "format" to LOCAL_FORMAT, "readOnly" to next.readOnly, "manifest" to cid.value,
+            "format" to LOCAL_FORMAT, "readOnly" to next.readOnly, "manifest" to cid.value, "times" to times,
         )))
         subvolumes[name] = next
     }
@@ -329,15 +378,40 @@ class UserspaceBtrfs(
             return Subvolume(lines[1] == "RO\t1", entries(tree(Subvolume(false, index))))
         }
         val fields = CanonicalCbor.decodeMap(bytes)
-        require(CanonicalCbor.encodeMap(fields).contentEquals(bytes) && fields["format"] == LOCAL_FORMAT) { "Invalid subvolume manifest" }
+        require(CanonicalCbor.encodeMap(fields).contentEquals(bytes) && fields["format"] in setOf(LOCAL_FORMAT, LEGACY_FORMAT)) {
+            "Invalid subvolume manifest"
+        }
         if (fields["deleted"] == true) {
             require(fields.size == 2)
             return null
         }
-        require(fields.size == 3 && fields["readOnly"] is Boolean && fields["manifest"] is String)
+        val timed = fields["format"] == LOCAL_FORMAT
+        require(fields.keys == if (timed) setOf("format", "readOnly", "manifest", "times") else setOf("format", "readOnly", "manifest"))
+        require(fields["readOnly"] is Boolean && fields["manifest"] is String)
         val cid = ContentId(fields["manifest"] as String)
         val manifest = FileTreeManifest.decode(requireNotNull(blob(cid)) { "Missing or corrupt canonical manifest" })
-        return Subvolume(fields["readOnly"] as Boolean, entries(manifest))
+        val index = entries(manifest)
+        var rootTimes = BtrfsFileTimes.ZERO
+        if (timed) {
+            val times = fields["times"] as? Map<*, *> ?: error("Invalid inode times")
+            require("" in times) { "Missing root inode times" }
+            for ((path, value) in times) {
+                require(path is String && (path.isEmpty() || path in index)) { "Inode times without an entry" }
+                val row = value as? List<*> ?: error("Invalid inode times row")
+                require(row.size == 8 && row.all { it is Long || it is Int }) { "Invalid inode times row" }
+                fun instant(at: Int): Instant {
+                    val seconds = (row[at] as Number).toLong()
+                    val nanos = (row[at + 1] as Number).toInt()
+                    require((row[at + 1] as Number).toLong() in 0..999_999_999L) { "Invalid nanoseconds" }
+                    return Instant.fromEpochSeconds(seconds, nanos).also {
+                        require(it.epochSeconds == seconds && it.nanosecondsOfSecond == nanos) { "Inode time overflow" }
+                    }
+                }
+                val decoded = BtrfsFileTimes(instant(0), instant(2), instant(4), instant(6))
+                if (path.isEmpty()) rootTimes = decoded else index[path] = index[path]!!.copy(times = decoded)
+            }
+        }
+        return Subvolume(fields["readOnly"] as Boolean, index, rootTimes)
     }
 
     private fun parseEntry(index: LinearHashMap<String, Entry>, row: String) {
@@ -392,7 +466,8 @@ class UserspaceBtrfs(
 
     companion object {
         private const val MAGIC = "BTRFS_SEND_V2"
-        private const val LOCAL_FORMAT = "userspace-subvolume-v1"
+        private const val LEGACY_FORMAT = "userspace-subvolume-v1"
+        private const val LOCAL_FORMAT = "userspace-subvolume-v2"
         private val SHARDED = Regex("sha256/(?:[0-9a-f]/){4}[0-9a-f]{60}")
         private val OLD_SHARDED = Regex("sha256/[0-9a-f]{2}/[0-9a-f]{62}")
         private val FLAT = Regex("sha256_[0-9a-f]{64}")

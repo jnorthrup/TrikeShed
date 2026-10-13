@@ -21,7 +21,7 @@ import kotlinx.datetime.Clock
  *     satisfied by construction.
  *
  * This generalizes the pattern verified in
- * `borg.trikeshed.jules.ui.JulesBlackboardAdapter.projectFullSurface`.
+ * `borg.trikeshed.forge.blackboard.SessionBlackboardAdapter.projectFullSurface`.
  *
  * Projection is a *pure function* of `(domain, base view, now)` — no I/O, no
  * clock read unless the caller omits `now`, no mutation of the base view.
@@ -56,7 +56,7 @@ fun ForgeSurfaceGeometry.asSection3D(): ForgeBlackboardSection3D = ForgeBlackboa
 
 /**
  * A TTL-stamped bag of geometry-bearing items — the `<DomainSurface>` half of a
- * projection result. Ring-specific surfaces (e.g. `JulesBlackboardSurface`)
+ * projection result. Ring-specific surfaces (e.g. `SessionBlackboardSurface`)
  * implement this so downstream seeds/renderers can treat every ring alike.
  */
 interface ForgeDomainSurface {

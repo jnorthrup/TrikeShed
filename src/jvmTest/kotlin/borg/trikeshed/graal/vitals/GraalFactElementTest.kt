@@ -181,6 +181,27 @@ class GraalFactElementTest {
     // ── pointcut: the landing's key IS the fact ─────────────────────
 
     @Test
+    fun sourceLocationsReachWorkingMemoryAndChangeTheFactVersion() = runBlocking {
+        val net = ReteNetwork()
+        val el = element(net)
+        val key = PointcutBlackboardAdapter.keyOf("Python", "score", 17)
+        val first = landing(key).copy(sourcePath = "curation.py", line = 2, column = 1)
+        el.onLanding(first)
+        val initial = assertNotNull(fact(net, key))
+        assertEquals("curation.py", initial.fields["sourcePath"])
+        assertEquals(2, initial.fields["line"])
+        assertEquals(1, initial.fields["column"])
+        el.onLanding(first.copy(line = 12))
+        val moved = assertNotNull(fact(net, key))
+        assertEquals(12, moved.fields["line"])
+        assertEquals(2L, el.factsApplied)
+        assertEquals(1, kind(net, "pointcut").size)
+        el.onLanding(first.copy(sourcePath = null, line = -1, column = -1))
+        assertTrue("sourcePath" !in assertNotNull(fact(net, key)).fields)
+        assertEquals(3L, el.factsApplied)
+    }
+
+    @Test
     fun sameLandingTwiceIsOneFactAndOneOp() = runBlocking {
         val net = ReteNetwork()
         val ops = ArrayList<ReteOp>()

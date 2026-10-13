@@ -75,7 +75,9 @@ class CouchWireSocketTest {
     }
 
     @Test
-    fun twoNodesReplicateOverRealSocketsThroughTheHtxClient() = runBlocking {
+    // The plain-socket oracle blocks. Do not pin the HTX reactor it drives to
+    // that same runBlocking event-loop thread while waiting for its response.
+    fun twoNodesReplicateOverRealSocketsThroughTheHtxClient() = runBlocking(Dispatchers.IO) {
         // Server coroutines die by cancellation at the end; a handler keeps their last gasps from
         // reaching the thread's uncaught handler, where kotlinx-test would blame the NEXT suite.
         val serverJob = SupervisorJob(coroutineContext[Job])

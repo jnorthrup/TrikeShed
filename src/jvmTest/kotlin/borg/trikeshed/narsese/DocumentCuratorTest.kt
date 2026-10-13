@@ -45,6 +45,34 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class DocumentCuratorTest {
+    @Test fun ledgerViewsReadOneVerifiedCasRecordOnDemand(): Unit = runBlocking {
+        withTimeout(10000) {
+            val reads = mutableListOf<ContentId>()
+            val cas = object : CasStore() {
+                override fun get(cid: ContentId): ByteArray? {
+                    reads.add(cid)
+                    return super.get(cid)
+                }
+            }
+            val f = fixture(this, cas = cas)
+            val curator = f.curator(this)
+            try {
+                val result = curator.curate(f.source)
+                reads.clear()
+                val receipts = curator.receipts()
+                val records = curator.records()
+                assertEquals(0, reads.size)
+                val receipt = receipts[receipts.size - 1]
+                assertEquals(result.recordCid, receipt.a)
+                assertEquals(DocumentCuratorCodec.record(result.record), DocumentCuratorCodec.record(receipt.b))
+                assertEquals(listOf(result.recordCid), reads)
+                cas.corrupt(result.recordCid)
+                assertFailsWith<IllegalStateException> { records[records.size - 1] }
+                assertFailsWith<IllegalStateException> { curator.record(result.recordCid) }
+            } finally { curator.drain(); f.bag.drain(); f.closeSessions() }
+        }
+    }
+
     @Test fun retainedTripletEnvelopeWithoutFormatReachesBothGroundingPaths(): Unit = runBlocking {
         withTimeout(10000) {
             // Exact synthetic glm-5.3-flash content and CoreNLP annotations retained on 2026-09-14.
@@ -258,7 +286,8 @@ class DocumentCuratorTest {
                     "source" to DocumentCuratorCodec.source(record.source),
                     "nlp" to DocumentCuratorCodec.nlp(assertNotNull(record.nlp)),
                 )), sentPrompt!!.messages[1].content)
-                assertTrue(curator.receipts().view.any { it.a == cid && it.b == record })
+                assertTrue(curator.receipts().view.any { it.a == cid &&
+                    DocumentCuratorCodec.record(it.b) == DocumentCuratorCodec.record(record) })
                 assertEquals(1, record.submittedReceiptCids.size)
 
                 for (invalid in listOf(

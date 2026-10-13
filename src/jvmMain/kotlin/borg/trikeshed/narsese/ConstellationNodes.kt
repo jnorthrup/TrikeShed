@@ -11,19 +11,18 @@ import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
-import borg.trikeshed.lib.packInts
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.withPermit
-import borg.trikeshed.lib.toSeries
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfQuad
 import borg.trikeshed.rdf.RdfTerm
 import borg.trikeshed.rdf.RdfVocab
 import borg.trikeshed.rdf.TurtleRdf
 import java.io.File
+import java.lang.System
 
 /**
  * `book.curate` and `constellation.join`: a book's text becomes a frozen [Book] (sections, statements,
@@ -33,11 +32,65 @@ import java.io.File
  */
 class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboard, private val bank: KifKnowledgeBase? = null,
                          /** The daemon's live rete: sense rules minted before the rows replaced them are retracted from it. */
-                         private val liveRete: CausalityReteElement? = null) {
+                         private val liveRete: CausalityReteElement? = null,
+                         private val bert: BertSenseElement? = null,
+                         private val files: borg.trikeshed.userspace.nio.file.spi.FileOperations =
+                             borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()) {
     private val wiki = File(stateDir, "wiki")
     val root = File(stateDir, "constellations").apply { mkdirs() }
     private val books = File(root, "books").apply { mkdirs() }
     private val live = HashMap<String, Constellation>()
+    private val bertCorpus = BertSenseCorpus(files, books.absolutePath)
+
+    suspend fun drain() { bert?.drain() }
+
+    /** BERT annotates the existing reading; it neither creates Jev tables nor mints NARS observations. */
+    suspend fun bertReading(name: String, reading: List<Map<String, Any?>>, evidenceBooks: List<String>,
+                            evidence: Series<BertSenseLabel>? = null): List<Map<String, Any?>> {
+        val lane = bert ?: return reading
+        val targets = reading.flatMap { sentence ->
+            (sentence["concepts"] as? List<*>).orEmpty().mapNotNull { c ->
+                val lemma = (c as? Map<*, *>)?.get("lemma") as? String ?: return@mapNotNull null
+                val menu = senseOptions(lemma)
+                if (menu.size < 2) return@mapNotNull null
+                val token = BertToken(lemma, sentence["text"] as String)
+                BertSenseQuery(cid("$name\u0000${token.sentence}\u0000$lemma"), token, menu.toSeries())
+            }
+        }.distinctBy { it.token }
+        val labels = evidence ?: bertCorpus.labels(evidenceBooks.distinct().map(::safe).toSeries(), targets.map { it.token.lemma }.toSet())
+        val answers = HashMap<BertToken, Pair<BertSenseReading, Int>>()
+        for (batch in targets.chunked(128)) {
+            val result = lane.read(batch.toSeries(), labels)
+            batch.forEachIndexed { i, q -> answers[q.token] = result to i }
+        }
+        return reading.map { sentence ->
+            sentence + ("concepts" to (sentence["concepts"] as? List<*>).orEmpty().map concepts@ { value ->
+                val concept = value as? Map<*, *> ?: return@concepts value
+                val token = BertToken(concept["lemma"].toString(), sentence["text"] as String)
+                val (read, ordinal) = answers[token] ?: return@concepts concept
+                val answer = read.results[ordinal]
+                LinkedHashMap<Any?, Any?>(concept).apply {
+                    // A repeated reading must not present an earlier prediction as a new supported choice.
+                    if (concept["by"] == "bert") {
+                        val original = concept["read"]
+                        put("class", original)
+                        put("is", original?.toString()?.let { SumoCorpus.classifier.classId(it)?.value }
+                            ?.let(::lineage).orEmpty())
+                        remove("by"); remove("read")
+                    }
+                    put("bert", mapOf("model" to read.model, "status" to answer.status.name, "error" to read.error,
+                        "scopeBooks" to evidenceBooks, "sense" to answer.sense,
+                        "neighbors" to answer.neighbors.view.map { neighbor -> mapOf(
+                            "source" to neighbor.evidence.source, "table" to neighbor.evidence.table,
+                            "sense" to neighbor.evidence.sense, "cosine" to neighbor.cosine) }))
+                    answer.sense?.let { sense -> SumoCorpus.classifier.classId(sense)?.value?.let { id ->
+                        put("read", concept["read"] ?: concept["class"])
+                        put("class", sense); put("is", lineage(id)); put("by", "bert")
+                    } }
+                }
+            })
+        }
+    }
 
     /**
      * What words denote where: the sense rows Jev's judgments of CoreNLP's nouns fill, kept beside the books. The
@@ -319,7 +372,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
 
     /** Reified Jev tables by path, each with the stamp of the file version it was read from; at most [PARSED] kept. */
     private val reified = object : LinkedHashMap<String, Pair<Long, Map<*, *>>>(64, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, Map<*, *>>>) = size > PARSED * 8
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, Map<*, *>>>) = size > PARSED
     }
 
     private val answering = Any()
@@ -527,7 +580,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         val gate = kotlinx.coroutines.sync.Semaphore(JEV_AT_ONCE)
         val m = memory()
         synchronized(m) { m.tick() }
-        for (name in names.sortedBy { texts(it).sumOf(String::length) }) {
+        for (name in names.sortedBy { File(books, "${safe(it)}.sections.jsonl").length() }) {
             val b = load(name) ?: continue
             val ts = texts(name)
             val c = constellationOf(name)?.let(::constellation)
@@ -623,9 +676,12 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         val bookNode = listOf("book.curate", name)
         val secNodes = IntArray(sections.size) { -1 }
         val secKeys = sectionKeys(sections.map(Book::heading))
-        // A book read again replaces its section readings: none from the last reading stand.
-        File(books, "${safe(name)}.readings").apply { deleteRecursively(); mkdirs() }
-        File(books, "${safe(name)}.jev").deleteRecursively()
+        // Old judgments remain available as labelled evidence, but never as this revision's table.
+        val retained = bertCorpus.retain(safe(name), "${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}")
+        files.mkdirs(File(books, "${safe(name)}.readings").absolutePath)
+        val evidenceBooks = (convention("constellation")?.let(::members).orEmpty() + name).distinct()
+        // Read labels once per book, not once per section of a large document.
+        val evidence = if (bert == null) emptySeriesOf() else bertCorpus.labels(evidenceBooks.map(::safe).toSeries())
         val clauses = CoreNlpRuntime().use { nlp -> sections.mapIndexed { k, sec ->
             if (k % 25 == 0) System.err.println("[CURATE] $name: section $k/${sections.size}, ${(System.currentTimeMillis() - began) / 1000}s")
             val at = trail.node(bookNode[0], listOf(bookNode[1]), secKeys[k], "book.section")
@@ -633,13 +689,23 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.BEGIN, at)
             val t0 = System.currentTimeMillis()
             val doc = nlp.analyze(sec)
-            readingFile(name, k).writeText(jsonOf(sentences(sec, doc)))
+            val read = bertReading(name, sentences(sec, doc), evidenceBooks, evidence)
+            files.writeAtomically(readingFile(name, k).absolutePath, jsonOf(read).encodeToByteArray())
             val found = NormClauses.extract(doc, generic)
             trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, at,
                 "${found.size} statements, ${doc.sentences.a} sentences, ${sec.length} chars, ${System.currentTimeMillis() - t0}ms · ${k + 1}/${sections.size}")
             // The section's other nouns are the context a bearer's sense is read in.
             val nouns = doc.sentences.values().flatMap { s -> s.tokens.values().filter { it.tag.startsWith("NN") }.map { it.lemma.lowercase() } }.distinct()
-            for (c in found) typed[c] = bearerClass(c, nouns, believed, crafted)
+            val bySentence = read.associateBy { it["text"] }
+            for (c in found) {
+                val neural = (bySentence[c.sentence]?.get("concepts") as? List<*>).orEmpty()
+                    .filterIsInstance<Map<*, *>>().firstOrNull { it["lemma"] == c.head && it["by"] == "bert" }
+                val learned = this@ConstellationNodes.typed(c.head, crafted) ?:
+                    this@ConstellationNodes.typed(c.head.removeSuffix("s"), crafted)
+                typed[c] = if (learned == null && neural != null)
+                    SumoCorpus.classifier.classId(neural["class"].toString())?.value ?: bearerClass(c, nouns, believed, crafted)
+                else bearerClass(c, nouns, believed, crafted)
+            }
             // The reading into the ring: each statement a node under its section, each concept a hub in the
             // shared pool, and the predicate as links statement → bearer (subject) and → object (relation).
             // An atom is a noun the parse tagged (a lemma, alphabetic, not a stray letter): numbers, pronouns
@@ -679,7 +745,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             "senses" to senses, "facts" to facts.size,
             "shape" to shape?.let { mapOf("key" to it.key, "lines" to it.lines.size, "counts" to it.counts.toString(), "heads" to it.heads.toString(),
                 "belief" to it.belief.expectation()) },
-            "cites" to cites.size, "conformance" to conformance)
+            "cites" to cites.size, "conformance" to conformance, "retainedReadings" to retained.toList())
     }
 
     /**
@@ -770,9 +836,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             val lemma = c["lemma"]?.toString() ?: return@map c
             typed(lemma, at)?.takeIf { it.cls != c["class"] }?.let { t ->
                 val id = sumo.classId(t.cls)?.value ?: return@let null
-                LinkedHashMap<Any?, Any?>(c).apply { put("class", t.cls); put("is", lineage(id)); put("read", c["class"]); put("jev", t.e); put("by", t.by) }
+                LinkedHashMap<Any?, Any?>(c).apply { put("class", t.cls); put("is", lineage(id)); put("read", c["read"] ?: c["class"]); put("jev", t.e); put("by", t.by) }
             }?.let { return@map it }
-            val j = sensed[lemma]?.takeIf { it["read"] == c["class"] } ?: return@map c
+            val j = sensed[lemma]?.takeIf { it["read"] == (c["read"] ?: c["class"]) } ?: return@map c
             val id = sumo.classId(j["sense"].toString())?.value ?: return@map c
             LinkedHashMap<Any?, Any?>(c).apply { put("class", j["sense"]); put("is", lineage(id)); put("read", j["read"]); put("jev", j["p"]); put("readP", j["readP"]); put("by", "jev") }
         }
@@ -802,15 +868,10 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         return out
     }
 
-    /** A book's section texts, kept while its sections file is unchanged. */
-    private val texts = HashMap<String, Pair<Long, List<String>>>()
+    /** A book's section texts, owned by the reading that requested them. */
     fun texts(book: String): List<String> {
         val f = File(books, "${safe(book)}.sections.jsonl").takeIf { it.isFile } ?: return emptyList()
-        val stamp = f.lastModified() * 31 + f.length()
-        synchronized(texts) { texts[book]?.takeIf { it.first == stamp }?.let { return it.second } }
-        val t = f.readLines().map { (borg.trikeshed.parse.reify(it) as? String).orEmpty() }
-        synchronized(texts) { texts[book] = stamp to t }
-        return t
+        return f.useLines { lines -> lines.map { (reify(it) as? String).orEmpty() }.toList() }
     }
 
     /**
@@ -1060,9 +1121,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * wired the statements are that text's; else the constellation's restated statements. A carried
      * loop over `text` reaches its fixed point when parse ∘ render is idempotent.
      */
-    private val render = LcncNodeRunner { node, inputs ->
+    private val render = LcncNodeRunner { node, inputs -> CoreNlpRuntime().use { nlp ->
         val text = (inputs["text"] ?: inputs["text?"]) as? String
-        val nlp = CoreNlpRuntime()
         fun read(t: String) = NormClausesNode.sections(t).flatMap { NormClauses.extract(nlp.analyze(it)) }.map { NormStatement.of(it, ::bearerClass) }
         val statements = if (text != null) read(text).distinctBy { it.key } else {
             val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.render: name the constellation or wire text")
@@ -1073,7 +1133,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             if (s.key in back) null else mapOf("id" to s.id, "sentence" to s.sentence, "key" to s.key, "readBack" to back)
         }
         mapOf("text" to statements.joinToString("\n\n") { it.sentence }, "statements" to statements.size, "drift" to drift)
-    }
+    } }
 
     /**
      * A saved book's reading into the activity ring, as curation laid it: each section a leaf of the
@@ -1192,7 +1252,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 .filter { ((it["date"] as? Number)?.toDouble() ?: 0.0) >= HOLDS && ((it["late"] as? Number)?.toDouble() ?: 1.0) <= 1 - HOLDS }
                 .flatMap { FrontMatter.years(it["tagged"].toString()).toList() }
         }.maxOrNull() ?: 0
-        val opening = commonest(stated(texts(name).firstOrNull().orEmpty().take(FrontMatter.FRONT_CHARS)))
+        val openingText = File(books, "${safe(name)}.sections.jsonl").takeIf { it.isFile }
+            ?.useLines { lines -> lines.firstOrNull()?.let { reify(it) as? String } }.orEmpty()
+        val opening = commonest(stated(openingText.take(FrontMatter.FRONT_CHARS)))
         val (year, by) = listOf(notes to "notes", FrontMatter.titleYear(name) to "title", front to "front", jev to "jev", opening to "opening")
             .firstOrNull { it.first > 0 } ?: (0 to "none")
         var nouns = 0; var unmapped = 0
@@ -1555,7 +1617,12 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             NlRulesNode.register(ctx.lcncRunners, bank)
             SkillOverlapNode.register(ctx.lcncRunners, bank)
             NormClausesNode.register(ctx.lcncRunners, bank)
-            val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank, liveRete).also { it.register(ctx.lcncRunners) }
+            val bertScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext +
+                borg.trikeshed.userspace.nio.file.spi.fileIoContext)
+            val bert = BertSenseElement(bertScope, BertPythonSleeve::local)
+            val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank, liveRete, bert,
+                ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations]
+                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()).also { it.register(ctx.lcncRunners) }
             // The ring is in memory: saved constellations stand in it again without waiting for a join.
             Thread({ runCatching { nodes.restore() }.onFailure { System.err.println("[OROBOROS] constellation restore failed: $it") } },
                 "constellation-restore").apply { isDaemon = true }.start()

@@ -212,6 +212,7 @@ internal class LcncRunService(
                     "budgets" to mapOf("timeoutMs" to timeoutMs, "maxNodes" to maxNodes, "maxPayloadChars" to 131072),
                 ) + (if (rebuildOf != null) mapOf("rebuildOf" to rebuildOf, "rebuildOfRunId" to rebuildOfRunId) else emptyMap())
                 var revision = 0L
+                val invocationLedger = LcncInvocationLedger()
                 suspend fun record(op: String, status: String, fields: Map<String, Any?> = emptyMap()): Map<String, Any?> {
                     receipt = commit(jobId, op, receipt + fields + mapOf(
                         "status" to status, "programVersions" to versions.toMap(),
@@ -220,8 +221,18 @@ internal class LcncRunService(
                     revision = (receipt["timelineRevision"] as Number).toLong()
                     return receipt
                 }
-                suspend fun finish(code: Int, op: String, status: String, fields: Map<String, Any?>): HttpResponse =
-                    response(code, record(op, status, fields + ("finishedAtMs" to ctx.clock())))
+                suspend fun finish(code: Int, op: String, status: String, fields: Map<String, Any?>): HttpResponse {
+                    val observations = invocationLedger.snapshot()
+                    val evidenceCid = withContext(Dispatchers.IO) {
+                        ctx.casStore.put(jsonOf(observations + mapOf(
+                            "kind" to "lcnc-invocations", "runId" to runId, "programCid" to cid,
+                        )).encodeToByteArray()).value
+                    }
+                    return response(code, record(op, status, fields + mapOf(
+                        "finishedAtMs" to ctx.clock(), "invocationsCid" to evidenceCid,
+                        "invocationsAttempted" to observations["attempted"], "invocationsDropped" to observations["dropped"],
+                    )))
+                }
 
                 record("submit", "validating")
                 try {
@@ -237,6 +248,7 @@ internal class LcncRunService(
                         // What the run READS rides the receipt (Cut F/S): stored prompts by name to cid,
                         // project documents and listings by id to cid, one fingerprint over the cids.
                         ledger = LcncConsumedLedger()
+                        invocations = invocationLedger
                         subprogramLoader = { label ->
                             pinned[label] ?: ctx.programLoader(label)?.let { source ->
                                 val (body, version) = freeze(label, source)
