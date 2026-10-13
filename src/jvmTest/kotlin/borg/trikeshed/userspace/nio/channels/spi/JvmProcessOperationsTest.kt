@@ -21,6 +21,17 @@ class JvmProcessOperationsTest {
     }
 
     @Test
+    fun blocksSecretShapedEnvVariables(): Unit = runBlocking {
+        // Sentinel Security Test: Verify that secret-shaped environment variables (e.g., MY_API_KEY) are filtered out
+        val processes = JvmProcessOperations()
+        val envMap = mapOf("SAFE_VAR" to "hello", "MY_API_KEY" to "secret_value")
+        val result = processes.exec("/bin/sh", listOf("-c", "echo SAFE=\$SAFE_VAR SECRET=\$MY_API_KEY"), env = envMap)
+        assertEquals(0, result.exitCode)
+        val output = result.stdout.decodeToString().trim()
+        assertEquals("SAFE=hello SECRET=", output)
+    }
+
+    @Test
     fun cancellationReapsTheStartedProcess(): Unit = runBlocking {
         val pidFile = File.createTempFile("trikeshed-process-", ".pid")
         val processes = JvmProcessOperations()
