@@ -44,11 +44,18 @@ class JvmProcessOperations : ProcessOperations {
     ): ProcessResult {
         validateCommand(listOf(command) + args)
         val pb = ProcessBuilder(command, *args.toTypedArray())
+<<<<<<< ef9064288c7c987cfc672a3776a17427ea70b918
         // Sentinel Security Guard: Filter caller environment to prevent leaking or injecting secret-shaped keys (Disposition.BLOCKED)
         val safeEnv = env.filterKeys {
             borg.trikeshed.graal.subvm.GuestEnvironment.deliberate(it) != borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED
         }
         pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(safeEnv) }
+||||||| a39a8f9cb
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env) }
+=======
+        val filteredEnv = env.filter { (k, _) -> borg.trikeshed.graal.subvm.GuestEnvironment.deliberate(k) != borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED }
+        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(filteredEnv) }
+>>>>>>> fcd790e4bc4f302a77f384b40929a0b214ba6039
 
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()

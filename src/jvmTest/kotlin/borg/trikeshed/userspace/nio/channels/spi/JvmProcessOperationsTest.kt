@@ -54,4 +54,13 @@ class JvmProcessOperationsTest {
             pidFile.delete()
         }
     }
+
+    @Test
+    fun filtersBlockedEnvironmentVariables(): Unit = runBlocking {
+        val result = JvmProcessOperations().exec("/usr/bin/env", env = mapOf("SAFE_VAR" to "1", "API_KEY" to "secret123"))
+        assertEquals(0, result.exitCode)
+        val output = String(result.stdout)
+        assertEquals(true, output.contains("SAFE_VAR=1"))
+        assertEquals(false, output.contains("API_KEY"))
+    }
 }
