@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.graal.subvm.GuestEnvironment
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runInterruptible
@@ -18,7 +19,9 @@ class JvmProcessOperations : ProcessOperations {
             return withContext(Dispatchers.IO) {
                 val builder = ProcessBuilder(command, *args.toTypedArray())
                 builder.environment().apply {
-                    clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env)
+                    clear()
+                    putAll(GuestEnvironment.curated())
+                    putAll(env.filterKeys { GuestEnvironment.deliberate(it) != GuestEnvironment.Disposition.BLOCKED })
                 }
                 JvmProcessPipes(builder.start().also { process = it })
             }
@@ -44,7 +47,11 @@ class JvmProcessOperations : ProcessOperations {
     ): ProcessResult {
         validateCommand(listOf(command) + args)
         val pb = ProcessBuilder(command, *args.toTypedArray())
-        pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()); putAll(env) }
+        pb.environment().apply {
+            clear()
+            putAll(GuestEnvironment.curated())
+            putAll(env.filterKeys { GuestEnvironment.deliberate(it) != GuestEnvironment.Disposition.BLOCKED })
+        }
 
         return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.coroutineScope {
             val proc = pb.start()

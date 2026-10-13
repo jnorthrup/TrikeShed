@@ -51,10 +51,10 @@ data class WorkspaceSnapshot(
     val cid: String get() = ContentId.of(bytes).value
 
     /** Key order without java.util.TreeMap: the same on every target. */
-    private fun <V> Map<String, V>.sorted(): Map<String, V> = entries.sortedBy { it.key }.associate { it.key to it.value }
+    private fun <V> Map<String, V>.sorted(): Map<String, V> = entries.sortedBy { it.key }.associateBy({ it.key }, { it.value })
 
     private fun normalize(v: Any?): Any? = when (v) {
-        is Map<*, *> -> v.entries.associate { (k, x) -> k.toString() to normalize(x) }
+        is Map<*, *> -> v.entries.associateBy({ it.key.toString() }, { normalize(it.value) })
         is List<*> -> v.map { normalize(it) }
         is Double -> if (v == kotlin.math.floor(v) && !v.isInfinite() && kotlin.math.abs(v) < 9.0e15) v.toLong() else v
         is Float -> normalize(v.toDouble())
@@ -108,17 +108,17 @@ data class WorkspaceSnapshot(
             val m = reify(text) as? Map<*, *> ?: return null
             if (m["kind"] != KIND) return null
             @Suppress("UNCHECKED_CAST")
-            fun strMap(v: Any?): Map<String, String> = (v as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
+            fun strMap(v: Any?): Map<String, String> = (v as? Map<*, *>)?.entries?.associateBy({ it.key.toString() }, { it.value.toString() }) ?: emptyMap()
             @Suppress("UNCHECKED_CAST")
-            fun anyMap(v: Any?): Map<String, Any?> = (v as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value } ?: emptyMap()
+            fun anyMap(v: Any?): Map<String, Any?> = (v as? Map<*, *>)?.entries?.associateBy({ it.key.toString() }, { it.value }) ?: emptyMap()
             return WorkspaceSnapshot(
                 atMs = (m["atMs"] as? Number)?.toLong() ?: 0L,
                 note = m["note"]?.toString().orEmpty(),
                 previousCid = m["previousCid"]?.toString(),
-                programs = (m["programs"] as? Map<*, *>)?.entries?.associate { it.key.toString() to strMap(it.value) } ?: emptyMap(),
+                programs = (m["programs"] as? Map<*, *>)?.entries?.associateBy({ it.key.toString() }, { strMap(it.value) }) ?: emptyMap(),
                 prompts = strMap(m["prompts"]),
                 projectDbs = (m["projectDbs"] as? List<*>)?.map { anyMap(it) } ?: emptyList(),
-                receipts = (m["receipts"] as? Map<*, *>)?.entries?.associate { it.key.toString() to anyMap(it.value) } ?: emptyMap(),
+                receipts = (m["receipts"] as? Map<*, *>)?.entries?.associateBy({ it.key.toString() }, { anyMap(it.value) }) ?: emptyMap(),
             )
         }
     }
