@@ -117,7 +117,7 @@ TrikeShed/
 
  **Toolchain** — JDK 25 (GraalVM CE 25.0.2), Kotlin 2.4.10, Gradle 9.6.1.
 **No libs/ subprojects** — everything lives in `src/`.
-**Confix** — the only portable serializer; `kotlinx-serialization-json` is not a `commonMain` dependency (jvmMain pulls it for the one target that needs the kotlinx JSON frontend). `commonMain` source allows only `kotlinx-serialization-core` annotations (`@Serializable`/`@Contextual`) via the `kotlin("plugin.serialization")` plugin; the json runtime never crosses into portable code.
+**Confix** — owns JSON, YAML, and CBOR formats on every target, including JVM; `kotlinx-serialization-json` and `kotlinx-serialization-cbor` are not dependencies. `commonMain` explicitly depends on `kotlinx-serialization-core` for annotations and serialization contracts, with the `kotlin("plugin.serialization")` plugin generating serializers.
 **License** — AGPLv3 (effective 2017). Do not change.
 **Task ledger** — `doc/todo.md` is live flywheel intake; dated task lists elsewhere are historical unless explicitly refreshed. The current marketability/MCP board audit is `docs/marketability-kanban-mcp-audit.md`; its **MKT-001…015 market backlog remains inert until explicitly dispatched**, but its MCP implementation backlog (KMFSM-001/004/005/006/009/010) shipped 2026-08-30 — the board is projected to any MCP client at `POST /api/mcp` (`docs/guide-mcp-kanban.md`), with `scripts/demo-mcp-kanban.sh` as the runnable proof.
 **Architecture docs** — `doc/rewire.md` (user-centric Forge workspace architecture, storage unification, K8s emulation via GraalVM pointcut server), `doc/taste.md` (high-performance hierarchical-UI engine principles, 10-point gap review).
@@ -740,7 +740,7 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 2. **Exclusive file ownership** — Jules tasks declare owned paths + forbidden paths; no overlap.
 3. **No libs/ references** — root-only, composite builds consume via `includeBuild("../..")`.
 4. **No FFI / no Rust linkage** — litebike is conceptual inspiration only; ports are clean-room Kotlin with TrikeShed-local conventions.
-5. **Pre-commit** — `git diff --check`, verify no `kotlinx-serialization-json/cbor` in commonMain, run focused tests.
+5. **Pre-commit** — `git diff --check`, verify no `kotlinx-serialization-json/cbor` dependencies or frontend usage on any target (including JVM), run focused tests.
 6. **Evidence** — real test output, generated artifact proof (HTML/WASM), branch + PR with exact commands.
 
 ---

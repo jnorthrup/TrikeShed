@@ -54,7 +54,6 @@ kotlin {
         }
         val jvmMain = getByName("jvmMain") {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:$serializationVersion")
                 implementation("org.apache.tika:tika-core:3.0.0")
                 implementation("org.apache.tika:tika-parsers-standard-package:3.0.0")
             }

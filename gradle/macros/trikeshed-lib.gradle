@@ -211,7 +211,6 @@ switch (project.path) {
         def ipfsKotlin = extensions.getByName("kotlin")
         pluginManager.apply("kotlinx-serialization")
         ipfsKotlin.sourceSets.getByName("jvmMain").dependencies {
-            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
             implementation "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3"
         }
         break
@@ -651,7 +650,6 @@ switch (project.path) {
         }
         forgeUiSourceSets.getByName("jvmMain").dependencies {
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
-            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
             implementation "org.jetbrains.kotlinx:kotlinx-serialization-core:1.7.3"
             implementation "org.jetbrains.compose.desktop:desktop-jvm:1.7.3"
             implementation "org.jetbrains.compose.runtime:runtime:1.7.3"
@@ -678,7 +676,6 @@ switch (project.path) {
             implementation "org.jetbrains.kotlin:kotlin-test-junit:${kotlinVersion}"
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:${prop('versions.kotlinx-coroutines-core')}"
             implementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:${prop('versions.kotlinx-coroutines-test')}"
-            implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3"
         }
         break
     default:
