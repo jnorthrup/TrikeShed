@@ -10,6 +10,7 @@ import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import modelmux.Airgap
 
 /** A VM-local socket ABI. Resolution checks existing policy; guest input never adds an egress permit. */
 class HermesSocketProvider(
@@ -17,6 +18,7 @@ class HermesSocketProvider(
     private val tlsConfig: TlsConfig = TlsConfig(alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1]),
     private val tlsBackend: TlsCodecBackend = scope.coroutineContext[TlsCodecBackend] ?: JvmTlsCodecBackend(),
 ) : AutoCloseable {
+    private val admission = scope.coroutineContext[Airgap] ?: Airgap(false)
     private val sockets = HermesSocketElement(CoroutineScope(scope.coroutineContext + Dispatchers.IO))
     private val operations = scope.coroutineContext[ChannelOperations] ?: JvmChannelOperations()
     private val resolved = mutableMapOf<String, MutableSet<String>>()
@@ -34,8 +36,13 @@ class HermesSocketProvider(
         fun number(at: Int) = (args.getOrNull(at) as? Teleported.Num)?.v ?: error("integer argument $at required")
         fun int(at: Int): Int = number(at).let { require(it in Int.MIN_VALUE..Int.MAX_VALUE); it.toInt() }
         fun arity(size: Int) { require(args.size == size) { "invalid socket argument count" } }
-        val value: Any? = runBlocking {
-            when (text(0)) {
+        val value: Any? = runBlocking(admission) {
+            val operation = text(0)
+            when (operation) {
+                "tls-policy", "name", "shutdown", "close" -> Unit
+                else -> Airgap.requireRemote()
+            }
+            when (operation) {
                 "tls-policy" -> {
                     arity(1)
                     mapOf("protocols" to tlsConfig.protocols.view.map { it.name },
@@ -85,6 +92,7 @@ class HermesSocketProvider(
         true j mapOf("verdict" to "ok", "value" to value)
     } catch (failure: Exception) {
         val errno = when (failure) {
+            is Airgap.Rejection -> 13
             is HermesSocketElement.SocketError -> failure.errno
             is SecurityException -> 13
             is javax.net.ssl.SSLException -> 71

@@ -297,6 +297,7 @@ kotlin {
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
                 implementation("org.gwtproject.web.bindery:requestfactory-server:$requestFactoryVersion")
+                api("org.gwtproject.web.bindery:requestfactory-client:$requestFactoryVersion")
 
                 // Kotlin scripting host: `language: "kotlin"` design-doc views compile
                 // against the daemon's own classpath and evaluate in its classloader.
@@ -340,7 +341,6 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
                 implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-                implementation("org.gwtproject.web.bindery:requestfactory-client:$requestFactoryVersion")
                 implementation("junit:junit:4.13.2")
             }
         }

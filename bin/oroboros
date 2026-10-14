@@ -23,7 +23,7 @@ for j in "$ROOT/build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar" "$ROOT"/build/stagi
   CP="${CP:+$CP:}$target"
 done
 cd "$ROOT"
-"$JAVA" -Xmx24g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED -cp "$CP" \
+"$JAVA" -Xmx6g --add-modules=jdk.internal.vm.ci --enable-native-access=ALL-UNNAMED -cp "$CP" \
   borg.trikeshed.daemon.OroborosDaemon "$@" &
 DAEMON_PID=$!
 forward_signal() { kill -s "$1" "$DAEMON_PID" 2>/dev/null || true; }

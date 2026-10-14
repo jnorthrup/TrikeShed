@@ -176,10 +176,9 @@ class CouchWireRouter(
     private suspend fun envelope(body: ByteArray): WireReply =
         WireReply.json(200, requestFactory.process(body.decodeToString()))
 
-    private fun requestFactoryEnvelope(root: Map<String, Any?>): Boolean =
-        root["F"] is String &&
-            ("I" !in root || Couch.asList(root["I"]) != null) &&
-            ("O" !in root || Couch.asList(root["O"]) != null)
+    // The factory marker selects the protocol even when its remaining fields are malformed.
+    // Validation belongs to RF; a rejected RF invocation must never become an implicit Couch put.
+    private fun requestFactoryEnvelope(root: Map<String, Any?>): Boolean = root["F"] is String
 
     /** RF returns its own protocol error envelope; it is never re-encoded as Couch receipts. */
     private suspend fun requestFactoryWire(method: String, body: ByteArray, contentType: String?): WireReply {

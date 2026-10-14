@@ -13,6 +13,7 @@ import keymux.FixedKeySource
 import keymux.HarnessRegistry
 import keymux.KeyMux
 import keymux.harness
+import modelmux.Airgap
 import modelmux.ModelEntry
 import modelmux.ModelMux
 import modelmux.acp.AcpMessage
@@ -339,6 +340,7 @@ open class BrainClient(
         temperature: Double = 0.2,
         contextId: String? = null,
     ): String {
+        Airgap.requireRemote()
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         return withTimeout(outerBudgetMs()) {
@@ -354,13 +356,18 @@ open class BrainClient(
 
     /** Retry [attempt] through the backoff ladder while it fails rate-limited — single-endpoint lanes only. */
     private suspend fun <T> withRateLimitRetry(attempt: suspend () -> Result<T>): Result<T> {
+        Airgap.requireRemote()
         var result = attempt()
         if (endpoints.size != 1) return result
         for (backoffMs in RATE_LIMIT_BACKOFF_MS) {
             currentCoroutineContext().ensureActive()
-            val msg = result.exceptionOrNull()?.message ?: return result
+            val failure = result.exceptionOrNull() ?: return result
+            if (failure is Airgap.Rejection) throw failure
+            val msg = failure.message ?: return result
             if (!isRetryableFailure(msg)) return result
+            Airgap.requireRemote()
             kotlinx.coroutines.delay(backoffMs)
+            Airgap.requireRemote()
             result = attempt()
         }
         return result
@@ -400,6 +407,7 @@ open class BrainClient(
                     return response.a  // AcpResponse.a = full_text content
                 },
                 onFailure = { t ->
+                    if (t is Airgap.Rejection) throw t
                     currentCoroutineContext().ensureActive()
                     val message = t.message.orEmpty()
                     lastError = "Brain ${endpoint.name} chat failed: $message"
@@ -432,6 +440,7 @@ open class BrainClient(
         preferredModel: String? = null,
         timeoutMs: Long = HtxRequest.DEFAULT_TIMEOUT_MS,
     ): Pair<String, String> = withTimeout(outerBudgetMs()) {
+        Airgap.requireRemote()
         chatSeatInner(messages, maxTokens, temperature, contextId, preferredModel, timeoutMs)
     }
 
@@ -478,6 +487,7 @@ open class BrainClient(
                     return response.a to modelId // AcpResponse.a = full_text content
                 },
                 onFailure = { t ->
+                    if (t is Airgap.Rejection) throw t
                     val message = t.message ?: t.toString()
                     trail.add("${endpoint.name}/$modelId: ${message.take(200)}")
                     currentCoroutineContext().ensureActive()

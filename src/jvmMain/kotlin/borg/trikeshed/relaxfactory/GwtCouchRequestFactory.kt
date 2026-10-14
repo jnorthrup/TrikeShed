@@ -10,11 +10,15 @@ import com.google.web.bindery.autobean.vm.AutoBeanFactorySource
 import com.google.web.bindery.requestfactory.server.ServiceLayer
 import com.google.web.bindery.requestfactory.server.ServiceLayerDecorator
 import com.google.web.bindery.requestfactory.server.SimpleRequestProcessor
+import com.google.web.bindery.requestfactory.server.DefaultExceptionHandler
 import com.google.web.bindery.requestfactory.shared.*
 import com.google.web.bindery.requestfactory.shared.messages.MessageFactory
 import com.google.web.bindery.requestfactory.shared.messages.RequestMessage
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
+import java.lang.reflect.ParameterizedType
+import java.lang.reflect.Type
+import javax.validation.ConstraintViolation
 
 /** The only RF domain access is registered metadata over Confix, decorated with Couch dynamics. */
 class RelaxFactoryServiceLayer(
@@ -22,10 +26,17 @@ class RelaxFactoryServiceLayer(
     val domain: RelaxFactoryDomain,
 ) : ServiceLayerDecorator() {
     val dispatch = linkedMapOf<Method, String>()
+    // RF's default resolver cache is process-global, so only pure generic metadata delegates to it.
+    val core: ServiceLayer = ServiceLayer.create()
+    var protocolFailure: Exception? = null
 
     init {
         for ((token, binding) in schema.operations) {
             if (dispatch.containsKey(binding.domain)) continue
+            if (binding.domain.declaringClass != RelaxFactoryDomain::class.java) {
+                dispatch[binding.domain] = token
+                continue
+            }
             val name = "requestfactory:$token"
             dispatch[binding.domain] = name
             domain.dyninvoke.register(name) { args ->
@@ -41,8 +52,17 @@ class RelaxFactoryServiceLayer(
         }
     }
 
-    override fun resolveRequestFactory(token: String): Class<out RequestFactory> =
-        schema.factories[token] ?: report("Unregistered RequestFactory")
+    override fun resolveRequestFactory(token: String): Class<out RequestFactory> {
+        protocolFailure?.let { return report(InvocationTargetException(it)) }
+        return schema.factories[token] ?: report("Unregistered RequestFactory")
+    }
+
+    override fun getRequestReturnType(contextMethod: Method): Type = core.getRequestReturnType(contextMethod)
+
+    override fun <T : Any?> validate(domainObject: T): Set<ConstraintViolation<T>> = core.validate(domainObject)
+
+    override fun loadDomainObjects(classes: List<Class<*>>, ids: List<Any>): List<Any?> =
+        classes.indices.map { loadDomainObject(classes[it], ids[it]) }
 
     override fun resolveRequestContext(operation: String): Class<out RequestContext> =
         schema.operations[operation]?.context ?: report("Unregistered RequestContext operation")
@@ -50,8 +70,10 @@ class RelaxFactoryServiceLayer(
     override fun resolveRequestContextMethod(operation: String): Method =
         schema.operations[operation]?.method ?: report("Unregistered RequestContext operation")
 
-    override fun resolveDomainMethod(operation: String): Method =
-        schema.operations[operation]?.domain ?: report("Unregistered Couch operation")
+    override fun resolveDomainMethod(operation: String): Method {
+        domain.invocation = schema.operations[operation]
+        return domain.invocation?.domain ?: report("Unregistered Couch operation")
+    }
 
     override fun resolveServiceClass(context: Class<out RequestContext>): Class<*> {
         require(schema.operations.values.any { it.context == context }) { "Unregistered RequestContext" }
@@ -100,30 +122,41 @@ class RelaxFactoryServiceLayer(
     }
 
     override fun getId(domainObject: Any): Any? = (domainObject as ConfixBean).let { bean ->
-        if (domain.dyninvoke.get(bean, "_rev", String::class.java) == null) null
+        if (ValueProxy::class.java.isAssignableFrom(domain.types[bean]) || domain.dyninvoke.get(bean, "_rev", String::class.java) == null) null
         else domain.dyninvoke.get(bean, "_id", String::class.java)
     }
 
-    override fun getVersion(domainObject: Any): Any? =
-        domain.dyninvoke.get(domainObject as ConfixBean, "_rev", String::class.java)
+    override fun getVersion(domainObject: Any): Any? = (domainObject as ConfixBean).let {
+        if (ValueProxy::class.java.isAssignableFrom(domain.types[it])) null
+        else domain.dyninvoke.get(it, "_rev", String::class.java)
+    }
 
     override fun isLive(domainObject: Any): Boolean =
         (getId(domainObject) as? String)?.let { domain.store.get(it) != null } ?: false
 
     override fun getProperty(domainObject: Any, property: String): Any? {
         val bean = domainObject as ConfixBean
-        val type = schema.propertyTypes[property] ?: return report("Unregistered proxy property")
+        val declared = schema.properties[domain.types[bean]]?.get(property) ?: return report("Unregistered proxy property")
+        val type = RequestFactorySchema.rawType(declared)
+        val entity = EntityProxy::class.java.isAssignableFrom(domain.types[bean])
         return when (property) {
-            "id" -> domain.dyninvoke.get(bean, "_id", type)
-            "rev" -> domain.dyninvoke.get(bean, "_rev", type)
-            "json" -> jsonOf(bean.fields().filterKeys { it != "_id" && it != "_rev" })
-            else -> domain.dyninvoke.get(bean, property, type)
+            "id" -> domain.dyninvoke.get(bean, if (entity) "_id" else property, type)
+            "rev" -> domain.dyninvoke.get(bean, if (entity) "_rev" else property, type)
+            "json" -> if (type == String::class.java && entity) jsonOf(domain.fields(bean).filterKeys { it != "_id" && it != "_rev" }) else domain.property(bean, property, declared)
+            else -> if (BaseProxy::class.java.isAssignableFrom(type) || declared is ParameterizedType) domain.property(bean, property, declared) else domain.dyninvoke.get(bean, property, type)
         }
     }
 
     override fun setProperty(domainObject: Any, property: String, expectedType: Class<*>, value: Any?) {
         val bean = domainObject as ConfixBean
-        if (schema.propertyTypes[property] != expectedType) report<Unit>("Unregistered proxy property type")
+        val declared = schema.properties[domain.types[bean]]?.get(property) ?: return report("Unregistered proxy property")
+        val type = RequestFactorySchema.rawType(declared)
+        if (resolveDomainClass(type) != expectedType) report<Unit>("Unregistered proxy property type")
+        val entity = EntityProxy::class.java.isAssignableFrom(domain.types[bean])
+        if (!entity && property in setOf("id", "rev")) {
+            domain.dyninvoke.set(bean, property, value)
+            return
+        }
         when (property) {
             "id" -> {
                 val prior = domain.revisions[bean]
@@ -134,11 +167,15 @@ class RelaxFactoryServiceLayer(
                 if (value != domain.dyninvoke.get(bean, "_rev", String::class.java)) report<Unit>("Couch revisions are assigned by persistence")
             }
             "json" -> {
+                if (type != String::class.java || !EntityProxy::class.java.isAssignableFrom(domain.types[bean])) {
+                    domain.property(bean, property, value, declared)
+                    return
+                }
                 val replacement = ConfixBean.from(value as? String ?: "{}").fields().filterKeys { it != "_id" && it != "_rev" }
                 val metadata = bean.fields().filterKeys { it == "_id" || it == "_rev" }
                 bean.replace(ConfixBean.from(replacement + metadata).document)
             }
-            else -> domain.dyninvoke.set(bean, property, value)
+            else -> if (BaseProxy::class.java.isAssignableFrom(type) || declared is ParameterizedType) domain.property(bean, property, value, declared) else domain.dyninvoke.set(bean, property, value)
         }
     }
 
@@ -146,8 +183,14 @@ class RelaxFactoryServiceLayer(
 
     override fun invoke(domainMethod: Method, vararg args: Any?): Any? {
         return try {
+            val invocation = domain.invocation ?: return report("Unregistered Couch invocation")
+            if (invocation.domain != domainMethod) return report("Unregistered Couch invocation")
+            domain.returnType = getRequestReturnType(invocation.method)
             val name = dispatch[domainMethod] ?: return report("Unregistered Couch method")
-            domain.dyninvoke.call(name, *args)
+            args.forEach(domain::materialize)
+            val result = domain.dyninvoke.call(name, *args)
+            args.forEach(domain::refresh)
+            domain.convert(result, domain.returnType!!)
         } catch (failure: Exception) {
             report(InvocationTargetException(failure))
         }
@@ -163,28 +206,52 @@ class GwtCouchRequestFactory(
 ) : AutoCloseable {
     val domain = RelaxFactoryDomain(RelaxStore.of(db), dyninvoke, viewServer)
     val decorator = RelaxFactoryServiceLayer(schema, domain)
-    val processor = SimpleRequestProcessor(ServiceLayer.create(decorator))
+    val exceptions = DefaultExceptionHandler()
+    val processor = SimpleRequestProcessor(decorator).also { it.setExceptionHandler(exceptions) }
     var closed = false
 
     @Synchronized
     fun process(payload: String): String {
         check(!closed) { "RequestFactory is closed" }
         domain.clear()
+        decorator.protocolFailure = null
         try {
             // Decode original RF metadata, without translating or replacing the RF message.
-            val message = AutoBeanCodex.decode(MESSAGES, RequestMessage::class.java, payload).`as`()
-            for (operation in message.operations.orEmpty()) {
-                if (operation.serverId == null) continue
-                val id = ValueCodex.decode(String::class.java, com.google.web.bindery.autobean.shared.impl.StringQuoter.split(decode(operation.serverId))) as String
-                val rev = operation.version?.let { encoded ->
-                    ValueCodex.decode(String::class.java, com.google.web.bindery.autobean.shared.impl.StringQuoter.split(decode(encoded))) as String
+            try {
+                val message = AutoBeanCodex.decode(MESSAGES, RequestMessage::class.java, payload).`as`()
+                val ids = linkedSetOf<String>()
+                for (operation in message.operations.orEmpty()) {
+                    val proxy = schema.proxies[operation.typeToken] ?: continue
+                    val key = "${operation.typeToken}:${operation.serverId}:${operation.clientId}:${operation.syntheticId}"
+                    if (!ids.add(key)) continue
+                    if (operation.serverId == null) {
+                        domain.creations.addLast(proxy)
+                        continue
+                    }
+                    val id = string(operation.serverId)
+                    domain.loads.getOrPut(id) { ArrayDeque() }.addLast(proxy)
+                    val rev = operation.version?.let(::string)
+                    require(!domain.clientRevisions.containsKey(id) || domain.clientRevisions[id] == rev) { "Conflicting RequestFactory revisions" }
+                    domain.clientRevisions[id] = rev
                 }
-                require(!domain.clientRevisions.containsKey(id) || domain.clientRevisions[id] == rev) { "Conflicting RequestFactory revisions" }
-                domain.clientRevisions[id] = rev
+            } catch (failure: Exception) {
+                decorator.protocolFailure = failure
             }
-            return processor.process(payload)
+            return try { processor.process(payload) } catch (failure: Exception) {
+                // Upstream decodes before its error handler; use its own factory/handler for decode failures too.
+                val error = exceptions.createServerFailure(failure)
+                val failureBean = MESSAGES.failure()
+                failureBean.`as`().setMessage(error.message)
+                failureBean.`as`().setExceptionType(error.exceptionType)
+                failureBean.`as`().setStackTrace(error.stackTraceString)
+                failureBean.`as`().setFatal(error.isFatal)
+                val response = MESSAGES.response()
+                response.`as`().setGeneralFailure(failureBean.`as`())
+                AutoBeanCodex.encode(response).payload
+            }
         } finally {
             domain.clear()
+            decorator.protocolFailure = null
         }
     }
 
@@ -198,6 +265,15 @@ class GwtCouchRequestFactory(
 
     companion object {
         val MESSAGES: MessageFactory = AutoBeanFactorySource.create(MessageFactory::class.java)
-        fun decode(value: String): String = Base64Utils.fromBase64(value).toString(Charsets.UTF_8)
+        fun decode(value: String): String {
+            val padding = value.takeLastWhile { it == '=' }.length
+            require(value.length % 4 == 0 && padding <= 2 && value.dropLast(padding).all {
+                it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '$' || it == '_'
+            }) { "Invalid RequestFactory Base64 metadata" }
+            val bytes = Base64Utils.fromBase64(value)
+            require(Base64Utils.toBase64(bytes) == value) { "Invalid RequestFactory Base64 metadata" }
+            return bytes.toString(Charsets.UTF_8)
+        }
+        fun string(value: String): String = ValueCodex.decode(String::class.java, com.google.web.bindery.autobean.shared.impl.StringQuoter.split(decode(value))) as String
     }
 }

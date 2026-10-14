@@ -7,6 +7,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap
 import kotlinx.coroutines.delay
+import modelmux.Airgap
 
 /**
  * TypeSafe Jev, a System One model: one `POST /v1/systemone` carries a state and a map of typed
@@ -28,10 +29,13 @@ object Jev {
 
     /** The answers keyed by question id, plus `model` and `usage`. 429/529 retry twice, 1 s then 2 s apart. */
     suspend fun ask(key: String, state: Any, questions: Map<String, Map<String, Any?>>): Map<String, Any?> {
+        Airgap.requireRemote()
+        require(key.isNotBlank()) { "JEV_API_KEY is not set" }
         val body = jsonOf(mapOf("model" to MODEL, "state" to state, "questions" to questions))
         val client = TrikeHtxHttpClient(BASE, htxHeaders("Authorization" j "Bearer $key"))
         var wait = 1_000L
         while (true) {
+            Airgap.requireRemote()
             try { return reifyMap(client.post("/v1/systemone", body)) }
             catch (e: HtxHttpError) { if ((e.status != 429 && e.status != 529) || wait > 2_000L) throw e }
             delay(wait); wait *= 2

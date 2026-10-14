@@ -33,7 +33,7 @@ class GwtRequestFactorySocketTest {
         override fun send(payload: String, receiver: RequestTransport.TransportReceiver) {
             scope.launch {
                 try {
-                    val response = client.request(parseHtxRequest(base + mount, HtxMethod.POST, body = ByteSeries(payload))
+                    val response = client.request(parseHtxRequest(base + mount, method = HtxMethod.POST, body = ByteSeries(payload))
                         .withHeader("Content-Type", "application/json; charset=utf-8"))
                     if (response.status == 200) receiver.onTransportSuccess(response.body.asString())
                     else receiver.onTransportFailure(ServerFailure("RequestFactory HTTP ${response.status}"))
@@ -108,7 +108,7 @@ class GwtRequestFactorySocketTest {
             val script = reify(withTimeout(15_000) { invoked.receipt.await() }!!) as Map<*, *>
             val revised = assertNotNull(withTimeout(15_000) { persisted.receipt.await() })
             assertEquals(8.0, script["qty"])
-            assertEquals(8.0, db.docJson("item")!!["qty"])
+            assertEquals(8.0, (db.docJson("item")!!["qty"] as Number).toDouble())
             assertNotEquals(saved.getRev(), revised.getRev())
             assertTrue(bridge.callRoot.invoke.hits > 0, "RF calls did not execute the specialized Truffle node")
 
@@ -120,7 +120,7 @@ class GwtRequestFactorySocketTest {
             val changes = client.request(parseHtxRequest("$base/rf/_changes?include_docs=true"))
             assertEquals(3, ((reify(changes.body.asString()) as Map<*, *>)["results"] as List<*>).size)
 
-            val wrongType = client.request(parseHtxRequest("$base/gwtRequest", HtxMethod.POST,
+            val wrongType = client.request(parseHtxRequest("$base/gwtRequest", method = HtxMethod.POST,
                 body = ByteSeries("""{"F":"${CouchGwtFactory::class.java.name}"}""")).withHeader("Content-Type", "text/plain"))
             assertEquals(415, wrongType.status)
         } finally {

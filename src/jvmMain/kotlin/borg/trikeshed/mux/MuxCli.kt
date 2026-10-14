@@ -29,6 +29,7 @@ import borg.trikeshed.userspace.reactor.MuxReactorElement
 import keymux.HarnessProvider
 import keymux.HarnessRegistry
 import keymux.KeyMux
+import modelmux.Airgap
 import keymux.defaultHermesHome
 import keymux.operatorKeyMux
 import kotlinx.coroutines.Dispatchers
@@ -698,6 +699,7 @@ Secrets are never printed — keys show as len= and sha256 prefix."""
      */
     private suspend fun remoteModelIds(baseUrl: String, apiKey: String, limit: Int = 8): List<String> =
         runCatching {
+            Airgap.requireRemote()
             val htx = kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.htx.HtxKey]
                 ?: return emptyList()
             fun hdr(k: String, v: String): borg.trikeshed.htx.HtxHeader =

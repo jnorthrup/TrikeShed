@@ -121,6 +121,19 @@ class BertModelTest {
         } finally { model.drain() }
     }
 
+    @Test fun airgapRetainsLocalInferenceAndItsNumericalResult() = runTest {
+        withContext(modelmux.Airgap()) {
+            assertFailsWith<modelmux.Airgap.Rejection> { modelmux.Airgap.requireRemote() }
+            val parameters = weights()
+            val model = BertModel(this, parameters, BertWordPiece(vocabulary, 16), "fixture-airgap")
+            try {
+                close(floatArrayOf(-.030064136f, .61820632f, 1.02417493f, -1.60981691f),
+                    model.encode(s_[bank])[0])
+            } finally { model.drain() }
+            assertTrue(parameters.tensors.isEmpty())
+        }
+    }
+
     @Test fun drainFinishesEnteredBatchesBeforeReleasingParameterStorage() = runTest {
         val parameters = weights()
         val parent = SupervisorJob(coroutineContext[Job])

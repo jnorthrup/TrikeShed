@@ -60,6 +60,7 @@ import borg.trikeshed.utils.kanban.SessionBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.kanban.SessionCause
 import kotlinx.coroutines.withContext
+import modelmux.Airgap
 
 /** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
 private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
@@ -76,6 +77,7 @@ private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.
  * Flags:
  *   --once                  single cycle then exit (default: --watch loops)
  *   --watch                 loop forever
+ *   --airgap                disable remote Jev/LLM calls; keep local BERT
  *   --interval-ms <N>       poll cadence (default = 30000)
  *   --max-slots <N>         live session cap (default = 15)
  *   --hermes-root <path>    Hermes Python source checkout
@@ -190,6 +192,7 @@ object OroborosDaemon {
         val modules: List<String> = emptyList(),
         /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode or TRIKESHED_AGENTS; default codex,opencode. */
         val agents: Set<String> = borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED,
+        val airgap: Boolean = Airgap.configured(),
     )
 
     @Volatile
@@ -200,6 +203,7 @@ object OroborosDaemon {
 
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
+        var airgap = Airgap.configured()
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
         var kanbanPort = DEFAULT_KANBAN_PORT
@@ -214,6 +218,7 @@ object OroborosDaemon {
         val flags = listOf(
             ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
             ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            ForgeCliArgs.Flag(name = "--airgap") { _, i -> airgap = true; i + 1 },
             // Consumed by mainImpl via the raw args (P2 belief-bag wiring); registered so the parser accepts it.
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
@@ -256,13 +261,19 @@ object OroborosDaemon {
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap)
     }
 
     @JvmStatic
     fun main(args: Array<String>) {
+        val config = parseConfig(args)
+        if (config.airgap) {
+            // Pin the process before child initialization, including scopes that drop the context.
+            System.setProperty(Airgap.PROPERTY, "true")
+            HostSystem.err("[OROBOROS] airgap enabled: remote Jev/LLM calls disabled; local BERT retained")
+        }
         try {
-            runBlocking {
+            runBlocking(Airgap(config.airgap)) {
                 // The daemon gets its OWN supervised scope rather than launching straight into this
                 // runBlocking. mainImpl is an extension on its receiver, so everything it launches
                 // without an explicit parent becomes a child of that receiver — and runBlocking
@@ -281,7 +292,7 @@ object OroborosDaemon {
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
                 var ipnsNode: borg.trikeshed.ipns.IpnsNode? = null
                 try {
-                    with(daemonScope) { mainImpl(args) { ipnsNode = it } }
+                    with(daemonScope) { mainImpl(args, config) { ipnsNode = it } }
                 } finally {
                     try { ipnsNode?.close() }
                     finally { daemonScope.cancel() }
@@ -525,7 +536,11 @@ object OroborosDaemon {
             processor = { payload -> processor.process(payload) },
             closeProcessor = { processor.close() },
             parentJob = coroutineContext[kotlinx.coroutines.Job],
-        ).also { it.open() }
+        )
+        try { requestFactory.open() } catch (failure: Throwable) {
+            try { requestFactory.drain() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
         return borg.trikeshed.forge.server.CouchWire(
             router = borg.trikeshed.couch.CouchWireRouter(db, WorktreeCouchGateway.WORKTREE_PREFIX,
                 replicator = replicator, report = report, rpcTargets = targets,
@@ -538,7 +553,7 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(
-        args: Array<String>, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+        args: Array<String>, config: DaemonConfig, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
     ) {
         // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
         // + codex/opencode credential files), then the legacy derived-name env
@@ -577,7 +592,6 @@ object OroborosDaemon {
             HostSystem.err("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
         }
 
-        val config = parseConfig(args)
         // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
         val envInterval = HostSystem.getenv("FLYWHEEL_CYCLE_INTERVAL")
         val intervalMs = if (envInterval != null) {
@@ -2590,8 +2604,12 @@ object OroborosDaemon {
                 healthJob.cancelAndJoin()
                 if (healthSock.exists()) healthSock.delete()
                 // Finish accepted guest turns while their blackboard/model/store dependencies are live.
-                hermesWire.drain()
-                couchWire.requestFactory?.drain()
+                runCatching { hermesWire.drain() }.onFailure {
+                    HostSystem.err("[OROBOROS] Hermes drain failed: ${it.message}")
+                }
+                runCatching { couchWire.requestFactory?.drain() }.onFailure {
+                    HostSystem.err("[OROBOROS] RequestFactory drain failed: ${it.message}")
+                }
                 // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
                 runCatching { blackboardFacts.close() }
                 runCatching { graalFacts.close() }
@@ -2653,7 +2671,7 @@ object OroborosDaemon {
         ),
         blackboard = blackboard,
         modelMuxProvider = { muxReactor.modelMux() },
-        muxContext = htxElement + muxReactor,
+        muxContext = htxElement + muxReactor + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
     )
 
@@ -2746,10 +2764,12 @@ object OroborosDaemon {
 
     private fun usage() {
         HostSystem.err(
-            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N]
+            """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N]
               [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
+              --airgap: disable remote Jev/LLM calls; keep local BERT
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
+                   TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
               kanban-port default: 8888"""

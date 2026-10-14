@@ -1,6 +1,7 @@
 package borg.trikeshed.relaxfactory
 
 import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.couch.ConfixDocStore
 import borg.trikeshed.couch.Couch
@@ -34,6 +35,9 @@ interface RelaxStore {
 
     /** `{ok,id,rev}` on success, `{error,reason,id}` on conflict — the `PUT /{db}/{id}` reply. */
     fun put(id: String, json: String, rev: String?): Map<String, Any?>
+
+    /** Typed RF fields retain their declared numbers at the canonical Couch boundary. */
+    fun put(id: String, body: Map<String, Any?>, rev: String?): Map<String, Any?> = put(id, jsonOf(body), rev)
 
     fun delete(id: String, rev: String?): Map<String, Any?>
 
@@ -131,6 +135,9 @@ private class CouchDatabaseRelaxStore(
         @Suppress("UNCHECKED_CAST")
         return db.put(id, body as Map<String, Any?>, rev ?: body["_rev"] as? String)
     }
+
+    override fun put(id: String, body: Map<String, Any?>, rev: String?): Map<String, Any?> =
+        db.put(id, body, rev ?: body["_rev"] as? String)
 
     override fun delete(id: String, rev: String?): Map<String, Any?> = db.delete(id, rev)
 

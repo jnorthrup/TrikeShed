@@ -2,8 +2,32 @@ package borg.trikeshed.daemon
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import modelmux.Airgap
 
 class OroborosDaemonArgsTest {
+
+    @Test
+    fun airgapDefaultsToProcessConfiguration() {
+        val config = OroborosDaemon.parseConfig(emptyArray())
+        assertEquals(Airgap.configured(), config.airgap)
+    }
+
+    @Test
+    fun airgapFlagDoesNotBecomeStoragePath() {
+        val config = OroborosDaemon.parseConfig(arrayOf("--airgap", "--once", "/state/forge", "/source/repo"))
+        assertEquals(true, config.airgap)
+        assertEquals(false, config.watch)
+        assertEquals(listOf("/state/forge", "/source/repo"), config.positional)
+    }
+
+    @Test
+    fun airgapParsingDoesNotChangeProcessConfiguration() {
+        val property = System.getProperty(Airgap.PROPERTY)
+        val configured = Airgap.configured()
+        OroborosDaemon.parseConfig(arrayOf("--airgap"))
+        assertEquals(property, System.getProperty(Airgap.PROPERTY))
+        assertEquals(configured, OroborosDaemon.parseConfig(emptyArray()).airgap)
+    }
 
     @Test
     fun documentFeedFlagsDoNotBecomeStoragePaths() {

@@ -48,6 +48,20 @@ class BertSenseElementTest {
         assertNull(result.results[0].sense)
         lane.drain()
     }
+    @Test fun airgapMissingAssetsAbstainsWithoutRemoteFallback() = runTest {
+        withContext(modelmux.Airgap()) {
+            var loads = 0
+            val lane = BertSenseElement(this, { loads++; error("local weights missing") })
+            try {
+                val result = lane.read(s_[query], labels)
+                assertEquals(1, loads)
+                assertEquals(BertSenseStatus.Unavailable, result.results[0].status)
+                assertEquals("local weights missing", result.error)
+                assertNull(result.results[0].sense)
+                assertFailsWith<modelmux.Airgap.Rejection> { modelmux.Airgap.requireRemote() }
+            } finally { lane.drain() }
+        }
+    }
     @Test fun drainFinishesAdmittedInferenceBeforeClosingTheEncoder() = runTest {
         val entered = CompletableDeferred<Unit>()
         val finish = CompletableDeferred<Unit>()

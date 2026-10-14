@@ -182,6 +182,7 @@ class ModelMux internal constructor(
 
     /** Create a session for a specific model by ID */
     suspend fun session(modelId: String): Result<LlmSession> {
+        runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
             ?: return Result.failure(NoSuchElementException("need(model): model not found: $modelId"))
         val card = entry.b
@@ -290,7 +291,10 @@ class ModelMux internal constructor(
         // Invalid protocol requests are rejected before admission. The catalog, not
         // a guest-supplied model field, owns the wire model and credential binding.
         val wireModel = models.view.firstOrNull { it.a == modelId }?.b?.wireName ?: modelId
-        val json = runCatching { AcpCodec.encodeCompletion(request, wireModel) }
+        val json = runCatching {
+            Airgap.requireRemote()
+            AcpCodec.encodeCompletion(request, wireModel)
+        }
             .getOrElse { return Result.failure(it) }
         return chatRequest(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl,
             encode = { json }, decode = AcpCodec::parseCompletion)
@@ -315,6 +319,7 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
+            Airgap.requireRemote()
             val result = chatCall(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl, encode, decode) { r, k ->
                 receipt = r
                 keyId = k
@@ -446,6 +451,7 @@ class ModelMux internal constructor(
                 body = ByteSeries(json.encodeToByteArray())
             ).copy(headers = htxHeaders, timeoutMs = timeoutMs)
 
+            Airgap.requireRemote()
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
             httpStatus = resp.status
@@ -548,6 +554,7 @@ class ModelMux internal constructor(
         messages: Series<AcpMessage>,
         tools: Series<AcpTool> = 0 j { error("no tools") }
     ): Flow<AcpChunk> = flow {
+        Airgap.requireRemote()
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
         val session = sessionResult.getOrThrow()
@@ -581,6 +588,7 @@ class ModelMux internal constructor(
                 body = ByteSeries(json.encodeToByteArray())
             ).copy(headers = htxHeaders)
 
+            Airgap.requireRemote()
             val resp = htx.request(htxReq)
             val text = resp.body.toArray().decodeToString()
             var emitted = false
@@ -606,6 +614,7 @@ class ModelMux internal constructor(
 
     /** Embed — routes to an embedding-capable model */
     suspend fun embed(modelId: String, texts: Series<String>): Series<Join<String, Series<Double>>> {
+        Airgap.requireRemote()
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
         val session = sessionResult.getOrThrow()
@@ -652,6 +661,7 @@ class ModelMux internal constructor(
             ).copy(headers = htxHeaders)
 
             val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+            Airgap.requireRemote()
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
 
