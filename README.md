@@ -67,6 +67,31 @@ line beat a week of silence. The Gradle daemon task forwards its output to
 the terminal; the last thirty lines plus what you
 dragged, clicked, or expected is a perfect report.
 
+## Curator — mostly done
+
+The curator use case is mostly done. The hard work is in place: reading documents
+and sections, extracting concepts and relations, and carrying that evidence
+through NLPCORE, Rete and NARS. The remaining work is in the controls and polish,
+not a replacement runtime.
+
+<img width="1490" height="899" alt="TrikeShed curator" src="https://github.com/user-attachments/assets/2f655967-82a1-4faa-bc2e-e671c9f13950" />
+
+**Ingest, briefly:** start the daemon, open `http://localhost:8888/graal`, and drag
+a folder onto the terrain. That is the current folder-ingest entry point; the
+files become a project database. Open `http://localhost:8888/curator` to work
+through the curated volumes, sections, concepts and their relationships.
+
+Volume/concept CRUD controls and editing tweaks are still missing. A focused
+ingest GUI, or a Notion-like document workspace over the same machinery, is
+future consideration—not something already shipped. The core is there; the
+whole editing experience is not finished.
+
+For local-only model use, launch with `--airgap` (or `TRIKESHED_AIRGAP=1`). Jev
+and other remote model calls are disabled even when credentials are configured.
+BERT uses local weights and tokenizer files; missing assets or insufficient
+retained labels remain unavailable, without a remote fallback. This is model
+egress control, not a machine-wide network firewall.
+
 ---
 
 # TrikeShed Concept Map — for the Kotlin Maintainer
