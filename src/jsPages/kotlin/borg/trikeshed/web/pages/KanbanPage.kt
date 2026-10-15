@@ -253,9 +253,11 @@ object KanbanPage {
             addrow.className = "addrow"
             val input = document.createElement("input") as HTMLInputElement
             input.placeholder = "Add a card…"
+            input.setAttribute("aria-label", "Add a card to $name")
             val addBtn = document.createElement("button") as HTMLButtonElement
             addBtn.textContent = "Add"
             addBtn.title = "Add a card to $name"
+            addBtn.setAttribute("aria-label", "Add card to $name")
             addBtn.disabled = true
             val submit = {
                 val title = input.value.trim()
