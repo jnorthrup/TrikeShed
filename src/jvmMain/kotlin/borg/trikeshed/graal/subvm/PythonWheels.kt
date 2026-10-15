@@ -76,7 +76,9 @@ data class PythonWheels(
                         if (path.endsWith(".py")) {
                             val names = cells.dropLast(1) + cells.last().removeSuffix(".py")
                             val module = (if (names.last() == "__init__") names.dropLast(1) else names)
-                            require(module.isNotEmpty() && module.all { it.matches(Regex("[A-Za-z_][A-Za-z0-9_]*")) }) { "invalid Python module path: $path" }
+                            // importlib accepts module names beyond the import statement's
+                            // identifier grammar (Rich loads unicode10-0-0 this way).
+                            require(module.isNotEmpty() && module.all { it.matches(Regex("[A-Za-z_][A-Za-z0-9_-]*")) }) { "invalid Python module path: $path" }
                             require(sources.putIfAbsent(module.joinToString("."), "wheel:$wheel/$path" to
                                 content.decodeToString(throwOnInvalidSequence = true)) == null) { "duplicate wheel module: $path" }
                         }

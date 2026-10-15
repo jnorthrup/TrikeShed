@@ -1,9 +1,16 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.couch.*
+import borg.trikeshed.dag.*
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.htx.*
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lib.*
+import borg.trikeshed.module.*
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyMap
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -20,6 +27,53 @@ import kotlin.test.*
 @ResourceLock(Resources.SYSTEM_PROPERTIES)
 class JevAirgapTest {
     @TempDir lateinit var directory: Path
+
+    @Test fun curatorSwitchRejectsRemoteRoutesAndRetainsLocalSearch() = runTest {
+        val prior = System.setProperty(Airgap.PROPERTY, "false")
+        try {
+            assumeFalse(Airgap.configured(), "The process environment already requires airgap")
+            val routes = ModuleRouteRegistry()
+            val cas = CasStore.inMemory()
+            val store = CouchStoreFactory.casBacked(cas)
+            val ctx = ModuleContext(
+                couch = Couch("airgap-test", store, cas), rete = ReteNetwork(), productions = ReteProductionRegistry(),
+                beliefBag = null, turnReview = null, blackboard = ConfixBlackboard(), casStore = cas,
+                attachments = CouchAttachmentGateway(store, cas), routes = routes, scope = this,
+                clock = { 0L }, stateDir = directory.toFile(),
+            )
+            val nodes = ConstellationNodes.registerLanguageNodes(ctx, KifKnowledgeBase())
+            try {
+                val path = "/api/curation/airgap"
+                val switch = checkNotNull(routes.match(path)).route
+                assertEquals(405, switch("GET", path, "", null)?.status)
+                assertEquals("false", System.getProperty(Airgap.PROPERTY))
+                repeat(2) {
+                    val response = checkNotNull(switch("POST", path, "", null))
+                    assertEquals(200, response.status)
+                    assertEquals(true, reifyMap(response.body)["disabled"])
+                }
+                assertEquals("true", System.getProperty(Airgap.PROPERTY))
+                withContext(Airgap(false)) {
+                    assertFailsWith<Airgap.Rejection> { Jev.ask("fixture", "page", emptyMap()) }
+                    for (remote in listOf("/api/curation/jev", "/api/curation/jev/score", "/api/curation/rank")) {
+                        val response = checkNotNull(routes.match(remote)?.route?.invoke("POST", remote, "{", null))
+                        assertEquals(503, response.status)
+                        assertEquals(true, reifyMap(response.body)["disabled"])
+                    }
+                }
+                val rank = checkNotNull(routes.match("/api/curation/rank")?.route?.invoke("GET", "/api/curation/rank", "", null))
+                assertEquals(true, reifyMap(rank.body)["disabled"])
+                val local = checkNotNull(routes.match("/api/curation/find")?.route?.invoke("POST", "/api/curation/find", """{"q":"bank"}""", null))
+                assertEquals(200, local.status)
+                assertEquals(0, (reifyMap(local.body)["found"] as Number).toInt())
+            } finally {
+                // Await the startup memory writes before JUnit removes the state directory.
+                try { nodes.senses(null, null) } finally { nodes.drain() }
+            }
+        } finally {
+            if (prior == null) System.clearProperty(Airgap.PROPERTY) else System.setProperty(Airgap.PROPERTY, prior)
+        }
+    }
 
     @Test fun contextRejectsBeforeHtxDispatch() = runTest {
         var requests = 0

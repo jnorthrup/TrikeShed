@@ -317,7 +317,7 @@ kotlin {
                 implementation(kotlin("scripting-jvm-host"))
 
                 // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
-                implementation("org.xerial:sqlite-jdbc:3.42.0.0")
+                implementation("org.xerial:sqlite-jdbc:3.53.4.0")
                 // Opt-in compression dictionaries; ISAM framing and all file I/O remain commonMain.
                 implementation("com.github.luben:zstd-jni:1.5.7-23")
 

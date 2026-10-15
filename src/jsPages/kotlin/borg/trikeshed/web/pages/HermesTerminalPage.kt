@@ -10,23 +10,87 @@ import org.w3c.dom.clipboard.ClipboardEvent
 import org.w3c.dom.events.CompositionEvent
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
+import kotlin.js.Date
 
 /** Hermes xterm-256color: the GraalPy sleeve terminal served at `/hermes`. */
 object HermesTerminalPage {
     private val grid = TerminalGrid(hermes = true)
     private var state = "closed"
+    private var boot: dynamic = null
+    private var detail = ""
     private var focused = false
 
     private fun setState(s: String) {
+        state = s
         byId("state").textContent = s
-        byId("state").className = "badge " + (if (s == "ready") "ok" else if (s == "failed") "bad" else "")
+        byId("state").className = "badge " + (if (s == "ready") "ok" else if (s == "failed" || s == "offline") "bad" else "")
+        renderBoot()
+    }
+
+    private fun adoptState(x: dynamic) {
+        if (jsTypeOf(x.boot) != "undefined") {
+            val next: dynamic = x.boot
+            val current: dynamic = boot
+            if (next != null && current != null && isNumber(next.startedAtMs) && isNumber(current.startedAtMs)) {
+                val nextStarted = next.startedAtMs as Double
+                val currentStarted = current.startedAtMs as Double
+                if (nextStarted < currentStarted) return
+                if (nextStarted == currentStarted && isNumber(next.revision) && isNumber(current.revision) &&
+                    (next.revision as Double) < (current.revision as Double)) return
+            }
+            if (next != null || x.state == "closed") boot = next
+        }
+        if (x.detail != null) detail = str(x.detail)
+        setState(if (truthy(x.state)) str(x.state) else state)
+    }
+
+    private fun renderBoot() {
+        val b: dynamic = boot
+        val status = if (b != null && truthy(b.status)) str(b.status) else state
+        val phase = if (b != null && truthy(b.phase)) str(b.phase) else "startup"
+        val offline = state == "offline"
+        val ready = state == "ready" && (b == null || b.steadyState == true)
+        val failed = status == "failed" || state == "failed"
+        val running = !offline && !ready && !failed && (status == "running" || state == "booting")
+        byId("boot").className = if (ready) "ok" else if (failed || offline) "bad" else ""
+        byId("bootState").textContent = when {
+            offline -> "Python diagnostic console · offline"
+            ready -> "Python diagnostic console ready"
+            failed -> "$phase failed · diagnostic console unavailable"
+            running -> "$phase · diagnostic console starting"
+            else -> "Python diagnostic console · $state"
+        }
+        renderBootTime()
+        val module = if (b != null) strOrEmpty(b.module) else ""
+        val progress = if (b != null && truthy(b.detail)) str(b.detail) else detail
+        byId("bootDetail").textContent = (if (module.isNotEmpty()) "$module · " else "") + progress
+        val failure = if (b != null) strOrEmpty(b.failure) else ""
+        byId("bootFailure").textContent = if (failure != progress) failure else ""
+        val trace = if (b != null) strOrEmpty(b.traceback) else ""
+        byId("bootTrace").hidden = trace.isEmpty()
+        byId("bootTraceback").textContent = trace
+    }
+
+    private fun renderBootTime() {
+        val b: dynamic = boot
+        val running = state == "booting" || (b != null && b.status == "running" && state != "failed" && state != "offline")
+        val started = if (b != null && isNumber(b.startedAtMs)) b.startedAtMs as Double else 0.0
+        val updated = if (b != null && isNumber(b.updatedAtMs)) b.updatedAtMs as Double else started
+        val wallSeconds = if (b != null && isNumber(b.wallMillis)) ((b.wallMillis as Double) / 1000).toInt() else 0
+        val now = Date.now()
+        byId("bootElapsed").textContent = if (started > 0.0) {
+            val elapsed = (maxOf(0.0, (if (running) now else updated) - started) / 1000).toInt()
+            " · ${elapsed}s elapsed" + if (running && updated > 0.0) {
+                " · ${(maxOf(0.0, now - updated) / 1000).toInt()}s since progress" +
+                    if (wallSeconds > 0) " · ${wallSeconds}s guest execution limit" else ""
+            } else ""
+        } else ""
     }
 
     private fun snapshot(x: dynamic) {
         val p: dynamic = if (truthy(x.panel)) x.panel else x
-        if (truthy(x.state)) state = str(x.state)
+        adoptState(x)
         grid.adopt(p)
-        setState(state)
         grid.renderAll()
         grid.lastCursorRow = grid.cursor.row
         for (s in jsArray(x.signals)) grid.signal(s)
@@ -95,7 +159,7 @@ object HermesTerminalPage {
         try {
             snapshot(fetchResponse("/api/hermes/terminal").jsonValue())
         } catch (_: Throwable) {
-            byId("state").textContent = "offline"
+            setState("offline")
         }
     }
 
@@ -128,7 +192,7 @@ object HermesTerminalPage {
         val es = EventSource("/api/hermes/terminal/events")
         es.onmessage = { e: MessageEvent ->
             val x: dynamic = JSON.parse<dynamic>(e.data as String)
-            if (x.kind == "state") setState(str(x.state))
+            if (x.kind == "state") adoptState(x)
             else if (x.kind == "manual") grid.signal(x.signal)
             else if (x.kind == "causal") {
                 grid.signal(x.signal)
@@ -199,14 +263,27 @@ object HermesTerminalPage {
         byId("screen").addEventListener("mousedown", { e: Event -> e.preventDefault() })
         byId("open").onclick = {
             launchPage {
-                fetchResponse("/api/hermes/terminal/open", requestInit("POST"))
+                boot = null
+                detail = "Boot requested; waiting for sleeve progress"
                 setState("booting")
+                try {
+                    val response = fetchResponse("/api/hermes/terminal/open", requestInit("POST"))
+                    if (!response.ok) {
+                        val failure = response.jsonValue()
+                        detail = strOrEmpty(failure.error)
+                        setState("failed")
+                    } else load()
+                } catch (t: Throwable) {
+                    detail = t.message ?: "Boot request failed"
+                    setState("failed")
+                }
                 kbd.focus()
             }
         }
         window.addEventListener("resize", { fitGeometry() })
         launchPage { load(); fitGeometry() }
         window.setInterval({ launchPage { load() } }, 10000)
+        window.setInterval({ renderBootTime() }, 1000)
         connect()
         kbd.focus()
         syncFocus()

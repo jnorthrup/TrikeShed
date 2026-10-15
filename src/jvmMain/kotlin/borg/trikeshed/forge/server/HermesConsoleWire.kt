@@ -141,6 +141,7 @@ class HermesConsoleWire(
                         "kind" to "state",
                         "state" to event.state.name.lowercase(),
                         "detail" to event.detail,
+                        "boot" to event.boot?.toMap(),
                     )
                 }
                 send("data: ${jsonOf(payload)}\n\n".toByteArray(StandardCharsets.UTF_8))

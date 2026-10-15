@@ -243,6 +243,7 @@ class LeafTrainer(
             .allowCreateProcess(false).allowEnvironmentAccess(EnvironmentAccess.NONE).allowPolyglotAccess(PolyglotAccess.NONE)
             .build()
         private val fns = ConcurrentHashMap<String, Value>()
+        private var nativeModulesWithheld = false
         private val materializedSources = HashSet<Int>()
         private val wallMillis = if (budget.wallMillis > 0) budget.wallMillis else GuestBounds.DEFAULT_WALL_MILLIS
 
@@ -253,6 +254,10 @@ class LeafTrainer(
         fun materialize(root: String, source: String) {
             if (fns.containsKey(root)) return
             val f = worker.submit<Value> {
+                if (!nativeModulesWithheld) {
+                    context.withholdNativeModules(bounds)
+                    nativeModulesWithheld = true
+                }
                 val b = context.getBindings(bounds.languageId)
                 val evaluated = if (materializedSources.add(source.hashCode())) context.eval(Source.newBuilder(bounds.languageId, source, "leaf:$root").buildLiteral()) else null
                 val fn = when {

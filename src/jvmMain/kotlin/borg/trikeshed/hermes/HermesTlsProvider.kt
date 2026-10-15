@@ -33,6 +33,9 @@ object HermesTlsProvider {
         class SSLEOFError(SSLError): pass
         class SSLCertVerificationError(SSLError): pass
         CertificateError = SSLCertVerificationError
+        # Compatibility consumers inspect this backend label even without using TLS.
+        # No OpenSSL version is claimed; OpenSSL-only capabilities remain absent.
+        OPENSSL_VERSION = 'TrikeShed host TLS lease (OpenSSL unavailable)'
         HAS_SNI = True
         HAS_ALPN = True
         _VERSIONS = {'TLS12': TLSVersion.TLSv1_2, 'TLS13': TLSVersion.TLSv1_3}

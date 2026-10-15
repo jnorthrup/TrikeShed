@@ -999,7 +999,7 @@ object OroborosDaemon {
             vmHost, wireScope,
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
-        val hermesConsole = hermesConsole(config, home, repoDir, daemonBlackboard, htxElement, muxReactor, wireScope)
+        val hermesConsole = hermesConsole(config, home, repoDir, daemonBlackboard, htxElement, muxReactor, wireScope, vmWorldStore, fileOps)
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
         if (config.hermesConsole) check(hermesWire.open()) { "Hermes console did not admit startup" }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
@@ -2658,6 +2658,8 @@ object OroborosDaemon {
         htxElement: HtxElement,
         muxReactor: MuxReactorElement,
         socketScope: CoroutineScope,
+        world: borg.trikeshed.btrfs.BtrfsWorldStore,
+        fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
     ) = borg.trikeshed.hermes.HermesVmConsole(
         root = java.nio.file.Paths.get(
             config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
@@ -2673,6 +2675,24 @@ object OroborosDaemon {
         modelMuxProvider = { muxReactor.modelMux() },
         muxContext = htxElement + muxReactor + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
+        world = world,
+        install = { guest ->
+            val workspace = repoDir.absolutePath
+            for (name in listOf("PRELOAD.md", "AGENTS.md")) {
+                val path = fileOps.resolvePath(workspace, name)
+                if (fileOps.isFile(path)) guest.put(path, fileOps.readAllBytes(path))
+            }
+            // A real snapshot of the reference workspace, inside this guest's
+            // own volume. The donor profile and its SQLite files stay outside it.
+            guest.eval("""
+                import os
+                os.environ['HERMES_HOME'] = '/hermes-graal'
+                os.environ['TERMINAL_CWD'] = ${jsonOf(workspace)}
+                os.makedirs('/hermes-graal', exist_ok=True)
+                os.chdir(${jsonOf(workspace)})
+                True
+            """.trimIndent(), "hermes-workspace.py")
+        },
     )
 
     /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */

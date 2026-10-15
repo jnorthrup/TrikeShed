@@ -8,7 +8,7 @@
 <style>
 :root{--bg:#090b10;--panel:#11151e;--line:#293142;--ink:#d8dce6;--dim:#7d879a;--amber:#f2a011;--green:#3ddc84;--red:#ff5964;--cyan:#3fd0ff}
 *{box-sizing:border-box} html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
-body{display:grid;grid-template-rows:auto 1fr;overflow:hidden}
+body{display:grid;grid-template-rows:auto auto minmax(0,1fr);overflow:hidden}
 header{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{color:var(--amber)} .badge{border:1px solid var(--line);border-radius:3px;padding:2px 6px;color:var(--dim)}
 button{font:inherit;color:var(--ink);background:#171d28;border:1px solid var(--line);border-radius:3px;padding:4px 8px;cursor:pointer} button:hover{border-color:var(--amber);color:var(--amber)}
@@ -30,6 +30,9 @@ main{min-height:0;display:grid;grid-template-columns:minmax(500px,1fr) 310px;gap
 .rail{overflow:auto;border-bottom:1px solid var(--line);padding:5px}.sig{padding:5px 7px;margin:3px 0;border-left:3px solid var(--dim);background:#161b25;font-size:10px;word-break:break-word}.sig.manual{border-color:var(--amber)}.sig.causal{border-color:var(--cyan)}.sig.failed{border-color:var(--red)}.sig .id{color:var(--dim)}.sig .cause{color:var(--cyan)}
 .ok{color:var(--green)}.bad{color:var(--red)}
 #hint{margin-left:auto;color:var(--dim);font-size:11px}
+#boot{padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel);max-height:35vh;overflow:auto}
+#bootState{font-weight:600}#bootElapsed{color:var(--dim)}#bootDetail,#bootFailure{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+#bootFailure{color:var(--red)}#bootTrace{margin-top:4px;color:var(--ink)}#bootTrace summary{cursor:pointer;color:var(--red)}#bootTraceback{margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
 @media(max-width:900px){main{grid-template-columns:1fr}#rails{display:none}}
 @media(prefers-reduced-motion:reduce){.blink,#screen.focused .cursor{animation:none}}
 
@@ -39,6 +42,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 </head>
 <body data-app-page="hermes">
 <header><b>HERMES · XTERM-256COLOR</b><span id="state" class="badge">closed</span><span id="geometry" class="badge">–</span><span id="revision" class="badge">rev 0</span><button id="open">boot GraalPy sleeve</button><span id="hint">click the screen and type · ↑ history · Ctrl-C cancel · Ctrl-L clear</span><a href="/graal" style="color:var(--dim);margin-left:12px">Graal console ↗</a></header>
+<section id="boot" aria-label="Python diagnostic console startup"><div><strong id="bootState" role="status" aria-live="polite">Python diagnostic console · closed</strong><span id="bootElapsed"></span></div><div id="bootDetail"></div><div id="bootFailure" role="status" aria-live="polite"></div><details id="bootTrace" hidden><summary>Failure traceback</summary><pre id="bootTraceback"></pre></details></section>
 <main>
   <section id="terminalPanel"><div id="screenWrap"><div id="screen" role="application" aria-label="Hermes xterm-256color terminal"></div><textarea id="kbd" aria-label="terminal input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></div></section>
   <aside id="rails"><h2>manual ↔ causal LCNC patch panel</h2><div id="manualRail" class="rail"></div><div id="causalRail" class="rail"></div></aside>

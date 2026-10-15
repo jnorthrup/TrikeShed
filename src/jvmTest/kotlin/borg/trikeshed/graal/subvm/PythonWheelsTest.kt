@@ -128,6 +128,23 @@ class PythonWheelsTest {
         }
     }
 
+    @Test fun richLoadsItsVersionedUnicodeTablesInTheGuest() {
+        val dependencies = assertNotNull(PythonWheels.installed())
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(mapOf("entry" to ("entry.py" to """
+                from importlib import import_module
+                from io import StringIO
+                from rich.console import Console
+                table = import_module('rich._unicode_data.unicode10-0-0')
+                assert table.__name__ == 'rich._unicode_data.unicode10-0-0'
+                output = StringIO()
+                Console(file=output, color_system=None).print('[bold]Hermes[/bold]')
+                assert output.getvalue() == 'Hermes\n'
+            """.trimIndent())), dependencies = dependencies)
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "entry"))
+        }
+    }
+
     @Test fun installedDotenvParsesAndLoadsOnlyTheGuestEnvironment() {
         val dependencies = assertNotNull(PythonWheels.installed(), "run ./gradlew -p utils/subvm installHermesPython")
         val before = System.getenv("TRIKESHED_DOTENV_TEST_VALUE")

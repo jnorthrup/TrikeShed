@@ -1657,6 +1657,11 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             if (!airgap) borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(Jev.BASE)
             suspend fun jevDisabled() = kotlinx.coroutines.withContext(jev) { Airgap.active() }
             fun disabled() = borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503, jsonOf(CurationFind.AIRGAP))
+            ctx.routes.claim("language", "/api/curation/airgap") { method, _, _, _ ->
+                if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                System.setProperty(Airgap.PROPERTY, "true")
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(CurationFind.AIRGAP))
+            }
             suspend fun jevKey(): String? = kotlinx.coroutines.withContext(jev) {
                 kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]?.keyMux()?.get("JEV_API_KEY")
                     ?.takeIf { it.isNotBlank() }

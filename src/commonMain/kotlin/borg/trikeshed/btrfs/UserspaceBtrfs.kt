@@ -87,19 +87,33 @@ class UserspaceBtrfs(
         return true
     }
 
-    fun writeFile(subvol: String, file: String, content: ByteArray): Boolean {
+    fun writeFile(subvol: String, file: String, content: ByteArray): Boolean =
+        writeFiles(subvol, s_[file j content])
+
+    /** Validate the whole batch before storing extents, then publish one root. Last duplicate path wins. */
+    fun writeFiles(subvol: String, files: Series<Join<String, ByteArray>>): Boolean {
         operational()
         val current = subvolumes[subvol] ?: return false
-        if (current.readOnly || !isValidPath(file) || current.entries[file]?.isDir == true) return false
+        if (current.readOnly) return false
+        val content = LinearHashMap<String, ByteArray>()
+        for ((file, bytes) in files.view) {
+            if (!isValidPath(file) || current.entries[file]?.isDir == true) return false
+            content[file] = bytes.copyOf()
+        }
+        if (content.count == 0) return true
         val entries = copyEntries(current.entries)
         val now = clock()
-        if (!ensureAncestors(entries, file, now)) return false
-        val bytes = content.copyOf()
-        entries[file] = Entry(putVerified(bytes) j bytes.size.toLong(),
-            current.entries[file]?.times?.written(now) ?: BtrfsFileTimes.at(now))
-        if (file !in current.entries) touchParent(entries, file, now)
-        publish(subvol, Subvolume(false, entries,
-            if (file.substringBefore('/') !in current.entries) current.times.written(now) else current.times))
+        var times = current.times
+        for ((file, bytes) in content.entries().view) {
+            if (entries[file]?.isDir == true || !ensureAncestors(entries, file, now)) return false
+            val previous = entries[file]
+            entries[file] = Entry(ContentId.of(bytes) j bytes.size.toLong(),
+                previous?.times?.written(now) ?: BtrfsFileTimes.at(now))
+            if (previous == null) touchParent(entries, file, now)
+            if (file.substringBefore('/') !in current.entries) times = current.times.written(now)
+        }
+        for ((_, bytes) in content.entries().view) putVerified(bytes)
+        publish(subvol, Subvolume(false, entries, times))
         return true
     }
 

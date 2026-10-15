@@ -6,6 +6,7 @@ object HermesContextVars {
     val source = """
         import _contextvars as _native
         from collections.abc import Mapping
+        from types import GenericAlias
 
         __all__ = ['Context', 'ContextVar', 'Token', 'copy_context']
         _MISSING = object()
@@ -53,7 +54,7 @@ object HermesContextVars {
                 if token._context is not _owner():
                     raise ValueError('Token was created in a different Context')
                 self._variable.reset(token._token)
-            def __class_getitem__(cls, item): return cls
+            def __class_getitem__(cls, item): return GenericAlias(cls, item)
             def __repr__(self): return '<ContextVar name=%r at 0x%x>' % (self._name, id(self))
 
         class Token:
@@ -76,6 +77,7 @@ object HermesContextVars {
                 return self.MISSING if value is _native.Token.MISSING else _value(value)
             def __enter__(self): return self
             def __exit__(self, *args): self.var.reset(self)
+            def __class_getitem__(cls, item): return GenericAlias(cls, item)
 
         class Context(Mapping):
             __slots__ = ('_context',)
