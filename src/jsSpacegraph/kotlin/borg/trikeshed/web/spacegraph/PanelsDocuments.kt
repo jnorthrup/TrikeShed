@@ -4,6 +4,31 @@ import borg.trikeshed.web.*
 import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
+/** Resolve a saved task at load time; execution still requires the ordinary explicit Run action. */
+suspend fun Panels.loadDocumentTask(taskId: String) {
+    require(taskId.isNotBlank()) { "A document task identity is required" }
+    val before = JSON.stringify(toConfix())
+    val response = fetchJs("/api/board?documentTask=" + encodeURIComponent(taskId))
+    val task = JSON.parse<dynamic>(PatchRead.text(response))
+    require(truthy(response.ok)) { str(task?.detail ?: task?.error ?: "Document task is unavailable") }
+    require(task.jobId == taskId && typeOf(task.revision) == "number" && typeOf(task.receiptCid) == "string") {
+        "Document task response identity is invalid"
+    }
+    val doc = task.document
+    require(doc != null && doc.controls?.humanOversight == true && isArray(doc.nodes) && isArray(doc.wires)) {
+        "Document correction must require human oversight"
+    }
+    require(arr(doc.nodes).all { contract(it.type) != null }) { "Refresh contracts before loading this construction" }
+    val correction = arr(doc.nodes).single { it.id == "correction" && it.type == "document.correct" }
+    require(correction.params.taskId == task.jobId && correction.params.expectedRevision == str(task.revision) &&
+        correction.params.priorReceiptCid == task.receiptCid) { "Correction does not match the current task snapshot" }
+    require(before == JSON.stringify(toConfix())) { "Canvas changed while reading the task; load it again to replace the current canvas" }
+    load(fromConfix(doc))
+    panelName().value = "document-correction"
+    status("Document task · revision " + str(task.revision) + " · " + str(task.column) +
+        " loaded without execution. Inspect source and evidence, then Run; later task changes are refused.")
+}
+
 /** Presentation of the existing document runners. Buttons load authored constructions, never execute them. */
 fun Panels.renderDocumentReview(n: dynamic, out: dynamic) {
     setResult(n, out)

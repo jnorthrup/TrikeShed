@@ -90,6 +90,7 @@ class LcncWorkspaceCurationTest {
             }
             val sheets = linkedMapOf<String, Any?>()
             val outputs = linkedMapOf<String, Any?>()
+            val reviewReceipts = mutableListOf<ContentId>()
             for ((name, doc) in LcncWorkspacePresets.documents()) {
                 if (name !in setOf(LcncWorkspacePresets.MEDICAL, LcncWorkspacePresets.LEGAL)) continue
                 val program = LcncProgramConfix.fromJson(name, doc)
@@ -97,6 +98,7 @@ class LcncWorkspaceCurationTest {
                 val output = result.nodeOutputs.getValue("curate")
                 val cid = ContentId(output["receiptCid"] as String)
                 val record = assertNotNull(curator.record(cid))
+                reviewReceipts.add(cid)
                 assertEquals("AVAILABLE", output["nlpStatus"])
                 assertTrue(assertNotNull(record.nlp).sentences.size >= 4)
                 assertEquals(record.source.originalCid, ContentId.of(record.source.text.encodeToByteArray()))
@@ -137,7 +139,11 @@ class LcncWorkspaceCurationTest {
                 assertEquals(calls, modelCalls, "Retained review never invokes the model")
                 assertEquals(framesBefore, frames.size, "Retained review never invokes the parser/curator")
 
-                val correction = LcncWorkspacePresets.correction(taskId, created["revision"].toString(), cid.value,
+                val inspected = assertNotNull(DocumentCurationTasks(cas).inspect(board, taskId))
+                assertEquals(sequence, board.lastSequence, "Opening a board task does not repeat review")
+                assertEquals(calls, modelCalls, "Opening a board task does not repeat curation")
+                assertEquals(record.instructions, inspected["instructions"])
+                val correction = LcncWorkspacePresets.correction(taskId, inspected["revision"].toString(), inspected["receiptCid"] as String,
                     mapOf("text" to record.source.text + "\n"))
                 val corrected = execute(correction)
                 val nextCid = ContentId(corrected.nodeOutputs.getValue("curate")["receiptCid"] as String)
@@ -175,6 +181,33 @@ class LcncWorkspaceCurationTest {
                 assertEquals(2, recovered.cards().size)
                 assertTrue(recovered.cards().all { it.col == BoardCol.DONE && it.spec.contains("DOCUMENT: sha256:") })
             } finally { recovered.drain(); recovered.close() }
+            // Optional browser fixture is a real recovered board and CAS, not intercepted HTTP.
+            System.getenv("LCNC_UI_REVIEW_HOME")?.let { destination ->
+                val root = java.io.File(destination)
+                require(!java.io.File(root, ".kanban").exists() && !java.io.File(root, "cas").exists()) {
+                    "Review fixture requires an unused state directory"
+                }
+                PackCasStore(borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(),
+                    java.io.File(root, "cas").absolutePath).use { retained ->
+                    for (cid in reviewReceipts) {
+                        val record = assertNotNull(curator.record(cid))
+                        for (content in s_[cid, record.source.originalCid, record.source.extractedTextCid].view)
+                            assertEquals(content, retained.put(assertNotNull(cas.get(content))))
+                    }
+                    val reviewBoard = BoardStoreElement(JvmBoardWal(java.io.File(root, ".kanban")), retained)
+                    reviewBoard.open()
+                    try {
+                        val tasks = DocumentCurationTasks(retained)
+                        for (cid in reviewReceipts) tasks.tasks(reviewBoard, cid)
+                        val card = reviewBoard.cards().first()
+                        val task = assertNotNull(tasks.inspect(reviewBoard, card.jobId))
+                        val prior = assertNotNull(curator.record(ContentId(task["receiptCid"] as String)))
+                        tasks.correct(reviewBoard, card.jobId, card.revision, ContentId(task["receiptCid"] as String),
+                            mapOf("text" to prior.source.text + "\nPending reviewed correction."))
+                    } finally { reviewBoard.drain(); reviewBoard.close() }
+                    retained.sync()
+                }
+            }
             // Optional browser probe consumes these actual projections, not a second UI vocabulary.
             System.getenv("LCNC_UI_FIXTURE")?.let { destination ->
                 val publisher = LcncPublisher(ctx.blackboard, { ctx.lcncRunners }, null)

@@ -35,6 +35,9 @@ class Panels : PatchSurface {
     var board: Board = Board(null)
     var diveStack: MutableList<Pair<String, dynamic>> = ArrayList()
     var autosave = true
+    var programRunning = false
+    var liveRuns = 0
+    var lastProgramRun: dynamic = null
 
     val history by lazy { PanelsHistory(this) }
     val facets by lazy { PanelsFacets(this) }

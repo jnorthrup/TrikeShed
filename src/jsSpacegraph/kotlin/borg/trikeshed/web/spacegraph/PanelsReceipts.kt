@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 
 /** Immutable run evidence through the existing content route. No load, replay, admission or execution. */
 fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
+    val latest = panels.lastProgramRun
     text("Recorded runs · immutable receipts. A matching program version does not mean its inputs or dependencies are still current.")
     val section = document.createElement("section").asDynamic()
     section.setAttribute("aria-label", "Durable run inspection"); body.appendChild(section)
@@ -71,8 +72,9 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
                 require(objectValue(run) && typeOf(run.runId) == "string" && typeOf(run.status) == "string" &&
                     typeOf(run.programCid) == "string") { "Content is not an LCNC run receipt" }
                 require(command.jobId == "lcnc/run/" + str(run.runId)) { "Receipt run identity mismatch" }
-                if (expected != null) require(run.runId == expected.runId && run.programCid == expected.programCid) {
-                    "Receipt does not match the selected run"
+                if (expected != null) require(cid == expected.receiptCid &&
+                    run.runId == expected.runId && run.programCid == expected.programCid) {
+                    "Receipt identity mismatch: receiptCid, runId or programCid differs from the selected run snapshot"
                 }
                 output.textContent = ""
                 text(str(run.program) + " · " + str(run.runId) + " · " + str(run.status), output)
@@ -80,7 +82,7 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
                     if (run.programCid == workspace.programCid) "\nSame program version as the inspected canvas."
                     else "\nDifferent program version from the inspected canvas; the canvas is unchanged.", output)
                 if (str(run.status) in arrayOf("validating", "running"))
-                    text("This receipt records a non-terminal state, not the run's current liveness. Refresh the run list for a newer receipt.", output)
+                    text("This receipt records a non-terminal state, not the run's current liveness. A newer state requires a newer receipt.", output)
                 text("Started: " + str(run.startedAtMs ?: "not recorded") + " · finished: " + str(run.finishedAtMs ?: "not recorded") + " (epoch ms)", output)
                 link("Immutable receipt JSON", url(cid), output)
                 link("Receipt as Confix sheets", url(cid) + "&view=sheet", output)
@@ -149,6 +151,12 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
         }
     }
     button("Inspect receipt", { inspect(str(selected.value).trim()) }, section)
+    if (latest?.receiptCid != null) {
+        text("Latest explicit program run in this page", section)
+        text(str(latest.status) + " · " + str(latest.runId), section)
+        text("An inline run label does not establish named-program membership. Refreshing or reopening this view re-inspects the retained response snapshot.", section)
+        button("Inspect latest explicit run", { inspect(str(latest.receiptCid), latest) }, section)
+    }
     for (run in arr(workspace.runs)) {
         text(str(run.status) + " · " + str(run.runId) +
             if (truthy(run.sameVersion)) " · this version" else " · different version", section)
@@ -157,4 +165,5 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
     }
     if (arr(workspace.runs).isEmpty()) text("No named run records for this program. A receipt content ID can still be inspected above.", section)
     section.appendChild(output)
+    if (latest?.receiptCid != null) inspect(str(latest.receiptCid), latest)
 }

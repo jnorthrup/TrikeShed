@@ -78,7 +78,8 @@ class PackCasStore(private val files: FileOperations, root: String) : CasStore()
     private fun append(kind: Byte, digest: ByteArray, payload: ByteArray): Unit = locked {
         val key = fold(digest)
         val prior = index.get(key, -1L)
-        if (prior >= 0 && readHeader(prior) && sameDigest(digest) && (kind == BLOB || header.get(0) == REF)) return@locked
+        // A BLOB owns immutable bytes; a REF may need a new path/stamp or promotion to a BLOB.
+        if (prior >= 0 && readHeader(prior) && sameDigest(digest) && header.get(0) == BLOB) return@locked
         val record = ByteBuffer.allocate(HEADER + payload.size)
         record.put(kind); record.putInt(payload.size); record.put(digest); record.put(payload)
         record.flip()

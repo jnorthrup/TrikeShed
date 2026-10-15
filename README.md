@@ -67,6 +67,40 @@ line beat a week of silence. The Gradle daemon task forwards its output to
 the terminal; the last thirty lines plus what you
 dragged, clicked, or expected is a perfect report.
 
+## Panels: language-authored Camel routes
+
+In `/panels`, open the language facet and choose **Author Camel route in …**.
+The construction loads for review; it does not execute until Run. Kotlin,
+Java, Clojure, JavaScript, Groovy, Ruby and Python use the existing typed
+language lane to return a Confix route definition. Wire that value to
+`vm.camel`'s `route` input; the message goes to its separate `messages` input.
+The older payload-transform construction remains available.
+
+This is data-defined Camel routing, **not native Camel DSL**. For example,
+the route parameter accepts:
+
+```json
+{"from":"direct:review","steps":[
+  {"setHeader":{"name":"ReviewParty","value":"reviewer"}},
+  {"choice":{"when":[{"bodyEquals":"missing","steps":[{"setBody":"request-evidence"}]}],
+             "otherwise":[{"setBody":"review-evidence"}]}},
+  {"to":"mock:review"}
+]}
+```
+
+The closed step set is `to`, `setBody`, `setHeader`, `choice` with literal
+`bodyEquals` branches, and `stop`. Unknown steps and dynamic endpoint
+indirection are refused. The module and reach gates inspect every branch
+before a context starts. Execution owns and closes one Camel context; its
+receipt retains the definition, reply and headers. OWN trust is required:
+host Camel effects are not a sandbox. The example labels a reviewer, not an
+approval or a clinical/legal decision.
+
+Typed guest values currently allow five nesting levels, so deeply nested
+choices must enter through the route node's Confix parameter. Available
+languages and their compiler/runtime limitations are reported in the facet;
+the Kotlin source lane runs on JVM and does not prove cross-target portability.
+
 ## Curator — mostly done
 
 The curator use case is mostly done. The hard work is in place: reading documents

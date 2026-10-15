@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.parse.reify
 
 object LcncClockKey : LcncServiceKey<() -> Long>("LcncClockKey")
@@ -17,8 +18,10 @@ object LcncClockKey : LcncServiceKey<() -> Long>("LcncClockKey")
  *    eval-free lane from map-shaped outputs (kanban.attention `cards`/
  *    `ordered`) to the `lines` port `read.construct`/`nal.mint` take, where
  *    the only alternative is the canvas-only `js` node.
- *  - display nodes (`dom.board`, `sheet.concentric`) echo their projection on
- *    a `rendered` port and emit NO gesture outputs, so gesture-shaping
+ *  - display nodes (`dom.board`, `sheet.concentric`) retain their primary
+ *    projection on `rendered`, plus supplied options under their input names;
+ *    `gauge` retains `x`. These are read-only render data, with NO gesture
+ *    outputs, so gesture-shaping
  *    downstream (`js` → `kanban.move`) skips silently per walker readiness.
  *  - `js` stays UNREGISTERED server-side on purpose: a gesture shaper with
  *    nothing to shape must stay loud if ever fed, not eval strings in-daemon.
@@ -100,8 +103,22 @@ object PureNodes {
         "slider" to LcncNodeRunner { node, _ ->
             mapOf("value" to ((node.params["value"] ?: "0").toDoubleOrNull() ?: 0.0))
         },
-        "dom.board" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["groups"]) },
-        "sheet.concentric" to LcncNodeRunner { _, inputs -> mapOf("rendered" to inputs["board"]) },
-        "gauge" to LcncNodeRunner { _, _ -> emptyMap() },
+        "dom.board" to LcncNodeRunner { _, inputs ->
+            buildMap {
+                put("rendered", inputs["groups"])
+                if ("columns" in inputs) put("columns", inputs["columns"])
+                else if ("columns?" in inputs) put("columns", inputs["columns?"])
+            }
+        },
+        "sheet.concentric" to LcncNodeRunner { _, inputs ->
+            buildMap {
+                put("rendered", inputs["board"])
+                for (port in s_["byStatus", "byPriority", "orchestration"].view) {
+                    if (port in inputs) put(port, inputs[port])
+                    else if ("$port?" in inputs) put(port, inputs["$port?"])
+                }
+            }
+        },
+        "gauge" to LcncNodeRunner { _, inputs -> mapOf("x" to inputs["x"]) },
     ) + ViewNodes.registry()
 }

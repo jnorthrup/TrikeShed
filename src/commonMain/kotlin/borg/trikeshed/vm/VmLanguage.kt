@@ -83,6 +83,7 @@ data class VmLanguageCapability(
         "sample" to sample,
         "params" to params,
         "camel" to if (available) "payload-transform" else "unavailable",
+        "camelAuthoring" to if (available) "confix-route-definition" else "unavailable",
         "trust" to if (language.facet == VmFacet.JVM) listOf("OWN") else listOf("OWN", "UNTRUSTED"),
         "wallLimit" to when (language) {
             VmLanguage.KOTLIN_COMMON, VmLanguage.JAVA, VmLanguage.CLOJURE -> "unsupported; compilation and host execution are not bounded"

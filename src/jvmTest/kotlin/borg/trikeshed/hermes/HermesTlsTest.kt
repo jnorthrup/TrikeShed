@@ -56,7 +56,7 @@ class HermesTlsTest {
         }
     }
 
-    private suspend fun HermesSocketElement.connected(port: Int): Int = socket(2).also {
+    private suspend fun PythonSocketElement.connected(port: Int): Int = socket(2).also {
         connect(it, sockaddrIpv4(byteArrayOf(127, 0, 0, 1), port), 2_000)
     }
 
@@ -76,7 +76,7 @@ class HermesTlsTest {
                     assertEquals(-1, socket.inputStream.read())
                 }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
                 val session = sockets.tls(id, "localhost", listener.localPort, 5_000, config(protocol), JvmTlsCodecBackend())
@@ -104,11 +104,11 @@ class HermesTlsTest {
                     runCatching { socket.startHandshake(); socket.inputStream.read() }
                 }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
                 assertFailsWith<SSLException> { sockets.tls(id, hostname, listener.localPort, 5_000, config(trust = trust), JvmTlsCodecBackend()) }
-                assertEquals(9, assertFailsWith<HermesSocketElement.SocketError> { sockets.name(id, true) }.errno)
+                assertEquals(9, assertFailsWith<PythonSocketElement.SocketError> { sockets.name(id, true) }.errno)
             } finally { sockets.drain() }
             peer.await()
         }
@@ -127,11 +127,11 @@ class HermesTlsTest {
                     assertEquals(-1, socket.inputStream.read())
                 }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
                 sockets.tls(id, "localhost", listener.localPort, 5_000, config(), JvmTlsCodecBackend())
-                assertEquals(110, assertFailsWith<HermesSocketElement.SocketError> { sockets.read(id, 1, 50) }.errno)
+                assertEquals(110, assertFailsWith<PythonSocketElement.SocketError> { sockets.read(id, 1, 50) }.errno)
                 respond.complete(Unit)
                 assertContentEquals(byteArrayOf(42), sockets.read(id, 1, 5_000))
             } finally { respond.complete(Unit); sockets.drain() }
@@ -146,13 +146,13 @@ class HermesTlsTest {
             val peer = async {
                 listener.accept().use { socket -> socket.soTimeout = 5_000; assertTrue(socket.inputStream.readAllBytes().isNotEmpty()) }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
-                assertEquals(110, assertFailsWith<HermesSocketElement.SocketError> {
+                assertEquals(110, assertFailsWith<PythonSocketElement.SocketError> {
                     sockets.tls(id, "localhost", listener.localPort, 100, config(), JvmTlsCodecBackend())
                 }.errno)
-                assertEquals(9, assertFailsWith<HermesSocketElement.SocketError> { sockets.name(id, true) }.errno)
+                assertEquals(9, assertFailsWith<PythonSocketElement.SocketError> { sockets.name(id, true) }.errno)
             } finally { sockets.drain() }
             peer.await()
         }
@@ -169,10 +169,10 @@ class HermesTlsTest {
                     assertEquals(-1, socket.inputStream.read())
                 }
             }
-            HermesSocketProvider(this, config()).use { provider ->
+            PythonSocketProvider(this, config()).use { provider ->
                 GraalBtrfsSupervisor("tls-fixture", VmFacet.GRAAL_PYTHON).use { guest ->
                     guest.delegate("socket") { args -> Teleported.Str(jsonOf(provider.call(args).b)) }
-                    guest.eval(HermesSocketProvider.source, "host-owned-socket.py")
+                    guest.eval(PythonSocketProvider.source, "host-owned-socket.py")
                     assertEquals(Teleported.Bool(true), guest.eval("""
                         connection = create_connection(('localhost', ${listener.localPort}), timeout=5)
                         session = connection._start_tls('localhost')
@@ -291,7 +291,7 @@ class HermesTlsTest {
     }
 
     @Test fun disablingHostnameVerificationIsRejectedBeforeTlsAdmission() = runBlocking(Dispatchers.IO) {
-        val sockets = HermesSocketElement(this)
+        val sockets = PythonSocketElement(this)
         try {
             val id = sockets.socket(2)
             assertFailsWith<IllegalArgumentException> {
@@ -309,7 +309,7 @@ class HermesTlsTest {
                     socket.outputStream.write(42)
                 }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
                 sockets.tls(id, "localhost", listener.localPort, 5_000, config(), JvmTlsCodecBackend())
@@ -337,13 +337,13 @@ class HermesTlsTest {
                     } finally { runCatching { tls.close() } }
                 }
             }
-            val sockets = HermesSocketElement(this)
+            val sockets = PythonSocketElement(this)
             try {
                 val id = sockets.connected(listener.localPort)
                 sockets.tls(id, "localhost", listener.localPort, 5_000, config(), JvmTlsCodecBackend())
                 assertContentEquals(byteArrayOf(42), sockets.read(id, 1, 5_000))
-                assertEquals(71, assertFailsWith<HermesSocketElement.SocketError> { sockets.read(id, 1, 5_000) }.errno)
-                assertEquals(9, assertFailsWith<HermesSocketElement.SocketError> { sockets.name(id, true) }.errno)
+                assertEquals(71, assertFailsWith<PythonSocketElement.SocketError> { sockets.read(id, 1, 5_000) }.errno)
+                assertEquals(9, assertFailsWith<PythonSocketElement.SocketError> { sockets.name(id, true) }.errno)
             } finally { sockets.drain() }
             peer.await()
         }

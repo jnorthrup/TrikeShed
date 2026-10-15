@@ -335,6 +335,32 @@ object SubVmLegos {
     // ── camel: route DSL over the lego's params ─────────────────────────
 
     fun camel(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
+        val routeParam = (node.params["in:route"] ?: node.params["route"])?.takeIf(String::isNotBlank)
+        if (routeParam != null || "route" in inputs || "route?" in inputs) {
+            val authored = if ("route" in inputs || "route?" in inputs)
+                VmRuntimeNodes.value(node, inputs, "route") else reifyStrict(requireNotNull(routeParam))
+            require(VmRuntimeNodes.trust(node, inputs) == VmTrust.OWN) {
+                "Camel executes host effects; a route requires OWN trust, not a sandbox claim"
+            }
+            require(VmRuntimeNodes.value(node, inputs, "keep") in listOf(null, "", "false", false) &&
+                VmRuntimeNodes.value(node, inputs, "world") in listOf(null, "") &&
+                VmRuntimeNodes.value(node, inputs, "vmId") in listOf(null, "")) {
+                "An authored Camel route owns one context; keep, world and vmId are not supported"
+            }
+            val plan = CamelRoutePlan.parse(authored)
+            val module = node.params["module"]?.takeIf(String::isNotBlank) ?: CamelLinkage.SPINE
+            val reach = CamelLinkage.Reach.valueOf(node.params["reach"]?.uppercase() ?: "LOCAL")
+            val hasMessages = "messages" in inputs || "messages?" in inputs
+            val body = if (hasMessages) jsonOf(vmLanguageValue(VmRuntimeNodes.value(node, inputs, "messages")).languageValue())
+                else node.params["body"]?.takeIf(String::isNotEmpty)
+            currentCoroutineContext().ensureActive()
+            val receipt = borg.trikeshed.graal.subvm.CamelRuntime.execute(
+                "lcnc:${UUID.randomUUID()}", plan,
+                body?.let { borg.trikeshed.graal.subvm.CamelRuntime.Request(it) }, module, reach)
+            currentCoroutineContext().ensureActive()
+            return@boundLcnc mapOf("routed" to (receipt["reply"] ?: ""), "ok" to true,
+                "error" to "", "receipt" to receipt, "text" to jsonOf(receipt))
+        }
         val facet = facetOf(node, default = "JVM")
         val from = node.params["from"] ?: "direct:lcnc"
         val to = node.params["to"] ?: "log:lcnc"
@@ -418,7 +444,7 @@ object SubVmLegos {
         val receipt = requireNotNull(reifyStrict(result.getValue("text") as String) as? Map<*, *>) {
             "Camel did not return a route receipt"
         }
-        result + mapOf("routed" to (receipt["reply"] ?: ""), "ok" to true, "error" to "")
+        result + mapOf("routed" to (receipt["reply"] ?: ""), "ok" to true, "error" to "", "receipt" to receipt)
     }
 
     // ── graalce: any Graal language, source spelled inline ──────────────

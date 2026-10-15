@@ -1,5 +1,6 @@
 package borg.trikeshed.hermes
 
+import borg.trikeshed.graal.subvm.PythonSocketProvider
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.vm.Teleported
@@ -16,7 +17,7 @@ class HermesAirgapTest {
         val operations = object : ChannelOperations by JvmChannelOperations() {
             override fun resolve(host: String): ByteArray? { resolutions++; error("DNS reached") }
         }
-        HermesSocketProvider(CoroutineScope(coroutineContext + Airgap() + operations)).use { provider ->
+        PythonSocketProvider(CoroutineScope(coroutineContext + Airgap() + operations)).use { provider ->
             for (operation in listOf("open", "resolve", "connect", "tls", "read", "write")) {
                 val reply = provider.call(listOf(Teleported.Str(operation), Teleported.Str("localhost")))
                 assertFalse(reply.a)
@@ -32,7 +33,7 @@ class HermesAirgapTest {
         val previous = System.setProperty(Airgap.PROPERTY, "false")
         try {
             org.junit.jupiter.api.Assumptions.assumeFalse(Airgap.configured())
-            HermesSocketProvider(CoroutineScope(coroutineContext + Airgap(false))).use { provider ->
+            PythonSocketProvider(CoroutineScope(coroutineContext + Airgap(false))).use { provider ->
                 val opened = provider.call(listOf(Teleported.Str("open"), Teleported.Num(2)))
                 assertTrue(opened.a)
                 val id = Teleported.Num((opened.b["value"] as Number).toLong())

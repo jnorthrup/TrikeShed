@@ -31,6 +31,12 @@ data class CursorFacetQuery(
 object WorkspaceFacets {
     const val MAX_BYTES = 1_048_576
     const val MAX_ROWS = 128
+    const val MAX_TOKENS = 65_536
+    const val MAX_VALUE_BYTES = 16_384
+
+    fun valueBudget(): ValueBudget = ValueBudget(
+        maxNodes = MAX_TOKENS, maxChars = MAX_BYTES, maxDepth = 64, maxMillis = 250,
+    )
 
     fun catalog(): Series<Map<String, String>> = WorkspaceFacet.entries.toSeries() α {
         mapOf("id" to it.id, "title" to it.title, "description" to it.description)
@@ -40,7 +46,6 @@ object WorkspaceFacets {
                 cursor: CursorFacetQuery = CursorFacetQuery()): Map<String, Any?> {
         val bytes = source.encodeToByteArray()
         require(bytes.size <= MAX_BYTES) { "Workspace document exceeds $MAX_BYTES bytes" }
-        ValueBudget().violation(reify(source))?.let { throw IllegalArgumentException(it) }
         return inspect(confixDoc(bytes, Syntax.JSON), Syntax.JSON, path, offset, limit, cursor)
     }
 
@@ -55,6 +60,7 @@ object WorkspaceFacets {
         require(cursor.sourceCid == null || cursor.sourceCid == cid) { "Cursor source changed; refresh its indexes" }
         val index = doc.index
         val spans = index.facet(ConfixIndexK.Spans)
+        require(spans.size <= MAX_TOKENS) { "work_limit" }
         val tags = index.facet(ConfixIndexK.Tags)
         val depths = index.facet(ConfixIndexK.Depths)
         val children = index.facet(ConfixIndexK.DirectChildren)
@@ -69,6 +75,8 @@ object WorkspaceFacets {
         }
         val steps = path.view.toList().toTypedArray()
         val selected = doc.docAt(*steps)
+        val valueBytes = selected?.let { it.row.close - it.row.open + 1 } ?: 0
+        val valueOmitted = valueBytes > MAX_VALUE_BYTES
         return mapOf(
             "cid" to cid, "bytes" to bytes.size, "syntax" to syntax.name,
             "tokens" to spans.size, "roots" to doc.roots.size,
@@ -76,8 +84,9 @@ object WorkspaceFacets {
             "keys" to listOf("Spans", "Tags", "Depths", "DirectChildren", "TreeCursor", "KeyToChild", "StructuralNodes"),
             "offset" to offset, "rows" to rows.view.toList(), "next" to if (end < spans.size) end else null,
             "path" to path.view.toList(), "found" to (selected != null),
-            // Materialize only the selected value at the JSON response boundary.
-            "value" to selected?.let {
+            "valueOmitted" to valueOmitted, "valueBytes" to valueBytes, "valueLimit" to MAX_VALUE_BYTES,
+            // Bound the selected source span before materializing its value at the response boundary.
+            "value" to selected?.takeUnless { valueOmitted }?.let {
                 if (syntax == Syntax.JSON) reify(bytes.copyOfRange(it.row.open, it.row.close + 1).decodeToString())
                 else jsonValue(CanonicalCbor.item(it).toAny())
             },

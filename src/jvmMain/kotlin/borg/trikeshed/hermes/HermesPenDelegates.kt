@@ -7,6 +7,7 @@ import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
+import borg.trikeshed.graal.subvm.PythonSocketProvider
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.memory.GoalCoord
@@ -82,7 +83,7 @@ class HermesPen(
     private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
 
-    fun install(guest: GraalBtrfsSupervisor, sockets: HermesSocketProvider? = null) {
+    fun install(guest: GraalBtrfsSupervisor, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
         guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
         guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { muxCompletion(args, cause) } } }

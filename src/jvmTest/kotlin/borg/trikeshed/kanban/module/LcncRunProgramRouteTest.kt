@@ -9,11 +9,8 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.lcnc.LcncContracts
-import borg.trikeshed.lcnc.LcncNode
-import borg.trikeshed.lcnc.LcncNodeRunner
-import borg.trikeshed.lcnc.LcncProgram
-import borg.trikeshed.lcnc.LcncWire
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
@@ -50,29 +47,42 @@ class LcncRunProgramRouteTest {
         val cas = CasStore.inMemory()
         val ctx = newContext(routes, tempDir("invocations"), cas)
         val server = JvmKanbanServer(moduleRoutes = routes)
-        ctx.lcncRunners["test.fail"] = LcncNodeRunner { _, _ -> error("deliberate node failure") }
+        var attempts = 0
+        ctx.lcncRunners["test.fail"] = LcncNodeRunner { _, _ ->
+            attempts++
+            error("deliberate node failure")
+        }
         val supervisor = ModuleSupervisor(ctx)
         supervisor.attach(KanbanModule())
         try {
-            val response = post(server, "/api/lcnc/run", """{"document":{"nodes":[
+            val response = post(server, "/api/lcnc/run", """{"name":"failed-inline","document":{"nodes":[
                 {"id":"input","type":"scope.in","params":{"name":"text"}},
-                {"id":"failure","type":"test.fail"}],
+                {"id":"failure","type":"test.fail"},
+                {"id":"unreached","type":"test.fail"}],
                 "wires":[{"from":["input","value"],"to":["failure","x"]}]},"inputs":{"text":"retained"}}""")
             assertEquals(400, response.status, response.body)
             val run = json(response)
-            val content = server.routeHttp("GET /api/lcnc/content?cid=${run["invocationsCid"]} HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
-            assertEquals(200, content.status, content.body)
-            assertEquals(run["invocationsCid"], borg.trikeshed.job.ContentId.of(content.body.encodeToByteArray()).value)
-            val evidence = json(content)
+            assertEquals(1, attempts)
+            val evidence = content(server, run["invocationsCid"])
             assertEquals(run["runId"], evidence["runId"])
             assertEquals(run["programCid"], evidence["programCid"])
             val calls = (evidence["entries"] as List<*>).map { it as Map<*, *> }
             assertEquals(listOf("completed", "failed"), calls.map { it["status"] })
             assertEquals(mapOf("x" to "retained"), calls.last()["inputs"])
             assertEquals("deliberate node failure", calls.last()["reason"])
-            val saved = reify(cas.get(borg.trikeshed.job.ContentId(run["receiptCid"].toString()))!!.decodeToString()) as Map<*, *>
-            assertEquals(run["invocationsCid"], (saved["lcncRun"] as Map<*, *>)["invocationsCid"])
+            val command = content(server, run["receiptCid"])
+            assertEquals("lcnc/run/${run["runId"]}", command["jobId"])
+            val saved = command["lcncRun"] as Map<*, *>
+            assertEquals(run["runId"], saved["runId"])
+            assertEquals(run["programCid"], saved["programCid"])
+            assertEquals(run["invocationsCid"], saved["invocationsCid"])
+            assertEquals("failed-inline", saved["program"])
+            assertEquals(null, saved["programKey"])
+            assertEquals(false, saved["ok"])
+            assertEquals("failed", saved["status"])
+            assertEquals("deliberate node failure", saved["error"])
             assertEquals("failed", run["status"])
+            assertEquals(1, attempts, "Inspecting failure evidence must not retry the effect or run the next statement")
         } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
     }
 
@@ -172,6 +182,13 @@ class LcncRunProgramRouteTest {
             "POST $path HTTP/1.1\r\nHost: t\r\nContent-Type: application/json\r\n\r\n$body"
                 .toByteArray(StandardCharsets.UTF_8),
         )
+
+    private suspend fun content(server: JvmKanbanServer, cid: Any?): Map<String, Any?> {
+        val response = server.routeHttp("GET /api/lcnc/content?cid=$cid HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
+        assertEquals(200, response.status, response.body)
+        assertEquals(cid, ContentId.of(response.body.encodeToByteArray()).value)
+        return json(response)
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun json(resp: JvmKanbanServer.HttpResponse): Map<String, Any?> =
@@ -301,6 +318,124 @@ class LcncRunProgramRouteTest {
         val garbage = post(server, "/api/lcnc/run", """{"document":"not a program"}""")
         assertEquals(400, garbage.status, "a malformed document is a loud 400: ${garbage.body}")
         supervisor.detach("kanban")
+    }
+
+    @Test fun inlineDocumentExecutesEffectOnceAndRetainsItsUnsavedVersion() = runBlocking {
+        val name = "edited-panel"
+        val document = """{"nodes":[
+            {"id":"input","type":"scope.in","params":{"name":"text","default":"default"}},
+            {"id":"effect","type":"test.effect","params":{"prefix":"unsaved"}},
+            {"id":"first","type":"scope.out","params":{"name":"first"}},
+            {"id":"second","type":"scope.out","params":{"name":"second"}}],
+            "wires":[{"from":["input","value"],"to":["effect","x"]},
+                {"from":["effect","value"],"to":["first","value"]},
+                {"from":["effect","value"],"to":["second","value"]}],
+            "controls":{"humanOversight":true}}"""
+        val stored = LcncProgramConfix.fromJson(name, document.replace("\"unsaved\"", "\"stored\""))
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("inline-receipt"), CasStore.inMemory(), mapOf(name to stored))
+        var effects = 0
+        ctx.lcncRunners["test.effect"] = LcncNodeRunner { node, inputs ->
+            effects++
+            mapOf("value" to "${node.params.getValue("prefix")}:${inputs.getValue("x")}")
+        }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        try {
+            val programKey = LcncBlackboard.programKey(name)
+            val published = ctx.blackboard.get(programKey)
+            val response = post(server, "/api/lcnc/run",
+                """{"name":"$name","document":$document,"inputs":{"text":"invoked"}}""")
+            assertEquals(200, response.status, response.body)
+            val run = json(response)
+            assertEquals(true, run["ok"])
+            assertEquals("completed", run["status"])
+            assertEquals(name, run["program"])
+            assertEquals(null, run["programKey"])
+            assertEquals(mapOf("text" to "invoked"), run["inputs"])
+            assertEquals(mapOf("first" to "unsaved:invoked", "second" to "unsaved:invoked"), run["returns"])
+            assertEquals(1, effects, "Two consumers must share the one authored effect invocation")
+            assertEquals(1, ctx.blackboard.snapshot().values.keys.count { it.startsWith("lcnc/run/") })
+
+            val frozen = content(server, run["programCid"])
+            assertEquals(reify(LcncProgramConfix.toJson(LcncProgramConfix.fromJson(name, document))), frozen)
+            assertFalse(run["programCid"] == LcncBlackboard.cidOf(stored))
+            assertEquals(published, ctx.blackboard.get(programKey), "Running edits must not publish over the stored program")
+
+            val command = content(server, run["receiptCid"])
+            assertEquals("lcnc/run/${run["runId"]}", command["jobId"])
+            val receipt = command["lcncRun"] as Map<*, *>
+            for (key in listOf("runId", "program", "programKey", "programCid", "inputs", "status", "outputs", "returns", "invocationsCid"))
+                assertEquals(run[key], receipt[key], key)
+            assertTrue("receiptCid" !in receipt && "timelineRevision" !in receipt && "sequence" !in receipt)
+            val evidence = content(server, receipt["invocationsCid"])
+            assertEquals(run["runId"], evidence["runId"])
+            assertEquals(run["programCid"], evidence["programCid"])
+            val calls = (evidence["entries"] as List<*>).map { it as Map<*, *> }
+            assertEquals(listOf("input", "effect", "first", "second"), calls.map { it["nodeId"] })
+            assertTrue(calls.all { it["status"] == "completed" })
+            assertEquals(mapOf("x" to "invoked"), calls.single { it["nodeId"] == "effect" }["inputs"])
+            assertEquals(command, content(server, run["receiptCid"]))
+            assertEquals(1, effects, "Reading immutable program, receipt and invocation evidence must not execute")
+        } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
+
+    @Test fun inspectionOnlyInlineDocumentRecordsFailureWithoutInvokingEffects() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("inspection-only"), CasStore.inMemory())
+        var effects = 0
+        ctx.lcncRunners["test.effect"] = LcncNodeRunner { _, _ -> effects++; emptyMap() }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        try {
+            val response = post(server, "/api/lcnc/run", """{"name":"inspection","document":{
+                "nodes":[{"id":"effect","type":"test.effect"}],"wires":[],
+                "controls":{"humanOversight":true,"inspectionOnly":true}},"inputs":{}}""")
+            assertEquals(400, response.status, response.body)
+            val run = json(response)
+            assertEquals(false, run["ok"])
+            assertEquals("failed", run["status"])
+            assertEquals("execution", run["phase"])
+            assertTrue(run["error"].toString().contains("Inspection-only"))
+            val receipt = content(server, run["receiptCid"])["lcncRun"] as Map<*, *>
+            assertEquals(run["runId"], receipt["runId"])
+            assertEquals("failed", receipt["status"])
+            assertEquals(null, receipt["programKey"])
+            val evidence = content(server, receipt["invocationsCid"])
+            assertTrue((evidence["entries"] as List<*>).isEmpty())
+            assertEquals(0, (evidence["attempted"] as Number).toInt())
+            assertEquals(0, effects)
+        } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
+    }
+
+    @Test fun inlineDocumentRejectsUseBeforeDefinitionWithoutReorderingEffects() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("authored-order"), CasStore.inMemory())
+        var effects = 0
+        ctx.lcncRunners["test.effect"] = LcncNodeRunner { _, _ -> effects++; emptyMap() }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        try {
+            val response = post(server, "/api/lcnc/run", """{"name":"authored-order","document":{
+                "nodes":[{"id":"effect","type":"test.effect"},
+                    {"id":"input","type":"scope.in","params":{"name":"text"}}],
+                "wires":[{"from":["input","value"],"to":["effect","x"]}]},"inputs":{"text":"supplied"}}""")
+            assertEquals(400, response.status, response.body)
+            val run = json(response)
+            assertEquals("failed", run["status"])
+            assertEquals("execution", run["phase"])
+            assertTrue(run["error"].toString().contains("use before def: effect consumes input"))
+            val receipt = content(server, run["receiptCid"])["lcncRun"] as Map<*, *>
+            assertEquals(run["error"], receipt["error"])
+            val evidence = content(server, receipt["invocationsCid"])
+            val call = (evidence["entries"] as List<*>).single() as Map<*, *>
+            assertEquals("effect", call["nodeId"])
+            assertEquals("failed", call["status"])
+            assertEquals(0, effects, "A later input must not cause the service to reorder or invoke the effect")
+        } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
     }
 
     @Test

@@ -1,7 +1,11 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.couch.*
+import borg.trikeshed.job.*
 import borg.trikeshed.kanban.module.WorkspaceService
+import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
+import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.vm.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -23,7 +27,12 @@ class WorkspaceServiceTest {
         val program = LcncProgramConfix.fromJson(name, jsonOf(construction["document"]))
         assertEquals("preset-polyglot-camel-java", name)
         assertTrue(LcncTypeCheck.check(program).isEmpty())
+        val route = assertIs<Map<*, *>>(service.language(available)["routeConstruction"])
+        assertEquals("preset-camel-authoring-java", route["name"])
+        assertTrue(LcncTypeCheck.check(LcncProgramConfix.fromJson(route["name"] as String,
+            jsonOf(route["document"]))).isEmpty())
         assertNull(service.language(available.copy(available = false))["construction"])
+        assertNull(service.language(available.copy(available = false))["routeConstruction"])
         assertEquals(revision, ctx.blackboard.snapshot().revision)
         assertEquals(0, executions)
     }
@@ -75,5 +84,127 @@ class WorkspaceServiceTest {
         assertEquals(revision, ctx.blackboard.snapshot().revision)
         assertEquals(400, service.route("POST", jsonOf(mapOf("document" to mapOf(
             "nodes" to listOf(mapOf("type" to "text.value")), "wires" to emptyList<Any>())))).status)
+    }
+
+    suspend fun post(service: WorkspaceService, body: String, status: Int = 200): Map<*, *> {
+        val response = service.route("POST", body)
+        assertEquals(status, response.status, response.body)
+        val result = assertIs<Map<*, *>>(reifyStrict(response.body))
+        if (status == 400) {
+            assertTrue(assertIs<String>(result["error"]).isNotBlank())
+            assertFalse("confix" in result)
+        }
+        return result
+    }
+
+    @Test fun shakeDemoPostPagesAndSelectsParamsWithoutExecutionOrWrites() = runTest {
+        var writes = 0
+        val cas = object : CasStore() {
+            override fun put(bytes: ByteArray): ContentId { writes++; return super.put(bytes) }
+        }
+        val store = CouchStoreFactory.casBacked(cas)
+        val base = vmRuntimeTestContext(this)
+        val ctx = ModuleContext(
+            couch = Couch("workspace-inspection", store, cas), rete = base.rete, productions = base.productions,
+            beliefBag = null, turnReview = null, blackboard = base.blackboard, casStore = cas,
+            attachments = CouchAttachmentGateway(store, cas), routes = base.routes, scope = this,
+            clock = base.clock, stateDir = base.stateDir,
+        )
+        var executions = 0
+        for (contract in LcncContracts.all())
+            ctx.lcncRunners[contract.type] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        val service = WorkspaceService(ctx)
+        val program = LcncShakeDemo.build().program
+        val document = assertIs<Map<*, *>>(reifyStrict(LcncProgramConfix.toJson(program)))
+        val request = mapOf("name" to program.name, "document" to document, "limit" to 7)
+        val board = ctx.blackboard.snapshot()
+        val sequence = store.changes.lastCommittedSequence
+        val initialWrites = writes
+
+        val response = post(service, jsonOf(request))
+        assertEquals(program.name, response["name"])
+        val root = assertIs<Map<*, *>>(response["confix"])
+        assertEquals(true, root["found"])
+        assertEquals(true, root["valueOmitted"])
+        assertNull(root["value"])
+        assertEquals(WorkspaceFacets.MAX_VALUE_BYTES, assertIs<Number>(root["valueLimit"]).toInt())
+        assertTrue(assertIs<Number>(root["valueBytes"]).toInt() > WorkspaceFacets.MAX_VALUE_BYTES)
+        val rows = assertIs<List<*>>(root["rows"])
+        assertEquals(7, rows.size)
+        assertTrue(assertIs<Number>(root["tokens"]).toInt() > rows.size)
+        val next = assertIs<Number>(root["next"]).toInt()
+        assertEquals(rows.size, next)
+        val cursor = mapOf("sourceCid" to assertIs<String>(root["cid"]))
+        val page = assertIs<Map<*, *>>(post(service, jsonOf(request + mapOf("offset" to next, "cursor" to cursor)))["confix"])
+        assertEquals(root["cid"], page["cid"])
+        assertEquals(next, assertIs<Number>(page["offset"]).toInt())
+        val pageRows = assertIs<List<*>>(page["rows"])
+        assertEquals(rows.size, pageRows.size)
+        pageRows.forEachIndexed { i, row ->
+            assertEquals(next + i, assertIs<Number>(assertIs<Map<*, *>>(row)["token"]).toInt())
+        }
+
+        val selected = assertIs<Map<*, *>>(post(service, jsonOf(request + mapOf(
+            "path" to listOf("nodes", 0, "params"), "cursor" to cursor)))["confix"])
+        val params = assertIs<Map<*, *>>(assertIs<List<*>>(document["nodes"]).first())["params"]
+        assertEquals(root["cid"], selected["cid"])
+        assertEquals(true, selected["found"])
+        assertEquals(false, selected["valueOmitted"])
+        assertEquals(params, selected["value"])
+        assertTrue(assertIs<Number>(selected["valueBytes"]).toInt() in 1..WorkspaceFacets.MAX_VALUE_BYTES)
+        assertEquals(0, executions)
+        assertEquals(board, ctx.blackboard.snapshot())
+        assertEquals(board.revision, assertIs<Number>(response["blackboardRevision"]).toLong())
+        assertEquals(sequence, store.changes.lastCommittedSequence)
+        assertEquals(initialWrites, writes)
+    }
+
+    @Test fun requestLimitCountsUtf8Bytes() = runTest {
+        val service = WorkspaceService(vmRuntimeTestContext(this))
+        val body = jsonOf(mapOf("document" to mapOf("nodes" to emptyList<Any>(), "wires" to emptyList<Any>()),
+            "padding" to "雪".repeat(WorkspaceFacets.MAX_BYTES / 3 + 1)))
+        assertTrue(body.length < WorkspaceFacets.MAX_BYTES)
+        assertTrue(body.encodeToByteArray().size > WorkspaceFacets.MAX_BYTES)
+        assertTrue(assertIs<String>(post(service, body, 400)["error"]).contains("byte"))
+    }
+
+    @Test fun traversalLimitRejectsValuesBeyondTheWorkspaceBudget() = runTest {
+        val service = WorkspaceService(vmRuntimeTestContext(this))
+        val body = jsonOf(mapOf("document" to mapOf("nodes" to emptyList<Any>(), "wires" to emptyList<Any>(),
+            "values" to List(WorkspaceFacets.MAX_TOKENS + 1) { "" }), "limit" to 1))
+        assertTrue(body.encodeToByteArray().size < WorkspaceFacets.MAX_BYTES)
+        assertEquals("work_limit", post(service, body, 400)["error"])
+    }
+
+    @Test fun excessiveDepthAndMalformedNestedJsonRemainErrors() = runTest {
+        val service = WorkspaceService(vmRuntimeTestContext(this))
+        val prefix = """{"document":{"nodes":[],"wires":[],"value":"""
+        val depth = WorkspaceFacets.valueBudget().maxDepth + 1
+        val deep = prefix + "[".repeat(depth) + "0" + "]".repeat(depth) + "}}"
+        assertEquals("depth_limit", post(service, deep, 400)["error"])
+        post(service, prefix + "[".repeat(8) + "0" + "]".repeat(7) + "}}", 400)
+        val parserDepth = prefix + "[".repeat(257) + "0" + "]".repeat(257) + "}}"
+        assertTrue(assertIs<String>(post(service, parserDepth, 400)["error"]).contains("nesting"))
+    }
+
+    @Test fun requestWrappersPathsWindowsAndCursorCidsRemainValidated() = runTest {
+        val service = WorkspaceService(vmRuntimeTestContext(this))
+        val request = mapOf("document" to mapOf("nodes" to listOf(mapOf("id" to "n", "type" to "text.value",
+            "params" to mapOf("value" to "fresh"))), "wires" to emptyList<Any>()))
+        post(service, jsonOf(request))
+        post(service, "[]", 400)
+        for (invalid in listOf(
+            mapOf("document" to "{}"), mapOf("document" to mapOf("nodes" to emptyList<Any>())),
+            mapOf("document" to mapOf("nodes" to "[]", "wires" to emptyList<Any>())),
+            mapOf("path" to "nodes"), mapOf("path" to listOf(-1)), mapOf("path" to listOf(0.5)),
+            mapOf("path" to listOf(true)), mapOf("path" to List(33) { "nodes" }),
+            mapOf("offset" to -1), mapOf("offset" to 0.5),
+            mapOf("limit" to 0), mapOf("limit" to WorkspaceFacets.MAX_ROWS + 1),
+            mapOf("cursor" to "{}"), mapOf("cursor" to mapOf("sourceCid" to "stale")),
+            mapOf("cursor" to mapOf("sourceCid" to 1)), mapOf("cursor" to mapOf("path" to listOf(0.5))),
+            mapOf("cursor" to mapOf("offset" to -1)), mapOf("cursor" to mapOf("groupOffset" to -1)),
+            mapOf("cursor" to mapOf("axes" to listOf(listOf(3)))),
+            mapOf("cursor" to mapOf("selections" to listOf(listOf(0)))),
+        )) post(service, jsonOf(request + invalid), 400)
     }
 }

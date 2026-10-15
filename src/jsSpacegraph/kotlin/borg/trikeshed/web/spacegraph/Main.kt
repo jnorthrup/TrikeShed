@@ -29,7 +29,7 @@ private fun boot() {
     try {
         val es = jsNew(js("EventSource"), "/blackboard/facts")
         es.onmessage = { e: dynamic ->
-            try { val d = JSON.parse<dynamic>(str(e.data)); if (truthy(d) && d.key == "lcnc/vocabulary") launchJs { p.syncContracts(); p.buildPalette() } } catch (x: dynamic) {}
+            try { val d = JSON.parse<dynamic>(str(e.data)); if (truthy(d) && d.key == "lcnc/vocabulary") launchJs { p.syncContracts(announce = false); p.buildPalette() } } catch (x: dynamic) {}
         }
     } catch (x: dynamic) {}
     launchJs { start(p) }
@@ -37,11 +37,26 @@ private fun boot() {
 
 /** boot: restore, or seed the starter panel. Boot waits for contract hydration. */
 private suspend fun start(p: Panels) {
+    val search = URLSearchParams(window.location.search)
+    val documentTask = search.get("documentTask")
+    if (documentTask != null) {
+        // Keep task links inert even while the vocabulary and saved task are still loading.
+        p.autosave = false
+        p.graph.controls = objOf { it.humanOversight = true; it.inspectionOnly = true }
+        byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true
+    }
     p.syncContracts(); p.syncLanes()
     launchJs { p.buildPalette() }
     if (!truthy(document.body!!.classList.contains("sg-spatial"))) byId("palette").classList.add("open")
-    val search = URLSearchParams(window.location.search)
     if (search.get("dlg") == "keys") launchJs { p.openKeyMuxDlg() }
+    if (documentTask != null) {
+        // A failed task link must never fall through to a live default or restored local canvas.
+        try { p.loadDocumentTask(documentTask); p.fit() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (e: dynamic) { p.status("Document task not loaded: " + failureText(e)) }
+        p.applyView(); window.requestAnimationFrame { p.redraw() }
+        return
+    }
     // /panels?load=<name> IS a link to a document: presets first, then the store. Link views are ephemeral.
     val qload = search.get("load")
     if (!qload.isNullOrEmpty()) {
@@ -161,7 +176,15 @@ private fun wire(p: Panels) {
     on(byId("fitBtn"), "click", { p.fit() })
     on(byId("shakeBtn"), "click", { e -> launchJs { p.shake.request(p.shakeOwner, objOf { it.optional = truthy(e.shiftKey) }) } })
     on(byId("fdBtn"), "click", { launchJs { p.layout.settle(p.layoutOwner) } })
-    on(byId("runBtn"), "click", { p.armSources(); launchJs { p.runAll(null) } })
+    byId("runBtn").title = "Run this authored program once in the daemon and inspect its durable receipt"
+    on(byId("runBtn"), "click", { launchJs { p.runProgram() } })
+    val live = document.createElement("button").asDynamic()
+    live.id = "liveBtn"; live.textContent = "Live"; live.setAttribute("aria-label", "Run live panel")
+    live.title = "Page-owned interactive sweep and sources; not a durable whole-program run"
+    byId("runBtn").parentNode.insertBefore(live, byId("stopBtn"))
+    on(live, "click", {
+        if (!p.programRunning) { p.armSources(); launchJs { p.runAll(null) } }
+    })
     on(byId("stopBtn"), "click", { p.stopSources() })
     on(p.mm, "click", { e ->
         if (truthy(p.mm._s)) {

@@ -1,8 +1,6 @@
 package borg.trikeshed.hermes
 
 import borg.trikeshed.parse.jsonOf
-import borg.trikeshed.parse.reify
-import borg.trikeshed.parse.reifyMap
 
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.btrfs.BtrfsWorldStore
@@ -10,6 +8,11 @@ import borg.trikeshed.collections.LineAperture
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.lib.*
+import borg.trikeshed.graal.subvm.PythonHostServices
+import borg.trikeshed.graal.subvm.PythonContextVars
+import borg.trikeshed.graal.subvm.PythonGuestPrelude
+import borg.trikeshed.graal.subvm.PythonSocketProvider
+import borg.trikeshed.graal.subvm.PythonTlsProvider
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.graal.subvm.PythonWheels
 import borg.trikeshed.pointcut.VmFacet
@@ -230,13 +233,17 @@ class HermesPythonPort(
     private val world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
 ) : AutoCloseable {
     private var isolate: GraalBtrfsSupervisor? = null
-    private var isolateSockets: HermesSocketProvider? = null
-    private var isolateSqlite: HermesSqlite? = null
+    private var isolateSockets: PythonSocketProvider? = null
+    private var isolateServices: PythonHostServices? = null
 
     fun inventory(root: Path, sleeveRoot: Path? = null): HermesPortInventory {
         require(Files.isDirectory(root)) { "Hermes source root is not a directory: $root" }
         val upstream = readSources(root)
-        val sleeve = sleeveRoot?.takeIf(Files::isDirectory)?.let { readSources(it, "sleeve:") }.orEmpty()
+        val shared = sleeveRoot?.parent?.resolve("python")?.takeIf(Files::isDirectory)
+            ?.let { readSources(it, "python-sleeve:") }.orEmpty()
+        val application = sleeveRoot?.takeIf(Files::isDirectory)?.let { readSources(it, "sleeve:") }.orEmpty()
+        require(shared.keys.none { it in application }) { "Application sleeve shadows a shared Python module" }
+        val sleeve = shared + application
         return inventorySources(upstream, root, sleeve, sleeveRoot, PythonWheels.installed())
     }
 
@@ -273,27 +280,27 @@ class HermesPythonPort(
         val dependencySources = dependencies?.sources.orEmpty()
         require(dependencySources.keys.none { it in sources || it in sleeveSources }) { "Python dependency shadows an upstream or sleeve module" }
         val supplied = if (pen == null) sleeveSources else LinkedHashMap(sleeveSources).apply {
-            if (HermesContextVars.MODULE !in sources && HermesContextVars.MODULE !in this &&
-                HermesContextVars.MODULE !in dependencySources) {
-                put(HermesContextVars.MODULE, "sleeve:contextvars.py" to HermesContextVars.source)
+            if (PythonContextVars.MODULE !in sources && PythonContextVars.MODULE !in this &&
+                PythonContextVars.MODULE !in dependencySources) {
+                put(PythonContextVars.MODULE, "sleeve:contextvars.py" to PythonContextVars.source)
             }
             if (GUEST_PRELUDE !in sources && GUEST_PRELUDE !in this) {
                 require(GUEST_PRELUDE !in dependencySources) { "Hermes guest prelude is host-owned" }
-                put(GUEST_PRELUDE, "sleeve:$GUEST_PRELUDE.py" to HermesGuestPrelude.source(socketScope != null))
+                put(GUEST_PRELUDE, "sleeve:$GUEST_PRELUDE.py" to PythonGuestPrelude.source(socketScope != null))
             }
             require(HermesModelProvider.MODULE !in sources && HermesModelProvider.MODULE !in this && HermesModelProvider.MODULE !in dependencySources) {
                 "Hermes model transport module is host-owned: ${HermesModelProvider.MODULE}"
             }
             put(HermesModelProvider.MODULE, "sleeve:${HermesModelProvider.MODULE}.py" to HermesModelProvider.source)
             if (socketScope != null) {
-                require(HermesSocketProvider.MODULE !in sources && HermesSocketProvider.MODULE !in this && HermesSocketProvider.MODULE !in dependencySources) {
-                    "Hermes socket transport module is host-owned: ${HermesSocketProvider.MODULE}"
+                require(PythonSocketProvider.MODULE !in sources && PythonSocketProvider.MODULE !in this && PythonSocketProvider.MODULE !in dependencySources) {
+                    "Hermes socket transport module is host-owned: ${PythonSocketProvider.MODULE}"
                 }
-                put(HermesSocketProvider.MODULE, "sleeve:socket.py" to HermesSocketProvider.source)
-                require(HermesTlsProvider.MODULE !in sources && HermesTlsProvider.MODULE !in this && HermesTlsProvider.MODULE !in dependencySources) {
-                    "Hermes TLS transport module is host-owned: ${HermesTlsProvider.MODULE}"
+                put(PythonSocketProvider.MODULE, "sleeve:socket.py" to PythonSocketProvider.source)
+                require(PythonTlsProvider.MODULE !in sources && PythonTlsProvider.MODULE !in this && PythonTlsProvider.MODULE !in dependencySources) {
+                    "Hermes TLS transport module is host-owned: ${PythonTlsProvider.MODULE}"
                 }
-                put(HermesTlsProvider.MODULE, "sleeve:ssl.py" to HermesTlsProvider.source)
+                put(PythonTlsProvider.MODULE, "sleeve:ssl.py" to PythonTlsProvider.source)
             }
         }
         val combined = LinkedHashMap(dependencySources).apply { putAll(sources); putAll(supplied) }
@@ -360,45 +367,26 @@ class HermesPythonPort(
             error = error,
             world = world,
         )
-        val sqlite = HermesSqlite(
-            readImage = guest.vfs::fetch,
-            writeImage = guest::put,
-            callFunction = { function, arguments ->
-                val result = guest.call("__trikeshed_sqlite_function", Teleported.Str(function),
-                    Teleported.Str(jsonOf(arguments.map(HermesSqlite::encode))))
-                val encoded = (result as? Teleported.Str)?.v ?: error("SQLite callback must return JSON")
-                HermesSqlite.decode(reify(encoded))
-            },
-        )
-        var sockets: HermesSocketProvider? = null
+        val services = PythonHostServices(guest, world)
+        var sockets: PythonSocketProvider? = null
         val result = try {
-            if (pen != null && socketScope != null) sockets = HermesSocketProvider(socketScope)
-            guest.delegate("sqlite3") { args ->
-                val request = (args.singleOrNull() as? Teleported.Str)?.v
-                    ?: throw IllegalArgumentException("sqlite3 requires a JSON request")
-                Teleported.Str(jsonOf(sqlite.call(reifyMap(request))))
-            }
-            guest.eval("""
-                def __trikeshed_sqlite_function(function, arguments):
-                    from sqlite3 import __trikeshed_sqlite_callback
-                    return __trikeshed_sqlite_callback(function, arguments)
-                True
-            """.trimIndent(), "hermes-sqlite-callback.py")
+            if (pen != null && socketScope != null) sockets = PythonSocketProvider(socketScope)
+            services.install()
             val imported = importInVm(guest, inventory, entry, baseline, sockets)
             isolate?.close()
             isolateSockets?.close()
-            isolateSqlite?.close()
+            isolateServices?.close()
             imported
         } catch (failure: Throwable) {
             try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) { failure.addSuppressed(diagnostic) }
             try { guest.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
             try { sockets?.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
-            try { sqlite.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
+            try { services.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
             throw failure
         }
         isolate = guest
         isolateSockets = sockets
-        isolateSqlite = sqlite
+        isolateServices = services
         blackboard.put(
             "hermes/python/vfs",
             mapOf("backend" to "userspace-btrfs", "subvolume" to guest.vfs.liveSubvolumeForTools(), "baseline" to result.b, "generation" to guest.vfs.generation()),
@@ -408,7 +396,7 @@ class HermesPythonPort(
     }
 
     private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
-                           sockets: HermesSocketProvider?): Join<Teleported, String> {
+                           sockets: PythonSocketProvider?): Join<Teleported, String> {
         val files = LinkedHashMap<String, ByteArray>()
         for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) files["/workspace/$path"] = bytes
         for (candidate in inventory.modules.values) {
@@ -467,12 +455,6 @@ class HermesPythonPort(
             val text = (args.firstOrNull() as? Teleported.Str)?.v
                 ?: throw IllegalArgumentException("yaml_load requires text")
             Teleported.Str(jsonOf(YamlParser.reify(text)))
-        }
-        guest.delegate("host_facts") { Teleported.Str(jsonOf(HermesHostFacts.snapshot())) }
-        guest.delegate("process_alive") { args ->
-            val pid = (args.singleOrNull() as? Teleported.Num)?.v
-                ?: throw IllegalArgumentException("process_alive requires a PID")
-            Teleported.Bool(ProcessHandle.of(pid).map { it.isAlive }.orElse(false))
         }
         guest.delegate("land") { args ->
             val name = (args.firstOrNull() as? Teleported.Str)?.v.orEmpty()
@@ -542,7 +524,7 @@ class HermesPythonPort(
             isolate = null
             try { isolateSockets?.close() } finally {
                 isolateSockets = null
-                try { isolateSqlite?.close() } finally { isolateSqlite = null }
+                try { isolateServices?.close() } finally { isolateServices = null }
             }
         }
     }

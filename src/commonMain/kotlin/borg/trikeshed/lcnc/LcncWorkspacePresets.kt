@@ -9,6 +9,7 @@ object LcncWorkspacePresets {
     const val MEDICAL = "preset-medical-curation"
     const val LEGAL = "preset-legal-curation"
     const val POLYGLOT = "preset-polyglot-camel"
+    const val CAMEL_AUTHORING = "preset-camel-authoring"
     const val DOCUMENT_REVIEW = "preset-document-review"
     const val DOCUMENT_CORRECTION = "preset-document-correction"
 
@@ -28,6 +29,11 @@ object LcncWorkspacePresets {
             "An available source language and installed Camel module. The gallery default uses JavaScript; the language facet offers other installed languages. No model provider key is needed.",
             "The transformed value and the reply from the route; both are ordinary construction outputs.",
             "Choose a language in the language facet, then edit the input or function body before running."),
+        LcncPresetInfo(CAMEL_AUTHORING, "Language-authored Camel route",
+            "Builds a Confix route definition in a language guest, then executes its actual Camel steps in an owned context.",
+            "An available source language and installed Camel module. No model provider is required. This is data-defined routing, not native Camel DSL or sandboxed host effects.",
+            "The authored definition, routed message and Camel receipt. Every declared endpoint is checked before a context starts.",
+            "The destination and party inputs, or the route-authoring function. Loading never executes the route."),
         LcncPresetInfo(DOCUMENT_REVIEW, "Retained document review tasks",
             "Inspects a retained medical or legal curation result and creates ordinary board tasks for its document-quality issues.",
             "A retained document receipt and the local board. No new parser or model call is made.",
@@ -59,6 +65,7 @@ object LcncWorkspacePresets {
                 "Synthetic conflicting workflow claims follow.\nDisputes cause delays.\nDisputes do not cause delays.",
             "Disputes", listOf("party-a", "party-b", "reviewer")),
         POLYGLOT to LcncProgramConfix.toJson(polyglot(VmLanguage.JAVASCRIPT)),
+        CAMEL_AUTHORING to LcncProgramConfix.toJson(camel(VmLanguage.JAVASCRIPT)),
         DOCUMENT_REVIEW to LcncProgramConfix.toJson(review()),
         DOCUMENT_CORRECTION to LcncProgramConfix.toJson(correction()),
     )
@@ -124,6 +131,74 @@ object LcncWorkspacePresets {
             LcncWire("function", "value", "route", "messages?"),
             LcncWire("function", "value", "value", "x"),
             LcncWire("route", "routed", "reply", "x"),
+        ])
+    }
+
+    /** The function authors endpoints and EIPs, not merely the message carried by a fixed route. */
+    fun camel(language: VmLanguage, name: String = CAMEL_AUTHORING): LcncProgram {
+        val source = when (language) {
+            VmLanguage.JAVASCRIPT -> """
+                return {from: 'direct:authored-review', steps: [
+                  {setHeader: {name: 'ReviewParty', value: input.party}},
+                  {to: input.destination}
+                ]}
+            """.trimIndent()
+            VmLanguage.JAVA -> """
+                var data = (Map<?, ?>) input;
+                return Map.of("from", "direct:authored-review", "steps", List.of(
+                  Map.of("setHeader", Map.of("name", "ReviewParty", "value", data.get("party"))),
+                  Map.of("to", data.get("destination"))
+                ));
+            """.trimIndent()
+            VmLanguage.KOTLIN_COMMON -> """
+                val data = input as Map<String, Any?>
+                return mapOf("from" to "direct:authored-review", "steps" to listOf(
+                  mapOf("setHeader" to mapOf("name" to "ReviewParty", "value" to data["party"])),
+                  mapOf("to" to data["destination"])
+                ))
+            """.trimIndent()
+            VmLanguage.CLOJURE -> """
+                {"from" "direct:authored-review" "steps"
+                  [{"setHeader" {"name" "ReviewParty" "value" (get input "party")}}
+                   {"to" (get input "destination")}]}
+            """.trimIndent()
+            VmLanguage.GROOVY -> """
+                return [from: 'direct:authored-review', steps: [
+                  [setHeader: [name: 'ReviewParty', value: input.party]],
+                  [to: input.destination]
+                ]]
+            """.trimIndent()
+            VmLanguage.RUBY -> """
+                return {"from" => "direct:authored-review", "steps" => [
+                  {"setHeader" => {"name" => "ReviewParty", "value" => input["party"]}},
+                  {"to" => input["destination"]}
+                ]}
+            """.trimIndent()
+            VmLanguage.PYTHON -> """
+                return {"from": "direct:authored-review", "steps": [
+                  {"setHeader": {"name": "ReviewParty", "value": input["party"]}},
+                  {"to": input["destination"]}
+                ]}
+            """.trimIndent()
+        }
+        return LcncProgram(name, s_[
+            LcncNode("source", "json.value", mapOf("value" to
+                """{"destination":"log:authored-review","party":"human-reviewer","case":"synthetic-review"}"""), x = 20.0, y = 50.0),
+            LcncNode("function", "vm.polyglot", language.params(source) +
+                mapOf("inputKind" to "OBJECT", "outputKind" to "OBJECT"), x = 350.0, y = 50.0),
+            LcncNode("route", "vm.camel", mapOf("reach" to "LOCAL", "trust" to "OWN"), x = 690.0, y = 50.0),
+            LcncNode("definition", "display", x = 350.0, y = 460.0),
+            LcncNode("receipt", "display", x = 1030.0, y = 50.0),
+            LcncNode("review", "note", mapOf("text" to "The selected language authors a Confix route definition. Camel executes its steps after the language guest has closed.\n" +
+                "This is not native Camel DSL. Supported steps: to, setBody, setHeader, choice (bodyEquals), stop. Unknown steps and hidden dynamic endpoints are refused.\n" +
+                "The receipt records the executed definition and returned headers. A party header is provenance, not approval. No model or clinical/legal actuation is wired.\n" +
+                "Typed guest values currently support five levels of nesting; deeply nested choices can be supplied as Confix directly on the route node."), x = 20.0, y = 460.0),
+        ], s_[
+            LcncWire("source", "value", "function", "input?"),
+            LcncWire("source", "value", "route", "messages?"),
+            LcncWire("function", "value", "route", "route?"),
+            LcncWire("function", "value", "definition", "x"),
+            LcncWire("route", "receipt", "receipt", "x"),
         ])
     }
 

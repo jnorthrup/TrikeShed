@@ -42,6 +42,30 @@ class DocumentCurationTasks(
         },
     )
 
+    /** Reopen a WAL-backed task without admitting a correction or repeating curation. */
+    suspend fun inspect(store: BoardStoreElement, taskId: String, includeReceipt: Boolean = false): Map<String, Any?>? = gate.withLock {
+        val row = store.card(taskId) ?: return@withLock null
+        val envelope = envelope(row)
+        val prior = record(ContentId(envelope["receiptCid"] as? String ?: error("Task receipt is absent")))
+        require(envelope["source"] == sourceReference(prior.source)) { "Task source differs from its retained receipt" }
+        require(envelope["recipeCid"] == recipe(prior).value && envelope["family"] == family(prior.source, prior)) {
+            "Task recipe differs from its retained receipt"
+        }
+        val pending = envelope["correction"]?.let {
+            objectOf(objectOf(it, "Task correction")["source"], "Task correction source")
+        } ?: emptyMap()
+        // Inspection is read-only even if a retained envelope is malformed. source() may put only
+        // when supplied literal text; retained envelopes must carry already-published references.
+        require("text" !in pending) { "Task correction must reference retained text" }
+        val current = source(pending, sourceReference(prior.source))
+        require(current.originalCid == prior.source.originalCid && family(current, prior) == envelope["family"]) {
+            "Task correction differs from its source and recipe identity"
+        }
+        reference(row, envelope) + mapOf("instructions" to prior.instructions,
+            "resolved" to (envelope["resolved"] == true), "correctionSource" to pending) +
+            if (includeReceipt) mapOf("record" to DocumentCuratorCodec.record(prior)) else emptyMap()
+    }
+
     /** No model call: retain the correction, then let the authored graph run its document.curate node. */
     suspend fun correct(
         store: BoardStoreElement, taskId: String, expectedRevision: Long,
@@ -251,7 +275,7 @@ class DocumentCurationTasks(
                 "quotes" to proposals.mapNotNull { it.quote }.distinct(),
                 "terms" to proposals.map { mapOf("subject" to it.subject, "predicate" to it.predicate, "object" to it.obj) }.distinct(),
                 "proposalCids" to proposals.mapNotNull { it.receiptCid?.value }.distinct(),
-                "reasons" to (proposals.flatMap { it.reasons.view } + record.reasons.view.filter { category(it) == kind }).distinct())
+                "reasons" to (proposals.flatMap { it.reasons.view } + record.reasons.filter { category(it) == kind }.view).distinct())
         }
     }
 

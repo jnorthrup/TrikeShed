@@ -1339,14 +1339,19 @@ object LcncContracts {
                 "wallMillis" to LcncPortContract.LcncParamSpec(v = "5000"),
                 "calls" to LcncPortContract.LcncParamSpec(v = "0"),
             )),
-        LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: route DSL in a sub-VM",
-            listOf("messages?"), listOf("routed", "ok", "error"),
-            inputKinds = mapOf("messages" to "json"),
+        LcncPortContract(SubVm.LEGO_PREFIX + "camel", "camel: dispatch a declared route",
+            listOf("messages?", "route?"), listOf("routed", "ok", "error", "receipt"),
+            isEffect = true,
+            inputKinds = mapOf("messages" to "json", "route" to "json"),
             // ok/error are declared because the linkage gate can refuse a route before it is
             // ever built: a lego that can decline has to be able to SAY it declined, or the
             // refusal arrives as a blank `routed` and reads like a route that carried nothing.
-            outputKinds = mapOf("routed" to "text", "ok" to "json", "error" to "text"),
+            outputKinds = mapOf("routed" to "text", "ok" to "json", "error" to "text", "receipt" to "json"),
             params = mapOf(
+                "route" to LcncPortContract.LcncParamSpec(v = "", ta = true,
+                    ph = "Optional Confix route {from,steps}; replaces from/to. Or wire a language function's value to route."),
+                "body" to LcncPortContract.LcncParamSpec(v = "", ta = true,
+                    ph = "Plain text when messages is unwired; wired messages are encoded as JSON."),
                 "facet" to LcncPortContract.LcncParamSpec(v = "JVM"),
                 // Guest module supplying this lego's classes (utils/subvm/<module>). Declared so the
                 // surface can express the override; blank means the lego's own default.

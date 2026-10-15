@@ -18,6 +18,7 @@ object HermesTerminalPage {
     private var state = "closed"
     private var boot: dynamic = null
     private var detail = ""
+    private var runtimeName = "GraalPy sleeve"
     private var focused = false
 
     private fun setState(s: String) {
@@ -41,6 +42,8 @@ object HermesTerminalPage {
             if (next != null || x.state == "closed") boot = next
         }
         if (x.detail != null) detail = str(x.detail)
+        if (x.runtime == "hermes-cli" || detail.contains("HermesCLI")) runtimeName = "HermesCLI"
+        else if (detail.contains("Python diagnostic console")) runtimeName = "Python diagnostic console"
         setState(if (truthy(x.state)) str(x.state) else state)
     }
 
@@ -54,11 +57,11 @@ object HermesTerminalPage {
         val running = !offline && !ready && !failed && (status == "running" || state == "booting")
         byId("boot").className = if (ready) "ok" else if (failed || offline) "bad" else ""
         byId("bootState").textContent = when {
-            offline -> "Python diagnostic console · offline"
-            ready -> "Python diagnostic console ready"
-            failed -> "$phase failed · diagnostic console unavailable"
-            running -> "$phase · diagnostic console starting"
-            else -> "Python diagnostic console · $state"
+            offline -> "$runtimeName · offline"
+            ready -> "$runtimeName ready"
+            failed -> "$phase failed · $runtimeName unavailable"
+            running -> "$phase · $runtimeName starting"
+            else -> "$runtimeName · $state"
         }
         renderBootTime()
         val module = if (b != null) strOrEmpty(b.module) else ""

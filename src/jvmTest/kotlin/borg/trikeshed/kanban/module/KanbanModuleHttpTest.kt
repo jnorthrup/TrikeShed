@@ -9,26 +9,46 @@ import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardCol
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.modelmux.ModelResponse
+import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
 import borg.trikeshed.module.ModuleSupervisor
+import borg.trikeshed.narsese.*
+import borg.trikeshed.nlp.*
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class KanbanModuleHttpTest {
+    private class Cas : CasStore() {
+        var puts = 0
+        var missing: ContentId? = null
+        override fun put(bytes: ByteArray): ContentId {
+            puts++
+            return super.put(bytes)
+        }
+        override fun get(cid: ContentId): ByteArray? = if (cid == missing) null else super.get(cid)
+    }
 
     private fun tempDir(name: String): File =
-        File(System.getProperty("java.io.tmpdir"), "kanban-module-$name-${System.nanoTime()}").apply { mkdirs() }
+        File(java.lang.System.getProperty("java.io.tmpdir"), "kanban-module-$name-${java.lang.System.nanoTime()}").apply { mkdirs() }
 
     private fun newContext(routes: ModuleRouteRegistry, stateDir: File, cas: CasStore): ModuleContext {
         val couchStore = CouchStoreFactory.casBacked(cas)
@@ -68,6 +88,246 @@ class KanbanModuleHttpTest {
         is List<*> -> v
         is Array<*> -> v.toList()
         else -> error("not an array: $v")
+    }
+
+    private fun retained(cas: CasStore): ContentId {
+        val text = "Alex uses Java."
+        val source = DocumentSource(cas.put("Original attachment bytes".encodeToByteArray()),
+            cas.put(text.encodeToByteArray()), text, "review.txt", "text/plain", "review",
+            mapOf("pages" to listOf("1", "2")))
+        return cas.put(DocumentCuratorCodec.encode(DocumentCurationRecord(source,
+            NlpDocument(text, s_[NlpSentence(0, 0, text.length,
+                s_[NlpToken(1, 0, text.length, text, text, "NN", "O")], s_[NlpDependency(0, 1, "root")])]),
+            ModelResponse("synthetic", ModelUsage(0, 0, 0), "fixture", "fixture"), "fixture",
+            s_[DocumentProposal("synthetic", "Alex", "use", "Kotlin", 0.9, "Alex uses Kotlin.",
+                0, 17, true, "asserted", s_["quote does not match UTF-16 span"])], emptySeriesOf(),
+            instructions = "Retain exact quotations.\nPreserve the author's uncertainty.")))
+    }
+
+    private suspend fun documentTask(ctx: ModuleContext, receipt: ContentId): Map<*, *> {
+        val output = ctx.lcncRunners.getValue(DocumentCurationTasks.TASKS).run(
+            LcncNode("tasks", DocumentCurationTasks.TASKS), mapOf("receiptCid" to receipt.value))
+        return arr(output["tasks"]).single() as Map<*, *>
+    }
+
+    private fun documentTaskPath(id: String): String =
+        "/api/board?documentTask=" + URLEncoder.encode(id, StandardCharsets.UTF_8.name())
+
+    private fun correctionDocument(task: Map<String, Any?>, id: String, revision: Long, receipt: ContentId,
+                                   source: Map<String, Any?> = emptyMap()) {
+        assertTrue(task.keys.containsAll(setOf("jobId", "revision", "column", "title", "receiptCid", "source",
+            "issue", "instructions", "resolved", "correctionSource", "document")))
+        val document = assertIs<Map<*, *>>(task["document"])
+        assertEquals(true, assertIs<Map<*, *>>(document["controls"])["humanOversight"])
+        val program = LcncProgramConfix.fromJson(LcncWorkspacePresets.DOCUMENT_CORRECTION, jsonOf(document))
+        assertTrue(program.controls.humanOversight)
+        val correction = program.nodes.view.single { it.type == DocumentCurationTasks.CORRECT }
+        assertEquals(mapOf("taskId" to id, "expectedRevision" to revision.toString(),
+            "priorReceiptCid" to receipt.value), correction.params)
+        val sourceNode = program.nodes.view.single { it.id == "source" }
+        assertEquals("json.value", sourceNode.type)
+        @Suppress("UNCHECKED_CAST")
+        val sourceFields = assertIs<Map<*, *>>(reify(sourceNode.params.getValue("value"))) as Map<String, Any?>
+        assertEquals(reify(jsonOf(source)), sourceFields)
+        assertEquals(
+            reify(LcncProgramConfix.toJson(LcncWorkspacePresets.correction(id, revision.toString(), receipt.value, sourceFields))),
+            document, "GET must return the existing authored correction construction",
+        )
+    }
+
+    @Test
+    fun documentTaskGetRetainsEvidenceAndResumesPendingCorrectionAfterRestart(): Unit = runBlocking {
+        val stateDir = tempDir("document-task")
+        val cas = Cas()
+        val routes = ModuleRouteRegistry()
+        var server = JvmKanbanServer(moduleRoutes = routes)
+        var ctx = newContext(routes, stateDir, cas)
+        var supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        var curatorCalls = 0
+        val curator = LcncNodeRunner { _, _ ->
+            curatorCalls++
+            error("GET must not execute the parser/model curation node")
+        }
+        ctx.lcncRunners[DocumentCurationLegos.CURATE] = curator
+        try {
+            val receipt = retained(cas)
+            val record = DocumentCuratorCodec.decode(assertNotNull(cas.get(receipt)))
+            val evidence = listOf(record.source.originalCid, record.source.extractedTextCid, receipt)
+                .associateWith { assertNotNull(cas.get(it)) }
+            val created = documentTask(ctx, receipt)
+            val id = created["jobId"] as String
+            val revision = (created["revision"] as Number).toLong()
+            val path = documentTaskPath(id)
+            assertTrue("%2F" in path, "document task identifiers must cross the encoded query boundary")
+            val board = get(server, "/api/board").body
+            val puts = cas.puts
+            val response = get(server, path)
+            assertEquals(200, response.status, response.body)
+            val inspected = json(response)
+            assertEquals(id, inspected["jobId"])
+            assertEquals(revision, (inspected["revision"] as Number).toLong())
+            assertEquals("todo", inspected["column"])
+            assertEquals(created["title"], inspected["title"])
+            assertEquals(receipt.value, inspected["receiptCid"])
+            assertEquals(record.instructions, inspected["instructions"])
+            assertEquals(false, inspected["resolved"])
+            assertEquals(emptyMap<String, Any?>(), inspected["correctionSource"])
+            val source = assertIs<Map<*, *>>(inspected["source"])
+            assertEquals(record.source.originalCid.value, source["originalCid"])
+            assertEquals(record.source.extractedTextCid.value, source["extractedTextCid"])
+            assertEquals(record.source.name, source["name"])
+            assertEquals(record.source.mediaType, source["mediaType"])
+            assertEquals(record.source.correlation, source["correlation"])
+            assertEquals(listOf("1", "2"), arr(assertIs<Map<*, *>>(source["metadata"])["pages"]))
+            assertTrue("text" !in source)
+            val issue = assertIs<Map<*, *>>(inspected["issue"])
+            assertEquals("quotation", issue["kind"])
+            assertEquals(listOf("Alex uses Kotlin."), arr(issue["quotes"]))
+            assertEquals(listOf("quote does not match UTF-16 span"), arr(issue["reasons"]))
+            correctionDocument(inspected, id, revision, receipt)
+            assertEquals(response.body, get(server, path).body)
+            assertTrue("record" !in inspected)
+            val pin = "&receiptCid=" + URLEncoder.encode(receipt.value, StandardCharsets.UTF_8.name())
+            val receiptResponse = get(server, "$path&view=receipt$pin")
+            assertEquals(200, receiptResponse.status, receiptResponse.body)
+            val receiptView = json(receiptResponse)
+            assertEquals(inspected - "document", receiptView - "record")
+            assertTrue("document" !in receiptView)
+            assertEquals(reify(jsonOf(DocumentCuratorCodec.record(record))), receiptView["record"])
+            val receiptSource = assertIs<Map<*, *>>(assertIs<Map<*, *>>(receiptView["record"])["source"])
+            assertEquals(record.source.text, receiptSource["text"])
+            assertEquals(record.source.originalCid.value, receiptSource["originalCid"])
+            assertEquals(record.source.extractedTextCid.value, receiptSource["extractedTextCid"])
+            assertEquals(receiptResponse.body, get(server, "$path&view=receipt").body)
+            val pinned = get(server, path + pin)
+            assertEquals(200, pinned.status, pinned.body)
+            assertEquals(response.body, pinned.body)
+            val wrongPin = "&receiptCid=" + URLEncoder.encode(record.source.originalCid.value, StandardCharsets.UTF_8.name())
+            for (view in listOf("", "&view=receipt")) {
+                val conflict = get(server, path + view + wrongPin)
+                assertEquals(409, conflict.status, conflict.body)
+                assertTrue("document" !in json(conflict) && "record" !in json(conflict))
+            }
+            val invalidView = get(server, "$path&view=unknown")
+            assertEquals(400, invalidView.status, invalidView.body)
+            assertTrue("document" !in json(invalidView) && "record" !in json(invalidView))
+            assertEquals(board, get(server, "/api/board").body)
+            assertEquals(puts, cas.puts)
+            assertEquals(0, curatorCalls)
+
+            val corrected = ctx.lcncRunners.getValue(DocumentCurationTasks.CORRECT).run(
+                LcncNode("correction", DocumentCurationTasks.CORRECT, mapOf("taskId" to id,
+                    "expectedRevision" to revision.toString(), "priorReceiptCid" to receipt.value)),
+                mapOf("source" to mapOf("text" to "Alex uses Kotlin.")))
+            val correctedSource = assertIs<Map<*, *>>(corrected["source"])
+            val pending = mapOf("originalCid" to record.source.originalCid.value,
+                "extractedTextCid" to correctedSource["extractedTextCid"], "name" to record.source.name,
+                "mediaType" to record.source.mediaType, "correlation" to record.source.correlation,
+                "metadata" to record.source.metadata)
+            val correctedRevision = (corrected["revision"] as Number).toLong()
+            val pendingBoard = get(server, "/api/board").body
+            supervisor.detach("kanban")
+            val replayRoutes = ModuleRouteRegistry()
+            server = JvmKanbanServer(moduleRoutes = replayRoutes)
+            ctx = newContext(replayRoutes, stateDir, cas)
+            supervisor = ModuleSupervisor(ctx)
+            supervisor.attach(KanbanModule())
+            ctx.lcncRunners[DocumentCurationLegos.CURATE] = curator
+
+            val replayPuts = cas.puts
+            val resumedResponse = get(server, path)
+            assertEquals(200, resumedResponse.status, resumedResponse.body)
+            val resumed = json(resumedResponse)
+            assertEquals(correctedRevision, (resumed["revision"] as Number).toLong())
+            assertEquals(receipt.value, resumed["receiptCid"])
+            assertEquals(record.instructions, resumed["instructions"])
+            assertEquals("todo", resumed["column"])
+            assertEquals(false, resumed["resolved"])
+            assertEquals(record.source.extractedTextCid.value, assertIs<Map<*, *>>(resumed["source"])["extractedTextCid"])
+            val pendingSource = assertIs<Map<*, *>>(resumed["correctionSource"])
+            assertEquals(pending["extractedTextCid"], pendingSource["extractedTextCid"])
+            assertEquals("Alex uses Kotlin.", assertNotNull(cas.get(ContentId(pendingSource["extractedTextCid"] as String))).decodeToString())
+            assertTrue("text" !in pendingSource)
+            correctionDocument(resumed, id, correctedRevision, receipt, pending)
+            assertEquals(resumedResponse.body, get(server, path).body)
+            val resumedReceiptResponse = get(server, "$path&view=receipt$pin")
+            assertEquals(200, resumedReceiptResponse.status, resumedReceiptResponse.body)
+            val resumedReceipt = json(resumedReceiptResponse)
+            assertEquals(resumed - "document", resumedReceipt - "record")
+            assertEquals(reify(jsonOf(DocumentCuratorCodec.record(record))), resumedReceipt["record"],
+                "a pending correction must not rewrite the pinned prior receipt")
+            assertEquals(pendingBoard, get(server, "/api/board").body)
+            assertEquals(replayPuts, cas.puts)
+            assertEquals(0, curatorCalls)
+            for ((cid, bytes) in evidence) assertContentEquals(bytes, cas.get(cid))
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test
+    fun documentTaskGetRefusesUnknownTasksOrdinaryCardsAndOtherMethods(): Unit = runBlocking {
+        val cas = Cas()
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(newContext(routes, tempDir("document-task-errors"), cas))
+        supervisor.attach(KanbanModule())
+        try {
+            val id = "ordinary/task +&?#"
+            val submitted = post(server, "/api/invoke", jsonOf(mapOf("commands" to listOf(
+                mapOf("type" to "submit", "jobId" to id, "idempotencyKey" to "ordinary-task", "title" to "Ordinary card")))))
+            assertEquals(202, submitted.status)
+            assertEquals(1, (json(submitted)["accepted"] as Number).toInt())
+            val board = get(server, "/api/board").body
+            val puts = cas.puts
+            val missing = get(server, documentTaskPath("absent/task +&?#"))
+            assertEquals(404, missing.status, missing.body)
+            assertTrue("document" !in json(missing))
+            val ordinary = get(server, documentTaskPath(id))
+            assertEquals(400, ordinary.status, ordinary.body)
+            assertTrue("document" !in json(ordinary))
+            for (method in listOf("POST", "PUT", "PATCH", "DELETE", "HEAD")) {
+                val response = server.routeHttp("$method ${documentTaskPath(id)} HTTP/1.1\r\nHost: t\r\n\r\n"
+                    .toByteArray(StandardCharsets.UTF_8))
+                assertEquals(405, response.status, "$method: ${response.body}")
+            }
+            assertEquals(board, get(server, "/api/board").body)
+            assertEquals(puts, cas.puts)
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test
+    fun documentTaskGetRefusesMissingAndCorruptRetainedEvidenceWithoutMutation(): Unit = runBlocking {
+        val cas = Cas()
+        val routes = ModuleRouteRegistry()
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val ctx = newContext(routes, tempDir("document-task-content"), cas)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val receipt = retained(cas)
+            val record = DocumentCuratorCodec.decode(assertNotNull(cas.get(receipt)))
+            val task = documentTask(ctx, receipt)
+            val path = documentTaskPath(task["jobId"] as String)
+            assertEquals(200, get(server, path).status)
+            val board = get(server, "/api/board").body
+            for (cid in listOf(receipt, record.source.originalCid, record.source.extractedTextCid)) {
+                val bytes = assertNotNull(cas.get(cid))
+                for (corrupt in listOf(false, true)) {
+                    val puts = cas.puts
+                    if (corrupt) cas.corrupt(cid) else cas.missing = cid
+                    try {
+                        val response = get(server, path)
+                        assertEquals(400, response.status, "${cid.value} (corrupt=$corrupt): ${response.body}")
+                        assertTrue("document" !in json(response))
+                        assertEquals(board, get(server, "/api/board").body)
+                        assertEquals(puts, cas.puts)
+                    } finally {
+                        cas.missing = null
+                        if (corrupt) assertEquals(cid, cas.put(bytes))
+                    }
+                }
+            }
+        } finally { supervisor.detach("kanban") }
     }
 
     @Test

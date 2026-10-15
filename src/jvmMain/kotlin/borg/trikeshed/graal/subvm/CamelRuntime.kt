@@ -1,6 +1,10 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.lcnc.CamelLinkage
+import borg.trikeshed.lcnc.CamelRoutePlan
+import borg.trikeshed.lcnc.CamelRouteStep
+import borg.trikeshed.lib.*
+import java.lang.System
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -158,6 +162,53 @@ object CamelRuntime {
 
     /** Whether a route with this id is up. */
     fun isRunning(id: String): Boolean = routes.containsKey(id)
+
+    /**
+     * Lower a declared plan into Camel, optionally request it, and stop all owned services.
+     * The status and route ids describe execution before shutdown; return follows shutdown.
+     * These contexts never enter the registry of long-lived routes.
+     */
+    fun execute(
+        id: String,
+        plan: CamelRoutePlan,
+        request: Request? = null,
+        module: String = MODULE,
+        reach: CamelLinkage.Reach = CamelLinkage.Reach.LOCAL,
+    ): Map<String, Any?> {
+        require(id.isNotBlank()) { "route id is blank" }
+        check(GuestModules.isInstalled(module)) {
+            "guest module '$module' is not installed — install it: " +
+                "./gradlew -p utils/subvm install${gradleTaskName(module)}"
+        }
+        // Public Series may be changing oracles. Parsing takes owned copies at every depth;
+        // admission, lowering and the receipt must all use that same snapshot.
+        val snapshot = CamelRoutePlan.parse(plan.toValue())
+        snapshot.validate(reach, GuestModules.chain(module))
+        check(request == null || CamelLinkage.schemeOf(snapshot.from) == "direct") {
+            "route '$id' refuses request to from='${snapshot.from}': one-shot requests require a direct: " +
+                "consumer; omit the request to start and stop a consumer of another scheme"
+        }
+
+        val loader = GuestModules.loaderFor(module)
+            ?: throw IllegalStateException("guest module '$module' resolved no classpath to mount")
+        return withLoader(loader) {
+            val bridge = Bridge(loader)
+            val ctx = bridge.newContext()
+            withCleanup({ bridge.stop(ctx) }) {
+                bridge.addRoute(ctx, id, snapshot)
+                bridge.start(ctx)
+                val reply = request?.let { bridge.request(ctx, snapshot.from, it) }
+                mapOf(
+                    "status" to bridge.statusOf(ctx),
+                    "routes" to bridge.routeIdsOf(ctx),
+                    "from" to snapshot.from,
+                    "reply" to reply?.body,
+                    "headers" to (reply?.headers ?: emptyMap<String, Any?>()),
+                    "plan" to snapshot.toValue(),
+                )
+            }
+        }
+    }
 
     /**
      * Start a route and leave it running.
@@ -344,6 +395,11 @@ object CamelRuntime {
         private val routeDefinitionClass: Class<*> = loader.loadClass("org.apache.camel.model.RouteDefinition")
         private val processorDefinitionClass: Class<*> = loader.loadClass("org.apache.camel.model.ProcessorDefinition")
         private val producerTemplateClass: Class<*> = loader.loadClass("org.apache.camel.ProducerTemplate")
+        private val choiceDefinitionClass: Class<*> = loader.loadClass("org.apache.camel.model.ChoiceDefinition")
+        private val expressionClass: Class<*> = loader.loadClass("org.apache.camel.Expression")
+        private val predicateClass: Class<*> = loader.loadClass("org.apache.camel.Predicate")
+        private val builderClass: Class<*> = loader.loadClass("org.apache.camel.builder.Builder")
+        private val valueBuilderClass: Class<*> = loader.loadClass("org.apache.camel.builder.ValueBuilder")
 
         // Camel 4 exposes the static seam an abstract RouteBuilder otherwise denies a non-subclass:
         // addRoutes(CamelContext, LambdaRouteBuilder), whose second parameter is a functional
@@ -354,6 +410,18 @@ object CamelRuntime {
         private val routeIdMethod: Method = routeDefinitionClass.getMethod("routeId", String::class.java)
         private val processMethod: Method = processorDefinitionClass.getMethod("process", processorClass)
         private val toMethod: Method = processorDefinitionClass.getMethod("to", String::class.java)
+        private val choiceMethod: Method = processorDefinitionClass.getMethod("choice")
+        private val whenMethod: Method = choiceDefinitionClass.getMethod("when", predicateClass)
+        private val otherwiseMethod: Method = choiceDefinitionClass.getMethod("otherwise")
+        private val endChoiceMethod: Method = choiceDefinitionClass.getMethod("endChoice")
+        private val endMethod: Method = processorDefinitionClass.getMethod("end")
+        private val routeStopMethod: Method = processorDefinitionClass.getMethod("stop")
+        private val routeSetBodyMethod: Method = processorDefinitionClass.getMethod("setBody", expressionClass)
+        private val routeSetHeaderMethod: Method =
+            processorDefinitionClass.getMethod("setHeader", String::class.java, expressionClass)
+        private val constantMethod: Method = builderClass.getMethod("constant", Any::class.java)
+        private val bodyMethod: Method = builderClass.getMethod("body")
+        private val isEqualToMethod: Method = valueBuilderClass.getMethod("isEqualTo", Any::class.java)
         private val getMessage: Method = exchangeClass.getMethod("getMessage")
         private val getExchangeId: Method = exchangeClass.getMethod("getExchangeId")
         private val setPropertyMethod: Method = exchangeClass.getMethod("setProperty", String::class.java, Any::class.java)
@@ -406,6 +474,47 @@ object CamelRuntime {
             addRoutes.invoke(null, ctx, lambda)
         }
 
+        fun addRoute(ctx: Any, routeId: String, plan: CamelRoutePlan) {
+            val lambda = Proxy.newProxyInstance(loader, arrayOf(lambdaRouteBuilderClass)) { proxy, method, args ->
+                if (method.name == "accept" && args != null && args.size == 1) {
+                    val definition = routeIdMethod.invoke(fromMethod.invoke(args[0], plan.from), routeId)
+                    lower(definition, plan.steps)
+                    null
+                } else objectMethod(proxy, method, args)
+            }
+            addRoutes.invoke(null, ctx, lambda)
+        }
+
+        /** Each recursive call retains its enclosing scope, including after a nested choice. */
+        private fun lower(scope: Any, steps: Series<CamelRouteStep>) {
+            for (step in steps.view) {
+                when (step) {
+                    is CamelRouteStep.To -> toMethod.invoke(scope, step.uri)
+                    is CamelRouteStep.SetBody ->
+                        routeSetBodyMethod.invoke(scope, constantMethod.invoke(null, step.value))
+                    is CamelRouteStep.SetHeader ->
+                        routeSetHeaderMethod.invoke(scope, step.name, constantMethod.invoke(null, step.value))
+                    CamelRouteStep.Stop -> routeStopMethod.invoke(scope)
+                    is CamelRouteStep.Choice -> {
+                        val choice = choiceMethod.invoke(scope)
+                        for (branch in step.branches.view) {
+                            val predicate = isEqualToMethod.invoke(bodyMethod.invoke(null), branch.bodyEquals)
+                            whenMethod.invoke(choice, predicate)
+                            lower(choice, branch.steps)
+                            // endChoice's return may name an outer choice. Keep this choice's
+                            // identity for its next clause, and the caller's scope for continuation.
+                            endChoiceMethod.invoke(choice)
+                        }
+                        if (step.otherwise.size > 0) {
+                            otherwiseMethod.invoke(choice)
+                            lower(choice, step.otherwise)
+                        }
+                        endMethod.invoke(choice)
+                    }
+                }
+            }
+        }
+
         fun start(ctx: Any) { startMethod.invoke(ctx) }
 
         fun stop(ctx: Any) { stopMethod.invoke(ctx) }
@@ -447,9 +556,8 @@ object CamelRuntime {
         }
 
         fun request(ctx: Any, endpoint: String, request: Request): Reply {
-            var template: Any? = null
-            try {
-                template = createProducerTemplate.invoke(ctx)
+            val template = createProducerTemplate.invoke(ctx)
+            return withCleanup({ templateStop.invoke(template) }) {
                 val reply = requestMethod.invoke(
                     template,
                     endpoint,
@@ -457,14 +565,10 @@ object CamelRuntime {
                         setBody(exchange, request.body)
                         request.headers.forEach { (name, value) -> setHeader(exchange, name, value) }
                     },
-                ) ?: return Reply("")
+                ) ?: return@withCleanup Reply("")
                 val failure = getException.invoke(reply) as? Throwable
                 if (failure != null) throw failure
-                return Reply(bodyOf(reply), headersOf(reply))
-            } catch (t: Throwable) {
-                throw unwrap(t)
-            } finally {
-                template?.let { runCatching { templateStop.invoke(it) } }
+                Reply(bodyOf(reply), headersOf(reply))
             }
         }
 
@@ -478,6 +582,27 @@ object CamelRuntime {
             "equals" -> proxy === args?.getOrNull(0)
             "toString" -> "CamelRuntime.Proxy@" + Integer.toHexString(System.identityHashCode(proxy))
             else -> null
+        }
+    }
+
+    /** Cleanup failure is a failure; when work already failed, retain both on that primary. */
+    internal fun <T> withCleanup(cleanup: () -> Unit, block: () -> T): T {
+        var failure: Throwable? = null
+        try {
+            return block()
+        } catch (t: Throwable) {
+            val primary = unwrap(t)
+            failure = primary
+            throw primary
+        } finally {
+            try {
+                cleanup()
+            } catch (t: Throwable) {
+                val stopped = unwrap(t)
+                val primary = failure
+                if (primary == null) throw stopped
+                if (primary !== stopped) primary.addSuppressed(stopped)
+            }
         }
     }
 

@@ -17,10 +17,10 @@ class HermesGuestPreludeTest {
         Files.writeString(cli.resolve("__init__.py"), "")
         Files.writeString(cli.resolve("main.py"), "READY = True")
         val failure = assertFailsWith<IllegalStateException> {
-            HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--command", ":eval raise RuntimeError('expected refusal')"))
+            HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--sleeve", directory.resolve("empty-sleeve").toString(), "--command", ":eval raise RuntimeError('expected refusal')"))
         }
         assertTrue(failure.message.orEmpty().contains("command failed"))
-        HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--command", ":eval 6 * 7"))
+        HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--sleeve", directory.resolve("empty-sleeve").toString(), "--command", ":eval 6 * 7"))
     }
 
     @Test

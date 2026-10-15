@@ -152,8 +152,13 @@ class PanelsFacets(val panels: Panels) {
             try { path = JSON.stringify(JSON.parse(str(input.value))); offset = 0; show("confix") }
             catch (e: dynamic) { panels.status("Use a JSON path array, for example [\"nodes\",0,\"params\"]") }
         }
-        text(if (truthy(c.found)) "Selected value" else "Path not found")
-        pre(if (truthy(c.found)) JSON.stringify(c.value, null, 2) else "—")
+        when {
+            !truthy(c.found) -> { text("Path not found"); pre("—") }
+            truthy(c.valueOmitted) -> text("Selected-value preview omitted · source size " + str(c.valueBytes) +
+                " bytes · preview cap " + str(c.valueLimit) +
+                "\nSelect a narrower path above or use cursor selection and traversal below.")
+            else -> { text("Selected value"); pre(JSON.stringify(c.value, null, 2)) }
+        }
         cursor(c.cursor)
         text("Flat token spans · these are not the row ordinals of the cursor above")
         val table = document.createElement("table").asDynamic(); table.style.cssText = "width:100%;text-align:left;font-size:11px"
@@ -386,7 +391,7 @@ class PanelsFacets(val panels: Panels) {
 
     fun languages(catalog: dynamic) {
         body.innerHTML = ""
-        text("Typed functions receive input as data and return Confix values. Each invocation releases its guest. Wire value into Camel messages to compose a transform with the existing route node.")
+        text("Typed functions receive input as data and return Confix values. Each invocation releases its guest. Wire value into Camel messages for a payload transform, or into Camel route to author endpoints and steps. Route definitions are data, not native Camel DSL.")
         text("Load a language-and-route construction for review to replace this canvas without running it. Undo restores the previous canvas. The local route carries data only; its review label is not an approval.")
         val runners = arr(catalog.runners).map { str(it) }
         for (language in arr(catalog.languages)) {
@@ -400,6 +405,14 @@ class PanelsFacets(val panels: Panels) {
                     panels.load(fromConfix(construction.document))
                     panels.panelName().value = str(construction.name).removePrefix("preset-")
                     panels.status(str(language.label) + " + Camel loaded without execution — edit the input or function, then choose Run")
+                    close()
+                }
+            val route = language.routeConstruction
+            if (truthy(language.available) && truthy(route?.document) && "vm.polyglot" in runners && "vm.camel" in runners)
+                button("Author Camel route in " + str(language.label)) {
+                    panels.load(fromConfix(route.document))
+                    panels.panelName().value = str(route.name).removePrefix("preset-")
+                    panels.status(str(language.label) + " route authoring loaded without execution — inspect endpoints and steps, then choose Run")
                     close()
                 }
         }

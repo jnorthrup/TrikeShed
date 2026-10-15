@@ -1,6 +1,7 @@
 package borg.trikeshed.hermes
 
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.graal.subvm.PythonSocketElement
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.channels.sockaddrIpv4
 import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
@@ -220,7 +221,7 @@ class HermesSocketProviderTest {
     @Test
     fun drainFinishesAcceptedReadBeforeClosingThePeer() = runBlocking(Dispatchers.IO) {
         val owner = SupervisorJob(coroutineContext[Job])
-        val sockets = HermesSocketElement(CoroutineScope(coroutineContext + owner))
+        val sockets = PythonSocketElement(CoroutineScope(coroutineContext + owner))
         try {
             server().use { listener ->
                 val id = sockets.socket(2)
@@ -248,7 +249,7 @@ class HermesSocketProviderTest {
     @Test
     fun ownerAbortSettlesActiveAndQueuedCallsAndClosesDescriptors() = runBlocking(Dispatchers.IO) {
         val owner = SupervisorJob(coroutineContext[Job])
-        val sockets = HermesSocketElement(CoroutineScope(coroutineContext + owner))
+        val sockets = PythonSocketElement(CoroutineScope(coroutineContext + owner))
         try {
             server().use { listener ->
                 val id = sockets.socket(2)

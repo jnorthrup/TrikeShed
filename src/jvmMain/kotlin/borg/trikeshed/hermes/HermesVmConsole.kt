@@ -201,7 +201,9 @@ class HermesVmConsole(
                     __hermes_cli = HermesCLI(model=mux.select_model(), provider=mux.PROVIDER,
                                             base_url=mux.BASE_URL)
                     if __hermes_cli._session_db_unavailable or __hermes_cli._session_db is None:
-                        raise RuntimeError('HermesCLI session store is unavailable')
+                        from hermes_state import get_last_init_error
+                        raise RuntimeError('HermesCLI session store is unavailable: ' +
+                                           (get_last_init_error() or 'initialization failed without a storage diagnostic'))
                     __hermes_cli.run()
                     assert trikeshed_cli.status()['open']
                     trikeshed_cli.status()

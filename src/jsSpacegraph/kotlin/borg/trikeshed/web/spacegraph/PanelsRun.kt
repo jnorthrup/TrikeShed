@@ -89,35 +89,165 @@ fun executionPreview(value: dynamic): String {
     return if (text.length <= 32_768) text else text.take(32_768) + "\n… preview truncated at 32768 characters"
 }
 
+/** The reporting boundary's omission envelope, not a domain field such as agent.run's Boolean. */
+fun executionOmitted(value: dynamic): Boolean = value != null && typeOf(value.truncated) == "string" &&
+    isArray(value.keys) && keysOf(value).size == 2
+
+/** One authored program, one daemon admission. Rendering never invokes another runner. */
+suspend fun Panels.runProgram() {
+    if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
+    if (programRunning) { status("A program run is already awaiting its receipt"); return }
+    stopSources()
+    if (liveRuns > 0) { status("Sources stopped; wait for the current live sweep to finish, then choose Run"); return }
+    val document = JSON.stringify(toConfix())
+    val request = JSON.stringify(objOf {
+        it.name = str(panelName().value).ifBlank { "canvas" }
+        it.document = JSON.parse(document); it.inputs = obj()
+    })
+    for (n in nodes()) {
+        n._lastOut = undefined; n.el.classList.remove("ok", "err")
+        n._sheets = null; n._sheetRequest = null; n._sheetError = null; n._cur = null; n._orch = null
+        n._groups = null; n._cols = null; n._lastMove = null; n._heap = null; n._standings = null
+        for (el in arr(n.el.querySelectorAll(".result,.csheet,.kboard,.kboard-status,canvas.heapmap,.heapstat"))) el.remove()
+        n.el.querySelector(".gaugeval")?.textContent = "—"
+    }
+    programRunning = true
+    byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true
+    status("Running the authored program once · sources stopped · awaiting durable receipt…")
+    try {
+        val response = fetchJs("/api/lcnc/run", jsonInit("POST", request))
+        val result: dynamic = JSON.parse(PatchRead.text(response))
+        // Failures after admission have receipts too. Never retry through individual node runners.
+        if (result?.receiptCid != null && result.runId != null && result.programCid != null) {
+            lastProgramRun = result
+            var displayError = ""
+            try { if (JSON.stringify(toConfix()) == document) programOutputs(result, document) }
+            catch (e: dynamic) { displayError = " · canvas output display failed: " + failureText(e) }
+            facets.tab = "execution"
+            if (facets.drawer == null) facets.toggle() else facets.show("execution")
+            status("Program " + str(result.status) + " · " + str(result.runId) + " · receipt in Evidence; live sources remain stopped" + displayError)
+        } else {
+            status("Program request returned HTTP " + str(response.status) + " without a receipt: " +
+                str(result?.error ?: result?.detail ?: "unrecognized response") + ". No automatic retry.")
+        }
+    } catch (e: CancellationException) {
+        status("Program response interrupted; daemon outcome is unknown. Inspect run records before retrying.")
+        throw e
+    } catch (e: dynamic) {
+        status("Program response unavailable; daemon outcome is unknown: " + failureText(e) +
+            ". Inspect run records before retrying; no automatic retry.")
+    } finally {
+        programRunning = false
+        byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
+        byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+    }
+}
+
+/** Complete root-frame outputs may seed later gestures; omission markers and nested traces may not. */
+suspend fun Panels.programOutputs(run: dynamic, document: String) {
+    val outputs = run.outputs ?: return
+    val canvas = graph
+    val projected = nodes().filter { !truthy(it._parentScope) }
+    fun current(): Boolean = graph === canvas && JSON.stringify(toConfix()) == document
+    // Seed complete outputs before asynchronous sheet reads; renderers never dispatch execution.
+    for (n in projected) {
+        val out = outputs[n.id]
+        if (out == null || typeOf(out) != "object" || isArray(out)) continue
+        if (executionOmitted(out)) {
+            setResult(n, "Program output omitted: " + str(out.truncated) + ". Inspect the receipt; this value cannot feed a live input.")
+            continue
+        }
+        n._lastOut = out
+    }
+    val failures = ArrayList<String>()
+    try { for (n in projected) {
+        if (!current()) break
+        if (truthy(n._parentScope) || n._lastOut === undefined) continue
+        val out = n._lastOut
+        n.el.classList.remove("err", "running"); n.el.classList.add("ok")
+        try {
+            when (str(n.type)) {
+                "sheet.concentric" -> loadConcentric(n, out.rendered, out.byStatus, out.byPriority, out.orchestration, ::current)
+                "dom.board" -> {
+                    // Gestures mutate their page-owned view, never the retained output/memo.
+                    n._groups = JSON.parse<dynamic>(JSON.stringify(out.rendered ?: obj()))
+                    n._cols = out.columns
+                    renderGroupedBoard(n)
+                }
+                "display" -> setResult(n, out.x)
+                "gauge" -> {
+                    val value = out.x
+                    n.el.querySelector(".gaugeval").textContent = if (typeOf(value) == "number" && num(value) > 9999)
+                        fixed(num(value) / 1e6, 1) + "M" else str(value)
+                    n.el.querySelector(".gaugelabel").textContent = p(n, "label")
+                }
+                "graal.heap" -> { n._heap = out.heap; renderHeap(n) }
+                "mux.standings" -> { n._standings = out.standings; renderStandings(n) }
+                "slider" -> {
+                    n._sval = out.value
+                    renderSliderNode(n)
+                    n._srange.value = out.value; n._slab.textContent = str(out.value)
+                }
+                else -> {
+                    val render = runners[str(n.type)]?.render
+                    if (render != null) render(n, out)
+                    else if (keysOf(out).isNotEmpty()) setResult(n, out)
+                }
+            }
+        } catch (e: CancellationException) { throw e }
+        catch (e: dynamic) {
+            if (current() && truthy(n.el.isConnected)) {
+                val failure = str(n.id) + ": " + failureText(e)
+                failures.add(failure)
+                setResult(n, "Program output retained; presentation failed: $failure")
+            }
+        }
+    } } finally {
+        if (!current()) for (n in projected) {
+            if (n._lastOut === outputs[n.id]) n._lastOut = undefined
+        }
+    }
+    // Rich projections grow their nodes just as live results do. Keep controls reachable.
+    if (current()) resolveTopLevelOverlaps()
+    redraw()
+    if (failures.isNotEmpty()) throw PatchRefusal(failures.joinToString("; "))
+}
+
 suspend fun Panels.runAll(fromId: String?, automatic: Boolean = false) {
     if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
     if (automatic && truthy(graph.controls?.humanOversight)) { status("Loaded for review — choose Run to execute"); return }
-    status("running…")
-    for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.live"))) w.classList.add("flow")
-    var order: List<dynamic>
-    try { order = topo() } catch (e: CancellationException) { throw e } catch (e: dynamic) { status(failureText(e)); return }
-    if (fromId != null) { // restrict to downstream closure of fromId
-        val keep = HashSet<String>(); keep.add(fromId); var grew = true
-        while (grew) { grew = false; for (w in arr(graph.wires)) if (str(w.from[0]) in keep && str(w.to[0]) !in keep) { keep.add(str(w.to[0])); grew = true } }
-        order = order.filter { str(it.id) in keep }
+    if (programRunning) { status("Live trigger not admitted while awaiting the program receipt; it will not be replayed"); return }
+    liveRuns++
+    try {
+        status("running live…")
+        for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.live"))) w.classList.add("flow")
+        var order: List<dynamic>
+        try { order = topo() } catch (e: CancellationException) { throw e } catch (e: dynamic) { status(failureText(e)); return }
+        if (fromId != null) { // restrict to downstream closure of fromId
+            val keep = HashSet<String>(); keep.add(fromId); var grew = true
+            while (grew) { grew = false; for (w in arr(graph.wires)) if (str(w.from[0]) in keep && str(w.to[0]) !in keep) { keep.add(str(w.to[0])); grew = true } }
+            order = order.filter { str(it.id) in keep }
+        }
+        val cache = obj()
+        if (fromId != null) {
+            // seed required inputs outside the closure from the last live sweep's memo
+            for (n in nodes()) if (!order.contains(n) && n._lastOut !== undefined) cache[n.id] = n._lastOut
+        }
+        for (n in order) { val out = runNode(n, cache); if (out !== undefined) cache[n.id] = out }
+        resolveTopLevelOverlaps() // result trees grow nodes — keep them clear of each other
+        redraw()
+        val failures = order.count { truthy(it.el.classList.contains("err")) }
+        status(if (failures > 0) "Live sweep has $failures failed node(s) — inspect the marked nodes"
+            else "Live sweep done " + js("new Date().toLocaleTimeString()").unsafeCast<String>())
+    } finally {
+        liveRuns--
+        for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.flow"))) w.classList.remove("flow")
     }
-    val cache = obj()
-    if (fromId != null) {
-        // seed required inputs outside the closure from the last full run's memo
-        for (n in nodes()) if (!order.contains(n) && n._lastOut !== undefined) cache[n.id] = n._lastOut
-    }
-    for (n in order) { val out = runNode(n, cache); if (out !== undefined) cache[n.id] = out }
-    for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.flow"))) w.classList.remove("flow")
-    resolveTopLevelOverlaps() // result trees grow nodes — keep them clear of each other
-    redraw()
-    val failures = order.count { truthy(it.el.classList.contains("err")) }
-    status(if (failures > 0) "Run has $failures failed node(s) — inspect the marked nodes"
-        else "done " + js("new Date().toLocaleTimeString()").unsafeCast<String>())
 }
 
-/** Loading under human oversight cannot arm timers/SSE; an explicit Run can. */
+/** Loading under human oversight cannot arm timers/SSE; explicit Live can. */
 fun Panels.armSources(automatic: Boolean = false) {
-    if (truthy(graph.controls?.inspectionOnly) || automatic && truthy(graph.controls?.humanOversight)) return
+    if (programRunning || truthy(graph.controls?.inspectionOnly) || automatic && truthy(graph.controls?.humanOversight)) return
     for (n in nodes()) {
         if (truthy(n._parentScope)) continue // the daemon owns the frame
         if (truthy(contract(n.type)?.source) && n.type == "timer" && !truthy(n._timer)) {
@@ -243,7 +373,8 @@ fun Panels.load(data: dynamic) {
     val g = obj(); g.nodes = jsArray(); g.wires = jsArray(); g.seq = if (truthy(data.seq)) data.seq else 1
     g.controls = if (truthy(data.controls)) spread(data.controls) else undefined
     graph = g
-    byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
+    byId("runBtn").disabled = programRunning || truthy(graph.controls?.inspectionOnly)
+    byId("liveBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
     val savedCamera = data.view
     // three passes: CLONE the tree (children stay the SAME objects flattened into G.nodes), BUILD, MOUNT
     fun cloneNode(sn: dynamic): dynamic {
@@ -322,7 +453,7 @@ suspend fun Panels.syncBoard(name: String?) {
 }
 
 /** ── contract hydration: the vocabulary is server-owned ── */
-suspend fun Panels.syncContracts() {
+suspend fun Panels.syncContracts(announce: Boolean = true) {
     try {
         val payload = fetchJson("/api/lcnc/contracts")
         val list = arr(payload.contracts)
@@ -363,7 +494,8 @@ suspend fun Panels.syncContracts() {
             if (el == null) { el = document.createElement("div").asDynamic(); el.className = "result"; n.el.appendChild(el); on(el, "pointerdown", { e -> e.stopPropagation() }) }
             el.innerHTML = html // server-authored; content/error are escaped there
         }
-        status("${keysOf(m).size} contracts · ${kindAcceptance.size} semantic kinds · ${kindHierarchy.size} rdfs:subClassOf edges")
+        // Background vocabulary hydration must not replace a task refusal or run outcome.
+        if (announce) status("${keysOf(m).size} contracts · ${kindAcceptance.size} semantic kinds · ${kindHierarchy.size} rdfs:subClassOf edges")
     } catch (e: CancellationException) { throw e } catch (e: dynamic) {
         status("contracts fetch failed: " + str(e))
     }

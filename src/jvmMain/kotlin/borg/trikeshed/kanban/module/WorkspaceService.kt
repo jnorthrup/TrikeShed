@@ -29,8 +29,10 @@ class WorkspaceService(
         if (!capability.available || SubVmLegos.POLYGLOT !in context.lcncRunners || SubVmLegos.CAMEL !in context.lcncRunners)
             return descriptor
         val program = LcncWorkspacePresets.polyglot(capability.language, "${LcncWorkspacePresets.POLYGLOT}-${capability.language.id}")
+        val route = LcncWorkspacePresets.camel(capability.language, "${LcncWorkspacePresets.CAMEL_AUTHORING}-${capability.language.id}")
         return descriptor + ("construction" to mapOf("name" to program.name,
-            "document" to reify(LcncProgramConfix.toJson(program))))
+            "document" to reify(LcncProgramConfix.toJson(program)))) +
+            ("routeConstruction" to mapOf("name" to route.name, "document" to reify(LcncProgramConfix.toJson(route))))
     }
 
     suspend fun storageCatalog(): Map<String, Any?> = try {
@@ -39,7 +41,7 @@ class WorkspaceService(
     catch (e: Exception) { mapOf("available" to false, "error" to (e.message ?: "Dense storage unavailable")) }
 
     fun inspect(request: Map<*, *>): Map<String, Any?> {
-        ValueBudget().violation(request)?.let { throw IllegalArgumentException(it) }
+        WorkspaceFacets.valueBudget().violation(request)?.let { throw IllegalArgumentException(it) }
         val raw = requireNotNull(request["document"] as? Map<*, *>) { "document must be an object" }
         require(raw["nodes"] is List<*> && raw["wires"] is List<*>) { "document needs nodes and wires arrays" }
         fun nodes(values: List<*>) {
@@ -144,7 +146,7 @@ class WorkspaceService(
             "POST", "PUT" -> {
                 require(body.encodeToByteArray().size <= WorkspaceFacets.MAX_BYTES) { "Workspace request exceeds byte limit" }
                 val request = requireNotNull(reifyStrict(body) as? Map<*, *>) { "Request must be an object" }
-                ValueBudget().violation(request)?.let { throw IllegalArgumentException(it) }
+                WorkspaceFacets.valueBudget().violation(request)?.let { throw IllegalArgumentException(it) }
                 if (method == "PUT") {
                     require(request["action"] == "index-couch") { "Unknown workspace action" }
                     val storage = context.confixIsam

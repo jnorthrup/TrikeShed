@@ -24,6 +24,8 @@ def start(cli):
         raise RuntimeError("HermesCLI line transport is already open")
     if not cli._claim_active_session("cli"):
         raise RuntimeError("HermesCLI could not claim its session")
+    if cli._active_session_lease is None:
+        raise RuntimeError("HermesCLI active-session ownership was not acquired")
     _cli = cli
     try:
         cli._tui_print_startup()
