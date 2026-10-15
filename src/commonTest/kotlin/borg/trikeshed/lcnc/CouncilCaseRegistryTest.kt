@@ -29,6 +29,33 @@ class CouncilCaseRegistryTest {
     private val plan = TribunalInstance.schemaPlan()
 
     @Test
+    fun sameVerdictWithDifferentTranscriptCannotAliasTheTerminalReceipt() = runTest {
+        val registry = CouncilCaseRegistry(this, plan)
+        try {
+            registry.recordRuling("evidence", "sha256:" + "a".repeat(64), "sha256:" + "b".repeat(64))
+            assertFailsWith<IllegalStateException> {
+                registry.recordRuling("evidence", "sha256:" + "a".repeat(64), "sha256:" + "c".repeat(64))
+            }
+            assertEquals(3L, registry.revision("evidence"))
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
+    fun differentMistrialsWithEqualStringHashesCannotAlias() = runTest {
+        assertEquals("Aa".hashCode(), "BB".hashCode())
+        val registry = CouncilCaseRegistry(this, plan)
+        try {
+            registry.recordMistrial("collision", "Aa")
+            assertFailsWith<IllegalStateException> { registry.recordMistrial("collision", "BB") }
+            assertEquals(3L, registry.revision("collision"))
+        } finally {
+            registry.close()
+        }
+    }
+
+    @Test
     fun everyCaseRecordsItsOwnRuling_theSingletonRegression() = runTest {
         val registry = CouncilCaseRegistry(this, plan)
         try {

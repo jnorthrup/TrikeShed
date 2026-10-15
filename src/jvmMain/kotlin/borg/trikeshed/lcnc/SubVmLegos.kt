@@ -485,14 +485,29 @@ object SubVmLegos {
     }
 
     /** A typed function invocation owns its guest; reusable workspaces use the vm.* lifecycle nodes. */
-    fun polyglot(host: VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
+    fun polyglot(host: VmHost) = boundLcnc(VmHostKey(host), object : LcncNodeRunner {
+        override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean {
+            // Invalid selectors remain inspectable at the node hold; execute reports their error.
+            val spec = try {
+                val language = VmLanguage.of(VmRuntimeNodes.string(node, inputs, "language", "js")) ?: return false
+                if (language.runtime != VmLanguageRuntime.TRUFFLE) return false
+                VmSpec(node.id, requireNotNull(language.facet), trust = VmRuntimeNodes.trust(node, inputs), module = language.module)
+            } catch (_: IllegalArgumentException) { return false }
+            return VmHostKey.require().sourceDebugging(spec)
+        }
+
+        override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> =
+            polyglot(VmHostKey.require(), node, inputs)
+    })
+
+    private suspend fun polyglot(host: VmHost, node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
         require(listOf("vmId", "keep").none { key ->
             key in inputs || "$key?" in inputs || key in node.params || "in:$key" in node.params
         }) { "$POLYGLOT owns a temporary guest; vmId and keep are not supported" }
         val language = requireNotNull(VmLanguage.of(VmRuntimeNodes.string(node, inputs, "language", "js"))) {
             "Unknown VM language"
         }
-        VmLanguages.require(service.value, language)
+        VmLanguages.require(host, language)
         val program = VmLanguageProgram(language, VmRuntimeNodes.string(node, inputs, "source"),
             VmValueKind.of(VmRuntimeNodes.string(node, inputs, "inputKind", "JSON")),
             VmValueKind.of(VmRuntimeNodes.string(node, inputs, "outputKind", "JSON")))
@@ -509,8 +524,8 @@ object SubVmLegos {
         var failure: Throwable? = null
         var handle: VmHandle? = null
         val invocation = currentCoroutineContext()[LcncInvocationLedger.Invocation]
-        try {
-            val guest = service.value.spawn(spec).also { handle = it }
+        return try {
+            val guest = host.spawn(spec).also { handle = it }
             val result = program.evaluate(guest, input, node.id, budget, currentCoroutineContext()[borg.trikeshed.vm.VmDebugRequest])
             currentCoroutineContext().ensureActive()
             mapOf("value" to result.languageValue(), "text" to result.canonical(),
@@ -529,7 +544,7 @@ object SubVmLegos {
                         "refutations" to stats.refutations, "interrupted" to stats.interrupted),
                     "pointcuts" to guest.pointcuts()?.toMap())
             } }
-            try { service.value.revoke(spec.id, "lcnc invocation closed") }
+            try { host.revoke(spec.id, "lcnc invocation closed") }
             catch (cleanup: Throwable) {
                 val original = failure
                 if (original == null) throw cleanup

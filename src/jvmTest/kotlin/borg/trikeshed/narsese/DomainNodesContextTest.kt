@@ -1,6 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.dag.JobDependencyProduction
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -8,6 +9,8 @@ import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.lcnc.BrainClientKey
 import borg.trikeshed.lcnc.CasStoreKey
+import borg.trikeshed.lcnc.DocumentCurationLegos
+import borg.trikeshed.lcnc.DocumentCurationRunnerKey
 import borg.trikeshed.lcnc.KifKnowledgeBaseKey
 import borg.trikeshed.lcnc.KifSinkKey
 import borg.trikeshed.lcnc.LcncNode
@@ -17,7 +20,8 @@ import borg.trikeshed.lcnc.LcncServiceBinding
 import borg.trikeshed.lcnc.LegalCitationsKey
 import borg.trikeshed.lcnc.MuxContextKey
 import borg.trikeshed.lcnc.ReteNetworkKey
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
+import borg.trikeshed.nlp.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -26,9 +30,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
-import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
@@ -67,6 +73,12 @@ class DomainNodesContextTest {
             val cas = CasStore.inMemory()
             val originalRete = ReteNetwork()
             val rete = ReteNetwork()
+            // A network starts with the job production. Provider isolation means
+            // preserving that baseline, not requiring an empty registry.
+            val originalProductions = originalRete.productions.all()
+            val selectedProductions = rete.productions.all()
+            assertIs<JobDependencyProduction>(originalProductions.single())
+            assertIs<JobDependencyProduction>(selectedProductions.single())
             val originalKif = mutableListOf<String>()
             val kif = mutableListOf<String>()
             val line = "If fire starts then sprinklers activate."
@@ -98,6 +110,12 @@ class DomainNodesContextTest {
                 val context = if (type == "nal.mint") providers + callerRoute else providers
                 val output = withContext(context) { runner.run(LcncNode("n", type), mapOf("lines" to listOf(line))) }
                 assertEquals(1, (output["accepted"] as List<*>).size)
+                assertEquals(originalProductions, originalRete.productions.all(), "Captured provider must remain unchanged")
+                val added = rete.productions.all().filter { it !in selectedProductions }
+                val construction = assertIs<ConstructionReteProduction>(added.single())
+                val identity = ContentId.of("if_then\u0000fire starts\u0000sprinklers activate".encodeToByteArray())
+                assertEquals("construction:${identity.hex}", construction.ruleId)
+                assertEquals(selectedProductions + construction, rete.productions.all(), "Keep boot rules and register exactly one construction across rereads")
                 type = "nal.mint"
                 expectedRoute = callerRoute
             }
@@ -105,8 +123,6 @@ class DomainNodesContextTest {
             assertEquals(2, calls)
             assertEquals(0, originalBag.size)
             assertNull(originalCas.get(cid))
-            assertTrue(originalRete.productions.all().isEmpty())
-            assertEquals(1, rete.productions.all().size)
             assertTrue(originalKif.isEmpty())
             assertEquals(listOf("(causes fire_starts sprinklers_activate)", "(causes fire_starts sprinklers_activate)"), kif)
             assertEquals(ElementState.ACTIVE, bag.state)
@@ -122,52 +138,108 @@ class DomainNodesContextTest {
     fun legalProvidersPreserveGroundingDurabilityOrderAndEvidenceReadback() = runBlocking {
         val events = mutableListOf<String>()
         val originalCas = CasStore.inMemory()
+        var receiptCid: ContentId? = null
+        var returned = false
         val cas = object : CasStore() {
             override fun put(bytes: ByteArray): ContentId {
-                events.add("cas")
+                events.add("put:${ContentId.of(bytes).value}")
                 return super.put(bytes)
+            }
+            override fun get(cid: ContentId): ByteArray? {
+                if (returned && cid == receiptCid) events.add("receipt-read")
+                return super.get(cid)
             }
         }
         val originalKif = KifKnowledgeBase()
         val kif = KifKnowledgeBase()
-        val text = "Smith v. Jones. The agreement is enforceable."
+        val text = "Acme pays Beta."
+        val nlp = NlpDocument(text, s_[NlpSentence(0, 0, text.length,
+            s_[NlpToken(1, 0, 4, "Acme", "Acme", "NNP", "O"),
+                NlpToken(2, 5, 9, "pays", "pay", "VBZ", "O"),
+                NlpToken(3, 10, 14, "Beta", "Beta", "NNP", "O"),
+                NlpToken(4, 14, 15, ".", ".", ".", "O")],
+            s_[NlpDependency(0, 2, "root"), NlpDependency(2, 1, "nsubj"),
+                NlpDependency(2, 3, "obj"), NlpDependency(2, 4, "punct")])],
+            NlpMetadata("provider-fixture", "retained NNV fixture", emptyMap(), emptyMap()))
         val selectedRoute = ModelRoute("legal")
-        val selectedBrain = brain {
-            events.add("model")
+        lateinit var record: DocumentCurationRecord
+        val canonical = LcncNodeRunner { node, inputs ->
+            events.add("curate")
+            assertEquals("i.curate", node.id)
+            assertEquals(DocumentCurationLegos.CURATE, node.type)
             assertSame(selectedRoute, currentCoroutineContext()[ModelRoute])
             assertSame(cas, currentCoroutineContext()[CasStoreKey]!!.value)
             assertEquals(ElementState.ACTIVE, currentCoroutineContext()[LcncNodeKey.LEGAL_INGEST]!!.state)
-            """{"citations":[],"holdings":[{"text":"The agreement is enforceable.","type":"holding"},{"text":"Invented holding","type":"holding"}],"parties":[]}"""
+            val source = DocumentCurationLegos.retainSource(cas, assertIs<Map<*, *>>(inputs["source"]))
+            assertEquals(text, source.text)
+            assertEquals("legal/i", source.name)
+            assertEquals(source.name, source.correlation)
+            assertEquals(text, assertNotNull(cas.get(source.extractedTextCid)).decodeToString())
+            record = DocumentCurationRecord(source, nlp, null, "provider-fixture", s_[
+                DocumentProposal(raw = "{}", subject = "Acme", predicate = "pay", obj = "Beta",
+                    quote = text, begin = 0, end = text.length, polarity = true, modality = "asserted"),
+                DocumentProposal(raw = "{}", quote = "Invented holding",
+                    reasons = s_["quote does not match UTF-16 span"]),
+            ], s_["source attribution only"])
+            receiptCid = cas.put(DocumentCuratorCodec.encode(record))
+            events.add("receipt-retained")
+            DocumentCurationLegos.reference(receiptCid!!, record).also {
+                returned = true
+                events.add("curate-return")
+            }
         }
-        val ingest = LegalNodes.ingestRunner(brain { error("captured model used") }, EmptyCoroutineContext, originalCas, originalKif::assertKif)
-        keys(ingest, BrainClientKey, MuxContextKey, CasStoreKey, KifSinkKey, LegalCitationsKey)
-        val providers = BrainClientKey(selectedBrain) + MuxContextKey(selectedRoute) + CasStoreKey(cas) +
+        val ingest = LegalNodes.ingestRunner({ error("captured curator used") }, originalCas)
+        keys(ingest, DocumentCurationRunnerKey, CasStoreKey, LegalCitationsKey)
+        val providers = selectedRoute + DocumentCurationRunnerKey {
+            events.add("resolve")
+            canonical
+        } + CasStoreKey(cas) + BrainClientKey(brain { error("legacy legal extraction used") }) +
             KifSinkKey { events.add("kif"); kif.assertKif(it) } + LegalCitationsKey { source ->
                 events.add("extract")
                 assertEquals(text, source)
-                listOf(mapOf("text" to "Smith v. Jones", "case" to "Smith v. Jones"))
+                listOf(mapOf("text" to "Acme", "case" to "Acme"))
             }
         val output = withContext(providers) {
             ingest.run(LcncNode("i", "legal.ingest"), mapOf("text" to text))
         }
-        assertEquals(listOf("extract", "model", "cas"), events.take(3))
-        assertTrue(events.drop(3).isNotEmpty() && events.drop(3).all { it == "kif" })
+        assertEquals(listOf("resolve", "curate", "receipt-retained", "curate-return", "receipt-read", "extract"),
+            events.filter { !it.startsWith("put:") })
+        assertEquals(1, events.count { it == "extract" })
+        assertFalse("kif" in events)
         val cid = ContentId(output["documentCid"] as String)
+        val retainedCid = assertNotNull(receiptCid)
+        assertEquals(retainedCid.value, output["receiptCid"])
+        assertTrue(events.indexOf("put:${cid.value}") < events.indexOf("put:${retainedCid.value}"))
         assertEquals(text, assertNotNull(cas.get(cid)).decodeToString())
+        assertContentEquals(DocumentCuratorCodec.encode(record), cas.get(retainedCid))
         assertNull(originalCas.get(cid))
+        assertNull(originalCas.get(retainedCid))
         assertTrue(originalKif.toKifFile().isBlank())
-        assertTrue("Invented" !in kif.toKifFile())
-        assertEquals(1, ((output["elements"] as Map<*, *>)["refused"] as List<*>).size)
+        assertTrue(kif.toKifFile().isBlank())
+        for ((key, value) in DocumentCurationLegos.reference(retainedCid, record)) assertEquals(value, output[key], key)
+        assertEquals(listOf(mapOf("text" to "Acme", "case" to "Acme")), output["citations"])
+        val proposals = record.proposals.view.map(DocumentCuratorCodec::proposal)
+        val elements = assertIs<Map<*, *>>(output["elements"])
+        assertEquals(proposals, elements["proposals"])
+        assertEquals(listOf(proposals[1]), elements["refused"])
+        assertEquals(record.reasons.view.toList(), elements["reasons"])
+        assertFalse("holdings" in elements || "parties" in elements)
+        val brief = assertIs<String>(output["brief"])
+        assertTrue(text in brief)
+        assertTrue(retainedCid.value in brief)
+        assertTrue("proposal" in brief.lowercase() && "refus" in brief.lowercase())
+        for (proposal in record.proposals.view) for (reason in proposal.reasons.view) assertTrue(reason in brief)
 
         val evidence = LegalNodes.evidenceRunner(originalKif)
         keys(evidence, KifKnowledgeBaseKey)
-        val input = mapOf("documentCid" to cid.value, "brief" to "Brief")
-        assertEquals("Brief", evidence.run(LcncNode("e", "legal.evidence"), input)["brief"])
+        val input = mapOf("documentCid" to cid.value, "brief" to brief)
+        assertEquals(brief, evidence.run(LcncNode("e", "legal.evidence"), input)["brief"])
+        kif.assertKif("(ruling case_prior doc_${cid.hex} verdict_prior)")
         val enriched = withContext(KifKnowledgeBaseKey(kif)) {
             evidence.run(LcncNode("e", "legal.evidence"), input)["brief"] as String
         }
-        assertTrue("The agreement is enforceable." in enriched)
-        assertTrue("Smith_v__Jones" in enriched)
-        assertTrue("Invented" !in enriched)
+        assertTrue(brief in enriched)
+        assertTrue("prior ruling: case_prior -> verdict_prior" in enriched)
+        assertFalse("- holding:" in enriched || "- party:" in enriched)
     }
 }

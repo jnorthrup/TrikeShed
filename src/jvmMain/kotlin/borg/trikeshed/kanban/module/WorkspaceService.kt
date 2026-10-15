@@ -10,10 +10,13 @@ import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
 import borg.trikeshed.parse.confix.Syntax
-import borg.trikeshed.vm.VmSupervisor
+import borg.trikeshed.vm.VmHost
 import borg.trikeshed.vm.VmLanguageCapability
 import borg.trikeshed.vm.VmLanguage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 
 /** Read-only inspection plus an explicit PUT for bounded Couch-to-dense indexing. No graph execution. */
 class WorkspaceService(
@@ -22,11 +25,28 @@ class WorkspaceService(
 ) {
     suspend fun catalog(): Map<String, Any?> = mapOf(
         "facets" to WorkspaceFacets.catalog().view.toList(),
-        "languages" to VmLanguages.capabilities(VmSupervisor.current).view.map(::language),
+        "languages" to capabilities().view.map(::language),
         "runners" to context.lcncRunners.keys.sorted(),
         "blackboardRevision" to context.blackboard.snapshot().revision,
         "storage" to storageCatalog(),
     )
+
+    suspend fun capabilities(): Series<VmLanguageCapability> {
+        val runner = context.lcncRunners[SubVmLegos.POLYGLOT]
+        val binding = runner as? LcncServiceBinding
+        if (binding == null || binding.requiredKeys.view.none { it === VmHostKey }) {
+            val note = if (runner == null) "vm.polyglot is not bound in this workspace."
+                else "The registered vm.polyglot runner does not declare a VM host binding."
+            return VmLanguage.all α { VmLanguageCapability(it, false, false, note) }
+        }
+        // Match LcncRunService: caller > mux > module > the runner's borrowed default.
+        return withContext(context.scope.coroutineContext.minusKey(Job) +
+            context.muxContext.minusKey(Job) + currentCoroutineContext()) {
+            binding.withServices {
+                VmLanguages.capabilities(currentCoroutineContext()[VmHostKey]?.value ?: VmHost.NONE)
+            }
+        }
+    }
 
     fun language(capability: VmLanguageCapability): Map<String, Any?> {
         val native = if (capability.language in setOf(VmLanguage.JAVA, VmLanguage.GROOVY) &&

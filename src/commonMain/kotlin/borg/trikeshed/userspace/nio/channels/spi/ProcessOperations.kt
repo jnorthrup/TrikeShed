@@ -55,16 +55,30 @@ interface ProcessPipes {
     suspend fun close()
 }
 
-/** A multiplexed worker may keep its protocol separate from physical terminal pipes. */
-interface ProcessProtocolPipes : ProcessPipes {
-    val processId: Long
-    val isAlive: Boolean
-    val terminalOutputs: Set<ProcessOutput>
+/** One duplex protocol endpoint; closing it does not own or terminate a process. */
+interface ProcessProtocolStream {
     suspend fun readProtocol(bytes: ByteArray): Int
     suspend fun writeProtocol(bytes: ByteArray)
     suspend fun closeProtocolInput()
+    suspend fun closeProtocol()
+}
+
+/** A multiplexed worker may keep its protocol separate from physical terminal pipes. */
+interface ProcessProtocolPipes : ProcessPipes, ProcessProtocolStream {
+    val processId: Long
+    val isAlive: Boolean
+    val separateProtocol: Boolean
+    val terminalOutputs: Set<ProcessOutput>
     /** Explicit revocation, never the normal drain path. Zero grace means immediate revocation. */
     suspend fun revoke(graceMillis: Long)
+}
+
+/** Platform bridge for a synchronous caller; all protocol scheduling remains in common userspace. */
+interface ProcessProtocolBinding {
+    val context: CoroutineContext
+    val pipes: ProcessProtocolPipes
+    fun <T> await(operation: suspend () -> T): T
+    suspend fun <T> invoke(operation: () -> T): T
 }
 
 data class ProcessResult(

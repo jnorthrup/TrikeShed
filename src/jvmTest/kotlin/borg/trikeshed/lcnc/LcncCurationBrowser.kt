@@ -17,11 +17,12 @@ import kotlin.test.assertTrue
 
 /** Optional loopback transport over the tested curator and production module; never the user's daemon. */
 internal suspend fun retainedSimulationBrowser(
-    source: ModuleContext, curator: DocumentCuratorElement, binding: CcekReactorBinding, program: LcncProgram,
+    source: ModuleContext, curator: DocumentCuratorElement?, binding: CcekReactorBinding, program: LcncProgram,
+    stateDirectory: java.io.File? = null,
     observations: () -> Map<String, Any?> = { emptyMap() },
 ) = coroutineScope {
     val owner = SupervisorJob(coroutineContext[Job])
-    val state = Files.createTempDirectory("lcnc-retained-simulation-").toFile()
+    val state = stateDirectory ?: Files.createTempDirectory("lcnc-retained-simulation-").toFile()
     val context = ModuleContext(source.couch, source.rete, source.productions, null, null,
         source.blackboard, source.casStore, source.attachments, ModuleRouteRegistry(),
         CoroutineScope(coroutineContext + owner + Dispatchers.Default), source.clock, state,
@@ -42,7 +43,12 @@ internal suspend fun retainedSimulationBrowser(
                 var mime = "application/json; charset=utf-8"
                 val bytes = when {
                     path == "/_test/finish" -> { finished.countDown(); "{}".encodeToByteArray() }
-                    path == "/_test/observations" -> jsonOf(observations()).encodeToByteArray()
+                    path == "/_test/observations" -> {
+                        val board = runBlocking {
+                            context.routes.match("/api/board")?.route("GET", "/api/board", "", null)
+                        }
+                        jsonOf(observations() + ("board" to board?.body?.let(::reify))).encodeToByteArray()
+                    }
                     path == "/blackboard/board" -> runBlocking {
                         requireNotNull(blackboard.route("GET", path, "")).body.encodeToByteArray()
                     }
@@ -55,7 +61,7 @@ internal suspend fun retainedSimulationBrowser(
                     path == "/api/documents" -> runBlocking {
                         val query = CouchHttpSurface.parseQuery(exchange.requestURI.rawQuery.orEmpty())
                         val cid = ContentId(requireNotNull(query["cid"]))
-                        val record = requireNotNull(curator.record(cid))
+                        val record = requireNotNull(curator?.record(cid))
                         jsonOf(DocumentCurationLegos.sheet(cid, record, query)).encodeToByteArray()
                     }
                     path in setOf("/panels", "/kanban", "/graal") || path.endsWith(".js") || path.endsWith(".css") -> {

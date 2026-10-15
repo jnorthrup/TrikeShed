@@ -599,6 +599,14 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.named<Test>("jvmTest") {
+    // The same canonical-curation contract can explicitly exercise the operator's provider.
+    // Keep fixture/live runs distinct in Gradle's up-to-date checks; none of these inputs is a credential.
+    listOf("TRIKESHED_CURATION_PROFILE", "TRIKESHED_CURATION_BASE", "TRIKESHED_CURATION_MODEL").forEach { name ->
+        inputs.property(name, providers.environmentVariable(name).orElse(""))
+    }
+    val liveCuration = providers.environmentVariable("TRIKESHED_CURATION_PROFILE")
+    outputs.upToDateWhen { !liveCuration.isPresent }
+    outputs.doNotCacheIf("Live curation requires a new provider response") { liveCuration.isPresent }
     // Boundary tests read sources and build declarations outside the JVM compilation inputs.
     inputs.files(fileTree(projectDir) {
         include("**/*.gradle.kts", "**/*.gradle", "**/*.versions.toml")

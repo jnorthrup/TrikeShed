@@ -29,14 +29,17 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-internal fun vmRuntimeTestContext(scope: kotlinx.coroutines.CoroutineScope): ModuleContext {
+internal fun vmRuntimeTestContext(
+    scope: kotlinx.coroutines.CoroutineScope,
+    muxContext: kotlin.coroutines.CoroutineContext = kotlin.coroutines.EmptyCoroutineContext,
+): ModuleContext {
     val cas = CasStore.inMemory()
     val store = CouchStoreFactory.casBacked(cas)
     return ModuleContext(
         couch = Couch("vm-runtime-test", store, cas), rete = ReteNetwork(), productions = ReteProductionRegistry(),
         beliefBag = null, turnReview = null, blackboard = ConfixBlackboard.empty(), casStore = cas,
         attachments = CouchAttachmentGateway(store, cas), routes = ModuleRouteRegistry(), scope = scope,
-        clock = { 123L }, stateDir = File(System.getProperty("java.io.tmpdir"), "vm-runtime-test"),
+        clock = { 123L }, stateDir = File(System.getProperty("java.io.tmpdir"), "vm-runtime-test"), muxContext = muxContext,
     )
 }
 

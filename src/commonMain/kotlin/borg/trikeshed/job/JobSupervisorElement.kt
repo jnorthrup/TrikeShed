@@ -65,11 +65,16 @@ class JobSupervisorElement private constructor(
     var committedSequence: Long = 0L
         private set
 
+    // Rejected commands also occupy a WAL frame. They must not reuse the
+    // next accepted command's sequence or poison subsequent appends.
+    private var logSequence: Long = 0L
+
     private val reducer = JobReducer()
     val instrumentation: Instrumentation get() = instrumentationRef
 
     private val snapshots = mutableMapOf<JobId, JobSnapshot>()
     private val snapshotCids = mutableMapOf<JobId, ContentId>()
+    private val receipts = mutableMapOf<String, ContentId>()
     private val factLog = mutableMapOf<JobId, MutableList<String>>()
 
     val isActive: Boolean get() = _lifecycleState == ElementState.ACTIVE
@@ -85,16 +90,26 @@ class JobSupervisorElement private constructor(
 
     init {
         _lifecycleState = ElementState.OPEN
-        // Replay from WAL if available
-        if (walData != null && walData.isNotEmpty()) {
-            val log = JobLog.fromMap(walData)
+        // The supplied log is authoritative; walData retains the compatibility
+        // entrypoint's map-backed replay. Rebuild receipts before admission.
+        try {
+            val log = if (walData != null && walData.isNotEmpty()) JobLog.fromMap(walData) else jobLog
             log.replay().forEach { frame ->
-                val result = reducer.reduce(CanonicalCbor.decodeJobCommand(frame.payload))
+                val command = CanonicalCbor.decodeJobCommand(frame.payload)
+                val result = reducer.reduce(command)
+                logSequence = frame.sequence
                 committedSequence = frame.sequence
                 if (result.accepted) {
-                    result.snapshot?.let { snapshots[it.jobId] = it }
+                    result.snapshot?.let { snapshot ->
+                        snapshotCids[snapshot.jobId] = retain(CanonicalCbor.encode(snapshot))
+                        receipts[command.idempotencyKey] = snapshotCids.getValue(snapshot.jobId)
+                        snapshots[snapshot.jobId] = snapshot
+                    }
                 }
             }
+        } catch (failure: Throwable) {
+            _rootJob.cancel()
+            throw failure
         }
         _lifecycleState = ElementState.ACTIVE
         reactorJob = parentScope.launch(coroutineContext) { reactor() }
@@ -121,9 +136,22 @@ class JobSupervisorElement private constructor(
     }
 
     private suspend fun reactor() {
-        for (cmd in _commands) {
-            processCommand(cmd)
+        try {
+            for (cmd in _commands) processCommand(cmd)
+        } catch (failure: Throwable) {
+            // A failed durability boundary leaves an unknown WAL outcome.
+            // Stop admission and wake commit waiters with the actual failure;
+            // no later command may use the potentially advanced reducer.
+            cancel(failure)
         }
+    }
+
+    private fun retain(bytes: ByteArray): ContentId {
+        val expected = ContentId.of(bytes)
+        check(casStore.put(bytes) == expected) { "CAS acknowledgement digest mismatch for $expected" }
+        check(casStore.get(expected)?.contentEquals(bytes) == true) { "CAS read-back verification failed for $expected" }
+        casStore.sync()
+        return expected
     }
 
     private suspend fun processCommand(cmd: JobCommand) {
@@ -135,25 +163,17 @@ class JobSupervisorElement private constructor(
         val canonicalBytes = CanonicalCbor.encode(cmd)
 
         // Step 3: CAS write
-        val cid = ContentId.of(canonicalBytes)
         instrumentationRef.casWriteAttempts++
-        try {
-            casStore.put(canonicalBytes)
-            casStore.get(cid) ?: throw IllegalStateException("CAS digest verification failed")
-        } catch (e: Exception) {
-            return
-        }
+        retain(canonicalBytes)
         instrumentationRef.casWriteCount++
         instrumentationRef.casWriteSequence = ++instrumentationRef.globalSequence
 
         // Step 4: WAL append
         instrumentationRef.walAppendAttempts++
-        try {
-            jobLog.append(committedSequence + 1, canonicalBytes)
-        } catch (e: Exception) {
-            return
-        }
-        walData?.let { it["${committedSequence + 1}"] = canonicalBytes }
+        val sequence = logSequence + 1
+        jobLog.append(sequence, canonicalBytes)
+        logSequence = sequence
+        walData?.let { it["$sequence"] = canonicalBytes }
         instrumentationRef.walAppendCount++
         instrumentationRef.walAppendSequence = ++instrumentationRef.globalSequence
 
@@ -167,15 +187,19 @@ class JobSupervisorElement private constructor(
         instrumentationRef.reducerApplySequence = ++instrumentationRef.globalSequence
 
         if (result.accepted) {
+            result.snapshot?.let {
+                val snapshotCid = retain(CanonicalCbor.encode(it))
+                snapshots[it.jobId] = it
+                snapshotCids[it.jobId] = snapshotCid
+                receipts[cmd.idempotencyKey] = snapshotCid
+            }
             committedSequence++
+            // Receiving Accepted is a visibility boundary, not merely a signal
+            // that the reducer ran. The snapshot and its CAS bytes exist first.
             result.event?.let { _committed.send(it) }
             result.fact?.let {
                 _facts.send(it)
                 factLog.getOrPut(cmd.jobId) { mutableListOf() }.add(canonicalBytes.decodeToString())
-            }
-            result.snapshot?.let {
-                snapshots[it.jobId] = it
-                snapshotCids[it.jobId] = ContentId.of(CanonicalCbor.encode(it))
             }
         } else {
             result.event?.let { _committed.send(it) }
@@ -242,16 +266,18 @@ class JobSupervisorElement private constructor(
         _commands.close()
     }
 
-    fun cancel() {
+    fun cancel(cause: Throwable? = null) {
         _lifecycleState = ElementState.CLOSED
         _commands.close()
-        _committed.close()
+        _committed.close(cause)
         _facts.close()
         _activations.close()
         _rootJob.cancel()
     }
 
     fun snapshot(jobId: JobId): JobSnapshot? = snapshots[jobId]
+    /** Original accepted snapshot for a command, restored from the authoritative log on open. */
+    fun receipt(idempotencyKey: String): ContentId? = receipts[idempotencyKey]
     fun snapshots(): List<JobSnapshot> = snapshots.values.toList()
 
     fun snapshot(jobId: String): JobSnapshot? = snapshots[JobId.of(jobId)]

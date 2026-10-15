@@ -8,7 +8,7 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProcessProtocolChannelTest {
-    class Pipes : ProcessProtocolPipes {
+    class Pipes(override val separateProtocol: Boolean = true) : ProcessProtocolPipes {
         override val processId = 17L
         override var isAlive = true
         override val terminalOutputs = setOf(ProcessOutput.Stdout, ProcessOutput.Stderr)
@@ -38,6 +38,7 @@ class ProcessProtocolChannelTest {
             protocol.close(); stdout.close(); stderr.close(); isAlive = false; exit.complete(0)
         }
         override suspend fun awaitExit() = exit.await()
+        override suspend fun closeProtocol() { protocol.cancel() }
         override suspend fun revoke(graceMillis: Long) { revoked = true; closeProtocolInput() }
         override suspend fun close() { closed = true; if (isAlive) revoke(0) }
     }
@@ -89,6 +90,37 @@ class ProcessProtocolChannelTest {
         assertTrue(pipes.inputClosed)
         channel.send("close") // Terminal EOF is not protocol EOF.
         channel.drain()
+    }
+
+    @Test fun stdioDrainDoesNotCloseTheProtocolThroughTheTerminalWriter() = runTest {
+        val pipes = Pipes(separateProtocol = false)
+        val release = CompletableDeferred<Unit>()
+        pipes.writeGate = release
+        val channel = ProcessProtocolChannel(coroutineContext, pipes, onLine = {})
+        val sender = async { channel.send("admitted") }
+        runCurrent()
+        val drain = async { channel.drain() }
+        runCurrent()
+        assertFalse(pipes.inputClosed, "Physical stdin is also the protocol: only its writer may close it")
+        assertFalse(drain.isCompleted)
+        release.complete(Unit)
+        sender.await(); drain.await()
+        assertEquals(listOf("admitted\n"), pipes.writes)
+        assertFalse(pipes.inputClosed)
+    }
+
+    @Test fun existingLargeAndUnterminatedFramesRetainTheirContents() = runTest {
+        val pipes = Pipes()
+        val frames = mutableListOf<String>()
+        val channel = ProcessProtocolChannel(coroutineContext, pipes, onLine = { frames.add(it) })
+        val source = "λ".repeat(600_000) // Existing VM frames have no one-MiB response restriction.
+        val bytes = (source + "\r\nlast").encodeToByteArray()
+        for (offset in bytes.indices step 4_093) {
+            pipes.protocol.send(bytes.copyOfRange(offset, minOf(bytes.size, offset + 4_093)))
+        }
+        channel.drain()
+        assertEquals(listOf(source, "last"), frames)
+        assertFalse(pipes.revoked)
     }
 
     @Test fun cancelledSendAndDrainWaitersStillJoinAdmittedWritesAndTerminalDelivery() = runTest {

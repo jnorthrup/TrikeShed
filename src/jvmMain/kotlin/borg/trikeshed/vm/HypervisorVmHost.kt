@@ -32,6 +32,10 @@ class HypervisorVmHost(
 
     private fun emit(e: VmEvent) { _events.tryEmit(e) }
 
+    override fun sourceDebugging(spec: VmSpec): Boolean =
+        spec.trust == VmTrust.OWN && spec.world.isEmpty() && spec.facet in languages &&
+            spec.facet in setOf(VmFacet.GRAAL_JS, VmFacet.GRAAL_PYTHON, VmFacet.GRAAL_RUBY)
+
     override fun spawn(spec: VmSpec): VmHandle {
         val trust = if (spec.trust == VmTrust.OWN) Trust.OWN else Trust.UNTRUSTED
         val budget = Budget(

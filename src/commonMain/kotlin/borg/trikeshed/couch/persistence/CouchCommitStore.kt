@@ -82,7 +82,6 @@ class CouchCommitStore(
         require(frame.sequence >= 0 && frame.sequence > frameSequence) { "Couch commit sequence must increase" }
         val captured = capture(frame)
         if (durability == StorageDurability.DURABLE) {
-            captured.doc?.let(::validateReferences)
             val body = captured.doc?.let { putVerified(CouchStoreFactory.canonicalBody(it)).value }
             append(mapOf(
                 "kind" to "frame", "sequence" to captured.sequence,
@@ -261,7 +260,9 @@ class CouchCommitStore(
         }
     }
 
-    private fun capture(frame: CouchCommittedFrame): CouchCommittedFrame {
+    /** Own and validate the body before another durable representation publishes it. */
+    internal fun capture(frame: CouchCommittedFrame): CouchCommittedFrame = synchronizedLock(gate) {
+        operational()
         validateFrame(frame)
         val doc = frame.doc?.let {
             val bytes = CouchStoreFactory.canonicalBody(it)
@@ -269,7 +270,8 @@ class CouchCommitStore(
                 require(captured.id == frame.docId) { "Canonical Couch body identity mismatch" }
             }
         }
-        return frame.copy(doc = doc)
+        if (durability == StorageDurability.DURABLE) doc?.let(::validateReferences)
+        frame.copy(doc = doc)
     }
 
     /**

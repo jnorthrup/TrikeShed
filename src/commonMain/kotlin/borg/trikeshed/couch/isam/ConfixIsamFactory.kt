@@ -2,11 +2,14 @@ package borg.trikeshed.couch.isam
 
 import borg.trikeshed.couch.*
 import borg.trikeshed.couch.persistence.CouchCommitStore
+import borg.trikeshed.couch.persistence.asLocalBacking
+import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.isam.*
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
@@ -54,6 +57,8 @@ class ConfixIsamCursorBridge(
     private val history = linkedMapOf<Long, ConfixIsamRevision>()
     private val heads = linkedMapOf<String, ConfixIsamRevision>()
     private var lastSequence = -1L
+    private var couchStore: CouchStore? = null
+    private var couchCommit = false
 
     init {
         try { for (frame in commits.recoveredFrames.view) retain(decode(frame)) }
@@ -97,6 +102,7 @@ class ConfixIsamCursorBridge(
     fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax,
             writer: IsamOperations = operations): ConfixIsamRevision = synchronizedLock(gate) {
         commits.checkOpen()
+        check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
         val bytes = source.copyOf()
         val cid = ContentId.of(bytes)
         replay(sequence, id, rev, cid, syntax)?.let { return@synchronizedLock it }
@@ -133,6 +139,7 @@ class ConfixIsamCursorBridge(
 
     fun delete(sequence: Long, id: String, rev: String): ConfixIsamRevision = synchronizedLock(gate) {
         commits.checkOpen()
+        check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
         replay(sequence, id, rev, null, null)?.let { return@synchronizedLock it }
         validate(sequence, id, rev)
         val entry = ConfixIsamRevision(sequence, id, rev, true, null, null, null, emptyMap())
@@ -152,6 +159,36 @@ class ConfixIsamCursorBridge(
                 put(frame.sequence, frame.docId, frame.rev, CouchStoreFactory.canonicalBody(doc), Syntax.CBOR, writer)
             }
         }
+    }
+
+    /**
+     * Couch protocol over this durable destination, not a migration of another database.
+     * Existing entries must be canonical Couch CBOR bodies; replay uses their dense Confix geometry.
+     * After binding, writes go through the shared Couch ingress, never the raw revision API.
+     * Heads remain memory projections. Closing this owner releases the durable writer lease.
+     */
+    fun couch(name: String): Couch = synchronizedLock(gate) {
+        commits.checkOpen()
+        val capture = commits::capture
+        val store = couchStore ?: CouchStoreFactory.committed(cas, revisions α { entry ->
+            val body = if (entry.deleted) null else {
+                require(entry.syntax == Syntax.CBOR) { "Couch requires canonical CBOR revisions" }
+                val doc = requireNotNull(document(entry.id, entry.rev))
+                val value = CanonicalCbor.item(requireNotNull(doc.rootCell)).toAny()
+                @Suppress("UNCHECKED_CAST")
+                val fields = requireNotNull(value as? Map<String, Any?>) { "Couch body must be an object" }
+                val body = requireNotNull(CouchStoreFactory.documentFromBody(fields)) { "Couch body requires _id" }
+                require(CouchStoreFactory.canonicalBody(body).contentEquals(doc.src.toArray())) { "Noncanonical Couch body" }
+                body
+            }
+            capture(CouchCommittedFrame(entry.sequence, entry.id, entry.rev, entry.deleted, body))
+        }) { frame -> synchronizedLock(gate) {
+            val captured = commits.capture(frame)
+            couchCommit = true
+            try { importFrames(s_[captured]) } finally { couchCommit = false }
+            captured
+        } }.also { couchStore = it }
+        Couch(name, store, cas, commits.asLocalBacking())
     }
 
     /** Each row's final cell is a nested cursor, not a JSON string masquerading as packed ISAM bytes. */

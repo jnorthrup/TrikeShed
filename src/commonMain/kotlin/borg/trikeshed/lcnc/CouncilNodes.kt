@@ -4,11 +4,16 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.parse.jsonOf
 
-import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.*
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
+
+/** Durable decision and publication are distinct boundaries across the record's stores. */
+enum class CouncilRecordPhase { PREPARED, RECORDED, PUBLISHED }
 
 /**
  * The persistence seams `council.record` / `council.case` cross — every
@@ -24,17 +29,61 @@ data class RecordSeams(
     val blackboardPut: (String, Map<String, String>, String) -> Unit,
     /** Assert one KIF expression into the shared bank. */
     val kifSink: (String) -> Unit,
-    /** Upsert a durable document: (id, body). */
+    /** Upsert a durable document: (id, body). Must throw on rejection, including conflicts. */
     val couchPut: (String, Map<String, Any?>) -> Unit,
-    /** Advance the per-case lifecycle to ruled; returns the recorded cid. */
+    /** Advance the per-case lifecycle to ruled; returns its retained JobSnapshot CID. */
     val recordRuling: suspend (caseId: String, verdictCid: String, transcriptCid: String) -> String,
-    /** Advance the per-case lifecycle to mistrial; returns the recorded cid. */
+    /** Advance the per-case lifecycle to mistrial; returns its retained JobSnapshot CID. */
     val recordMistrial: suspend (caseId: String, reason: String) -> String,
     val blackboardGet: (String) -> Map<String, String>?,
     val couchGet: (String) -> Map<String, Any?>?,
     val casGet: (String) -> ByteArray?,
+    /** Shared by copies of these borrowed services; serialize journal admission and replay. */
+    val recordMutex: Mutex = Mutex(),
 ) {
+    fun verifyRetained(bytes: ByteArray): String {
+        val cid = ContentId.of(bytes).value
+        check(casGet(cid)?.contentEquals(bytes) == true) { "council.record: CAS bytes not retained for $cid" }
+        return cid
+    }
+
+    fun retain(bytes: ByteArray): String {
+        check(casPut(bytes) == ContentId.of(bytes).value) { "council.record: CAS acknowledgement digest mismatch" }
+        return verifyRetained(bytes)
+    }
+
+    /** Check the receipt itself, without reconstructing or rewriting any missing state. */
+    fun lifecycleReceipt(caseId: String, receipt: String?, decisionStatus: String?): String {
+        try {
+            val cid = ContentId(checkNotNull(receipt?.takeIf { it.isNotBlank() }) { "missing identity" })
+            val bytes = checkNotNull(casGet(cid.value)) { "snapshot bytes not retained" }
+            check(ContentId.of(bytes) == cid) { "snapshot digest mismatch" }
+            val snapshot = CanonicalCbor.decodeJobSnapshot(bytes)
+            val expected = when (decisionStatus) {
+                "ruled" -> "closed"
+                "mistrial" -> "failed"
+                else -> error("missing or invalid decision status")
+            }
+            check(snapshot.jobId == JobId.of("case/$caseId")) { "snapshot names another case" }
+            check(snapshot.revision > 0L) { "snapshot has no committed revision" }
+            check(snapshot.lifecycle == expected) { "expected '$expected' lifecycle, found '${snapshot.lifecycle}'" }
+            return cid.value
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            throw IllegalStateException("council.record: invalid lifecycle receipt for '$caseId': ${failure.message}", failure)
+        }
+    }
+
     companion object {
+        /** Couch rejects writes with an error body as well as exceptions. Both fail recording. */
+        fun requireCouchWrite(id: String, response: Map<String, Any?>) {
+            check(response["ok"] == true && response["id"] == id &&
+                (response["rev"] as? String)?.isNotBlank() == true) {
+                "council.record: Couch write '$id' was not acknowledged: ${jsonOf(response)}"
+            }
+        }
+
         /** Map/list-backed fakes over [store] — the zero-spend test seams. */
         fun inMemory(store: InMemoryRecordStore = InMemoryRecordStore()): RecordSeams = RecordSeams(
             casPut = { bytes -> ContentId.of(bytes).value.also { store.cas[it] = bytes } },
@@ -46,11 +95,11 @@ data class RecordSeams(
             couchPut = { id, body -> store.couch[id] = body },
             recordRuling = { caseId, verdictCid, transcriptCid ->
                 store.rulings.add(Triple(caseId, verdictCid, transcriptCid))
-                verdictCid
+                store.receipt(caseId, "closed")
             },
             recordMistrial = { caseId, reason ->
                 store.mistrials.add(caseId to reason)
-                "mistrial:$caseId"
+                store.receipt(caseId, "failed")
             },
             blackboardGet = { store.blackboard[it] },
             couchGet = { store.couch[it] },
@@ -68,6 +117,12 @@ class InMemoryRecordStore {
     val couch = LinkedHashMap<String, Map<String, Any?>>()
     val rulings = ArrayList<Triple<String, String, String>>()
     val mistrials = ArrayList<Pair<String, String>>()
+
+    /** Snapshot-shaped fixture; this does not execute a job nexus or establish disk durability. */
+    fun receipt(caseId: String, lifecycle: String): String {
+        val bytes = CanonicalCbor.encode(JobSnapshot(JobId.of("case/$caseId"), 3L, "", lifecycle, attemptCount = 1))
+        return ContentId.of(bytes).value.also { cas[it] = bytes }
+    }
 }
 
 /**
@@ -259,13 +314,14 @@ object CouncilNodes {
         },
 
         // The ONE host-wired sink: per-turn bytes to CAS with commit-time
-        // cid verification (mismatches counted, never thrown), transcript +
+        // cid verification (missing/mismatched provenance retained as mistrial), transcript +
         // verdict + case doc to CAS, blackboard index fact, durable couch
         // doc, the (ruling …) KIF assertion, and the per-case lifecycle
-        // advance. Commit-time mistrial rule: all seats refused OR a banner
-        // verdict OR the verdict itself declares mistrial — never silent.
+        // advance. All seats refused, a banner verdict, an explicit mistrial,
+        // or unverified turn bytes prevent a ruling fact from entering the bank.
         "council.record" to boundLcnc(CouncilRecordKey(seams)) { service, node, inputs ->
             val seams = service.value
+            seams.recordMutex.withLock {
             val verdict = inputs["verdict"] ?: inputs["verdict?"]
             require(verdict != null) { "council.record: no verdict wired" }
             val caseId = ((inputs["caseId"] ?: inputs["caseId?"]) as? String)?.takeIf { it.isNotBlank() }
@@ -273,16 +329,15 @@ object CouncilNodes {
                 ?: "default"
             val documentCid = ((inputs["documentCid"] ?: inputs["documentCid?"]) as? String)
                 ?.takeIf { it.isNotBlank() }
+                ?.also { ContentId(it) } // Validate before any durable effect or KIF interpolation.
 
             val turns = ArrayList<Map<String, Any?>>()
             flattenTurns(inputs["turns"] ?: inputs["turns?"], turns)
             var cidMismatches = 0
             for (turn in turns) {
-                val text = turn["text"] as? String ?: continue
-                val declared = turn["cid"] as? String ?: continue
-                val bytes = text.encodeToByteArray()
-                seams.casPut(bytes)
-                if (ContentId.of(bytes).value != declared) cidMismatches++
+                val bytes = (turn["text"] as? String)?.encodeToByteArray()
+                val declared = turn["cid"] as? String
+                if (bytes == null || ContentId.of(bytes).value != declared) cidMismatches++
             }
             val seatCount = turns.size
             val seatFailures = turns.count { it["status"] == "refused" }
@@ -290,13 +345,16 @@ object CouncilNodes {
             val transcriptParts = ArrayList<String>()
             flattenText(inputs["transcript"] ?: inputs["transcript?"], transcriptParts)
             val transcriptDoc = transcriptParts.filter { it.isNotBlank() }.joinToString("\n\n---\n\n")
-            val transcriptCid = seams.casPut(transcriptDoc.encodeToByteArray())
+            val transcriptBytes = transcriptDoc.encodeToByteArray()
+            val transcriptCid = ContentId.of(transcriptBytes).value
 
             val verdictText = if (verdict is String) verdict else jsonOf(verdict)
-            val verdictCid = seams.casPut(verdictText.encodeToByteArray())
+            val verdictBytes = verdictText.encodeToByteArray()
+            val verdictCid = ContentId.of(verdictBytes).value
 
             val verdictMistrial = (verdict as? Map<*, *>)?.get("mistrial").let { it == true || it == "true" }
             val status = when {
+                cidMismatches > 0 -> "mistrial"
                 seatCount > 0 && seatFailures == seatCount -> "mistrial"
                 verdictText.contains("[SEAT FAILED") -> "mistrial"
                 verdictMistrial -> "mistrial"
@@ -310,35 +368,61 @@ object CouncilNodes {
                 "transcriptCid" to transcriptCid,
                 "seatFailures" to seatFailures,
                 "seatCount" to seatCount,
+                "cidMismatches" to cidMismatches,
                 "status" to status,
                 "turns" to turns,
             )
-            val caseCid = seams.casPut(jsonOf(caseDoc).encodeToByteArray())
-
-            val recorded = if (status == "mistrial") {
-                seams.recordMistrial(
-                    caseId,
-                    "seatFailures=$seatFailures/$seatCount; verdict=${verdictText.take(160)}",
-                )
-            } else {
-                seams.recordRuling(caseId, verdictCid, transcriptCid)
+            val caseBytes = jsonOf(caseDoc).encodeToByteArray()
+            val caseCid = ContentId.of(caseBytes).value
+            val key = "council-case/$caseId"
+            val existing = seams.couchGet(key)
+            check(existing == null || existing["caseCid"] == caseCid) {
+                "council.record: case '$caseId' already names different or legacy evidence; use a distinct case id"
             }
-            seams.blackboardPut(
-                "council-case/$caseId",
-                linkedMapOf(
-                    "caseCid" to caseCid,
-                    "verdictCid" to verdictCid,
-                    "documentCid" to documentCid.orEmpty(),
-                    "status" to status,
-                ),
-                "council.record",
-            )
-            seams.couchPut("council-case/$caseId", caseDoc)
-            if (documentCid != null) {
-                seams.kifSink(
-                    "(ruling case_${kifAtom(caseId)} doc_${documentCid.removePrefix("sha256:")} " +
-                        verdictCid.removePrefix("sha256:") + ")",
-                )
+            val phase = existing?.let { doc ->
+                checkNotNull(CouncilRecordPhase.entries.find { it.name == doc["recordPhase"] }) {
+                    "council.record: case '$caseId' has no valid persistence phase"
+                }
+            }
+            // Validate replay before any repair/publication writes, not just before returning a report.
+            val priorReceipt = if (phase == CouncilRecordPhase.RECORDED || phase == CouncilRecordPhase.PUBLISHED) {
+                seams.lifecycleReceipt(caseId, existing?.get("recorded") as? String, status)
+            } else null
+            // A published replay is read-only, including CAS. Missing bytes are a failure,
+            // not an excuse to silently reconstruct a previously completed record.
+            fun retain(bytes: ByteArray) {
+                if (phase == CouncilRecordPhase.PUBLISHED) seams.verifyRetained(bytes) else seams.retain(bytes)
+            }
+            for (turn in turns) (turn["text"] as? String)?.let { retain(it.encodeToByteArray()) }
+            retain(transcriptBytes)
+            retain(verdictBytes)
+            retain(caseBytes)
+            val index = linkedMapOf("caseCid" to caseCid, "verdictCid" to verdictCid,
+                "documentCid" to documentCid.orEmpty(), "status" to status)
+            fun journal(next: CouncilRecordPhase, recorded: String? = null): Map<String, Any?> =
+                caseDoc + mapOf("caseCid" to caseCid, "decisionStatus" to status,
+                    "status" to if (next == CouncilRecordPhase.PUBLISHED) status else "recording",
+                    "recordPhase" to next.name, "recorded" to recorded)
+
+            val recorded = priorReceipt ?: run {
+                seams.couchPut(key, journal(CouncilRecordPhase.PREPARED))
+                seams.blackboardPut(key, index + ("status" to "recording"), "council.record")
+                val cid = if (status == "mistrial") {
+                    seams.recordMistrial(caseId,
+                        "seatFailures=$seatFailures/$seatCount; cidMismatches=$cidMismatches; verdict=${verdictText.take(160)}")
+                } else seams.recordRuling(caseId, verdictCid, transcriptCid)
+                seams.lifecycleReceipt(caseId, cid, status)
+                seams.couchPut(key, journal(CouncilRecordPhase.RECORDED, cid))
+                cid
+            }
+            if (phase != CouncilRecordPhase.PUBLISHED) {
+                // Never expose a ruling in the evidence bank before the lifecycle commits.
+                if (documentCid != null && status == "ruled") {
+                    seams.kifSink("(ruling case_${kifAtom(caseId)} doc_${documentCid.removePrefix("sha256:")} " +
+                        verdictCid.removePrefix("sha256:") + ")")
+                }
+                seams.blackboardPut(key, index, "council.record")
+                seams.couchPut(key, journal(CouncilRecordPhase.PUBLISHED, recorded))
             }
             mapOf("report" to linkedMapOf(
                 "caseId" to caseId,
@@ -351,6 +435,7 @@ object CouncilNodes {
                 "seatCount" to seatCount,
                 "cidMismatches" to cidMismatches,
             ))
+            }
         },
 
         // Read-back veneer: index fact (blackboard, falling back to the
@@ -364,11 +449,17 @@ object CouncilNodes {
             val key = "council-case/$caseId"
             val bb = seams.blackboardGet(key)
             val couch = seams.couchGet(key)
+            if (couch?.get("recordPhase") in setOf(CouncilRecordPhase.RECORDED.name, CouncilRecordPhase.PUBLISHED.name)) {
+                seams.lifecycleReceipt(caseId, couch?.get("recorded") as? String, couch?.get("decisionStatus") as? String)
+            }
             if (bb == null && couch == null) {
                 mapOf("case" to mapOf("error" to "not_found", "caseId" to caseId))
             } else {
+                // The durable journal wins over a partially updated volatile index.
+                val index = if (couch?.containsKey("recordPhase") == true) couch else (bb ?: couch)
                 fun field(name: String): String? =
-                    bb?.get(name) ?: couch?.get(name)?.toString()?.takeIf { it.isNotBlank() }
+                    index?.get(name)?.toString()?.takeIf { it.isNotBlank() }
+                        ?: couch?.get(name)?.toString()?.takeIf { it.isNotBlank() }
                 val verdictCid = field("verdictCid")
                 // The blackboard index fact carries no transcriptCid — fall
                 // back to the couch doc, then to the CAS-stored case doc.
@@ -379,7 +470,7 @@ object CouncilNodes {
                         ?.get("transcriptCid")?.toString()
                 mapOf("case" to linkedMapOf(
                     "caseId" to caseId,
-                    "index" to (bb ?: couch),
+                    "index" to index,
                     "transcript" to transcriptCid?.let { seams.casGet(it)?.decodeToString() },
                     "verdict" to verdictCid?.let { seams.casGet(it)?.decodeToString() },
                 ))

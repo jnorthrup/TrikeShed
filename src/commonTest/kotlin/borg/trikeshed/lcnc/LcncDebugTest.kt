@@ -7,6 +7,27 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LcncDebugTest {
+    @Test fun nodeTypeAloneDoesNotAdmitSourceCommandsOrConsumeTheHold() = runTest {
+        val debug = LcncDebug()
+        var calls = 0
+        val runner = LcncRunner(mapOf("vm.polyglot" to LcncNodeRunner { _, _ ->
+            calls++; mapOf("value" to calls)
+        }))
+        val execution = async(debug) { runner.runProcedure(LcncProgram("node-only",
+            s_[LcncNode("guest", "vm.polyglot")], emptySeriesOf())) }
+        try {
+            runCurrent()
+            val pause = debug.snapshot()
+            assertEquals(listOf("step", "continue"), pause["actions"])
+            assertEquals(0, calls)
+            assertFalse(debug.command(pause["ordinal"] as Int, LcncDebug.Command.SOURCE_INTO))
+            assertEquals(pause, debug.snapshot())
+            assertTrue(debug.command(pause["ordinal"] as Int, LcncDebug.Command.STEP))
+            assertEquals(1, execution.await().nodeOutputs["guest"]?.get("value"))
+            assertEquals(1, calls)
+        } finally { execution.cancelAndJoin(); debug.close() }
+    }
+
     @Test fun lineCommandsValidateTheHeldSourceBeforeConsumingItsOrdinal() = runTest {
         val debug = LcncDebug()
         val hold = async { debug.sourceCheckpoint(1, "guest", mapOf("lineCount" to 8)) }
@@ -29,7 +50,8 @@ class LcncDebugTest {
 
     @Test fun sourceCommandsUseTheSamePauseSequenceAndDrainReleasesTheCallback() = runTest {
         val debug = LcncDebug()
-        val node = async { debug.checkpoint(1, LcncNode("guest", "vm.polyglot"), emptyList(), null, null, emptyMap()) }
+        val node = async { debug.checkpoint(1, LcncNode("guest", "vm.polyglot"), emptyList(), null, null, emptyMap(),
+            sourceDebugging = true) }
         runCurrent()
         val start = debug.snapshot()
         assertEquals(listOf("step", "continue", "source-into"), start["actions"])

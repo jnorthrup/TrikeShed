@@ -4,14 +4,6 @@ import borg.trikeshed.vm.Teleported
 import borg.trikeshed.vm.field
 import borg.trikeshed.vm.str
 import java.io.File
-import java.io.DataInputStream
-import java.io.DataOutputStream
-import java.net.InetAddress
-import java.net.ServerSocket
-import java.net.Socket
-import java.net.SocketTimeoutException
-import java.util.concurrent.TimeUnit
-import java.util.UUID
 
 /** One stock GraalPy context in its own process, with an explicit application environment. */
 data class PythonWorker(
@@ -48,45 +40,6 @@ data class PythonWorker(
             return PythonWorker(message.str("directory"), strings("path"), message.str("executable"),
                 message.str("home"), environment, strings("arguments"),
                 (message.field("timeout") as? Teleported.Num)?.v ?: 300_000)
-        }
-    }
-}
-
-/** Separate protocol transport: native writes to fd 1/2 remain terminal bytes. */
-internal class PythonWorkerTransport(private val timeoutMillis: Long) : AutoCloseable {
-    private val listener = ServerSocket(0, 1, InetAddress.getLoopbackAddress()).apply {
-        soTimeout = timeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-    }
-    val port: Int get() = listener.localPort
-    val token: String = UUID.randomUUID().toString()
-
-    fun accept(process: Process): Socket {
-        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
-        var connection: Socket? = null
-        while (connection == null) {
-            if (!process.isAlive) error("Python worker exited ${process.exitValue()}: " +
-                process.errorStream.readAllBytes().decodeToString())
-            val remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())
-            check(remaining > 0) { "Python worker did not open its protocol within ${timeoutMillis}ms" }
-            listener.soTimeout = remaining.coerceAtMost(250).coerceAtLeast(1).toInt()
-            try { connection = listener.accept() } catch (_: SocketTimeoutException) { /* Check process/deadline. */ }
-        }
-        val socket = requireNotNull(connection)
-        try {
-            socket.soTimeout = timeoutMillis.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            require(DataInputStream(socket.getInputStream()).readUTF() == token) { "Python worker protocol identity mismatch" }
-            socket.soTimeout = 0
-            socket.tcpNoDelay = true
-            return socket
-        } catch (failure: Throwable) { socket.close(); throw failure }
-    }
-
-    override fun close() = listener.close()
-
-    companion object {
-        fun connect(port: Int, token: String): Socket = Socket(InetAddress.getLoopbackAddress(), port).apply {
-            tcpNoDelay = true
-            DataOutputStream(getOutputStream()).apply { writeUTF(token); flush() }
         }
     }
 }

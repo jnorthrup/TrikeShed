@@ -1674,22 +1674,11 @@ object OroborosDaemon {
         }
         // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
         moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
-            brain = brainClient,
-            muxContext = htxElement + muxReactor,
+            curate = { moduleContext.lcncRunners[borg.trikeshed.lcnc.DocumentCurationLegos.CURATE] },
             cas = casStore,
-            kifSink = { kif ->
-                val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
-                daemonBlackboard.put("legal-kif/${cid.hex}", kif, "legal.ingest")
-                runCatching { kifBank.assertKif(kif) }
-                // Durable tee: the in-memory bank dies with the process; the
-                // couch ledger is what the council boot thaw re-asserts from.
-                runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "legal.ingest", "atMs" to HostSystem.currentTimeMillis()), null) }
-            },
         )
-        // Evidence-bank injection (§3/§5 gap): queries the shared kifBank for
-        // every fact legal.ingest asserted against this document's atom and
-        // folds it into the brief argue actually reads — closing the loop
-        // the report flagged as "nothing reads these entries back out".
+        // Historical KIF and prior rulings remain readable. New curation publishes
+        // through DocumentCurationWire's retained tuple plane, not a second KIF sink.
         moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
         // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
         //    REAL hermes-env model dialogs. The node family (mux.chat /
@@ -1942,39 +1931,11 @@ object OroborosDaemon {
         }
         // Per-case job nexus: every convened case gets its own lifecycle (the
         // boot TribunalInstance singleton above stays legacy-preset-only).
-        val councilCases = borg.trikeshed.lcnc.CouncilCaseRegistry(
-            moduleScope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
-        )
-        // The council's KIF sink: blackboard provenance + live bank + durable
-        // couch ledger (same tee shape as legal.ingest's sink above).
-        val councilKifSink: (String) -> Unit = { kif ->
-            val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
-            daemonBlackboard.put("legal-kif/${cid.hex}", kif, "council.record")
-            runCatching { kifBank.assertKif(kif) }
-            runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "council", "atMs" to HostSystem.currentTimeMillis()), null) }
-        }
+        val councilCases = councilCaseRegistry(moduleScope, casStore, couchDb)
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.CouncilNodes.registry(
                 dialog = councilDialog,
-                seams = borg.trikeshed.lcnc.RecordSeams(
-                    casPut = { bytes -> casStore.put(bytes).value },
-                    blackboardPut = { key, fact, source -> daemonBlackboard.put(key, fact, source) },
-                    kifSink = councilKifSink,
-                    couchPut = { docId, body ->
-                        runCatching {
-                            val rev = couchDb.docJson(docId)?.get("_rev") as? String
-                            couchDb.put(docId, body, rev)
-                        }
-                    },
-                    recordRuling = councilCases::recordRuling,
-                    recordMistrial = councilCases::recordMistrial,
-                    blackboardGet = { key ->
-                        (daemonBlackboard.get(key) as? Map<*, *>)
-                            ?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }
-                    },
-                    couchGet = { docId -> couchDb.docJson(docId) },
-                    casGet = { cid -> runCatching { casStore.get(borg.trikeshed.job.ContentId(cid)) }.getOrNull() },
-                ),
+                seams = councilRecordSeams(casStore, couchDb, daemonBlackboard, kifBank, councilCases),
             ),
         )
         // ── WikiSkill (arXiv 2608.27454) as two legos: wiki.consolidate (the
@@ -2629,6 +2590,56 @@ object OroborosDaemon {
                 try { nioSupervisor.close() } catch (_: Exception) {}
             }
         }
+    }
+
+    /** Per-case commands and snapshot receipts share the daemon's existing storage owners. */
+    internal fun councilCaseRegistry(
+        scope: kotlinx.coroutines.CoroutineScope,
+        cas: borg.trikeshed.job.CasStore,
+        couch: borg.trikeshed.couch.Couch,
+    ): borg.trikeshed.lcnc.CouncilCaseRegistry {
+        require(couch.cas === cas) { "Council lifecycle and Couch must share CAS ownership" }
+        return borg.trikeshed.lcnc.CouncilCaseRegistry(scope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+            componentFactories = { caseId -> borg.trikeshed.job.JobNexusComponentFactories(
+                casStoreFactory = borg.trikeshed.job.CasStoreFactory { cas },
+                walFactory = borg.trikeshed.job.JobLogFactory {
+                    borg.trikeshed.couch.CouchJobLog.open(couch,
+                        "council-log/${borg.trikeshed.job.ContentId.of(caseId.encodeToByteArray()).hex}")
+                },
+            ) })
+    }
+
+    /** Host adapters acknowledge persistence before exposing derived Council facts. */
+    internal fun councilRecordSeams(
+        cas: borg.trikeshed.job.CasStore,
+        couch: borg.trikeshed.couch.Couch,
+        blackboard: borg.trikeshed.graal.ConfixBlackboard,
+        kif: borg.trikeshed.kif.KifKnowledgeBase,
+        cases: borg.trikeshed.lcnc.CouncilCaseRegistry,
+    ): borg.trikeshed.lcnc.RecordSeams {
+        val couchPut: (String, Map<String, Any?>) -> Unit = { id, body ->
+            val rev = couch.docJson(id)?.get("_rev") as? String
+            borg.trikeshed.lcnc.RecordSeams.requireCouchWrite(id, couch.put(id, body, rev))
+        }
+        return borg.trikeshed.lcnc.RecordSeams(
+            casPut = { cas.put(it).value },
+            blackboardPut = { key, fact, source -> blackboard.put(key, fact, source) },
+            kifSink = { expression ->
+                val cid = borg.trikeshed.job.ContentId.of(expression.encodeToByteArray())
+                couchPut("kif-ledger/${cid.hex}", mapOf("kif" to expression, "source" to "council",
+                    "atMs" to HostSystem.currentTimeMillis()))
+                kif.assertKif(expression)
+                blackboard.put("legal-kif/${cid.hex}", expression, "council.record")
+            },
+            couchPut = couchPut,
+            recordRuling = cases::recordRuling,
+            recordMistrial = cases::recordMistrial,
+            blackboardGet = { key ->
+                (blackboard.get(key) as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }
+            },
+            couchGet = couch::docJson,
+            casGet = { cid -> cas.get(borg.trikeshed.job.ContentId(cid)) },
+        )
     }
 
     private suspend fun CoroutineScope.worktreeReconciliation(

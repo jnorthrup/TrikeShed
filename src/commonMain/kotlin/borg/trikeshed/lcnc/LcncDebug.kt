@@ -28,7 +28,7 @@ class LcncDebug : AbstractCoroutineContextElement(Key) {
 
     /** Values are bounded copies, never aliases to the live runner's inputs or bindings. */
     suspend fun checkpoint(at: Int, node: LcncNode, path: List<String>, parent: Int?, iteration: Int?,
-                           inputs: Map<String, Any?>) = checkpoints.withLock {
+                           inputs: Map<String, Any?>, sourceDebugging: Boolean = false) = checkpoints.withLock {
         val paused = gate.withLock {
             check(state != "closed") { "Debug controller is closed" }
             if (!stepping || detached) false
@@ -44,7 +44,7 @@ class LcncDebug : AbstractCoroutineContextElement(Key) {
                 ordinal++
                 site = fields.toMap()
                 actions = listOf(Command.STEP, Command.CONTINUE) +
-                    if (node.type == "vm.polyglot") listOf(Command.SOURCE_INTO) else emptyList()
+                    if (sourceDebugging) listOf(Command.SOURCE_INTO) else emptyList()
                 state = "paused"
                 true
             }

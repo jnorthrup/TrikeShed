@@ -29,6 +29,54 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LcncServiceBindingTest {
+    @Test fun observationsBorrowNestedServicesWithoutDispatchAndPropagateFailure() = runTest {
+        val owner = currentCoroutineContext()[kotlinx.coroutines.Job]
+        val failure = IllegalStateException("metadata probe failed")
+        val delegate = LcncNodeRunner { _, _ -> error("Observation must not dispatch the node") }
+        val binding = boundLcnc(CoroutineName("outer"),
+            boundLcnc(CoroutineName("inner"), boundLcnc(AgentRunIdKey { "bound" }, delegate))) as LcncServiceBinding
+        withContext(LcncOwnerJob(owner)) {
+            suspend fun observe(expected: String) = binding.withServices {
+                assertEquals(expected, currentCoroutineContext()[CoroutineName]?.name)
+                assertEquals("bound", AgentRunIdKey.require().invoke())
+                assertSame(owner, currentCoroutineContext()[LcncOwnerJob]?.job)
+            }
+            observe("outer")
+            withContext(CoroutineName("caller")) { observe("caller") }
+            assertSame(failure, runCatching { binding.withServices<Unit> { throw failure } }.exceptionOrNull())
+        }
+        assertNull(currentCoroutineContext()[AgentRunIdKey])
+        assertNull(currentCoroutineContext()[LcncOwnerJob])
+    }
+
+    @Test fun sourceCapabilityBorrowsTheSameNestedBindingsAndOwnerAsExecution() = runTest {
+        val node = LcncNode("capability", "test.capability")
+        val owner = currentCoroutineContext()[kotlinx.coroutines.Job]
+        val observed = mutableListOf<String>()
+        val delegate = object : LcncNodeRunner {
+            override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean {
+                observed += currentCoroutineContext()[CoroutineName]!!.name
+                assertSame(owner, currentCoroutineContext()[LcncOwnerJob]?.job)
+                return true
+            }
+            override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+                sourceDebugging(node, inputs)
+                return emptyMap()
+            }
+        }
+        val runner = boundLcnc(CoroutineName("outer"), boundLcnc(CoroutineName("inner"), delegate))
+        withContext(LcncOwnerJob(owner)) {
+            assertTrue(runner.sourceDebugging(node, emptyMap()))
+            runner.execute(node, emptyMap())
+            withContext(CoroutineName("caller")) {
+                assertTrue(runner.sourceDebugging(node, emptyMap()))
+                runner.execute(node, emptyMap())
+            }
+        }
+        assertEquals(listOf("outer", "outer", "caller", "caller"), observed)
+        assertNull(currentCoroutineContext()[LcncOwnerJob])
+    }
+
     @Test fun failedBindingCancelsAndJoinsItsAdmittedChildBeforeRethrowing() = runTest {
         val failure = IllegalStateException("bound operation failed")
         var childClosed = false

@@ -44,6 +44,50 @@ import kotlin.test.assertTrue
  * (presets-only) program loader with zero registered runners.
  */
 class LcncRunProgramRouteTest {
+    @Test fun unsupportedSourceCommandLeavesTheNodeHeldAndContinueExecutesTheGuestOnce(): Unit = runBlocking {
+        for ((language, trust) in listOf(borg.trikeshed.vm.VmLanguage.JAVA to "OWN",
+            borg.trikeshed.vm.VmLanguage.JAVASCRIPT to "UNTRUSTED")) {
+            val routes = ModuleRouteRegistry()
+            val ctx = newContext(routes, tempDir("node-debug-${language.id}"), CasStore.inMemory())
+            val server = JvmKanbanServer(moduleRoutes = routes)
+            val host = borg.trikeshed.vm.HypervisorVmHost()
+            ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+            val supervisor = ModuleSupervisor(ctx)
+            supervisor.attach(KanbanModule())
+            val token = java.util.UUID.randomUUID().toString()
+            val execution = async(Dispatchers.Default) { post(server, "/api/lcnc/run", jsonOf(mapOf(
+                "debugToken" to token, "timeoutMs" to 30000,
+                "document" to mapOf("nodes" to listOf(mapOf("id" to "source", "type" to SubVmLegos.POLYGLOT,
+                    "params" to language.params("return input;") + mapOf("trust" to trust, "input" to "41"))),
+                    "wires" to emptyList<Any>())))) }
+            suspend fun snapshot() = json(server.routeHttp(
+                "GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray()))
+            try {
+                val pause = withTimeout(5000) {
+                    var value = snapshot()
+                    while (value["state"] != "paused") { delay(10); value = snapshot() }
+                    value
+                }
+                assertEquals(listOf("step", "continue"), pause["actions"])
+                assertTrue(host.ids().isEmpty(), "The node hold must precede guest creation")
+                val command = mapOf("token" to token, "runId" to pause["runId"], "ordinal" to pause["ordinal"])
+                assertEquals(409, post(server, "/api/lcnc/run/debug", jsonOf(command + ("action" to "source-into"))).status)
+                assertEquals(pause, snapshot(), "Refusing a source command must not consume the held ordinal")
+                assertEquals(202, post(server, "/api/lcnc/run/debug", jsonOf(command + ("action" to "continue"))).status)
+                val response = withTimeout(20000) { execution.await() }
+                assertEquals(200, response.status, response.body)
+                val run = json(response)
+                assertEquals(pause["runId"], run["runId"])
+                assertEquals(41, (((run["outputs"] as Map<*, *>)["source"] as Map<*, *>)["value"] as Number).toInt())
+                assertEquals(1, host.ids().size)
+                assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+            } finally {
+                execution.cancelAndJoin(); supervisor.detach("kanban"); host.close()
+                ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            }
+        }
+    }
+
     @Test fun lineBreakpointsResumeTheSameLoopWithoutReplayingItsEffects(): Unit = runBlocking {
         val routes = ModuleRouteRegistry()
         val ctx = newContext(routes, tempDir("line-debug"), CasStore.inMemory())

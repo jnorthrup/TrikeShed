@@ -320,12 +320,19 @@ object CouchStoreFactory {
         require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             "durableCasBacked requires a DURABLE commit store"
         }
+        return committed(cas, commits.recoveredFrames) { frame ->
+            commits.commit(frame)
+            frame
+        }
+    }
+
+    /** One ingress/projection contract for durable representations; publication precedes visibility. */
+    internal fun committed(cas: borg.trikeshed.job.CasStore, recovered: Series<CouchCommittedFrame>,
+                           publish: (CouchCommittedFrame) -> CouchCommittedFrame): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection(cas)
         var maxSequence = -1L
-        val recovered = commits.recoveredFrames
-        for (i in 0 until recovered.size) {
-            val frame = recovered[i]
+        for (frame in recovered.view) {
             head.applyCommit(frame)
             changes.applyCommit(frame)
             if (frame.sequence > maxSequence) maxSequence = frame.sequence
@@ -333,9 +340,9 @@ object CouchStoreFactory {
         val ingress = ProductionCouchIngress(
             head,
             { frame ->
-                commits.commit(frame)
-                head.applyCommit(frame)
-                changes.applyCommit(frame)
+                val captured = publish(frame)
+                head.applyCommit(captured)
+                changes.applyCommit(captured)
             },
             { doc -> cas.put(canonicalBody(doc)) },
             initialSequence = maxSequence + 1,

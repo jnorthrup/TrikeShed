@@ -88,6 +88,8 @@ interface VmHandle : AutoCloseable {
 interface VmHost : AutoCloseable {
     val platform: String get() = "none"
     val languages: Set<VmFacet> get() = emptySet()
+    /** Read-only preflight for an unadmitted spec. The spawned handle remains authoritative. */
+    fun sourceDebugging(spec: VmSpec): Boolean = false
     fun spawn(spec: VmSpec): VmHandle = discontinued("vm.spawn")
     fun get(id: String): VmHandle? = null
     fun ids(): List<String> = emptyList()

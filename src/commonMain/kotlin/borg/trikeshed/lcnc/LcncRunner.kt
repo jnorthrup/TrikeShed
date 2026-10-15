@@ -26,6 +26,9 @@ import kotlinx.coroutines.job
 fun interface LcncNodeRunner {
     suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?>
 
+    /** Observational only: no node dispatch, guest creation or source evaluation. */
+    suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean = false
+
     suspend fun run(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
         currentCoroutineContext().ensureActive()
         val key = LcncNodeKey.of(node.type)
@@ -310,7 +313,8 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     val debugContract = LcncContracts.find(node.type)
                     if (debugContract == null || debugContract.inputs.isNotEmpty() || debugContract.outputs.isNotEmpty() ||
                         node.children.size > 0 || node.subprogram != null)
-                        sourceStep = debug.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, inputs)
+                        sourceStep = debug.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, inputs,
+                            sourceDebugging = registry[node.type]?.sourceDebugging(node, inputs) == true)
                 }
 
                 // scope.out gathers this ring's yield — the ONLY thing that crosses out.

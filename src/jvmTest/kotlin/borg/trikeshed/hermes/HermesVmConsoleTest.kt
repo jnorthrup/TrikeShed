@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.test.assertFalse
 
@@ -290,9 +291,12 @@ class HermesVmConsoleTest {
                 val wire = HermesConsoleWire(console, scope)
                 val page = wire.route("GET", "/hermes", "", null)
                 assertEquals(200, page?.status)
-                assertTrue(page?.bytes?.decodeToString()?.contains("HERMES · XTERM-256COLOR") == true)
+                val html = assertNotNull(page?.bytes).decodeToString()
+                // The route serves the interactive terminal; its display banner is not the protocol.
+                assertTrue(html.contains("role=\"application\""))
+                assertTrue(html.contains("aria-label=\"terminal input\""))
                 // The bottom command dialog is gone: the terminal itself takes keystrokes.
-                assertTrue(page?.bytes?.decodeToString()?.contains("id=\"command\"") == false)
+                assertFalse(html.contains("id=\"command\""))
                 val snapshot = wire.route("GET", "/api/hermes/terminal", "", null)
                 assertTrue(snapshot?.body?.contains("\"kind\":\"xterm-256color\"") == true)
                 val resized = wire.route(

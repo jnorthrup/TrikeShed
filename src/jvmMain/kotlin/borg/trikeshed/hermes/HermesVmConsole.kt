@@ -94,6 +94,8 @@ class HermesVmConsole(
     )
     private val lock = Any()
     private val currentCause = AtomicReference<String?>(null)
+    private val terminalCause = AtomicReference<String?>(null)
+    private fun activeCause(): String? = terminalCause.get() ?: currentCause.get()
 
     /**
      * Server-side line discipline. The browser is a dumb VT client: it ships keystrokes and draws the
@@ -136,10 +138,10 @@ class HermesVmConsole(
     private var importFailure: Map<String, Any?>? = null
     private val loading = mutableListOf<String>()
     @Volatile private var inventory: HermesPortInventory? = null
-    private val stdout = TerminalOutputStream { text -> causalOutput(text, currentCause.get()) }
-    private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
+    private val stdout = TerminalOutputStream { text -> causalOutput(text, activeCause()) }
+    private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", activeCause()) }
     private val pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
-        muxContext = muxContext, contextId = currentCause::get)
+        muxContext = muxContext, contextId = ::activeCause)
     private val worker = workerConfiguration?.let { configuration ->
         HermesPythonWorker(configuration, pen, stdout, stderr, stopped = { session, failure ->
             synchronized(lock) {
@@ -147,11 +149,12 @@ class HermesVmConsole(
                 cliStatus = (cliStatus ?: emptyMap()) + mapOf("open" to false, "session_id" to session, "failure" to failure)
                 val next = if (failure == null) State.CLOSED else State.FAILED
                 val message = failure ?: "HermesCLI closed · Start or Reset to resume"
+                failTerminalInput(failure ?: "HermesCLI closed before terminal input completed")
                 boot = boot?.copy(status = next, updatedAtMs = System.currentTimeMillis(),
                     detail = message, failure = failure, revision = boot!!.revision + 1)
                 transition(next, message)
             }
-        }) { progress ->
+        }, inputStarted = ::workerInputStarted, inputFinished = ::workerInputFinished) { progress ->
             bootPhase(BootPhase.BOOTSTRAP, progress, "cli.HermesCLI")
         }
     }
@@ -666,15 +669,7 @@ class HermesVmConsole(
                 transition(State.CLOSED, "HermesCLI exited")
                 worker.close()
             }
-            check(cliStatus?.get("input_processed") == true) { "HermesCLI did not process input" }
-            val turn = cliStatus?.get("turn") as? Map<*, *>
-            check(cliStatus?.get("turn_attempted") != true || turn != null) {
-                "HermesCLI could not complete the turn; see the CLI output"
-            }
-            check(turn == null || (turn["completed"] != false && turn["failed"] != true &&
-                turn["interrupted"] != true && turn["error"] == null)) {
-                turn?.get("error") as? String ?: "HermesCLI turn did not complete"
-            }
+            workerInputFailure(requireNotNull(cliStatus))?.let { error(it) }
             return
         }
         if (cliStarted) {
@@ -705,6 +700,44 @@ class HermesVmConsole(
     private fun causalOutput(text: String, cause: String?, timestampMs: Long = System.currentTimeMillis()) = synchronized(lock) {
         if (text.isEmpty()) return@synchronized
         emitCausal(panel.causalOutput(text, cause, timestampMs))
+    }
+
+    /** The donor's input loop admits a complete terminal line, not each browser keystroke. */
+    internal fun workerInputStarted(line: String): String = synchronized(lock) {
+        check(terminalCause.get() == null) { "Hermes terminal input is already active" }
+        prepareCommand(line).signal.id.also(terminalCause::set)
+    }
+
+    internal fun workerInputFinished(cause: String?, result: Map<String, Any?>) = synchronized(lock) {
+        check(cause != null && terminalCause.get() == cause) { "Hermes terminal result has no matching input" }
+        try {
+            cliStatus = result
+            modelId = result["model"] as? String
+            val failure = workerInputFailure(result)
+            val now = System.currentTimeMillis()
+            emitCausal(if (failure == null) panel.causalCompleted(cause, now) else panel.causalFailed(cause, now, failure))
+        } finally {
+            terminalCause.set(null)
+        }
+    }
+
+    /** Retire a stopped/failed terminal; normal close reaches this only after worker drain. */
+    private fun failTerminalInput(failure: String) = synchronized(lock) {
+        terminalCause.getAndSet(null)?.let { cause ->
+            emitCausal(panel.causalFailed(cause, System.currentTimeMillis(), failure))
+        }
+    }
+
+    private fun workerInputFailure(result: Map<String, Any?>): String? {
+        (result["input_error"] as? String)?.let { return it }
+        if (result["input_processed"] != true) return "HermesCLI did not process input"
+        val turn = result["turn"] as? Map<*, *>
+        if (result["turn_attempted"] == true && turn == null)
+            return "HermesCLI could not complete the turn; see the CLI output"
+        if (turn != null && (turn["completed"] != true || turn["failed"] == true || turn["partial"] == true ||
+                turn["interrupted"] == true || turn["error"] != null))
+            return turn["error"] as? String ?: "HermesCLI turn did not complete"
+        return null
     }
 
 
@@ -765,6 +798,7 @@ class HermesVmConsole(
     private fun checkWorker() {
         if (worker != null && state == State.READY && !worker.isAlive) {
             val failure = "Hermes worker exited · Reset resumes this conversation"
+            failTerminalInput(failure)
             cliStarted = false
             cliStatus = cliStatus?.plus("open" to false)
             boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
@@ -822,8 +856,14 @@ class HermesVmConsole(
             if (worker != null) worker.close()
             else if (started && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
         } finally {
-            try { port.close() } finally { stdout.close(); stderr.close() }
-            synchronized(lock) { transition(State.CLOSED, "closed") }
+            try {
+                try { port.close() } finally { stdout.close(); stderr.close() }
+            } finally {
+                synchronized(lock) {
+                    failTerminalInput("Hermes console closed before terminal input completed")
+                    transition(State.CLOSED, "closed")
+                }
+            }
         }
     }
 

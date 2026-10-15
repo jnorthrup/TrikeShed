@@ -1,5 +1,7 @@
 package borg.trikeshed.docs
 
+import borg.trikeshed.lib.*
+
 /**
  * THE DOCUMENT SURFACE: the muggle half of Forge, and the first page whose logic lives in
  * commonMain and reaches the browser through the Kotlin/JS bundle (the owner's 2026-09-06
@@ -49,9 +51,19 @@ data class CurationAxiom(
     val quote: String?, val label: String?,
 )
 
+/** Read-side projections of retained receipts; missing fields never imply a successful call. */
+data class CurationStageReceipt(val stage: String?, val status: String?, val tool: String?, val receiptCid: String?)
+
+data class CurationModelReceipt(
+    val receiptId: String?, val modelId: String?, val providerId: String?,
+    val httpStatus: Int?, val latencyMs: Long?, val cachedHit: Boolean?, val errorClass: String?,
+)
+
 data class CurationResult(
     val receiptCid: String, val name: String, val text: String,
     val proposals: List<CurationProposal>, val reasons: List<String>, val axioms: List<CurationAxiom>,
+    val stages: Series<CurationStageReceipt> = emptySeriesOf(),
+    val modelReceipt: CurationModelReceipt? = null,
 )
 
 /** The table's sortable columns, each with the header a reader sees. */
@@ -166,6 +178,16 @@ object DocumentSurface {
             receiptCid = receiptCid, name = source["name"]?.toString().orEmpty(), text = source["text"]?.toString().orEmpty(),
             proposals = proposals, reasons = (record["reasons"] as? List<*>)?.map { it.toString() }.orEmpty(),
             axioms = axioms,
+            stages = ((record["toolReceipts"] as? List<*>) ?: emptyList<Any?>()).toSeries() α { row ->
+                val r = row as? Map<*, *>
+                CurationStageReceipt(r?.get("stage") as? String, r?.get("status") as? String,
+                    r?.get("tool") as? String, r?.get("receiptCid") as? String)
+            },
+            modelReceipt = (record["receipt"] as? Map<*, *>)?.let { r -> CurationModelReceipt(
+                r["receiptId"] as? String, r["modelId"] as? String, r["providerId"] as? String,
+                (r["httpStatus"] as? Number)?.toInt(), (r["latencyMs"] as? Number)?.toLong(),
+                r["cachedHit"] as? Boolean, r["errorClass"] as? String,
+            ) },
         )
     }
 
@@ -202,7 +224,7 @@ object DocumentSurface {
         append("<div class=\"ds-curate-dest\">")
         if (destination != null) append("Destination model: <strong>").append(esc(destination.model)).append("</strong>")
             .append(" <span class=\"ds-dim\">(").append(esc(destination.provider)).append(")</span>")
-        else append("<span class=\"ds-dim\">No curation model is configured.</span>")
+        else append("<span class=\"ds-dim\">No curation destination is available.</span>")
         append("</div>")
         if (formError != null) append("<p class=\"ds-curate-error\">").append(esc(formError)).append("</p>")
         append("<button type=\"submit\" class=\"ds-curate-submit\" data-curate-submit=\"1\"")
@@ -210,7 +232,7 @@ object DocumentSurface {
         append(">").append(if (busy) "Curating…" else "Curate").append("</button>")
         append("</form>")
         if (records.isNotEmpty()) {
-            append("<h2 class=\"ds-curate-h2\">Saved results</h2><ul class=\"ds-curate-list\">")
+            append("<h2 class=\"ds-curate-h2\">Saved attempts</h2><ul class=\"ds-curate-list\">")
             for (r in records) {
                 val open = r.receiptCid == result?.receiptCid
                 append("<li><a class=\"ds-curate-item").append(if (open) " ds-selected" else "").append('"')
@@ -229,7 +251,9 @@ object DocumentSurface {
     fun curationResultHtml(result: CurationResult): String = buildString {
         append("<section class=\"ds-curate-result\">")
         append("<h2 class=\"ds-curate-h2\">").append(esc(result.name.ifBlank { "Untitled" })).append("</h2>")
-        append("<p class=\"ds-sub\">saved result · <code class=\"ds-cid\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
+        append("<p class=\"ds-sub\">Saved attempt · <code class=\"ds-cid\" title=\"")
+            .append(esc(result.receiptCid)).append("\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
+        append(curationReceiptsHtml(result))
         append("<details class=\"ds-curate-source\"><summary>Source text</summary><pre>")
             .append(esc(result.text)).append("</pre></details>")
         val statements = result.proposals.filter { it.subject != null && it.predicate != null && it.obj != null }
@@ -274,13 +298,65 @@ object DocumentSurface {
                 .append("</p>")
         }
         if (result.proposals.isEmpty() && result.axioms.isEmpty())
-            append("<p class=\"ds-empty\">No statements were proposed for this text.</p>")
+            append("<p class=\"ds-empty\">No statements are retained in this attempt.</p>")
         if (result.reasons.isNotEmpty()) {
             append("<h3 class=\"ds-curate-h3\">Notes on this document</h3><ul class=\"ds-curate-notes\">")
             for (r in result.reasons) append("<li>").append(esc(r)).append("</li>")
             append("</ul>")
         }
         append("</section>")
+    }
+
+    /** Status belongs to each recorded stage, not to HTTP success or to the enclosing LCNC run. */
+    fun curationReceiptsHtml(result: CurationResult): String = buildString {
+        append("<div class=\"ds-curate-receipts\"><h3 class=\"ds-curate-h3\">Recorded stage outcomes</h3>")
+        append("<p class=\"ds-curate-status\">A saved attempt is not a verification of its statements. ")
+            .append("Stages without a receipt have no recorded outcome.</p>")
+        if (result.stages.size == 0) append("<p class=\"ds-curate-warn\">No stage receipts are available for this attempt.</p>")
+        else {
+            append("<ul class=\"ds-curate-notes\">")
+            for (r in result.stages.view) {
+                val status = when (r.status) {
+                    "SUCCESS" -> "succeeded"
+                    "FAILURE" -> "failed"
+                    "SKIPPED" -> "skipped"
+                    null, "" -> "status unavailable"
+                    else -> "unrecognized status: ${r.status}"
+                }
+                append("<li><strong class=\"").append(when (r.status) {
+                    "FAILURE" -> "ds-curate-error"
+                    "SUCCESS" -> "ds-curate-status"
+                    else -> "ds-curate-warn"
+                }).append("\">").append(esc(r.stage ?: "Unknown stage")).append(" · ")
+                    .append(esc(status)).append("</strong>")
+                r.tool?.let { append(" · ").append(esc(it)) }
+                append("<div class=\"ds-cid\">").append(esc(r.receiptCid ?: "Stage receipt CID unavailable")).append("</div></li>")
+            }
+            append("</ul>")
+        }
+        append("<h3 class=\"ds-curate-h3\">Model call receipt</h3>")
+        val receipt = result.modelReceipt
+        if (receipt == null) append("<p class=\"ds-curate-status\">No model-call receipt is available; a call is not established.</p>")
+        else {
+            append("<dl class=\"ds-run-meta\"><dt>Receipt</dt><dd class=\"ds-cid\">")
+                .append(esc(receipt.receiptId ?: "Unavailable")).append("</dd>")
+            append("<dt>Model</dt><dd>").append(esc(receipt.modelId ?: "Unavailable")).append("</dd>")
+            append("<dt>Provider</dt><dd>").append(esc(receipt.providerId ?: "Unavailable")).append("</dd>")
+            append("<dt>Transport</dt><dd>").append(when (receipt.httpStatus) {
+                null -> "HTTP status unavailable"
+                0 -> "No HTTP response (status 0)"
+                else -> "HTTP ${receipt.httpStatus}"
+            }).append("</dd>")
+            append("<dt>Latency</dt><dd>").append(receipt.latencyMs?.let { "$it ms" } ?: "Unavailable").append("</dd>")
+            append("<dt>Cache</dt><dd>").append(when (receipt.cachedHit) {
+                true -> "Cached response"
+                false -> "Uncached call"
+                null -> "Cache status unavailable"
+            }).append("</dd>")
+            receipt.errorClass?.let { append("<dt>Error class</dt><dd class=\"ds-curate-error\">").append(esc(it)).append("</dd>") }
+            append("</dl>")
+        }
+        append("</div>")
     }
 
     // ── the shell ───────────────────────────────────────────────────────────

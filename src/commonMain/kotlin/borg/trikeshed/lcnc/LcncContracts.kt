@@ -1173,13 +1173,13 @@ object LcncContracts {
             outputKinds = mapOf("restored" to "json"), isEffect = true),
 
         // ── Legal domain nodes ────────────────────────────────────
-        LcncPortContract("legal.ingest", "legal document ingest (eyecite + LLM propose/gate)",
-            listOf("text?"), listOf("documentCid", "citations", "elements", "brief"),
+        LcncPortContract("legal.ingest", "legal source through the canonical document curator (retained proposals, not legal conclusions)",
+            listOf("text?"), listOf("documentCid", "receiptCid", "citations", "elements", "brief", "record", "sheet", "sheets", "ruleCandidates", "nlpStatus"),
             inputKinds = mapOf("text" to "text"),
-            outputKinds = mapOf("documentCid" to "id", "citations" to "json", "elements" to "json", "brief" to "text"),
+            outputKinds = mapOf("documentCid" to "id", "receiptCid" to "id", "citations" to "json", "elements" to "json", "brief" to "text",
+                "record" to "json", "sheet" to "json", "sheets" to "json", "ruleCandidates" to "json", "nlpStatus" to "text"),
             params = mapOf(
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "legal document text (or wire one in)"),
-                "maxTokens" to LcncPortContract.LcncParamSpec(v = "2048"),
                 "brief" to LcncPortContract.LcncParamSpec(ph = "root frame binding to read when no text is wired (human-oversight brief)"),
             ), isEffect = true),
         LcncPortContract("legal.evidence", "evidence-bank query (shared KIF bank) → brief folded with prior facts",

@@ -33,6 +33,20 @@ typealias Cursor = Series<RowVec>
 
 ---
 
+## What's in it
+
+The goal is lawyer-quality analysis of text: adaptively formed, CLIPS/Rete-level rules that mark trees of source fragments with meaning and analysis, with every conclusion traceable to the sentence it came from. Neural models (local BERT, LLM council seats) serve as System 1: they only propose. Kotlin Multiplatform on JDK 25 and GraalVM. The main parts:
+
+- **Causal analytical text ingest:** drag a folder onto `/graal` and it becomes a project database. The curator extracts concepts and relations through CoreNLP, runs rule candidates through a Rete production-rule engine (agenda, salience and refraction, as in CLIPS) and NARS, and each rule firing links back to the quoted source sentences behind it.
+- **Columnar core:** a lazy `Series`/`Cursor` algebra over zero-copy, memory-mapped I/O; one parser for JSON, YAML and CBOR (Confix); and an embedded content-addressed store with a write-ahead log and a copy-on-write B+tree.
+- **No-code:** a visual node-graph editor (LCNC, `/panels`) whose programs run in the daemon. Nodes can be written in Kotlin, Java, Clojure, JavaScript, Groovy, Ruby or Python and stepped at node boundaries. In-process JavaScript, Python and Ruby also support stepping into guest source; every run leaves an immutable, content-addressed receipt.
+- **Agent isolation harness:** AI agents, including the Python/Hermes sleeve, run as revocable guest processes with bounded, deadline-limited host calls. `council.seat` nodes put the same evidence to several models as separate parties and keep each model's identity and refusals. Model output stays a proposal and never becomes a command; `--airgap` keeps models local.
+- **Oroboros:** the daemon underneath absorbs worktree, git, agent-environment and runtime changes as content-addressed, peer-replicable history, and hot-swaps code while it runs.
+- **Durable job nexus:** jobs and a Kanban board on a write-ahead log. Kill the daemon mid-flight and restart without losing work; the board is open to any MCP client (`POST /api/mcp`).
+- **Tests:** the old suite was deleted when it was holding the project back. AI coding agents have rebuilt it from about 20 `@Test` cases in February 2026 to about 4,400 in October 2026.
+
+---
+
 ## Run it in anger — please
 
 The best thing you can do for this project is point it at your **real** mess and
@@ -146,6 +160,91 @@ task creation, clinical/legal conclusions or external actuation. Retained
 simulation and document-quality task review remain separate constructions that
 make no new model request.
 
+The separate full-Council `council.record` sink retains missing or mismatched
+turn CIDs as a mistrial, including the supplied evidence and mismatch count.
+Mistrials never emit a `(ruling …)` fact for later evidence queries. Invalid
+document CIDs are rejected before any durable write. A partial seat refusal
+remains visible without automatically voiding an otherwise intact ruling.
+Full Council and tribunal `legal.ingest` delegate to the same `document.curate`
+owner as DocumentSurface. Their outputs expose the retained curation receipt,
+sheet links, proposals, refusals and parser rule candidates; the brief includes
+the entire source rather than an 8,000-character prefix. Curation model and token
+budget belong to that shared owner, not the old `legal.ingest.maxTokens` setting.
+An unavailable owner or unvalidated NLP reading refuses ingestion. Eyecite remains
+an optional literal-citation aid, not verification of authority. New ingestion
+does not turn substring matches into KIF holdings, party roles or legal truth;
+`elements` now carries canonical proposals/refusals rather than those legacy
+classifications. Historical KIF and prior rulings remain available to evidence
+queries. This does not establish transactional full-Council sink durability.
+
+Document curation startup requires the daemon's opt-in belief bag
+(`--belief-bag` or `TRIKESHED_BELIEF_BAG=1`), a configured ModelMux chat model
+and the installed CoreNLP guest module. Opening the document curator does not
+submit a document; curation remains an explicit Run/Curate action. If the belief
+bag or model is absent, `/api/documents` reports the prerequisite, document
+runners remain unbound, and curation/receipt requests return 503 without retaining
+submitted source. An unavailable record store is not reported as an empty one.
+Missing CoreNLP is also reported by the readiness surface without hiding retained
+records from an opened curator.
+
+The Curate page shows each saved attempt's recorded NLP, model, grounding and
+axiomatics outcomes and stage receipt CIDs, plus the retained model-call receipt.
+A completed LCNC run or HTTP 200 does not override a failed stage. Missing
+historical receipts remain unavailable, not successful; reopening an attempt
+does not retry its model call. These outcomes do not verify the source's claims.
+
+`DocumentCurationWireTest` normally uses a deterministic model transport with
+the installed CoreNLP guest. To exercise that same contract against an existing
+Hermes profile, explicitly set `TRIKESHED_CURATION_PROFILE` to its directory and
+`TRIKESHED_CURATION_BASE` / `TRIKESHED_CURATION_MODEL` to the expected configured
+endpoint and model, then run
+`./gradlew :jvmTest --tests 'borg.trikeshed.forge.server.DocumentCurationWireTest'`.
+This sends one synthetic Acme/Beta passage through the production curator,
+HTX and ModelMux, in temporary storage; it does not restart the daemon.
+A mismatched destination or unresolved
+credential fails before dispatch, with no provider fallback. Success requires
+the exact uncached model receipt, retained source/CoreNLP provenance, rule
+candidates, and read-back without another model call or write. Explicit live
+runs are never served from Gradle's test cache or up-to-date results. It is not
+evidence of medical/legal accuracy or of enabling curation in an already-running daemon.
+
+For a local browser check of a retained model failure, run
+`TRIKESHED_CURATION_UI=1 ./gradlew :jvmTest --tests 'borg.trikeshed.forge.server.DocumentCurationWireTest.failedModelStageRemainsVisibleThroughTheCanonicalRecordAndReadback' --rerun`.
+The test prints a loopback document URL, serves the production Kotlin/JS page
+and document routes over temporary storage, and waits up to three minutes for
+`/_test/finish`. Its model transport returns a synthetic 503; no live provider
+or running daemon is used. `/_test/observations` reports model calls and any
+additional retention writes during inspection.
+
+Council recording distinguishes `PREPARED`, `RECORDED` and `PUBLISHED` in its
+Couch journal. CAS identities and retained bytes are checked; Couch conflicts
+and rejected acknowledgements propagate. KIF publication follows the lifecycle
+commit, and case read-back prefers the journal over a partially updated
+blackboard index. An incomplete publication reads as `recording`; a retry uses
+the retained lifecycle receipt. Published replays are read-only. Recorders
+sharing the same services serialize admission, and different evidence cannot
+overwrite an existing case ID. Legacy records remain readable but require a
+distinct case ID or explicit migration before recording again.
+The job nexus retains, verifies and syncs snapshot bytes before exposing an
+accepted receipt, and rebuilds command receipts when opening a supplied log.
+Council's daemon wiring borrows the shared CAS and stores each case's ordered
+command references in a revision-pinned Couch job log. Reopening that log restores
+the lifecycle and original terminal receipt; a retry after lifecycle commit but
+before its journal acknowledgement does not advance the case again. Ruling
+identity includes the transcript as well as the verdict; mistrial identity
+includes the complete reason rather than its platform string hash. Stale log
+writers and missing or corrupt command bytes fail rather than overwrite history.
+Controlled disk-store reopen tests cover those interruption and partial-start
+boundaries. These are still separate stores, not one transaction or an OS-crash
+or cross-process exactly-once guarantee. Restart durability depends on the
+host's configured CAS/Couch backing; a volatile host remains volatile.
+Fresh recording, recorded/published replay and phased case read-back validate the
+named lifecycle snapshot: retained bytes must match its CID, decode as a job
+snapshot, name the same case, have a committed revision and carry the expected
+terminal state. Invalid receipts fail before ruling publication; replay does not
+repair missing or corrupt receipts. Published replay also verifies the evidence
+blobs without writing them again.
+
 In **Evidence → Recorded node outputs**, a successful seat response offers
 **Load review task … (no execution)**. This separate construction pins the exact
 run receipt and seat node. Write a review question, then Run to create an ordinary
@@ -175,6 +274,17 @@ selects a compression dictionary for that batch only; blank uses the portable
 dictionary-free codec. This is distinct from dictionary-coded column values.
 The JVM daemon supplies the native dictionary codec; other hosts must supply a
 codec before offering this option. There is no silent fallback.
+
+For embedded callers, `ConfixIsamCursorBridge.couch(name)` binds the dense
+destination to the existing Couch protocol: writes publish dense geometry and
+exact canonical CBOR before becoming visible, and reopen recovers revisions,
+tombstones and destination-local replication checkpoints. The storage owner
+must remain open; close it to release its writer lease. After binding, mutate
+through the returned Couch, not the raw revision API. Heads and query indexes
+are still memory projections. This adapter does **not** switch the daemon's
+primary store or migrate an existing database. `importFrames` copies revision
+history explicitly; a separate destination does not inherit the source's
+peer-local checkpoints.
 
 Publish trained Zstd or raw-content dictionary bytes through the existing Couch
 CAS route (`POST /trikeshed/_cas`, raw binary body), then paste its returned
@@ -219,6 +329,12 @@ Java, Clojure, JavaScript, Groovy, Ruby and Python use the existing typed
 language lane to return a Confix route definition. Wire that value to
 `vm.camel`'s `route` input; the message goes to its separate `messages` input.
 The older payload-transform construction remains available.
+
+Language availability comes from the registered `vm.polyglot` runner's service
+bindings, using the same caller-over-mux-over-module-over-default precedence as
+execution, not the global VM host. Missing runners or undeclared host bindings
+remain unavailable. Discovery does not dispatch a node or create a guest; native
+Java/Groovy Camel compiler discovery remains independent of the polyglot host.
 
 This is data-defined Camel routing, **not native Camel DSL**. For example,
 the route parameter accepts:
@@ -344,14 +460,17 @@ and resolved wired inputs, the scope path, iteration, pause ordinal, run ID and 
 program CID. A skipped/unfed node can still be inspected before the executor
 decides to skip it. Ordinary node stepping runs a polyglot guest call to completion.
 
-At a `vm.polyglot` pause, **Into guest source** instead suspends the same call
+At a `vm.polyglot` pause, **Into guest source** is enabled only when the effective
+bound host supports the resolved language and trust tier. This capability check
+does not create a guest or evaluate source. The command suspends the same call
 through Truffle, then offers **Into guest source**, **Step over source** and
 **Step out of source**. In-process JS, Python and Ruby expose bounded stack frames
 and copied scalar locals at statement and function-entry/exit stops. Each pause
 identifies its before/after anchor; object inspection does not invoke getters or
 evaluate expressions. Coordinates refer to generated guest source, including the language
 adapter, not directly to the authored body. JVM-language wrappers and process
-guests explicitly refuse source stepping before evaluation. **Step into next
+guests offer node stepping only; the guest execution boundary also refuses an
+unsupported source-debug request before evaluation. **Step into next
 node** from a source pause finishes the guest and stops at the next node.
 **Run to line** resumes to a one-shot breakpoint in the current guest source,
 without replaying earlier effects. The panel numbers a bounded source window;
@@ -425,8 +544,50 @@ operation even at capacity: admission stops, preceding operations finish, the
 guest context closes, then its acknowledgement follows earlier replies. Ordinary
 restricted-worker close no longer uses a one-second kill timer. Interrupt and
 transport failure remain explicit revocation paths, not successful drain.
-Process launch and raw pipe transport remain platform boundaries; this change
-does not claim those I/O paths have been migrated to the uring facade.
+The parent `ProcessIsolate` transport uses `ProcessProtocolChannel` in commonMain
+userspace NIO. It composes `ProcessFrameChannel`, also used by `SubVmMain` and
+`PythonWorkerMain`: one shared UTF-8 framer, bounded acknowledged writes, an
+independent reader and joined endpoint cleanup under owning SupervisorJobs.
+Guest operations stay on the process main thread while protocol reads and replies
+remain independently runnable. Construction output does not wait for the guest
+request handler; close replies remain writable until the parent sends EOF.
+The parent additionally owns terminal input, concurrent terminal output readers,
+and the child lifetime. Physical stdin
+backpressure does not block a protocol callback reply. Terminal EOF leaves the
+protocol open for admitted operations; normal close awaits those operations and
+the child exit, while explicit revocation reaps a failed or interrupted worker.
+`JvmProcessProtocolPipes` binds process and socket effects at the userspace SPI;
+explicit revocation (including failed/cancelled pipe I/O or closing a live
+worker) snapshots its reachable descendants and terminates them deepest-first
+before reaping the worker. Grace is shared across that snapshot; forced exits
+are awaited and failures propagate. Normal protocol drain still has no kill
+timer. This is not process-group containment: descendants that already detached
+or fork after the snapshot are not covered by the JVM handle snapshot.
+The stock-Python worker keeps its authenticated loopback protocol separate from
+native terminal bytes. `JvmProcessProtocolStream` owns only a child's protocol
+endpoint, never process termination. Its restricted stdio binding owns fd 0/1;
+the stock-Python socket binding leaves native terminal descriptors alone.
+This does not claim native SQE execution.
+
+Hermes terminal lines acquire a host command identity when the donor input loop
+admits them, not on each keystroke. That identity links terminal output, pen and
+ModelMux receipts, and the validated completion or failure signal. A processed
+slash command need not run a model; an attempted model turn needs an explicit
+completed result, without failure, partial or interrupted flags. The console
+snapshot updates after each processed input. Reset drains a live turn before
+replacing its worker and resuming the saved conversation. An observed worker
+exit or unfinished input remaining after close produces one failure receipt and
+clears the retired identity; late results cannot complete the next worker's turn.
+
+The standalone `ProcessVmHost`/`ProcessIsolateHost` path also uses common userspace
+ownership through `ProcessVmChannel`. Its synchronous VM API waits through a
+platform SPI binding; bounded requests, independent host callbacks and close
+ordering remain common code. Delegate registration reaches the child before
+returning. Close sends terminal EOF, finishes admitted requests, awaits the child
+close acknowledgement, and joins transport and callbacks. Explicit revocation
+bypasses the request queue so a blocked guest cannot prevent its own termination;
+subsequent close still joins admitted host effects. Host close attempts every
+child and propagates cleanup failures instead of silently accepting them.
 
 The existing Teleported wire tree admits only finite `Real` values. Host and
 Graal projections retain NaN and infinities as opaque number markers, including

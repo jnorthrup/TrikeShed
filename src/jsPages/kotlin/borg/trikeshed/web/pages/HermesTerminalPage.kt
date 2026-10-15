@@ -260,7 +260,8 @@ object HermesTerminalPage {
         }
         fun focusTerminal() {
             dragging = false
-            window.asDynamic().getSelection()?.removeAllRanges()
+            // Clearing the textarea's native selection during keydown suppresses text input in Chrome.
+            if (selectedText().isNotEmpty()) window.asDynamic().getSelection()?.removeAllRanges()
             selectionChanged()
             menu.hidden = true
             kbd.focus()

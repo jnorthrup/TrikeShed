@@ -137,3 +137,25 @@ nal_projection.txt
 /.tasks.txt
 /cas/
 .zenith-runtime/
+
+# Local credentials; keep documented examples visible.
+/.env
+/.env.*
+!/.env.example
+!/.env.sample
+!/.env.*.example
+!/.env.*.sample
+/.ssh/
+/.aws/
+/credentials.json
+/service-account.json
+/service-account-*.json
+/id_rsa
+/id_ecdsa
+/id_ed25519
+/id_dsa
+
+# Local compiler/download caches and private corpora, outside source roots.
+/.cache/
+/.konan/
+/corpora/

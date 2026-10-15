@@ -14,6 +14,8 @@ class HermesPythonWorker(
     private val output: OutputStream,
     private val error: OutputStream,
     private val stopped: (String?, String?) -> Unit = { _, _ -> },
+    private val inputStarted: (String) -> String? = { null },
+    private val inputFinished: (String?, Map<String, Any?>) -> Unit = { _, _ -> },
     private val progress: (String) -> Unit = {},
 ) : AutoCloseable {
     private var guest: ProcessIsolate? = null
@@ -30,6 +32,18 @@ class HermesPythonWorker(
         guest = worker
         try {
             pen.install(worker)
+            worker.delegate("sleeve_cli_input") { arguments ->
+                val line = (arguments.singleOrNull() as? Teleported.Str)?.v
+                    ?: error("terminal input requires text")
+                inputStarted(line)?.let { Teleported.Str(it) } ?: Teleported.Null
+            }
+            worker.delegate("sleeve_cli_result") { arguments ->
+                check(arguments.size == 2) { "terminal result requires cause and state" }
+                val result = (arguments[1] as? Teleported.Str)?.v ?: error("terminal result requires JSON state")
+                inputFinished((arguments[0] as? Teleported.Str)?.v,
+                    reifyMap(result) + ("workerPid" to worker.processId))
+                Teleported.Null
+            }
             worker.delegate("sleeve_cli_closed") { arguments ->
                 stopped((arguments.getOrNull(0) as? Teleported.Str)?.v,
                     (arguments.getOrNull(1) as? Teleported.Str)?.v)

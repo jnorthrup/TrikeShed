@@ -9,11 +9,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * legal.ingest's grounding gate is the anti-hallucination invariant the
- * plan requires (Task 2 Stage 2): the LLM is asked nicely not to fabricate,
- * but only [LegalNodes.groundList] actually enforces it — same shape as
- * [ConstructionPatternGate], applied to legal spans instead of causal
- * constructions.
+ * Literal citation filtering and historical KIF compatibility. These checks
+ * do not establish legal semantic admission; new ingestion uses the canonical
+ * document curator, exercised by LegalCurationCouncilTest.
  */
 class LegalNodesTest {
 

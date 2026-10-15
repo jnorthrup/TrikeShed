@@ -3,6 +3,7 @@
 import collections
 import codecs
 import gc
+import json
 import os
 import select
 import sys
@@ -103,9 +104,18 @@ def _turn_result(previous, result):
 def _observe(line):
     with _condition:
         receipt = _pending.popleft() if _pending and _pending[0]["line"] == line else None
+    terminal_input = receipt is None
+    if terminal_input:
+        receipt = {"line": line, "done": threading.Event(), "error": None,
+                   "turn_attempted": False, "turn": None}
+    cause = None
+    admitted = False
     previous = getattr(_cli, "_last_turn_result", None)
     _receipt.current = receipt
     try:
+        if terminal_input:
+            cause = _host_call("sleeve_cli_input", line)
+            admitted = True
         # GraalPy finalizes temporary native cursors at collection rather than at
         # CPython's reference-count boundary. Retire them before admitting input.
         gc.collect()
@@ -116,11 +126,17 @@ def _observe(line):
             receipt["error"] = traceback.format_exc()
         raise
     finally:
-        if receipt is not None:
+        try:
             result = getattr(_cli, "_last_turn_result", None)
             receipt["turn"] = _turn_result(previous, result)
+            if admitted:
+                outcome = status()
+                outcome.update(input_processed=True, turn_attempted=receipt["turn_attempted"],
+                               turn=receipt["turn"], input_error=receipt["error"])
+                _host_call("sleeve_cli_result", cause, json.dumps(outcome))
+        finally:
             receipt["done"].set()
-        _receipt.current = None
+            _receipt.current = None
 
 
 def _serve():

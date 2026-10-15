@@ -6,12 +6,68 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.kanban.module.WorkspaceService
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
+import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.vm.*
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.withContext
 import kotlin.test.*
 
 class WorkspaceServiceTest {
+    @Test fun catalogUsesExecutionContextPrecedenceAndDoesNotAssumeAnUnboundHost() = runTest {
+        fun host(facet: VmFacet) = object : VmHost {
+            override val languages = setOf(facet)
+            override fun spawn(spec: VmSpec): VmHandle = error("Catalog must not spawn a guest")
+        }
+        val module = CoroutineScope(coroutineContext + VmHostKey(host(VmFacet.GRAAL_PYTHON)))
+        val ctx = vmRuntimeTestContext(module)
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host(VmFacet.GRAAL_JS))
+        suspend fun available(context: ModuleContext) = WorkspaceService(context).capabilities()
+            .view.filter { it.available }.map { it.language.id }
+        assertEquals(listOf("python"), available(ctx))
+        val mux = vmRuntimeTestContext(module, VmHostKey(host(VmFacet.GRAAL_RUBY)))
+        mux.lcncRunners.putAll(ctx.lcncRunners)
+        assertEquals(listOf("ruby"), available(mux))
+        withContext(VmHostKey(host(VmFacet.GRAAL_JS))) {
+            assertEquals(listOf("js"), available(mux))
+            mux.lcncRunners.clear()
+            assertTrue(available(mux).isEmpty(), "A caller's host cannot supply a missing runner")
+        }
+    }
+
+    @Test fun catalogUsesTheRegisteredHostWithoutSpawningAGuest() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        var probes = 0
+        val host = object : VmHost {
+            override val languages: Set<VmFacet> get() {
+                probes++
+                return setOf(VmFacet.GRAAL_JS)
+            }
+            override fun spawn(spec: VmSpec): VmHandle = error("Catalog must not spawn a guest")
+        }
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+        ctx.lcncRunners[SubVmLegos.CAMEL] = SubVmLegos.camel(host)
+        val revision = ctx.blackboard.snapshot().revision
+        val service = WorkspaceService(ctx)
+        val response = service.route("GET", "")
+        assertEquals(200, response.status)
+        val catalog = reifyMap(response.body)
+        val languages = assertIs<List<*>>(catalog["languages"]).map { assertIs<Map<*, *>>(it) }
+        assertTrue(probes > 0, "Language discovery must inspect the registered runner's host")
+        assertEquals(listOf("js"), languages.filter { it["available"] == true }.map { it["id"] })
+        assertNotNull(languages.single { it["id"] == "js" }["construction"])
+        withContext(VmHostKey(VmHost.NONE)) {
+            val disabled = assertIs<List<*>>(service.catalog()["languages"]).map { assertIs<Map<*, *>>(it) }
+            assertTrue(disabled.none { it["available"] == true || it["construction"] != null })
+        }
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = LcncNodeRunner { _, _ -> error("Discovery must not execute") }
+        val unknown = assertIs<List<*>>(service.catalog()["languages"]).map { assertIs<Map<*, *>>(it) }
+        assertTrue(unknown.none { it["available"] == true || it["construction"] != null },
+            "A runner without declared host bindings cannot inherit the global host's capability")
+        assertEquals(revision, ctx.blackboard.snapshot().revision)
+    }
+
     @Test fun inspectionDistinguishesInterpreterScopesFromMissingRunnersWithoutExecution() = runTest {
         val ctx = vmRuntimeTestContext(this)
         var executions = 0
