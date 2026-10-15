@@ -1,6 +1,7 @@
 package borg.trikeshed.kanban.module
 
 import borg.trikeshed.graal.subvm.VmLanguages
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.couch.isam.descriptor
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
@@ -85,11 +86,33 @@ class WorkspaceService(
             ) }.toList()
         return mapOf(
             "name" to name, "programCid" to programCid,
+            "comparison" to request["compareProgramCid"]?.let { compare(program, it) },
             "confix" to WorkspaceFacets.inspect(source, path, offset, limit, cursorQuery(request["cursor"])),
             "violations" to LcncTypeCheck.check(program, contracts).map { it.render() },
             "bindings" to describe(program.nodes),
             "blackboardRevision" to board.revision, "runs" to runs,
         )
+    }
+
+    /** Read the immutable program, never a mutable named head or client-provided definition. */
+    fun compare(program: LcncProgram, reference: Any): Map<String, Any?> {
+        val cid = ContentId(requireNotNull(reference as? String) { "compareProgramCid must be a content ID" })
+        val bytes = context.casStore.get(cid)
+            ?: return mapOf("programCid" to cid.value, "relation" to "unavailable", "detail" to "Frozen program is unavailable")
+        require(bytes.size <= WorkspaceFacets.MAX_BYTES) { "Frozen program exceeds workspace byte limit" }
+        require(ContentId.of(bytes) == cid) { "Frozen program content identity mismatch" }
+        val raw = requireNotNull(reifyStrict(bytes.decodeToString()) as? Map<*, *>) { "Frozen program must be an object" }
+        require(raw["nodes"] is List<*> && raw["wires"] is List<*>) { "Content is not a frozen program" }
+        WorkspaceFacets.valueBudget().violation(raw)?.let { throw IllegalArgumentException(it) }
+        val frozen = LcncProgramConfix.fromJson(program.name, jsonOf(raw))
+        // Refuse lossy parsing or a noncanonical blob before making a definition claim.
+        require(LcncBlackboard.cidOf(frozen) == cid.value) { "Content is not a canonical frozen program" }
+        val relation = when {
+            LcncBlackboard.cidOf(program) == cid.value -> "identical"
+            LcncProgramConfix.sameDefinition(program, frozen) -> "presentation"
+            else -> "different"
+        }
+        return mapOf("programCid" to cid.value, "relation" to relation)
     }
 
     fun path(request: Map<*, *>): Series<Any> {

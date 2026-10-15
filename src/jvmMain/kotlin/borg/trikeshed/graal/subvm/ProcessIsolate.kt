@@ -14,11 +14,14 @@ import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
 import java.io.OutputStream
+import java.net.Socket
 import java.util.Base64
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
@@ -31,7 +34,9 @@ typealias SubVmProtocol = borg.trikeshed.vm.SubVmProtocol
  * A guest behind a process wall. The child is either a JVM running [SubVmMain] (the same
  * [InProcessIsolate] bounds apply inside it) or — for JS with `nodeLauncher` — the GraalJS `node`
  * launcher, which is the only way to get Node.js APIs (`require`, `process`, the event loop): the
- * in-process JS engine deliberately does not have them.
+ * in-process JS engine deliberately does not have them. [pythonWorker] instead starts one stock
+ * GraalPy context with native Python facilities. It is explicitly OWN-trust and never changes
+ * the permissions of the default restricted tiers.
  *
  * Crash isolation is the point: a guest that kills its JVM (OOM, native crash, a GraalPy GIL
  * assertion) costs the parent one [isAlive]=false, never the parent itself.
@@ -45,24 +50,37 @@ class ProcessIsolate(
     private val replyTimeoutMillis: Long = 30_000,
     private val terminalOutput: OutputStream? = null,
     private val terminalError: OutputStream? = terminalOutput,
+    val pythonWorker: PythonWorker? = null,
 ) : GuestIsolate {
-    override val trust = Trust.UNTRUSTED
+    override val trust = if (pythonWorker == null) Trust.UNTRUSTED else Trust.OWN
     override val bounds: FacetBounds = GuestBounds.of(facet)
 
     private val lock = ReentrantLock()
     private val process: Process
+    private val protocol: Socket?
     private val out: BufferedWriter
     private val inbox = LinkedBlockingQueue<Teleported.Obj>()
-    private val delegates = java.util.concurrent.ConcurrentHashMap<String, (List<Teleported>) -> Teleported>()
+    private class HostDelegate(val timeoutMillis: Long?, val function: (List<Teleported>) -> Teleported)
+    private val delegates = ConcurrentHashMap<String, HostDelegate>()
+    private val hostOperations = Executors.newSingleThreadExecutor { action -> Thread(action, "subvm-host-$id") }
+    private val reader: Thread
+    private val errors: Thread?
+    private val terminalReader: Thread?
     private val ids = AtomicInteger()
     private val evals = AtomicLong(); private val calls = AtomicLong(); private val hostCalls = AtomicLong(); private val interrupted = AtomicLong()
     @Volatile private var alive = true
+    @Volatile private var accepting = true
+    val processId: Long get() = process.pid()
 
     private companion object {
         val surveyed = java.util.concurrent.atomic.AtomicBoolean(false)
     }
 
     init {
+        require(pythonWorker == null || facet == VmFacet.GRAAL_PYTHON && nodeLauncher == null) {
+            "PythonWorker requires the Python facet and its own child JVM"
+        }
+        val transport = pythonWorker?.let { PythonWorkerTransport(it.timeoutMillis) }
         val cmd: List<String> = if (nodeLauncher != null) {
             require(facet == VmFacet.GRAAL_JS) { "nodeLauncher only serves JS" }
             guard(nodeLauncher.path)
@@ -70,28 +88,48 @@ class ProcessIsolate(
         } else {
             val java = File(System.getProperty("java.home"), "bin/java").path
             guard(java)
-            listOf(java, "-Xss4m", "-cp", System.getProperty("java.class.path"), SubVmMain::class.java.name, bounds.languageId, id, budget.statements.toString(), budget.wallMillis.toString())
+            if (pythonWorker == null)
+                listOf(java, "-Xss4m", "-cp", System.getProperty("java.class.path"), SubVmMain::class.java.name, bounds.languageId, id, budget.statements.toString(), budget.wallMillis.toString())
+            else listOf(java, "-Xss4m", "-cp", System.getProperty("java.class.path"),
+                PythonWorkerMain::class.java.name, id, pythonWorker.encode(),
+                requireNotNull(transport).port.toString(), transport.token)
         }
         val builder = ProcessBuilder(cmd)
         // A bare ProcessBuilder's environment is a COPY of this daemon's own — every provider key
         // KeyMux holds, TRIKESHED_EGRESS_ALLOWLIST, whatever else lives in the shell — handed to an
         // UNTRUSTED child by default. Replace it with the same curated whitelist InProcessIsolate
         // uses; the child's `java`/`node` launch itself needs nothing from the host env to run.
-        builder.environment().apply { clear(); putAll(GuestEnvironment.curated()) }
+        builder.environment().apply {
+            clear(); putAll(GuestEnvironment.curated())
+            pythonWorker?.environment?.let(::putAll)
+        }
+        pythonWorker?.workingDirectory?.let { builder.directory(File(it)) }
         deliberateHostEnvironmentOnce()
         if (terminalError == null) builder.redirectError(ProcessBuilder.Redirect.INHERIT)
-        process = builder.start()
-        out = process.outputStream.bufferedWriter()
-        Thread({ pump(process.inputStream.bufferedReader()) }, "subvm-reader-$id").apply { isDaemon = true }.start()
+        process = try { builder.start() } catch (failure: Throwable) { transport?.close(); throw failure }
+        protocol = try { transport?.accept(process) }
+        catch (failure: Throwable) {
+            process.destroy()
+            if (!process.waitFor(2, TimeUnit.SECONDS)) process.destroyForcibly()
+            process.waitFor()
+            throw failure
+        }
+        finally { transport?.close() }
+        out = (protocol?.getOutputStream() ?: process.outputStream).bufferedWriter()
+        reader = Thread({ pump((protocol?.getInputStream() ?: process.inputStream).bufferedReader()) }, "subvm-reader-$id").apply { isDaemon = true; start() }
+        terminalReader = if (pythonWorker == null) null else Thread({
+            runCatching { process.inputStream.use { input -> input.copyTo(terminalOutput ?: OutputStream.nullOutputStream()) } }
+            terminalOutput?.flush()
+        }, "subvm-stdout-$id").apply { isDaemon = true; start() }
         val childError = terminalError
-        if (childError != null) {
+        errors = if (childError != null) {
             Thread({
                 runCatching {
                     process.errorStream.use { input -> input.copyTo(childError) }
                     childError.flush()
                 }
-            }, "subvm-stderr-$id").apply { isDaemon = true }.start()
-        }
+            }, "subvm-stderr-$id").apply { isDaemon = true; start() }
+        } else null
     }
 
     private fun deliberateHostEnvironmentOnce() {
@@ -122,7 +160,10 @@ class ProcessIsolate(
                     else -> inbox.put(msg)
                 }
             }
-        } finally { alive = false }
+        } finally {
+            alive = false
+            inbox.offer(Teleported.obj("op" to "dead"))
+        }
     }
 
     private fun forwardTerminal(msg: Teleported.Obj) {
@@ -137,8 +178,17 @@ class ProcessIsolate(
         val name = msg.str("name") ?: ""
         val args = (msg.field("args") as? Teleported.Arr)?.v ?: emptyList()
         val reply = try {
-            val fn = delegates[name] ?: error("no host delegate named '$name'")
-            Teleported.obj("id" to msg.int("id"), "value" to fn(args))
+            val delegate = delegates[name] ?: error("no host delegate named '$name'")
+            val value = if (delegate.timeoutMillis == null) delegate.function(args) else {
+                val operation = FutureTask { delegate.function(args) }
+                hostOperations.execute(operation)
+                try { operation.get(delegate.timeoutMillis, TimeUnit.MILLISECONDS) }
+                catch (timeout: TimeoutException) {
+                    operation.cancel(true)
+                    throw IllegalStateException("host delegate '$name' exceeded ${delegate.timeoutMillis}ms", timeout)
+                }
+            }
+            Teleported.obj("id" to msg.int("id"), "value" to value)
         } catch (t: Throwable) { Teleported.obj("id" to msg.int("id"), "error" to (t.message ?: t.toString())) }
         send(reply)
     }
@@ -146,15 +196,25 @@ class ProcessIsolate(
     @Synchronized private fun send(m: Teleported.Obj) { out.write(SubVmProtocol.encode(m)); out.newLine(); out.flush() }
 
     private fun roundTrip(vararg fields: Pair<String, Any?>): Teleported = lock.withLock {
+        if (!accepting) throw GuestException(GuestFailure.DEAD, "isolate $id is draining")
+        exchange(*fields)
+    }
+
+    private fun exchange(vararg fields: Pair<String, Any?>): Teleported {
         if (!alive) throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
         val rid = ids.incrementAndGet()
         send(Teleported.obj("id" to rid, *fields))
         var reply: Teleported.Obj
         do {
-            reply = inbox.poll(replyTimeoutMillis, TimeUnit.MILLISECONDS)
-                ?: throw GuestException(if (!alive) GuestFailure.DEAD else GuestFailure.INTERRUPTED, if (!alive) "child died" else "no reply in ${replyTimeoutMillis}ms")
+            val timeout = pythonWorker?.timeoutMillis ?: replyTimeoutMillis
+            reply = inbox.poll(timeout, TimeUnit.MILLISECONDS) ?: run {
+                if (pythonWorker != null) revokeWorker()
+                throw GuestException(if (!alive) GuestFailure.DEAD else GuestFailure.INTERRUPTED,
+                    if (!alive) "child died or its deadline expired" else "no reply in ${timeout}ms")
+            }
+            if (reply.str("op") == "dead") throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
         } while (reply.int("id") != rid)
-        if (reply.bool("ok") == true) return@withLock reply.field("value") ?: Teleported.Null
+        if (reply.bool("ok") == true) return reply.field("value") ?: Teleported.Null
         val kind = runCatching { GuestFailure.valueOf(reply.str("kind") ?: "") }.getOrDefault(GuestFailure.GUEST_ERROR)
         if (kind == GuestFailure.EXHAUSTED) alive = false
         throw GuestException(kind, reply.str("error") ?: "guest error")
@@ -166,12 +226,27 @@ class ProcessIsolate(
 
     /** Register on both sides: the parent keeps the function, the child installs a bridge that asks for it. */
     override fun delegate(name: String, fn: (List<Teleported>) -> Teleported) {
-        delegates[name] = fn
+        delegates[name] = HostDelegate(null, fn)
         roundTrip("op" to "delegate", "name" to name)
     }
 
-    /** Raw terminal stdin is multiplexed beside protocol requests; it never shares the JSON payload bytes. */
+    override fun delegate(name: String, hostWallMillis: Long, fn: (List<Teleported>) -> Teleported) {
+        require(pythonWorker != null) { "bounded host delegation requires a Python worker" }
+        require(hostWallMillis > 0 && hostWallMillis <= pythonWorker.timeoutMillis)
+        delegates[name] = HostDelegate(hostWallMillis, fn)
+        roundTrip("op" to "delegate", "name" to name, "timeout" to hostWallMillis)
+    }
+
+    /** Stock Python has physical stdin; restricted children multiplex input beside protocol frames. */
     fun pushInput(text: String) {
+        check(accepting && isAlive) { "isolate $id is draining" }
+        if (pythonWorker != null) {
+            synchronized(process.outputStream) {
+                process.outputStream.write(text.encodeToByteArray())
+                process.outputStream.flush()
+            }
+            return
+        }
         val encoded = Base64.getEncoder().encodeToString(text.encodeToByteArray())
         send(Teleported.obj("op" to "stdin", "data" to encoded))
     }
@@ -186,6 +261,7 @@ class ProcessIsolate(
         process.destroyForcibly()
         process.waitFor()
         alive = false
+        accepting = false
         return true
     }
 
@@ -193,11 +269,47 @@ class ProcessIsolate(
     override val isAlive: Boolean get() = alive && process.isAlive
 
     override fun close() {
-        runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "close")) }
-        if (!process.waitFor(1, TimeUnit.SECONDS)) {
-            process.destroyForcibly()
-            process.waitFor()
+        try {
+            if (pythonWorker != null) {
+                // Native stdin is a separate pipe, so EOF also releases ordinary os.read/input.
+                accepting = false
+                process.outputStream.close()
+                lock.withLock {
+                    try { if (alive) exchange("op" to "close") }
+                    finally {
+                        out.flush()
+                        protocol?.let { if (!it.isOutputShutdown && !it.isClosed) it.shutdownOutput() }
+                    }
+                }
+                // The close reply follows the final admitted operation and Context.close().
+                // Protocol EOF then releases the child reader. Ordinary close never revokes it.
+                process.waitFor()
+            } else {
+                runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "close")) }
+                if (!process.waitFor(1, TimeUnit.SECONDS)) {
+                    process.destroyForcibly()
+                    process.waitFor()
+                }
+            }
+        } finally {
+            accepting = false
+            if (process.isAlive && pythonWorker != null) revokeWorker()
+            alive = false
+            hostOperations.shutdown()
+            while (!hostOperations.awaitTermination(1, TimeUnit.SECONDS)) { /* Join admitted host calls. */ }
+            protocol?.close()
+            reader.join()
+            terminalReader?.join()
+            errors?.join()
+            process.inputStream.close(); process.errorStream.close(); process.outputStream.close()
         }
+    }
+
+    private fun revokeWorker() {
+        accepting = false
+        process.destroy()
+        if (!process.waitFor(InProcessIsolate.INTERRUPT_GRACE_MS, TimeUnit.MILLISECONDS)) process.destroyForcibly()
+        process.waitFor()
         alive = false
     }
 

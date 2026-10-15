@@ -999,7 +999,7 @@ object OroborosDaemon {
             vmHost, wireScope,
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
-        val hermesConsole = hermesConsole(config, home, repoDir, daemonBlackboard, htxElement, muxReactor, wireScope, vmWorldStore, fileOps)
+        val hermesConsole = hermesConsole(config, home, repoDir, forgeHome, daemonBlackboard, htxElement, muxReactor, wireScope, vmWorldStore, fileOps)
         val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
         if (config.hermesConsole) check(hermesWire.open()) { "Hermes console did not admit startup" }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
@@ -2654,13 +2654,18 @@ object OroborosDaemon {
         config: DaemonConfig,
         home: String,
         repoDir: File,
+        forgeHome: File,
         blackboard: borg.trikeshed.graal.ConfixBlackboard,
         htxElement: HtxElement,
         muxReactor: MuxReactorElement,
         socketScope: CoroutineScope,
         world: borg.trikeshed.btrfs.BtrfsWorldStore,
         fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
-    ) = borg.trikeshed.hermes.HermesVmConsole(
+    ): borg.trikeshed.hermes.HermesVmConsole {
+        val runtime = File(repoDir, "build/runtime/graalpy-25.3.4.1")
+        val workerHome = File(forgeHome, "hermes-graal")
+        fileOps.mkdirs(workerHome.absolutePath)
+        return borg.trikeshed.hermes.HermesVmConsole(
         root = java.nio.file.Paths.get(
             config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
                 ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath
@@ -2676,6 +2681,22 @@ object OroborosDaemon {
         muxContext = htxElement + muxReactor + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
         world = world,
+        workerConfiguration = borg.trikeshed.graal.subvm.PythonWorker(
+            workingDirectory = repoDir.absolutePath,
+            pythonPath = listOf(
+                config.hermesRoot ?: File(repoDir, "build/runtime/hermes-source").absolutePath,
+                File(repoDir, "graalpy-sleeve/bridges").absolutePath,
+            ),
+            executable = File(runtime, "venv/bin/python").absolutePath,
+            environment = mapOf(
+                "HERMES_HOME" to workerHome.absolutePath,
+                "HERMES_RUNTIME_DIR" to File(workerHome, "runtime").absolutePath,
+                "HERMES_DISABLE_LAZY_INSTALLS" to "1",
+                "TERMINAL_CWD" to repoDir.absolutePath,
+                "TERM" to "xterm-256color",
+                "COLUMNS" to "100", "LINES" to "32",
+            ),
+        ),
         install = { guest ->
             val workspace = repoDir.absolutePath
             for (name in listOf("PRELOAD.md", "AGENTS.md")) {
@@ -2693,7 +2714,8 @@ object OroborosDaemon {
                 True
             """.trimIndent(), "hermes-workspace.py")
         },
-    )
+        )
+    }
 
     /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */
     private fun openCouchStore(

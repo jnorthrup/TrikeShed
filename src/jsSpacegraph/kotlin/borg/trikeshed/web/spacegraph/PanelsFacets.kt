@@ -128,7 +128,7 @@ class PanelsFacets(val panels: Panels) {
                 "\nContext: " + str(binding.context.key ?: binding.context.role) +
                 (if (arr(binding.requiredKeys).isEmpty()) "" else "\nServices: " + arr(binding.requiredKeys).joinToString(", ") { str(it) }))
             for (violation in arr(r.violations)) text("Type diagnostic: " + str(violation))
-            receipts(r, serial)
+            receipts(r, serial, JSON.stringify(request))
             link("Run records", "/api/lcnc/runs?program=" + encodeURIComponent(str(request.name)))
             link("Shared blackboard", "/blackboard")
             pointcutEvidence(serial)

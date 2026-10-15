@@ -19,6 +19,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.graal.subvm.GuestException
 import borg.trikeshed.graal.subvm.GuestFailure
+import borg.trikeshed.graal.subvm.PythonWorker
 import org.graalvm.polyglot.PolyglotException
 
 import java.nio.file.Files
@@ -33,7 +34,7 @@ import modelmux.ModelMux
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
-/** Host terminal lane for Hermes source running in the supervised no-native GraalPy sleeve. */
+/** Host terminal lane for the real Hermes CLI in a supervised GraalPy runtime. */
 class HermesVmConsole(
     private val root: Path,
     private val sleeve: Path,
@@ -45,6 +46,7 @@ class HermesVmConsole(
     socketScope: CoroutineScope? = null,
     world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
     install: (borg.trikeshed.graal.subvm.GraalBtrfsSupervisor) -> Unit = {},
+    workerConfiguration: PythonWorker? = null,
 ) : AutoCloseable {
     /** READY admits diagnostic commands after imports, provider registration and bootstrap complete. */
     enum class State { CLOSED, BOOTING, READY, FAILED }
@@ -62,6 +64,7 @@ class HermesVmConsole(
         val failure: String? = null,
         val traceback: String? = null,
         val revision: Long = 0,
+        val wallMillis: Long = HermesPythonPort.IMPORT_WALL_MILLIS,
     ) {
         fun toMap(): Map<String, Any?> = mapOf(
             "phase" to phase.name.lowercase(),
@@ -74,7 +77,7 @@ class HermesVmConsole(
             "traceback" to traceback,
             // Compatibility key for diagnostic-console readiness; it does not measure HermesCLI lifecycle.
             "steadyState" to (status == State.READY),
-            "wallMillis" to if (phase == BootPhase.INVENTORY) null else HermesPythonPort.IMPORT_WALL_MILLIS,
+            "wallMillis" to if (phase == BootPhase.INVENTORY) null else wallMillis,
             "revision" to revision,
         )
     }
@@ -133,10 +136,16 @@ class HermesVmConsole(
     @Volatile private var inventory: HermesPortInventory? = null
     private val stdout = TerminalOutputStream { text -> causalOutput(text, currentCause.get()) }
     private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
+    private val pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
+        muxContext = muxContext, contextId = currentCause::get)
+    private val worker = workerConfiguration?.let { configuration ->
+        HermesPythonWorker(configuration, pen, stdout, stderr) { progress ->
+            bootPhase(BootPhase.BOOTSTRAP, progress, "cli.HermesCLI")
+        }
+    }
     private val port = HermesPythonPort(
         blackboard = blackboard, output = stdout, error = stderr,
-        pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
-            muxContext = muxContext, contextId = currentCause::get),
+        pen = pen,
         socketScope = socketScope,
         importPointcut = ::importPointcut,
         world = world,
@@ -161,6 +170,7 @@ class HermesVmConsole(
             causalOutput("sleeve · ${boot!!.detail}\r\n", null, timestampMs)
         }
         return try {
+            if (worker != null) return openWorker(timestampMs)
             val scanned = inventoryLoader(port)
             inventory = scanned
             cliRequested = "cli" in scanned.modules && "trikeshed_cli" in scanned.modules
@@ -260,6 +270,22 @@ class HermesVmConsole(
         }
     }
 
+    private fun openWorker(timestampMs: Long): State {
+        cliRequested = true
+        boot = boot!!.copy(wallMillis = 300_000)
+        bootPhase(BootPhase.IMPORT, "starting stock GraalPy in a dedicated worker", "cli")
+        val snapshot = panel.snapshot()
+        cliStatus = worker!!.open(snapshot.rows, snapshot.columns)
+        modelId = cliStatus?.get("model") as? String
+        cliStarted = true
+        synchronized(lock) {
+            boot = boot!!.copy(status = State.READY, updatedAtMs = System.currentTimeMillis(),
+                detail = "HermesCLI ready · stock GraalPy worker ${worker.processId}", revision = boot!!.revision + 1)
+            transition(State.READY, boot!!.detail)
+        }
+        return state
+    }
+
     /** Complete line submission. Web/TUI/desktop line disciplines all converge here. */
     fun submit(command: String, timestampMs: Long = System.currentTimeMillis()): LcncUserSignal =
         execute(prepareCommand(command, timestampMs), timestampMs)
@@ -310,6 +336,10 @@ class HermesVmConsole(
      */
     fun manualText(text: String, timestampMs: Long = System.currentTimeMillis(), paste: Boolean = false): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualText(text, timestampMs, paste).also(::emitManual)
+        if (worker != null) {
+            if (state == State.READY) worker.input(text)
+            return@synchronized manual
+        }
         var index = 0
         while (index < text.length) {
             when (val ch = text[index]) {
@@ -344,6 +374,10 @@ class HermesVmConsole(
         shift: Boolean = false,
     ): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualKey(key, timestampMs, ctrl, alt, shift).also(::emitManual)
+        if (worker != null) {
+            if (state == State.READY) worker.input(manual.input)
+            return@synchronized manual
+        }
         when (key) {
             VtKey.ENTER -> submitLine(timestampMs)
             VtKey.BACKSPACE -> backspace(timestampMs)
@@ -463,6 +497,7 @@ class HermesVmConsole(
     }
 
     private fun promptAndRedraw(timestampMs: Long) {
+        if (worker != null) return
         windowStart = 0
         redrawLine(timestampMs)
     }
@@ -516,6 +551,10 @@ class HermesVmConsole(
     }
 
     private fun dispatch(command: String, cause: String, timestampMs: Long) {
+        if (worker != null) {
+            runHermes(command)
+            return
+        }
         when {
             command.isEmpty() -> Unit
             command == ":help" -> causalOutput(HELP, cause, timestampMs)
@@ -591,6 +630,17 @@ class HermesVmConsole(
 
     private fun runHermes(prompt: String) {
         require(prompt.isNotBlank()) { "prompt is blank" }
+        if (worker != null) {
+            cliStatus = worker.submit(prompt)
+            modelId = cliStatus?.get("model") as? String
+            check(cliStatus?.get("input_processed") == true) { "HermesCLI did not process input" }
+            if (cliStatus?.get("open") != true) {
+                cliStarted = false
+                worker.close()
+                transition(State.CLOSED, "HermesCLI exited")
+            }
+            return
+        }
         if (cliStarted) {
             val result = port.evalInVm("trikeshed_cli.submit(${pythonString(prompt)})", "hermes-cli-input.py")
             val status = (result as? Teleported.Obj)?.v
@@ -684,7 +734,8 @@ class HermesVmConsole(
 
     override fun close() = synchronized(lock) {
         try {
-            if (cliStarted && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
+            if (worker != null) worker.close()
+            else if (cliStarted && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
         } finally {
             cliStarted = false
             try { port.close() } finally { stdout.close(); stderr.close() }

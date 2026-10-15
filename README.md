@@ -101,6 +101,14 @@ choices must enter through the route node's Confix parameter. Available
 languages and their compiler/runtime limitations are reported in the facet;
 the Kotlin source lane runs on JVM and does not prove cross-target portability.
 
+The Evidence facet reads immutable run receipts and their frozen programs. Exact
+program CIDs include layout. When automatic output layout or manual positioning
+changes that CID, the facet separately compares the authored definition while
+ignoring node position, size, collapse and viewport. Parameters, wires and their
+order, nested scopes, controls and Kanban remain compared. This read-only
+comparison neither executes nor saves a program, and does not establish that
+inputs, dependencies or results are still current.
+
 ## Curator — mostly done
 
 The curator use case is mostly done. The hard work is in place: reading documents

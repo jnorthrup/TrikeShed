@@ -2,6 +2,7 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.couch.*
 import borg.trikeshed.job.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.kanban.module.WorkspaceService
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
@@ -11,6 +12,56 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class WorkspaceServiceTest {
+    @Test fun frozenProgramComparisonIsReadOnlyAndKeepsExactIdentityDistinct() = runTest {
+        var writes = 0
+        val cas = object : CasStore() {
+            override fun put(bytes: ByteArray): ContentId { writes++; return super.put(bytes) }
+        }
+        val store = CouchStoreFactory.casBacked(cas)
+        val base = vmRuntimeTestContext(this)
+        val ctx = ModuleContext(couch = Couch("comparison", store, cas), rete = base.rete,
+            productions = base.productions, beliefBag = null, turnReview = null, blackboard = base.blackboard,
+            casStore = cas, attachments = CouchAttachmentGateway(store, cas), routes = base.routes,
+            scope = this, clock = base.clock, stateDir = base.stateDir)
+        var executions = 0
+        ctx.lcncRunners["text.value"] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        val service = WorkspaceService(ctx)
+        val original = LcncProgram("receipt", s_[LcncNode("source", "text.value", mapOf("value" to "雪"), x = 1270.0)], emptySeriesOf())
+        val cid = cas.put(LcncProgramConfix.toJson(original).encodeToByteArray()).value
+        val initialWrites = writes
+        val board = ctx.blackboard.snapshot()
+        val sequence = store.changes.lastCommittedSequence
+        suspend fun inspect(program: LcncProgram, expected: String): Map<*, *> {
+            val result = post(service, jsonOf(mapOf("name" to program.name,
+                "document" to reifyStrict(LcncProgramConfix.toJson(program)), "compareProgramCid" to cid)))
+            val comparison = assertIs<Map<*, *>>(result["comparison"])
+            assertEquals(cid, comparison["programCid"])
+            assertEquals(expected, comparison["relation"])
+            return result
+        }
+        assertEquals(cid, inspect(original, "identical")["programCid"])
+        val moved = original.copy(nodes = s_[original.nodes[0].copy(x = 1354.0)])
+        assertNotEquals(cid, inspect(moved, "presentation")["programCid"])
+        inspect(moved.copy(nodes = s_[moved.nodes[0].copy(params = mapOf("value" to "edited"))]), "different")
+        assertEquals(initialWrites, writes)
+        assertEquals(board, ctx.blackboard.snapshot())
+        assertEquals(sequence, store.changes.lastCommittedSequence)
+        assertEquals(0, executions)
+    }
+
+    @Test fun comparisonCannotInventAMatchForMissingMalformedOrNonProgramContent() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        val request = mapOf("document" to mapOf("nodes" to emptyList<Any>(), "wires" to emptyList<Any>()))
+        val missing = ContentId.of("missing".encodeToByteArray()).value
+        val result = post(service, jsonOf(request + ("compareProgramCid" to missing)))
+        assertEquals("unavailable", assertIs<Map<*, *>>(result["comparison"])["relation"])
+        for (invalid in listOf("bad", 123, ctx.casStore.put("{}".encodeToByteArray()).value,
+            ctx.casStore.put("{\"nodes\":[],\"wires\":[],\"unknown\":true}".encodeToByteArray()).value)) {
+            post(service, jsonOf(request + ("compareProgramCid" to invalid)), 400)
+        }
+    }
+
     @Test fun languageConstructionsRequireCapabilitiesAndBothRunnersWithoutExecuting() = runTest {
         val ctx = vmRuntimeTestContext(this)
         val service = WorkspaceService(ctx)

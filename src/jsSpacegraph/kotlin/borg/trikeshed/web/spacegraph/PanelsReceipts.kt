@@ -5,7 +5,7 @@ import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
 /** Immutable run evidence through the existing content route. No load, replay, admission or execution. */
-fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
+fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: String) {
     val latest = panels.lastProgramRun
     text("Recorded runs · immutable receipts. A matching program version does not mean its inputs or dependencies are still current.")
     val section = document.createElement("section").asDynamic()
@@ -80,7 +80,12 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
                 text(str(run.program) + " · " + str(run.runId) + " · " + str(run.status), output)
                 text("Receipt: " + cid + "\nProgram: " + str(run.programCid) +
                     if (run.programCid == workspace.programCid) "\nSame program version as the inspected canvas."
-                    else "\nDifferent program version from the inspected canvas; the canvas is unchanged.", output)
+                    else "\nDifferent program version from the inspected canvas. Inspection does not change the canvas.", output)
+                val comparison = if (run.programCid != workspace.programCid) document.createElement("p").asDynamic() else null
+                if (comparison != null) {
+                    comparison.textContent = "Comparing the frozen program with the inspected canvas…"
+                    output.appendChild(comparison)
+                }
                 if (str(run.status) in arrayOf("validating", "running"))
                     text("This receipt records a non-terminal state, not the run's current liveness. A newer state requires a newer receipt.", output)
                 text("Started: " + str(run.startedAtMs ?: "not recorded") + " · finished: " + str(run.finishedAtMs ?: "not recorded") + " (epoch ms)", output)
@@ -145,6 +150,24 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int) {
                 }
                 if (run.previousReceiptCid != null) link("Previous state receipt", url(str(run.previousReceiptCid)), output)
                 if (run.rebuildOf != null) link("Receipt this run rebuilt", url(str(run.rebuildOf)), output)
+                if (comparison != null) try {
+                    val request: dynamic = JSON.parse(inspectedRequest)
+                    request.compareProgramCid = run.programCid
+                    val checked = fetchJson("/api/lcnc/workspace", jsonInit("POST", JSON.stringify(request)))
+                    if (!current(ticket)) return@launchJs
+                    if (checked.error != null) error(str(checked.error))
+                    require(checked.programCid == workspace.programCid && checked.comparison?.programCid == run.programCid) {
+                        "Program comparison identity mismatch"
+                    }
+                    comparison.textContent = when (str(checked.comparison.relation)) {
+                        "presentation" -> "The authored definition matches when presentation is excluded (node position, size, collapse and viewport). " +
+                            "Exact program CIDs remain distinct. Inputs and dependencies were not compared."
+                        "different" -> "The authored definition also differs. This receipt is not evidence for the edited definition."
+                        else -> "Frozen-program comparison unavailable; no definition match is established."
+                    }
+                } catch (e: CancellationException) { throw e } catch (e: dynamic) {
+                    if (current(ticket)) comparison.textContent = "Frozen-program comparison unavailable: " + failureText(e)
+                }
             } catch (e: CancellationException) { throw e } catch (e: dynamic) {
                 if (current(ticket)) output.textContent = "Receipt inspection failed: " + failureText(e)
             }
