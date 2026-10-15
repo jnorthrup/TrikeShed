@@ -1,0 +1,6 @@
+headers = lz4.h lzo/lzo1x.h
+headerFilter = lz4.h lzo/*
+package = borg.trikeshed.tilting.leaf.c
+linkerOpts.linux_x64 = -L/usr/lib/x86_64-linux-gnu -llz4 -llzo2 --allow-shlib-undefined
+linkerOpts.linux_arm64 = -L/usr/lib/aarch64-linux-gnu -llz4 -llzo2 --allow-shlib-undefined
+linkerOpts.macos_arm64 = -L/opt/homebrew/lib -llz4 -llzo2
