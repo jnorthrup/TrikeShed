@@ -3,9 +3,12 @@
 import collections
 import codecs
 import gc
+import importlib.util
 import json
 import os
+from pathlib import Path
 import select
+import subprocess
 import sys
 import threading
 import time
@@ -23,6 +26,48 @@ _pending = collections.deque()
 _condition = threading.Condition()
 _receipt = threading.local()
 _size = (32, 100)
+_source = None
+
+
+def verify_source(root, lock_path):
+    root, lock_path = Path(root).resolve(), Path(lock_path).resolve()
+    try:
+        lock = json.loads(lock_path.read_text(encoding="utf-8"))
+        repository, revision = lock["repository"], lock["revision"]
+        if not isinstance(repository, str) or not repository:
+            raise ValueError("repository must name the curated fork")
+        if (not isinstance(revision, str) or len(revision) != 40 or
+                any(character not in "0123456789abcdef" for character in revision)):
+            raise ValueError("revision must be an exact 40-character Git commit")
+    except (OSError, ValueError, TypeError, KeyError) as failure:
+        raise RuntimeError(f"Hermes source lock unavailable or invalid at {lock_path}: {failure}") from failure
+    expected = f"{repository}@{revision}"
+
+    def git(*arguments):
+        try:
+            result = subprocess.run(["git", "--no-optional-locks", "-C", str(root), *arguments],
+                                    stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                    timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired) as failure:
+            raise RuntimeError(f"Hermes Git verification failed at {root}; expected {expected}: {failure}") from failure
+        if result.returncode:
+            raise RuntimeError(f"Hermes Git verification failed at {root}; expected {expected}: "
+                               f"{result.stderr.strip() or result.stdout.strip()}")
+        return result.stdout.strip()
+
+    actual_root = Path(git("rev-parse", "--show-toplevel")).resolve()
+    if actual_root != root:
+        raise RuntimeError(f"Hermes source root is {root}, Git root is {actual_root}; expected {expected}")
+    actual_repository = git("remote", "get-url", "origin")
+    if actual_repository != repository:
+        raise RuntimeError(f"Hermes source repository is {actual_repository}; expected {repository}")
+    actual_revision = git("rev-parse", "HEAD")
+    if actual_revision != revision:
+        raise RuntimeError(f"Hermes source revision is {actual_revision}; expected {revision} ({repository})")
+    dirty = git("status", "--porcelain", "--untracked-files=no")
+    if dirty:
+        raise RuntimeError(f"Hermes tracked source differs from {expected}:\n{dirty}")
+    return {"repository": repository, "revision": revision}
 
 
 def _feed(pipe):
@@ -180,10 +225,16 @@ def _serve():
 
 
 def start(call, model=None, resume=None, rows=32, columns=100):
-    global _cli, _thread, _process, _chat, _size, _host_call
+    global _cli, _thread, _process, _chat, _size, _host_call, _source
     if _cli is not None:
         raise RuntimeError("HermesCLI worker already started")
     _host_call = call
+    call("sleeve_progress", "verifying curated Hermes source pin")
+    spec = importlib.util.find_spec("cli")
+    if spec is None or not spec.origin:
+        raise RuntimeError("Pinned Hermes CLI source could not be found")
+    _source = verify_source(Path(spec.origin).resolve().parent,
+                            Path(__file__).resolve().parents[1] / "hermes.lock.json")
     if not sys.argv:
         sys.argv.append("hermes")
     import trikeshed_contextvars
@@ -239,8 +290,8 @@ def start(call, model=None, resume=None, rows=32, columns=100):
 
 
 def status():
-    import cli
     import sqlite3
+    cli = sys.modules.get("cli")
     app = getattr(_cli, "_app", None)
     input_open = bool(_feeder and _feeder.is_alive() and not _input_stop.is_set() and not _failure)
     return {
@@ -252,7 +303,9 @@ def status():
         "history_size": len(_cli.conversation_history) if _cli else 0,
         "model": _cli.model if _cli else None,
         "provider": _cli.provider if _cli else None,
-        "source": cli.__file__,
+        "source": getattr(cli, "__file__", None),
+        "source_repository": _source["repository"] if _source else None,
+        "source_revision": _source["revision"] if _source else None,
         "sqlite": sqlite3.__file__,
         "python": sys.version,
         "failure": _failure,

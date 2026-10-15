@@ -1,0 +1,19 @@
+{
+  "repository": "https://github.com/jnorthrup/hermes-trikeshed-graal.git",
+  "revision": "9b91afb72d44481e91c4022cce2af18d672c28a7",
+  "branch": "codex/graalpy",
+  "upstream": {
+    "repository": "https://github.com/NousResearch/hermes-agent.git",
+    "revision": "e06df9c2eae6901f4c88f464e0ae6e753c0428b8",
+    "release": "v0.22.0"
+  },
+  "graalpy": {
+    "distribution": "GraalPy Community",
+    "version": "25.3.4.1",
+    "python": "3.13.14",
+    "platform": "macos-aarch64",
+    "archive_url": "https://github.com/oracle/graalpython/releases/download/graal-25.3.4/graalpy3.13-community-25.3.4.1-macos-aarch64.tar.gz",
+    "archive_sha256": "e2cf7ae230478ad8d100ad868f75e3addb174d81e7f550322ea5e74cab066644",
+    "requirements_sha256": "0c90f0d055ffe628cab612429e2a62ab3f248f31b335a8c2a7991d17df5d265f"
+  }
+}
