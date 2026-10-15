@@ -49,6 +49,12 @@
     display: flex; flex-direction: column; max-height: calc(100vh - 260px);
   }
   .lane.drop-ok { outline: 2px dashed var(--accent); outline-offset: -4px; }
+  /* Retained evidence needs reading width; keep scrolling in the card list. */
+  .lane:has(.document-task[open]) {
+    flex: 0 0 min(640px, calc(100vw - 40px));
+    min-width: 0; max-width: min(640px, calc(100vw - 40px));
+  }
+  .card:has(.document-task[open]) { flex-shrink: 0; }
   .lane h2 {
     font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
     margin: 0; padding: 12px 14px 8px; color: var(--muted); font-weight: 650;

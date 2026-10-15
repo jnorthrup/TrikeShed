@@ -38,10 +38,13 @@ sealed class DocumentCurationIndexK<out R> : OpK<R>() {
     data object DependencyCursor : DocumentCurationIndexK<(Int) -> Cursor>()
     /** Model proposals remain unverified source-linked rows, not asserted facts. */
     data object ProposalCursor : DocumentCurationIndexK<Cursor>()
+    /** Retained parser candidates, not admitted rules or model proposals. */
+    data object RuleCursor : DocumentCurationIndexK<Cursor>()
     data object SentenceColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
     data object TokenColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
     data object DependencyColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
     data object ProposalColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
+    data object RuleColumns : DocumentCurationIndexK<Series<ColumnMeta>>()
     data object Model : DocumentCurationIndexK<ModelResponse?>()
     data object ModelId : DocumentCurationIndexK<String?>()
     data object Proposals : DocumentCurationIndexK<Series<DocumentProposal>>()
@@ -62,7 +65,7 @@ fun DocumentSource.curationIndex(
 ): DocumentCurationIndex = curationIndex(nlp, reasons, null, null, emptySeriesOf())
 
 fun DocumentCurationRecord.curationIndex(): DocumentCurationIndex =
-    source.curationIndex(nlp, reasons, model, modelId, proposals)
+    source.curationIndex(nlp, reasons, model, modelId, proposals) { DocumentCurationFacts.ruleCandidates(this) }
 
 fun DocumentCurationResult.curationIndex(): DocumentCurationIndex = record.curationIndex()
 
@@ -72,6 +75,7 @@ private fun DocumentSource.curationIndex(
     model: ModelResponse?,
     modelId: String?,
     proposals: Series<DocumentProposal>,
+    candidates: () -> Series<Map<String, Any?>> = { emptySeriesOf() },
 ): DocumentCurationIndex {
     val source = this
     val sentences = nlp?.sentences ?: emptySeriesOf()
@@ -163,6 +167,15 @@ private fun DocumentSource.curationIndex(
             }
         }
     }
+    // Defer the canonical candidate gate: it reads NlpStatus through a separate index.
+    val ruleSchema = ruleColumns
+    val ruleCursor: Cursor by lazy {
+        val rows = candidates()
+        rows.size j { ordinal: Int ->
+            val candidate = rows[ordinal]
+            documentRow(ruleSchema) { column -> candidate[column.columnName] }
+        }
+    }
     return sentences.size j { operation: Any ->
         when (operation) {
             DocumentCurationIndexK.Source -> source
@@ -181,10 +194,12 @@ private fun DocumentSource.curationIndex(
             DocumentCurationIndexK.TokenCursor -> tokenCursor
             DocumentCurationIndexK.DependencyCursor -> dependencyCursor
             DocumentCurationIndexK.ProposalCursor -> proposalCursor
+            DocumentCurationIndexK.RuleCursor -> ruleCursor
             DocumentCurationIndexK.SentenceColumns -> sentenceColumns α { ColumnMeta(it.columnName, it.type) }
             DocumentCurationIndexK.TokenColumns -> tokenColumns α { ColumnMeta(it.columnName, it.type) }
             DocumentCurationIndexK.DependencyColumns -> dependencyColumns α { ColumnMeta(it.columnName, it.type) }
             DocumentCurationIndexK.ProposalColumns -> proposalColumns α { ColumnMeta(it.columnName, it.type) }
+            DocumentCurationIndexK.RuleColumns -> ruleColumns α { ColumnMeta(it.columnName, it.type) }
             DocumentCurationIndexK.Model -> model
             DocumentCurationIndexK.ModelId -> modelId
             DocumentCurationIndexK.Proposals -> proposals
@@ -274,6 +289,16 @@ private enum class DocumentIndexColumn(val columnName: String, val type: IOMemen
     RECEIPT_CID("receiptCid", IOMemento.IoString),
     QUOTATION_CID("quotationReceiptCid", IOMemento.IoString),
     RAW("raw", IOMemento.IoString),
+    ANTECEDENT("antecedent", IOMemento.IoString),
+    CONSEQUENT("consequent", IOMemento.IoString),
+    COPULA("copula", IOMemento.IoString),
+    RULE_CID("ruleCid", IOMemento.IoString),
+    PROVENANCE_CID("provenanceCid", IOMemento.IoString),
+    POSITIVE_EVIDENCE("positiveEvidence", IOMemento.IoLong),
+    NEGATIVE_EVIDENCE("negativeEvidence", IOMemento.IoLong),
+    SENTENCE_INDEX("sentenceIndex", IOMemento.IoInt),
+    PATTERN_WEIGHT("patternWeight", IOMemento.IoDouble),
+    ADMISSION("admission", IOMemento.IoString),
 }
 
 private val sentenceColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndexColumn.EXTRACTED_TEXT_CID,
@@ -289,6 +314,11 @@ private val proposalColumns = s_[DocumentIndexColumn.ORIGINAL_CID, DocumentIndex
     DocumentIndexColumn.CONFIDENCE, DocumentIndexColumn.POLARITY, DocumentIndexColumn.MODALITY,
     DocumentIndexColumn.QUOTE, DocumentIndexColumn.BEGIN, DocumentIndexColumn.END,
     DocumentIndexColumn.RECEIPT_CID, DocumentIndexColumn.QUOTATION_CID, DocumentIndexColumn.RAW]
+private val ruleColumns = s_[DocumentIndexColumn.ANTECEDENT, DocumentIndexColumn.CONSEQUENT,
+    DocumentIndexColumn.COPULA, DocumentIndexColumn.RULE_CID, DocumentIndexColumn.PROVENANCE_CID,
+    DocumentIndexColumn.POSITIVE_EVIDENCE, DocumentIndexColumn.NEGATIVE_EVIDENCE,
+    DocumentIndexColumn.SENTENCE_INDEX, DocumentIndexColumn.BEGIN, DocumentIndexColumn.END,
+    DocumentIndexColumn.QUOTE, DocumentIndexColumn.PATTERN_WEIGHT, DocumentIndexColumn.ADMISSION]
 
 private fun documentRow(columns: Series<DocumentIndexColumn>, value: (DocumentIndexColumn) -> Any?): RowVec =
     columns.size j { position: Int ->

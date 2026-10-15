@@ -69,9 +69,25 @@ fun <E : CoroutineContext.Element> boundLcnc(defaultElement: E, delegate: LcncNo
             val current = currentCoroutineContext()
             val bound = current[key] ?: defaultElement
             val ownerJob = current[LcncOwnerJob]?.job ?: current[Job]
-            return withContext(bound + LcncOwnerJob(ownerJob)) { delegate.execute(node, inputs) }
+            return lcncContext(bound + LcncOwnerJob(ownerJob)) { delegate.execute(node, inputs) }
         }
     }
+
+/** Preserve the body failure without changing withContext's child cancellation and join. */
+internal suspend fun <T> lcncContext(context: CoroutineContext, body: suspend () -> T): T {
+    var original: Throwable? = null
+    try {
+        return withContext(context) {
+            try { body() } catch (failure: Throwable) {
+                original = failure
+                throw failure
+            }
+        }
+    } catch (failure: Throwable) {
+        // Coroutine debug stack recovery can copy a throwable at the context boundary.
+        throw original ?: failure
+    }
+}
 
 // Element erases its key's result type; each element's own key supplies that type identity.
 @Suppress("UNCHECKED_CAST")

@@ -25,12 +25,14 @@ import borg.trikeshed.ontology.zipper.PlaneAdapters
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import modelmux.ModelMux
 import modelmux.acp.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.TimeSource
 
 /**
  * THE PEN — the hosted model's entire tool surface: typed host.call delegates
@@ -176,30 +178,40 @@ class HermesPen(
     }
 
     private suspend fun muxConverse(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
-        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
         val prompt = str(args, 1) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
-        val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause, timeoutMs = MODEL_WALL_MILLIS)
-        return result.fold(
-            onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
-                "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
-            onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
-        )
+        val timeout = MODEL_WALL_MILLIS - 5_000L // Leave the process crossing time to return its terminal reply.
+        val started = TimeSource.Monotonic.markNow()
+        return withTimeout(timeout) {
+            val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
+            val remaining = (timeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
+            val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause, timeoutMs = remaining)
+            result.fold(
+                onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
+                    "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
+                onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
+            )
+        }
     }
 
     private suspend fun muxCompletion(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
-        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
         val json = str(args, 1) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
         val timeout = if (args.size == 2) MODEL_WALL_MILLIS
             else (args.getOrNull(2) as? Teleported.Num)?.v?.takeIf { args.size == 3 && it > 0 }
                 ?.coerceAtMost(MODEL_WALL_MILLIS)
                 ?: return refusal("bad-args", "mux_completion timeout must be positive milliseconds")
-        val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = timeout)
-        return result.fold(
-            onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
-            onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
-        )
+        val admittedTimeout = timeout.coerceAtMost(MODEL_WALL_MILLIS - 5_000L)
+        val started = TimeSource.Monotonic.markNow()
+        return withTimeout(admittedTimeout) {
+            val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
+            val remaining = (admittedTimeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
+            val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = remaining)
+            result.fold(
+                onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
+                onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
+            )
+        }
     }
 
     private fun bagRecall(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {

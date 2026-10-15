@@ -30,7 +30,7 @@ import borg.trikeshed.lib.view
  *     (input T p?) (inKind T p K) (output T p) (outKind T p K)
  *     (cardinality T p MANY) (functions T p) (function T p "fn")
  *     (param T name) (paramDefault T name "v") (paramOption T name "o")
- *     (paramMultiline T name) (paramPlaceholder T name "ph") (paramCol T name "c") (paramLive T name "runner#path")
+ *     (paramMultiline T name) (paramPlaceholder T name "ph") (paramCol T name "c") (paramLive T name "runner#path") (paramOptional T name)
  *     (kind K)
  *     (introduces T K) (shape K key)      ; the json keys a literal's rows must carry to BE the CCEK type K
  *     (binding T how "provenance")        ; kotlin | canvas_js | composite | unbound
@@ -133,6 +133,7 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
             if (s.ph.isNotEmpty()) tell("paramPlaceholder", t, name, str(s.ph))
             for (col in s.cols) tell("paramCol", t, name, str(col))
             if (s.optsFrom.isNotEmpty()) tell("paramLive", t, name, str(s.optsFrom))
+            if (s.optional) tell("paramOptional", t, name)
         }
         if (c.isSource) tell("source", t)
         if (c.isSink) tell("sink", t)
@@ -347,6 +348,7 @@ class LcncFacts private constructor(private val kb: KifKnowledgeBase) {
                     ph = q("paramPlaceholder", type, name, null).firstOrNull()?.let { unstr(it[0]) } ?: "",
                     cols = q("paramCol", type, name, null).map { unstr(it[0]) },
                     optsFrom = q("paramLive", type, name, null).firstOrNull()?.let { unstr(it[0]) } ?: "",
+                    optional = has("paramOptional", type, name),
                 )
             },
             isSource = has("source", type),

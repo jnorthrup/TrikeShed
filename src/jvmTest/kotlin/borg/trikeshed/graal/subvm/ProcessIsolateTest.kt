@@ -166,6 +166,90 @@ class ProcessIsolateTest {
         assertEquals(GuestFailure.DEAD, e.kind)
     }
 
+    @Test fun closePreservesAnAdmittedHostCallBeyondTheFormerKillGrace() {
+        val iso = spawnJs()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val closing = CountDownLatch(1)
+        val closed = CountDownLatch(1)
+        val result = AtomicReference<Teleported?>()
+        val evaluationFailure = AtomicReference<Throwable?>()
+        val closeFailure = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        var closer: Thread? = null
+        try {
+            iso.delegate("held") {
+                entered.countDown()
+                check(release.await(10, TimeUnit.SECONDS))
+                Num(42)
+            }
+            caller = Thread {
+                try { result.set(iso.eval("host.call('held')")) }
+                catch (failure: Throwable) { evaluationFailure.set(failure) }
+            }.apply { start() }
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            closer = Thread {
+                closing.countDown()
+                try { iso.close() }
+                catch (failure: Throwable) { closeFailure.set(failure) }
+                finally { closed.countDown() }
+            }.apply { start() }
+            assertTrue(closing.await(1, TimeUnit.SECONDS))
+            assertFalse(closed.await(1_500, TimeUnit.MILLISECONDS))
+            assertTrue(iso.isAlive, "Ordinary close must not kill the child while admitted work remains")
+            release.countDown()
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertEquals(null, evaluationFailure.get())
+            assertEquals(Num(42), result.get())
+            assertTrue(closed.await(10, TimeUnit.SECONDS))
+            assertEquals(null, closeFailure.get())
+            assertFalse(ProcessHandle.of(iso.processId).map { it.isAlive }.orElse(false))
+        } finally {
+            release.countDown()
+            caller?.join(10_000)
+            closer?.join(10_000)
+            if (closer == null) iso.close()
+        }
+    }
+
+    @Test fun closeReleasesRestrictedTerminalInputBeforeJoiningTheGuest() {
+        val iso = ProcessIsolate("stdin-close-${System.nanoTime()}", VmFacet.GRAAL_PYTHON)
+        val entered = CountDownLatch(1)
+        val ended = CountDownLatch(1)
+        val closed = CountDownLatch(1)
+        val evaluationFailure = AtomicReference<Throwable?>()
+        val closeFailure = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        var closer: Thread? = null
+        try {
+            iso.delegate("entered") { entered.countDown(); Teleported.Null }
+            caller = Thread {
+                try { iso.eval("host.call('entered')\ninput()") }
+                catch (failure: Throwable) { evaluationFailure.set(failure) }
+                finally { ended.countDown() }
+            }.apply { start() }
+            assertTrue(entered.await(10, TimeUnit.SECONDS))
+            closer = Thread {
+                try { iso.close() }
+                catch (failure: Throwable) { closeFailure.set(failure) }
+                finally { closed.countDown() }
+            }.apply { start() }
+            assertTrue(ended.await(10, TimeUnit.SECONDS), "Close must send terminal EOF before waiting for input()")
+            val failure = assertIs<GuestException>(evaluationFailure.get())
+            assertEquals(GuestFailure.GUEST_ERROR, failure.kind, "Terminal EOF is not process death")
+            assertTrue(failure.message.orEmpty().contains("EOF"), failure.message)
+            assertTrue(closed.await(10, TimeUnit.SECONDS))
+            assertEquals(null, closeFailure.get())
+            assertFalse(ProcessHandle.of(iso.processId).map { it.isAlive }.orElse(false))
+        } finally {
+            if (caller?.isAlive == true || closer?.isAlive == true) iso.interrupt()
+            caller?.join(10_000)
+            closer?.join(10_000)
+            if (closer == null) iso.close()
+        }
+    }
+
     @Test fun pythonEvalAndCallAcrossTheWall() {
         ProcessIsolate("pp-${System.nanoTime()}", VmFacet.GRAAL_PYTHON).use { iso ->
             assertEquals(VmFacet.GRAAL_PYTHON, iso.facet)

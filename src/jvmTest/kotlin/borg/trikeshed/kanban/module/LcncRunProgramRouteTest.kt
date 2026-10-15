@@ -24,12 +24,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -41,6 +44,413 @@ import kotlin.test.assertTrue
  * (presets-only) program loader with zero registered runners.
  */
 class LcncRunProgramRouteTest {
+    @Test fun lineBreakpointsResumeTheSameLoopWithoutReplayingItsEffects(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("line-debug"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val host = borg.trikeshed.vm.HypervisorVmHost()
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val token = java.util.UUID.randomUUID().toString()
+        val source = "let count = 0;\nfor (let i = 0; i < 3; i++) {\n  count += 1;\n}\nreturn count;"
+        val execution = async(Dispatchers.Default) { post(server, "/api/lcnc/run", jsonOf(mapOf(
+            "debugToken" to token, "timeoutMs" to 20000,
+            "document" to mapOf("nodes" to listOf(mapOf("id" to "source", "type" to SubVmLegos.POLYGLOT,
+                "params" to mapOf("language" to "js", "source" to source))), "wires" to emptyList<Any>())))) }
+        suspend fun paused(after: Int = 0): Map<String, Any?> = withTimeout(5000) {
+            while (true) {
+                val value = json(server.routeHttp("GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray()))
+                if (value["state"] == "paused" && (value["ordinal"] as Number).toInt() > after) return@withTimeout value
+                delay(10)
+            }
+            error("unreachable")
+        }
+        suspend fun command(at: Map<String, Any?>, action: String, line: Int? = null) = post(server, "/api/lcnc/run/debug",
+            jsonOf(mapOf("token" to token, "runId" to at["runId"], "ordinal" to at["ordinal"], "action" to action, "line" to line)))
+        try {
+            val node = paused()
+            assertEquals(202, command(node, "source-into").status)
+            var stop = paused((node["ordinal"] as Number).toInt())
+            for (invalid in listOf(null, 0, -1, 1.5, "4", 2147483648L)) {
+                assertEquals(400, post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
+                    "token" to token, "runId" to stop["runId"], "ordinal" to stop["ordinal"], "action" to "source-line", "line" to invalid))).status)
+                assertEquals(stop["ordinal"], paused()["ordinal"])
+            }
+            assertEquals(202, command(stop, "source-line", 4).status)
+            stop = paused((stop["ordinal"] as Number).toInt())
+            for (expected in 0..1) {
+                val site = stop["site"] as Map<*, *>
+                assertEquals(4, (site["line"] as Number).toInt())
+                val breakpoint = site["breakpoint"] as Map<*, *>
+                assertEquals(true, breakpoint["hit"])
+                assertEquals(4, (breakpoint["requestedLine"] as Number).toInt())
+                assertEquals(4, (breakpoint["resolvedLine"] as Number).toInt())
+                val locals = ((site["frames"] as List<*>).first() as Map<*, *>)["locals"] as List<*>
+                assertTrue(locals.any { val row = it as Map<*, *>; row["name"] == "count" && (row["value"] as? Number)?.toInt() == expected })
+                assertEquals(400, command(stop, "source-line", 10000).status)
+                assertEquals(stop["ordinal"], paused()["ordinal"], "Invalid input must not release the hold")
+                if (expected == 0) {
+                    val old = stop
+                    assertEquals(202, command(stop, "source-line", 4).status)
+                    stop = paused((stop["ordinal"] as Number).toInt())
+                    assertEquals(409, command(old, "source-line", 4).status)
+                }
+            }
+            assertEquals(202, command(stop, "continue").status)
+            val response = withTimeout(5000) { execution.await() }
+            assertEquals(200, response.status, response.body)
+            val run = json(response)
+            assertEquals(node["runId"], run["runId"])
+            assertEquals(3, (((run["outputs"] as Map<*, *>)["source"] as Map<*, *>)["value"] as Number).toInt())
+            assertEquals(1, host.ids().size)
+            assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+        } finally {
+            execution.cancelAndJoin(); supervisor.detach("kanban"); host.close()
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
+    }
+
+    @Test fun sourceHoldsRespectRunTimeoutCancellationAndModuleDrain(): Unit = runBlocking {
+        for (lineHold in listOf(false, true)) for (action in listOf("timeout", "cancel", "drain")) {
+            val routes = ModuleRouteRegistry()
+            val ctx = newContext(routes, tempDir("source-$action"), CasStore.inMemory())
+            val server = JvmKanbanServer(moduleRoutes = routes)
+            val host = borg.trikeshed.vm.HypervisorVmHost()
+            ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+            val supervisor = ModuleSupervisor(ctx)
+            supervisor.attach(KanbanModule())
+            val token = java.util.UUID.randomUUID().toString()
+            val execution = async(Dispatchers.Default) { post(server, "/api/lcnc/run", jsonOf(mapOf(
+                "debugToken" to token, "timeoutMs" to if (action == "timeout") 3000 else 20000,
+                "document" to mapOf("nodes" to listOf(mapOf("id" to "source", "type" to SubVmLegos.POLYGLOT,
+                    "params" to mapOf("language" to "js", "source" to "const result = input + 1;\nreturn result;", "input" to "41"))),
+                    "wires" to emptyList<Any>())))) }
+            suspend fun paused(kind: String? = null, after: Int = 0): Map<String, Any?> = withTimeout(5000) {
+                while (true) {
+                    val value = json(server.routeHttp("GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray()))
+                    if (value["state"] == "paused" && (value["site"] as Map<*, *>)["kind"] == kind &&
+                        (value["ordinal"] as Number).toInt() > after) return@withTimeout value
+                    delay(10)
+                }
+                error("unreachable")
+            }
+            try {
+                val node = paused()
+                assertEquals(202, post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
+                    "token" to token, "runId" to node["runId"], "ordinal" to node["ordinal"], "action" to "source-into"))).status)
+                var source = paused("source")
+                if (lineHold) {
+                    assertEquals(202, post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
+                        "token" to token, "runId" to source["runId"], "ordinal" to source["ordinal"], "action" to "source-line", "line" to 3))).status)
+                    source = paused("source", (source["ordinal"] as Number).toInt())
+                    assertEquals(true, ((source["site"] as Map<*, *>)["breakpoint"] as Map<*, *>)["hit"])
+                }
+                assertEquals(node["runId"], source["runId"])
+                assertEquals(1, host.ids().count { host.get(it)?.isAlive == true })
+                if (action == "cancel") assertEquals(202, post(server, "/api/lcnc/run/cancel", jsonOf(mapOf("runId" to source["runId"]))).status)
+                if (action == "drain") withTimeout(5000) { supervisor.detach("kanban") }
+                val response = withTimeout(5000) { execution.await() }
+                assertEquals(when (action) { "timeout" -> 504; "cancel" -> 499; else -> 200 }, response.status, response.body)
+                val result = json(response)
+                assertEquals(when (action) { "timeout" -> "timed_out"; "cancel" -> "cancelled"; else -> "completed" }, result["status"])
+                assertTrue(result["receiptCid"] is String)
+                assertEquals(1, host.ids().size)
+                assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+            } finally {
+                execution.cancelAndJoin()
+                supervisor.detach("kanban")
+                host.close()
+                ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test fun sourceStepsSuspendTheSameGuestAndRetainItsResult(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("source-debug"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val host = borg.trikeshed.vm.HypervisorVmHost()
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val token = java.util.UUID.randomUUID().toString()
+        val source = "let count = 0;\nfunction add(value) {\n  count++;\n  return value + 1;\n}\nconst answer = add(input);\nreturn {count: count, answer: answer};"
+        val execution = async(Dispatchers.Default) { post(server, "/api/lcnc/run", jsonOf(mapOf(
+            "debugToken" to token, "timeoutMs" to 20000,
+            "document" to mapOf("nodes" to listOf(mapOf("id" to "source", "type" to SubVmLegos.POLYGLOT,
+                "params" to mapOf("language" to "js", "source" to source, "input" to "41"))), "wires" to emptyList<Any>())))) }
+        suspend fun paused(after: Int = 0): Map<String, Any?> = withTimeout(5000) {
+            while (true) {
+                val value = json(server.routeHttp("GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray()))
+                if (value["state"] == "paused" && (value["ordinal"] as Number).toInt() > after) return@withTimeout value
+                delay(10)
+            }
+            error("unreachable")
+        }
+        suspend fun command(at: Map<String, Any?>, action: String) = post(server, "/api/lcnc/run/debug",
+            jsonOf(mapOf("token" to token, "runId" to at["runId"], "ordinal" to at["ordinal"], "action" to action)))
+        try {
+            val node = paused()
+            assertEquals(202, command(node, "source-into").status)
+            var stop = paused((node["ordinal"] as Number).toInt())
+            var sawLocal = false
+            var sawFunction = false
+            repeat(12) {
+                val site = stop["site"] as Map<*, *>
+                assertEquals("source", site["kind"])
+                assertEquals("source", site["sourceName"])
+                assertTrue((site["line"] as Number).toInt() > 0)
+                val frames = (site["frames"] as List<*>).map { it as Map<*, *> }
+                sawFunction = sawFunction || frames.any { it["name"] == "add" }
+                sawLocal = sawLocal || frames.any { frame -> (frame["locals"] as List<*>).any {
+                    val local = it as Map<*, *>
+                    local["name"] == "count" && (local["value"] as? Number)?.toInt() == 1
+                } }
+                if (sawLocal && sawFunction) return@repeat
+                assertEquals(409, command(node, "source-into").status, "Old node commands cannot step a source pause")
+                assertEquals(202, command(stop, "source-into").status)
+                stop = paused((stop["ordinal"] as Number).toInt())
+            }
+            assertTrue(sawFunction, "Stepping enters the real guest function")
+            assertTrue(sawLocal, "A copied local exposes the increment in that same call")
+            assertEquals(1, host.ids().size)
+            assertEquals(202, command(stop, "continue").status)
+            val response = withTimeout(5000) { execution.await() }
+            assertEquals(200, response.status, response.body)
+            val run = json(response)
+            assertEquals(node["runId"], run["runId"])
+            val outputs = (run["outputs"] as Map<*, *>)["source"] as Map<*, *>
+            val value = outputs["value"] as Map<*, *>
+            assertEquals(1, (value["count"] as Number).toInt())
+            assertEquals(42, (value["answer"] as Number).toInt())
+            assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+        } finally {
+            execution.cancelAndJoin()
+            supervisor.detach("kanban")
+            host.close()
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
+    }
+
+    @Test fun pausedRunsRespectTimeoutCancellationAndModuleDrain(): Unit = runBlocking {
+        for (action in listOf("timeout", "cancel", "drain")) {
+            val routes = ModuleRouteRegistry()
+            val ctx = newContext(routes, tempDir("debug-$action"), CasStore.inMemory())
+            val server = JvmKanbanServer(moduleRoutes = routes)
+            var calls = 0
+            ctx.lcncRunners["test.effect"] = LcncNodeRunner { _, _ -> calls++; emptyMap() }
+            val supervisor = ModuleSupervisor(ctx)
+            supervisor.attach(KanbanModule())
+            val token = java.util.UUID.randomUUID().toString()
+            val execution = async { post(server, "/api/lcnc/run", jsonOf(mapOf("debugToken" to token,
+                "timeoutMs" to if (action == "timeout") 1000 else 10000,
+                "document" to mapOf("nodes" to listOf(mapOf("id" to "effect", "type" to "test.effect")), "wires" to emptyList<Any>())))) }
+            try {
+                val pause = withTimeout(5000) {
+                    var value: Map<String, Any?>
+                    do {
+                        delay(10)
+                        value = json(server.routeHttp("GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray()))
+                    } while (value["state"] != "paused")
+                    value
+                }
+                assertEquals(0, calls)
+                if (action == "cancel") assertEquals(202, post(server, "/api/lcnc/run/cancel", jsonOf(mapOf("runId" to pause["runId"]))).status)
+                if (action == "drain") withTimeout(5000) { supervisor.detach("kanban") }
+                val response = withTimeout(5000) { execution.await() }
+                assertEquals(when (action) { "timeout" -> 504; "cancel" -> 499; else -> 200 }, response.status, response.body)
+                val result = json(response)
+                assertEquals(when (action) { "timeout" -> "timed_out"; "cancel" -> "cancelled"; else -> "completed" }, result["status"])
+                assertEquals(if (action == "drain") 1 else 0, calls)
+                assertTrue(result["receiptCid"] is String)
+            } finally {
+                execution.cancelAndJoin()
+                supervisor.detach("kanban")
+                ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            }
+        }
+    }
+
+    @Test fun debuggerRecoveryPinsTheRunAcrossTokenReuseAndRetainsTheTerminalReceipt(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("debug-recovery"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        var effects = 0
+        ctx.lcncRunners["test.effect"] = LcncNodeRunner { _, _ -> effects++; emptyMap() }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val token = java.util.UUID.randomUUID().toString()
+        val request = jsonOf(mapOf("debugToken" to token, "document" to mapOf(
+            "nodes" to listOf(mapOf("id" to "effect", "type" to "test.effect")), "wires" to emptyList<Any>())))
+        suspend fun observe(runId: String? = null) = server.routeHttp(
+            ("GET /api/lcnc/run/debug?token=$token" + (runId?.let { "&runId=$it" } ?: "") + " HTTP/1.1\r\nHost: t\r\n\r\n").encodeToByteArray())
+        suspend fun paused(): Map<String, Any?> = withTimeout(5000) {
+            while (true) {
+                val value = json(observe())
+                if (value["state"] == "paused") return@withTimeout value
+                delay(10)
+            }
+            error("unreachable")
+        }
+        suspend fun advance(at: Map<String, Any?>) = post(server, "/api/lcnc/run/debug",
+            jsonOf(mapOf("token" to token, "runId" to at["runId"], "ordinal" to at["ordinal"], "action" to "continue")))
+        var execution = async { post(server, "/api/lcnc/run", request) }
+        try {
+            val first = paused()
+            val id = first["runId"] as String
+            val before = ctx.blackboard.snapshot()
+            repeat(3) { assertEquals(first, json(observe(id)), "Reconnection is observation, not admission or stepping") }
+            assertEquals(before, ctx.blackboard.snapshot())
+            assertEquals(0, effects)
+            assertEquals(409, observe(java.util.UUID.randomUUID().toString()).status)
+            assertEquals(409, advance(first + ("runId" to java.util.UUID.randomUUID().toString())).status)
+            assertEquals(400, post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
+                "token" to token, "ordinal" to first["ordinal"], "action" to "continue"))).status)
+            assertEquals(first, json(observe(id)))
+            assertEquals(202, advance(first).status)
+            val receipt = json(execution.await())
+            assertEquals(1, effects)
+            val terminal = observe(id)
+            assertEquals(404, terminal.status, "Retained evidence must not pretend the controller is live")
+            val retained = json(terminal)["receipt"] as Map<*, *>
+            assertEquals(id, retained["runId"])
+            assertEquals(receipt["receiptCid"], retained["receiptCid"])
+            assertEquals("completed", retained["status"])
+            assertNull(json(observe(java.util.UUID.randomUUID().toString()))["receipt"])
+
+            execution = async { post(server, "/api/lcnc/run", request) }
+            val second = paused()
+            assertNotEquals(id, second["runId"])
+            assertEquals(first["ordinal"], second["ordinal"], "Pause numbers alone cannot identify a run")
+            assertEquals(409, observe(id).status)
+            assertEquals(409, advance(first).status, "A saved command cannot advance a new run using the old token")
+            assertEquals(second, json(observe(second["runId"] as String)))
+            assertEquals(1, effects)
+            assertEquals(202, advance(second).status)
+            assertEquals("completed", json(execution.await())["status"])
+            assertEquals(2, effects)
+            supervisor.detach("kanban")
+            supervisor.attach(KanbanModule())
+            val recovered = observe(id)
+            assertEquals(404, recovered.status)
+            assertEquals(receipt["receiptCid"], (json(recovered)["receipt"] as Map<*, *>)["receiptCid"],
+                "A module restart recovers durable evidence, not the transient controller")
+            assertEquals(2, effects)
+        } finally {
+            execution.cancelAndJoin()
+            supervisor.detach("kanban")
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
+    }
+
+    @Test fun debuggerStepsTheAdmittedRunAndRejectsStaleCommands(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("debug-step"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val calls = mutableListOf<String>()
+        ctx.lcncRunners["test.effect"] = LcncNodeRunner { node, inputs ->
+            calls += node.id
+            mapOf("value" to inputs["x"])
+        }
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val token = java.util.UUID.randomUUID().toString()
+        val request = jsonOf(mapOf("name" to "debug-inline", "debugToken" to token,
+            "document" to mapOf("nodes" to listOf(
+                mapOf("id" to "note", "type" to "note"),
+                mapOf("id" to "input", "type" to "scope.in", "params" to mapOf("name" to "x")),
+                mapOf("id" to "first", "type" to "test.effect"),
+                mapOf("id" to "second", "type" to "test.effect")),
+                "wires" to listOf(mapOf("from" to listOf("input", "value"), "to" to listOf("first", "x")),
+                    mapOf("from" to listOf("first", "value"), "to" to listOf("second", "x")))),
+            "inputs" to mapOf("x" to "synthetic")))
+        val execution = async { post(server, "/api/lcnc/run", request) }
+        suspend fun state() = server.routeHttp("GET /api/lcnc/run/debug?token=$token HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
+        suspend fun paused(node: String): Map<String, Any?> = withTimeout(5000) {
+            while (true) {
+                val value = json(state())
+                if (value["state"] == "paused" && (value["site"] as? Map<*, *>)?.get("nodeId") == node) return@withTimeout value
+                delay(10)
+            }
+            error("unreachable")
+        }
+        suspend fun command(at: Map<String, Any?>, action: String) = post(server, "/api/lcnc/run/debug",
+            jsonOf(mapOf("token" to token, "runId" to at["runId"], "ordinal" to at["ordinal"], "action" to action)))
+        try {
+            val input = paused("input")
+            assertTrue(calls.isEmpty())
+            val before = ctx.blackboard.snapshot()
+            assertEquals(input, json(state()), "Inspection cannot advance the run")
+            assertEquals(before, ctx.blackboard.snapshot())
+            assertEquals(400, command(input, "restart").status)
+            assertEquals(400, post(server, "/api/lcnc/run/debug", jsonOf(mapOf("token" to token, "runId" to input["runId"], "ordinal" to 1.5, "action" to "step"))).status)
+            assertEquals(400, post(server, "/api/lcnc/run", request.replace(token, "invalid")).status)
+            assertEquals(400, post(server, "/api/lcnc/run", jsonOf(mapOf("type" to "test.effect", "debugToken" to token))).status)
+            assertTrue(calls.isEmpty(), "Malformed debug requests never dispatch effects")
+            assertEquals(409, post(server, "/api/lcnc/run", request).status, "An active token cannot admit another run")
+            assertEquals(202, command(input, "step").status)
+            val first = paused("first")
+            assertEquals(mapOf("x" to "synthetic"), (first["site"] as Map<*, *>)["inputs"])
+            assertTrue(calls.isEmpty(), "Pause precedes the effect")
+            assertEquals(409, command(input, "step").status)
+            assertEquals(202, command(first, "step").status)
+            val second = paused("second")
+            assertEquals(listOf("first"), calls)
+            assertEquals(202, command(second, "continue").status)
+            val result = json(withTimeout(5000) { execution.await() })
+            assertEquals("completed", result["status"])
+            assertEquals(input["runId"], result["runId"])
+            assertEquals(input["programCid"], result["programCid"])
+            assertEquals(listOf("first", "second"), calls)
+            assertEquals(404, state().status, "Terminal runs retain receipts, not live controllers")
+            assertEquals(404, command(second, "step").status)
+        } finally {
+            execution.cancelAndJoin()
+            supervisor.detach("kanban")
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
+    }
+
+    @Test fun failedGuestProfilesRemainReadableFromTheImmutableRunReceipt(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("guest-evidence"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val host = borg.trikeshed.vm.HypervisorVmHost()
+        ctx.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        try {
+            val response = post(server, "/api/lcnc/run", jsonOf(mapOf("document" to mapOf("nodes" to listOf(
+                mapOf("id" to "guest-failure", "type" to SubVmLegos.POLYGLOT, "params" to mapOf(
+                    "language" to "js", "source" to "function reviewed() { return false; }; reviewed(); throw new Error('source refusal');"))),
+                "wires" to emptyList<Any>()))))
+            assertEquals(400, response.status, response.body)
+            val run = json(response)
+            val command = content(server, run["receiptCid"])
+            val retained = command["lcncRun"] as Map<*, *>
+            val evidence = content(server, retained["invocationsCid"])
+            val invocation = (evidence["entries"] as List<*>).single() as Map<*, *>
+            assertEquals("failed", invocation["status"])
+            val runtime = invocation["runtime"] as Map<*, *>
+            val guest = host.get(runtime["vmId"] as String)!!
+            assertFalse(guest.isAlive)
+            val roots = (runtime["pointcuts"] as Map<*, *>)["roots"] as List<*>
+            assertTrue(roots.any { (it as Map<*, *>)["root"] == "reviewed" })
+            val counters = guest.stats()
+            val before = ctx.blackboard.snapshot().revision
+            assertEquals(evidence, content(server, retained["invocationsCid"]))
+            assertEquals(counters, guest.stats())
+            assertEquals(before, ctx.blackboard.snapshot().revision)
+        } finally {
+            try { supervisor.detach("kanban") } finally {
+                try { host.close() } finally {
+                    ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+                }
+            }
+        }
+    }
+
 
     @Test fun failedExecutionRetainsInvocationEvidenceInTheExistingContentStore(): Unit = runBlocking {
         val routes = ModuleRouteRegistry()

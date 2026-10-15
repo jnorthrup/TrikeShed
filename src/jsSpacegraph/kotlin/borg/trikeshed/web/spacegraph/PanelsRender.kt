@@ -319,6 +319,9 @@ fun Panels.renderConcentric(n: dynamic) {
         if (axes.isNotEmpty()) button("Clear indexes") { select(emptyList(), emptyList()) }
         wrap.insertBefore(controls, wrap.querySelector(".tablewrap"))
     }
+    documentRulePageActions(wrap, cur) {
+        n._sheets === idx && idx[n._cur] === cur && n._sheetRequest == null && truthy(n.el.isConnected)
+    }
     for (el in arr(wrap.querySelectorAll("[data-sheet]"))) on(el, "click", { e ->
         e.stopPropagation()
         navigate(str(el.dataset.sheet), str(el.dataset.href ?: ""), el.dataset.page == "true")
@@ -608,10 +611,11 @@ suspend fun Panels.diveInto(name: String) {
     val resp = fetchJs("/api/panels/" + encodeURIComponent(name))
     if (!truthy(resp.ok)) { status("dive failed: no such program '$name'"); return }
     val data = awaitJs(resp.json())
-    diveStack.add(name to serialize())
+    val previous = serialize()
+    if (!load(data)) return
+    diveStack.add(name to previous)
     crumbSync()
     panelName().value = name
-    load(data)
     status("diving into $name — ⌂ root or a breadcrumb segment to climb back out")
     syncBoard(name)
 }
@@ -619,8 +623,8 @@ suspend fun Panels.diveInto(name: String) {
 fun Panels.popTo(depth: Int) {
     if (depth >= diveStack.size) return
     val target = diveStack[depth]
+    if (!load(target.second)) return
     diveStack = diveStack.subList(0, depth).toMutableList()
     crumbSync()
     panelName().value = if (depth == 0) "" else diveStack[depth - 1].first
-    load(target.second)
 }

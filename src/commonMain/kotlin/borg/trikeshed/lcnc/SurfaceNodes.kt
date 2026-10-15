@@ -56,8 +56,10 @@ object SurfaceNodes {
         "blackboard.neighbors" to boundLcnc(SurfaceCallKey(call)) { service, node, inputs ->
             val key = (inputs["key"] as? String) ?: node.params["key"].orEmpty()
             require(key.isNotBlank()) { "blackboard.neighbors requires a key" }
-            val projection = service.value("GET", "/blackboard/neighbors?key=${percentEncodePathSegment(key)}", null)
-            mapOf("neighbors" to field(projection, "neighbors"), "projection" to projection)
+            val projection = response(service.value("GET", "/blackboard/neighbors?key=${percentEncodePathSegment(key)}", null), node.type)
+            val neighbors = projection["neighbors"] as? List<*>
+                ?: error("${node.type}: dispatcher returned no neighbor list")
+            mapOf("neighbors" to neighbors, "projection" to projection)
         },
         "blackboard.sites" to boundLcnc(SurfaceCallKey(call)) { service, node, _ ->
             val call = service.value

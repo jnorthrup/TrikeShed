@@ -22,9 +22,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,6 +34,25 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun ownerCancellationSettlesAnExchangeAdmittedBeforeTheWorkerStarts() = runTest {
+        val owner = SupervisorJob()
+        val operations = FakeChannelOperations(emptyList())
+        val reactor = openHtxReactorElement(channelOperations = operations, parentJob = owner)
+        val exchange = async(start = CoroutineStart.UNDISPATCHED) {
+            runCatching { reactor.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/")) }
+        }
+        assertTrue(!exchange.isCompleted)
+        owner.cancel()
+        runCurrent()
+        assertTrue(exchange.isCompleted, "An admitted request must receive the worker's terminal failure")
+        assertTrue(exchange.await().exceptionOrNull() is CancellationException)
+        reactor.drain()
+        owner.join()
+        assertEquals(0, operations.closedHandles)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun seatTimeoutReachesReadAndWriteCompletionsWithoutChangingTheDefault() = runTest {

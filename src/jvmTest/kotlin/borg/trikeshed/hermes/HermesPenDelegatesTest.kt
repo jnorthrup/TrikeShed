@@ -99,7 +99,7 @@ class HermesPenDelegatesTest {
                 """.trimIndent()))
             }
             assertEquals(2, sent.size)
-            assertEquals(1500L, sent.first().timeoutMs)
+            assertTrue(sent.first().timeoutMs in 1L..1500L)
             val first = confixDoc(sent.first().body.toArray().decodeToString())
             assertEquals("wire-fixture", first.value("model"))
             assertEquals("low", first.value("reasoning_effort"))

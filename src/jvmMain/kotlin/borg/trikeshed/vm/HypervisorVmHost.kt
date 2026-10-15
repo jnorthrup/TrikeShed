@@ -1,6 +1,7 @@
 package borg.trikeshed.vm
 
 import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.lib.*
 import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.graal.subvm.GuestIsolate
 import borg.trikeshed.graal.subvm.Hypervisor
@@ -9,6 +10,7 @@ import borg.trikeshed.graal.subvm.Trust
 import borg.trikeshed.pointcut.VmFacet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import java.lang.System
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -143,6 +145,11 @@ class HypervisorVmHost(
         override val facet: VmFacet get() = iso.facet
         override val tier: String get() = if (iso is ProcessIsolate) "process" else "in-process"
         override val isAlive: Boolean get() = iso.isAlive
+        override val sourceDebugging: Boolean get() = iso is borg.trikeshed.graal.subvm.InProcessIsolate && facet != VmFacet.JVM
+        override fun debug(sourceName: String, request: VmDebugRequest): AutoCloseable {
+            check(sourceDebugging) { "Source debugging is unavailable for $tier/${facet.id}" }
+            return (iso as borg.trikeshed.graal.subvm.InProcessIsolate).debug(sourceName, request)
+        }
 
         override fun eval(source: String, name: String): Teleported {
             val t0 = System.nanoTime()
@@ -155,6 +162,21 @@ class HypervisorVmHost(
 
         override fun stats(): VmStats = iso.stats().let {
             VmStats(evals = it.evals, calls = it.calls, hostCalls = it.hostCalls, refutations = it.refutations, interrupted = it.interrupted)
+        }
+
+        override fun pointcuts(): VmPointcuts? {
+            val profiles = hypervisor.trainer(id)?.profiles ?: return null
+            // The caller reads after its own evaluation, before release. Profile locks also
+            // protect against the existing Rete promotion callback; no guest Values escape.
+            val names = profiles.keys.sorted()
+            val rows = names.take(VmPointcuts.LIMIT).map { name ->
+                val profile = profiles.getValue(name)
+                synchronized(profile) {
+                    VmRootProfile(profile.root, profile.sourceName, profile.line, profile.column,
+                        profile.calls, profile.phase.name)
+                }
+            }.toSeries()
+            return VmPointcuts(rows, names.size)
         }
 
         override fun close() = this@HypervisorVmHost.revoke(id, "closed")

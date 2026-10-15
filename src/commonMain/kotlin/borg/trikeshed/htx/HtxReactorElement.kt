@@ -45,7 +45,9 @@ class HtxReactorElement(
 ) : AsyncContextElement(ElementState.CREATED, parentJob), HtxRouteService {
     override val key get() = HtxRouteService.Key
 
-    private val requests = Channel<HtxDispatch>(16)
+    private val requests = Channel<HtxDispatch>(16, onUndeliveredElement = { dispatch ->
+        dispatch.b.completeExceptionally(CancellationException("HTX exchange was not dispatched"))
+    })
     private var worker: Job? = null
 
     override suspend fun open() {
@@ -61,6 +63,15 @@ class HtxReactorElement(
                     } catch (failure: Throwable) {
                         dispatch.b.completeExceptionally(failure)
                     }
+                }.invokeOnCompletion { failure ->
+                    // Cancellation can prevent the child body (including its catch) from starting.
+                    if (failure != null) dispatch.b.completeExceptionally(failure)
+                }
+            }.also { job ->
+                job.invokeOnCompletion { failure ->
+                    // Every admitted exchange needs a terminal reply, even if the owner stops
+                    // before this worker first runs or while requests remain in its channel.
+                    if (failure != null) requests.cancel(CancellationException("HTX reactor stopped", failure))
                 }
             }
         }

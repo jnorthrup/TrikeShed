@@ -6,6 +6,9 @@ import kotlinx.browser.document
 import kotlinx.browser.localStorage
 import kotlinx.browser.window
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
 
 // ── execution ─────────────────────────────────────────────────────────────
 fun Panels.inputsOf(id: dynamic): List<dynamic> = arr(graph.wires).filter { it.to[0] == id }
@@ -94,7 +97,7 @@ fun executionOmitted(value: dynamic): Boolean = value != null && typeOf(value.tr
     isArray(value.keys) && keysOf(value).size == 2
 
 /** One authored program, one daemon admission. Rendering never invokes another runner. */
-suspend fun Panels.runProgram() {
+suspend fun Panels.runProgram(debug: Boolean = false) {
     if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
     if (programRunning) { status("A program run is already awaiting its receipt"); return }
     stopSources()
@@ -103,6 +106,7 @@ suspend fun Panels.runProgram() {
     val request = JSON.stringify(objOf {
         it.name = str(panelName().value).ifBlank { "canvas" }
         it.document = JSON.parse(document); it.inputs = obj()
+        if (debug) it.debugToken = debugger.start()
     })
     for (n in nodes()) {
         n._lastOut = undefined; n.el.classList.remove("ok", "err")
@@ -113,9 +117,14 @@ suspend fun Panels.runProgram() {
     }
     programRunning = true
     byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true
+    byId("debugBtn")?.disabled = true
     status("Running the authored program once · sources stopped · awaiting durable receipt…")
     try {
-        val response = fetchJs("/api/lcnc/run", jsonInit("POST", request))
+        val response = coroutineScope {
+            val observer = if (debug) launch { debugger.observe() } else null
+            try { fetchJs("/api/lcnc/run", jsonInit("POST", request)) }
+            finally { observer?.cancelAndJoin() }
+        }
         val result: dynamic = JSON.parse(PatchRead.text(response))
         // Failures after admission have receipts too. Never retry through individual node runners.
         if (result?.receiptCid != null && result.runId != null && result.programCid != null) {
@@ -140,6 +149,8 @@ suspend fun Panels.runProgram() {
         programRunning = false
         byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
         byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+        byId("debugBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+        if (debug) debugger.finish()
     }
 }
 
@@ -305,6 +316,7 @@ fun Panels.serialize(): dynamic {
 private const val STORE_KEY = "trikeshed.panels.v3"
 
 fun Panels.saveDoc() {
+    documentRevision++
     facets.changed()
     // History first: a ?load= view is ephemeral for the SCRATCH, but undo is not autosave.
     history.record(JSON.stringify(serialize()))
@@ -346,28 +358,38 @@ class PanelsHistory(private val p: Panels) {
         if (r != null) { r.disabled = redo.isEmpty(); r.title = "redo (${redo.size}) ⇧⌘Z" }
     }
 
-    private fun applyDoc(json: String) {
+    private fun applyDoc(json: String): Boolean {
         restoring = true
-        try { p.load(JSON.parse(json)); lastDoc = JSON.stringify(p.serialize()) } finally { restoring = false }
+        try {
+            if (!p.load(JSON.parse(json))) return false
+            lastDoc = JSON.stringify(p.serialize())
+        } finally { restoring = false }
         if (p.autosave) try { localStorage.setItem(STORE_KEY, lastDoc!!) } catch (e: dynamic) {}
-        buttons(); launchJs { p.runAll(null, automatic = true) }
+        launchJs { p.runAll(null, automatic = true) }
+        return true
     }
 
     fun undo() {
         if (undo.isEmpty()) { p.status("nothing to undo"); return }
-        redo.add(lastDoc!!); applyDoc(undo.removeAt(undo.size - 1))
+        val previous = lastDoc!!
+        if (!applyDoc(undo.last())) return
+        undo.removeAt(undo.size - 1); redo.add(previous); buttons()
         p.status("undo · ${undo.size} step" + (if (undo.size == 1) "" else "s") + " back")
     }
 
     fun redo() {
         if (redo.isEmpty()) { p.status("nothing to redo"); return }
-        undo.add(lastDoc!!); applyDoc(redo.removeAt(redo.size - 1))
+        val previous = lastDoc!!
+        if (!applyDoc(redo.last())) return
+        redo.removeAt(redo.size - 1); undo.add(previous); buttons()
         p.status("redo · ${redo.size} ahead")
     }
 }
 
 
-fun Panels.load(data: dynamic) {
+fun Panels.load(data: dynamic): Boolean {
+    loadFailure(data)?.let { return refuseLoad(it) }
+    byId("panelLoadRefusal")?.remove()
     shakeOwner.parentRevision++
     for (n in nodes()) { if (truthy(n._timer)) window.clearInterval(n._timer); if (truthy(n._es)) { n._es.close(); n._es = null }; n.el.remove() }
     val g = obj(); g.nodes = jsArray(); g.wires = jsArray(); g.seq = if (truthy(data.seq)) data.seq else 1
@@ -375,6 +397,7 @@ fun Panels.load(data: dynamic) {
     graph = g
     byId("runBtn").disabled = programRunning || truthy(graph.controls?.inspectionOnly)
     byId("liveBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
+    byId("debugBtn")?.disabled = programRunning || truthy(graph.controls?.inspectionOnly)
     val savedCamera = data.view
     // three passes: CLONE the tree (children stay the SAME objects flattened into G.nodes), BUILD, MOUNT
     fun cloneNode(sn: dynamic): dynamic {
@@ -382,12 +405,10 @@ fun Panels.load(data: dynamic) {
     }
     val built = ArrayList<dynamic>()
     for (sn in arr(data.nodes)) {
-        if (contract(sn.type) == null) continue
         val n = cloneNode(sn)
         buildNode(n); built.add(n)
         fun flatten(nd: dynamic) {
             for (c in arr(nd.children)) {
-                if (contract(c.type) == null) continue
                 buildNode(c); built.add(c)
                 flatten(c)
             }
@@ -396,11 +417,14 @@ fun Panels.load(data: dynamic) {
     }
     graph.nodes = built.toTypedArray()
     mountChildren()
-    graph.wires = arr(data.wires).filter { w -> node(w.from[0]) != null && node(w.to[0]) != null }.toTypedArray()
+    graph.wires = arr(data.wires).map { w ->
+        val copy = spread(w); copy.from = arr(w.from).copyOf(); copy.to = arr(w.to).copyOf(); copy
+    }.toTypedArray()
     val bad = arr(graph.wires).count { !wireKindOk(it) }
     if (bad > 0) status("$bad kind-unsafe cable" + (if (bad > 1) "s" else "") + " (red, dashed) — they feed nothing until reconnected")
     if (savedCamera != null) camera.restoreCameraView(savedCamera)
     applyView(); redraw(); save()
+    return true
 }
 
 /** Server-shape (LcncProgramConfix) → client-shape; children map RECURSIVELY. */
@@ -453,16 +477,20 @@ suspend fun Panels.syncBoard(name: String?) {
 }
 
 /** ── contract hydration: the vocabulary is server-owned ── */
-suspend fun Panels.syncContracts(announce: Boolean = true) {
+suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
     try {
-        val payload = fetchJson("/api/lcnc/contracts")
+        val response = fetchJs("/api/lcnc/contracts")
+        require(truthy(response.ok)) { "HTTP ${str(response.status)}" }
+        val payload = awaitJs(response.json())
+        require(payload != null && isArray(payload.contracts) && num(payload.contracts.length) > 0) { "No contract vocabulary returned" }
         val list = arr(payload.contracts)
         val acc = if (truthy(payload.kindAcceptance)) payload.kindAcceptance else obj()
-        kindAcceptance = keysOf(acc).associateWith { k -> arr(acc[k]).map { str(it) } }
-        kindRefinements = arr(payload.kindRefinements)
-        kindHierarchy = arr(payload.kindHierarchy)
+        val acceptance = keysOf(acc).associateWith { k -> arr(acc[k]).map { str(it) } }
+        val refinements = arr(payload.kindRefinements)
+        val hierarchy = arr(payload.kindHierarchy)
         val m = obj()
         for (c in list) {
+            require(c != null && typeOf(c.type) == "string" && str(c.type).isNotBlank() && m[c.type] == null) { "Invalid or duplicate node contract" }
             // an EMPTY opts array must not become a select
             c.ins = if (truthy(c.inputs)) c.inputs else jsArray(); c.outs = if (truthy(c.outputs)) c.outputs else jsArray()
             val ps = obj()
@@ -471,6 +499,7 @@ suspend fun Panels.syncContracts(announce: Boolean = true) {
                 val d = if (truthy(raw[k])) raw[k] else obj()
                 val q = obj()
                 q.v = d.v ?: ""
+                q.optional = truthy(d.optional)
                 q.opts = if (truthy(d.opts) && num(d.opts.length) > 0) d.opts else undefined
                 q.optsFrom = if (truthy(d.optsFrom)) d.optsFrom else undefined
                 q.ta = if (truthy(d.ta)) d.ta else undefined; q.ph = if (truthy(d.ph)) d.ph else undefined
@@ -481,11 +510,13 @@ suspend fun Panels.syncContracts(announce: Boolean = true) {
             m[c.type] = c
         }
         contracts = m
+        kindAcceptance = acceptance; kindRefinements = refinements; kindHierarchy = hierarchy
         // Fallback parity: every hydrated type with no explicit browser runner dispatches to the daemon
         for (t in keysOf(m)) if (!runners.containsKey(t)) runners[t] = serverRun(t)
-        for (t in arrayOf("document.curate", "document.tasks")) runners[t]?.render = { n, out ->
+        for (t in arrayOf("document.curate", "document.tasks", "document.sheet")) runners[t]?.render = { n, out ->
             renderDocumentReview(n, out)
         }
+        runners["nars.reteFire"]?.render = { n, out -> renderSimulation(n, out) }
         // result.confirm is a SINK whose server runner answers with a ready HTML card (x)
         val confirm = runners["result.confirm"]
         if (confirm != null && confirm.render == null) confirm.render = { n, out ->
@@ -496,8 +527,10 @@ suspend fun Panels.syncContracts(announce: Boolean = true) {
         }
         // Background vocabulary hydration must not replace a task refusal or run outcome.
         if (announce) status("${keysOf(m).size} contracts · ${kindAcceptance.size} semantic kinds · ${kindHierarchy.size} rdfs:subClassOf edges")
+        return true
     } catch (e: CancellationException) { throw e } catch (e: dynamic) {
-        status("contracts fetch failed: " + str(e))
+        if (announce) status("contracts fetch failed: " + failureText(e))
+        return false
     }
 }
 

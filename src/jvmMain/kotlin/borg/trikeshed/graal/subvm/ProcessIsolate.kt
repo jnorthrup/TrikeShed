@@ -9,7 +9,12 @@ import borg.trikeshed.vm.str
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.process.ProcessCapability
 import borg.trikeshed.userspace.nio.process.SecurityException
+import borg.trikeshed.userspace.nio.process.ProcessCalls
+import borg.trikeshed.userspace.nio.process.ProcessCallTimeout
+import borg.trikeshed.userspace.nio.channels.spi.processHostCall
 import borg.trikeshed.terminal.TerminalInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.File
@@ -18,10 +23,7 @@ import java.net.Socket
 import java.util.Base64
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
@@ -62,7 +64,7 @@ class ProcessIsolate(
     private val inbox = LinkedBlockingQueue<Teleported.Obj>()
     private class HostDelegate(val timeoutMillis: Long?, val function: (List<Teleported>) -> Teleported)
     private val delegates = ConcurrentHashMap<String, HostDelegate>()
-    private val hostOperations = Executors.newSingleThreadExecutor { action -> Thread(action, "subvm-host-$id") }
+    private val hostDispatch: ProcessCalls
     private val reader: Thread
     private val errors: Thread?
     private val terminalReader: Thread?
@@ -106,6 +108,8 @@ class ProcessIsolate(
         pythonWorker?.workingDirectory?.let { builder.directory(File(it)) }
         deliberateHostEnvironmentOnce()
         if (terminalError == null) builder.redirectError(ProcessBuilder.Redirect.INHERIT)
+        if (pythonWorker != null && terminalOutput != null && terminalOutput === terminalError)
+            builder.redirectErrorStream(true)
         process = try { builder.start() } catch (failure: Throwable) { transport?.close(); throw failure }
         protocol = try { transport?.accept(process) }
         catch (failure: Throwable) {
@@ -116,13 +120,25 @@ class ProcessIsolate(
         }
         finally { transport?.close() }
         out = (protocol?.getOutputStream() ?: process.outputStream).bufferedWriter()
+        hostDispatch = ProcessCalls(Dispatchers.Default, concurrency = if (pythonWorker == null) 1 else 4) { response ->
+            processHostCall {
+                val message = response.b.fold(
+                    { Teleported.obj("id" to response.a, "value" to it) },
+                    { failure -> Teleported.obj("id" to response.a, "error" to
+                        if (failure is ProcessCallTimeout) "host delegate '${failure.operation}' exceeded ${failure.timeoutMillis}ms"
+                        else (failure.message ?: failure.toString())) },
+                )
+                try { send(message) }
+                catch (failure: Throwable) { if (alive && process.isAlive) throw failure }
+            }
+        }
         reader = Thread({ pump((protocol?.getInputStream() ?: process.inputStream).bufferedReader()) }, "subvm-reader-$id").apply { isDaemon = true; start() }
         terminalReader = if (pythonWorker == null) null else Thread({
             runCatching { process.inputStream.use { input -> input.copyTo(terminalOutput ?: OutputStream.nullOutputStream()) } }
             terminalOutput?.flush()
         }, "subvm-stdout-$id").apply { isDaemon = true; start() }
         val childError = terminalError
-        errors = if (childError != null) {
+        errors = if (childError != null && !builder.redirectErrorStream()) {
             Thread({
                 runCatching {
                     process.errorStream.use { input -> input.copyTo(childError) }
@@ -177,20 +193,18 @@ class ProcessIsolate(
         hostCalls.incrementAndGet()
         val name = msg.str("name") ?: ""
         val args = (msg.field("args") as? Teleported.Arr)?.v ?: emptyList()
-        val reply = try {
-            val delegate = delegates[name] ?: error("no host delegate named '$name'")
-            val value = if (delegate.timeoutMillis == null) delegate.function(args) else {
-                val operation = FutureTask { delegate.function(args) }
-                hostOperations.execute(operation)
-                try { operation.get(delegate.timeoutMillis, TimeUnit.MILLISECONDS) }
-                catch (timeout: TimeoutException) {
-                    operation.cancel(true)
-                    throw IllegalStateException("host delegate '$name' exceeded ${delegate.timeoutMillis}ms", timeout)
-                }
-            }
-            Teleported.obj("id" to msg.int("id"), "value" to value)
-        } catch (t: Throwable) { Teleported.obj("id" to msg.int("id"), "error" to (t.message ?: t.toString())) }
-        send(reply)
+        val delegate = delegates[name]
+        if (delegate == null) {
+            send(Teleported.obj("id" to msg.int("id"), "error" to "no host delegate named '$name'"))
+            return
+        }
+        val admitted = hostDispatch.trySubmit(msg.int("id") ?: -1, name, delegate.timeoutMillis ?: pythonWorker?.timeoutMillis) {
+            processHostCall { delegate.function(args) }
+        }
+        if (admitted == null) {
+            send(Teleported.obj("id" to msg.int("id"), "error" to
+                "host delegate '$name' was not admitted: host capacity exhausted or draining"))
+        }
     }
 
     @Synchronized private fun send(m: Teleported.Obj) { out.write(SubVmProtocol.encode(m)); out.newLine(); out.flush() }
@@ -270,38 +284,33 @@ class ProcessIsolate(
 
     override fun close() {
         try {
-            if (pythonWorker != null) {
-                // Native stdin is a separate pipe, so EOF also releases ordinary os.read/input.
-                accepting = false
-                process.outputStream.close()
-                lock.withLock {
-                    try { if (alive) exchange("op" to "close") }
-                    finally {
+            accepting = false
+            // Release terminal reads without closing the protocol needed by admitted host calls.
+            if (pythonWorker != null) process.outputStream.close()
+            else if (nodeLauncher == null && alive) send(Teleported.obj("op" to "stdin-close"))
+            lock.withLock {
+                try { if (alive && process.isAlive) exchange("op" to "close") }
+                finally {
+                    if (protocol != null && process.isAlive) {
                         out.flush()
-                        protocol?.let { if (!it.isOutputShutdown && !it.isClosed) it.shutdownOutput() }
-                    }
-                }
-                // The close reply follows the final admitted operation and Context.close().
-                // Protocol EOF then releases the child reader. Ordinary close never revokes it.
-                process.waitFor()
-            } else {
-                runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "close")) }
-                if (!process.waitFor(1, TimeUnit.SECONDS)) {
-                    process.destroyForcibly()
-                    process.waitFor()
+                        if (!protocol.isOutputShutdown && !protocol.isClosed) protocol.shutdownOutput()
+                    } else if (protocol == null) out.close()
                 }
             }
+            // Close acknowledgement follows admitted operations and context cleanup, never a kill timer.
+            process.waitFor()
         } finally {
             accepting = false
-            if (process.isAlive && pythonWorker != null) revokeWorker()
+            if (process.isAlive) revokeWorker() // A failed transport is revocation, not a successful drain.
             alive = false
-            hostOperations.shutdown()
-            while (!hostOperations.awaitTermination(1, TimeUnit.SECONDS)) { /* Join admitted host calls. */ }
-            protocol?.close()
-            reader.join()
-            terminalReader?.join()
-            errors?.join()
-            process.inputStream.close(); process.errorStream.close(); process.outputStream.close()
+            try { runBlocking { hostDispatch.drain() } }
+            finally {
+                protocol?.close()
+                reader.join()
+                terminalReader?.join()
+                errors?.join()
+                process.inputStream.close(); process.errorStream.close(); process.outputStream.close()
+            }
         }
     }
 
@@ -318,6 +327,7 @@ class ProcessIsolate(
         val SCRIPT: String = """
             const rl = require('readline').createInterface({ input: process.stdin });
             const canon = (v) => { if (v === null || v === undefined) return null; if (typeof v === 'function') return {'${'$'}opaque': 'fn'};
+              if (typeof v === 'number' && !Number.isFinite(v)) return {'${'$'}opaque': 'number:' + String(v)};
               if (Array.isArray(v)) return v.map(canon); if (typeof v === 'object') { const o = {}; for (const k of Object.keys(v).sort()) o[k] = canon(v[k]); return o; } return v; };
             const wireOut = process.stdout.write.bind(process.stdout);
             const send = (m) => wireOut(JSON.stringify(m) + '\n');
@@ -347,7 +357,7 @@ class ProcessIsolate(
 /** Child-JVM entry point: one [InProcessIsolate] speaking [SubVmProtocol] on stdin/stdout. */
 object SubVmMain {
     @JvmStatic
-    fun main(args: Array<String>) {
+    fun main(args: Array<String>): Unit = runBlocking {
         val languageId = args.getOrElse(0) { "js" }
         val id = args.getOrElse(1) { "child" }
         val budget = Budget(statements = args.getOrNull(2)?.toLongOrNull() ?: GuestBounds.DEFAULT_STATEMENT_LIMIT, wallMillis = args.getOrNull(3)?.toLongOrNull() ?: GuestBounds.DEFAULT_WALL_MILLIS)
@@ -362,71 +372,85 @@ object SubVmMain {
             output = ProtocolTerminalOutputStream("stdout", ::send),
             error = ProtocolTerminalOutputStream("stderr", ::send),
         )
-        val operations = Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "subvm-guest-$id").apply { isDaemon = true }
+        // The process main thread retains guest thread affinity; only pipe effects leave it.
+        val operations = ProcessCalls(coroutineContext, concurrency = 1) { response ->
+            processHostCall {
+                send(response.b.fold(
+                    { Teleported.obj("id" to response.a, "ok" to true, "value" to it) },
+                    { failure -> Teleported.obj("id" to response.a, "ok" to false,
+                        "kind" to ((failure as? GuestException)?.kind ?: GuestFailure.GUEST_ERROR).name,
+                        "error" to (failure.message ?: failure.toString())) },
+                ))
+            }
         }
         val hostReplies = ConcurrentHashMap<Int, LinkedBlockingQueue<Teleported.Obj>>()
-        var hostSeq = 0
+        val hostSeq = AtomicInteger()
+        val connected = java.util.concurrent.atomic.AtomicBoolean(true)
         val hostBridge: (String) -> ((List<Teleported>) -> Teleported) = { name ->
             { targs ->
-                val hid = ++hostSeq
+                val hid = hostSeq.incrementAndGet()
                 val replies = hostReplies.computeIfAbsent(hid) { LinkedBlockingQueue() }
-                send(Teleported.obj("op" to "host", "id" to hid, "name" to name, "args" to Teleported.Arr(targs)))
-                val reply = replies.take()
-                hostReplies.remove(hid)
-                reply.str("error")?.let { error(it) }
-                reply.field("value") ?: Teleported.Null
+                try {
+                    check(connected.get()) { "Process parent closed" }
+                    send(Teleported.obj("op" to "host", "id" to hid, "name" to name, "args" to Teleported.Arr(targs)))
+                    val reply = replies.take()
+                    reply.str("error")?.let { error(it) }
+                    reply.field("value") ?: Teleported.Null
+                } finally { hostReplies.remove(hid) }
             }
         }
 
         fun asyncReply(m: Teleported.Obj, action: () -> Teleported) {
-            val rid = m.int("id")
-            operations.execute {
-                try {
-                    send(Teleported.obj("id" to rid, "ok" to true, "value" to action()))
-                } catch (e: GuestException) {
-                    send(Teleported.obj("id" to rid, "ok" to false, "kind" to e.kind.name, "error" to (e.message ?: e.kind.name)))
-                } catch (t: Throwable) {
-                    send(Teleported.obj("id" to rid, "ok" to false, "kind" to "GUEST_ERROR", "error" to (t.message ?: t.toString())))
-                }
+            if (operations.trySubmit(m.int("id") ?: -1, m.str("op") ?: "", null) { action() } == null) {
+                send(Teleported.obj("id" to m.int("id"), "ok" to false, "kind" to "GUEST_ERROR",
+                    "error" to "guest operation was not admitted: capacity exhausted or draining"))
             }
         }
 
         try {
-            while (true) {
-                val line = stdin.readLine() ?: break
-                if (line.isBlank()) continue
-                val m = runCatching { SubVmProtocol.decode(line) }.getOrNull() ?: continue
-                val op = m.str("op")
-                if (op == null) {
-                    m.int("id")?.let { hostReplies[it]?.put(m) }
-                    continue
-                }
-                when (op) {
-                    "stdin" -> runCatching { Base64.getDecoder().decode(m.str("data") ?: "") }.getOrNull()?.let(guestInput::push)
-                    "eval" -> asyncReply(m) { iso.eval(m.str("source") ?: "", m.str("name") ?: "<eval>") }
-                    "call" -> asyncReply(m) {
-                        val targs = (m.field("args") as? Teleported.Arr)?.v ?: emptyList()
-                        iso.call(m.str("root") ?: "", *targs.toTypedArray())
+            processHostCall {
+                try {
+                    while (true) {
+                        val line = stdin.readLine() ?: break
+                        if (line.isBlank()) continue
+                        val m = runCatching { SubVmProtocol.decode(line) }.getOrNull() ?: continue
+                        val op = m.str("op")
+                        if (op == null) {
+                            m.int("id")?.let { hostReplies[it]?.put(m) }
+                            continue
+                        }
+                        when (op) {
+                            "stdin" -> runCatching { Base64.getDecoder().decode(m.str("data") ?: "") }.getOrNull()?.let(guestInput::push)
+                            "stdin-close" -> guestInput.close()
+                            "eval" -> asyncReply(m) { iso.eval(m.str("source") ?: "", m.str("name") ?: "<eval>") }
+                            "call" -> asyncReply(m) {
+                                val targs = (m.field("args") as? Teleported.Arr)?.v ?: emptyList()
+                                iso.call(m.str("root") ?: "", *targs.toTypedArray())
+                            }
+                            "delegate" -> asyncReply(m) {
+                                val name = m.str("name") ?: ""
+                                iso.delegate(name, hostBridge(name))
+                                Teleported.Null
+                            }
+                            "interrupt" -> send(Teleported.obj("id" to m.int("id"), "ok" to true, "value" to iso.interrupt()))
+                            "stats" -> send(Teleported.obj("id" to m.int("id"), "ok" to true, "value" to iso.stats().toString()))
+                            "close" -> {
+                                guestInput.close()
+                                if (operations.finish(m.int("id") ?: -1, "close") { iso.close(); Teleported.Null } == null)
+                                    send(Teleported.obj("id" to m.int("id"), "ok" to false, "kind" to "DEAD", "error" to "guest is draining"))
+                            }
+                            else -> send(Teleported.obj("id" to m.int("id"), "ok" to false, "kind" to "GUEST_ERROR", "error" to "unknown op $op"))
+                        }
                     }
-                    "delegate" -> asyncReply(m) {
-                        val name = m.str("name") ?: ""
-                        iso.delegate(name, hostBridge(name))
-                        Teleported.Null
-                    }
-                    "interrupt" -> send(Teleported.obj("id" to m.int("id"), "ok" to true, "value" to iso.interrupt()))
-                    "stats" -> send(Teleported.obj("id" to m.int("id"), "ok" to true, "value" to iso.stats().toString()))
-                    "close" -> {
-                        send(Teleported.obj("id" to m.int("id"), "ok" to true, "value" to null))
-                        guestInput.close(); iso.close(); return
-                    }
-                    else -> send(Teleported.obj("id" to m.int("id"), "ok" to false, "kind" to "GUEST_ERROR", "error" to "unknown op $op"))
+                } finally {
+                    connected.set(false)
+                    guestInput.close()
+                    for (reply in hostReplies.values) reply.offer(Teleported.obj("error" to "Process parent closed"))
                 }
             }
         } finally {
-            guestInput.close()
-            runCatching { iso.close() }
-            operations.shutdownNow()
+            try { operations.drain() }
+            finally { iso.close() }
         }
     }
 }

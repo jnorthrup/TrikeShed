@@ -47,6 +47,7 @@ class HermesVmConsole(
     world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
     install: (borg.trikeshed.graal.subvm.GraalBtrfsSupervisor) -> Unit = {},
     workerConfiguration: PythonWorker? = null,
+    panelId: String = "default",
 ) : AutoCloseable {
     /** READY admits diagnostic commands after imports, provider registration and bootstrap complete. */
     enum class State { CLOSED, BOOTING, READY, FAILED }
@@ -89,7 +90,7 @@ class HermesVmConsole(
     }
 
     val panel = XtermMediaPatchPanel(
-        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/xterm"), "xterm-256color", "Hermes GraalPy", columns, rows),
+        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/$panelId"), "xterm-256color", "Hermes", columns, rows),
     )
     private val lock = Any()
     private val currentCause = AtomicReference<String?>(null)
@@ -125,6 +126,7 @@ class HermesVmConsole(
     @Volatile private var cliStarted = false
     @Volatile private var cliRequested = false
     @Volatile private var cliStatus: Map<String, Any?>? = null
+    private var resumeSession: String? = null
     private val _events = MutableSharedFlow<Event>(replay = 128, extraBufferCapacity = 1024)
     val events: SharedFlow<Event> = _events.asSharedFlow()
     @Volatile var state: State = State.CLOSED; private set
@@ -139,7 +141,17 @@ class HermesVmConsole(
     private val pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
         muxContext = muxContext, contextId = currentCause::get)
     private val worker = workerConfiguration?.let { configuration ->
-        HermesPythonWorker(configuration, pen, stdout, stderr) { progress ->
+        HermesPythonWorker(configuration, pen, stdout, stderr, stopped = { session, failure ->
+            synchronized(lock) {
+                cliStarted = false
+                cliStatus = (cliStatus ?: emptyMap()) + mapOf("open" to false, "session_id" to session, "failure" to failure)
+                val next = if (failure == null) State.CLOSED else State.FAILED
+                val message = failure ?: "HermesCLI closed · Start or Reset to resume"
+                boot = boot?.copy(status = next, updatedAtMs = System.currentTimeMillis(),
+                    detail = message, failure = failure, revision = boot!!.revision + 1)
+                transition(next, message)
+            }
+        }) { progress ->
             bootPhase(BootPhase.BOOTSTRAP, progress, "cli.HermesCLI")
         }
     }
@@ -164,7 +176,11 @@ class HermesVmConsole(
             importFailure = null
             loading.clear()
             val now = maxOf(System.currentTimeMillis(), (boot?.startedAtMs ?: 0) + 1)
-            boot = Boot(BootPhase.INVENTORY, State.BOOTING, now, now, "inventorying ${root.toAbsolutePath()}")
+            boot = if (worker != null) {
+                Boot(BootPhase.IMPORT, State.BOOTING, now, now, "starting stock GraalPy worker")
+            } else {
+                Boot(BootPhase.INVENTORY, State.BOOTING, now, now, "inventorying ${root.toAbsolutePath()}")
+            }
             transition(State.BOOTING, boot!!.detail)
             causalOutput("\u001b[2J\u001b[H\u001b[1;38;5;208mTrikeShed Hermes VM · xterm-256color\u001b[0m\r\n", null, timestampMs)
             causalOutput("sleeve · ${boot!!.detail}\r\n", null, timestampMs)
@@ -272,10 +288,12 @@ class HermesVmConsole(
 
     private fun openWorker(timestampMs: Long): State {
         cliRequested = true
-        boot = boot!!.copy(wallMillis = 300_000)
+        worker!!.close()
+        boot = boot!!.copy(wallMillis = worker!!.configuration.timeoutMillis)
         bootPhase(BootPhase.IMPORT, "starting stock GraalPy in a dedicated worker", "cli")
         val snapshot = panel.snapshot()
-        cliStatus = worker!!.open(snapshot.rows, snapshot.columns)
+        cliStatus = worker!!.open(snapshot.rows, snapshot.columns, resumeSession)
+        resumeSession = null
         modelId = cliStatus?.get("model") as? String
         cliStarted = true
         synchronized(lock) {
@@ -341,7 +359,9 @@ class HermesVmConsole(
     fun manualText(text: String, timestampMs: Long = System.currentTimeMillis(), paste: Boolean = false): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualText(text, timestampMs, paste).also(::emitManual)
         if (worker != null) {
-            if (state == State.READY) worker.input(text)
+            checkWorker()
+            check(state == State.READY) { detail }
+            worker.input(if (paste) "\u001b[200~${text}\u001b[201~" else text)
             return@synchronized manual
         }
         var index = 0
@@ -379,7 +399,9 @@ class HermesVmConsole(
     ): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualKey(key, timestampMs, ctrl, alt, shift).also(::emitManual)
         if (worker != null) {
-            if (state == State.READY) worker.input(manual.input)
+            checkWorker()
+            check(state == State.READY) { detail }
+            worker.input(manual.input)
             return@synchronized manual
         }
         when (key) {
@@ -506,11 +528,13 @@ class HermesVmConsole(
         redrawLine(timestampMs)
     }
 
-    fun resize(columns: Int, rows: Int, timestampMs: Long = System.currentTimeMillis()): CausalMediaEmission = synchronized(lock) {
-        panel.manualResize(columns, rows, timestampMs).also(::emitCausal)
+    fun resize(columns: Int, rows: Int, timestampMs: Long = System.currentTimeMillis()): CausalMediaEmission {
+        if (state == State.READY && worker?.isAlive == true) worker.resize(rows, columns)
+        return synchronized(lock) { panel.manualResize(columns, rows, timestampMs).also(::emitCausal) }
     }
 
     fun snapshotMap(): Map<String, Any?> = synchronized(lock) {
+        checkWorker()
         val snapshot = panel.snapshot()
         val scanned = inventory
         linkedMapOf(
@@ -637,11 +661,19 @@ class HermesVmConsole(
         if (worker != null) {
             cliStatus = worker.submit(prompt)
             modelId = cliStatus?.get("model") as? String
-            check(cliStatus?.get("input_processed") == true) { "HermesCLI did not process input" }
             if (cliStatus?.get("open") != true) {
                 cliStarted = false
                 transition(State.CLOSED, "HermesCLI exited")
                 worker.close()
+            }
+            check(cliStatus?.get("input_processed") == true) { "HermesCLI did not process input" }
+            val turn = cliStatus?.get("turn") as? Map<*, *>
+            check(cliStatus?.get("turn_attempted") != true || turn != null) {
+                "HermesCLI could not complete the turn; see the CLI output"
+            }
+            check(turn == null || (turn["completed"] != false && turn["failed"] != true &&
+                turn["interrupted"] != true && turn["error"] == null)) {
+                turn?.get("error") as? String ?: "HermesCLI turn did not complete"
             }
             return
         }
@@ -730,22 +762,69 @@ class HermesVmConsole(
         _events.tryEmit(Event.StateChanged(next, value, boot))
     }
 
+    private fun checkWorker() {
+        if (worker != null && state == State.READY && !worker.isAlive) {
+            val failure = "Hermes worker exited · Reset resumes this conversation"
+            cliStarted = false
+            cliStatus = cliStatus?.plus("open" to false)
+            boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+                detail = failure, failure = failure, revision = boot!!.revision + 1)
+            transition(State.FAILED, failure)
+        }
+    }
+
+    fun fail(failure: Throwable) = synchronized(lock) {
+        val message = failure.message ?: failure.toString()
+        boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+            detail = message, failure = message, revision = boot!!.revision + 1)
+        transition(State.FAILED, message)
+    }
+
     private fun land(signal: LcncUserSignal) {
         val map = signal.toMap()
         runCatching { port.blackboard().put("hermes/console/signal/${signal.id}", map, "xterm") }
         KanbanFSM.kanbanEvents.tryEmit(signal.toKanbanEvent())
     }
 
-    override fun close() = synchronized(lock) {
+    /** The console lane calls this after admitted turns, retaining the native session on reset. */
+    fun reset(resume: Boolean = true) {
+        val session = if (resume) {
+            val status = worker?.takeIf { it.isAlive }?.let { current -> runCatching { current.status() }.getOrNull() } ?: cliStatus
+            status?.get("session_id") as? String
+        } else null
+        try { close() } catch (failure: Throwable) {
+            if (worker?.isClosed != true) throw failure
+            synchronized(lock) {
+                emitCausal(panel.causalFailed(null, System.currentTimeMillis(),
+                    "Previous Hermes worker retired with cleanup failure: ${failure.message ?: failure}"))
+            }
+        }
+        synchronized(lock) {
+            cliStatus = null
+            line.clear()
+            lineCursor = 0
+            windowStart = 0
+            resumeSession = session
+        }
+        causalOutput("\u001bc\u001b[3J", null)
+        open()
+    }
+
+    override fun close() {
+        val started = synchronized(lock) {
+            val started = cliStarted
+            cliStarted = false
+            boot = boot?.let { it.copy(status = State.CLOSED, updatedAtMs = System.currentTimeMillis(), revision = it.revision + 1) }
+            transition(State.CLOSED, "closing")
+            started
+        }
         try {
             if (worker != null) worker.close()
-            else if (cliStarted && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
+            else if (started && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
         } finally {
-            cliStarted = false
             try { port.close() } finally { stdout.close(); stderr.close() }
+            synchronized(lock) { transition(State.CLOSED, "closed") }
         }
-        boot = boot?.let { it.copy(status = State.CLOSED, updatedAtMs = System.currentTimeMillis(), revision = it.revision + 1) }
-        transition(State.CLOSED, "closed")
     }
 
     companion object {

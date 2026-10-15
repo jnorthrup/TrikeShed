@@ -294,7 +294,6 @@ kotlin {
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
-                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 
                 implementation("org.ow2.asm:asm:9.7")
@@ -304,6 +303,7 @@ kotlin {
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("org.graalvm.python:python-bouncycastle-support:$graalVersion")
                 implementation("dev.truffleruby:truffleruby:40.0.0")
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")

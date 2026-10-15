@@ -105,6 +105,17 @@ class TeleportTest {
         assertFailsWith<IllegalArgumentException> { Teleported.parseCanonical("1 2") }
     }
 
+    @Test fun nonFiniteGuestNumbersAreOpaqueAndRemainDecodable() {
+        Context.newBuilder("js").allowHostAccess(HostAccess.NONE).option("engine.WarnInterpreterOnly", "false").build().use { ctx ->
+            val value = Teleported.of(ctx.eval("js", "({values: [NaN, Infinity, -Infinity]})"))
+            val numbers = assertIs<Arr>(assertIs<Obj>(value).v.getValue("values"))
+            assertEquals(listOf("number:NaN", "number:Infinity", "number:-Infinity"),
+                numbers.v.map { assertIs<Opaque>(it).repr })
+            val envelope = Teleported.obj("id" to 1, "ok" to true, "value" to value)
+            assertEquals(envelope, SubVmProtocol.decode(SubVmProtocol.encode(envelope)))
+        }
+    }
+
     @Test fun ofProjectsJsValuesAndToGuestBuildsProxies() {
         Context.newBuilder("js").allowHostAccess(HostAccess.NONE).option("engine.WarnInterpreterOnly", "false").build().use { ctx ->
             assertEquals(Num(42), Teleported.of(ctx.eval("js", "42")))

@@ -4,6 +4,7 @@ import borg.trikeshed.lcnc.CamelLinkage
 import borg.trikeshed.lcnc.CamelRoutePlan
 import borg.trikeshed.lcnc.CamelRouteStep
 import borg.trikeshed.lib.*
+import borg.trikeshed.vm.*
 import java.lang.System
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
@@ -208,6 +209,58 @@ object CamelRuntime {
                 )
             }
         }
+    }
+
+    /**
+     * Actual RouteBuilder source, not a Confix-plan translation. OWN code is not sandboxed:
+     * this gate governs Camel URI lookup, not arbitrary Java I/O or detached work in processors.
+     * The context and producer share the ordinary one-shot lifecycle; no new executor is added.
+     */
+    fun executeJava(id: String, source: String, entry: String, input: Any?, request: Request,
+                    module: String = MODULE, reach: CamelLinkage.Reach = CamelLinkage.Reach.LOCAL): Map<String, Any?> =
+        executeNative(VmLanguage.JAVA, id, source, entry, input, request, module, reach)
+
+    fun executeNative(language: VmLanguage, id: String, source: String, entry: String, input: Any?, request: Request,
+                      module: String = MODULE, reach: CamelLinkage.Reach = CamelLinkage.Reach.LOCAL): Map<String, Any?> {
+        require(id.isNotBlank()) { "route id is blank" }
+        require(CamelLinkage.schemeOf(entry) == "direct") { "Native one-shot Camel requests require a direct: entry" }
+        val mounted = GuestModules.chain(module)
+        val refused = java.util.concurrent.atomic.AtomicReference<IllegalStateException?>(null)
+        val admit = java.util.function.Consumer<String> { uri ->
+            CamelLinkage.refusal(uri, reach, mounted)?.let {
+                val failure = IllegalStateException("Native Camel refuses '$uri': $it")
+                refused.compareAndSet(null, failure)
+                throw failure
+            }
+        }
+        admit.accept(entry)
+        val loader = requireNotNull(GuestModules.loaderFor(module)) { "Camel module '$module' is not installed" }
+        return CamelSource.withRoute(language, source, id, module, loader) { contextClass, authored -> withLoader(authored.classLoader) {
+            val bridge = Bridge(loader)
+            val ctx = contextClass.getConstructor(java.util.function.Consumer::class.java).newInstance(admit)
+            val receipt = withCleanup({ bridge.stop(ctx) }) {
+                contextClass.getMethod("setApplicationContextClassLoader", ClassLoader::class.java).invoke(ctx, authored.classLoader)
+                // Data never becomes Java source, and the author cannot mutate the caller's input.
+                val data = vmLanguageValue(input).languageValue()
+                val builder = authored.getConstructor(Any::class.java, String::class.java, String::class.java)
+                    .newInstance(data, id, entry)
+                contextClass.getMethod("install", loader.loadClass("org.apache.camel.builder.RouteBuilder"), String::class.java)
+                    .invoke(ctx, builder, entry)
+                bridge.start(ctx)
+                refused.get()?.let { throw it }
+                val reply = bridge.request(ctx, entry, request)
+                // Native onException/doCatch/ignoreInvalidEndpoint may handle transport errors,
+                // but cannot turn a host admission refusal into a successful node receipt.
+                refused.get()?.let { throw it }
+                mapOf("status" to bridge.statusOf(ctx), "routes" to bridge.routeIdsOf(ctx), "from" to entry,
+                    "reply" to reply.body, "headers" to vmLanguageValue(reply.headers).languageValue(),
+                    "language" to language.id, "authoring" to "native-dsl",
+                    "sourceCid" to borg.trikeshed.job.ContentId.of(source.encodeToByteArray()).value)
+            }
+            // Camel-owned asynchronous branches can finish (and refuse an endpoint) during stop.
+            refused.get()?.let { throw it }
+            receipt
+        } }
     }
 
     /**

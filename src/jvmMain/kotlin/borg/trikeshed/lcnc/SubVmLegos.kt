@@ -336,6 +336,35 @@ object SubVmLegos {
 
     fun camel(host: borg.trikeshed.vm.VmHost) = boundLcnc(VmHostKey(host)) { service, node, inputs ->
         val routeParam = (node.params["in:route"] ?: node.params["route"])?.takeIf(String::isNotBlank)
+        val authoring = node.params["authoring"] ?: "declared"
+        require(authoring in listOf("declared", "native-dsl")) { "Unknown Camel authoring mode '$authoring'" }
+        val source = node.params["source"]
+        if (authoring == "native-dsl") {
+            require(!source.isNullOrBlank()) { "Native Camel source must be nonblank; no route fallback is executed" }
+            require(routeParam == null && "route" !in inputs && "route?" !in inputs) { "Camel cannot use both source and a route plan" }
+            require(VmRuntimeNodes.trust(node, inputs) == VmTrust.OWN) { "Native Camel source requires OWN trust; host code is not sandboxed" }
+            val language = VmLanguage.of(node.params["language"].orEmpty())
+            require(language in setOf(VmLanguage.JAVA, VmLanguage.GROOVY)) { "Native Camel source supports Java and Groovy DSL" }
+            val budget = VmRuntimeNodes.budget(node, inputs)
+            require(budget.statements == 0L && budget.wallMillis == 0L && budget.calls == 0L) {
+                "Native Camel source has no statement, wall-clock or VM call-count enforcement"
+            }
+            require(VmRuntimeNodes.value(node, inputs, "keep") in listOf(null, "", "false", false) &&
+                VmRuntimeNodes.value(node, inputs, "world") in listOf(null, "") &&
+                VmRuntimeNodes.value(node, inputs, "vmId") in listOf(null, "")) {
+                "Native Camel source owns one context; keep, world and vmId are not supported"
+            }
+            val input = VmRuntimeNodes.value(node, inputs, "messages")?.let { vmLanguageValue(it).languageValue() }
+            val body = if ("messages" in inputs || "messages?" in inputs) jsonOf(input) else node.params["body"].orEmpty()
+            currentCoroutineContext().ensureActive()
+            val receipt = borg.trikeshed.graal.subvm.CamelRuntime.executeNative(requireNotNull(language), "lcnc:${UUID.randomUUID()}", source,
+                node.params["from"] ?: "direct:lcnc", input, borg.trikeshed.graal.subvm.CamelRuntime.Request(body),
+                node.params["module"]?.takeIf(String::isNotBlank) ?: CamelLinkage.SPINE,
+                CamelLinkage.Reach.valueOf(node.params["reach"]?.uppercase() ?: "LOCAL"))
+            currentCoroutineContext().ensureActive()
+            return@boundLcnc mapOf("routed" to receipt["reply"], "ok" to true, "error" to "", "receipt" to receipt, "text" to jsonOf(receipt))
+        }
+        require(source.isNullOrBlank()) { "Camel source requires authoring=native-dsl" }
         if (routeParam != null || "route" in inputs || "route?" in inputs) {
             val authored = if ("route" in inputs || "route?" in inputs)
                 VmRuntimeNodes.value(node, inputs, "route") else reifyStrict(requireNotNull(routeParam))
@@ -478,16 +507,28 @@ object SubVmLegos {
             trust = trust, budget = budget, module = language.module)
         currentCoroutineContext().ensureActive()
         var failure: Throwable? = null
+        var handle: VmHandle? = null
+        val invocation = currentCoroutineContext()[LcncInvocationLedger.Invocation]
         try {
-            val handle = service.value.spawn(spec)
-            val result = program.evaluate(handle, input, node.id, budget)
+            val guest = service.value.spawn(spec).also { handle = it }
+            val result = program.evaluate(guest, input, node.id, budget, currentCoroutineContext()[borg.trikeshed.vm.VmDebugRequest])
             currentCoroutineContext().ensureActive()
             mapOf("value" to result.languageValue(), "text" to result.canonical(),
-                "language" to language.id, "facet" to handle.facet.id, "vmId" to spec.id, "cid" to result.cid.value)
+                "language" to language.id, "facet" to guest.facet.id, "vmId" to spec.id, "cid" to result.cid.value)
         } catch (t: Throwable) {
             failure = t
+            currentCoroutineContext().ensureActive()
             throw t
         } finally {
+            handle?.let { guest -> invocation?.runtime {
+                val stats = guest.stats()
+                mapOf("vmId" to spec.id, "language" to language.id, "facet" to guest.facet.id,
+                    "tier" to guest.tier, "capture" to "before-release",
+                    "sourceScope" to if (language.facet == borg.trikeshed.pointcut.VmFacet.JVM) "graal-wrapper" else "guest-function",
+                    "stats" to mapOf("evals" to stats.evals, "calls" to stats.calls, "hostCalls" to stats.hostCalls,
+                        "refutations" to stats.refutations, "interrupted" to stats.interrupted),
+                    "pointcuts" to guest.pointcuts()?.toMap())
+            } }
             try { service.value.revoke(spec.id, "lcnc invocation closed") }
             catch (cleanup: Throwable) {
                 val original = failure

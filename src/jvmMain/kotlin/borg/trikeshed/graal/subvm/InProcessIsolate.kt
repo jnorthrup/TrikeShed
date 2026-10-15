@@ -112,6 +112,17 @@ class InProcessIsolate(
     internal val memoServed = AtomicLong(); internal val hostServed = AtomicLong(); internal val refutations = AtomicLong()
     private val seq = AtomicInteger()
     @Volatile private var alive = true
+    @Volatile private var debugger: GraalDebug? = null
+
+    fun debug(sourceName: String, request: borg.trikeshed.vm.VmDebugRequest): AutoCloseable = lock.withLock {
+        check(alive && debugger == null) { "Guest is closed or already has a source debugger" }
+        val session = GraalDebug(engine, sourceName, request)
+        debugger = session
+        AutoCloseable {
+            try { session.close() }
+            finally { if (debugger === session) debugger = null }
+        }
+    }
 
     init {
         val ioAccess = fileSystem?.let { fs ->
@@ -317,6 +328,7 @@ class InProcessIsolate(
 
     override fun interrupt(): Boolean {
         if (!alive) return false
+        debugger?.interrupt()
         interrupted.incrementAndGet()
         return try {
             context.interrupt(Duration.ofMillis(INTERRUPT_GRACE_MS))
@@ -340,6 +352,8 @@ class InProcessIsolate(
 
     override fun close() {
         alive = false
+        runCatching { debugger?.close() }
+        debugger = null
         runCatching { listener?.close() }
         runCatching { context.close(true) }
         runCatching { engine.close(true) }

@@ -25,9 +25,12 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.await
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.EventSource
 import org.w3c.dom.HTMLElement
+import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.HTMLTextAreaElement
@@ -171,27 +174,59 @@ fun GraalConsole.boardInit() {
             "<b style=\"color:var(--dim);font-size:10px\">ACE chunk cache receipts (cache-receipt/ · context-receipt/)</b>" +
             "<div id=\"aceRcpts\" style=\"color:var(--dim);font-size:10px;margin:4px 0 8px\">no cache receipts yet — they land when a context chain assembles</div>" +
             "<hr style=\"border:0;border-top:1px solid var(--line);margin:10px 0\">" +
+            "<b style=\"color:var(--dim);font-size:10px\">LCNC runs — retained evidence, not live guest state</b>" +
+            "<div id=\"lcncRcpts\" style=\"font-size:11px;margin:4px 0 8px\"></div>" +
+            "<hr style=\"border:0;border-top:1px solid var(--line);margin:10px 0\">" +
             "<b style=\"color:var(--dim);font-size:10px\">blackboard snapshot</b> <span class=\"x\" style=\"cursor:pointer\" onclick=\"boardRefresh()\">↻</span>" +
             "<pre id=\"boardSnap\" style=\"white-space:pre-wrap;word-break:break-word;color:var(--dim);font-size:10px;margin:4px 0\"></pre>"
 }
 
 fun esc9(s: dynamic): String = Projection.escAll(s0(s))
 
+val boardMutex = Mutex()
+
 fun GraalConsole.boardRefresh() {
     scope.launch {
-        try {
-            val b: dynamic = fetchJson("/blackboard/board")
-            val board: dynamic = orr(b.board, newObject()); val keys = objectKeys(board)
-            (q("cBoard").querySelector("b") as HTMLElement).textContent = keys.size.toString()
-            if (q("boardBody").innerHTML == "") return@launch
-            val sites = keys.filter { it.startsWith("pointcut/") || it.startsWith("pointcut-def/") }
-            q("pcSites").innerHTML = if (sites.isNotEmpty()) sites.take(60).joinToString("<br>") { esc9(it) + " = " + esc9(jsonStringify(board[it])) } else "no pointcut sites on the board yet"
-            val ace = keys.filter { it.startsWith("cache-receipt/") || it.startsWith("context-receipt/") }
-            q("aceRcpts").innerHTML = if (ace.isNotEmpty()) ace.takeLast(40).reversed().joinToString("<br>") { esc9(it) + " = " + esc9(jsonStringify(board[it])) }
-            else "no cache receipts yet — they land when a context chain assembles"
-            q("boardSnap").textContent = jsonIndent(board, 1).take(16000)
-        } catch (_: Throwable) {}
+        try { boardRefreshNow() } catch (_: Throwable) {}
     }
+}
+
+suspend fun GraalConsole.boardRefreshNow() = boardMutex.withLock {
+    val response = fetchResponse("/blackboard/board")
+    if (!response.ok) error("blackboard refresh HTTP " + response.status)
+    val b: dynamic = response.json().await()
+    val board: dynamic = orr(b.board, newObject()); val keys = objectKeys(board)
+    (q("cBoard").querySelector("b") as HTMLElement).textContent = keys.size.toString()
+    if (q("boardBody").innerHTML == "") return@withLock
+    val sites = keys.filter { it.startsWith("pointcut/") || it.startsWith("pointcut-def/") }
+    q("pcSites").innerHTML = if (sites.isNotEmpty()) sites.take(60).joinToString("<br>") { esc9(it) + " = " + esc9(jsonStringify(board[it])) } else "no pointcut sites on the board yet"
+    val ace = keys.filter { it.startsWith("cache-receipt/") || it.startsWith("context-receipt/") }
+    q("aceRcpts").innerHTML = if (ace.isNotEmpty()) ace.takeLast(40).reversed().joinToString("<br>") { esc9(it) + " = " + esc9(jsonStringify(board[it])) }
+    else "no cache receipts yet — they land when a context chain assembles"
+    val runs = keys.filter { it.startsWith("lcnc/run/") }
+    val runTarget = q("lcncRcpts")
+    runTarget.textContent = if (runs.isEmpty()) "No retained LCNC run pointers on this board" else
+        "${runs.size} run pointers · showing up to 32 in board order. A pointer may have a newer receipt later."
+    for (key in runs.takeLast(32).reversed()) {
+        val run: dynamic = board[key]
+        val row = document.createElement("div") as HTMLElement
+        row.style.cssText = "margin:8px 0;overflow-wrap:anywhere"
+        row.textContent = key + " · " + s0(run?.status) + " "
+        runTarget.appendChild(row)
+        fun retained(label: String, cid: dynamic, path: String = "[]") {
+            if (cid == null) return
+            val href = try { borg.trikeshed.web.ConfixNavigation.href(str(cid), path) }
+            catch (_: IllegalArgumentException) { return }
+            val link = document.createElement("a") as org.w3c.dom.HTMLAnchorElement
+            link.href = href; link.textContent = label; link.target = "_blank"; link.rel = "noopener"
+            link.style.cssText = "color:var(--commit);margin-left:8px"
+            row.appendChild(link)
+        }
+        retained("Receipt in Confix", run?.receiptCid, "[\"lcncRun\"]")
+        retained("Program in Confix", run?.programCid)
+        retained("Invocations in Confix", run?.invocationsCid, "[\"entries\"]")
+    }
+    q("boardSnap").textContent = jsonIndent(board, 1).take(16000)
 }
 
 fun GraalConsole.pcAssert() {
@@ -682,6 +717,7 @@ suspend fun productRows(): List<Array<dynamic>> {
 
 var mapTimer: Int? = null
 var mapBusy = false
+val mapMutex = Mutex()
 var mapAgain = false
 var mapUrgent = false
 var heapTimer: Int? = null
@@ -693,22 +729,56 @@ fun GraalConsole.requestMapRefresh() {
     mapUrgent = true; mapTimer?.let { window.clearTimeout(it) }; mapTimer = window.setTimeout({ loadMap() }, 750)
 }
 
-fun GraalConsole.loadMap() { scope.launch { loadMapNow() } }
+fun GraalConsole.sync() {
+    val button = q("cSync") as HTMLButtonElement
+    if (button.disabled) return
+    button.disabled = true; button.setAttribute("aria-busy", "true"); first("cSync").textContent = "Sync…"
+    crumb("sync: reconciling primary worktree…")
+    scope.launch {
+        try {
+            val response = fetchResponse("/api/graal/sync", methodInit("POST"))
+            if (!response.ok) {
+                val failure: dynamic = try { response.json().await() } catch (_: Throwable) { newObject() }
+                error("HTTP " + response.status + ": " + str(orr(failure.error, response.statusText)))
+            }
+            val result: dynamic = response.json().await()
+            loadMapNow()
+            boardRefreshNow()
+            val skipped = orr(result.skippedDirs, js("[]")).unsafeCast<Array<dynamic>>().size +
+                orr(result.skippedFiles, js("[]")).unsafeCast<Array<dynamic>>().size
+            val status = "sync: " + loc(num(orr(result.paths, 0))) + " paths · " + loc(num(orr(result.deleted, 0))) + " deleted" +
+                (if (skipped > 0) " · " + loc(skipped) + " skipped" else "")
+            crumb(status); river("commit", status)
+        } catch (e: Throwable) {
+            val status = "sync failed: " + errText(e)
+            crumb(status); river("deopt", status)
+        } finally {
+            button.disabled = false; button.removeAttribute("aria-busy"); first("cSync").textContent = "Sync"
+        }
+    }
+}
+
+fun GraalConsole.loadMap() {
+    if (mapBusy) { mapAgain = true; return }
+    scope.launch {
+        try { loadMapNow() } catch (e: Throwable) { crumb("map fetch failed: " + errText(e)) }
+    }
+}
 
 suspend fun GraalConsole.loadMapNow() {
-    if (mapBusy) { mapAgain = true; return }
-    mapTimer?.let { window.clearTimeout(it) }; mapUrgent = false; mapBusy = true
-    var mapErr = ""
-    try {
-        val m: dynamic = fetchJson("/api/graal/map")
-        PROJECT_DBS = orr(m.dbs, js("[]")).unsafeCast<Array<String>>().toSet()
-        val prod = productRows()
-        lastRows = orr(m.rows, js("[]")).unsafeCast<Array<dynamic>>() + prod.map { it.asDynamic() }.toTypedArray()
-    } catch (e: Throwable) { mapErr = errText(e) }
-    if (lastRows == null) lastRows = emptyArray()
-    if (lastRows!!.isEmpty()) crumb("map fetch failed: " + mapErr.ifEmpty { "empty" })
-    try { buildAll() } finally {
-        mapBusy = false; mapTimer = window.setTimeout({ loadMap() }, if (mapAgain) 750 else 30000); mapAgain = false
+    mapMutex.withLock {
+        mapTimer?.let { window.clearTimeout(it) }; mapUrgent = false; mapBusy = true
+        try {
+            val response = fetchResponse("/api/graal/map")
+            if (!response.ok) error("map refresh HTTP " + response.status)
+            val m: dynamic = response.json().await()
+            PROJECT_DBS = orr(m.dbs, js("[]")).unsafeCast<Array<String>>().toSet()
+            val prod = productRows()
+            lastRows = orr(m.rows, js("[]")).unsafeCast<Array<dynamic>>() + prod.map { it.asDynamic() }.toTypedArray()
+            buildAll()
+        } finally {
+            mapBusy = false; mapTimer = window.setTimeout({ loadMap() }, if (mapAgain) 750 else 30000); mapAgain = false
+        }
     }
 }
 

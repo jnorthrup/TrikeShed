@@ -2,6 +2,7 @@ package borg.trikeshed.graal.console
 
 import borg.trikeshed.web.AppNav
 import borg.trikeshed.web.MuxIcons
+import borg.trikeshed.landscape.*
 import borg.trikeshed.web.graal.AllocationInspector
 import borg.trikeshed.web.graal.TerrainPainter
 import borg.trikeshed.web.graal.byId
@@ -177,8 +178,9 @@ object GraalConsole {
 
     fun buildAll() {
         val rows = activeRows()
-        if (rows.isEmpty()) return
         buildTree(rows)
+        if (mode == "graph") buildGraph()
+        if (mode == "notion") buildNotion()
         crumb("terrain: " + (if (HEAP_TERRAIN) "JVM heap continent" else "store") +
             " — " + loc(rows.size) + " rows · " + (if (HEAP_TERRAIN) "live-set + allocation, per class" else "documents") +
             " · arrangement: " + ARRANGE + (if (HEAP_TERRAIN) " — x back to store" else " — x for the heap continent"))
@@ -193,12 +195,28 @@ object GraalConsole {
     private val HEAP_ID = Regex("^heap-(live|alloc)/")
 
     fun buildTree(rows: Array<dynamic>) {
+        val previousRoot = root
         classNodes.clear()
         val now = perfNow()
         heat.entries.removeAll { now - it.value >= 120000 }
         val touched = HashMap(heat)
         val built = Terrain.build(terrainRows(rows), ARRANGE == "similarity")
         root = built.root; byIdMap = built.byId; maxSeq = built.maxSeq
+        fun remap(n: TerrainNode?): TerrainNode? {
+            if (n == null) return null
+            if (n === previousRoot) return built.root
+            n.id?.let { return built.byId[it] }
+            var current = built.root
+            for (part in n.path().split('/')) current = current.children[part] ?: return null
+            return current
+        }
+        val selected = sel != null
+        sel = remap(sel); hover = remap(hover); gDrag = null
+        selEdges = if (sel == null) emptyList() else selEdges.mapNotNull { e -> built.byId[e.id]?.let { SelEdge(it, e.kind, e.id) } }
+        window.asDynamic().selEdges = selEdges.map { e -> val o: dynamic = newObject(); o.id = e.id; o.kind = e.kind; o }.toTypedArray()
+        if (selected && sel == null) { hide("doc"); sheetFamily = null; window.asDynamic().sheetCurrentId = null }
+        hubsCache = null
+        graph.nodes.clear(); graph.edges.clear()
         for (r in rows) {
             val id = str(r[0])
             val n = built.byId[id] ?: continue
@@ -249,12 +267,15 @@ object GraalConsole {
     }
 
     fun buildGraph() {
+        val currentRoot = root ?: return
         scope.launch {
-            if (hubsCache == null) hubsCache = try {
+            val hubs = hubsCache ?: try {
                 val d: dynamic = fetchJson("/api/graal/dag")
                 (orr(d.hubs, js("[]"))).unsafeCast<Array<dynamic>>().map { h -> DagHub(h.ids.unsafeCast<Array<String>>().toList(), num(h.degree)) }
             } catch (_: Throwable) { emptyList() }
-            root?.let { graph.build(it, hubsCache!!) }
+            if (root !== currentRoot) return@launch
+            hubsCache = hubs
+            graph.build(currentRoot, hubs)
         }
     }
 
@@ -302,9 +323,10 @@ object GraalConsole {
         map.addEventListener("wheel", { ev ->
             val e = ev as WheelEvent
             e.preventDefault()
-            val f = if (e.deltaY < 0) 1.18 else 1 / 1.18
+            if (e.deltaY == 0.0) return@addEventListener
+            val f = if (e.deltaY < 0) 1.4 else 1 / 1.4
             val wx = cam.ox + e.clientX / cam.s; val wy = cam.oy + e.clientY / cam.s
-            cam.s = min(max(cam.s * f, 0.2), 4000.0)
+            cam.s = min(max(cam.s * f, 0.2), LandscapeNavigation.absoluteZoom)
             cam.ox = wx - e.clientX / cam.s; cam.oy = wy - e.clientY / cam.s
             if (!reduced) {
                 momAx = e.clientX.toDouble(); momAy = e.clientY.toDouble() // glide anchor = wheel point
@@ -320,7 +342,7 @@ object GraalConsole {
                 return@addEventListener
             }
             val n = hit(e.clientX.toDouble(), e.clientY.toDouble())
-            if (n != null) flyTo(if (n.leaf) (n.parent ?: n) else n)
+            if (n != null) flyTo(n)
         })
         map.addEventListener("click", { ev ->
             val e = ev as MouseEvent
@@ -399,7 +421,7 @@ object GraalConsole {
         }
         if (abs(momZv) > 0.0008) {
             val f = exp(momZv * k); val wx = cam.ox + momAx / cam.s; val wy = cam.oy + momAy / cam.s
-            cam.s = min(max(cam.s * f, 0.2), 4000.0)
+            cam.s = min(max(cam.s * f, 0.2), LandscapeNavigation.absoluteZoom)
             cam.ox = wx - momAx / cam.s; cam.oy = wy - momAy / cam.s
             momZv *= 0.88.pow(k)
             if (abs(momZv) <= 0.0008) momZv = 0.0
@@ -409,7 +431,7 @@ object GraalConsole {
     fun flyTo(n: TerrainNode) {
         killMomentum() // the fly animation owns the camera; a live glide would fight it
         val margin = 0.94
-        val s = min(innerWidth / n.w, innerHeight / n.h) * margin
+        val s = min(min(innerWidth / n.w, innerHeight / n.h) * margin, LandscapeNavigation.absoluteZoom)
         val tx = n.x + n.w / 2 - innerWidth / (2 * s); val ty = n.y + n.h / 2 - innerHeight / (2 * s)
         if (reduced) { cam = Camera(s, tx, ty); return }
         val from = Camera(cam.s, cam.ox, cam.oy); val t0 = perfNow()
@@ -573,6 +595,7 @@ object GraalConsole {
     }
 
     private fun bindChrome() {
+        q("cSync").addEventListener("click", { sync() })
         q("qsLink").addEventListener("click", { qsInstall() })
         q("fbLink").addEventListener("click", {
             val coords: dynamic = newObject()

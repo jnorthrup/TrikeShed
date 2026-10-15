@@ -68,6 +68,8 @@ data class LcncPortContract(
          * construction, because there is no list to go stale.
          */
         val optsFrom: String = "",
+        /** Omission differs from an explicit value (including empty text); editors must preserve it. */
+        val optional: Boolean = false,
     )
 }
 
@@ -138,7 +140,7 @@ object LcncContracts {
             outputKinds = mapOf("value" to "json"),
             params = mapOf(
                 "name" to LcncPortContract.LcncParamSpec(ph = "parameter name (trailing ? = optional)"),
-                "default" to LcncPortContract.LcncParamSpec(ph = "value when the caller omits it"),
+                "default" to LcncPortContract.LcncParamSpec(ph = "value when the caller omits it", optional = true),
                 // Progressive typing: a ring parameter is GENERIC until it declares a
                 // kind. Declared ⇒ LcncTypeCheck enforces it like any leaf port; absent
                 // ⇒ the ring accepts any kind (a frame binding is Any?, and pretending
@@ -1088,10 +1090,10 @@ object LcncContracts {
                 "copula" to LcncPortContract.LcncParamSpec(ph = "force every bridged copula", opts = listOf("==>", "<=>")),
             ), isEffect = true),
         LcncPortContract("nars.reteFire", "hypothetical rule evaluation (in-process, no live admission)",
-            listOf("assertions?", "rules?"), listOf("firings", "ruleCid", "ruleCids", "rejected", "rules", "assertions", "hypothetical"),
+            listOf("assertions?", "rules?"), listOf("firings", "ruleCid", "ruleCids", "rejected", "rules", "assertions", "hypothetical", "discount", "evaluation"),
             inputKinds = mapOf("assertions" to "json", "rules" to "json"),
             outputKinds = mapOf("firings" to "json", "ruleCid" to "id", "ruleCids" to "json", "rejected" to "num",
-                "rules" to "json", "assertions" to "json", "hypothetical" to "json"),
+                "rules" to "json", "assertions" to "json", "hypothetical" to "json", "discount" to "num", "evaluation" to "json"),
             params = mapOf(
                 "antecedent" to LcncPortContract.LcncParamSpec(ph = "rule antecedent when no rules are wired"),
                 "consequent" to LcncPortContract.LcncParamSpec(ph = "rule consequent when no rules are wired"),
@@ -1108,12 +1110,12 @@ object LcncContracts {
                 "sheet" to "json", "sheets" to "json", "ruleCandidates" to "json"), isEffect = true),
 
         LcncPortContract("document.sheet", "retained curation cursor page (no NLP or model call)",
-            listOf("receiptCid?", "sentence?", "offset?"), listOf("sheet", "rowCount", "next"),
+            listOf("receiptCid?", "sentence?", "offset?"), listOf("sheet", "rowCount", "next", "receiptCid", "ruleCandidates", "selection"),
             inputKinds = mapOf("receiptCid" to "id", "sentence" to "num", "offset" to "num"),
-            outputKinds = mapOf("sheet" to "json", "rowCount" to "num", "next" to "json"),
+            outputKinds = mapOf("sheet" to "json", "rowCount" to "num", "next" to "json", "receiptCid" to "id", "ruleCandidates" to "json", "selection" to "json"),
             params = mapOf(
                 "receiptCid" to LcncPortContract.LcncParamSpec(ph = "retained curation receipt CID (or wire it)"),
-                "view" to LcncPortContract.LcncParamSpec(v = "sentences", opts = listOf("sentences", "tokens", "dependencies", "proposals")),
+                "view" to LcncPortContract.LcncParamSpec(v = "sentences", opts = listOf("sentences", "tokens", "dependencies", "proposals", "rules")),
                 "sentence" to LcncPortContract.LcncParamSpec(v = "0", ph = "source sentence ordinal for a child cursor"),
                 "offset" to LcncPortContract.LcncParamSpec(v = "0"),
                 "limit" to LcncPortContract.LcncParamSpec(v = "32", ph = "rows per page, 1–128; rowCount names the full cursor"),
@@ -1125,6 +1127,13 @@ object LcncContracts {
             inputKinds = mapOf("receiptCid" to "id"),
             outputKinds = mapOf("tasks" to "json", "completed" to "json", "reopened" to "json",
                 "unchanged" to "json", "ignored" to "json"), isEffect = true),
+        LcncPortContract(DocumentCurationTasks.REVIEW_TASK, "document proposal review (retained seat to TODO card)",
+            listOf("question", "runReceiptCid?", "nodeId?"), listOf("task", "provenance"),
+            inputKinds = mapOf("question" to "text", "runReceiptCid" to "id", "nodeId" to "id"),
+            outputKinds = mapOf("task" to "json", "provenance" to "json"),
+            params = mapOf(
+                "runReceiptCid" to LcncPortContract.LcncParamSpec(ph = "exact completed run receipt CID"),
+                "nodeId" to LcncPortContract.LcncParamSpec(ph = "successful top-level council.seat in that run")), isEffect = true),
         LcncPortContract(DocumentCurationTasks.CORRECT, "document correction (retained source lineage)",
             listOf("source", "taskId?", "expectedRevision?", "priorReceiptCid?"),
             listOf("source", "taskId", "revision", "priorReceiptCid", "instructions"),
@@ -1348,6 +1357,10 @@ object LcncContracts {
             // refusal arrives as a blank `routed` and reads like a route that carried nothing.
             outputKinds = mapOf("routed" to "text", "ok" to "json", "error" to "text", "receipt" to "json"),
             params = mapOf(
+                "authoring" to LcncPortContract.LcncParamSpec(v = "declared", opts = listOf("declared", "native-dsl")),
+                "source" to LcncPortContract.LcncParamSpec(v = "", ta = true,
+                    ph = "Native Java or Groovy RouteBuilder.configure body. Variables: input (messages), id, entry (from). OWN only; unbounded, not sandboxed. Mutually exclusive with route."),
+                "language" to LcncPortContract.LcncParamSpec(v = "java", opts = listOf("java", "groovy")),
                 "route" to LcncPortContract.LcncParamSpec(v = "", ta = true,
                     ph = "Optional Confix route {from,steps}; replaces from/to. Or wire a language function's value to route."),
                 "body" to LcncPortContract.LcncParamSpec(v = "", ta = true,
@@ -1500,7 +1513,7 @@ object LcncContracts {
                 "temperature" to LcncPortContract.LcncParamSpec(v = "0.2"),
                 "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> spend receipt"),
                 "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
-            )),
+            ), isEffect = true),
         LcncPortContract("nars.seat", "NARS seat (curated belief review, no model call)",
             listOf("charge", "choices"), listOf("content", "labeled", "model", "record"),
             cardinality = mapOf("choices" to LcncCardinality.MANY),

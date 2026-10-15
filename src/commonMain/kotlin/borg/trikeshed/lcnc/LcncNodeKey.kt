@@ -121,6 +121,7 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     DOCUMENT_CURATE("document.curate"),
     DOCUMENT_SHEET("document.sheet"),
     DOCUMENT_TASKS(DocumentCurationTasks.TASKS),
+    DOCUMENT_REVIEW_TASK(DocumentCurationTasks.REVIEW_TASK),
     DOCUMENT_CORRECT(DocumentCurationTasks.CORRECT),
     NAL_MINT("nal.mint"),
     NAL_DECAY("nal.decay"),

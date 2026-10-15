@@ -20,7 +20,7 @@ data class PythonWorker(
     val executable: String? = null,
     val pythonHome: String? = null,
     val environment: Map<String, String> = emptyMap(),
-    val arguments: List<String> = emptyList(),
+    val arguments: List<String> = listOf("python"),
     val timeoutMillis: Long = 300_000,
 ) {
     init {

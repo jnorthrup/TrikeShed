@@ -130,7 +130,7 @@ def bind_runtime(runtime, auxiliary):
                 return original(requested=requested, explicit_api_key=explicit_api_key,
                                 explicit_base_url=explicit_base_url, target_model=target_model)
             runtime._raise_if_provider_disabled(PROVIDER)
-            if explicit_api_key or explicit_base_url not in (None, "", BASE_URL):
+            if explicit_api_key not in (None, "", "no-key-required") or explicit_base_url not in (None, "", BASE_URL):
                 raise ValueError("ModelMux credentials and destinations are host-owned")
             select_model(target_model)
             return dict(provider=PROVIDER, requested_provider=PROVIDER, api_mode="chat_completions",
@@ -154,7 +154,7 @@ def bind_runtime(runtime, auxiliary):
             if options.get("api_mode") not in (None, "", "chat_completions"):
                 raise ValueError("ModelMux exposes chat completions")
             runtime._raise_if_provider_disabled(PROVIDER)
-            if options.get("explicit_api_key") or options.get("explicit_base_url") not in (None, "", BASE_URL):
+            if options.get("explicit_api_key") not in (None, "", "no-key-required") or options.get("explicit_base_url") not in (None, "", BASE_URL):
                 raise ValueError("ModelMux credentials and destinations are host-owned")
             model = select_model(options.get("model"), vision=bool(options.get("is_vision")))
             return create_client(), model

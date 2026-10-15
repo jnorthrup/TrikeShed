@@ -3,6 +3,7 @@ package borg.trikeshed.vm
 import borg.trikeshed.lib.*
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.parse.jsonOf
+import kotlinx.coroutines.ensureActive
 
 /** Authoring language is distinct from the host-access facet called JVM. */
 enum class VmLanguage(val id: String, val label: String, val runtime: VmLanguageRuntime, val facet: VmFacet?) {
@@ -265,12 +266,28 @@ data class VmLanguageProgram(
         }
     }
 
-    fun evaluate(handle: VmHandle, input: Teleported, name: String, budget: VmBudget = VmBudget()): Teleported {
+    fun evaluate(handle: VmHandle, input: Teleported, name: String, budget: VmBudget = VmBudget(),
+                 debug: VmDebugRequest? = null): Teleported {
         require(handle.facet == language.facet) { "VM facet does not match ${language.label}" }
+        require(debug == null || language.facet != VmFacet.JVM && handle.sourceDebugging) {
+            "Source debugging is unavailable for ${language.label} on ${handle.tier}; no guest code executed"
+        }
         inputKind.validate(input)
+        debug?.context?.ensureActive()
         handle.eval(declaration(budget, name), name)
+        debug?.context?.ensureActive()
         val argument = if (language == VmLanguage.PYTHON) Teleported.Str(input.canonical()) else input
-        return outputKind.validate(handle.call(ROOT, argument))
+        val session = debug?.let { handle.debug(name, it) }
+        try {
+            val result = outputKind.validate(handle.call(ROOT, argument))
+            debug?.context?.ensureActive()
+            return result
+        } catch (failure: Throwable) {
+            // A Truffle kill becomes a guest exception; retain the owning caller's cancellation.
+            debug?.context?.ensureActive()
+            throw failure
+        }
+        finally { session?.close() }
     }
 
     companion object { const val ROOT = "lcnc_polyglot" }

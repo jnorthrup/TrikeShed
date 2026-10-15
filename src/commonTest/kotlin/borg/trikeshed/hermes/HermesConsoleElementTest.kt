@@ -113,6 +113,71 @@ class HermesConsoleElementTest {
     }
 
     @Test
+    fun resetWaitsForTheAdmittedTurnAndDrainJoinsTheFollowingCommand() = runTest {
+        val turnRelease = CompletableDeferred<Unit>()
+        val resetRelease = CompletableDeferred<Unit>()
+        val events = mutableListOf<String>()
+        val failures = mutableListOf<Throwable>()
+        val element = HermesConsoleElement(this, open = {}, execute = {
+            events += "${it.input}:started"
+            if (it.input == "first") turnRelease.await()
+            events += "${it.input}:finished"
+        }, reset = { resume ->
+            events += "reset:$resume:started"
+            resetRelease.await()
+            events += "reset:$resume:finished"
+        }, failed = { _, failure -> failures += failure }, capacity = 2)
+        try {
+            assertTrue(element.submit(command("first")))
+            runCurrent()
+            assertTrue(element.reset(resume = false))
+            assertTrue(element.submit(command("next")))
+            assertFalse(element.reset(), "Reset must share the bounded command lane")
+            val drained = async { element.drain() }
+            runCurrent()
+            assertFalse(drained.isCompleted)
+            assertFalse(element.reset())
+            assertFalse(element.submit(command("late")))
+            assertEquals(listOf("first:started"), events)
+
+            turnRelease.complete(Unit)
+            runCurrent()
+            assertFalse(drained.isCompleted, "Drain must also join the reset operation")
+            assertEquals(listOf("first:started", "first:finished", "reset:false:started"), events)
+            resetRelease.complete(Unit)
+            drained.await()
+            assertEquals(listOf("first:started", "first:finished", "reset:false:started",
+                "reset:false:finished", "next:started", "next:finished"), events)
+            assertTrue(failures.isEmpty())
+            assertFalse(element.reset())
+        } finally {
+            turnRelease.complete(Unit)
+            resetRelease.complete(Unit)
+            element.drain()
+        }
+    }
+
+    @Test
+    fun failedResetReportsNoCommandAndAllowsTheFollowingTurn() = runTest {
+        val failure = IllegalStateException("reset failed")
+        val events = mutableListOf<String>()
+        val failedCommands = mutableListOf<ManualMediaInput?>()
+        val failures = mutableListOf<Throwable>()
+        val element = HermesConsoleElement(this, open = {}, execute = { events += it.input },
+            reset = { resume -> assertTrue(resume); events += "reset"; throw failure },
+            failed = { command, cause -> failedCommands += command; failures += cause; events += "failed" })
+        try {
+            assertTrue(element.reset())
+            assertTrue(element.submit(command("next")))
+            element.drain()
+            assertEquals(listOf("reset", "failed", "next"), events)
+            assertEquals(listOf<ManualMediaInput?>(null), failedCommands)
+            assertSame(failure, failures.single())
+            assertFalse(element.reset())
+        } finally { element.drain() }
+    }
+
+    @Test
     fun parentCancellationReportsUnfinishedCommandsAndClosesAdmission() = runTest {
         val owner = SupervisorJob(coroutineContext[Job])
         val failed = mutableListOf<String?>()

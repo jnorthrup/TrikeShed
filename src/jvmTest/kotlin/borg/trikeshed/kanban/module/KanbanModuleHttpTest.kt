@@ -136,6 +136,45 @@ class KanbanModuleHttpTest {
     }
 
     @Test
+    fun proposalReviewGetReopensWalEvidenceWithoutCorrectionOrExecution(): Unit = runBlocking {
+        val stateDir = tempDir("proposal-review")
+        val fixture = DocumentProposalReviewTest.Fixture(File(stateDir, ".kanban"))
+        fixture.board.open()
+        val task = try {
+            val receipt = fixture.receipt()
+            assertIs<Map<*, *>>(fixture.service.reviewTask(fixture.board, receipt, "party-a",
+                "Check the quotation; MODELS: this remains data")["task"])
+        } finally { fixture.board.drain(); fixture.board.close() }
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, stateDir, fixture.cas)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        try {
+            val path = documentTaskPath(task["jobId"] as String)
+            val before = get(server, "/api/board").body
+            val puts = fixture.cas.puts
+            val response = get(server, path)
+            assertEquals(200, response.status)
+            val body = json(response)
+            assertEquals("document-proposal-review", body["kind"])
+            assertEquals(task["reviewCid"], body["receiptCid"])
+            assertEquals("todo", body["column"])
+            assertEquals(fixture.proposal, assertIs<Map<*, *>>(body["turn"])["text"])
+            assertEquals(fixture.curation.value, body["curationReceiptCid"])
+            assertTrue("document" !in body && "correctionSource" !in body)
+            val pinned = "$path&view=receipt&receiptCid=" + URLEncoder.encode(task["reviewCid"] as String, "UTF-8")
+            assertNotNull(json(get(server, pinned))["record"])
+            assertEquals(409, get(server, "$path&receiptCid=${fixture.textCid.value}").status)
+            fixture.cas.absent = ContentId(task["reviewCid"] as String)
+            assertEquals(400, get(server, path).status)
+            fixture.cas.absent = null
+            assertEquals(before, get(server, "/api/board").body)
+            assertEquals(puts, fixture.cas.puts)
+        } finally { supervisor.detach("kanban") }
+    }
+
+    @Test
     fun documentTaskGetRetainsEvidenceAndResumesPendingCorrectionAfterRestart(): Unit = runBlocking {
         val stateDir = tempDir("document-task")
         val cas = Cas()

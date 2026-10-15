@@ -43,6 +43,52 @@ import kotlin.test.assertTrue
 
 class DocumentCurationLegosTest {
     @Test
+    fun retainedRulePagesPreserveCandidateIdentityPolarityAndSelection() {
+        val text = "x"
+        val textCid = ContentId.of(text.encodeToByteArray())
+        val source = DocumentSource(textCid, textCid, text, "retained-rules", "text/plain", "rules")
+        val nlp = NlpDocument(text, s_[NlpSentence(0, 0, 1,
+            s_[NlpToken(1, 0, 1, text, text, "NN", "O")], s_[NlpDependency(0, 1, "root")])])
+        // Persisted candidate rows: this verifies projection, not parser recognition.
+        val axioms = listOf(900L to 0L, 0L to 900L, 0L to 700L).map { (positive, negative) ->
+            val rule = borg.trikeshed.narsese.EternalRule("Delays", "cancellations",
+                borg.trikeshed.narsese.NalCopula.IMPLICATION,
+                borg.trikeshed.narsese.EvidenceCoord(positive, negative), textCid.value)
+            borg.trikeshed.narsese.NlpcoreAxiom(0, 0, 1, "Delays", "cause", "cancellations", 0.9f, rule)
+        }.toSeries()
+        val record = DocumentCurationRecord(source, nlp, null, "fixture", emptySeriesOf(), emptySeriesOf(), axioms = axioms)
+        val bytes = DocumentCuratorCodec.encode(record)
+        val cid = ContentId.of(bytes)
+        val candidates = borg.trikeshed.narsese.DocumentCurationFacts.ruleCandidates(record)
+        val page = DocumentCurationLegos.sheet(cid, record, "rules", 0, 0, 1,
+            s_[s_["positiveEvidence"]], s_[0 j 1])
+        assertEquals(cid.value, page["receiptCid"])
+        assertEquals(3, page["rowCount"])
+        assertEquals(listOf(candidates[1]), page["ruleCandidates"])
+        val sheet = page["sheet"] as Map<*, *>
+        assertEquals("document/${cid.value}/rules", sheet["id"])
+        assertEquals(2, sheet["selectedRows"])
+        assertEquals(listOf(1), sheet["sourceOrdinals"])
+        assertTrue((sheet["notice"] as String).contains("not admitted"))
+        val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery((sheet["nextHref"] as String).substringAfter('?'))
+        val next = DocumentCurationLegos.sheet(cid, record, query)
+        assertEquals(listOf(candidates[2]), next["ruleCandidates"])
+        assertNull(next["next"])
+        assertEquals(listOf(2), (next["sheet"] as Map<*, *>)["sourceOrdinals"])
+        val exhausted = DocumentCurationLegos.sheet(cid, record, "rules", 0, Int.MAX_VALUE, 32)
+        assertEquals(emptyList<Any?>(), exhausted["ruleCandidates"])
+        for (unavailable in listOf(record.copy(axioms = emptySeriesOf()), record.copy(nlp = null),
+                record.copy(reasons = s_["source CID mismatch"]))) {
+            val empty = DocumentCurationLegos.sheet(ContentId.of(DocumentCuratorCodec.encode(unavailable)),
+                unavailable, "rules", 0, 0, 32)
+            assertEquals(0, empty["rowCount"])
+            assertEquals(emptyList<Any?>(), empty["ruleCandidates"])
+            assertEquals(sheet["columns"], (empty["sheet"] as Map<*, *>)["columns"])
+        }
+        assertContentEquals(bytes, DocumentCuratorCodec.encode(record))
+    }
+
+    @Test
     fun retainedTupleIndexesIntersectWithoutFlatteningOrChangingProposals() {
         for (name in listOf("synthetic-medical-review", "synthetic-legal-review")) {
             val text = "λ source"

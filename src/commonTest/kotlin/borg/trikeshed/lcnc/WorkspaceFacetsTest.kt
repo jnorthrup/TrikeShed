@@ -8,6 +8,18 @@ import borg.trikeshed.parse.confix.*
 import kotlin.test.*
 
 class WorkspaceFacetsTest {
+    @Test fun retainedProposalReviewRequiresAnExplicitQuestionAndBoardEffect() {
+        val name = "preset-document-proposal-review"
+        val source = assertNotNull(LcncWorkspacePresets.documents()[name], "Retained AI output needs a review handoff")
+        val program = LcncProgramConfix.fromJson(name, source)
+        assertTrue(program.controls.humanOversight)
+        assertEquals("", program.nodes.view.single { it.id == "question" }.params["value"])
+        assertEquals(listOf("document.reviewTask"), program.nodes.view.map { it.type }
+            .filter { LcncFacts.of(LcncContracts.all()).isEffect(it) })
+        assertTrue(LcncTypeCheck.check(program).isEmpty())
+        assertEquals(1, program.wires.view.count { it.fromNode == "question" && it.toNode == "task" && it.toPort == "question" })
+    }
+
     val source = """{"nodes":[{"id":"雪","params":{"text":"a\\b","value":null}}],"wires":[]}"""
 
     fun inspections(bytes: ByteArray, syntax: Syntax, path: Series<Any> = emptySeriesOf(),
@@ -193,11 +205,55 @@ class WorkspaceFacetsTest {
         assertTrue((empty["rows"] as List<*>).isEmpty())
     }
 
+    @Test fun retainedDeliberationIsAnExplicitModelConstructionWithoutAdmissionOrActuation() {
+        val name = "preset-document-deliberation"
+        val doc = assertNotNull(LcncWorkspacePresets.documents()[name], "The retained evidence needs an authored council construction")
+        val program = LcncProgramConfix.fromJson(name, doc)
+        assertTrue(program.controls.humanOversight)
+        assertTrue(LcncTypeCheck.check(program).isEmpty(), LcncTypeCheck.check(program).joinToString { it.render() })
+        val seats = program.nodes.view.filter { it.type == "council.seat" }
+        assertEquals(listOf("party-a", "party-b", "reviewer"), seats.map { it.id })
+        val facts = LcncFacts.of(LcncContracts.all())
+        assertTrue(facts.isEffect("council.seat"), "A model request is an effect, not a pure transform")
+        assertEquals(setOf("council.seat"), program.nodes.view.filter { facts.isEffect(it.type) }.map { it.type }.toSet())
+        assertTrue(seats.view.all { it.params.getValue("system").contains("not observations or votes") })
+        assertTrue(program.wires.view.any { it.fromNode == "sheet" && it.toNode == "evidence-prompt" && it.fromPort == "sheet" })
+        assertTrue(program.wires.view.any { it.fromNode == "simulation" && it.toNode == "simulation-prompt" && it.fromPort == "evaluation" })
+        assertTrue(program.wires.view.none { it.toNode == "simulation" && it.fromNode in seats.map { s -> s.id } })
+        for (prompt in program.nodes.view.filter { it.type == PromptNodes.RENDER }.view) {
+            assertTrue(program.wires.view.any { it.toNode == prompt.id && it.toPort == "template" })
+        }
+        val unwired = LcncProgram("unwired-seat", s_[
+            LcncNode("text", "text.value", mapOf("value" to "review"), x = 100.0, y = 100.0),
+            LcncNode("seat", "council.seat", x = 200.0, y = 100.0),
+        ], emptySeriesOf())
+        assertTrue(LcncTreeShake.shake(unwired).made.isEmpty(), "Tree shake must not auto-connect a model effect")
+    }
+
+    @Test fun retainedSimulationPinsEvidenceAndRequiresExplicitAssumptions() {
+        val assertions = listOf(mapOf("subject" to "Delays", "obj" to "reviewer"))
+        val program = LcncWorkspacePresets.simulation("sha256:retained", assertions)
+        assertTrue(program.controls.humanOversight)
+        assertTrue(LcncTypeCheck.check(program).isEmpty())
+        assertEquals(setOf("document.sheet", "sheet.concentric", "json.value", "nars.reteFire", "display", "note"),
+            program.nodes.view.map { it.type }.toSet())
+        val sheet = program.nodes.view.single { it.type == "document.sheet" }
+        assertEquals("sha256:retained", sheet.params["receiptCid"])
+        assertEquals("rules", sheet.params["view"])
+        assertEquals("32", sheet.params["limit"])
+        assertEquals(assertions, reify(program.nodes.view.single { it.id == "assumptions" }.params.getValue("value")))
+        assertEquals(emptyList<Any?>(), reify(LcncWorkspacePresets.simulation().nodes.view
+            .single { it.id == "assumptions" }.params.getValue("value")))
+        assertTrue(program.wires.view.any { it.fromNode == "sheet" && it.fromPort == "ruleCandidates" && it.toPort == "rules?" })
+        assertTrue(program.nodes.view.single { it.type == "note" }.params.getValue("text").contains("Only the selected rules page"))
+    }
+
     @Test fun domainPresetsReuseCuratorWithoutAutomaticRuleAdmission() {
         for ((name, json) in LcncWorkspacePresets.documents()) {
             val p = LcncProgramConfix.fromJson(name, json)
             assertTrue(LcncTypeCheck.check(p).isEmpty(), "$name: ${LcncTypeCheck.check(p)}")
-            if (name != LcncWorkspacePresets.POLYGLOT) {
+            if (name in setOf(LcncWorkspacePresets.MEDICAL, LcncWorkspacePresets.LEGAL,
+                    LcncWorkspacePresets.DOCUMENT_REVIEW, LcncWorkspacePresets.DOCUMENT_CORRECTION)) {
                 assertEquals(if (name == LcncWorkspacePresets.DOCUMENT_REVIEW) 0 else 1,
                     p.nodes.view.count { it.type == "document.curate" })
                 assertTrue(p.controls.humanOversight)

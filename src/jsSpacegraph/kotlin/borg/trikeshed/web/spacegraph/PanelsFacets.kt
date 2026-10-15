@@ -20,8 +20,11 @@ class PanelsFacets(val panels: Panels) {
     var cursorCid: String? = null
     var storedId: String? = null
     var storedRev: String? = null
+    var contentCid: String? = null
+    var fileTreeFacet = false
     var storageOffset = 0
     var storage: dynamic = null
+    var compressionDictionary = ""
 
     fun install() {
         val anchor = byId("rdfBtn") ?: return
@@ -33,7 +36,8 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun changed() {
-        if (drawer != null && storedId == null) drawer.querySelector("[data-state]").textContent = "Canvas changed — refresh to inspect this version"
+        if (drawer != null && (tab != "confix" || storedId == null && contentCid == null))
+            drawer.querySelector("[data-state]").textContent = "Canvas changed — refresh to inspect this version"
         revision++
         cursorPath = "[]"; cursorSelections = emptyMap(); cursorOffset = 0; groupOffset = 0; cursorCid = null
     }
@@ -55,9 +59,18 @@ class PanelsFacets(val panels: Panels) {
 
     fun close() { revision++; drawer?.remove(); drawer = null; body = null }
 
+    /** Switch only the inspection source, never the authored canvas or run state. */
+    fun inspectContent(cid: String, selectedPath: Array<out Any> = emptyArray()) {
+        contentCid = cid; storedId = null; storedRev = null; fileTreeFacet = false; storageOffset = 0
+        path = JSON.stringify(selectedPath); offset = 0; cursorAxes = "[[2]]"
+        changed()
+        if (drawer == null) { tab = "confix"; toggle() } else show("confix")
+    }
+
     fun show(selected: String) {
         tab = selected
         val serial = ++revision
+        drawer.querySelector("[data-state]").textContent = "Read-only inspection · no graph execution"
         body.textContent = "Reading workspace…"
         launchJs {
             try {
@@ -88,13 +101,15 @@ class PanelsFacets(val panels: Panels) {
                 }
             } catch (e: CancellationException) { throw e } catch (e: dynamic) {
                 if (serial == revision && body != null) {
-                    body.textContent = "Inspection failed: " + str(e)
+                    drawer.querySelector("[data-state]").textContent = "Inspection unavailable — no source substituted"
+                    body.textContent = "Inspection failed: " + failureText(e)
                     button("Reset inspection") {
                         path = "[]"; offset = 0; cursorAxes = "[[2]]"
+                        fileTreeFacet = false
                         changed(); show("confix")
                     }
-                    if (storedId != null) button("Inspect canvas") {
-                        storedId = null; storedRev = null; storageOffset = 0
+                    if (storedId != null || contentCid != null) button("Inspect canvas") {
+                        storedId = null; storedRev = null; contentCid = null; storageOffset = 0
                         path = "[]"; offset = 0; changed(); show("confix")
                     }
                 }
@@ -105,8 +120,11 @@ class PanelsFacets(val panels: Panels) {
     suspend fun inspect(serial: Int, selected: String) {
         val request = objOf {
             it.name = str(panels.panelName().value).ifBlank { "canvas" }
-            if (storedId != null && selected == "confix") it.source = objOf { s ->
+            if (contentCid != null && selected == "confix") it.source = objOf { s ->
+                s.kind = "cas"; s.cid = contentCid
+            } else if (storedId != null && selected == "confix") it.source = objOf { s ->
                 s.kind = "couch"; s.id = storedId; s.rev = storedRev
+                if (fileTreeFacet) s.facet = "file-tree"
             } else it.document = panels.toConfix()
             it.path = JSON.parse(if (selected == "execution") "[]" else path); it.offset = offset; it.limit = 32
             it.cursor = objOf { q ->
@@ -118,12 +136,16 @@ class PanelsFacets(val panels: Panels) {
         val r = fetchJson("/api/lcnc/workspace", jsonInit("POST", JSON.stringify(request)))
         if (serial != revision || drawer == null) return
         if (truthy(r.error)) error(str(r.error))
-        drawer.querySelector("[data-state]").textContent = (if (r.source != null) "Stored Couch revision · " + str(r.source.rev)
-            else "Inspected this canvas") + " · blackboard revision " + str(r.blackboardRevision)
+        drawer.querySelector("[data-state]").textContent = when {
+            r.source?.kind == "cas" -> "Retained JSON · " + str(r.source.cid)
+            r.source != null -> "Stored Couch revision · " + str(r.source.rev)
+            else -> "Inspected this canvas"
+        } + " · blackboard revision " + str(r.blackboardRevision)
         body.innerHTML = ""
         if (selected == "execution") {
             text("Program identity: " + str(r.programCid))
             nodeEvidence()
+            text("Bindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.")
             for (binding in arr(r.bindings)) text(str(binding.id) + " · " + str(binding.type) + " · " + str(binding.binding) +
                 "\nContext: " + str(binding.context.key ?: binding.context.role) +
                 (if (arr(binding.requiredKeys).isEmpty()) "" else "\nServices: " + arr(binding.requiredKeys).joinToString(", ") { str(it) }))
@@ -137,10 +159,19 @@ class PanelsFacets(val panels: Panels) {
             return
         }
         sources()
-        if (r.source != null) {
+        if (r.source?.kind == "cas") {
+            require(r.source.cid == contentCid && r.confix?.cid == contentCid) { "Retained inspection identity mismatch" }
+            text("Exact retained JSON bytes, not live state. Missing paths and omission markers are not empty outputs or proof of execution. Inspection leaves the canvas unchanged.")
+            try { link("Pinned Confix link (content and path)", ConfixNavigation.href(requireNotNull(contentCid), path)) }
+            catch (_: IllegalArgumentException) { text("Selected path exceeds the link budget; inspection remains available.") }
+            if (truthy(panels.graph.controls?.inspectionOnly))
+                link("Open Panels editor (saved scratch)", "/panels")
+            button("Back to execution evidence") { show("execution") }
+        } else if (r.source != null) {
             text(str(r.source.id) + " · revision " + str(r.source.rev) + " · sequence " + str(r.source.sequence))
             text("This is the indexed revision, not a claim that the live Couch head is unchanged. Inspecting it does not change the canvas.")
             if (truthy(r.source.deleted)) { text("Tombstone — this revision has no document body. Earlier revisions remain selectable."); return }
+            fileTree(r)
         }
         val c = r.confix
         cursorCid = str(c.cid)
@@ -172,6 +203,42 @@ class PanelsFacets(val panels: Panels) {
             val violations = arr(r.violations)
             text(if (violations.isEmpty()) "No reported type violations. This is inspection, not an execution result."
                 else "Type diagnostics\n" + violations.joinToString("\n") { str(it) })
+        }
+    }
+
+    fun fileTree(response: dynamic) {
+        val tree = response.fileTree ?: return
+        text("Published VM file tree · " + str(tree.cid) + " · " + str(tree.bytes) + " metadata bytes")
+        text("Paths and extents belong to this published revision, not the live guest. Metadata inspection does not read or verify file payloads, restore a world, or claim kernel Btrfs compatibility.")
+        fun select(tree: Boolean) {
+            fileTreeFacet = tree; path = if (tree) "[\"entries\"]" else "[]"; offset = 0
+            changed(); show("confix")
+        }
+        if (fileTreeFacet) button("Inspect publication document") { select(false) }
+        else if (truthy(tree.indexed)) button("Inspect indexed file tree") { select(true) }
+        else if (num(tree.bytes) > num(tree.byteLimit)) text("File-tree metadata exceeds the 1 MiB indexing limit.")
+        else button("Index published file tree") {
+            val source = objOf { it.kind = "couch"; it.id = response.source.id; it.rev = response.source.rev }
+            val dictionary = compressionDictionary.trim()
+            val serial = ++revision
+            body.textContent = "Indexing this immutable file-tree manifest…"
+            launchJs {
+                try {
+                    val receipt = fetchJson("/api/lcnc/workspace", jsonInit("PUT", JSON.stringify(objOf {
+                        it.action = "index-file-tree"; it.source = source
+                        if (dictionary.isNotEmpty()) it.dictionaryCid = dictionary
+                    })))
+                    if (serial != revision || drawer == null) return@launchJs
+                    if (truthy(receipt.error)) error(str(receipt.error))
+                    panels.status("File-tree metadata indexed. Couch and guest files unchanged.")
+                    select(true)
+                } catch (e: CancellationException) { throw e } catch (e: dynamic) {
+                    if (serial == revision && drawer != null) {
+                        body.textContent = "File-tree indexing failed: " + str(e)
+                        button("Inspect publication") { select(false) }
+                    }
+                }
+            }
         }
     }
 
@@ -268,7 +335,7 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun sources() {
-        text("Source · canvas or indexed Couch revision")
+        text("Source · canvas, retained JSON or indexed Couch revision")
         val select = document.createElement("select").asDynamic()
         select.setAttribute("aria-label", "Confix source")
         select.style.cssText = "max-width:100%;font:inherit"
@@ -285,35 +352,67 @@ class PanelsFacets(val panels: Panels) {
         if (storedId != null && selected == "canvas") {
             option("pinned", storedId + " · " + storedRev + " (another page)"); selected = "pinned"
         }
+        if (contentCid != null) {
+            option("content", "Retained JSON · " + contentCid); selected = "content"
+        }
         select.value = selected; body.appendChild(select)
         on(select, "change", {
             val value = str(select.value)
-            if (value != "pinned") {
+            if (value != "pinned" && value != "content") {
                 val entry = value.toIntOrNull()?.let { revisions[it] }
                 storedId = if (entry == null) null else str(entry.id)
                 storedRev = if (entry == null) null else str(entry.rev)
+                contentCid = null
+                fileTreeFacet = false
                 path = "[]"; offset = 0; changed(); show("confix")
             }
         })
+        val content = document.createElement("input").asDynamic()
+        content.setAttribute("aria-label", "Retained JSON content ID")
+        content.placeholder = "sha256:… from a run receipt or frozen program"
+        content.value = contentCid ?: ""
+        content.style.cssText = "display:block;width:100%;box-sizing:border-box;font:inherit;margin-top:8px"
+        body.appendChild(content)
+        button("Inspect retained JSON") {
+            val cid = str(content.value).trim()
+            if (Regex("sha256:[0-9a-f]{64}").matches(cid)) inspectContent(cid)
+            else panels.status("Use a complete sha256 content ID")
+        }
         if (!truthy(storage?.available)) {
             text("Dense Couch indexing is unavailable on this host." + if (truthy(storage?.error)) "\n" + str(storage.error) else "")
             return
         }
         text(str(storage.indexedRevisions) + " indexed revisions / " + str(storage.sourceRevisions) +
             " Couch revisions. Indexing writes a separate dense projection; it does not replace Couch, run a graph, or change checkpoints.")
+        text("Zstd leaf compression · blank dictionary uses the portable codec. This choice applies only to the next batch; historical files retain their own dictionary identities.")
+        val dictionary = document.createElement("input").asDynamic()
+        dictionary.setAttribute("aria-label", "Zstd dictionary CID")
+        dictionary.placeholder = "Optional sha256:… dictionary already in daemon CAS"
+        dictionary.style.cssText = "width:100%;box-sizing:border-box;font:inherit"
+        dictionary.disabled = !truthy(storage.compression?.dictionaryAvailable)
+        dictionary.value = compressionDictionary
+        body.appendChild(dictionary)
+        on(dictionary, "input", { compressionDictionary = str(dictionary.value) })
+        button("Use dictionary-free Zstd") { compressionDictionary = ""; dictionary.value = "" }
+        if (truthy(dictionary.disabled)) text("Dictionary compression is unavailable on this host; only dictionary-free batches are supported.")
+        else text("Publish trained or raw-content dictionary bytes through the existing Couch CAS route. Retain the blob for the lifetime of its indexed revisions.")
         if (storageOffset > 0) button("Newer revisions") { storageOffset = maxOf(0, storageOffset - 32); show("confix") }
         if (storage.next != null) button("Older revisions") { storageOffset = num(storage.next).toInt(); show("confix") }
         button("Index next 32 Couch revisions") {
+            val selectedDictionary = compressionDictionary.trim()
             val serial = ++revision
             body.textContent = "Indexing one bounded batch…"
             launchJs {
                 try {
                     val receipt = fetchJson("/api/lcnc/workspace", jsonInit("PUT", JSON.stringify(objOf {
                         it.action = "index-couch"; it.limit = 32
+                        if (selectedDictionary.isNotEmpty()) it.dictionaryCid = selectedDictionary
                     })))
                     if (serial != revision || drawer == null) return@launchJs
                     if (truthy(receipt.error)) error(str(receipt.error))
-                    panels.status(str(receipt.imported) + " revisions indexed; " + str(receipt.remaining) + " remain. Couch source unchanged.")
+                    val usedDictionary = receipt.compression?.dictionaryCid
+                    panels.status(str(receipt.imported) + " revisions indexed; " + str(receipt.remaining) + " remain. " +
+                        (if (usedDictionary != null) "Dictionary: " + str(usedDictionary) else "Dictionary-free Zstd") + ". Couch source unchanged.")
                     storageOffset = 0; show("confix")
                 } catch (e: CancellationException) { throw e } catch (e: dynamic) {
                     if (serial == revision && drawer != null) {
@@ -392,17 +491,18 @@ class PanelsFacets(val panels: Panels) {
     fun languages(catalog: dynamic) {
         body.innerHTML = ""
         text("Typed functions receive input as data and return Confix values. Each invocation releases its guest. Wire value into Camel messages for a payload transform, or into Camel route to author endpoints and steps. Route definitions are data, not native Camel DSL.")
+        text("Native Java and Groovy Camel DSL compile actual RouteBuilder bodies, with their own compiler/module availability. These run OWN-trust host code without time or call limits; they do not require the GraalJS function adapter.")
         text("Load a language-and-route construction for review to replace this canvas without running it. Undo restores the previous canvas. The local route carries data only; its review label is not an approval.")
         val runners = arr(catalog.runners).map { str(it) }
         for (language in arr(catalog.languages)) {
-            text(str(language.label) + " · " + (if (truthy(language.available)) "available" else "unavailable") + "\n" + str(language.note))
+            text(str(language.label) + " functions · " + (if (truthy(language.available)) "available" else "unavailable") + "\n" + str(language.note))
             if (truthy(language.available) && "vm.polyglot" in runners) button("Place " + str(language.label) + " function") {
                 place("vm.polyglot", language.params)
             }
             val construction = language.construction
             if (truthy(language.available) && truthy(construction?.document) && "vm.polyglot" in runners && "vm.camel" in runners)
                 button("Load " + str(language.label) + " + Camel for review") {
-                    panels.load(fromConfix(construction.document))
+                    if (!panels.load(fromConfix(construction.document))) return@button
                     panels.panelName().value = str(construction.name).removePrefix("preset-")
                     panels.status(str(language.label) + " + Camel loaded without execution — edit the input or function, then choose Run")
                     close()
@@ -410,11 +510,31 @@ class PanelsFacets(val panels: Panels) {
             val route = language.routeConstruction
             if (truthy(language.available) && truthy(route?.document) && "vm.polyglot" in runners && "vm.camel" in runners)
                 button("Author Camel route in " + str(language.label)) {
-                    panels.load(fromConfix(route.document))
+                    if (!panels.load(fromConfix(route.document))) return@button
                     panels.panelName().value = str(route.name).removePrefix("preset-")
                     panels.status(str(language.label) + " route authoring loaded without execution — inspect endpoints and steps, then choose Run")
                     close()
                 }
+            val native = language.nativeConstruction
+            val documentRoute = language.documentRoutingConstruction
+            if (truthy(language.available) && truthy(documentRoute?.document))
+                button("Retained document route in " + str(language.label)) {
+                    if (!panels.load(fromConfix(documentRoute.document))) return@button
+                    panels.panelName().value = str(documentRoute.name).removePrefix("preset-")
+                    panels.status("Document routing loaded without execution — supply a retained receipt and review page, assumptions and source before Run")
+                    close()
+                }
+            if (native != null) {
+                text("Native " + str(language.label) + " Camel DSL · " +
+                    (if (truthy(native.available)) "available" else "unavailable") + "\n" + str(native.note))
+                if (truthy(native.available) && truthy(native.document) && "vm.camel" in runners)
+                    button("Native " + str(language.label) + " Camel DSL") {
+                        if (!panels.load(fromConfix(native.document))) return@button
+                        panels.panelName().value = str(native.name).removePrefix("preset-")
+                        panels.status("Native " + str(language.label) + " Camel DSL loaded without execution — inspect OWN-trust source and inputs, then choose Run")
+                        close()
+                    }
+            }
         }
         if ("vm.camel" in runners) button("Place Camel route") { place("vm.camel", obj()) }
         if ("vm.camel.catalog" in runners) button("Place Camel catalog") { place("vm.camel.catalog", obj()) }
@@ -431,7 +551,7 @@ class PanelsFacets(val panels: Panels) {
             text(str(recipe.title) + "\n" + str(recipe.does) + "\nNeeds: " + str(recipe.needs))
             button("Load for review") {
                 if (truthy(recipe.document)) {
-                    panels.load(fromConfix(recipe.document))
+                    if (!panels.load(fromConfix(recipe.document))) return@button
                     panels.panelName().value = str(recipe.name).removePrefix("preset-")
                     panels.status(str(recipe.title) + " loaded without execution — " + str(recipe.tweakFirst))
                     close()
@@ -441,6 +561,7 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun place(type: String, params: dynamic) {
+        if (panels.contract(type) == null) { panels.refuseLoad("Missing node contract: $type"); return }
         panels.addNode(type, (num(panels.viewport.clientWidth) / 2 - num(panels.view.x)) / num(panels.view.z),
             (num(panels.viewport.clientHeight) / 2 - num(panels.view.y)) / num(panels.view.z), params)
         panels.status("$type placed — inspect its parameters, then choose Run")

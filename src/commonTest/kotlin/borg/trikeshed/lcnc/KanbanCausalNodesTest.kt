@@ -35,6 +35,8 @@ class KanbanCausalNodesTest {
         val node = LcncNode("simulate", "nars.reteFire", mapOf("discount" to "0.5"))
         val output = runner.run(node, mapOf("rules?" to jsonOf(rules), "assertions?" to assumptions))
         assertEquals(true, output["hypothetical"])
+        assertEquals(output - "evaluation", output["evaluation"], "Prompt consumers receive the actual evaluation, including rejected rules")
+        assertEquals(0.5f, output["discount"])
         assertEquals(assumptions, output["assertions"])
         assertEquals(1, output["rejected"])
         assertEquals(listOf(positive.ruleCid.value, negative.ruleCid.value, equivalence.ruleCid.value), output["ruleCids"])

@@ -440,10 +440,10 @@ class KanbanModule : ForgeModule {
                 if (query["receiptCid"] != null && query["receiptCid"] != task["receiptCid"])
                     return@claim JvmKanbanServer.HttpResponse(409, """{"error":"document_task_receipt_changed"}""")
                 @Suppress("UNCHECKED_CAST")
-                val program = borg.trikeshed.lcnc.LcncWorkspacePresets.correction(taskId,
+                val program = if (task["kind"] == "document-proposal-review") null else borg.trikeshed.lcnc.LcncWorkspacePresets.correction(taskId,
                     task.getValue("revision").toString(), task.getValue("receiptCid") as String,
                     task.getValue("correctionSource") as Map<String, Any?>)
-                val body = jsonOf(if (view == "receipt") task else task + ("document" to
+                val body = jsonOf(if (view == "receipt" || program == null) task else task + ("document" to
                     reify(borg.trikeshed.lcnc.LcncProgramConfix.toJson(program))))
                 if (body.encodeToByteArray().size > borg.trikeshed.lcnc.WorkspaceFacets.MAX_BYTES)
                     JvmKanbanServer.HttpResponse(413, """{"error":"document_task_payload_limit"}""")
@@ -601,6 +601,9 @@ class KanbanModule : ForgeModule {
             val cancelled = req?.get("runId")?.toString()?.let(runs::cancel) ?: false
             JvmKanbanServer.HttpResponse(if (cancelled) 202 else 404, jsonOf(mapOf("ok" to cancelled)))
         }
+        ctx.routes.claim(id, "/api/lcnc/run/debug") { method, path, text, _ ->
+            runs.debug(method, path, rawBody(text))
+        }
 
         // The same vocabulary as a GRAPH: kinds, ports, and the binding edges,
         // as Turtle — queryable, countable, and the form LcncRdf's doc comment
@@ -714,6 +717,8 @@ class KanbanModule : ForgeModule {
                 }
                 return@claim runs.execute(label, program, false, inputs, req)
             }
+            if (req.containsKey("debugToken")) return@claim JvmKanbanServer.HttpResponse(400,
+                """{"error":"debug_requires_program"}""")
             val type = req["type"]?.toString()
                 ?: return@claim JvmKanbanServer.HttpResponse(400, """{"error":"type_required"}""")
             val runner = ctx.lcncRunners[type]

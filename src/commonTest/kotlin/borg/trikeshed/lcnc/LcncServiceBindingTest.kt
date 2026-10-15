@@ -10,9 +10,14 @@ import borg.trikeshed.lib.toList
 import borg.trikeshed.relaxfactory.RelaxTransport
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.CoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -24,6 +29,22 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LcncServiceBindingTest {
+    @Test fun failedBindingCancelsAndJoinsItsAdmittedChildBeforeRethrowing() = runTest {
+        val failure = IllegalStateException("bound operation failed")
+        var childClosed = false
+        val runner = boundLcnc(CoroutineName("child-owner")) { _, _, _ ->
+            CoroutineScope(currentCoroutineContext()).launch(start = CoroutineStart.UNDISPATCHED) {
+                try { awaitCancellation() } finally { childClosed = true }
+            }
+            throw failure
+        }
+        val result = withTimeout(1000) {
+            runCatching { runner.run(LcncNode("failure", "text.value"), emptyMap()) }
+        }
+        assertSame(failure, result.exceptionOrNull())
+        assertTrue(childClosed)
+    }
+
     private class Corpus(val text: String) : ProjectCorpus {
         private val source = InMemoryProjectCorpus().apply {
             put("p", "doc.md", text.encodeToByteArray())
@@ -227,6 +248,8 @@ class LcncServiceBindingTest {
                 }
                 if (path == "/api/projects") return mapOf("verdict" to "ok", "name" to label)
                 if (method == "DELETE") return mapOf("verdict" to "unmounted", "name" to label)
+                if (path.substringBefore('?') == "/blackboard/neighbors")
+                    return mapOf("provider" to label, "neighbors" to emptyList<Any?>())
                 return mapOf("provider" to label, "rows" to listOf(label), "routes" to listOf(label),
                     "panels" to listOf(label), "standings" to listOf(label))
             }

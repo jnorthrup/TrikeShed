@@ -28,6 +28,20 @@ class LcncConcentricScopeTest {
     private fun program(name: String, nodes: List<LcncNode>, wires: List<LcncWire> = emptyList()) =
         LcncProgram(name, nodes.toSeries(), wires.toSeries())
 
+    @Test
+    fun absentDefaultRequiresABindingButAnExplicitEmptyDefaultDoesNot() = runBlocking {
+        fun ring(params: Map<String, String>) = program("default-presence", listOf(
+            LcncNode("r", LcncContracts.SCOPE, children = listOf(
+                LcncNode("i", LcncContracts.SCOPE_IN, params),
+                LcncNode("o", LcncContracts.SCOPE_OUT, mapOf("name" to "value")),
+            ).toSeries()),
+        ), listOf(LcncWire("i", "value", "o", "value")))
+        val runner = LcncRunner(emptyMap())
+        assertEquals(false, runner.runProcedure(ring(mapOf("name" to "value"))).nodeOutputs.containsKey("r"))
+        assertEquals("", runner.runProcedure(ring(mapOf("name" to "value", "default" to "")))
+            .nodeOutputs.getValue("r")["value"])
+    }
+
     // ── line 1: inner sees outer — a wire crosses TWO ring boundaries inward,
     //    zero re-plumbing; yields climb out explicitly ──────────────────────
 

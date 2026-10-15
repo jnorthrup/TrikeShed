@@ -45,6 +45,29 @@ class TeleportedCanonicalTest {
     }
 
     @Test
+    fun nonFiniteNumbersCannotProduceUndecodableEnvelopes() {
+        for (number in listOf(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            assertFailsWith<IllegalArgumentException> { Real(number) }
+            val value = Teleported.ofHost(mapOf("number" to number))
+            assertTrue(value.isOpaque)
+            val reply = Teleported.obj("id" to 7, "ok" to true, "value" to value)
+            assertEquals(reply, SubVmProtocol.decode(SubVmProtocol.encode(reply)))
+        }
+        assertFailsWith<IllegalArgumentException> { Teleported.parseCanonical("1e999") }
+    }
+
+    @Test
+    fun finiteRealsRoundTripWithoutLongSaturation() {
+        for (number in listOf(-0.0, 0.0, 3.0, Double.MIN_VALUE, Double.MAX_VALUE,
+            Long.MAX_VALUE.toDouble(), 1e30, -1e30)) {
+            val original = Real(number)
+            val decoded = Teleported.parseCanonical(original.canonical())
+            assertEquals(original, decoded, "Real must retain its value: $number")
+            assertEquals(original.cid, decoded.cid)
+        }
+    }
+
+    @Test
     fun hostProjectionCoversTheCommonSubset() {
         assertEquals(Num(5), Teleported.ofHost(5))
         assertEquals(Real(0.5), Teleported.ofHost(0.5))

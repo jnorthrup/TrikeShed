@@ -94,7 +94,8 @@ class ConfixIsamCursorBridge(
     }
 
     /** Idempotent replay requires every identity component to agree, not merely the sequence number. */
-    fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax): ConfixIsamRevision = synchronizedLock(gate) {
+    fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax,
+            writer: IsamOperations = operations): ConfixIsamRevision = synchronizedLock(gate) {
         commits.checkOpen()
         val bytes = source.copyOf()
         val cid = ContentId.of(bytes)
@@ -106,7 +107,7 @@ class ConfixIsamCursorBridge(
         val dataFile = if (geometry.size == 0) null else allocate(sequence)
         val artifacts = if (dataFile == null) emptyMap() else {
             val dataPath = path(dataFile)
-            operations.write(geometry, dataPath, emptyMap(), false)
+            writer.write(geometry, dataPath, emptyMap(), false)
             // Data groups were forced by ISAM. Atomic metadata publication also fsyncs their shared directory.
             files.writeAtomically("$dataPath.meta", files.readAllBytes("$dataPath.meta"))
             artifactNames(dataFile).associateWith { ContentId.of(files.readAllBytes(path(it))) }
@@ -114,7 +115,7 @@ class ConfixIsamCursorBridge(
         val entry = ConfixIsamRevision(sequence, id, rev, false, syntax, cid, dataFile, artifacts)
         // Verify physical projection before acknowledging it, including custom operation/codec owners.
         if (dataFile != null) {
-            val data = IsamDataFile(path(dataFile), operations = operations)
+            val data = IsamDataFile(path(dataFile), operations = writer)
             try {
                 data.open()
                 require(data.size == geometry.size) { "Confix geometry row count changed during publication" }
@@ -141,14 +142,14 @@ class ConfixIsamCursorBridge(
     }
 
     /** Explicit Couch conversion preserves committed canonical bodies, sequences, revisions and tombstones. */
-    fun importFrames(frames: Series<CouchCommittedFrame>) {
+    fun importFrames(frames: Series<CouchCommittedFrame>, writer: IsamOperations = operations) {
         for (frame in frames.view) {
             require(frame.deleted == (frame.doc == null)) { "Invalid Couch frame body" }
             if (frame.deleted) delete(frame.sequence, frame.docId, frame.rev)
             else {
                 val doc = requireNotNull(frame.doc)
                 require(doc.id == frame.docId) { "Couch frame identity mismatch" }
-                put(frame.sequence, frame.docId, frame.rev, CouchStoreFactory.canonicalBody(doc), Syntax.CBOR)
+                put(frame.sequence, frame.docId, frame.rev, CouchStoreFactory.canonicalBody(doc), Syntax.CBOR, writer)
             }
         }
     }

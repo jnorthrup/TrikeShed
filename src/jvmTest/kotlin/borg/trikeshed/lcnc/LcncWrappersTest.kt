@@ -1,8 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +17,27 @@ import kotlin.test.assertTrue
 class LcncWrappersTest {
 
     private val compiled = LcncContracts.all().associateBy { it.type }
+
+    @Test fun scopeBindingsIdentifyTheInterpreterThatActuallyExecutesThem() = runBlocking {
+        var calls = 0
+        val structural = listOf(LcncContracts.SCOPE_IN, LcncContracts.SCOPE_OUT)
+        val registry = structural.associateWith { LcncNodeRunner { _, _ -> calls++; error("shadow runner") } }
+        val bindings = LcncWrappers.bindings(LcncContracts.all(), registry, { error("Unused shadow provenance") })
+            .associateBy { it.type }
+        for (type in structural) {
+            assertEquals("INTERPRETER", bindings.getValue(type).kind.name)
+            assertEquals("LcncRunner", bindings.getValue(type).provenance)
+        }
+        assertEquals("INTERPRETER", bindings.getValue(LcncContracts.SCOPE).kind.name)
+        assertEquals(LcncBindingKind.UNBOUND, bindings.getValue("vm.polyglot").kind)
+        val program = LcncProgram("scope-owner", s_[LcncNode("ring", LcncContracts.SCOPE,
+            children = s_[
+                LcncNode("in", LcncContracts.SCOPE_IN, mapOf("name" to "evidence", "default" to "retained")),
+                LcncNode("out", LcncContracts.SCOPE_OUT, mapOf("name" to "evidence")),
+            ])], s_[LcncWire("in", "value", "out", "value")])
+        assertEquals("retained", LcncRunner(registry).runAll(program).getValue("ring")["evidence"])
+        assertEquals(0, calls)
+    }
 
     /** A ring with three formals and one yield: `s` required, `sep?` optional, `n` defaulted. */
     private fun twice(): LcncProgram = LcncProgram(

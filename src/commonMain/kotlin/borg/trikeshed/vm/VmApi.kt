@@ -75,6 +75,11 @@ interface VmHandle : AutoCloseable {
     fun eval(source: String, name: String = "<eval>"): Teleported = discontinued("vm.eval")
     fun call(root: String, vararg args: Teleported): Teleported = discontinued("vm.call")
     fun stats(): VmStats = discontinued("vm.stats")
+    /** Null means this tier does not expose root profiles; an empty snapshot means none observed. */
+    fun pointcuts(): VmPointcuts? = null
+    /** Source suspension is explicit; an unsupported tier must not silently execute instead. */
+    val sourceDebugging: Boolean get() = false
+    fun debug(sourceName: String, request: VmDebugRequest): AutoCloseable = discontinued("vm.debug")
     val isAlive: Boolean get() = false
     override fun close() {}
 }

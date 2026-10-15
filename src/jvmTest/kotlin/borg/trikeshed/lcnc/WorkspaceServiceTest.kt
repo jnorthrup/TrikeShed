@@ -12,6 +12,141 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.*
 
 class WorkspaceServiceTest {
+    @Test fun inspectionDistinguishesInterpreterScopesFromMissingRunnersWithoutExecution() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        var executions = 0
+        ctx.lcncRunners["text.value"] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        ctx.lcncRunners[LcncContracts.SCOPE] = LcncNodeRunner { _, _ -> executions++; error("unused scope runner") }
+        val service = WorkspaceService(ctx)
+        val revision = ctx.blackboard.snapshot().revision
+        val children = s_[
+            LcncNode("in", LcncContracts.SCOPE_IN, mapOf("name" to "evidence", "default" to "retained")),
+            LcncNode("out", LcncContracts.SCOPE_OUT, mapOf("name" to "evidence")),
+        ]
+        val program = LcncProgram("scope-owner", s_[
+            LcncNode("ring", LcncContracts.SCOPE, children = children),
+            LcncNode("inline", "text.value", children = s_[LcncNode("nested", "note")]),
+            LcncNode("named", LcncContracts.SCOPE, mapOf("program" to "not-loaded-by-inspection")),
+            LcncNode("registry-scope", LcncContracts.SCOPE),
+            LcncNode("missing", "vm.polyglot"),
+            LcncNode("value", "text.value"),
+        ], s_[LcncWire("in", "value", "out", "value")])
+        val result = post(service, jsonOf(mapOf("document" to reify(LcncProgramConfix.toJson(program)))))
+        val bindings = assertIs<List<*>>(result["bindings"]).map { assertIs<Map<*, *>>(it) }.associateBy { it["id"] }
+        for (id in listOf("ring", "in", "out", "inline", "named")) {
+            val binding = bindings.getValue(id)
+            assertEquals("INTERPRETER", binding["binding"], id)
+            assertEquals("LcncScopeFrame.Key", assertIs<Map<*, *>>(binding["context"])["key"], id)
+            assertEquals(emptyList<String>(), binding["requiredKeys"])
+        }
+        assertEquals("UNBOUND", bindings.getValue("missing")["binding"])
+        assertEquals("KOTLIN", bindings.getValue("value")["binding"])
+        assertEquals("KOTLIN", bindings.getValue("registry-scope")["binding"])
+        assertEquals(0, executions)
+        assertEquals(revision, ctx.blackboard.snapshot().revision)
+    }
+
+    @Test fun receiptDiscoveryKeepsNamedHistoryAndExactInlineVersionsSeparate() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        var executions = 0
+        ctx.lcncRunners["text.value"] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        val program = LcncProgram("canvas", s_[LcncNode("source", "text.value", mapOf("value" to "review"))], emptySeriesOf())
+        val cid = LcncBlackboard.cidOf(program)
+        val otherCid = LcncBlackboard.cidOf(program.copy(nodes = s_[program.nodes[0].copy(params = mapOf("value" to "different"))]))
+        val key = LcncBlackboard.programKey(program.name)
+        fun record(id: String, programKey: String?, programCid: String?, label: String = program.name) {
+            ctx.blackboard.put("lcnc/run/$id", mapOf("runId" to id, "program" to label,
+                "programKey" to programKey, "programCid" to programCid, "status" to "failed",
+                "receiptCid" to ContentId.of(id.encodeToByteArray()).value, "startedAtMs" to 123L,
+                "sequence" to id.length.toLong()), "fixture")
+        }
+        record("named-old", key, otherCid)
+        record("named-current", key, cid)
+        record("inline-exact", null, cid, "unrelated-label")
+        record("inline-stale", null, otherCid)
+        record("inline-unversioned", null, null)
+        record("other-named", LcncBlackboard.programKey("other"), cid)
+        val board = ctx.blackboard.snapshot()
+        val sequence = ctx.couch.store.changes.lastCommittedSequence
+        val request = mapOf("name" to program.name, "document" to reifyStrict(LcncProgramConfix.toJson(program)))
+        repeat(2) {
+            val result = post(service, jsonOf(request))
+            val runs = assertIs<List<*>>(result["runs"]).map { assertIs<Map<*, *>>(it) }.associateBy { it["runId"] }
+            assertEquals(setOf("named-old", "named-current", "inline-exact"), runs.keys)
+            assertEquals(false, runs.getValue("named-old")["sameVersion"])
+            assertEquals(key, runs.getValue("named-current")["programKey"])
+            assertEquals(true, runs.getValue("inline-exact")["sameVersion"])
+            assertNull(runs.getValue("inline-exact")["programKey"])
+            assertEquals(ContentId.of("inline-exact".encodeToByteArray()).value, runs.getValue("inline-exact")["receiptCid"])
+        }
+        assertEquals(board, ctx.blackboard.snapshot())
+        assertEquals(sequence, ctx.couch.store.changes.lastCommittedSequence)
+        assertEquals(0, executions)
+    }
+
+    @Test fun inlineReceiptDiscoveryRetainsTheEightRunWindowAndSequenceOrder() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        val program = LcncProgram("canvas", emptySeriesOf(), emptySeriesOf())
+        val cid = LcncBlackboard.cidOf(program)
+        repeat(12) { i -> ctx.blackboard.put("lcnc/run/$i", mapOf("runId" to "$i", "programCid" to cid,
+            "status" to "completed", "startedAtMs" to if (i == 0) 124L else 123L, "sequence" to i), "fixture") }
+        val result = post(service, jsonOf(mapOf("name" to program.name,
+            "document" to reifyStrict(LcncProgramConfix.toJson(program)))))
+        val ids = assertIs<List<*>>(result["runs"]).map { assertIs<Map<*, *>>(it)["runId"] }
+        assertEquals(listOf("0", "11", "10", "9", "8", "7", "6", "5"), ids)
+    }
+
+    @Test fun inlineDiscoveryUsesFrozenDefinitionsForPresentationChangesButNotEdits() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        var executions = 0
+        ctx.lcncRunners["text.value"] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        val original = LcncProgram("canvas", s_[LcncNode("source", "text.value", mapOf("value" to "review"), x = 10.0)], emptySeriesOf())
+        val cid = ctx.casStore.put(LcncProgramConfix.toJson(original).encodeToByteArray()).value
+        val malformed = ctx.casStore.put("{}".encodeToByteArray()).value
+        for ((id, frozen) in listOf("retained" to cid, "malformed" to malformed,
+            "missing" to ContentId.of("missing".encodeToByteArray()).value)) {
+            ctx.blackboard.put("lcnc/run/$id", mapOf("runId" to id, "programCid" to frozen,
+                "status" to "failed", "startedAtMs" to 123L), "fixture")
+        }
+        val board = ctx.blackboard.snapshot()
+        suspend fun inspect(program: LcncProgram): List<Map<*, *>> = assertIs<List<*>>(post(service,
+            jsonOf(mapOf("name" to program.name, "document" to reifyStrict(LcncProgramConfix.toJson(program)))))["runs"])
+            .map { assertIs<Map<*, *>>(it) }
+        val moved = original.copy(nodes = s_[original.nodes[0].copy(x = 450.0)])
+        val retained = inspect(moved).single()
+        assertEquals("retained", retained["runId"])
+        assertEquals(false, retained["sameVersion"])
+        assertEquals("presentation", retained["programRelation"])
+        assertNull(retained["programKey"])
+        assertTrue(inspect(moved.copy(nodes = s_[moved.nodes[0].copy(params = mapOf("value" to "edited"))])).isEmpty())
+        assertEquals(board, ctx.blackboard.snapshot())
+        assertEquals(0, executions)
+    }
+
+    @Test fun inlineComparisonBudgetDoesNotHideExactMatchesOrNamedHistory() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        val program = LcncProgram("canvas", s_[LcncNode("source", "text.value", mapOf("value" to "review"), x = 100.0)], emptySeriesOf())
+        val presentation = program.copy(nodes = s_[program.nodes[0].copy(x = 10.0)])
+        val presentationCid = ctx.casStore.put(LcncProgramConfix.toJson(presentation).encodeToByteArray()).value
+        ctx.blackboard.put("lcnc/run/older-presentation", mapOf("runId" to "older-presentation",
+            "programCid" to presentationCid, "status" to "completed", "startedAtMs" to 122L), "fixture")
+        repeat(34) { i -> ctx.blackboard.put("lcnc/run/other-$i", mapOf("runId" to "other-$i",
+            "programCid" to ContentId.of("missing-$i".encodeToByteArray()).value,
+            "status" to "completed", "startedAtMs" to 124L, "sequence" to i), "fixture") }
+        for (id in listOf("exact", "named")) ctx.blackboard.put("lcnc/run/$id", mapOf("runId" to id,
+            "programKey" to if (id == "named") LcncBlackboard.programKey(program.name) else null,
+            "programCid" to if (id == "exact") LcncBlackboard.cidOf(program) else ContentId.of("old".encodeToByteArray()).value,
+            "status" to "completed", "startedAtMs" to 123L), "fixture")
+        val result = post(service, jsonOf(mapOf("name" to program.name,
+            "document" to reifyStrict(LcncProgramConfix.toJson(program)))))
+        assertEquals(true, result["runComparisonLimited"])
+        assertEquals(setOf("exact", "named"), assertIs<List<*>>(result["runs"]).map { assertIs<Map<*, *>>(it)["runId"] }.toSet())
+    }
+
     @Test fun frozenProgramComparisonIsReadOnlyAndKeepsExactIdentityDistinct() = runTest {
         var writes = 0
         val cas = object : CasStore() {
@@ -82,8 +217,45 @@ class WorkspaceServiceTest {
         assertEquals("preset-camel-authoring-java", route["name"])
         assertTrue(LcncTypeCheck.check(LcncProgramConfix.fromJson(route["name"] as String,
             jsonOf(route["document"]))).isEmpty())
+        val documentRoute = assertIs<Map<*, *>>(service.language(available)["documentRoutingConstruction"])
+        val retained = LcncProgramConfix.fromJson(documentRoute["name"] as String, jsonOf(documentRoute["document"]))
+        assertEquals("preset-document-routing-java", retained.name)
+        assertTrue(LcncTypeCheck.check(retained).isEmpty(), LcncTypeCheck.check(retained).joinToString { it.render() })
+        assertEquals("", retained.nodes.view.single { it.type == "document.sheet" }.params["receiptCid"])
+        assertEquals("[]", retained.nodes.view.single { it.id == "assumptions" }.params["value"])
+        assertEquals("java", retained.nodes.view.single { it.type == "vm.polyglot" }.params["language"])
+        assertFalse(retained.nodes.view.any { it.type in setOf("document.curate", "document.tasks", "council.seat") })
         assertNull(service.language(available.copy(available = false))["construction"])
         assertNull(service.language(available.copy(available = false))["routeConstruction"])
+        assertNull(service.language(available.copy(available = false))["documentRoutingConstruction"])
+        assertEquals(revision, ctx.blackboard.snapshot().revision)
+        assertEquals(0, executions)
+    }
+
+    @Test fun nativeCamelConstructionsDoNotRequireThePolyglotFunctionRunner() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val service = WorkspaceService(ctx)
+        var executions = 0
+        val revision = ctx.blackboard.snapshot().revision
+        for (language in listOf(VmLanguage.JAVA, VmLanguage.GROOVY)) {
+            val capability = VmLanguageCapability(language, false, false, "No GraalJS function adapter")
+            assertNull(service.language(capability)["nativeConstruction"])
+        }
+        ctx.lcncRunners[SubVmLegos.CAMEL] = LcncNodeRunner { _, _ -> executions++; emptyMap() }
+        for (language in listOf(VmLanguage.JAVA, VmLanguage.GROOVY)) {
+            val descriptor = service.language(VmLanguageCapability(language, false, false, "No GraalJS function adapter"))
+            assertNull(descriptor["construction"])
+            val native = assertIs<Map<*, *>>(descriptor["nativeConstruction"])
+            assertEquals(true, native["available"], native["note"].toString())
+            val program = LcncProgramConfix.fromJson(native["name"] as String, jsonOf(native["document"]))
+            assertTrue(LcncTypeCheck.check(program).isEmpty())
+            val route = program.nodes.view.single { it.type == "vm.camel" }
+            assertEquals(language.id, route.params["language"])
+            assertEquals("native-dsl", route.params["authoring"])
+            assertTrue(route.params.getValue("source").isNotBlank())
+            assertTrue(program.controls.humanOversight)
+        }
+        assertNull(service.language(VmLanguageCapability(VmLanguage.PYTHON, true, true, ""))["nativeConstruction"])
         assertEquals(revision, ctx.blackboard.snapshot().revision)
         assertEquals(0, executions)
     }

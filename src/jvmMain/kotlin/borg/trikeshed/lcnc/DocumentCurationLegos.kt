@@ -119,6 +119,7 @@ object DocumentCurationLegos {
         val cursor = when (view) {
             "sentences" -> sentenceCursor(cid, index)
             "proposals" -> index.facet(DocumentCurationIndexK.ProposalCursor)
+            "rules" -> index.facet(DocumentCurationIndexK.RuleCursor)
             "tokens", "dependencies" -> {
                 require(sentence < index.facet(DocumentCurationIndexK.Sentences).size) { "Sentence outside retained document" }
                 if (view == "tokens") index.facet(DocumentCurationIndexK.TokenCursor)(sentence)
@@ -130,6 +131,7 @@ object DocumentCurationLegos {
             "sentences" -> DocumentCurationIndexK.SentenceColumns
             "tokens" -> DocumentCurationIndexK.TokenColumns
             "dependencies" -> DocumentCurationIndexK.DependencyColumns
+            "rules" -> DocumentCurationIndexK.RuleColumns
             else -> DocumentCurationIndexK.ProposalColumns
         })
         val columns = (schema α {
@@ -156,13 +158,16 @@ object DocumentCurationLegos {
         fun href(row: Int, groups: Int = groupOffset): String = sheetHref(cid, view, sentence, row, limit) +
             if (axes.size == 0) "" else "&axes=" + java.net.URLEncoder.encode(jsonOf(axisValues), "UTF-8") +
                 "&selections=" + java.net.URLEncoder.encode(jsonOf(selectionValues), "UTF-8") + "&groupOffset=$groups"
-        val seed = sheetSeed(if (view == "sentences") root else if (view == "proposals") "$root/proposals" else "$root/$sentence/$view",
+        val seed = sheetSeed(if (view == "sentences") root else if (view in setOf("proposals", "rules")) "$root/$view" else "$root/$sentence/$view",
             if (view == "sentences") record.source.name else view, window,
             if (view == "sentences") null else root, columns)
-        return mapOf("sheet" to (seed.toMap() + mapOf<String, Any?>("offset" to offset, "sourceRows" to cursor.size,
-            "href" to href(offset), "selectedRows" to selected.size,
+        // The same returned selection accompanies low-code payloads without duplicating cursor cells or index groups.
+        val selection = mapOf("id" to seed.id, "offset" to offset, "sourceRows" to cursor.size,
+            "selectedRows" to selected.size, "pageSize" to limit,
             "sourceOrdinals" to (window.size j { i: Int -> selected.sourceRow(offset + i) }).view.toList(),
-            "indexColumns" to fields, "axes" to axisValues, "selections" to selectionValues,
+            "axes" to axisValues, "selections" to selectionValues, "next" to if (end < selected.size) end else null)
+        return mapOf("receiptCid" to cid.value, "selection" to selection,
+            "sheet" to (seed.toMap() + selection + mapOf<String, Any?>("href" to href(offset), "indexColumns" to fields,
             "indexes" to indexes.mapIndexed { a, groups ->
                 val stop = minOf(groups.size.toLong(), groupOffset.toLong() + limit).toInt()
                 mapOf("fields" to axisValues[a], "groupCount" to groups.size, "offset" to groupOffset,
@@ -175,13 +180,21 @@ object DocumentCurationLegos {
             "previousGroupsHref" to if (groupOffset > 0) href(offset, maxOf(0, groupOffset - limit)) else null,
             "nextGroupsHref" to if (indexes.any { groupOffset.toLong() + limit < it.size }) href(offset, groupOffset + limit) else null,
             "views" to listOf(mapOf("sheet" to root, "title" to "Sentences", "href" to sheetHref(cid)),
-                mapOf("sheet" to "$root/proposals", "title" to "Proposal tuples", "href" to sheetHref(cid, "proposals"))),
-            "notice" to if (view == "proposals") "Model proposals, not verified facts. modelConfidence is the model's score, not parser confidence or approval." else null,
+                mapOf("sheet" to "$root/proposals", "title" to "Proposal tuples", "href" to sheetHref(cid, "proposals")),
+                mapOf("sheet" to "$root/rules", "title" to "Rule candidates", "href" to sheetHref(cid, "rules"))),
+            "notice" to when (view) {
+                "proposals" -> "Model proposals, not verified facts. modelConfidence is the model's score, not parser confidence or approval."
+                "rules" -> "Parser candidates, not admitted rules. Simulation uses only this selected page; patternWeight is structural weight, not parser confidence."
+                else -> null
+            },
             "parentHref" to if (view == "sentences") null else sheetHref(cid),
             "previousHref" to if (offset > 0) href(maxOf(0, offset - limit)) else null,
             "nextHref" to if (end < selected.size) href(end) else null,
             "truncated" to (window.size < selected.size), "limit" to if (window.size < selected.size) "row_window" else null)),
-            "rowCount" to cursor.size, "next" to if (end < selected.size) end else null)
+            "rowCount" to cursor.size, "next" to if (end < selected.size) end else null) +
+            if (view == "rules") mapOf("ruleCandidates" to (window α { row ->
+                row.view.associate { cell -> cell.b().name.toString() to cell.a }
+            }).view.toList()) else emptyMap()
     }
 
     fun sentenceCursor(cid: ContentId, index: DocumentCurationIndex): Cursor {

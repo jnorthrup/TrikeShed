@@ -9,10 +9,10 @@ import borg.trikeshed.parse.confix.*
 import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.parse.reify
 
-/** The workspace selects projections of one program; a facet never owns an executor. */
+/** The workspace selects projections of existing data; a facet never owns an executor. */
 enum class WorkspaceFacet(val id: String, val title: String, val description: String) {
     CURATION("curation", "Use cases", "Document and tuple curation, shared evidence, and role-based simulations."),
-    CONFIX("confix", "Confix & facets", "Inspect the program's indexed structure, cursor rows, and content identity."),
+    CONFIX("confix", "Confix & facets", "Inspect constructions, retained data, cursor rows, and content identity."),
     LANGUAGE("language", "Low code", "Place language and Camel nodes backed by the host's installed runtimes."),
     EXECUTION("execution", "Evidence", "Follow node bindings, causal evidence, pointcuts, and run receipts."),
 }

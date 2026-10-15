@@ -20,12 +20,14 @@ class HermesConsoleElement(
     private val execute: suspend (ManualMediaInput) -> Unit,
     private val failed: (ManualMediaInput?, Throwable) -> Unit,
     capacity: Int = 64,
+    private val reset: suspend (Boolean) -> Unit = {},
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<HermesConsoleElement>
     override val key: CoroutineContext.Key<*> get() = Key
 
     private sealed interface Work {
         data object Open : Work
+        data class Reset(val resume: Boolean) : Work
         data class Command(val input: ManualMediaInput) : Work
     }
 
@@ -39,6 +41,7 @@ class HermesConsoleElement(
                 try {
                     when (work) {
                         Work.Open -> open.invoke()
+                        is Work.Reset -> reset.invoke(work.resume)
                         is Work.Command -> execute(work.input)
                     }
                 } catch (failure: Exception) {
@@ -58,6 +61,7 @@ class HermesConsoleElement(
     val accepting: Boolean get() = supervisor.isActive && !input.isClosed()
 
     fun open(): Boolean = accepting && input.kChannel.trySend(Work.Open).isSuccess
+    fun reset(resume: Boolean = true): Boolean = accepting && input.kChannel.trySend(Work.Reset(resume)).isSuccess
     fun submit(command: ManualMediaInput): Boolean = accepting && input.kChannel.trySend(Work.Command(command)).isSuccess
 
     /** Stop admission, finish every accepted open/turn, and join the owner. No cancellation. */

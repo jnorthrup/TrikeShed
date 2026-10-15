@@ -1,11 +1,15 @@
 package borg.trikeshed.couch.isam
 
 import borg.trikeshed.couch.*
+import borg.trikeshed.btrfs.VmWorldTeleport
+import borg.trikeshed.cas.FileTreeManifest
+import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.isam.*
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
-import borg.trikeshed.parse.confix.ConfixDoc
+import borg.trikeshed.parse.confix.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -20,7 +24,7 @@ class ConfixIsamElement(
     private val location: String,
     private val files: FileOperations,
     private val cas: CasStore,
-    private val operations: IsamOperations = UringIsamOperations(parent, leafBytes = 64 * 1024),
+    private val dictionaryCodec: ((ByteArray) -> IsamLeafCodec)? = null,
     capacity: Int = 8,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ConfixIsamElement>
@@ -38,9 +42,14 @@ class ConfixIsamElement(
 
     private val input = Channel<Request<*>>(capacity.also { require(it > 0) })
     val job = SupervisorJob(parent.coroutineContext[Job])
+    private val scope = CoroutineScope(parent.coroutineContext + this + job)
+    // Reads resolve the identity in each file, never the next batch's write selection.
+    private val operations = UringIsamOperations(scope, leafBytes = 64 * 1024,
+        leafCodec = dictionaryCodec?.let { CasLeafCodec(cas, it) } ?: ZstdLeafCodec)
     private var store: ConfixIsamCursorBridge? = null
+    private var fileTrees: ConfixIsamCursorBridge? = null
     private val completion = CompletableDeferred<Result<Unit>>()
-    private val consumer = CoroutineScope(parent.coroutineContext + this + job).launch {
+    private val consumer = scope.launch {
         val owner = requireNotNull(currentCoroutineContext()[Key])
         var failure: Throwable? = null
         try { for (request in input) request.execute(owner) }
@@ -51,8 +60,10 @@ class ConfixIsamElement(
                 val request = input.tryReceive().getOrNull() ?: break
                 request.result.completeExceptionally(failure ?: IllegalStateException("Confix index closed"))
             }
-            try { store?.close() } catch (caught: Throwable) {
-                if (failure == null) failure = caught else failure.addSuppressed(caught)
+            for (storage in listOf(fileTrees, store)) {
+                try { storage?.close() } catch (caught: Throwable) {
+                    if (failure == null) failure = caught else failure.addSuppressed(caught)
+                }
             }
             completion.complete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
         }
@@ -81,12 +92,69 @@ class ConfixIsamElement(
         return result.await()
     }
 
+    private fun trees(create: Boolean = false): ConfixIsamCursorBridge? {
+        val treeLocation = "$location.file-trees"
+        if (fileTrees == null && (create || files.exists(files.resolvePath("$treeLocation.store", "HEAD")))) {
+            fileTrees = ConfixIsamCursorBridge(treeLocation, files, cas, operations)
+        }
+        return fileTrees
+    }
+
+    private fun writer(dictionary: ContentId?): IsamOperations = dictionary?.let { cid ->
+        val codec = CasLeafCodec(cas, requireNotNull(dictionaryCodec) { "Zstd dictionary codec unavailable on this host" }, cid)
+            .also { it.prepareWrite() }
+        UringIsamOperations(scope, leafBytes = 64 * 1024, leafCodec = codec)
+    } ?: operations
+
+    /** Exact published metadata only: no live mount, file reads, restoration or recursive CAS traversal. */
+    private fun treeReference(id: String, rev: String): Join<ContentId, Long>? {
+        require(rev.isNotEmpty()) { "File-tree inspection requires an exact Couch revision" }
+        val doc = requireNotNull(open()?.document(id, rev)) { "Publication revision not indexed" }
+        fun field(name: String): Any? = doc.docAt(name)?.let { CanonicalCbor.item(it).toAny() }
+        if (field("kind") != VmWorldTeleport.KIND || field("contentType") != FileTreeManifest.CONTENT_TYPE) return null
+        require(field("guest") is String && id == VmWorldTeleport.PREFIX + field("guest")) { "Invalid VM-world publication identity" }
+        val cid = ContentId(requireNotNull(field("contentId") as? String) { "Missing file-tree CID" })
+        val length = requireNotNull(field("length") as? Long) { "Invalid file-tree length" }
+        require(length > 0) { "Invalid file-tree length" }
+        return cid j length
+    }
+
+    suspend fun fileTree(id: String, rev: String, read: Boolean = false): Join<Map<String, Any?>, ConfixDoc?>? = submit {
+        val (cid, length) = treeReference(id, rev) ?: return@submit null
+        val storage = trees()
+        val indexed = storage?.revision(cid.value, cid.value) != null
+        val doc = if (read && indexed) storage.document(cid.value, cid.value) else null
+        if (doc != null) require(doc.src.size.toLong() == length) { "File-tree metadata length mismatch" }
+        mapOf("cid" to cid.value, "bytes" to length, "byteLimit" to 1_048_576, "indexed" to indexed) j doc
+    }
+
+    /** Explicit content-addressed metadata projection; shared roots are indexed only once. */
+    suspend fun importFileTree(id: String, rev: String, dictionary: ContentId? = null): Map<String, Any?> = submit {
+        val (cid, length) = requireNotNull(treeReference(id, rev)) { "Revision is not a canonical VM-world publication" }
+        require(length <= 1_048_576L) { "File-tree metadata exceeds the 1 MiB inspection limit" }
+        val writer = writer(dictionary)
+        val bytes = requireNotNull(cas.get(cid)) { "File-tree metadata missing: ${cid.value}" }
+        require(bytes.size.toLong() == length && ContentId.of(bytes) == cid) { "File-tree metadata identity or length mismatch" }
+        val prior = trees()?.document(cid.value, cid.value)
+        if (prior != null) return@submit mapOf("imported" to 0, "cid" to cid.value, "source" to "unchanged")
+        val doc = confixDoc(bytes, Syntax.CBOR)
+        require(doc.index.facet(ConfixIndexK.Spans).size <= 65_536 &&
+            (doc.index.facet(ConfixIndexK.Depths).view.maxOrNull() ?: 0) <= 64) { "File-tree metadata exceeds inspection limits" }
+        FileTreeManifest.decode(bytes) // Validate canonical paths/extents, without opening their payloads.
+        val destination = requireNotNull(trees(true))
+        destination.put(destination.revisions.size.toLong(), cid.value, cid.value, bytes, Syntax.CBOR, writer)
+        mapOf("imported" to 1, "cid" to cid.value, "source" to "unchanged",
+            "compression" to mapOf("format" to "zstd", "dictionaryCid" to dictionary?.value))
+    }
+
     suspend fun catalog(offset: Int = 0, limit: Int = 32): Map<String, Any?> = submit {
         require(offset >= 0 && limit in 1..128) { "Invalid revision window" }
         val revisions = open()?.revisions ?: emptySeriesOf()
         val frames = source.afterSequence(-1)
         val end = minOf(revisions.size.toLong(), offset.toLong() + limit).toInt()
         mapOf("available" to true, "indexedRevisions" to revisions.size, "sourceRevisions" to frames.size,
+            "compression" to mapOf("format" to "zstd", "dictionaryAvailable" to (dictionaryCodec != null),
+                "selection" to "per-batch", "defaultDictionaryCid" to null),
             "offset" to offset, "next" to if (end < revisions.size) end else null,
             "revisions" to (maxOf(0, end - offset) j { i: Int ->
                 revisions[revisions.size - 1 - offset - i].descriptor()
@@ -94,8 +162,9 @@ class ConfixIsamElement(
     }
 
     /** A point-in-time batch, not a background subscription or a database replacement. */
-    suspend fun importCouch(limit: Int = 32): Map<String, Any?> = submit {
+    suspend fun importCouch(limit: Int = 32, dictionary: ContentId? = null): Map<String, Any?> = submit {
         require(limit in 1..128) { "Import limit must be in 1..128" }
+        val writer = writer(dictionary)
         val frames = source.afterSequence(-1)
         val existing = open()?.revisions ?: emptySeriesOf()
         require(existing.size <= frames.size) { "Couch history is shorter than the dense projection" }
@@ -109,10 +178,12 @@ class ConfixIsamElement(
             }
         }
         val count = minOf(limit, frames.size - existing.size)
-        if (count > 0) requireNotNull(open(true)).importFrames(count j { frames[existing.size + it] })
-        mapOf("imported" to count, "indexedRevisions" to existing.size + count,
-            "sourceRevisions" to frames.size, "remaining" to frames.size - existing.size - count,
-            "through" to if (frames.size == 0) null else frames[frames.size - 1].sequence,
+        if (count > 0) requireNotNull(open(true)).importFrames(count j { frames[existing.size + it] }, writer)
+        val indexed = existing.size + count
+        mapOf("imported" to count, "indexedRevisions" to indexed,
+            "compression" to mapOf("format" to "zstd", "dictionaryCid" to dictionary?.value),
+            "sourceRevisions" to frames.size, "remaining" to frames.size - indexed,
+            "through" to if (indexed == 0) null else frames[indexed - 1].sequence,
             "checkpoints" to "unchanged", "source" to "unchanged")
     }
 

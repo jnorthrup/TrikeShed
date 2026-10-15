@@ -337,7 +337,7 @@ object KanbanPage {
             // there is no "archive" verb in the reducer — archiving IS a move to the archived column
             launchPage { moveCard(id, revision, from, "archived", null) }
         })
-        if (strOrEmpty(it.spec).lineSequence().any { line -> line.startsWith("DOCUMENT: ") })
+        if (strOrEmpty(it.spec).lineSequence().any { line -> line.startsWith("DOCUMENT: ") || line.startsWith("DOCUMENT-REVIEW: ") })
             el.appendChild(documentTaskDetail(el, id, str(revision), from))
         flashes[id]?.let { applyFlash(el, it) }
         // Pointer-event drag, NOT HTML5 DnD: works identically for mouse, trackpad, touch, and pen.
@@ -406,7 +406,7 @@ object KanbanPage {
     fun documentTaskDetail(card: HTMLElement, id: String, revision: String, column: String): HTMLElement {
         val details = document.createElement("details") as HTMLElement
         details.className = "document-task"
-        details.style.cssText = "margin-top:8px;cursor:auto;user-select:text;font-size:12px;overflow-wrap:anywhere;"
+        details.style.cssText = "margin-top:8px;cursor:auto;user-select:text;font-size:14px;overflow-wrap:anywhere;"
         val summary = document.createElement("summary") as HTMLElement
         summary.textContent = "Review document task (read-only)"
         summary.style.cursor = "pointer"
@@ -421,7 +421,6 @@ object KanbanPage {
         refresh.textContent = "Refresh task details"
         details.appendChild(refresh)
         val content = document.createElement("div") as HTMLElement
-        content.style.cssText = "max-height:22rem;overflow:auto;"
         content.tabIndex = 0
         content.setAttribute("role", "region")
         content.setAttribute("aria-label", "Document task snapshot")
@@ -474,11 +473,16 @@ object KanbanPage {
                         status.textContent = reason + (if (detail.isEmpty()) "" else " $detail") + " No task snapshot loaded. Refresh to retry."
                         return@launchPage
                     }
+                    val proposal = objectValue(body) && body.kind == "document-proposal-review"
+                    val validEvidence = if (proposal) isString(body.question) && objectValue(body.turn) &&
+                        isString(body.turn.text) && isString(body.turn.answeredBy) &&
+                        isString(body.curationReceiptCid) && isString(body.runReceiptCid) && isString(body.programCid) &&
+                        jsTypeOf(body.sourceCurrent) == "boolean" else if (objectValue(body))
+                        isString(body.instructions) && jsTypeOf(body.resolved) == "boolean" && objectValue(body.issue) &&
+                            objectValue(body.correctionSource) && objectValue(body.document) else false
                     if (!objectValue(body) || body.jobId != id || !isNumber(body.revision) ||
                         !isString(body.column) || !isString(body.title) || !isString(body.receiptCid) ||
-                        str(body.receiptCid).isBlank() || !isString(body.instructions) ||
-                        jsTypeOf(body.resolved) != "boolean" || !objectValue(body.source) ||
-                        !objectValue(body.issue) || !objectValue(body.correctionSource) || !objectValue(body.document)) {
+                        str(body.receiptCid).isBlank() || !objectValue(body.source) || !validEvidence) {
                         status.textContent = "The server returned an invalid document task projection. No task snapshot loaded. Refresh to retry."
                         return@launchPage
                     }
@@ -488,11 +492,30 @@ object KanbanPage {
                         status.textContent = "The task changed since this card was rendered. Wait for the board to refresh, then reopen review. No current snapshot is shown."
                         return@launchPage
                     }
-                    field("Task", id)
                     field("Title", str(body.title))
+                    if (proposal) {
+                        field("Revision / status", "r${str(body.revision)} · ${str(body.column)}")
+                        field("Operator question", str(body.question))
+                        field("Retained model proposal — unverified", str(body.turn.text))
+                        field("Model / seat", "${str(body.turn.answeredBy)} · ${str(body.nodeId)}")
+                        field("Task", id)
+                        field("Source identities", JSON.stringify(body.source, null, 2))
+                        field("Source version current", str(body.sourceCurrent))
+                        field("Review receipt CID", str(body.receiptCid))
+                        val receipt = js("encodeURIComponent")(body.receiptCid) as String
+                        link("Retained evidence in Documents", "/documents#curation/" + (js("encodeURIComponent")(body.curationReceiptCid) as String))
+                        link("Original run receipt", "/api/lcnc/content?cid=" + (js("encodeURIComponent")(body.runReceiptCid) as String))
+                        link("Frozen program", "/api/lcnc/content?cid=" + (js("encodeURIComponent")(body.programCid) as String))
+                        link("Original run in Confix", borg.trikeshed.web.ConfixNavigation.href(str(body.runReceiptCid), "[\"lcncRun\"]"))
+                        link("Frozen program in Confix", borg.trikeshed.web.ConfixNavigation.href(str(body.programCid)))
+                        link("Review evidence JSON (pinned)", "$taskUrl&view=receipt&receiptCid=$receipt")
+                        status.textContent = "Fetched snapshot r${str(body.revision)}. Read-only: no model request, rule admission or execution. A proposal is not a fact or approval."
+                        return@launchPage
+                    }
                     field("Revision / status", "r${str(body.revision)} · ${str(body.column)} · resolved: ${str(body.resolved)}")
                     field("Issue", JSON.stringify(body.issue, null, 2))
                     field("Instructions", str(body.instructions))
+                    field("Task", id)
                     field("Source identities", JSON.stringify(body.source, null, 2))
                     field("Pending correction source", JSON.stringify(body.correctionSource, null, 2))
                     field("Receipt CID", str(body.receiptCid))
@@ -517,7 +540,10 @@ object KanbanPage {
         }
         refresh.addEventListener("click", { load() })
         details.addEventListener("toggle", {
-            if (details.hasAttribute("open")) load()
+            if (details.hasAttribute("open")) {
+                card.closest(".lane")?.asDynamic()?.scrollIntoView(js("({block:'nearest',inline:'nearest'})"))
+                load()
+            }
             else { generation++; refresh.disabled = false; content.textContent = ""; content.removeAttribute("aria-busy") }
         })
         return details

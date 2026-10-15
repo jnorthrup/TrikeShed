@@ -55,6 +55,18 @@ interface ProcessPipes {
     suspend fun close()
 }
 
+/** A multiplexed worker may keep its protocol separate from physical terminal pipes. */
+interface ProcessProtocolPipes : ProcessPipes {
+    val processId: Long
+    val isAlive: Boolean
+    val terminalOutputs: Set<ProcessOutput>
+    suspend fun readProtocol(bytes: ByteArray): Int
+    suspend fun writeProtocol(bytes: ByteArray)
+    suspend fun closeProtocolInput()
+    /** Explicit revocation, never the normal drain path. Zero grace means immediate revocation. */
+    suspend fun revoke(graceMillis: Long)
+}
+
 data class ProcessResult(
     val exitCode: Int,
     val stdout: ByteArray,

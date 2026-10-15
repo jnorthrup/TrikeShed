@@ -12,7 +12,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
-import kotlinx.coroutines.withContext
 
 /**
  * One node type's behavior — a plain Kotlin function. Registered against real
@@ -179,7 +178,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
         val state = WalkState(program)
         val root = LcncScopeFrame(bindings = args, chain = FrameIdChain.root(ROOT_SCOPE), bindingSources = args.keys.associateWith { "invocation" })
         val ledger = this.ledger
-        val returns = withContext(if (ledger == null) root else root + ledger) {
+        val returns = lcncContext(if (ledger == null) root else root + ledger) {
             runRing(program.nodes, state, root, emptyList())
         }
         return ScopeResult(
@@ -277,6 +276,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                 // then the declared default.
                 if (node.type == LcncContracts.SCOPE_IN) {
                     invocation?.capture("inputs", emptyMap<String, Any?>())
+                    currentCoroutineContext()[LcncDebug]?.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, emptyMap())
                     val name = node.params["name"]?.removeSuffix("?")
                     val installed = checkNotNull(currentCoroutineContext()[LcncScopeFrame])
                     check(installed === frame) { "scope frame differs from installed CoroutineContext element" }
@@ -302,6 +302,16 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
 
                 val inputs = gather(node, state, frame)
                 invocation?.capture("inputs", inputs)
+                // Annotation-only nodes are not debugger stops. Rings and binding/yield nodes are:
+                // stepping enters their real nested walk, including each/carry iterations.
+                val debug = currentCoroutineContext()[LcncDebug]
+                var sourceStep = false
+                if (debug != null) {
+                    val debugContract = LcncContracts.find(node.type)
+                    if (debugContract == null || debugContract.inputs.isNotEmpty() || debugContract.outputs.isNotEmpty() ||
+                        node.children.size > 0 || node.subprogram != null)
+                        sourceStep = debug.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, inputs)
+                }
 
                 // scope.out gathers this ring's yield — the ONLY thing that crosses out.
                 if (node.type == LcncContracts.SCOPE_OUT) {
@@ -404,7 +414,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                             val iterState = if (inline) state else WalkState(bodyDoc!!)
                             val iterFrame = LcncScopeFrame(bindings = iterBound, chain = childChain, parent = frame, bindingSources = iterSources)
                             onScopeEnter?.invoke(pathNames + ringName, childChain)
-                            val yielded = withContext(iterFrame) {
+                            val yielded = lcncContext(iterFrame) {
                                 runRing(bodyNodes, iterState, iterFrame, pathNames + ringName, ordinal, turn)
                             }
                             iterations.add(yielded)
@@ -429,7 +439,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                             mark(LcncTrail.Kind.TURN, pathNames, node, "turn $turns")
                             val iterFrame = LcncScopeFrame(bindings = LinkedHashMap(carried), chain = childChain, parent = frame, bindingSources = LinkedHashMap(carriedSources))
                             onScopeEnter?.invoke(pathNames + ringName, childChain)
-                            val next = withContext(iterFrame) {
+                            val next = lcncContext(iterFrame) {
                                 runRing(bodyNodes, if (inline) state else WalkState(bodyDoc!!), iterFrame, pathNames + ringName, ordinal, turns - 1)
                             }
                             val fixed = turns > 1 && next == yielded
@@ -444,7 +454,7 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
                     // Ring entry IS withContext: any suspend runner in the subtree
                     // reads currentCoroutineContext()[LcncScopeFrame] — block
                     // compatibility through the context machinery, not the grammar.
-                    val yielded = withContext(childFrame) {
+                    val yielded = lcncContext(childFrame) {
                         runRing(bodyNodes, bodyState, childFrame, pathNames + ringName, ordinal)
                     }
                     publish(yielded + ("returns" to yielded))
@@ -463,7 +473,15 @@ class LcncRunner(private val registry: Map<String, LcncNodeRunner>) {
 
                 val runner = registry[node.type] ?: throw LcncUnknownNodeType(node.type)
                 mark(LcncTrail.Kind.BEGIN, pathNames, node)
-                val produced = try { runner.run(node, inputs) }
+                val produced = try {
+                    if (invocation == null && !sourceStep) runner.run(node, inputs)
+                    else {
+                        val sourceContext = if (sourceStep) borg.trikeshed.vm.VmDebugRequest(currentCoroutineContext()) {
+                            checkNotNull(debug).sourceCheckpoint(ordinal, node.id, it)
+                        } else kotlin.coroutines.EmptyCoroutineContext
+                        lcncContext((invocation ?: kotlin.coroutines.EmptyCoroutineContext) + sourceContext) { runner.run(node, inputs) }
+                    }
+                }
                     catch (failure: Throwable) { mark(LcncTrail.Kind.FAIL, pathNames, node, failure.message); throw failure }
                 publish(produced)
                 mark(LcncTrail.Kind.END, pathNames, node, if (trail != null) LcncTrail.summary(produced) else null)
