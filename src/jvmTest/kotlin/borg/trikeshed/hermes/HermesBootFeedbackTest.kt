@@ -169,7 +169,7 @@ class HermesBootFeedbackTest {
     }
 
     @Test
-    fun oneShotRuntimeBindingMustCompleteBeforeConsoleReadiness() {
+    fun runtimeProviderBindingMustCompleteBeforeConsoleReadiness() {
         HermesVmConsole(Path.of("unused"), Path.of("unused")).use { console ->
             console.inventoryLoader = { port ->
                 port.inventorySources(mapOf(
@@ -185,7 +185,7 @@ class HermesBootFeedbackTest {
             assertEquals(HermesVmConsole.State.FAILED, console.open())
             val boot = console.snapshotMap()["boot"] as Map<*, *>
             assertEquals("bootstrap", boot["phase"])
-            assertEquals("hermes_cli.oneshot", boot["module"], "completed imports must not replace the runtime evaluation anchor")
+            assertEquals("hermes_cli.runtime_provider", boot["module"], "completed imports must not replace the runtime evaluation anchor")
             assertEquals(false, boot["steadyState"])
             assertTrue(assertNotNull(boot["failure"] as? String).contains("resolve_runtime_provider"))
             assertTrue(assertNotNull(boot["traceback"] as? String).contains("bind_runtime"))

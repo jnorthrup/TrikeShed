@@ -95,7 +95,8 @@ class HermesSqlite(
                 "connection" to id, "generation" to connection.generation.toString(),
                 "readonly" to connection.readOnly, "current" to current(connection, id))
             "close" -> {
-                if (inTransaction(db)) db.createStatement().use { it.execute("ROLLBACK") }
+                // SQLite close rolls back its pending transaction. Do not run guest progress
+                // callbacks, checkpoints, or image publication while retiring a lease.
                 db.close()
                 connections.remove(id)
                 if (connection.path != null && writers[connection.path] == id) writers.remove(connection.path)
@@ -157,6 +158,7 @@ class HermesSqlite(
             "script" -> {
                 val sql = text("sql")
                 HermesSqliteSql.check(sql, script = true)
+                if (connection.readOnly) HermesSqliteSql.checkReadOnly(sql)
                 if (inTransaction(db)) db.createStatement().use { it.execute("COMMIT") }
                 try {
                     val rc = db.database._exec(sql)
@@ -192,7 +194,9 @@ class HermesSqlite(
         if (path != null && !readOnly && path in writers)
             throw UnsupportedOperationException("a writable SQLite connection already owns this virtual database: $path")
         val image = path?.let(readImage)
-        if (readOnly && image == null) throw SQLException("unable to open database file")
+        if (path != null && listOf("-wal", "-shm").any { readImage(path + it)?.isNotEmpty() == true })
+            throw UnsupportedOperationException("SQLite sidecar import requires a checkpointed database image")
+        if ((readOnly || request["existing"] == true) && image == null) throw SQLException("unable to open database file")
         val db = memory()
         try {
             if (image != null && image.isNotEmpty()) db.deserialize("main", image)
@@ -272,6 +276,7 @@ class HermesSqlite(
 
     fun execute(connection: Connection, sql: String, parameters: Any?, isolation: String?): Map<String, Any?> {
         HermesSqliteSql.check(sql)
+        if (connection.readOnly) HermesSqliteSql.checkReadOnly(sql)
         val db = connection.db
         val command = HermesSqliteSql.command(sql)
         val dml = command in setOf("INSERT", "UPDATE", "DELETE", "REPLACE")
@@ -334,7 +339,6 @@ class HermesSqlite(
     override fun close() {
         var failure: Exception? = null
         for (connection in connections.values) try {
-            if (inTransaction(connection.db)) connection.db.createStatement().use { it.execute("ROLLBACK") }
             connection.db.close()
         } catch (caught: Exception) { if (failure == null) failure = caught else failure.addSuppressed(caught) }
         connections.clear()

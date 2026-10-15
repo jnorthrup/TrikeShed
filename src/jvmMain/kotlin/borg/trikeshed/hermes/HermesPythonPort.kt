@@ -401,14 +401,14 @@ class HermesPythonPort(
         isolateSqlite = sqlite
         blackboard.put(
             "hermes/python/vfs",
-            mapOf("backend" to "userspace-btrfs", "subvolume" to "live", "baseline" to baseline, "generation" to guest.vfs.generation()),
+            mapOf("backend" to "userspace-btrfs", "subvolume" to guest.vfs.liveSubvolumeForTools(), "baseline" to result.b, "generation" to guest.vfs.generation()),
             "graal-python",
         )
-        return result
+        return result.a
     }
 
     private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
-                           sockets: HermesSocketProvider?): Teleported {
+                           sockets: HermesSocketProvider?): Join<Teleported, String> {
         val files = LinkedHashMap<String, ByteArray>()
         for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) files["/workspace/$path"] = bytes
         for (candidate in inventory.modules.values) {
@@ -416,7 +416,11 @@ class HermesPythonPort(
             files["/workspace/$modulePath"] = candidate.source.encodeToByteArray()
         }
         guest.put(files.entries.toTypedArray().toSeries() α { it.key j it.value })
-        check(guest.snapshot(baseline)) { "unable to snapshot Hermes Graal VFS baseline $baseline" }
+        val volume = guest.vfs.btrfsForTools()
+        val manifest = requireNotNull(volume.manifestId(guest.vfs.liveSubvolumeForTools()))
+        val mountedBaseline = "$baseline-${manifest.hex.take(16)}"
+        check(if (volume.hasSubvolume(mountedBaseline)) volume.manifestId(mountedBaseline) == manifest
+              else guest.snapshot(mountedBaseline)) { "unable to snapshot Hermes Graal VFS baseline $mountedBaseline" }
         // A directory with no __init__.py is a PEP 420 namespace package on a real filesystem,
         // and Hermes leans on that: `plugins/platforms`, `plugins/browser`, `scripts` and friends
         // carry no __init__.py, so they never enter the inventory and every module beneath them
@@ -494,7 +498,7 @@ class HermesPythonPort(
         if (GUEST_PRELUDE in inventory.modules) {
             guest.eval("import importlib\nimportlib.import_module(${pythonString(GUEST_PRELUDE)})\nTrue", "hermes-guest-prelude.py")
         }
-        return guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py")
+        return guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py") j mountedBaseline
     }
 
     private fun land(name: String, status: String, failure: String? = null, traceback: String? = null, origin: String = "guest", exceptionId: String? = null) {

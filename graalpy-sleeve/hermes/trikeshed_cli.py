@@ -52,6 +52,7 @@ def submit(line=None):
         except queue.Empty:
             cli._tui_idle_tick()
             return status()
+    cli._last_turn_attempted = False
     cli._last_turn_result = None
     cli._tui_process_one_input(line)
     if cli._should_exit:
@@ -67,6 +68,10 @@ def status():
         "session_id": cli.session_id if cli is not None else None,
         "pending": cli._pending_input.qsize() if cli is not None else 0,
         "history_size": len(cli.conversation_history) if cli is not None else 0,
+        "turn_attempted": bool(getattr(cli, "_last_turn_attempted", False)) if cli is not None else False,
+        "model": cli.model if cli is not None else None,
+        "provider": cli.provider if cli is not None else None,
+        "session_store": getattr(cli, "_session_db", None) is not None if cli is not None else False,
         "turn": {
             key: result.get(key)
             for key in ("completed", "failed", "interrupted", "api_calls", "error", "failure_reason")

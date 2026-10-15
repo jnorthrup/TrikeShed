@@ -248,6 +248,7 @@ class Connection:
         self._progress = None
         database = os.fsdecode(os.fspath(database))
         readonly = False
+        existing = False
         if uri and database.startswith("file:"):
             parsed = urlsplit(database)
             if parsed.netloc not in ("", "localhost"):
@@ -258,13 +259,16 @@ class Connection:
                 raise OperationalError("invalid SQLite URI mode")
             if set(options) - {"mode", "cache"}:
                 raise NotSupportedError("unsupported SQLite URI options")
+            if options.get("cache", ["private"])[0] != "private":
+                raise NotSupportedError("shared SQLite URI caches are unavailable at the image boundary")
             if mode == "memory" or parsed.path == ":memory:": database = ":memory:"
             else: database = unquote(parsed.path)
             readonly = mode == "ro"
+            existing = mode == "rw"
         if not database: raise NotSupportedError("temporary SQLite files are unavailable; use :memory:")
         if database != ":memory:": database = os.path.abspath(database)
         self.__trikeshed_sqlite_path__ = database
-        result = _call("connect", path=database, timeout=timeout, readonly=readonly)
+        result = _call("connect", path=database, timeout=timeout, readonly=readonly, existing=existing)
         self._id = int(result["id"])
 
     def _check(self):
@@ -369,6 +373,59 @@ converters = {}
 def register_adapter(type, adapter): adapters[(type, PrepareProtocol)] = adapter
 def register_converter(typename, converter): converters[typename.upper()] = converter
 def Binary(value): return memoryview(value)
+
+
+def complete_statement(statement):
+    """SQLite 3.53.4 src/complete.c state machine, without native FFI.
+
+    https://github.com/sqlite/sqlite/blob/version-3.53.4/src/complete.c
+    SQLite dedicates this source to the public domain.
+    """
+    if not isinstance(statement, str): raise TypeError("statement must be str")
+    if "\x00" in statement: raise ValueError("embedded null character")
+    transitions = (
+        (1, 0, 2, 3, 4, 2, 2, 2),
+        (1, 1, 2, 3, 4, 2, 2, 2),
+        (1, 2, 2, 2, 2, 2, 2, 2),
+        (1, 3, 3, 2, 4, 2, 2, 2),
+        (1, 4, 2, 2, 2, 4, 5, 2),
+        (6, 5, 5, 5, 5, 5, 5, 5),
+        (6, 6, 5, 5, 5, 5, 5, 7),
+        (1, 7, 5, 5, 5, 5, 5, 5),
+    )
+    keywords = {"explain": 3, "create": 4, "temp": 5, "temporary": 5, "trigger": 6, "end": 7}
+    state = at = 0
+    while at < len(statement):
+        char = statement[at]
+        token = 2
+        if char == ";": token = 0
+        elif char in " \r\t\n\f": token = 1
+        elif statement.startswith("/*", at):
+            end = statement.find("*/", at + 2)
+            if end < 0: return False
+            at = end + 1
+            token = 1
+        elif statement.startswith("--", at):
+            end = statement.find("\n", at + 2)
+            if end < 0: return state == 1
+            at = end
+            token = 1
+        elif char in "[\"'`":
+            end = statement.find("]" if char == "[" else char, at + 1)
+            if end < 0: return False
+            at = end
+        elif char.isascii() and (char.isalnum() or char in "_$") or ord(char) >= 128:
+            end = at + 1
+            while end < len(statement):
+                next_char = statement[end]
+                if not ((next_char.isascii() and (next_char.isalnum() or next_char in "_$")) or ord(next_char) >= 128): break
+                end += 1
+            token = keywords.get(statement[at:end].lower(), 2)
+            at = end - 1
+        state = transitions[state][token]
+        at += 1
+    return state == 1
+
 
 sqlite_version = _call("version")
 sqlite_version_info = tuple(int(part) for part in sqlite_version.split("."))

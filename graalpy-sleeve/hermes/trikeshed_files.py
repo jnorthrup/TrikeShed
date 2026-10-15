@@ -13,7 +13,7 @@ import stat
 from tools.file_operations import ShellFileOperations, describe_binary_file
 from tools.binary_extensions import has_binary_extension
 from tools.file_operations_common import (
-    ExecuteResult, PatchResult, ReadResult, SearchResult, WriteResult, _strip_bom,
+    PatchResult, ReadResult, SearchResult, WriteResult, _strip_bom,
 )
 
 VFS = True
@@ -33,7 +33,18 @@ class VfsFileOperations(ShellFileOperations):
         return os.path.expanduser(path)
 
     def _exec(self, command, cwd=None, timeout=None, stdin_data=None):
-        return ExecuteResult(stdout=_UNAVAILABLE, exit_code=1)
+        raise NotImplementedError(_UNAVAILABLE)
+
+    def _read_file_missing(self, path, offset, limit):
+        return ReadResult(error=f"File not found: {path}", not_found=True)
+
+    def _read_file_sequential(self, path, offset, limit):
+        return ReadResult(error=f"Failed to read mounted file '{path}'; shell fallback is unavailable")
+
+    def _read_binary_file(self, path, offset, limit, file_size, sample_bytes):
+        return ReadResult(
+            is_binary=True, file_size=file_size, error=describe_binary_file(sample_bytes, file_size),
+        )
 
     def _read_bytes(self, path, max_bytes=None):
         path = self._expand_path(path)

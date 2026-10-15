@@ -14,6 +14,7 @@ import borg.trikeshed.terminal.VtKey
 import borg.trikeshed.terminal.TerminalOutputStream
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import borg.trikeshed.vm.Teleported
+import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.graal.subvm.GuestException
@@ -120,6 +121,7 @@ class HermesVmConsole(
     @Volatile private var modelId: String? = null
     @Volatile private var cliStarted = false
     @Volatile private var cliRequested = false
+    @Volatile private var cliStatus: Map<String, Any?>? = null
     private val _events = MutableSharedFlow<Event>(replay = 128, extraBufferCapacity = 1024)
     val events: SharedFlow<Event> = _events.asSharedFlow()
     @Volatile var state: State = State.CLOSED; private set
@@ -192,7 +194,7 @@ class HermesVmConsole(
             }
             if (cliRequested) {
                 bootPhase(BootPhase.BOOTSTRAP, "initializing HermesCLI and its session store", "cli.HermesCLI")
-                port.evalInVm("""
+                val started = port.evalInVm("""
                     import trikeshed_cli
                     import trikeshed_files
                     from cli import HermesCLI
@@ -202,8 +204,11 @@ class HermesVmConsole(
                         raise RuntimeError('HermesCLI session store is unavailable')
                     __hermes_cli.run()
                     assert trikeshed_cli.status()['open']
-                    True
+                    trikeshed_cli.status()
                 """.trimIndent(), "hermes-cli-start.py")
+                check(started is Teleported.Obj) { "HermesCLI did not return its state" }
+                cliStatus = reifyMap(started.canonical())
+                modelId = cliStatus?.get("model") as? String
                 cliStarted = true
             } else {
                 bootPhase(BootPhase.BOOTSTRAP, "initializing the Python diagnostic console", "hermes-xterm-bootstrap.py")
@@ -473,6 +478,7 @@ class HermesVmConsole(
             "boot" to boot?.toMap(),
             "model" to modelId,
             "runtime" to if (cliRequested) "hermes-cli" else "python-diagnostic",
+            "cli" to cliStatus,
             "panel" to mapOf(
                 "id" to panel.descriptor.id.value,
                 "kind" to panel.descriptor.kind,
@@ -586,9 +592,21 @@ class HermesVmConsole(
         if (cliStarted) {
             val result = port.evalInVm("trikeshed_cli.submit(${pythonString(prompt)})", "hermes-cli-input.py")
             val status = (result as? Teleported.Obj)?.v
+            check(status != null) { "HermesCLI did not return its state" }
+            cliStatus = reifyMap(result.canonical())
+            modelId = cliStatus?.get("model") as? String
             if (status?.get("open") == Teleported.Bool(false)) {
                 cliStarted = false
                 transition(State.CLOSED, "HermesCLI exited")
+            }
+            val turn = (status["turn"] as? Teleported.Obj)?.v
+            check(status["turn_attempted"] != Teleported.Bool(true) || turn != null) {
+                "HermesCLI could not complete the turn; see the CLI output"
+            }
+            check(turn == null || (turn["completed"] != Teleported.Bool(false) &&
+                turn["failed"] != Teleported.Bool(true) && turn["interrupted"] != Teleported.Bool(true) &&
+                (turn["error"] == null || turn["error"] == Teleported.Null))) {
+                (turn?.get("error") as? Teleported.Str)?.v ?: "HermesCLI turn did not complete"
             }
             return
         }

@@ -65,6 +65,7 @@ class CLIChatTurnMixin:
         # Reset per turn; only a real interrupt flips it, so early returns leave it False.
         self._last_turn_interrupted = False
         if _host_cli_runtime() is not None:
+            self._last_turn_attempted = True
             self._last_turn_result = None
 
         if not self._ensure_runtime_credentials():

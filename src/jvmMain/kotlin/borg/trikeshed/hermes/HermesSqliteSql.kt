@@ -111,4 +111,17 @@ object HermesSqliteSql {
     }
 
     fun command(sql: String): String? = tokens(sql).firstOrNull()?.text?.uppercase()
+
+    fun checkReadOnly(sql: String) {
+        val tokens = tokens(sql)
+        tokens.forEachIndexed { index, token ->
+            if (!token.quoted && token.text.equals("pragma", true)) {
+                var name = index + 1
+                if (tokens.getOrNull(name + 1)?.text == ".") name += 2
+                if (tokens.getOrNull(name)?.text.equals("query_only", true) &&
+                    tokens.getOrNull(name + 1)?.text in setOf("=", "("))
+                    throw UnsupportedOperationException("read-only SQLite image leases cannot disable query_only")
+            }
+        }
+    }
 }
