@@ -315,6 +315,10 @@ class HermesVmConsole(
             emitCausal(completed)
         } catch (t: Throwable) {
             val message = t.message ?: t.toString()
+            if (worker != null && state == State.READY && !worker.isAlive) {
+                cliStarted = false
+                transition(State.FAILED, "Hermes worker stopped: $message")
+            }
             causalOutput("\u001b[31m$message\u001b[0m\r\n", manual.signal.id, timestampMs)
             emitCausal(panel.causalFailed(manual.signal.id, timestampMs, message))
         } finally {
@@ -636,8 +640,8 @@ class HermesVmConsole(
             check(cliStatus?.get("input_processed") == true) { "HermesCLI did not process input" }
             if (cliStatus?.get("open") != true) {
                 cliStarted = false
-                worker.close()
                 transition(State.CLOSED, "HermesCLI exited")
+                worker.close()
             }
             return
         }

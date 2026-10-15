@@ -90,7 +90,7 @@ class ProcessIsolate(
             guard(java)
             if (pythonWorker == null)
                 listOf(java, "-Xss4m", "-cp", System.getProperty("java.class.path"), SubVmMain::class.java.name, bounds.languageId, id, budget.statements.toString(), budget.wallMillis.toString())
-            else listOf(java, "-Xss4m", "-cp", System.getProperty("java.class.path"),
+            else listOf(java, "--enable-native-access=ALL-UNNAMED", "-Xss4m", "-cp", System.getProperty("java.class.path"),
                 PythonWorkerMain::class.java.name, id, pythonWorker.encode(),
                 requireNotNull(transport).port.toString(), transport.token)
         }

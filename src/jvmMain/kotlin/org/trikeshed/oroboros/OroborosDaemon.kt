@@ -2688,7 +2688,10 @@ object OroborosDaemon {
                 File(repoDir, "graalpy-sleeve/bridges").absolutePath,
             ),
             executable = File(runtime, "venv/bin/python").absolutePath,
+            arguments = listOf("hermes"),
             environment = mapOf(
+                "HOME" to workerHome.absolutePath,
+                "XDG_STATE_HOME" to File(workerHome, ".local/state").absolutePath,
                 "HERMES_HOME" to workerHome.absolutePath,
                 "HERMES_RUNTIME_DIR" to File(workerHome, "runtime").absolutePath,
                 "HERMES_DISABLE_LAZY_INSTALLS" to "1",
@@ -2697,23 +2700,6 @@ object OroborosDaemon {
                 "COLUMNS" to "100", "LINES" to "32",
             ),
         ),
-        install = { guest ->
-            val workspace = repoDir.absolutePath
-            for (name in listOf("PRELOAD.md", "AGENTS.md")) {
-                val path = fileOps.resolvePath(workspace, name)
-                if (fileOps.isFile(path)) guest.put(path, fileOps.readAllBytes(path))
-            }
-            // A real snapshot of the reference workspace, inside this guest's
-            // own volume. The donor profile and its SQLite files stay outside it.
-            guest.eval("""
-                import os
-                os.environ['HERMES_HOME'] = '/hermes-graal'
-                os.environ['TERMINAL_CWD'] = ${jsonOf(workspace)}
-                os.makedirs('/hermes-graal', exist_ok=True)
-                os.chdir(${jsonOf(workspace)})
-                True
-            """.trimIndent(), "hermes-workspace.py")
-        },
         )
     }
 
