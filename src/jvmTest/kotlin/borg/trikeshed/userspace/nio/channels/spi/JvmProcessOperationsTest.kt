@@ -12,6 +12,18 @@ import kotlin.test.assertEquals
 
 class JvmProcessOperationsTest {
     @Test
+    fun filtersSecretEnvironmentKeys(): Unit = runBlocking {
+        val result = JvmProcessOperations().exec(
+            "/bin/sh",
+            listOf("-c", "echo \"MY_TOKEN=\$MY_TOKEN,FOO=\$FOO\""),
+            env = mapOf("MY_TOKEN" to "secret123", "FOO" to "bar")
+        )
+        assertEquals(0, result.exitCode)
+        val output = result.stdout.decodeToString().trim()
+        assertEquals("MY_TOKEN=,FOO=bar", output)
+    }
+
+    @Test
     fun progressesInputAndOutputBeyondPipeCapacity(): Unit = runBlocking {
         val bytes = ByteArray(1024 * 1024) { (it % 251).toByte() }
         val result = withTimeout(10_000) { JvmProcessOperations().exec("/bin/cat", stdin = bytes) }
