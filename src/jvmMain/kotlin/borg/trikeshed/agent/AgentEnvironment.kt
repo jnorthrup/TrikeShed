@@ -1,5 +1,6 @@
 package borg.trikeshed.agent
 
+import borg.trikeshed.graal.subvm.GuestEnvironment
 import java.io.File
 
 /**
@@ -26,7 +27,12 @@ object AgentEnvironment {
         out["NO_COLOR"] = "1"
         out["CI"] = "1"
         out["PATH"] = (cliDirs + SYSTEM_PATH).map { File(it).path }.distinct().joinToString(File.pathSeparator)
-        out.putAll(extra)
+        // Security: Filter out secret-shaped keys from extra caller-supplied environment variables
+        for ((k, v) in extra) {
+            if (GuestEnvironment.deliberate(k) != GuestEnvironment.Disposition.BLOCKED) {
+                out[k] = v
+            }
+        }
         return out
     }
 }
