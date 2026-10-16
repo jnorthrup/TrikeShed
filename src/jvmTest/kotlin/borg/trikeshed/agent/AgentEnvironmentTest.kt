@@ -3,6 +3,7 @@ package borg.trikeshed.agent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** The agent's environment is a whitelist: no key crosses, PATH is built, git never smudges or prompts. */
@@ -19,5 +20,15 @@ class AgentEnvironmentTest {
         val dirs = AgentCli.candidateDirs(home = "/Users/x", path = "/tmp/cmux-cli-shims:/opt/homebrew/bin:/usr/local/go/bin", tmp = "/tmp")
         assertEquals("/opt/homebrew/bin", dirs.first())
         assertTrue("/tmp/cmux-cli-shims" !in dirs && "/usr/local/go/bin" in dirs, dirs.toString())
+    }
+
+    @Test
+    fun extraEnvironmentFiltersToxicKeys() {
+        val host = mapOf("HOME" to "/Users/x")
+        val extra = mapOf("SAFE_FLAG" to "1", "MY_API_KEY" to "leak", "USER_PASSWORD" to "secret")
+        val env = AgentEnvironment.build(host, listOf("/usr/bin"), extra)
+        assertEquals("1", env["SAFE_FLAG"])
+        assertNull(env["MY_API_KEY"])
+        assertNull(env["USER_PASSWORD"])
     }
 }
