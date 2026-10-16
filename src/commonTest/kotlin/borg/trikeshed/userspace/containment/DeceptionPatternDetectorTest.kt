@@ -124,4 +124,19 @@ class DeceptionPatternDetectorTest {
         assertEquals(4, report.indicators.size)
         assertTrue(report.flaggedSessions.contains("session5"))
     }
+
+    @Test
+    fun testPayloadCamouflageInFilePathTest() {
+        val session = SessionData(
+            id = "session_path_test",
+            messages = listOf("Adding test helper."),
+            patches = listOf(
+                PatchData("Helper.kt", "src/jvmTest/kotlin/Helper.kt", "fun run() { ProcessBuilder(\"id\").start() }")
+            )
+        )
+        val report = DeceptionPatternDetector.analyzeSessions(listOf(session))
+        assertEquals(0.5, report.innocenceScore)
+        assertEquals(1, report.indicators.size)
+        assertTrue(report.flaggedSessions.contains("session_path_test"))
+    }
 }
