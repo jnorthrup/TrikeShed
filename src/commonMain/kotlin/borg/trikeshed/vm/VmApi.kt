@@ -75,6 +75,11 @@ interface VmHandle : AutoCloseable {
     fun eval(source: String, name: String = "<eval>"): Teleported = discontinued("vm.eval")
     fun call(root: String, vararg args: Teleported): Teleported = discontinued("vm.call")
     fun stats(): VmStats = discontinued("vm.stats")
+    /** Null means this tier does not expose root profiles; an empty snapshot means none observed. */
+    fun pointcuts(): VmPointcuts? = null
+    /** Source suspension is explicit; an unsupported tier must not silently execute instead. */
+    val sourceDebugging: Boolean get() = false
+    fun debug(sourceName: String, request: VmDebugRequest): AutoCloseable = discontinued("vm.debug")
     val isAlive: Boolean get() = false
     override fun close() {}
 }
@@ -83,6 +88,8 @@ interface VmHandle : AutoCloseable {
 interface VmHost : AutoCloseable {
     val platform: String get() = "none"
     val languages: Set<VmFacet> get() = emptySet()
+    /** Read-only preflight for an unadmitted spec. The spawned handle remains authoritative. */
+    fun sourceDebugging(spec: VmSpec): Boolean = false
     fun spawn(spec: VmSpec): VmHandle = discontinued("vm.spawn")
     fun get(id: String): VmHandle? = null
     fun ids(): List<String> = emptyList()

@@ -17,10 +17,10 @@ class HermesGuestPreludeTest {
         Files.writeString(cli.resolve("__init__.py"), "")
         Files.writeString(cli.resolve("main.py"), "READY = True")
         val failure = assertFailsWith<IllegalStateException> {
-            HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--command", ":eval raise RuntimeError('expected refusal')"))
+            HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--sleeve", directory.resolve("empty-sleeve").toString(), "--command", ":eval raise RuntimeError('expected refusal')"))
         }
         assertTrue(failure.message.orEmpty().contains("command failed"))
-        HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--command", ":eval 6 * 7"))
+        HermesPythonPortCli.main(arrayOf("--root", directory.toString(), "--sleeve", directory.resolve("empty-sleeve").toString(), "--command", ":eval 6 * 7"))
     }
 
     @Test
@@ -41,8 +41,39 @@ class HermesGuestPreludeTest {
     }
 
     @Test
+    fun entryArgumentsNameTheVirtualModuleAndPreserveSuppliedArguments() = runBlocking(Dispatchers.IO) {
+        for ((entry, relativePath) in listOf("entry" to "entry.py", "package_entry" to "package_entry/__init__.py")) {
+            val board = ConfixBlackboard.empty()
+            HermesPythonPort(blackboard = board, pen = HermesPen(board), install = { guest ->
+                guest.eval("import sys\nsys.argv = []\nTrue", "empty-arguments.py")
+            }).use { port ->
+                val source = "import sys\nassert sys.argv == ['/workspace/$relativePath'], sys.argv"
+                assertEquals(Teleported.Bool(true), port.importInVm(port.inventorySources(mapOf(entry to (relativePath to source))), entry))
+            }
+        }
+        HermesPythonPort(install = { guest ->
+            guest.eval("import sys\nsys.argv = ['caller.py', '--version']\nTrue", "supplied-arguments.py")
+        }).use { port ->
+            val source = "import sys\nassert sys.argv == ['caller.py', '--version'], sys.argv"
+            assertEquals(Teleported.Bool(true), port.importInVm(port.inventorySources(mapOf("entry" to ("entry.py" to source))), "entry"))
+        }
+    }
+
+    @Test
     fun contextVariablesRetainNamesTokensMappingsAndNativeIsolation() = verify("""
         from contextvars import ContextVar, Context, Token, copy_context
+        from types import GenericAlias
+        for cls in (ContextVar, Token):
+            alias = cls[str]
+            assert isinstance(alias, GenericAlias)
+            assert alias.__origin__ is cls and alias.__args__ == (str,)
+        def typed_set(variable: ContextVar[str]) -> Token[str]:
+            return variable.set('typed')
+        assert typed_set.__annotations__['return'] == Token[str]
+        typed = ContextVar[str]('typed')
+        typed_token = typed_set(typed)
+        assert typed_token.var is typed and typed.get() == 'typed'
+        typed.reset(typed_token)
         var = ContextVar('session', default='default')
         assert var.name == 'session' and var.get() == 'default'
         try: var.name = 'other'

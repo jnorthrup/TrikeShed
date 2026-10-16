@@ -4,6 +4,8 @@ import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.pointcut.VmFacet
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 /**
  * Tier 2 as a host of its own: every guest is a child process behind a [ProcessPipe], speaking
@@ -11,6 +13,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
  * pipe (`java … SubVmMain` on the JVM, a node launcher, a native guest). Separate address space is
  * the page protection the in-process tier cannot give.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class ProcessVmHost(
     override val platform: String,
     override val languages: Set<VmFacet>,
@@ -19,11 +22,13 @@ class ProcessVmHost(
     private val handles = LinkedHashMap<String, ProcessIsolateHost>()
     private val specs = LinkedHashMap<String, VmSpec>()
     private val revoked = LinkedHashMap<String, String>()
+    private val closed = AtomicBoolean(false)
     private var seq = 0L
     private val _events = MutableSharedFlow<VmEvent>(replay = 256, extraBufferCapacity = 1024)
     override val events: Flow<VmEvent> get() = _events
 
     override fun spawn(spec: VmSpec): VmHandle {
+        check(!closed.load()) { "Process VM host is closed" }
         require(spec.id !in handles) { "isolate '${spec.id}' exists" }
         val h = ProcessIsolateHost(spec.id, spec.facet, launcher(spec))
         handles[spec.id] = h; specs[spec.id] = spec
@@ -52,7 +57,17 @@ class ProcessVmHost(
         )
     }.asCursor()
 
-    override fun close() { handles.values.forEach { runCatching { it.close() } } }
+    override fun close() {
+        closed.store(true)
+        var failure: Throwable? = null
+        for (handle in handles.values.toList()) {
+            try { handle.close() }
+            catch (cause: Throwable) {
+                if (failure == null) failure = cause else if (failure !== cause) failure.addSuppressed(cause)
+            }
+        }
+        failure?.let { throw it }
+    }
 
     private inner class Observed(private val h: ProcessIsolateHost) : VmHandle by h {
         override fun eval(source: String, name: String): Teleported {

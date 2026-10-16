@@ -3,19 +3,29 @@ package borg.trikeshed.hermes
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.cas.LineCas
+import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.collections.LineAperture
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.Budget
 import borg.trikeshed.lib.*
+import borg.trikeshed.graal.subvm.PythonHostServices
+import borg.trikeshed.graal.subvm.PythonContextVars
+import borg.trikeshed.graal.subvm.PythonGuestPrelude
+import borg.trikeshed.graal.subvm.PythonSocketProvider
+import borg.trikeshed.graal.subvm.PythonTlsProvider
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.graal.subvm.PythonWheels
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.parse.yaml.YamlParser
 import borg.trikeshed.vm.Teleported
+import java.nio.file.FileVisitResult
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.SimpleFileVisitor
+import java.nio.file.attribute.BasicFileAttributes
 import java.io.OutputStream
 import kotlinx.coroutines.CoroutineScope
+import org.graalvm.polyglot.PolyglotException
 import kotlin.io.path.extension
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
@@ -218,24 +228,44 @@ class HermesPythonPort(
     private val socketScope: CoroutineScope? = null,
     /** Host-owned services installed before source imports, under the existing guest bounds. */
     private val install: (GraalBtrfsSupervisor) -> Unit = {},
+    /** The same import-site evidence projected to the blackboard, delivered while the guest is running. */
+    private val importPointcut: (Map<String, Any?>) -> Unit = {},
+    private val world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
 ) : AutoCloseable {
     private var isolate: GraalBtrfsSupervisor? = null
-    private var isolateSockets: HermesSocketProvider? = null
+    private var isolateSockets: PythonSocketProvider? = null
+    private var isolateServices: PythonHostServices? = null
 
     fun inventory(root: Path, sleeveRoot: Path? = null): HermesPortInventory {
         require(Files.isDirectory(root)) { "Hermes source root is not a directory: $root" }
         val upstream = readSources(root)
-        val sleeve = sleeveRoot?.takeIf(Files::isDirectory)?.let { readSources(it, "sleeve:") }.orEmpty()
+        val shared = sleeveRoot?.parent?.resolve("python")?.takeIf(Files::isDirectory)
+            ?.let { readSources(it, "python-sleeve:") }.orEmpty()
+        val application = sleeveRoot?.takeIf(Files::isDirectory)?.let { readSources(it, "sleeve:") }.orEmpty()
+        require(shared.keys.none { it in application }) { "Application sleeve shadows a shared Python module" }
+        val sleeve = shared + application
         return inventorySources(upstream, root, sleeve, sleeveRoot, PythonWheels.installed())
     }
 
     private fun readSources(root: Path, displayPrefix: String = ""): Map<String, Pair<String, String>> {
         val sources = linkedMapOf<String, Pair<String, String>>()
-        Files.walk(root).use { paths ->
-            paths.filter { path -> include(root, path) }.sorted().forEach { path ->
-                val relative = root.relativize(path).toString().replace('\\', '/')
-                moduleName(relative)?.let { name -> sources[name] = "$displayPrefix$relative" to path.readText() }
+        val paths = mutableListOf<Path>()
+        Files.walkFileTree(root, object : SimpleFileVisitor<Path>() {
+            override fun preVisitDirectory(dir: Path, attrs: BasicFileAttributes): FileVisitResult {
+                val name = dir.fileName.toString()
+                return if (dir != root && (name.startsWith('.') || name in EXCLUDED_DIRS)) {
+                    FileVisitResult.SKIP_SUBTREE
+                } else FileVisitResult.CONTINUE
             }
+
+            override fun visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult {
+                if (include(root, file)) paths.add(file)
+                return FileVisitResult.CONTINUE
+            }
+        })
+        for (path in paths.sorted()) {
+            val relative = root.relativize(path).toString().replace('\\', '/')
+            moduleName(relative)?.let { name -> sources[name] = "$displayPrefix$relative" to path.readText() }
         }
         return sources
     }
@@ -250,27 +280,27 @@ class HermesPythonPort(
         val dependencySources = dependencies?.sources.orEmpty()
         require(dependencySources.keys.none { it in sources || it in sleeveSources }) { "Python dependency shadows an upstream or sleeve module" }
         val supplied = if (pen == null) sleeveSources else LinkedHashMap(sleeveSources).apply {
-            if (HermesContextVars.MODULE !in sources && HermesContextVars.MODULE !in this &&
-                HermesContextVars.MODULE !in dependencySources) {
-                put(HermesContextVars.MODULE, "sleeve:contextvars.py" to HermesContextVars.source)
+            if (PythonContextVars.MODULE !in sources && PythonContextVars.MODULE !in this &&
+                PythonContextVars.MODULE !in dependencySources) {
+                put(PythonContextVars.MODULE, "sleeve:contextvars.py" to PythonContextVars.source)
             }
             if (GUEST_PRELUDE !in sources && GUEST_PRELUDE !in this) {
                 require(GUEST_PRELUDE !in dependencySources) { "Hermes guest prelude is host-owned" }
-                put(GUEST_PRELUDE, "sleeve:$GUEST_PRELUDE.py" to HermesGuestPrelude.source(socketScope != null))
+                put(GUEST_PRELUDE, "sleeve:$GUEST_PRELUDE.py" to PythonGuestPrelude.source(socketScope != null))
             }
             require(HermesModelProvider.MODULE !in sources && HermesModelProvider.MODULE !in this && HermesModelProvider.MODULE !in dependencySources) {
                 "Hermes model transport module is host-owned: ${HermesModelProvider.MODULE}"
             }
             put(HermesModelProvider.MODULE, "sleeve:${HermesModelProvider.MODULE}.py" to HermesModelProvider.source)
             if (socketScope != null) {
-                require(HermesSocketProvider.MODULE !in sources && HermesSocketProvider.MODULE !in this && HermesSocketProvider.MODULE !in dependencySources) {
-                    "Hermes socket transport module is host-owned: ${HermesSocketProvider.MODULE}"
+                require(PythonSocketProvider.MODULE !in sources && PythonSocketProvider.MODULE !in this && PythonSocketProvider.MODULE !in dependencySources) {
+                    "Hermes socket transport module is host-owned: ${PythonSocketProvider.MODULE}"
                 }
-                put(HermesSocketProvider.MODULE, "sleeve:socket.py" to HermesSocketProvider.source)
-                require(HermesTlsProvider.MODULE !in sources && HermesTlsProvider.MODULE !in this && HermesTlsProvider.MODULE !in dependencySources) {
-                    "Hermes TLS transport module is host-owned: ${HermesTlsProvider.MODULE}"
+                put(PythonSocketProvider.MODULE, "sleeve:socket.py" to PythonSocketProvider.source)
+                require(PythonTlsProvider.MODULE !in sources && PythonTlsProvider.MODULE !in this && PythonTlsProvider.MODULE !in dependencySources) {
+                    "Hermes TLS transport module is host-owned: ${PythonTlsProvider.MODULE}"
                 }
-                put(HermesTlsProvider.MODULE, "sleeve:ssl.py" to HermesTlsProvider.source)
+                put(PythonTlsProvider.MODULE, "sleeve:ssl.py" to PythonTlsProvider.source)
             }
         }
         val combined = LinkedHashMap(dependencySources).apply { putAll(sources); putAll(supplied) }
@@ -327,44 +357,58 @@ class HermesPythonPort(
         require(module.status == HermesModuleStatus.READY) {
             "Hermes module $entry is ${module.status.name.lowercase()}: ${module.blockedBy.sorted().joinToString()}"
         }
+        val importRevision = blackboard.snapshot().revision
         val baseline = "boot-${inventory.ontology.cid.hex.take(16)}"
         val guest = GraalBtrfsSupervisor(
             id = "hermes-python",
             facet = VmFacet.GRAAL_PYTHON,
-            budget = Budget(statements = 0, wallMillis = 30_000, calls = 0),
+            budget = Budget(statements = 0, wallMillis = IMPORT_WALL_MILLIS, calls = 0),
             output = output,
             error = error,
+            world = world,
         )
-        var sockets: HermesSocketProvider? = null
+        val services = PythonHostServices(guest, world)
+        var sockets: PythonSocketProvider? = null
         val result = try {
-            if (pen != null && socketScope != null) sockets = HermesSocketProvider(socketScope)
+            if (pen != null && socketScope != null) sockets = PythonSocketProvider(socketScope)
+            services.install()
             val imported = importInVm(guest, inventory, entry, baseline, sockets)
             isolate?.close()
             isolateSockets?.close()
+            isolateServices?.close()
             imported
         } catch (failure: Throwable) {
+            try { importFailure(entry, importRevision, failure) } catch (diagnostic: Throwable) { failure.addSuppressed(diagnostic) }
             try { guest.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
             try { sockets?.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
+            try { services.close() } catch (closing: Throwable) { failure.addSuppressed(closing) }
             throw failure
         }
         isolate = guest
         isolateSockets = sockets
+        isolateServices = services
         blackboard.put(
             "hermes/python/vfs",
-            mapOf("backend" to "userspace-btrfs", "subvolume" to "live", "baseline" to baseline, "generation" to guest.vfs.generation()),
+            mapOf("backend" to "userspace-btrfs", "subvolume" to guest.vfs.liveSubvolumeForTools(), "baseline" to result.b, "generation" to guest.vfs.generation()),
             "graal-python",
         )
-        return result
+        return result.a
     }
 
     private fun importInVm(guest: GraalBtrfsSupervisor, inventory: HermesPortInventory, entry: String, baseline: String,
-                           sockets: HermesSocketProvider?): Teleported {
-        for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) guest.put("/workspace/$path", bytes)
+                           sockets: PythonSocketProvider?): Join<Teleported, String> {
+        val files = LinkedHashMap<String, ByteArray>()
+        for ((path, bytes) in inventory.dependencies?.resources.orEmpty()) files["/workspace/$path"] = bytes
         for (candidate in inventory.modules.values) {
             val modulePath = candidate.name.replace('.', '/') + if (candidate.packageModule) "/__init__.py" else ".py"
-            guest.put("/workspace/$modulePath", candidate.source.encodeToByteArray())
+            files["/workspace/$modulePath"] = candidate.source.encodeToByteArray()
         }
-        check(guest.snapshot(baseline)) { "unable to snapshot Hermes Graal VFS baseline $baseline" }
+        guest.put(files.entries.toTypedArray().toSeries() α { it.key j it.value })
+        val volume = guest.vfs.btrfsForTools()
+        val manifest = requireNotNull(volume.manifestId(guest.vfs.liveSubvolumeForTools()))
+        val mountedBaseline = "$baseline-${manifest.hex.take(16)}"
+        check(if (volume.hasSubvolume(mountedBaseline)) volume.manifestId(mountedBaseline) == manifest
+              else guest.snapshot(mountedBaseline)) { "unable to snapshot Hermes Graal VFS baseline $mountedBaseline" }
         // A directory with no __init__.py is a PEP 420 namespace package on a real filesystem,
         // and Hermes leans on that: `plugins/platforms`, `plugins/browser`, `scripts` and friends
         // carry no __init__.py, so they never enter the inventory and every module beneath them
@@ -417,12 +461,18 @@ class HermesPythonPort(
             val status = (args.getOrNull(1) as? Teleported.Str)?.v ?: "loaded"
             require(status in setOf("loading", "loaded", "failed", "refused")) { "invalid import status" }
             val failure = (args.getOrNull(2) as? Teleported.Str)?.v
-            blackboard.put("hermes/python/pointcut/import/$name",
-                mapOf("module" to name, "status" to status, "error" to failure), "graal-python")
+            val traceback = (args.getOrNull(3) as? Teleported.Str)?.v
+            val exceptionId = (args.getOrNull(4) as? Teleported.Str)?.v
+            land(name, status, failure, traceback, exceptionId = exceptionId)
             Teleported.Null
         }
         install(guest)
         pen?.install(guest, sockets)
+        val entryPath = "/workspace/" + entry.replace('.', '/') +
+            if (inventory.modules.getValue(entry).packageModule) "/__init__.py" else ".py"
+        // Embedded GraalPy starts with no argv[0]; the donor expects its actual
+        // script identity even when this host imports the entry instead of executing it.
+        guest.eval("import sys\nif not sys.argv:\n    sys.argv.append(${pythonString(entryPath)})\nTrue", "hermes-entry-arguments.py")
         guest.eval(IMPORTER_BOOTSTRAP, "hermes-blackboard-importer.py")
         // The prelude twins the capabilities the polyglot bounds withhold, and it has to run
         // before the guest binds them: stdlib `threading` copies `_thread.start_joinable_thread`
@@ -430,11 +480,34 @@ class HermesPythonPort(
         if (GUEST_PRELUDE in inventory.modules) {
             guest.eval("import importlib\nimportlib.import_module(${pythonString(GUEST_PRELUDE)})\nTrue", "hermes-guest-prelude.py")
         }
-        return try {
-            guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py")
-        } catch (t: Throwable) {
-            blackboard.put("hermes/python/pointcut/import/$entry", mapOf("module" to entry, "status" to "failed", "error" to (t.message ?: t::class.simpleName)), "graal-python")
-            throw t
+        return guest.eval("import importlib\nimportlib.import_module(${pythonString(entry)})\nTrue", "hermes-entry.py") j mountedBaseline
+    }
+
+    private fun land(name: String, status: String, failure: String? = null, traceback: String? = null, origin: String = "guest", exceptionId: String? = null) {
+        val pointcut = mapOf("module" to name, "status" to status, "error" to failure, "traceback" to traceback, "origin" to origin, "exceptionId" to exceptionId)
+        blackboard.put("hermes/python/pointcut/import/$name", pointcut, "graal-python")
+        importPointcut(pointcut)
+    }
+
+    /** A watchdog may leave Python before its except block can land the active import. */
+    private fun importFailure(entry: String, afterRevision: Long, failure: Throwable) {
+        val snapshot = blackboard.snapshot()
+        val prefix = "hermes/python/pointcut/import/"
+        val current = snapshot.values.filterKeys { key ->
+            key.startsWith(prefix) && (snapshot.provenance[key]?.revision ?: 0) > afterRevision
+        }
+        val traceback = generateSequence(failure) { it.cause }.filterIsInstance<PolyglotException>().firstOrNull()?.let { guest ->
+            runCatching {
+                guest.polyglotStackTrace.filter { it.isGuestFrame }.joinToString("\n").takeIf { it.isNotBlank() }
+            }.getOrNull()
+        }
+        val error = failure.message ?: failure::class.simpleName
+        val loading = current.entries.filter { (_, value) -> (value as? Map<*, *>)?.get("status") == "loading" }
+            .sortedByDescending { (key, _) -> snapshot.provenance[key]?.revision ?: 0 }
+        for ((key, _) in loading) land(key.removePrefix(prefix), "failed", error, traceback, "host")
+        val entryPointcut = current["$prefix$entry"] as? Map<*, *>
+        if (entryPointcut?.get("status") !in setOf("failed", "refused") && loading.none { it.key == "$prefix$entry" }) {
+            land(entry, "failed", error, traceback, "host")
         }
     }
 
@@ -449,7 +522,10 @@ class HermesPythonPort(
     override fun close() {
         try { isolate?.close() } finally {
             isolate = null
-            try { isolateSockets?.close() } finally { isolateSockets = null }
+            try { isolateSockets?.close() } finally {
+                isolateSockets = null
+                try { isolateServices?.close() } finally { isolateServices = null }
+            }
         }
     }
 
@@ -577,6 +653,7 @@ class HermesPythonPort(
     }
 
     companion object {
+        const val IMPORT_WALL_MILLIS = 60_000L
         /** Sleeve module holding the withheld/ported capability twins; imported at the waist when present. */
         const val GUEST_PRELUDE = "trikeshed_guest_prelude"
         private val EXCLUDED_DIRS = setOf("__pycache__", "build", "dist", "docs", "node_modules", "optional-skills", "skills", "tests", "venv")
@@ -600,6 +677,7 @@ class HermesPythonPort(
 
         private val IMPORTER_BOOTSTRAP = """
             import sys, importlib.abc, importlib.machinery, importlib.util
+            import traceback as _hermes_traceback
 
             # This is the guest Btrfs directory, not a host site-packages path. Standard
             # distribution discovery reads the verified wheels' .dist-info here.
@@ -615,8 +693,9 @@ class HermesPythonPort(
                 def find_spec(self, fullname, path=None, target=None):
                     verdict = host.call('verdict', fullname)
                     if verdict.startswith('ban:'):
-                        host.call('land', fullname, 'refused', verdict[4:])
-                        raise ImportError('native module banned in TrikeShed guest: ' + fullname + ': ' + verdict[4:])
+                        failure = ImportError('native module banned in TrikeShed guest: ' + fullname + ': ' + verdict[4:])
+                        host.call('land', fullname, 'refused', str(failure), None, str(id(failure)))
+                        raise failure
                     if verdict == 'namespace':
                         # A directory with no __init__.py: PEP 420 shape, no source to execute.
                         from importlib._bootstrap_external import _NamespacePath
@@ -666,7 +745,12 @@ class HermesPythonPort(
                     try:
                         exec(compile(source, module.__file__, 'exec'), module.__dict__)
                     except BaseException as failure:
-                        host.call('land', name, 'failed', str(failure))
+                        detail = None
+                        try:
+                            detail = ''.join(_hermes_traceback.format_exception(type(failure), failure, failure.__traceback__))
+                        except BaseException:
+                            pass
+                        host.call('land', name, 'failed', str(failure), detail, str(id(failure)))
                         raise
                     host.call('land', name, 'loaded')
 

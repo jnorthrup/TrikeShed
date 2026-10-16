@@ -3,6 +3,7 @@ package borg.trikeshed.graal.subvm
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.btrfs.UserspaceBtrfs
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.lib.*
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
@@ -63,6 +64,17 @@ class TrikeShedGraalVfs(
         require(relative.isNotEmpty()) { "cannot write VFS root" }
         check(btrfs.writeFile(liveSubvolume, relative, bytes)) { "VFS write rejected: $path" }
         generation.incrementAndGet()
+    }
+
+    fun put(files: Series<Join<String, ByteArray>>) {
+        val relativeFiles = ArrayList<Join<String, ByteArray>>(files.size)
+        for ((path, bytes) in files.view) {
+            val relative = relativeOf(parsePath(path))
+            require(relative.isNotEmpty()) { "cannot write VFS root" }
+            relativeFiles += relative j bytes
+        }
+        check(btrfs.writeFiles(liveSubvolume, relativeFiles.toSeries())) { "VFS batch write rejected" }
+        generation.addAndGet(relativeFiles.size.toLong())
     }
 
     fun fetch(path: String): ByteArray? = btrfs.fetchFile(liveSubvolume, relativeOf(parsePath(path)))
@@ -427,12 +439,15 @@ class GraalBtrfsSupervisor(
     )
 
     fun put(path: String, bytes: ByteArray) = vfs.put(path, bytes)
+    fun put(files: Series<Join<String, ByteArray>>) = vfs.put(files)
     fun snapshot(name: String): Boolean = vfs.snapshot(name)
     override val trust: Trust get() = Trust.OWN
     override val bounds: FacetBounds get() = guest.bounds
     override fun eval(source: String, name: String): Teleported = guest.eval(source, name)
     override fun call(root: String, vararg args: Teleported): Teleported = guest.call(root, *args)
     override fun delegate(name: String, fn: (List<Teleported>) -> Teleported) = guest.delegate(name, fn)
+    override fun delegate(name: String, hostWallMillis: Long, fn: (List<Teleported>) -> Teleported) =
+        guest.delegate(name, hostWallMillis, fn)
     override fun interrupt(): Boolean = guest.interrupt()
     override fun stats(): IsolateStats = guest.stats()
     override val isAlive: Boolean get() = guest.isAlive

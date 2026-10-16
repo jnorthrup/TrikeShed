@@ -11,7 +11,10 @@ enum class Trust { OWN, UNTRUSTED }
 /** Who served a delegated call. GUEST = original guest function; MEMO = content-hash table; HOST = warm leaf isolate. */
 enum class Served { GUEST, MEMO, HOST, SHADOW }
 
-/** Budget a lease grants an isolate. Zero = unlimited for that dimension; [calls] is per guest root. */
+/**
+ * Budget a lease grants an isolate. Zero = unlimited for that dimension; [calls] is per guest root.
+ * Ordinary host delegates share [wallMillis]; an explicit bounded host lease has its own deadline.
+ */
 data class Budget(
     val statements: Long = GuestBounds.DEFAULT_STATEMENT_LIMIT,
     val wallMillis: Long = GuestBounds.DEFAULT_WALL_MILLIS,
@@ -69,6 +72,14 @@ interface GuestIsolate : AutoCloseable {
 
     /** Register a host function the guest may call as `host.call("name", ...)` (guest → host delegation). */
     fun delegate(name: String, fn: (List<Teleported>) -> Teleported)
+
+    /**
+     * Host-authorized finite wait, separate from the remaining guest execution budget.
+     * Only implementations that enforce the host deadline may admit this lease.
+     */
+    fun delegate(name: String, hostWallMillis: Long, fn: (List<Teleported>) -> Teleported) {
+        throw UnsupportedOperationException("bounded host delegation is unavailable for $id")
+    }
 
     /** Stop whatever is running using the facet's [StopStrategy]; the isolate may or may not survive. */
     fun interrupt(): Boolean

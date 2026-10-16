@@ -162,7 +162,7 @@ tasks.register("install") {
     dependsOn(installAll)
 }
 
-// Hermes' uv.lock pins this pure wheel. No host Python environment, C accelerator,
+// Hermes' uv.lock pins these pure wheels. No host Python environment, C accelerator,
 // or Python package installer is executed. Like JVM departments, this is an optional mount.
 val hermesPython = configurations.create("hermesPython") {
     isCanBeConsumed = false
@@ -172,6 +172,21 @@ val hermesPython = configurations.create("hermesPython") {
 dependencies {
     add(hermesPython.name, "python.wheels:ruamel.yaml:0.18.16:py3-none-any@whl")
     add(hermesPython.name, "python.wheels:python_dotenv:1.2.2:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:requests:2.33.0:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:certifi:2026.5.20:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:charset_normalizer:3.5.1:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:idna:3.19:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:urllib3:2.7.0:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:httpx:0.28.1:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:httpcore:1.0.9:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:anyio:4.14.2:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:h11:0.16.0:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:markdown_it_py:4.2.0:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:mdurl:0.1.2:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:prompt_toolkit:3.0.52:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:pygments:2.21.0:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:rich:14.3.3:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:wcwidth:0.8.2:py3-none-any@whl")
 }
 val installHermesPython = tasks.register("installHermesPython") {
     group = "subvm"
@@ -183,6 +198,21 @@ val installHermesPython = tasks.register("installHermesPython") {
         val pins = mapOf(
             "ruamel.yaml-0.18.16-py3-none-any.whl" to "048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba",
             "python_dotenv-1.2.2-py3-none-any.whl" to "1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a",
+            "requests-2.33.0-py3-none-any.whl" to "3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b",
+            "certifi-2026.5.20-py3-none-any.whl" to "3c52e209ba0a4ad7aebe60436a4ab349c39e1e602e8c134221e546902ad25897",
+            "charset_normalizer-3.5.1-py3-none-any.whl" to "6df0ec430f9a831772c23ca5a224cba36517a58a84bb32c32bb59a9fa67c47f6",
+            "idna-3.19-py3-none-any.whl" to "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+            "urllib3-2.7.0-py3-none-any.whl" to "9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897",
+            "httpx-0.28.1-py3-none-any.whl" to "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+            "httpcore-1.0.9-py3-none-any.whl" to "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+            "anyio-4.14.2-py3-none-any.whl" to "9f505dda5ac9f0c8309b5e8bd445a8c2bf7246f3ce950121e45ea15bc41d1494",
+            "h11-0.16.0-py3-none-any.whl" to "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+            "markdown_it_py-4.2.0-py3-none-any.whl" to "9f7ebbcd14fe59494226453aed97c1070d83f8d24b6fc3a3bcf9a38092641c4a",
+            "mdurl-0.1.2-py3-none-any.whl" to "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+            "prompt_toolkit-3.0.52-py3-none-any.whl" to "9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955",
+            "pygments-2.21.0-py3-none-any.whl" to "2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9",
+            "rich-14.3.3-py3-none-any.whl" to "793431c1f8619afa7d3b52b2cdec859562b950ea0d4b6b505397612db8d5362d",
+            "wcwidth-0.8.2-py3-none-any.whl" to "d63947694a0539a1d51e01eda7caf800c291020e6cdd7e28ad7b14dd33ad4f85",
         )
         val wheels = hermesPython.resolve().sortedBy { it.name }
         check(wheels.map { it.name }.toSet() == pins.keys) { "Hermes Python artifacts differ from the lockfile" }
@@ -193,6 +223,16 @@ val installHermesPython = tasks.register("installHermesPython") {
         wheels.forEach { it.copyTo(File(lib, it.name), overwrite = true) }
         File(directory, "MANIFEST.tsv").writeText(
             "# guest module\thermes-python\n# declared\truamel.yaml==0.18.16\n# declared\tpython-dotenv==1.2.2\n" +
+                "# declared\trequests==2.33.0\n# declared\tcertifi==2026.5.20\n" +
+                "# declared\tcharset-normalizer==3.5.1\n# declared\tidna==3.19\n# declared\turllib3==2.7.0\n" +
+                "# declared\thttpx==0.28.1\n# declared\thttpcore==1.0.9\n" +
+                "# declared\tanyio==4.14.2\n# declared\th11==0.16.0\n" +
+                "# declared\tmarkdown-it-py==4.2.0\n" +
+                "# declared\tmdurl==0.1.2\n" +
+                "# declared\tprompt-toolkit==3.0.52\n" +
+                "# declared\tpygments==2.21.0\n" +
+                "# declared\trich==14.3.3\n" +
+                "# declared\twcwidth==0.8.2\n" +
                 "file\tsize\tsha256\n" + wheels.joinToString("") { "${it.name}\t${it.length()}\t${pins.getValue(it.name)}\n" },
         )
         logger.lifecycle("[subvm] hermes-python: ${wheels.sumOf { it.length() }} bytes -> ${lib.path}")

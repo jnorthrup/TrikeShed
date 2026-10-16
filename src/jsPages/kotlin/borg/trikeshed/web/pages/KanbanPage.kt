@@ -2,6 +2,7 @@ package borg.trikeshed.web.pages
 
 import kotlinx.browser.document
 import kotlinx.browser.window
+import kotlinx.coroutines.CancellationException
 import org.w3c.dom.Element
 import org.w3c.dom.EventSource
 import org.w3c.dom.HTMLButtonElement
@@ -348,11 +349,13 @@ object KanbanPage {
             // there is no "archive" verb in the reducer — archiving IS a move to the archived column
             launchPage { moveCard(id, revision, from, "archived", null) }
         })
+        if (strOrEmpty(it.spec).lineSequence().any { line -> line.startsWith("DOCUMENT: ") || line.startsWith("DOCUMENT-REVIEW: ") })
+            el.appendChild(documentTaskDetail(el, id, str(revision), from))
         flashes[id]?.let { applyFlash(el, it) }
         // Pointer-event drag, NOT HTML5 DnD: works identically for mouse, trackpad, touch, and pen.
         el.addEventListener("pointerdown", { ev: Event ->
             val e = ev as PointerEvent
-            if (e.button.toInt() != 0 || (e.target as Element).closest(".archive") != null) return@addEventListener
+            if (e.button.toInt() != 0 || (e.target as Element).closest(".archive, .document-task") != null) return@addEventListener
             val sx = e.clientX
             val sy = e.clientY
             var ghost: HTMLElement? = null
@@ -409,6 +412,153 @@ object KanbanPage {
             window.addEventListener("pointercancel", onUp)
         })
         return el
+    }
+
+    /** A retained DOCUMENT spec enables inspection; only the task GET supplies review data. */
+    fun documentTaskDetail(card: HTMLElement, id: String, revision: String, column: String): HTMLElement {
+        val details = document.createElement("details") as HTMLElement
+        details.className = "document-task"
+        details.style.cssText = "margin-top:8px;cursor:auto;user-select:text;font-size:14px;overflow-wrap:anywhere;"
+        val summary = document.createElement("summary") as HTMLElement
+        summary.textContent = "Review document task (read-only)"
+        summary.style.cursor = "pointer"
+        details.appendChild(summary)
+        val status = document.createElement("p") as HTMLElement
+        status.setAttribute("role", "status")
+        status.setAttribute("aria-live", "polite")
+        status.setAttribute("aria-atomic", "true")
+        details.appendChild(status)
+        val refresh = document.createElement("button") as HTMLButtonElement
+        refresh.type = "button"
+        refresh.textContent = "Refresh task details"
+        details.appendChild(refresh)
+        val content = document.createElement("div") as HTMLElement
+        content.tabIndex = 0
+        content.setAttribute("role", "region")
+        content.setAttribute("aria-label", "Document task snapshot")
+        details.appendChild(content)
+        details.addEventListener("pointerdown", { e -> e.stopPropagation() })
+        details.addEventListener("dragstart", { e -> e.preventDefault(); e.stopPropagation() })
+
+        var generation = 0
+        fun attached(): Boolean = boardEl.contains(card) && cardById(id) === card
+        fun field(label: String, value: String) {
+            val row = document.createElement("p") as HTMLElement
+            row.style.whiteSpace = "pre-wrap"
+            row.textContent = label + ": " + value.take(4096) + if (value.length > 4096) "\n[Truncated; full task JSON below.]" else ""
+            content.appendChild(row)
+        }
+        fun link(label: String, href: String) {
+            val row = document.createElement("p")
+            val anchor = document.createElement("a")
+            anchor.textContent = label
+            anchor.setAttribute("href", href)
+            anchor.setAttribute("draggable", "false")
+            row.appendChild(anchor)
+            content.appendChild(row)
+        }
+        fun objectValue(value: dynamic): Boolean = value != null && jsTypeOf(value) == "object" && !(js("Array").isArray(value) as Boolean)
+        val taskUrl = "/api/board?documentTask=" + (js("encodeURIComponent")(id) as String)
+        fun load() {
+            val request = ++generation
+            content.textContent = ""
+            if (!attached()) { status.textContent = "This card is no longer on the board. Reopen review from the current card."; return }
+            status.textContent = "Reading the retained task…"
+            refresh.disabled = true
+            content.setAttribute("aria-busy", "true")
+            launchPage {
+                try {
+                    val res = api(taskUrl, requestInit("GET", cache = "no-store"))
+                    if (request != generation || !details.hasAttribute("open")) return@launchPage
+                    if (!attached()) {
+                        toast("The board changed during document review. Reopen review from the current card.", 5000)
+                        return@launchPage
+                    }
+                    val body = res.body
+                    if (res.status != 200) {
+                        val reason = when (res.status) {
+                            404 -> "This document task no longer exists."
+                            400 -> "This card is not a readable document task, or its retained content is invalid."
+                            else -> "Document task read failed (HTTP ${res.status})."
+                        }
+                        val detail = if (objectValue(body) && isString(body.detail)) str(body.detail).take(512) else ""
+                        status.textContent = reason + (if (detail.isEmpty()) "" else " $detail") + " No task snapshot loaded. Refresh to retry."
+                        return@launchPage
+                    }
+                    val proposal = objectValue(body) && body.kind == "document-proposal-review"
+                    val validEvidence = if (proposal) isString(body.question) && objectValue(body.turn) &&
+                        isString(body.turn.text) && isString(body.turn.answeredBy) &&
+                        isString(body.curationReceiptCid) && isString(body.runReceiptCid) && isString(body.programCid) &&
+                        jsTypeOf(body.sourceCurrent) == "boolean" else if (objectValue(body))
+                        isString(body.instructions) && jsTypeOf(body.resolved) == "boolean" && objectValue(body.issue) &&
+                            objectValue(body.correctionSource) && objectValue(body.document) else false
+                    if (!objectValue(body) || body.jobId != id || !isNumber(body.revision) ||
+                        !isString(body.column) || !isString(body.title) || !isString(body.receiptCid) ||
+                        str(body.receiptCid).isBlank() || !objectValue(body.source) || !validEvidence) {
+                        status.textContent = "The server returned an invalid document task projection. No task snapshot loaded. Refresh to retry."
+                        return@launchPage
+                    }
+                    val current = prevItems?.get(id)
+                    if (str(body.revision) != revision || str(body.column) != column ||
+                        current == null || current.revision != revision || current.status != column) {
+                        status.textContent = "The task changed since this card was rendered. Wait for the board to refresh, then reopen review. No current snapshot is shown."
+                        return@launchPage
+                    }
+                    field("Title", str(body.title))
+                    if (proposal) {
+                        field("Revision / status", "r${str(body.revision)} · ${str(body.column)}")
+                        field("Operator question", str(body.question))
+                        field("Retained model proposal — unverified", str(body.turn.text))
+                        field("Model / seat", "${str(body.turn.answeredBy)} · ${str(body.nodeId)}")
+                        field("Task", id)
+                        field("Source identities", JSON.stringify(body.source, null, 2))
+                        field("Source version current", str(body.sourceCurrent))
+                        field("Review receipt CID", str(body.receiptCid))
+                        val receipt = js("encodeURIComponent")(body.receiptCid) as String
+                        link("Retained evidence in Documents", "/documents#curation/" + (js("encodeURIComponent")(body.curationReceiptCid) as String))
+                        link("Original run receipt", "/api/lcnc/content?cid=" + (js("encodeURIComponent")(body.runReceiptCid) as String))
+                        link("Frozen program", "/api/lcnc/content?cid=" + (js("encodeURIComponent")(body.programCid) as String))
+                        link("Original run in Confix", borg.trikeshed.web.ConfixNavigation.href(str(body.runReceiptCid), "[\"lcncRun\"]"))
+                        link("Frozen program in Confix", borg.trikeshed.web.ConfixNavigation.href(str(body.programCid)))
+                        link("Review evidence JSON (pinned)", "$taskUrl&view=receipt&receiptCid=$receipt")
+                        status.textContent = "Fetched snapshot r${str(body.revision)}. Read-only: no model request, rule admission or execution. A proposal is not a fact or approval."
+                        return@launchPage
+                    }
+                    field("Revision / status", "r${str(body.revision)} · ${str(body.column)} · resolved: ${str(body.resolved)}")
+                    field("Issue", JSON.stringify(body.issue, null, 2))
+                    field("Instructions", str(body.instructions))
+                    field("Task", id)
+                    field("Source identities", JSON.stringify(body.source, null, 2))
+                    field("Pending correction source", JSON.stringify(body.correctionSource, null, 2))
+                    field("Receipt CID", str(body.receiptCid))
+                    val receipt = js("encodeURIComponent")(body.receiptCid) as String
+                    link("Retained evidence in Documents", "/documents#curation/$receipt")
+                    link("Retained receipt JSON (pinned)", "$taskUrl&view=receipt&receiptCid=$receipt")
+                    link("Full task JSON", taskUrl)
+                    link("Load correction in Panels (does not run)", "/panels?documentTask=" + (js("encodeURIComponent")(id) as String))
+                    status.textContent = "Fetched snapshot r${str(body.revision)}. Review is read-only. Panels loads the correction for review; execution requires Run."
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Throwable) {
+                    if (request == generation && details.hasAttribute("open")) {
+                        content.textContent = ""
+                        if (attached()) status.textContent = "Unable to read the document task. No task snapshot loaded. Refresh to retry. " + (e.message ?: "Network or response error").take(512)
+                        else toast("Document review could not finish on the replaced card. Reopen review from the current card.", 5000)
+                    }
+                } finally {
+                    if (request == generation) { refresh.disabled = false; content.removeAttribute("aria-busy") }
+                }
+            }
+        }
+        refresh.addEventListener("click", { load() })
+        details.addEventListener("toggle", {
+            if (details.hasAttribute("open")) {
+                card.closest(".lane")?.asDynamic()?.scrollIntoView(js("({block:'nearest',inline:'nearest'})"))
+                load()
+            }
+            else { generation++; refresh.disabled = false; content.textContent = ""; content.removeAttribute("aria-busy") }
+        })
+        return details
     }
 
     private suspend fun addCard(title: String, lane: String, input: HTMLInputElement) {

@@ -23,6 +23,7 @@ import borg.trikeshed.rdf.RdfVocab
 import borg.trikeshed.rdf.TurtleRdf
 import java.io.File
 import java.lang.System
+import modelmux.Airgap
 
 /**
  * `book.curate` and `constellation.join`: a book's text becomes a frozen [Book] (sections, statements,
@@ -527,7 +528,12 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 "question" to "In which sense does `sentence` use the word `word`?"),
                 s.options.associateWith { SumoCorpus.nounGloss(s.lemma, it) ?: SumoCorpus.nounGloss(s.lemma.removeSuffix("s"), it) ?: SumoCorpus.classGloss(it) } +
                     (NONE to "none of the other senses: the word is used here in a sense not listed"))
-            Asked(tuplesOf, datesOf, premisesOf, sensesOf[x], gate.withPermit { runCatching { asked(key, state, q) }.getOrElse { e -> mapOf("error" to (e.message ?: e.toString())) } })
+            Asked(tuplesOf, datesOf, premisesOf, sensesOf[x], gate.withPermit {
+                runCatching { asked(key, state, q) }.getOrElse { e ->
+                    if (e is Airgap.Rejection) throw e
+                    mapOf("error" to (e.message ?: e.toString()))
+                }
+            })
         } }.awaitAll() }
         for ((x, a) in replies.withIndex()) {
             val tuplesOf = a.tuples; val datesOf = a.dates; val reply = a.reply
@@ -577,6 +583,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the premises its pages established, so the next book is asked only what is still open.
      */
     suspend fun score(key: String, names: List<String>) {
+        Airgap.requireRemote()
         val gate = kotlinx.coroutines.sync.Semaphore(JEV_AT_ONCE)
         val m = memory()
         synchronized(m) { m.tick() }
@@ -604,6 +611,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                     .mapNotNull { e -> (e as? Map<*, *>)?.let { it["premise"].toString() to ((it["noul"] as? Number)?.toDouble() ?: 0.0) } }
                     .filter { askable(it.first) }
                 val t = table(key, b, k, ts[k], read[k], open, prior, gate, at, posited, byKey)
+                Airgap.requireRemote()
                 tokens.addAndGet(t["tokens"] as Long); requests.addAndGet(t["requests"] as Int); questions.addAndGet(t["asked"] as Int)
                 // Whole or not at all: a page read while its table is rewritten sees the old table or the new one, never a torn file.
                 val f = tableFile(name, k).apply { parentFile.mkdirs() }
@@ -906,6 +914,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the premises it establishes join the facts and the rete fires again.
      */
     suspend fun oracle(key: String, bookName: String, k: Int, ask: String): Map<String, Any?> {
+        Airgap.requireRemote()
         val name = constellationOf(bookName) ?: return mapOf("error" to "book '$bookName' is in no constellation")
         val c = constellation(name)
         val sumo = SumoCorpus.classifier
@@ -1641,21 +1650,34 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 404 else 200, jsonOf(out))
             }
             // Jev rides the HTX reactor in the module's context; its key resolves through the operator KeyMux.
-            borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(Jev.BASE)
-            val jev = ctx.muxContext.minusKey(kotlinx.coroutines.Job)
+            val jev = ctx.muxContext.minusKey(kotlinx.coroutines.Job).minusKey(Airgap).let {
+                if (ctx.scope.coroutineContext[Airgap]?.enabled == true || ctx.muxContext[Airgap]?.enabled == true) it + Airgap() else it
+            }
+            val airgap = Airgap.configured() || jev[Airgap]?.enabled == true
+            if (!airgap) borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(Jev.BASE)
+            suspend fun jevDisabled() = kotlinx.coroutines.withContext(jev) { Airgap.active() }
+            fun disabled() = borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503, jsonOf(CurationFind.AIRGAP))
+            ctx.routes.claim("language", "/api/curation/airgap") { method, _, _, _ ->
+                if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                System.setProperty(Airgap.PROPERTY, "true")
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(CurationFind.AIRGAP))
+            }
             suspend fun jevKey(): String? = kotlinx.coroutines.withContext(jev) {
                 kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]?.keyMux()?.get("JEV_API_KEY")
+                    ?.takeIf { it.isNotBlank() }
             }
             // Jev over the corpus the open page's constellation reaches: `{book, section, question}` in, the oracle's reading out.
             ctx.routes.claim("language", "/api/curation/jev") { method, _, text, _ ->
                 if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                if (jevDisabled()) return@claim disabled()
                 val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
                 val out = kotlinx.coroutines.withContext(jev) {
+                    if (Airgap.active()) return@withContext CurationFind.AIRGAP
                     val key = jevKey() ?: return@withContext mapOf("error" to "JEV_API_KEY is not set")
                     runCatching { nodes.oracle(key, q["book"].toString(), (q["section"] as? Number)?.toInt() ?: 0, q["question"].toString()) }
-                        .getOrElse { mapOf("error" to (it.message ?: it.toString())) }
+                        .getOrElse { if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString())) }
                 }
-                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 502 else 200, jsonOf(out))
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out["disabled"] == true) 503 else if (out.containsKey("error")) 502 else 200, jsonOf(out))
             }
             // Jev's tables over every section of a constellation's books, or of `books`: POST `{constellation}` starts
             // the run in the background; GET reads each book's progress (sections tabled, of how many, tokens).
@@ -1663,10 +1685,12 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 when (method) {
                     "GET" -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(nodes.scored.values.toList()))
                     "POST" -> {
+                        if (jevDisabled()) return@claim disabled()
                         val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
                         val names = (q["books"] as? List<*>)?.map { it.toString() } ?: nodes.members(q["constellation"].toString())
                         val key = jevKey()
                         when {
+                            jevDisabled() -> disabled()
                             names.isEmpty() -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(404, jsonOf(mapOf("error" to "no books to score")))
                             key == null -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(502, jsonOf(mapOf("error" to "JEV_API_KEY is not set")))
                             else -> {
@@ -1683,7 +1707,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             // The curator's search: `{q, constellation?, book?, depth, limit}` over the curated leaves, n deep. Jev orders
             // what it found once the startup question came back as known: GET the verdict, POST `{q, rows}` to rank.
             val find = CurationFind(nodes)
-            ctx.scope.launch(jev + kotlinx.coroutines.Dispatchers.IO) { find.probe { jevKey() } }
+            if (airgap) find.gate = CurationFind.AIRGAP
+            else ctx.scope.launch(jev + kotlinx.coroutines.Dispatchers.IO) { find.probe { jevKey() } }
             ctx.routes.claim("language", "/api/curation/find") { method, _, text, _ ->
                 if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
@@ -1695,17 +1720,20 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             }
             ctx.routes.claim("language", "/api/curation/rank") { method, _, text, _ ->
                 when (method) {
-                    "GET" -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(find.gate))
+                    "GET" -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200,
+                        jsonOf(if (jevDisabled()) CurationFind.AIRGAP else find.gate))
                     "POST" -> {
+                        if (jevDisabled()) return@claim disabled()
                         val gate = find.gate
                         if (gate["ready"] != true) return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503, jsonOf(gate))
                         val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
                         val out = kotlinx.coroutines.withContext(jev) {
+                            if (Airgap.active()) return@withContext CurationFind.AIRGAP
                             val key = jevKey() ?: return@withContext mapOf("error" to "JEV_API_KEY is not set")
                             runCatching { find.rank(key, q["q"]?.toString().orEmpty(), (q["rows"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }) }
-                                .getOrElse { mapOf("error" to (it.message ?: it.toString())) }
+                                .getOrElse { if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString())) }
                         }
-                        borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 502 else 200, jsonOf(out))
+                        borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out["disabled"] == true) 503 else if (out.containsKey("error")) 502 else 200, jsonOf(out))
                     }
                     else -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 }

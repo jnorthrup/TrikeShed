@@ -52,7 +52,9 @@ private fun teleportOf(v: Value?, depth: Int): Teleported = when {
         if (integer.bitLength() <= 63) Teleported.Num(integer.toLong())
         else Teleported.Opaque("number:$integer")
     }
-    v.isNumber -> if (v.fitsInLong()) Teleported.Num(v.asLong()) else Teleported.Real(v.asDouble())
+    v.isNumber -> if (v.fitsInLong()) Teleported.Num(v.asLong()) else v.asDouble().let { number ->
+        if (number.isFinite()) Teleported.Real(number) else Teleported.Opaque("number:$number")
+    }
     // TruffleRuby Symbols also answer isString, but are not text: :x and "x"
     // can coexist as Hash keys. Collapsing them would silently discard data.
     v.isString -> if (v.metaObject?.metaSimpleName == "Symbol") Teleported.Opaque("symbol:${v.asString()}")

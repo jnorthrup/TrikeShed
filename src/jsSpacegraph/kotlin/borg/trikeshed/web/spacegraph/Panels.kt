@@ -35,9 +35,14 @@ class Panels : PatchSurface {
     var board: Board = Board(null)
     var diveStack: MutableList<Pair<String, dynamic>> = ArrayList()
     var autosave = true
+    var documentRevision = 0
+    var programRunning = false
+    var liveRuns = 0
+    var lastProgramRun: dynamic = null
 
     val history by lazy { PanelsHistory(this) }
     val facets by lazy { PanelsFacets(this) }
+    val debugger by lazy { PanelsDebug(this) }
     val shakeOwner by lazy { PanelsShakeOwner(this) }
     val layoutOwner by lazy { PanelsLayoutOwner(this) }
     var workspace: SpaceGraphWorkspace? = null
@@ -153,6 +158,7 @@ class Panels : PatchSurface {
         if (seedEl != null) seedEl.textContent = (arr(t.ins).map { str(it) } + inNames.map { "in:$it" }).joinToString(" · ")
         val emitEl = n.el?.querySelector(":scope > .emit")
         if (emitEl != null) emitEl.textContent = (arr(t.outs).map { str(it) } + outNames.map { "out:$it" }).joinToString(" · ")
+        renderPorts(n)
     }
 
     fun mountChildren() {
@@ -222,7 +228,11 @@ class Panels : PatchSurface {
     fun addNode(type: String, x: Double, y: Double, params: dynamic = null): dynamic {
         val t = contract(type) ?: return null
         val n = obj(); n.id = mintId(); n.type = type; n.x = x; n.y = y; n.params = obj()
-        for (k in keysOf(if (truthy(t.params)) t.params else obj())) n.params[k] = (if (params != null) params[k] else null) ?: t.params[k].v
+        for (k in keysOf(if (truthy(t.params)) t.params else obj())) {
+            val given = if (params != null) params[k] else null
+            if (given != null) n.params[k] = given
+            else if (!truthy(t.params[k].optional)) n.params[k] = t.params[k].v
+        }
         graph.nodes.push(n); buildNode(n); redraw(); save(); return n
     }
 
@@ -232,7 +242,8 @@ class Panels : PatchSurface {
     fun addChildNode(scope: dynamic, type: String): dynamic {
         val t = contract(type) ?: return null
         val n = obj(); n.id = mintId(); n.type = type; n.x = 0; n.y = 0; n.params = obj(); n._parentScope = scope
-        for (k in keysOf(if (truthy(t.params)) t.params else obj())) n.params[k] = t.params[k].v
+        for (k in keysOf(if (truthy(t.params)) t.params else obj()))
+            if (!truthy(t.params[k].optional)) n.params[k] = t.params[k].v
         if (!truthy(scope.children)) scope.children = jsArray()
         scope.children.push(n)
         graph.nodes.push(n); buildNode(n)
@@ -274,23 +285,18 @@ class Panels : PatchSurface {
             val declared = if (truthy(nd.params) && truthy(nd.params.kind)) str(nd.params.kind) else ""
             return declared.ifEmpty { "*" }
         }
-        val k = kindOf(nd.type, dir, port)
+        val ring = nd.type == "scope" || arr(nd.children).isNotEmpty()
+        val k = kindOf(if (ring) "scope" else nd.type, dir, port)
         if (k != null) return if (dir == "out") refinedLiteralKind(nd, port, k) else k
-        if (nd.type == "scope") {
+        if (ring) {
             // PROGRESSIVE TYPING: a ring parameter is GENERIC until its scope.in/scope.out declares a `kind`.
             if (!(truthy(nd.children) && num(nd.children.length) > 0) && truthy(nd.params) && truthy(nd.params.program)) return "*"
             val want = if (dir == "out") "scope.out" else "scope.in"
-            var declared: String? = null; var hit = false
-            fun wk(m: dynamic) {
-                for (c in arr(m.children)) {
-                    if (c.type == want && PatchKinds.bare(if (truthy(c.params) && truthy(c.params.name)) str(c.params.name) else "") == bare) {
-                        hit = true; val dk = if (truthy(c.params) && truthy(c.params.kind)) str(c.params.kind) else ""; if (dk.isNotEmpty()) declared = dk
-                    }
-                    wk(c)
+            for (c in arr(nd.children)) {
+                if (c.type == want && PatchKinds.bare(str(c.params?.name ?: "")) == bare) {
+                    return str(c.params?.kind ?: "").takeIf { it.isNotBlank() } ?: "*"
                 }
             }
-            wk(nd)
-            if (hit) return declared ?: "*"
         }
         return null
     }
@@ -345,11 +351,15 @@ class Panels : PatchSurface {
         val n = node(nodeId) ?: return null
         // a ring's DOM contains its children's ports — resolve the node's OWN port
         var el: dynamic = null
-        for (cand in arr(n.el.querySelectorAll(".port[data-dir=\"$dir\"][data-port=\"$name\"]"))) {
-            if (cand.closest(".node") === n.el) { el = cand; break }
+        for (cand in arr(n.el.querySelectorAll(":scope > .body .port"))) {
+            if (cand.dataset.dir == dir && PatchKinds.bare(str(cand.dataset.port)) == PatchKinds.bare(name)) {
+                el = cand; break
+            }
         }
         if (el == null) return null
         val r = el.getBoundingClientRect(); val w = world.getBoundingClientRect()
+        // A hidden child has no geometric endpoint; do not draw its cable from page origin.
+        if (num(r.width) <= 0 || num(r.height) <= 0) return null
         val o = obj()
         o.x = (num(r.left) + num(r.width) / 2 - w.left) / num(view.z)
         o.y = (num(r.top) + num(r.height) / 2 - w.top) / num(view.z)

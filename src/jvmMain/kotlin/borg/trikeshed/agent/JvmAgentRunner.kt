@@ -12,6 +12,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import modelmux.Airgap
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -51,9 +52,12 @@ class JvmAgentRunner(
 
     override suspend fun roster(): List<AgentCliInfo> = rosterRows
 
-    override suspend fun run(request: AgentRunRequest): AgentRunResult = withContext(Dispatchers.IO) { runBlockingIo(request) }
+    override suspend fun run(request: AgentRunRequest): AgentRunResult = withContext(Dispatchers.IO) {
+        Airgap.requireRemote()
+        runBlockingIo(request)
+    }
 
-    private fun runBlockingIo(request: AgentRunRequest): AgentRunResult {
+    private suspend fun runBlockingIo(request: AgentRunRequest): AgentRunResult {
         val runId = request.runId.ifBlank { mintRunId() }
         val started = clock()
         val info = rosterRows.firstOrNull { it.id == request.agent }
@@ -85,6 +89,7 @@ class JvmAgentRunner(
             val env = AgentEnvironment.build(environment, listOf(File(info.path).parent ?: "/usr/bin") + toolDirs, AgentEnvironment.GIT + extraEnvironment)
             val pb = ProcessBuilder(command).directory(repo).redirectErrorStream(true)
             pb.environment().clear(); pb.environment().putAll(env)
+            Airgap.requireRemote()
             val process = pb.start()
             val capture = BoundedCapture(request.maxBytes)
             val drain = Thread { runCatching { process.inputStream.use { capture.drain(it) } } }.apply { isDaemon = true; start() }

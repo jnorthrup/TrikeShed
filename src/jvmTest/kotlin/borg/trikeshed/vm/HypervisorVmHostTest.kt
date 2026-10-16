@@ -14,6 +14,21 @@ class HypervisorVmHostContractTest : VmHostContract() {
 }
 
 class JvmVmProvidersTest {
+    @Test fun rootProfileSnapshotsAreBoundedAndDetachedFromLaterGuestCalls() {
+        HypervisorVmHost().use { host ->
+            val guest = host.spawn(VmSpec("profiles", VmFacet.GRAAL_JS))
+            guest.eval((0..11).joinToString("\n") { "function root$it() { return $it; }; root$it();" }, "profiles.js")
+            val snapshot = guest.pointcuts()!!
+            val before = snapshot.toMap()
+            assertEquals(VmPointcuts.LIMIT, (before["roots"] as List<*>).size)
+            assertTrue((before["omitted"] as Int) > 0)
+            guest.call("root0")
+            assertEquals(before, snapshot.toMap(), "snapshot must not alias the mutable trainer profiles")
+            val current = guest.pointcuts()!!.toMap()["roots"] as List<*>
+            assertEquals(2L, current.map { it as Map<*, *> }.single { it["root"] == "root0" }["calls"])
+        }
+    }
+
     @Test
     fun jvmOffersInProcessThenProcessTiers() {
         val ids = platformVmProviders().map { it.id }

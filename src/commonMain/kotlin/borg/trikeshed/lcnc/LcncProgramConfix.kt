@@ -3,10 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
 
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import borg.trikeshed.job.ContentId
@@ -20,6 +17,22 @@ import borg.trikeshed.job.ContentId
  * (the panel editor and its `panels/` occupancy were rooted out 2026-08-27).
  */
 object LcncProgramConfix {
+
+    /**
+     * Compare authored definitions, ignoring only node presentation and the viewport.
+     * This is NOT program identity, execution equivalence, or evidence freshness: wires,
+     * order, parameters, subprogram references, controls, Kanban and seq remain compared.
+     * Canonical storage and receipt CIDs continue to include all presentation fields.
+     */
+    fun sameDefinition(left: LcncProgram, right: LcncProgram): Boolean {
+        fun definition(program: LcncProgram) = reify(toJson(program.copy(nodes = definitionNodes(program.nodes), view = null)))
+        return definition(left) == definition(right)
+    }
+
+    fun definitionNodes(values: Series<LcncNode>): Series<LcncNode> = values α { node ->
+        node.copy(x = 0.0, y = 0.0, width = null, height = null, collapsed = false,
+            children = definitionNodes(node.children))
+    }
 
     private fun nodeMap(n: LcncNode): LinkedHashMap<String, Any?> = linkedMapOf(
         "id" to n.id,

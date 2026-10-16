@@ -25,7 +25,9 @@ sealed class Teleported {
     object Null : Teleported()
     data class Bool(val v: Boolean) : Teleported()
     data class Num(val v: Long) : Teleported()
-    data class Real(val v: Double) : Teleported()
+    data class Real(val v: Double) : Teleported() {
+        init { require(v.isFinite()) { "Teleported.Real requires a finite JSON number" } }
+    }
     data class Str(val v: String) : Teleported()
     data class Bytes(val v: ByteArray) : Teleported() {
         override fun equals(other: Any?) = other is Bytes && v.contentEquals(other.v)
@@ -56,7 +58,11 @@ sealed class Teleported {
             is Boolean -> Bool(o)
             is Long -> Num(o)
             // Kotlin/JS: every number is both `Int` and `Double`; decide by fractional part there, exact types on the JVM.
-            is Float, is Double -> { val d = (o as Number).toDouble(); if (o is Int && d == floor(d) && !d.isInfinite()) Num(d.toLong()) else Real(d) }
+            is Float, is Double -> {
+                val d = (o as Number).toDouble()
+                if (!d.isFinite()) Opaque("number:$d")
+                else if (o is Int && d == floor(d)) Num(d.toLong()) else Real(d)
+            }
             is Byte, is Short, is Int -> Num((o as Number).toLong())
             is String -> Str(o)
             is ByteArray -> Bytes(o)
@@ -141,7 +147,18 @@ sealed class Teleported {
                 Null -> sb.append("null")
                 is Bool -> sb.append(t.v)
                 is Num -> sb.append(t.v)
-                is Real -> sb.append(if (t.v == floor(t.v) && !t.v.isInfinite()) t.v.toLong().toString() + ".0" else t.v.toString())
+                is Real -> {
+                    // Keep existing integral encodings where Long is exact, without saturating larger doubles.
+                    val number = when {
+                        t.v == 0.0 && t.v.toBits() == (-0.0).toBits() -> "-0.0"
+                        t.v == floor(t.v) && t.v >= Long.MIN_VALUE.toDouble() && t.v < Long.MAX_VALUE.toDouble() ->
+                            t.v.toLong().toString() + ".0"
+                        else -> t.v.toString()
+                    }
+                    sb.append(number)
+                    // JS can render integral doubles without a dot; retain the Real wire tag.
+                    if (number.none { it == '.' || it == 'e' || it == 'E' }) sb.append(".0")
+                }
                 is Str -> quote(t.v, sb)
                 is Bytes -> { sb.append("{\"\$bytes\":"); quote(Base64.encode(t.v), sb); sb.append('}') }
                 is Arr -> { sb.append('['); t.v.forEachIndexed { i, e -> if (i > 0) sb.append(','); encode(e, sb) }; sb.append(']') }

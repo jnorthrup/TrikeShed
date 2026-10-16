@@ -87,12 +87,14 @@ object ModelDiscovery {
         baseUrl: String,
         keyMux: KeyMux? = null,
     ): Result<Series<DiscoveredModel>> {
+        runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val htx = currentCoroutineContext()[HtxKey]
             ?: return Result.failure(IllegalStateException("No HtxKey found in coroutine context"))
         val key = keyMux?.get("llm.$provider.key") ?: keyMux?.get("llm.default.key")
         val headers = if (key != null) htxHeaders("Authorization" j "Bearer $key") else emptyHtxHeaders()
         val req = parseHtxRequest(url = "$baseUrl/models", method = HtxMethod.GET).copy(headers = headers)
         return try {
+            Airgap.requireRemote()
             val resp = htx.request(req)
             if (resp.status !in 200..299) {
                 Result.failure(IllegalStateException("ModelDiscovery failed with HTTP ${resp.status}"))

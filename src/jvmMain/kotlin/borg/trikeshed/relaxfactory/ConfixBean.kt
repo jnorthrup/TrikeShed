@@ -142,7 +142,8 @@ class ConfixBean(doc: ConfixDoc) {
         fun number(text: String): Number {
             val decimal = java.math.BigDecimal(text)
             return try { decimal.longValueExact() } catch (_: ArithmeticException) {
-                if (decimal.stripTrailingZeros().scale() <= 0) decimal.toBigIntegerExact() else decimal.toDouble()
+                if (decimal.stripTrailingZeros().scale() <= 0) decimal.toBigIntegerExact()
+                else decimal.toDouble().takeIf { it.isFinite() && java.math.BigDecimal.valueOf(it).compareTo(decimal) == 0 } ?: decimal
             }
         }
 
@@ -196,9 +197,14 @@ object ConfixTypes {
             java.lang.Short.TYPE, java.lang.Short::class.java -> integral(value, Short.MIN_VALUE.toLong(), Short.MAX_VALUE.toLong()).toShort()
             java.lang.Byte.TYPE, java.lang.Byte::class.java -> integral(value, Byte.MIN_VALUE.toLong(), Byte.MAX_VALUE.toLong()).toByte()
             java.lang.Double.TYPE, java.lang.Double::class.java -> (value as? Number)?.toDouble()
-                ?: throw IllegalArgumentException("Confix value is not numeric")
+                ?: decimal(value).toDouble()
             java.lang.Float.TYPE, java.lang.Float::class.java -> (value as? Number)?.toFloat()
-                ?: throw IllegalArgumentException("Confix value is not numeric")
+                ?: decimal(value).toFloat()
+            java.math.BigDecimal::class.java -> decimal(value)
+            java.math.BigInteger::class.java -> try { decimal(value).toBigIntegerExact() } catch (e: ArithmeticException) {
+                throw IllegalArgumentException("Confix value is not an exact integer", e)
+            }
+            java.util.Date::class.java -> java.util.Date(integral(value, Long.MIN_VALUE, Long.MAX_VALUE))
             java.lang.Boolean.TYPE, java.lang.Boolean::class.java -> value as? Boolean
                 ?: throw IllegalArgumentException("Confix value is not boolean")
             java.lang.Character.TYPE, java.lang.Character::class.java -> (value as? String)?.singleOrNull()
@@ -214,8 +220,7 @@ object ConfixTypes {
     }
 
     fun integral(value: Any, min: Long, max: Long): Long {
-        val number = value as? Number ?: throw IllegalArgumentException("Confix value is not numeric")
-        val decimal = java.math.BigDecimal(number.toString())
+        val decimal = decimal(value)
         val result = try { decimal.longValueExact() } catch (e: ArithmeticException) {
             throw IllegalArgumentException("Confix value is not an exact integer", e)
         }
@@ -223,7 +228,17 @@ object ConfixTypes {
         return result
     }
 
+    fun decimal(value: Any): java.math.BigDecimal = when (value) {
+        is java.math.BigDecimal -> value
+        is Number, is String -> try { java.math.BigDecimal(value.toString()) } catch (e: NumberFormatException) {
+            throw IllegalArgumentException("Confix value is not numeric", e)
+        }
+        else -> throw IllegalArgumentException("Confix value is not numeric")
+    }
+
     fun document(value: Any?): Any? = when (value) {
+        is java.math.BigDecimal, is java.math.BigInteger -> value.toString()
+        is java.util.Date -> value.time
         null, is String, is Boolean, is Number -> value
         is Char -> value.toString()
         is Enum<*> -> value.name

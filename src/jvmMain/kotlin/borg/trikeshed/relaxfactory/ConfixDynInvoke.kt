@@ -13,7 +13,9 @@ import com.oracle.truffle.api.nodes.RootNode
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
+import java.util.IdentityHashMap
 import java.util.concurrent.locks.ReentrantLock
+import org.graalvm.polyglot.Context
 import kotlin.concurrent.withLock
 
 /** All paths execute adopted Truffle nodes. Scripts are registered by the host, never by RF input. */
@@ -26,14 +28,32 @@ class ConfixDynInvoke(val statementLimit: Long = 5_000_000L) : AutoCloseable {
     val lock = ReentrantLock()
     val calls = mutableMapOf<String, Callable>()
     val methods = mutableMapOf<Method, Callable>()
+    // RootNode(null) captures the current sharing layer. A root is never transferred between
+    // the host's null layer and a guest context, or between independently owned contexts.
+    val roots = IdentityHashMap<Context?, Ast>()
     var closed = false
         private set
-    val readRoot = ReadRoot()
-    val writeRoot = WriteRoot()
-    val callRoot = CallRoot()
-    val readTarget: RootCallTarget = readRoot.callTarget
-    val writeTarget: RootCallTarget = writeRoot.callTarget
-    val callTarget: RootCallTarget = callRoot.callTarget
+    val readRoot: ReadRoot get() = ast().readRoot
+    val writeRoot: WriteRoot get() = ast().writeRoot
+    val callRoot: CallRoot get() = ast().callRoot
+    val readTarget: RootCallTarget get() = ast().readTarget
+    val writeTarget: RootCallTarget get() = ast().writeTarget
+    val callTarget: RootCallTarget get() = ast().callTarget
+
+    class Ast {
+        val readRoot = ReadRoot()
+        val writeRoot = WriteRoot()
+        val callRoot = CallRoot()
+        val readTarget: RootCallTarget = readRoot.callTarget
+        val writeTarget: RootCallTarget = writeRoot.callTarget
+        val callTarget: RootCallTarget = callRoot.callTarget
+    }
+
+    fun ast(): Ast = lock.withLock {
+        check(!closed) { "Confix dyninvoke is closed" }
+        val context = try { Context.getCurrent() } catch (_: IllegalStateException) { null }
+        roots.getOrPut(context) { Ast() }
+    }
 
     fun get(bean: ConfixBean, name: String, type: Class<*> = Any::class.java): Any? = lock.withLock {
         check(!closed) { "Confix dyninvoke is closed" }
@@ -53,15 +73,17 @@ class ConfixDynInvoke(val statementLimit: Long = 5_000_000L) : AutoCloseable {
     fun registerScript(name: String, language: String, source: String) = lock.withLock {
         check(!closed) { "Confix dyninvoke is closed" }
         require(name.isNotBlank()) { "Confix callable name is empty" }
-        val script = ConfixScript(language, source, name, statementLimit)
+        val script = ConfixScript(language, source, name, statementLimit, this)
         install(Callable(name, script::call, script))
     }
 
-    fun install(callable: Callable) {
+    fun install(callable: Callable) = lock.withLock {
         check(!closed) { "Confix dyninvoke is closed" }
         require(callable.name.isNotBlank()) { "Confix callable name is empty" }
+        if (calls[callable.name] === callable) return@withLock
         CompilerDirectives.transferToInterpreterAndInvalidate()
         calls.put(callable.name, callable)?.close()
+        Unit
     }
 
     fun call(name: String, vararg args: Any?): Any? = lock.withLock {
@@ -99,6 +121,7 @@ class ConfixDynInvoke(val statementLimit: Long = 5_000_000L) : AutoCloseable {
             }
             calls.clear()
             methods.clear()
+            roots.clear()
             failure?.let { throw it }
         }
     }
@@ -133,9 +156,10 @@ class ConfixDynInvoke(val statementLimit: Long = 5_000_000L) : AutoCloseable {
             }
             if (!generic) {
                 CompilerDirectives.transferToInterpreterAndInvalidate()
-                if (caches.size < CACHE_LIMIT) {
+                val live = caches.filter { it.assumption.isValid }.toTypedArray()
+                if (live.size < CACHE_LIMIT) {
                     val cache = insert(ReadCache(state.shape, property, type, state.shape.slot(property), state.assumption))
-                    caches += cache
+                    caches = live + cache
                     return bean.read(state, cache.slot, type)
                 }
                 generic = true

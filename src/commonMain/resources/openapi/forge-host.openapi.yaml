@@ -207,6 +207,57 @@ paths:
       responses:
         "200":
           description: ok
+  /blackboard/neighbors:
+    get:
+      operationId: blackboardNeighbors
+      summary: read-only semantic neighbors from one whole-board revision
+      description: >-
+        Uses the pinned middle SUMO corpus, lexical overlap, and exact key
+        references across the whole board. Does not assert facts or call a model.
+        References sort first, then weighted cosine score, then key; score is
+        similarity, not confidence. Opaque values are reported, not evaluated.
+      parameters:
+        - name: key
+          in: query
+          required: true
+          description: exact blackboard key, URL-encoded in the query
+          schema:
+            type: string
+        - name: revision
+          in: query
+          description: >-
+            Expected board revision. A different integer revision returns 409;
+            omission or a value that cannot be parsed as int64 uses the current snapshot.
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          description: result cap; parsed integers are clamped to 1..256, absent or invalid values use 32
+          schema:
+            type: integer
+            format: int32
+            default: 32
+        - name: corpus
+          in: query
+          description: only the pinned middle corpus is supported
+          schema:
+            type: string
+            enum: [middle]
+            default: middle
+      responses:
+        "200":
+          description: >-
+            JSON with key, revision, epoch, corpus, ontology statistics,
+            indexedKeys, classifiedKeys, opaqueKeys, and neighbors. Each neighbor
+            has key, score, concepts, terms, references (from/to), and nullable
+            provenance (actor, atMs, revision).
+        "400":
+          description: key_required or unknown_corpus
+        "404":
+          description: no_such_fact
+        "409":
+          description: snapshot_changed; refresh the board before retrying
   /blackboard/sheet:
     get:
       operationId: blackboardSheet
@@ -236,6 +287,17 @@ paths:
       responses:
         "200":
           description: html page
+  /api/graal/sync:
+    post:
+      operationId: graalSync
+      summary: reconcile worktree files and await document and memory index updates
+      responses:
+        "200":
+          description: path and deletion counts, with skipped directories and files
+        "500":
+          description: reconciliation failed
+        "503":
+          description: worktree reconciliation is unavailable on this host
   /api/graal/heap:
     get:
       operationId: graalHeap

@@ -17,6 +17,8 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.RepoOccupancy
+import borg.trikeshed.util.oroboros.element.WorktreeReconcileElement
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +42,7 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET /api/graal/vitals         [JvmVitals.snapshot] + pointcut route summary
  *   GET /api/graal/pointcuts      every `pointcut/…` document as a route row
  *   GET /api/graal/map            the whole store as compact `[id, bytes]` rows — the RTS terrain
+ *   POST /api/graal/sync          reconcile the worktree and await its document/index updates
  *   GET /api/graal/doc?id=…       selected document detail sanitized for the Graal inspector
  *   GET /api/graal/content?id=…   selected attachment bytes through the same project-db resolver
  *   GET /api/graal/dag[?id=…]     the DAG arcs the tree cannot show: shared-blob cross-links and
@@ -134,6 +137,23 @@ class GraalWire(
             }
             method == "GET" && p == "/api/graal/pointcuts" -> JvmKanbanServer.HttpResponse(200, jsonOf(mapOf("routes" to pointcutRoutes())))
             method == "GET" && p == "/api/graal/map" -> JvmKanbanServer.HttpResponse(200, jsonOf(mapMap()))
+            method == "POST" && p == "/api/graal/sync" -> {
+                val worktree = scope.coroutineContext[WorktreeReconcileElement]
+                    ?: return json(503, mapOf("error" to "worktree_sync_unavailable"))
+                try {
+                    val snapshot = worktree.sync()
+                    json(200, mapOf(
+                        "paths" to snapshot.paths.size,
+                        "deleted" to snapshot.deletedPaths.size,
+                        "skippedDirs" to snapshot.skippedDirs,
+                        "skippedFiles" to snapshot.skippedFiles,
+                    ))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    json(500, mapOf("error" to "worktree_sync_failed"))
+                }
+            }
             method == "GET" && p == "/api/graal/doc" -> withContext(Dispatchers.IO) { docRoute(path) }
             method == "GET" && p == "/api/graal/content" -> withContext(Dispatchers.IO) { contentRoute(path) }
             method == "GET" && p == "/api/graal/zoom" -> zoomRoute(path)

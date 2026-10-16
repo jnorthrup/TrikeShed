@@ -4,6 +4,9 @@ import borg.trikeshed.vm.Teleported
 import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
 import borg.trikeshed.graal.subvm.GuestException
 import borg.trikeshed.graal.subvm.PythonWheels
+import borg.trikeshed.graal.subvm.PythonContextVars
+import borg.trikeshed.graal.subvm.PythonGuestPrelude
+import borg.trikeshed.graal.subvm.PythonSocketProvider
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.toList
 import kotlin.test.Test
@@ -194,9 +197,9 @@ class HermesPythonPortTest {
 
     private fun sleeveFile(name: String): Pair<String, Pair<String, String>> {
         val source = when (name) {
-            HermesPythonPort.GUEST_PRELUDE -> HermesGuestPrelude.source(logging = true)
-            HermesSocketProvider.MODULE -> HermesSocketProvider.source
-            HermesContextVars.MODULE -> HermesContextVars.source
+            HermesPythonPort.GUEST_PRELUDE -> PythonGuestPrelude.source(logging = true)
+            PythonSocketProvider.MODULE -> PythonSocketProvider.source
+            PythonContextVars.MODULE -> PythonContextVars.source
             else -> error("No host sleeve for $name")
         }
         return name to ("$name.py" to source)
@@ -288,7 +291,7 @@ class HermesPythonPortTest {
                         assert contextvars.copy_context() is not None
                     """.trimIndent()),
                 ),
-                sleeveSources = mapOf(sleeveFile(HermesContextVars.MODULE)),
+                sleeveSources = mapOf(sleeveFile(PythonContextVars.MODULE)),
             )
             assertEquals(Teleported.Bool(true), port.importInVm(inventory, "channels"))
         }

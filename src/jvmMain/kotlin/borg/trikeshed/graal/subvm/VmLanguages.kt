@@ -49,7 +49,7 @@ object VmLanguages {
                 !adapter -> "${language.label} engine is installed, but GuestBounds and the typed source adapter do not support it."
                 !supported -> "The bound VM host does not expose ${language.label}."
                 language == VmLanguage.RUBY -> "TruffleRuby function body receives native string-keyed Hash/Array data. Native, file, process and Java access remain denied. Method roots are observable; automatic root rebinding is not supported. Return text keys, not Ruby Symbols."
-                else -> "Function body receives typed input through VmHandle.call; Camel composition transforms the payload before dispatch."
+                else -> "Function body receives typed input through VmHandle.call. Return payload data or a Confix route definition; no native Camel object crosses the guest boundary."
             }
             VmLanguageCapability(language, present, available, note)
         }

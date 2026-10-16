@@ -15,6 +15,7 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncRunner
 import borg.trikeshed.lcnc.LcncScopeFrame
+import borg.trikeshed.lcnc.LcncDebug
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.s_
@@ -74,6 +75,82 @@ class LcncCcekAssemblyTest {
         assertTrue(run.node.supervisor.isCompleted)
         assertEquals(0, run.node.childScopeCount)
         assertFalse(run.result.children.any(), "result must release all receipt and walker jobs")
+    }
+
+    @Test fun sourceDebugHoldsRemainInsideTheOwnedReactorAssembly() = runTest {
+        for (cancel in listOf(false, true)) withBinding { binding ->
+            val debug = LcncDebug()
+            val caller = currentCoroutineContext().job
+            val children = caller.children.toList()
+            var calls = 0
+            val runner = LcncRunner(mapOf("vm.polyglot" to LcncNodeRunner { _, _ ->
+                val request = assertNotNull(currentCoroutineContext()[borg.trikeshed.vm.VmDebugRequest])
+                assertSame(binding.reactor, request.context[MuxReactorElement])
+                assertEquals(borg.trikeshed.vm.VmDebugAction.CONTINUE,
+                    request.suspendAt(mapOf("sourceName" to "p", "line" to 1)))
+                calls++
+                mapOf("value" to 42)
+            }))
+            val run = LcncCcekAssembly(binding, runner).launch("source-assembly",
+                program("source-assembly", LcncNode("p", "vm.polyglot")), context = currentCoroutineContext() + debug)
+            try {
+                runCurrent()
+                assertTrue(debug.command(debug.snapshot()["ordinal"] as Int, LcncDebug.Command.SOURCE_INTO))
+                runCurrent()
+                assertEquals("source", (debug.snapshot()["site"] as Map<*, *>)["kind"])
+                assertEquals(0, calls)
+                if (cancel) {
+                    run.cancel("source cancellation")
+                    kotlin.test.assertFailsWith<CancellationException> { run.result.await() }
+                } else {
+                    debug.drain()
+                    assertEquals(mapOf("value" to 42), run.result.await().nodeOutputs["p"])
+                }
+                assertEquals(if (cancel) 0 else 1, calls)
+                assertClosed(run)
+                assertEquals(children, caller.children.toList())
+                assertTrue(caller.isActive)
+                assertFalse(binding.reactor.supervisor.children.any())
+            } finally { run.scope.coroutineContext.job.cancelAndJoin(); debug.close() }
+        }
+    }
+
+    @Test fun nodeDebugHoldsRemainInsideTheOwnedReactorAssembly() = runTest {
+        for (cancel in listOf(false, true)) withBinding { binding ->
+            val debug = LcncDebug()
+            val caller = currentCoroutineContext().job
+            val children = caller.children.toList()
+            var calls = 0
+            val runner = LcncRunner(mapOf("probe" to LcncNodeRunner { _, _ ->
+                assertSame(debug, currentCoroutineContext()[LcncDebug])
+                assertSame(binding.reactor, currentCoroutineContext()[MuxReactorElement])
+                calls++
+                mapOf("ok" to true)
+            }))
+            val run = LcncCcekAssembly(binding, runner).launch("debug-assembly",
+                program("debug-assembly", LcncNode("p", "probe")), context = currentCoroutineContext() + debug)
+            try {
+                runCurrent()
+                val pause = debug.snapshot()
+                assertEquals("paused", pause["state"])
+                assertEquals(0, calls)
+                if (cancel) {
+                    run.cancel("debug cancellation")
+                    kotlin.test.assertFailsWith<CancellationException> { run.result.await() }
+                } else {
+                    assertTrue(debug.command(pause["ordinal"] as Int, LcncDebug.Command.CONTINUE))
+                    assertEquals(mapOf("ok" to true), run.result.await().nodeOutputs["p"])
+                }
+                assertEquals(if (cancel) 0 else 1, calls)
+                assertClosed(run)
+                assertEquals(children, caller.children.toList())
+                assertTrue(caller.isActive)
+                assertFalse(binding.reactor.supervisor.children.any())
+            } finally {
+                run.scope.coroutineContext.job.cancelAndJoin()
+                debug.close()
+            }
+        }
     }
 
     @Test

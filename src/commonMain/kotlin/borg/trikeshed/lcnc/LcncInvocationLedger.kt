@@ -2,20 +2,30 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.ValueBudget
 import kotlin.time.TimeSource
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /** Bounded observations of the existing walk, not another executor. Values are copied at the boundary. */
 class LcncInvocationLedger(val limit: Int = 128) {
     init { require(limit > 0) }
 
-    class Invocation(val values: MutableMap<String, Any?>) {
+    class Invocation(val values: MutableMap<String, Any?>) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<Invocation>
         val started = TimeSource.Monotonic.markNow()
 
         fun capture(port: String, value: Any?) {
             try {
-                val over = ValueBudget(maxNodes = 128, maxChars = 2048, maxDepth = 12).violation(value)
+                val over = (if (port == "runtime") ValueBudget(maxNodes = 512, maxChars = 8192, maxDepth = 12)
+                    else ValueBudget(maxNodes = 128, maxChars = 2048, maxDepth = 12)).violation(value)
                 if (over != null) values[port + "Omitted"] = over
                 else values[port] = copy(value)
             } catch (_: Exception) { values[port + "Omitted"] = "unsupported_or_unreadable_value" }
+        }
+
+        /** Observation failure cannot replace a guest failure or prevent its cleanup. */
+        fun runtime(snapshot: () -> Any?) {
+            try { capture("runtime", snapshot()) }
+            catch (_: Throwable) { values["runtimeOmitted"] = "unavailable" }
         }
 
         fun finish(status: String, reason: String?, outputs: Map<String, Any?>?) {

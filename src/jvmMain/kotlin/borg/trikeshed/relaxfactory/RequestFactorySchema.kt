@@ -57,7 +57,7 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
             }
             if (type !is Class<*> || !BaseProxy::class.java.isAssignableFrom(type)) return
             require(type.isInterface && (EntityProxy::class.java.isAssignableFrom(type) || ValueProxy::class.java.isAssignableFrom(type))) { "A Couch proxy must be an EntityProxy or ValueProxy interface" }
-            require(type.getAnnotation(ProxyFor::class.java)?.value == ConfixBean::class.java) { "A Couch proxy must map to ConfixBean" }
+            require(type.getAnnotation(ProxyFor::class.java)?.value == ConfixBean::class) { "A Couch proxy must map to ConfixBean" }
             val clazz = type.asSubclass(BaseProxy::class.java)
             if (proxyMap.putIfAbsent(proxyToken(clazz), clazz) != null) return
             val declared = linkedMapOf<String, Type>()
@@ -66,7 +66,8 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
                 val name = property(method) ?: continue
                 val valueType = if (method.parameterCount == 0) method.genericReturnType else method.genericParameterTypes.single()
                 val prior = declared.putIfAbsent(name, valueType)
-                require(prior == null || prior == valueType) { "Conflicting Couch property types for $name" }
+                require(prior == null || rawType(prior) == rawType(valueType)) { "Conflicting Couch property types for $name" }
+                if (method.parameterCount == 0) declared[name] = valueType
                 method.genericParameterTypes.forEach(::proxy)
                 proxy(method.genericReturnType)
             }
@@ -77,13 +78,14 @@ class RequestFactorySchema(vararg registrations: Class<out RequestFactory>) {
             for (endpoint in factory.methods) {
                 if (!RequestContext::class.java.isAssignableFrom(endpoint.returnType)) continue
                 val context = endpoint.returnType.asSubclass(RequestContext::class.java)
-                require(context.getAnnotation(Service::class.java)?.value == RelaxFactoryDomain::class.java) { "A Couch context must use RelaxFactoryDomain" }
+                require(context.getAnnotation(Service::class.java)?.value == RelaxFactoryDomain::class) { "A Couch context must use RelaxFactoryDomain" }
                 for (method in context.methods) {
                     if (!Request::class.java.isAssignableFrom(method.returnType)) continue
                     method.genericParameterTypes.forEach(::proxy)
                     proxy(method.genericReturnType)
                     val parameters = method.parameterTypes.map { if (BaseProxy::class.java.isAssignableFrom(it)) ConfixBean::class.java else it }.toTypedArray()
-                    val domain = RelaxFactoryDomain::class.java.getMethod(method.name, *parameters)
+                    // A registered context method is also valid dyninvoke metadata; it is never reflectively executed.
+                    val domain = try { RelaxFactoryDomain::class.java.getMethod(method.name, *parameters) } catch (_: NoSuchMethodException) { method }
                     operationMap[operationToken(context, method)] = RequestFactoryOperation(context, method, domain)
                 }
             }

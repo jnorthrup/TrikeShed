@@ -1,5 +1,6 @@
 package borg.trikeshed.relaxfactory
 
+import borg.trikeshed.job.CanonicalCbor
 import org.graalvm.polyglot.PolyglotException
 import kotlin.test.*
 
@@ -18,6 +19,11 @@ class ConfixDynInvokeTest {
             assertSame(bridge.readRoot, bridge.readRoot.read.parent)
             assertTrue(bridge.readRoot.read.caches.all { it.parent === bridge.readRoot.read })
             assertFailsWith<IllegalArgumentException> { bridge.get(first, "name", Int::class.java) }
+            repeat(6) { index ->
+                bridge.set(first, "field$index", true)
+                assertEquals(3, bridge.get(first, "count", Int::class.java))
+            }
+            assertFalse(bridge.readRoot.read.generic)
         }
     }
 
@@ -85,6 +91,7 @@ class ConfixDynInvokeTest {
             val assumption = bean.assumption
             bridge.registerScript("mutate", "js", """
                 (function (bean) {
+                    bean.keep = bean.keep && bean.keep;
                     bean.nested.count = "changed";
                     bean.array[1] = 9;
                     bean.nested.other = true;
@@ -97,6 +104,62 @@ class ConfixDynInvokeTest {
             assertEquals(mapOf("count" to "changed", "other" to true), bean.fields()["nested"])
             assertEquals(listOf(2L, 9L), bean.fields()["array"])
             assertEquals(true, bean.get("keep"))
+            assertTrue(bridge.roots.values.any { it.readRoot.read.hits > 0 })
+        }
+    }
+
+    @Test
+    fun guestCallbacksOwnTheirTruffleSharingLayer() {
+        ConfixDynInvoke().use { bridge ->
+            val bean = ConfixBean.from("""{"count":1}""")
+            // Warm the host AST before either independent guest context executes it.
+            assertEquals(1, bridge.get(bean, "count", Int::class.java))
+            bridge.registerScript("first", "js", "(bean) => { const count = bean.count; if (count !== bean.count) throw Error('read'); bean.count = count + 1; return bean.count; }")
+            bridge.registerScript("second", "js", "(bean) => { const count = bean.count; if (count !== bean.count) throw Error('read'); bean.count = count + 2; return bean.count; }")
+            val first = bridge.calls.getValue("first").resource as ConfixScript
+            assertEquals(2, bridge.call("first", bean))
+            val firstAst = assertNotNull(bridge.roots[first.current])
+            assertNotSame(first.context, first.current)
+            first.context.enter()
+            try { assertSame(first.current, org.graalvm.polyglot.Context.getCurrent()) } finally { first.context.leave() }
+            assertEquals(4, bridge.call("second", bean))
+            assertEquals(5, bridge.call("first", bean))
+            assertSame(firstAst, bridge.roots[first.current])
+            assertEquals(5, bridge.get(bean, "count", Int::class.java))
+            val guests = bridge.roots.filterKeys { it != null }
+            assertEquals(2, guests.size)
+            assertEquals(3, bridge.roots.size)
+            assertTrue(guests.values.all { it.readRoot.read.hits > 0 })
+            first.close()
+            assertFalse(bridge.roots.containsKey(first.current))
+            assertEquals(7, bridge.call("second", bean))
+            assertEquals(2, bridge.roots.size)
+            bridge.registerScript("python", "python", "lambda bean: bean.count + bean.count")
+            assertEquals(14, bridge.call("python", bean))
+            val python = bridge.calls.getValue("python").resource as ConfixScript
+            assertTrue(assertNotNull(bridge.roots[python.current]).readRoot.read.hits > 0)
+            assertEquals(3, bridge.roots.size)
+        }
+    }
+
+    @Test
+    fun receiverProxiesDistinguishMissingNullAndContainers() {
+        ConfixDynInvoke().use { bridge ->
+            val bean = ConfixBean.from("""{"nil":null,"object":{"count":3},"array":[2]}""")
+            val proxy = ConfixPolyglot.ObjectProxy(bean, emptyList(), bridge)
+            assertFalse(proxy.hasMember("missing"))
+            assertTrue(proxy.hasMember("nil"))
+            assertNull(proxy.getMember("missing"))
+            assertNull(proxy.getMember("nil"))
+            assertNull(proxy.getMember("nil"))
+            val nested = assertIs<ConfixPolyglot.ObjectProxy>(proxy.getMember("object"))
+            val array = assertIs<ConfixPolyglot.ArrayProxy>(proxy.getMember("array"))
+            assertEquals(3L, nested.getMember("count"))
+            assertEquals(2L, array.get(0))
+            assertTrue(bridge.readRoot.read.hits > 0)
+            assertFailsWith<IllegalArgumentException> { bridge.get(bean, "nil", Long::class.java) }
+            bridge.set(bean, "object", false)
+            assertFailsWith<IllegalStateException> { nested.hasMember("count") }
         }
     }
 
@@ -121,6 +184,35 @@ class ConfixDynInvokeTest {
     }
 
     @Test
+    fun arbitraryPrecisionAndDateScalarsSurviveCborStorage() {
+        ConfixDynInvoke().use { bridge ->
+            val decimal = java.math.BigDecimal("0.10000000000000000000000000000100")
+            val integer = java.math.BigInteger("9223372036854775807123456789")
+            val date = java.util.Date(1_729_381_123_456L)
+            val bean = ConfixBean.from("{}")
+            bridge.set(bean, "decimal", decimal)
+            bridge.set(bean, "integer", integer)
+            bridge.set(bean, "date", date)
+            assertEquals(decimal.toString(), bean.fields()["decimal"])
+            assertEquals(integer.toString(), bean.fields()["integer"])
+            assertEquals(date.time, bean.fields()["date"])
+            val loaded = ConfixBean.from(CanonicalCbor.decodeMap(CanonicalCbor.encodeMap(bean.fields())))
+            assertEquals(decimal, bridge.get(loaded, "decimal", java.math.BigDecimal::class.java))
+            assertEquals(integer, bridge.get(loaded, "integer", java.math.BigInteger::class.java))
+            assertEquals(date, bridge.get(loaded, "date", java.util.Date::class.java))
+            val numeric = ConfixBean.from("""{"decimal":0.10000000000000000000000000000100,"integer":9223372036854775807123456789,"date":1729381123456}""")
+            assertEquals(decimal, bridge.get(numeric, "decimal", java.math.BigDecimal::class.java))
+            assertEquals(integer, bridge.get(numeric, "integer", java.math.BigInteger::class.java))
+            assertEquals(date, bridge.get(numeric, "date", java.util.Date::class.java))
+            bridge.set(numeric, "other", true)
+            assertEquals(decimal, bridge.get(numeric, "decimal", java.math.BigDecimal::class.java))
+            assertFailsWith<IllegalArgumentException> {
+                bridge.get(ConfixBean.from("""{"integer":1.5}"""), "integer", java.math.BigInteger::class.java)
+            }
+        }
+    }
+
+    @Test
     fun scriptFallbackReturnsStructuredValuesWithoutJsonRoundTrip() {
         ConfixDynInvoke().use { bridge ->
             bridge.registerScript("project", "js", "(function (input) { return {name: input.name, result: [input.value + 1, null]}; })")
@@ -128,6 +220,8 @@ class ConfixDynInvokeTest {
                 bridge.call("project", mapOf("name" to "n", "value" to 3)))
             bridge.registerScript("python", "python", "lambda value: value + 7")
             assertEquals(10, bridge.call("python", 3))
+            bridge.registerScript("integer", "js", "(function () { return 9223372036854775807123456789n; })")
+            assertEquals(java.math.BigInteger("9223372036854775807123456789"), bridge.call("integer"))
         }
     }
 

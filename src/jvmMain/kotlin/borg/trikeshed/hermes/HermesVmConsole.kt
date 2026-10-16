@@ -8,18 +8,23 @@ import borg.trikeshed.lcnc.media.MediaPatchPanelId
 import borg.trikeshed.lcnc.media.XtermMediaPatchPanel
 import borg.trikeshed.lcnc.media.toKanbanEvent
 import borg.trikeshed.lcnc.media.toMap
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 import borg.trikeshed.terminal.VtCell
 import borg.trikeshed.terminal.VtKey
 import borg.trikeshed.terminal.TerminalOutputStream
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import borg.trikeshed.vm.Teleported
+import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.btrfs.BtrfsWorldStore
+import borg.trikeshed.graal.subvm.GuestException
+import borg.trikeshed.graal.subvm.GuestFailure
+import borg.trikeshed.graal.subvm.PythonWorker
+import org.graalvm.polyglot.PolyglotException
 
 import java.nio.file.Files
 import java.nio.file.Path
+import java.lang.System
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.CoroutineScope
@@ -29,7 +34,7 @@ import modelmux.ModelMux
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 
-/** A real xterm-256color session around the supervised no-native Hermes GraalPy sleeve. */
+/** Host terminal lane for the real Hermes CLI in a supervised GraalPy runtime. */
 class HermesVmConsole(
     private val root: Path,
     private val sleeve: Path,
@@ -39,20 +44,58 @@ class HermesVmConsole(
     modelMuxProvider: suspend () -> ModelMux? = { null },
     muxContext: CoroutineContext = EmptyCoroutineContext,
     socketScope: CoroutineScope? = null,
+    world: BtrfsWorldStore = BtrfsWorldStore.ofMemory(),
+    install: (borg.trikeshed.graal.subvm.GraalBtrfsSupervisor) -> Unit = {},
+    workerConfiguration: PythonWorker? = null,
+    panelId: String = "default",
 ) : AutoCloseable {
+    /** READY admits diagnostic commands after imports, provider registration and bootstrap complete. */
     enum class State { CLOSED, BOOTING, READY, FAILED }
+    enum class BootPhase(val module: String?) {
+        INVENTORY(null), IMPORT("hermes_cli.main"), PROVIDER("trikeshed_modelmux"), BOOTSTRAP("hermes-xterm-bootstrap.py")
+    }
+
+    data class Boot(
+        val phase: BootPhase,
+        val status: State,
+        val startedAtMs: Long,
+        val updatedAtMs: Long,
+        val detail: String,
+        val module: String? = null,
+        val failure: String? = null,
+        val traceback: String? = null,
+        val revision: Long = 0,
+        val wallMillis: Long = HermesPythonPort.IMPORT_WALL_MILLIS,
+    ) {
+        fun toMap(): Map<String, Any?> = mapOf(
+            "phase" to phase.name.lowercase(),
+            "status" to if (status == State.BOOTING) "running" else status.name.lowercase(),
+            "startedAtMs" to startedAtMs,
+            "updatedAtMs" to updatedAtMs,
+            "detail" to detail,
+            "module" to module,
+            "failure" to failure,
+            "traceback" to traceback,
+            // Compatibility key for diagnostic-console readiness; it does not measure HermesCLI lifecycle.
+            "steadyState" to (status == State.READY),
+            "wallMillis" to if (phase == BootPhase.INVENTORY) null else wallMillis,
+            "revision" to revision,
+        )
+    }
 
     sealed class Event {
         data class Manual(val signal: LcncUserSignal) : Event()
         data class Causal(val emission: CausalMediaEmission) : Event()
-        data class StateChanged(val state: State, val detail: String) : Event()
+        data class StateChanged(val state: State, val detail: String, val boot: Boot? = null) : Event()
     }
 
     val panel = XtermMediaPatchPanel(
-        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/xterm"), "xterm-256color", "Hermes GraalPy", columns, rows),
+        MediaPatchPanelDescriptor(MediaPatchPanelId("hermes/$panelId"), "xterm-256color", "Hermes", columns, rows),
     )
     private val lock = Any()
     private val currentCause = AtomicReference<String?>(null)
+    private val terminalCause = AtomicReference<String?>(null)
+    private fun activeCause(): String? = terminalCause.get() ?: currentCause.get()
 
     /**
      * Server-side line discipline. The browser is a dumb VT client: it ships keystrokes and draws the
@@ -82,18 +125,46 @@ class HermesVmConsole(
      */
     @Volatile private var turnInFlight = false
     @Volatile private var modelId: String? = null
+    @Volatile private var cliStarted = false
+    @Volatile private var cliRequested = false
+    @Volatile private var cliStatus: Map<String, Any?>? = null
+    private var resumeSession: String? = null
     private val _events = MutableSharedFlow<Event>(replay = 128, extraBufferCapacity = 1024)
     val events: SharedFlow<Event> = _events.asSharedFlow()
     @Volatile var state: State = State.CLOSED; private set
     @Volatile var detail: String = "not started"; private set
+    @Volatile var boot: Boot? = null; private set
+    private var phaseModule: String? = null
+    private var importFailure: Map<String, Any?>? = null
+    private val loading = mutableListOf<String>()
     @Volatile private var inventory: HermesPortInventory? = null
-    private val stdout = TerminalOutputStream { text -> causalOutput(text, currentCause.get()) }
-    private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", currentCause.get()) }
+    private val stdout = TerminalOutputStream { text -> causalOutput(text, activeCause()) }
+    private val stderr = TerminalOutputStream { text -> causalOutput("\u001b[31m$text\u001b[0m", activeCause()) }
+    private val pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
+        muxContext = muxContext, contextId = ::activeCause)
+    private val worker = workerConfiguration?.let { configuration ->
+        HermesPythonWorker(configuration, pen, stdout, stderr, stopped = { session, failure ->
+            synchronized(lock) {
+                cliStarted = false
+                cliStatus = (cliStatus ?: emptyMap()) + mapOf("open" to false, "session_id" to session, "failure" to failure)
+                val next = if (failure == null) State.CLOSED else State.FAILED
+                val message = failure ?: "HermesCLI closed · Start or Reset to resume"
+                failTerminalInput(failure ?: "HermesCLI closed before terminal input completed")
+                boot = boot?.copy(status = next, updatedAtMs = System.currentTimeMillis(),
+                    detail = message, failure = failure, revision = boot!!.revision + 1)
+                transition(next, message)
+            }
+        }, inputStarted = ::workerInputStarted, inputFinished = ::workerInputFinished) { progress ->
+            bootPhase(BootPhase.BOOTSTRAP, progress, "cli.HermesCLI")
+        }
+    }
     private val port = HermesPythonPort(
         blackboard = blackboard, output = stdout, error = stderr,
-        pen = HermesPen(blackboard, modelMuxProvider = modelMuxProvider,
-            muxContext = muxContext, contextId = currentCause::get),
+        pen = pen,
         socketScope = socketScope,
+        importPointcut = ::importPointcut,
+        world = world,
+        install = install,
     )
     internal var inventoryLoader: (HermesPythonPort) -> HermesPortInventory = { p ->
         require(Files.isDirectory(root)) { "Hermes source root missing: $root" }
@@ -103,34 +174,137 @@ class HermesVmConsole(
     fun open(timestampMs: Long = System.currentTimeMillis()): State {
         synchronized(lock) {
             if (state == State.READY || state == State.BOOTING) return state
-            transition(State.BOOTING, "inventorying ${root.toAbsolutePath()}")
+            inventory = null
+            phaseModule = null
+            importFailure = null
+            loading.clear()
+            val now = maxOf(System.currentTimeMillis(), (boot?.startedAtMs ?: 0) + 1)
+            boot = if (worker != null) {
+                Boot(BootPhase.IMPORT, State.BOOTING, now, now, "starting stock GraalPy worker")
+            } else {
+                Boot(BootPhase.INVENTORY, State.BOOTING, now, now, "inventorying ${root.toAbsolutePath()}")
+            }
+            transition(State.BOOTING, boot!!.detail)
             causalOutput("\u001b[2J\u001b[H\u001b[1;38;5;208mTrikeShed Hermes VM · xterm-256color\u001b[0m\r\n", null, timestampMs)
+            causalOutput("sleeve · ${boot!!.detail}\r\n", null, timestampMs)
         }
         return try {
+            if (worker != null) return openWorker(timestampMs)
             val scanned = inventoryLoader(port)
             inventory = scanned
+            cliRequested = "cli" in scanned.modules && "trikeshed_cli" in scanned.modules
             causalOutput(
                 "inventory ${scanned.modules.size} modules · ${scanned.ready} ready · " +
                     "${scanned.blockedNative} native-blocked · ${scanned.blockedTransitive} transitive\r\n",
                 null,
                 timestampMs,
             )
+            bootPhase(BootPhase.IMPORT, "importing hermes_cli.main in no-native GraalPy (${HermesPythonPort.IMPORT_WALL_MILLIS / 1000}s execution limit)", "hermes_cli.main")
             port.importInVm(scanned, "hermes_cli.main")
             if ("providers.base" in scanned.modules) {
+                bootPhase(BootPhase.PROVIDER, "registering the Hermes model provider", "trikeshed_modelmux")
                 port.evalInVm("import trikeshed_modelmux\ntrikeshed_modelmux.register()\nTrue", "hermes-model-provider.py")
             }
-            port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
-            transition(State.READY, "hermes_cli.main imported in no-native GraalPy")
-            causalOutput("\u001b[32mready\u001b[0m · :help for console commands\r\n", null, timestampMs)
+            if ("hermes_cli.oneshot" in scanned.modules) {
+                bootPhase(BootPhase.BOOTSTRAP, "binding the Hermes runtime to ModelMux", "hermes_cli.runtime_provider")
+                port.evalInVm("""
+                    from hermes_cli import runtime_provider
+                    from agent import auxiliary_client
+                    import trikeshed_modelmux as mux
+                    mux.bind_runtime(runtime_provider, auxiliary_client)
+                    True
+                """.trimIndent(), "hermes-console-runtime.py")
+                if ("run_agent" in scanned.modules) {
+                    for (module in s_["run_agent", "agent.agent_init", "agent.conversation_loop", "hermes_cli.mcp_startup"].view) {
+                        bootPhase(BootPhase.BOOTSTRAP, "importing the Hermes runtime: $module", module)
+                        port.evalInVm("import importlib\nimportlib.import_module(${pythonString(module)})\nTrue", "hermes-console-runtime.py")
+                    }
+                }
+            }
+            if (cliRequested) {
+                bootPhase(BootPhase.BOOTSTRAP, "initializing HermesCLI and its session store", "cli.HermesCLI")
+                val started = port.evalInVm("""
+                    import trikeshed_cli
+                    import trikeshed_files
+                    from cli import HermesCLI
+                    __hermes_cli = HermesCLI(model=mux.select_model(), provider=mux.PROVIDER,
+                                            base_url=mux.BASE_URL)
+                    if __hermes_cli._session_db_unavailable or __hermes_cli._session_db is None:
+                        from hermes_state import get_last_init_error
+                        raise RuntimeError('HermesCLI session store is unavailable: ' +
+                                           (get_last_init_error() or 'initialization failed without a storage diagnostic'))
+                    __hermes_cli.run()
+                    assert trikeshed_cli.status()['open']
+                    trikeshed_cli.status()
+                """.trimIndent(), "hermes-cli-start.py")
+                check(started is Teleported.Obj) { "HermesCLI did not return its state" }
+                cliStatus = reifyMap(started.canonical())
+                modelId = cliStatus?.get("model") as? String
+                cliStarted = true
+            } else {
+                bootPhase(BootPhase.BOOTSTRAP, "initializing the Python diagnostic console", "hermes-xterm-bootstrap.py")
+                port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
+            }
+            val ready = if (cliStarted) "HermesCLI ready" else "Python diagnostic console ready"
+            synchronized(lock) {
+                boot = boot!!.copy(status = State.READY, updatedAtMs = System.currentTimeMillis(), detail = ready, revision = boot!!.revision + 1)
+                transition(State.READY, boot!!.detail)
+            }
+            causalOutput("\u001b[32m$ready\u001b[0m · " + if (cliStarted) "/help for Hermes commands\r\n" else ":help for console commands\r\n", null, timestampMs)
             if (!turnInFlight) promptAndRedraw(timestampMs)
             State.READY
         } catch (t: Throwable) {
+            val interrupted = generateSequence(t) { it.cause }.filterIsInstance<GuestException>().any { it.kind == GuestFailure.INTERRUPTED }
+            val evidence = importFailure?.takeIf { pointcut ->
+                if (interrupted) pointcut["origin"] == "host"
+                // Entry failures close the candidate after its final import callback. Later evals
+                // retain their context, so compare the thrown exception rather than its message.
+                else if (boot!!.phase == BootPhase.IMPORT) true
+                else runCatching {
+                    val guest = generateSequence(t) { it.cause }.filterIsInstance<PolyglotException>().firstOrNull()?.guestObject
+                    guest != null && guest.context.eval("python", "id").execute(guest).toString() == pointcut["exceptionId"]
+                }.getOrDefault(false)
+            }
+            val failure = if (interrupted) t.message ?: t.toString()
+                else (evidence?.get("error") as? String)?.takeIf(String::isNotBlank) ?: (t.message ?: t.toString())
+            val trace = (evidence?.get("traceback") as? String)?.takeIf(String::isNotBlank)
+                ?: runCatching {
+                    generateSequence(t) { it.cause }.filterIsInstance<PolyglotException>().firstOrNull()
+                        ?.polyglotStackTrace?.filter { it.isGuestFrame }?.joinToString("\n")?.takeIf(String::isNotBlank)
+                }.getOrNull()
+            val failed = boot!!.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+                detail = "${boot!!.phase.name.lowercase()} failed; ${if (cliRequested) "HermesCLI" else "Python diagnostic console"} unavailable" +
+                    if (interrupted) "; guest interrupted (${HermesPythonPort.IMPORT_WALL_MILLIS / 1000}s execution limit)" else "",
+                module = evidence?.get("module") as? String ?: loading.lastOrNull() ?: phaseModule,
+                failure = failure, traceback = trace, revision = boot!!.revision + 1)
             try { port.close() } catch (closing: Throwable) { t.addSuppressed(closing) }
-            transition(State.FAILED, t.message ?: t.toString())
-            causalOutput("\u001b[31mboot failed: ${t.message ?: t}\u001b[0m\r\n", null, timestampMs)
+            synchronized(lock) {
+                boot = failed
+                transition(State.FAILED, "${failed.detail}: $failure")
+            }
+            causalOutput("\u001b[31mboot failed at ${failed.phase.name.lowercase()}${failed.module?.let { " ($it)" }.orEmpty()}: $failure\r\n${failed.detail}\u001b[0m\r\n", null, timestampMs)
+            if (trace != null) causalOutput(trace.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n", null, timestampMs)
             if (!turnInFlight) promptAndRedraw(timestampMs)
             State.FAILED
         }
+    }
+
+    private fun openWorker(timestampMs: Long): State {
+        cliRequested = true
+        worker!!.close()
+        boot = boot!!.copy(wallMillis = worker!!.configuration.timeoutMillis)
+        bootPhase(BootPhase.IMPORT, "starting stock GraalPy in a dedicated worker", "cli")
+        val snapshot = panel.snapshot()
+        cliStatus = worker!!.open(snapshot.rows, snapshot.columns, resumeSession)
+        resumeSession = null
+        modelId = cliStatus?.get("model") as? String
+        cliStarted = true
+        synchronized(lock) {
+            boot = boot!!.copy(status = State.READY, updatedAtMs = System.currentTimeMillis(),
+                detail = "HermesCLI ready · stock GraalPy worker ${worker.processId}", revision = boot!!.revision + 1)
+            transition(State.READY, boot!!.detail)
+        }
+        return state
     }
 
     /** Complete line submission. Web/TUI/desktop line disciplines all converge here. */
@@ -162,6 +336,10 @@ class HermesVmConsole(
             emitCausal(completed)
         } catch (t: Throwable) {
             val message = t.message ?: t.toString()
+            if (worker != null && state == State.READY && !worker.isAlive) {
+                cliStarted = false
+                transition(State.FAILED, "Hermes worker stopped: $message")
+            }
             causalOutput("\u001b[31m$message\u001b[0m\r\n", manual.signal.id, timestampMs)
             emitCausal(panel.causalFailed(manual.signal.id, timestampMs, message))
         } finally {
@@ -183,6 +361,12 @@ class HermesVmConsole(
      */
     fun manualText(text: String, timestampMs: Long = System.currentTimeMillis(), paste: Boolean = false): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualText(text, timestampMs, paste).also(::emitManual)
+        if (worker != null) {
+            checkWorker()
+            check(state == State.READY) { detail }
+            worker.input(if (paste) "\u001b[200~${text}\u001b[201~" else text)
+            return@synchronized manual
+        }
         var index = 0
         while (index < text.length) {
             when (val ch = text[index]) {
@@ -217,6 +401,12 @@ class HermesVmConsole(
         shift: Boolean = false,
     ): ManualMediaInput = synchronized(lock) {
         val manual = panel.manualKey(key, timestampMs, ctrl, alt, shift).also(::emitManual)
+        if (worker != null) {
+            checkWorker()
+            check(state == State.READY) { detail }
+            worker.input(manual.input)
+            return@synchronized manual
+        }
         when (key) {
             VtKey.ENTER -> submitLine(timestampMs)
             VtKey.BACKSPACE -> backspace(timestampMs)
@@ -336,21 +526,27 @@ class HermesVmConsole(
     }
 
     private fun promptAndRedraw(timestampMs: Long) {
+        if (worker != null) return
         windowStart = 0
         redrawLine(timestampMs)
     }
 
-    fun resize(columns: Int, rows: Int, timestampMs: Long = System.currentTimeMillis()): CausalMediaEmission = synchronized(lock) {
-        panel.manualResize(columns, rows, timestampMs).also(::emitCausal)
+    fun resize(columns: Int, rows: Int, timestampMs: Long = System.currentTimeMillis()): CausalMediaEmission {
+        if (state == State.READY && worker?.isAlive == true) worker.resize(rows, columns)
+        return synchronized(lock) { panel.manualResize(columns, rows, timestampMs).also(::emitCausal) }
     }
 
     fun snapshotMap(): Map<String, Any?> = synchronized(lock) {
+        checkWorker()
         val snapshot = panel.snapshot()
         val scanned = inventory
         linkedMapOf(
             "state" to state.name.lowercase(),
             "detail" to detail,
+            "boot" to boot?.toMap(),
             "model" to modelId,
+            "runtime" to if (cliRequested) "hermes-cli" else "python-diagnostic",
+            "cli" to cliStatus,
             "panel" to mapOf(
                 "id" to panel.descriptor.id.value,
                 "kind" to panel.descriptor.kind,
@@ -386,6 +582,10 @@ class HermesVmConsole(
     }
 
     private fun dispatch(command: String, cause: String, timestampMs: Long) {
+        if (worker != null) {
+            runHermes(command)
+            return
+        }
         when {
             command.isEmpty() -> Unit
             command == ":help" -> causalOutput(HELP, cause, timestampMs)
@@ -461,6 +661,38 @@ class HermesVmConsole(
 
     private fun runHermes(prompt: String) {
         require(prompt.isNotBlank()) { "prompt is blank" }
+        if (worker != null) {
+            cliStatus = worker.submit(prompt)
+            modelId = cliStatus?.get("model") as? String
+            if (cliStatus?.get("open") != true) {
+                cliStarted = false
+                transition(State.CLOSED, "HermesCLI exited")
+                worker.close()
+            }
+            workerInputFailure(requireNotNull(cliStatus))?.let { error(it) }
+            return
+        }
+        if (cliStarted) {
+            val result = port.evalInVm("trikeshed_cli.submit(${pythonString(prompt)})", "hermes-cli-input.py")
+            val status = (result as? Teleported.Obj)?.v
+            check(status != null) { "HermesCLI did not return its state" }
+            cliStatus = reifyMap(result.canonical())
+            modelId = cliStatus?.get("model") as? String
+            if (status?.get("open") == Teleported.Bool(false)) {
+                cliStarted = false
+                transition(State.CLOSED, "HermesCLI exited")
+            }
+            val turn = (status["turn"] as? Teleported.Obj)?.v
+            check(status["turn_attempted"] != Teleported.Bool(true) || turn != null) {
+                "HermesCLI could not complete the turn; see the CLI output"
+            }
+            check(turn == null || (turn["completed"] != Teleported.Bool(false) &&
+                turn["failed"] != Teleported.Bool(true) && turn["interrupted"] != Teleported.Bool(true) &&
+                (turn["error"] == null || turn["error"] == Teleported.Null))) {
+                (turn?.get("error") as? Teleported.Str)?.v ?: "HermesCLI turn did not complete"
+            }
+            return
+        }
         val result = port.evalInVm("__trikeshed_hermes(${pythonString(prompt)}, ${modelId?.let(::pythonString) ?: "None"})", "hermes-console-turn.py")
         check(result is Teleported.Num && result.v == 0L) { "hermes exit $result" }
     }
@@ -468,6 +700,44 @@ class HermesVmConsole(
     private fun causalOutput(text: String, cause: String?, timestampMs: Long = System.currentTimeMillis()) = synchronized(lock) {
         if (text.isEmpty()) return@synchronized
         emitCausal(panel.causalOutput(text, cause, timestampMs))
+    }
+
+    /** The donor's input loop admits a complete terminal line, not each browser keystroke. */
+    internal fun workerInputStarted(line: String): String = synchronized(lock) {
+        check(terminalCause.get() == null) { "Hermes terminal input is already active" }
+        prepareCommand(line).signal.id.also(terminalCause::set)
+    }
+
+    internal fun workerInputFinished(cause: String?, result: Map<String, Any?>) = synchronized(lock) {
+        check(cause != null && terminalCause.get() == cause) { "Hermes terminal result has no matching input" }
+        try {
+            cliStatus = result
+            modelId = result["model"] as? String
+            val failure = workerInputFailure(result)
+            val now = System.currentTimeMillis()
+            emitCausal(if (failure == null) panel.causalCompleted(cause, now) else panel.causalFailed(cause, now, failure))
+        } finally {
+            terminalCause.set(null)
+        }
+    }
+
+    /** Retire a stopped/failed terminal; normal close reaches this only after worker drain. */
+    private fun failTerminalInput(failure: String) = synchronized(lock) {
+        terminalCause.getAndSet(null)?.let { cause ->
+            emitCausal(panel.causalFailed(cause, System.currentTimeMillis(), failure))
+        }
+    }
+
+    private fun workerInputFailure(result: Map<String, Any?>): String? {
+        (result["input_error"] as? String)?.let { return it }
+        if (result["input_processed"] != true) return "HermesCLI did not process input"
+        val turn = result["turn"] as? Map<*, *>
+        if (result["turn_attempted"] == true && turn == null)
+            return "HermesCLI could not complete the turn; see the CLI output"
+        if (turn != null && (turn["completed"] != true || turn["failed"] == true || turn["partial"] == true ||
+                turn["interrupted"] == true || turn["error"] != null))
+            return turn["error"] as? String ?: "HermesCLI turn did not complete"
+        return null
     }
 
 
@@ -481,9 +751,67 @@ class HermesVmConsole(
         _events.tryEmit(Event.Causal(emission))
     }
 
+    private fun importPointcut(pointcut: Map<String, Any?>) = synchronized(lock) {
+        if (state != State.BOOTING) return@synchronized
+        val module = pointcut["module"] as? String ?: return@synchronized
+        when (pointcut["status"]) {
+            "loading" -> {
+                importFailure = null
+                loading.add(module)
+                boot = boot!!.copy(updatedAtMs = System.currentTimeMillis(), module = module, detail = "loading $module", revision = boot!!.revision + 1)
+            }
+            "loaded" -> {
+                loading.remove(module)
+                importFailure = null
+                boot = boot!!.copy(updatedAtMs = System.currentTimeMillis(), module = loading.lastOrNull() ?: module, detail = "loaded $module", revision = boot!!.revision + 1)
+            }
+            "failed", "refused" -> {
+                loading.remove(module)
+                val prior = importFailure
+                val sameException = pointcut["exceptionId"] != null && pointcut["exceptionId"] == prior?.get("exceptionId")
+                val sameHostFailure = pointcut["origin"] == "host" && prior?.get("origin") == "host"
+                if (!sameException && !sameHostFailure) importFailure = pointcut
+                else if (prior?.get("traceback") == null && pointcut["traceback"] != null) {
+                    importFailure = prior!! + ("traceback" to pointcut["traceback"])
+                }
+                boot = boot!!.copy(updatedAtMs = System.currentTimeMillis(), module = importFailure!!["module"] as? String, detail = "import ${pointcut["status"]}: $module", revision = boot!!.revision + 1)
+            }
+            else -> return@synchronized
+        }
+        transition(State.BOOTING, boot!!.detail)
+    }
+
+    private fun bootPhase(phase: BootPhase, value: String, module: String? = null) = synchronized(lock) {
+        phaseModule = module ?: phase.module
+        importFailure = null
+        loading.clear()
+        boot = boot!!.copy(phase = phase, updatedAtMs = System.currentTimeMillis(), detail = value, module = phaseModule, revision = boot!!.revision + 1)
+        transition(State.BOOTING, value)
+        causalOutput("sleeve · $value\r\n", null)
+    }
+
     private fun transition(next: State, value: String) {
         state = next; detail = value
-        _events.tryEmit(Event.StateChanged(next, value))
+        _events.tryEmit(Event.StateChanged(next, value, boot))
+    }
+
+    private fun checkWorker() {
+        if (worker != null && state == State.READY && !worker.isAlive) {
+            val failure = "Hermes worker exited · Reset resumes this conversation"
+            failTerminalInput(failure)
+            cliStarted = false
+            cliStatus = cliStatus?.plus("open" to false)
+            boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+                detail = failure, failure = failure, revision = boot!!.revision + 1)
+            transition(State.FAILED, failure)
+        }
+    }
+
+    fun fail(failure: Throwable) = synchronized(lock) {
+        val message = failure.message ?: failure.toString()
+        boot = boot?.copy(status = State.FAILED, updatedAtMs = System.currentTimeMillis(),
+            detail = message, failure = message, revision = boot!!.revision + 1)
+        transition(State.FAILED, message)
     }
 
     private fun land(signal: LcncUserSignal) {
@@ -492,8 +820,51 @@ class HermesVmConsole(
         KanbanFSM.kanbanEvents.tryEmit(signal.toKanbanEvent())
     }
 
-    override fun close() = synchronized(lock) {
-        port.close(); stdout.close(); stderr.close(); transition(State.CLOSED, "closed")
+    /** The console lane calls this after admitted turns, retaining the native session on reset. */
+    fun reset(resume: Boolean = true) {
+        val session = if (resume) {
+            val status = worker?.takeIf { it.isAlive }?.let { current -> runCatching { current.status() }.getOrNull() } ?: cliStatus
+            status?.get("session_id") as? String
+        } else null
+        try { close() } catch (failure: Throwable) {
+            if (worker?.isClosed != true) throw failure
+            synchronized(lock) {
+                emitCausal(panel.causalFailed(null, System.currentTimeMillis(),
+                    "Previous Hermes worker retired with cleanup failure: ${failure.message ?: failure}"))
+            }
+        }
+        synchronized(lock) {
+            cliStatus = null
+            line.clear()
+            lineCursor = 0
+            windowStart = 0
+            resumeSession = session
+        }
+        causalOutput("\u001bc\u001b[3J", null)
+        open()
+    }
+
+    override fun close() {
+        val started = synchronized(lock) {
+            val started = cliStarted
+            cliStarted = false
+            boot = boot?.let { it.copy(status = State.CLOSED, updatedAtMs = System.currentTimeMillis(), revision = it.revision + 1) }
+            transition(State.CLOSED, "closing")
+            started
+        }
+        try {
+            if (worker != null) worker.close()
+            else if (started && port.vmStarted) port.evalInVm("trikeshed_cli.close()", "hermes-cli-close.py")
+        } finally {
+            try {
+                try { port.close() } finally { stdout.close(); stderr.close() }
+            } finally {
+                synchronized(lock) {
+                    failTerminalInput("Hermes console closed before terminal input completed")
+                    transition(State.CLOSED, "closed")
+                }
+            }
+        }
     }
 
     companion object {

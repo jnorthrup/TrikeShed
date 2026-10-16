@@ -4,9 +4,59 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.runBlocking
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
 import kotlin.test.*
 
 class LcncInvocationLedgerTest {
+    @Test fun boundFailuresKeepTheirIdentityAcrossEveryRingWithOrWithoutObservation(): Unit = runBlocking {
+        val leaf = LcncNode("fail", "test.fail")
+        val programs = listOf(
+            LcncProgram("root", s_[leaf], emptySeriesOf()),
+            LcncProgram("nested", s_[LcncNode("ring", "scope", children = s_[leaf])], emptySeriesOf()),
+            LcncProgram("carry", s_[LcncNode("ring", "scope", mapOf("carry" to "true"), children = s_[leaf])], emptySeriesOf()),
+            LcncProgram("each", s_[LcncNode("source", "test.items"), LcncNode("ring", "scope", children = s_[leaf])],
+                s_[LcncWire("source", "items", "ring", "each?")]),
+        )
+        for (observed in listOf(false, true)) for (program in programs)
+            for (failure in listOf(IllegalStateException("refused"), CancellationException("cancelled"))) {
+                val binding = kotlinx.coroutines.CoroutineName("failure-binding")
+                val runner = LcncRunner(mapOf(
+                    "test.items" to LcncNodeRunner { _, _ -> mapOf("items" to listOf(1)) },
+                    "test.fail" to boundLcnc(binding) { bound, _, _ ->
+                        assertSame(binding, bound)
+                        throw failure
+                    },
+                )).apply { if (observed) invocations = LcncInvocationLedger() }
+                assertSame(failure, assertFails { runner.runProcedure(program) }, "${program.name}, observed=$observed")
+                assertNull(currentCoroutineContext()[kotlinx.coroutines.CoroutineName])
+                assertNull(currentCoroutineContext()[LcncInvocationLedger.Invocation])
+            }
+    }
+
+    @Test fun runtimeObservationIsScopedCopiedAndCannotChangeTheNodeOutcome(): Unit = runBlocking {
+        val ledger = LcncInvocationLedger()
+        val runtime = mutableMapOf<String, Any?>("vmId" to "first")
+        val runner = LcncRunner(mapOf("observe" to LcncNodeRunner { node, _ ->
+            val invocation = assertNotNull(currentCoroutineContext()[LcncInvocationLedger.Invocation])
+            assertEquals(node.id, invocation.values["nodeId"])
+            invocation.runtime {
+                if (node.id == "second") error("diagnostics unavailable")
+                runtime
+            }
+            mapOf("value" to node.id)
+        })).apply { invocations = ledger }
+        val result = runner.runProcedure(LcncProgram("scoped", s_[LcncNode("first", "observe"),
+            LcncNode("second", "observe")], emptySeriesOf()))
+        runtime["vmId"] = "mutated"
+        assertEquals("first", (rows(ledger).first()["runtime"] as Map<*, *>)["vmId"])
+        assertEquals("unavailable", rows(ledger).last()["runtimeOmitted"])
+        assertFalse(rows(ledger).last().containsKey("runtime"))
+        assertEquals("second", result.nodeOutputs.getValue("second")["value"])
+        assertNull(currentCoroutineContext()[LcncInvocationLedger.Invocation])
+        ledger.begin(3, LcncNode("large", "observe"), emptyList(), null, null)!!.runtime { "x".repeat(9000) }
+        assertEquals("payload_limit", rows(ledger).last()["runtimeOmitted"])
+    }
+
     private fun rows(ledger: LcncInvocationLedger) =
         (ledger.snapshot().getValue("entries") as List<*>).map { it as Map<*, *> }
 

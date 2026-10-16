@@ -199,7 +199,7 @@ object CouncilProgram {
         // is the fallback the ingest already looks for: bind `document` and it
         // wins, bind nothing and the council still has a matter to argue.
         nodes.add(LcncNode("ingest", "legal.ingest", params = mapOf(
-            "brief" to "document", "text" to DEFAULT_MATTER, "maxTokens" to "2048",
+            "brief" to "document", "text" to DEFAULT_MATTER,
         ), x = laneX(), y = 40.0))
         nodes.add(LcncNode("evidence", "legal.evidence", params = mapOf("scope" to "corpus", "maxFacts" to "64"), x = laneX(), y = 40.0))
         wires.add(LcncWire("ingest", "documentCid", "evidence", "documentCid?"))

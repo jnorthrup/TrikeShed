@@ -60,11 +60,13 @@ class HeadhunterWire private constructor(
                 val log = borg.trikeshed.narsese.DocumentAppendLog.open(files.resolvePath(path, "records.wal"), path)
                 var credentials: HeadhunterCredentials? = null
                 var documentOwner: DocumentCurationWire? = null
+                var documentStatusAttached = false
                 try {
                     val keys = HeadhunterCredentials.open(privatePath).also { credentials = it }
                     val store = HeadhunterStore(ctx.blackboard, ctx.casStore, log, ctx.clock)
                     store.restore()
                     val documents = DocumentCurationWire.open(ctx, brain, panels).also { documentOwner = it }
+                    documentStatusAttached = documents == null
                     val curation = HeadhunterCuration(store, documents?.destination.orEmpty(), { documents?.available == true }) { source, instructions ->
                         checkNotNull(documents) { "Shared document curator is unavailable" }.curate(source, instructions)
                     }
@@ -81,6 +83,7 @@ class HeadhunterWire private constructor(
                             for (record in store.records().view) if (record["kind"] == "evidence") documents?.sourceChanged(record["id"] as String)
                         }
                 } catch (failure: Throwable) {
+                    if (documentStatusAttached) ctx.routes.release("documents")
                     withContext(kotlinx.coroutines.NonCancellable) {
                         try { documentOwner?.drain() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                         try { documentOwner?.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
@@ -118,7 +121,10 @@ class HeadhunterWire private constructor(
 
     suspend fun drain() {
         ctx.routes.release("headhunter")
-        try { requests.drain() } finally { documents?.stopAdmission() }
+        try { requests.drain() } finally {
+            ctx.routes.release("documents") // Includes the reduced-startup status routes when no curator was opened.
+            documents?.stopAdmission()
+        }
     }
 
     /** The host calls this after the LCNC producers have drained. */

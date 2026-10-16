@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * this gate: a BOUND operator brief must beat the canned text (that is the
  * human-oversight contract, pinned in the end-to-end test), and the refusal
  * test now runs a variant with the socket removed — the one shape that is
- * genuinely blind. `legal.ingest`'s real runner also needs a live [borg.trikeshed.modelmux.BrainClient],
+ * genuinely blind. `legal.ingest`'s real runner needs the canonical document curator,
  * so — same as [TribunalExecutionTest] fakes the model dialog — this test
  * fakes `legal.ingest` with the identical brief-resolution precedence the
  * real [borg.trikeshed.narsese.LegalNodes.ingestRunner] uses (brief binding

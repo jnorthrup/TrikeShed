@@ -22,9 +22,11 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.ScheduledThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
@@ -95,7 +97,9 @@ class InProcessIsolate(
     private val context: Context
     /** Native function roots, where supported; binding pointcuts are only the fallback. */
     private val listener: ExecutionListener?
-    private val delegates = ConcurrentHashMap<String, (List<Teleported>) -> Teleported>()
+    private class HostDelegate(val hostWallMillis: Long?, val call: (List<Teleported>) -> Teleported)
+    private val delegates = ConcurrentHashMap<String, HostDelegate>()
+    private var executionBudget: ExecutionBudget? = null
 
     private class Frame(val root: String, val enterNanos: Long) { var foreign = false; var host = false }
     private val stack = ArrayDeque<Frame>()
@@ -108,6 +112,17 @@ class InProcessIsolate(
     internal val memoServed = AtomicLong(); internal val hostServed = AtomicLong(); internal val refutations = AtomicLong()
     private val seq = AtomicInteger()
     @Volatile private var alive = true
+    @Volatile private var debugger: GraalDebug? = null
+
+    fun debug(sourceName: String, request: borg.trikeshed.vm.VmDebugRequest): AutoCloseable = lock.withLock {
+        check(alive && debugger == null) { "Guest is closed or already has a source debugger" }
+        val session = GraalDebug(engine, sourceName, request)
+        debugger = session
+        AutoCloseable {
+            try { session.close() }
+            finally { if (debugger === session) debugger = null }
+        }
+    }
 
     init {
         val ioAccess = fileSystem?.let { fs ->
@@ -160,6 +175,7 @@ class InProcessIsolate(
         context.getBindings(bounds.languageId).putMember(HOST_BINDING, ProxyObject.fromMap(mapOf(
             "call" to ProxyExecutable { args -> hostCall(args) },
         )))
+        context.withholdNativeModules(bounds)
         initialized.set(true)
         listener = if (bounds.rootEventsObservable) ExecutionListener.newBuilder()
             .roots(true)
@@ -207,9 +223,22 @@ class InProcessIsolate(
         for (f in stack) f.host = true
         val name = args.firstOrNull()?.takeIf { it.isString }?.asString()
             ?: throw IllegalArgumentException("host.call(name, ...args): name must be a string")
-        val fn = delegates[name] ?: throw IllegalStateException("no host delegate named '$name'")
+        val delegate = delegates[name] ?: throw IllegalStateException("no host delegate named '$name'")
         val teleported = args.drop(1).map { Teleported.of(it) }
-        return fn(teleported).toGuest()
+        // Host work must poll the context's pending cancellation before resuming guest code.
+        // In particular, an interrupted blocking delegate must unwind at this boundary rather
+        // than returning to GraalPy's lock/finally machinery with an unobserved interrupt.
+        context.safepoint()
+        val hostBudget = delegate.hostWallMillis?.let { millis ->
+            checkNotNull(executionBudget) { "host lease outside guarded crossing" }.also { it.enterHost(millis) }
+        }
+        val result = try {
+            delegate.call(teleported)
+        } finally {
+            hostBudget?.leaveHost()
+            context.safepoint()
+        }
+        return result.toGuest()
     }
 
     // ── binding pointcuts (languages whose roots the listener cannot see) ─
@@ -288,12 +317,30 @@ class InProcessIsolate(
         Teleported.of(fn.execute(*args.map { it.toGuest() }.toTypedArray()))
     }
 
-    override fun delegate(name: String, fn: (List<Teleported>) -> Teleported) { delegates[name] = fn }
+    override fun delegate(name: String, fn: (List<Teleported>) -> Teleported) {
+        delegates[name] = HostDelegate(null, fn)
+    }
+
+    override fun delegate(name: String, hostWallMillis: Long, fn: (List<Teleported>) -> Teleported) {
+        require(hostWallMillis > 0) { "host lease must have a positive finite deadline" }
+        delegates[name] = HostDelegate(hostWallMillis, fn)
+    }
 
     override fun interrupt(): Boolean {
         if (!alive) return false
+        debugger?.interrupt()
         interrupted.incrementAndGet()
-        return try { context.interrupt(Duration.ofMillis(INTERRUPT_GRACE_MS)); true } catch (_: Throwable) { false }
+        return try {
+            context.interrupt(Duration.ofMillis(INTERRUPT_GRACE_MS))
+            true
+        } catch (_: TimeoutException) {
+            // A timed-out soft interrupt has not stopped the guest. In GraalPy an interrupted
+            // finalizer can still be acquiring a lock, so that context cannot be offered again.
+            close()
+            false
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     override fun stats() = IsolateStats(
@@ -305,6 +352,8 @@ class InProcessIsolate(
 
     override fun close() {
         alive = false
+        runCatching { debugger?.close() }
+        debugger = null
         runCatching { listener?.close() }
         runCatching { context.close(true) }
         runCatching { engine.close(true) }
@@ -384,7 +433,10 @@ class InProcessIsolate(
                 else -> 0L
             }
             val interruptedBefore = interrupted.get()
-            val watchdog = if (depth == 0 && wall > 0 && (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0)) armWatchdog(wall) else null
+            val crossing = if (depth == 0) ExecutionBudget(
+                if (bounds.stop != StopStrategy.STATEMENT_LIMIT || budget.statements <= 0) wall else 0L,
+            ).also { executionBudget = it; it.start() } else null
+            val callback = if (depth > 0) executionBudget?.takeIf { it.enterGuest() } else null
             try {
                 block()
             } catch (e: PolyglotException) {
@@ -397,11 +449,16 @@ class InProcessIsolate(
                 // AssertionError escapes instead of the typed path. The breach is ours and the guest
                 // was interrupted; the assert is exception cosmetics. Attribute to the interrupt ONLY
                 // when this crossing's watchdog actually fired — anything else stays a host bug.
-                if (watchdog != null && interrupted.get() > interruptedBefore)
-                    throw GuestException(GuestFailure.INTERRUPTED, "wall budget interrupt (engine assert during exception construction: ${t.message})", t)
+                if (crossing?.expired == true && interrupted.get() > interruptedBefore)
+                    throw GuestException(if (alive) GuestFailure.INTERRUPTED else GuestFailure.DEAD,
+                        "wall budget interrupt (engine assert during exception construction: ${t.message})", t)
                 throw t
             } finally {
-                watchdog?.cancel(false)
+                callback?.leaveGuest()
+                if (crossing != null) {
+                    executionBudget = null
+                    crossing.finish()
+                }
             }
         }
     }
@@ -413,12 +470,95 @@ class InProcessIsolate(
     /** Run queued guest-thread actions now, without evaluating anything (a safe point on demand). */
     fun settle() { if (!alive) return; lock.withLock { drainGuestActions() } }
 
-    private fun armWatchdog(wallMillis: Long): ScheduledFuture<*> = WATCHDOG.schedule({
-        interrupted.incrementAndGet()
-        runCatching { context.interrupt(Duration.ofMillis(INTERRUPT_GRACE_MS)) }
-    }, wallMillis, TimeUnit.MILLISECONDS)
+    /** One crossing's remaining guest time and nested, absolute host deadlines. */
+    private inner class ExecutionBudget(wallMillis: Long) {
+        private val monitor = Any()
+        private var remainingGuestNanos = wallMillis.takeIf { it > 0 }?.let(TimeUnit.MILLISECONDS::toNanos)
+        private var guestDeadlineNanos = remainingGuestNanos?.let { System.nanoTime() + it }
+        private val hostDeadlines = ArrayDeque<Long>()
+        private val hostGuestStates = ArrayDeque<Boolean>()
+        private var guestRunning = true
+        private var generation = 0L
+        private var task: ScheduledFuture<*>? = null
+        private var finished = false
+        @Volatile var expired = false
+            private set
+
+        fun start() = synchronized(monitor) { schedule(System.nanoTime()) }
+
+        fun enterHost(wallMillis: Long) = synchronized(monitor) {
+            val now = System.nanoTime()
+            hostGuestStates.addLast(guestRunning)
+            hostDeadlines.addLast(now + TimeUnit.MILLISECONDS.toNanos(wallMillis))
+            guestPhase(false, now)
+            if (!expired) schedule(now)
+        }
+
+        fun leaveHost() = synchronized(monitor) {
+            hostDeadlines.removeLast()
+            val now = System.nanoTime()
+            guestPhase(hostGuestStates.removeLast(), now)
+            if (!expired) schedule(now)
+        }
+
+        fun enterGuest(): Boolean = synchronized(monitor) {
+            if (guestRunning) return@synchronized false
+            val now = System.nanoTime()
+            guestPhase(true, now)
+            if (!expired) schedule(now)
+            true
+        }
+
+        fun leaveGuest() = synchronized(monitor) {
+            val now = System.nanoTime()
+            guestPhase(false, now)
+            if (!expired) schedule(now)
+        }
+
+        private fun guestPhase(running: Boolean, now: Long) {
+            if (guestRunning == running) return
+            if (running) guestDeadlineNanos = remainingGuestNanos?.let { now + it }
+            else remainingGuestNanos = guestDeadlineNanos?.let { (it - now).coerceAtLeast(0) }
+            guestRunning = running
+        }
+
+        private fun schedule(now: Long) {
+            task?.cancel(false)
+            val ticket = ++generation
+            val guestDelay = guestDeadlineNanos?.minus(now)?.takeIf { guestRunning }
+            val hostDelay = hostDeadlines.minOfOrNull { it - now }
+            val delay = when {
+                guestDelay == null -> hostDelay
+                hostDelay == null -> guestDelay
+                else -> minOf(guestDelay, hostDelay)
+            }
+            task = delay?.let {
+                WATCHDOG.schedule({
+                    val stop = synchronized(monitor) {
+                        if (finished || ticket != generation) false else { expired = true; true }
+                    }
+                    if (stop) interrupt()
+                }, it.coerceAtLeast(0), TimeUnit.NANOSECONDS)
+            }
+        }
+
+        fun finish() {
+            val stopping = synchronized(monitor) {
+                finished = true
+                generation++
+                if (!expired) task?.cancel(false)
+                task.takeIf { expired }
+            }
+            // eval/call has left the polyglot context. Finish its stop before another crossing
+            // can enter this isolate; an old interrupt must never land on a later request.
+            try { stopping?.get() }
+            catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+            catch (_: ExecutionException) { /* interruption already classified at the guest boundary */ }
+        }
+    }
 
     private fun classify(e: PolyglotException): GuestException {
+        if (!alive) return GuestException(GuestFailure.DEAD, e.message ?: e.toString(), e)
         val (kind, failClosed) = classify(e.isResourceExhausted, e.isInternalError, e.isInterrupted || e.isCancelled)
         if (failClosed) runCatching { close() } // the context can no longer be trusted; free it now, not at .use{} exit
         return GuestException(kind, e.message ?: e.toString(), e)
@@ -445,6 +585,8 @@ class InProcessIsolate(
 
         /** Meta-object names of executables that are runtime furniture, not program roots. */
         val BINDING_NOISE_META = setOf("builtin_function_or_method", "builtin_method", "method-wrapper", "wrapper_descriptor", "method_descriptor", "type", "module", "classmethod_descriptor")
-        private val WATCHDOG = Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "subvm-watchdog").apply { isDaemon = true } }
+        private val WATCHDOG = ScheduledThreadPoolExecutor(1) { r ->
+            Thread(r, "subvm-watchdog").apply { isDaemon = true }
+        }.apply { removeOnCancelPolicy = true }
     }
 }

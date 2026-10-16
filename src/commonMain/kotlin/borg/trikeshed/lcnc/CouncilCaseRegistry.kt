@@ -1,10 +1,7 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.job.ConfixFacetPlan
-import borg.trikeshed.job.JobEvent
-import borg.trikeshed.job.JobNexusBindings
-import borg.trikeshed.job.JobNexusFactory
-import borg.trikeshed.job.JobNexusSpec
+import borg.trikeshed.job.*
+import borg.trikeshed.parse.jsonOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -28,9 +25,9 @@ import kotlinx.coroutines.sync.withLock
  * submitted jobs; an explicit start is issued only when no auto-start lands) —
  * then exactly ONE terminal advance: `complete` (ruling) or `fail`
  * (mistrial). Idempotency is two-layer: the registry caches the snapshot cid
- * per idempotency key (`council-<caseId>-<verdictCid>` /
- * `council-<caseId>-mistrial-<reason.hashCode()>`) and returns it WITHOUT
- * re-advancing, and the reducer's own idempotencyKey dedupe backstops it.
+ * per evidence-complete command digest and returns it WITHOUT re-advancing.
+ * Receipts and lifecycle are recovered from the supplied command log on open;
+ * the reducer's own idempotencyKey dedupe backstops the live cache.
  * A per-case [Mutex] serializes concurrent recorders, so two parallel
  * recordings of the same verdict land exactly one advance.
  *
@@ -47,27 +44,31 @@ class CouncilCaseRegistry(
     private val scope: CoroutineScope,
     private val plan: ConfixFacetPlan,
     private val cap: Int = 64,
+    private val componentFactories: (String) -> JobNexusComponentFactories = { JobNexusComponentFactories() },
 ) {
 
     private inner class CaseEntry(val caseId: String) {
         val jobId = "case/$caseId"
         val childJob: Job = SupervisorJob(scope.coroutineContext[Job])
         val childScope = CoroutineScope(scope.coroutineContext + childJob)
-        val instance = TribunalInstance(
+        val instance = try { TribunalInstance(
             JobNexusFactory.open(
                 spec = JobNexusSpec(),
-                bindings = JobNexusBindings(parentScope = childScope),
+                bindings = JobNexusBindings(parentScope = childScope, componentFactories = componentFactories(caseId)),
             ),
             plan,
             listOf(jobId),
-        )
+        ) } catch (failure: Throwable) {
+            childJob.cancel()
+            throw failure
+        }
         val mutex = Mutex()
 
         /** idempotency key → the snapshot cid that record returned. */
         val recordedByKey = mutableMapOf<String, String>()
-        var lastRecordedCid: String? = null
-        var seeded = false
-        var terminal = false
+        var terminal = instance.lifecycle(jobId) in setOf("closed", "failed")
+        var lastRecordedCid: String? = if (terminal) instance.snapshotCid(jobId) else null
+        var seeded = instance.lifecycle(jobId) == "active" || terminal
         var terminalAt = 0L
         var evicted = false
     }
@@ -83,16 +84,15 @@ class CouncilCaseRegistry(
 
     /**
      * Record the case's ruling: advance its job to `closed` and return the
-     * committed snapshot cid. Idempotent per (caseId, verdictCid) — a repeat
+     * committed snapshot cid. Idempotent per (caseId, verdictCid, transcriptCid) — a repeat
      * returns the cached cid without advancing the job again.
      */
     suspend fun recordRuling(caseId: String, verdictCid: String, transcriptCid: String): String =
         record(
             caseId = caseId,
-            idempotencyKey = "council-$caseId-$verdictCid",
+            idempotencyKey = ContentId.of(jsonOf(listOf("council-ruling", caseId, verdictCid, transcriptCid)).encodeToByteArray()).value,
             operation = "complete",
             reason = "",
-            fallbackCid = verdictCid,
         )
 
     /**
@@ -103,10 +103,9 @@ class CouncilCaseRegistry(
     suspend fun recordMistrial(caseId: String, reason: String): String =
         record(
             caseId = caseId,
-            idempotencyKey = "council-$caseId-mistrial-${reason.hashCode()}",
+            idempotencyKey = ContentId.of(jsonOf(listOf("council-mistrial", caseId, reason)).encodeToByteArray()).value,
             operation = "fail",
             reason = reason,
-            fallbackCid = null,
         )
 
     /** Entries whose nexus is still alive (not evicted). */
@@ -131,13 +130,13 @@ class CouncilCaseRegistry(
         idempotencyKey: String,
         operation: String,
         reason: String,
-        fallbackCid: String?,
     ): String {
         val entry = entriesLock.withLock { entries.getOrPut(caseId) { CaseEntry(caseId) } }
         val cid = entry.mutex.withLock {
             // Idempotency first: a repeat of a recorded key answers from cache
             // WITHOUT re-advancing — even on an evicted (cancelled) entry.
             entry.recordedByKey[idempotencyKey]?.let { return@withLock it }
+            entry.instance.nexus.receipt(idempotencyKey)?.let { return@withLock it.value }
             if (entry.terminal) throw IllegalStateException(
                 "council case '$caseId' is closed for commits " +
                     "(already terminal: ${entry.instance.lifecycle(entry.jobId)}); " +
@@ -153,7 +152,7 @@ class CouncilCaseRegistry(
 
             drainCommitted(entry)
             advanceLoud(entry, operation, idempotencyKey, entry.instance.revision(entry.jobId) ?: 1L, reason)
-            val snapshotCid = entry.instance.snapshotCid(entry.jobId) ?: fallbackCid
+            val snapshotCid = entry.instance.snapshotCid(entry.jobId)
                 ?: throw IllegalStateException("council case '$caseId': no snapshot cid after '$operation' commit")
             entry.recordedByKey[idempotencyKey] = snapshotCid
             entry.lastRecordedCid = snapshotCid
@@ -175,6 +174,13 @@ class CouncilCaseRegistry(
      * back to an explicit start only if no auto-start ever lands.
      */
     private suspend fun seed(entry: CaseEntry) {
+        val recovered = entry.instance.lifecycle(entry.jobId)
+        check(recovered == null || recovered == "submitted") { "Cannot seed council case '${entry.caseId}' from '$recovered'" }
+        if (recovered == "submitted") {
+            // Replay restores the reducer, not live Rete activations. Do not submit twice.
+            advanceLoud(entry, "start", "council-case-${entry.caseId}-start", requireNotNull(entry.instance.revision(entry.jobId)))
+            return
+        }
         advanceLoud(entry, "submit", "council-case-${entry.caseId}", 0L)
         var waitedMs = 0
         while (entry.instance.lifecycle(entry.jobId) != "active" && waitedMs < AUTO_START_WAIT_MS) {

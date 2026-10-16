@@ -68,6 +68,20 @@ val coroutinesTestVersion = extra["versions.kotlinx-coroutines-test"] as String
 val datetimeVersion = extra["versions.kotlinx-datetime"] as String
 val serializationVersion = extra["versions.kotlinx-serialization"] as String
 
+// Confix owns formats on every target; reject direct and transitive format runtimes.
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "org.jetbrains.kotlinx" && listOf("json", "cbor").any { format ->
+                val module = "kotlinx-serialization-$format"
+                requested.name == module || requested.name.startsWith("$module-")
+            }) {
+                throw GradleException("Confix owns formats on every target; forbidden dependency: $requested")
+            }
+        }
+    }
+}
+
 
 repositories {
     maven("https://oss.sonatype.org/content/repositories/snapshots/")
@@ -251,13 +265,11 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$serializationVersion")
+                // Core supplies annotations, descriptors and generated serializer contracts.
+                // Confix owns formats on every target; no kotlinx JSON/CBOR frontend.
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
                 
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:$datetimeVersion")
-                // Confix is the only portable serializer in commonMain. The kotlinx-serialization
-                // plugin stays applied (core @Serializable/@Contextual annotations need it), but the
-                // json *runtime* is not a commonMain dependency — jvmMain pulls it for the one target
-                // that legitimately needs the kotlinx JSON frontend. See README.md §4.
                 // Compose runtime annotations must be visible to every target so the
                 // compose compiler plugin (applied globally) doesn't bail on JS/WASM/Native.
                 // Full UI deps stay in jvmMain — Compose doesn't publish for macosX64 (target now commented out).
@@ -282,9 +294,7 @@ kotlin {
             dependencies {
                 implementation("org.openjdk.jmh:jmh-core:1.37")
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
-                implementation("org.bouncycastle:bcprov-jdk15on:1.70")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:$serializationVersion")
                 
                 implementation("org.ow2.asm:asm:9.7")
                 implementation("org.ow2.asm:asm-tree:9.7")
@@ -293,10 +303,12 @@ kotlin {
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
                 implementation("org.graalvm.polyglot:js-community:$graalVersion")
                 implementation("org.graalvm.polyglot:python-community:$graalVersion")
+                implementation("org.graalvm.python:python-bouncycastle-support:$graalVersion")
                 implementation("dev.truffleruby:truffleruby:40.0.0")
                 implementation("org.graalvm.polyglot:llvm-community:$graalVersion")
                 implementation("org.graalvm.truffle:truffle-api:$graalVersion")
                 implementation("org.gwtproject.web.bindery:requestfactory-server:$requestFactoryVersion")
+                api("org.gwtproject.web.bindery:requestfactory-client:$requestFactoryVersion")
 
                 // Kotlin scripting host: `language: "kotlin"` design-doc views compile
                 // against the daemon's own classpath and evaluate in its classloader.
@@ -305,7 +317,8 @@ kotlin {
                 implementation(kotlin("scripting-jvm-host"))
 
                 // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
-                implementation("org.xerial:sqlite-jdbc:3.42.0.0")
+                implementation("org.xerial:sqlite-jdbc:3.53.4.0")
+                implementation("org.slf4j:slf4j-api:2.0.16")
                 // Opt-in compression dictionaries; ISAM framing and all file I/O remain commonMain.
                 implementation("com.github.luben:zstd-jni:1.5.7-23")
 
@@ -340,7 +353,6 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
                 implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-                implementation("org.gwtproject.web.bindery:requestfactory-client:$requestFactoryVersion")
                 implementation("junit:junit:4.13.2")
             }
         }
@@ -584,6 +596,23 @@ tasks.withType<Test>().configureEach {
         "--add-exports", "java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.components=ALL-UNNAMED"
     )
+}
+
+tasks.named<Test>("jvmTest") {
+    // The same canonical-curation contract can explicitly exercise the operator's provider.
+    // Keep fixture/live runs distinct in Gradle's up-to-date checks; none of these inputs is a credential.
+    listOf("TRIKESHED_CURATION_PROFILE", "TRIKESHED_CURATION_BASE", "TRIKESHED_CURATION_MODEL").forEach { name ->
+        inputs.property(name, providers.environmentVariable(name).orElse(""))
+    }
+    val liveCuration = providers.environmentVariable("TRIKESHED_CURATION_PROFILE")
+    outputs.upToDateWhen { !liveCuration.isPresent }
+    outputs.doNotCacheIf("Live curation requires a new provider response") { liveCuration.isPresent }
+    // Boundary tests read sources and build declarations outside the JVM compilation inputs.
+    inputs.files(fileTree(projectDir) {
+        include("**/*.gradle.kts", "**/*.gradle", "**/*.versions.toml")
+        include("**/src/**/kotlin/**/*.kt", "**/src/**/java/**/*.java")
+        exclude("**/build/**", "**/node_modules/**", "**/.*/**")
+    }).withPropertyName("confixBoundarySources")
 }
 
 tasks.register<Test>("btrfsStorageCheck") {

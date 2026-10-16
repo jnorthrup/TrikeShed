@@ -60,10 +60,12 @@ class DocumentCurationWire private constructor(
 
         suspend fun open(ctx: ModuleContext, brain: BrainClient, panels: PatchWire): DocumentCurationWire? =
             withContext(ctx.muxContext + fileIoContext) {
-                val bag = ctx.beliefBag ?: return@withContext null
+                val bag = ctx.beliefBag ?: return@withContext unavailable(ctx,
+                    "Document curation requires the daemon belief bag. Start with --belief-bag or TRIKESHED_BELIEF_BAG=1; this does not submit documents to a model.")
                 val mux = brain.modelMux()
                 val model = mux.defaultModel ?: brain.lastModel() ?: brain.endpointSummaries().firstOrNull()?.model
-                    ?: return@withContext null
+                    ?: return@withContext unavailable(ctx,
+                        "No document curation model is configured. Configure a chat model in ModelMux, then start the document curator.")
                 val session = mux.session(model).getOrThrow()
                 val base = session.baseUrl.trimEnd('/')
                 val destination = mapOf("provider" to (session.model.b.providerTag ?: model),
@@ -105,6 +107,24 @@ class DocumentCurationWire private constructor(
                     throw failure
                 }
             }
+
+        /** Reduced startup retains a read-only status surface, not a substitute curator or runner. */
+        private fun unavailable(ctx: ModuleContext, reason: String): DocumentCurationWire? {
+            for (path in s_["/api/documents", "/api/documents/curate"].view)
+                ctx.routes.claim("documents", path) { method, target, _, _ ->
+                    val read = method == "GET" && target.substringBefore('?') == "/api/documents"
+                    val submit = method == "POST" && target.substringBefore('?') == "/api/documents/curate"
+                    val status = when {
+                        read && !CouchHttpSurface.parseQuery(target.substringAfter('?', "")).containsKey("cid") -> 200
+                        read || submit -> 503
+                        else -> 405
+                    }
+                    WireHttpResponse(status, jsonOf(mapOf("available" to false,
+                        "error" to if (status == 405) "method_not_allowed" else reason)),
+                        "application/json; charset=utf-8")
+                }
+            return null
+        }
     }
 
     val available: Boolean get() = "corenlp" in GuestModules.installed()
@@ -233,6 +253,7 @@ class DocumentCurationWire private constructor(
                             else DocumentCurationLegos.output(receipt, record)["sheets"]
                         } else if (cid != null) view(ContentId(cid)) else mapOf(
                             "available" to available, "destination" to destination,
+                            "error" to if (available) null else "The CoreNLP guest module is not installed; document curation is unavailable.",
                             "records" to (curator.receipts() α { mapOf("receiptCid" to it.a.value,
                                 "name" to it.b.source.name, "correlation" to it.b.source.correlation,
                                 "originalCid" to it.b.source.originalCid.value) }).toList()))

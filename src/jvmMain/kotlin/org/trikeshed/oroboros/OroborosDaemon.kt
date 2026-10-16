@@ -60,6 +60,7 @@ import borg.trikeshed.utils.kanban.SessionBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.kanban.SessionCause
 import kotlinx.coroutines.withContext
+import modelmux.Airgap
 
 /** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
 private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
@@ -76,6 +77,7 @@ private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.
  * Flags:
  *   --once                  single cycle then exit (default: --watch loops)
  *   --watch                 loop forever
+ *   --airgap                disable remote Jev/LLM calls; keep local BERT
  *   --interval-ms <N>       poll cadence (default = 30000)
  *   --max-slots <N>         live session cap (default = 15)
  *   --hermes-root <path>    Hermes Python source checkout
@@ -190,6 +192,7 @@ object OroborosDaemon {
         val modules: List<String> = emptyList(),
         /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode or TRIKESHED_AGENTS; default codex,opencode. */
         val agents: Set<String> = borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED,
+        val airgap: Boolean = Airgap.configured(),
     )
 
     @Volatile
@@ -200,6 +203,7 @@ object OroborosDaemon {
 
     fun parseConfig(args: Array<String>): DaemonConfig {
         var watch = true
+        var airgap = Airgap.configured()
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
         var kanbanPort = DEFAULT_KANBAN_PORT
@@ -214,6 +218,7 @@ object OroborosDaemon {
         val flags = listOf(
             ForgeCliArgs.Flag(name = "--once") { _, i -> watch = false; i + 1 },
             ForgeCliArgs.Flag(name = "--watch") { _, i -> watch = true; i + 1 },
+            ForgeCliArgs.Flag(name = "--airgap") { _, i -> airgap = true; i + 1 },
             // Consumed by mainImpl via the raw args (P2 belief-bag wiring); registered so the parser accepts it.
             ForgeCliArgs.Flag(name = "--belief-bag") { _, i -> i + 1 },
             ForgeCliArgs.Flag(name = "--project", withValue = true) { a, i -> projects.add(a[i]); i + 1 },
@@ -256,13 +261,19 @@ object OroborosDaemon {
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap)
     }
 
     @JvmStatic
     fun main(args: Array<String>) {
+        val config = parseConfig(args)
+        if (config.airgap) {
+            // Pin the process before child initialization, including scopes that drop the context.
+            System.setProperty(Airgap.PROPERTY, "true")
+            HostSystem.err("[OROBOROS] airgap enabled: remote Jev/LLM calls disabled; local BERT retained")
+        }
         try {
-            runBlocking {
+            runBlocking(Airgap(config.airgap)) {
                 // The daemon gets its OWN supervised scope rather than launching straight into this
                 // runBlocking. mainImpl is an extension on its receiver, so everything it launches
                 // without an explicit parent becomes a child of that receiver — and runBlocking
@@ -281,7 +292,7 @@ object OroborosDaemon {
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
                 var ipnsNode: borg.trikeshed.ipns.IpnsNode? = null
                 try {
-                    with(daemonScope) { mainImpl(args) { ipnsNode = it } }
+                    with(daemonScope) { mainImpl(args, config) { ipnsNode = it } }
                 } finally {
                     try { ipnsNode?.close() }
                     finally { daemonScope.cancel() }
@@ -525,7 +536,11 @@ object OroborosDaemon {
             processor = { payload -> processor.process(payload) },
             closeProcessor = { processor.close() },
             parentJob = coroutineContext[kotlinx.coroutines.Job],
-        ).also { it.open() }
+        )
+        try { requestFactory.open() } catch (failure: Throwable) {
+            try { requestFactory.drain() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+            throw failure
+        }
         return borg.trikeshed.forge.server.CouchWire(
             router = borg.trikeshed.couch.CouchWireRouter(db, WorktreeCouchGateway.WORKTREE_PREFIX,
                 replicator = replicator, report = report, rpcTargets = targets,
@@ -538,7 +553,7 @@ object OroborosDaemon {
     }
 
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(
-        args: Array<String>, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+        args: Array<String>, config: DaemonConfig, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
     ) {
         // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
         // + codex/opencode credential files), then the legacy derived-name env
@@ -577,7 +592,6 @@ object OroborosDaemon {
             HostSystem.err("[OROBOROS] JULES_API_KEY not set; Jules credential pool will be empty.")
         }
 
-        val config = parseConfig(args)
         // FLYWHEEL_CYCLE_INTERVAL env overrides CLI --interval-ms.
         val envInterval = HostSystem.getenv("FLYWHEEL_CYCLE_INTERVAL")
         val intervalMs = if (envInterval != null) {
@@ -985,8 +999,11 @@ object OroborosDaemon {
             vmHost, wireScope,
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
-        val hermesConsole = hermesConsole(config, home, repoDir, daemonBlackboard, htxElement, muxReactor, wireScope)
-        val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope)
+        val hermesConsole = hermesConsole(config, home, repoDir, forgeHome, daemonBlackboard, htxElement, muxReactor, wireScope, vmWorldStore, fileOps)
+        val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope) { panelId ->
+            OroborosDaemon.hermesConsole(config, home, repoDir, forgeHome, daemonBlackboard,
+                htxElement, muxReactor, wireScope, vmWorldStore, fileOps, panelId)
+        }
         if (config.hermesConsole) check(hermesWire.open()) { "Hermes console did not admit startup" }
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
@@ -996,17 +1013,7 @@ object OroborosDaemon {
         // maintains taxonomy/temporal/provenance ISAM routes.
         // Declared BEFORE graalWire: the density route reads its live lineIndex.
         val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
-        val graalWire = borg.trikeshed.forge.server.GraalWire(
-            jvmVitals,
-            couchStore,
-            reportReactorForWires,
-            wireScope,
-            couchDb,
-            vmHost,
-            attachmentGateway,
-            projectDbs = projectDbRegistry,
-            memoryStore = memoryStore,
-        )
+
 
         // R2: persist the inverted index. At boot, restore the continent from the store
         // (no cold re-derive); after every ingest the live index snapshots to CAS+Couch,
@@ -1028,6 +1035,31 @@ object OroborosDaemon {
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
         val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
         HostSystem.err("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
+
+        // ── Reactive git-state hub: JvmFileWatchReactorElement watches .git/**
+        //    and feeds the GitCouchGateway + git-state cache. This IS the
+        //    choreography — coroutine pipelines that react to filesystem
+        //    events, not blocking ProcessBuilder calls. ──
+        val gitState = GitStateCache(repoDir)
+        val cycleTriggers = Channel<Unit>(Channel.CONFLATED)
+
+        // ── Composable Reconcile Elements (CCEK) ──
+        val worktreeReconcileElement = worktreeReconciliation(
+            repoDir, worktreeCouchGateway, couchIndexBridge, memoryStore, attachmentGateway,
+            casStore, gitState,
+        )
+
+        val graalWire = borg.trikeshed.forge.server.GraalWire(
+            jvmVitals,
+            couchStore,
+            reportReactorForWires,
+            CoroutineScope(wireScope.coroutineContext + worktreeReconcileElement),
+            couchDb,
+            vmHost,
+            attachmentGateway,
+            projectDbs = projectDbRegistry,
+            memoryStore = memoryStore,
+        )
 
         // ── BeliefBagElement: the daemon-owned NarseseBag (AIKR belief bound) ──
         // Flagged (--belief-bag / TRIKESHED_BELIEF_BAG=1) while phases P3..P8 land.
@@ -1445,7 +1477,8 @@ object OroborosDaemon {
         val storedProgramLoader: suspend (String) -> borg.trikeshed.lcnc.LcncProgram? = { name -> lcncPublisher.load(name) }
         val confixIsam = if (casStore.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             borg.trikeshed.couch.isam.ConfixIsamElement(moduleScope, couchStore.changes,
-                fileOps.resolvePath(forgeHome.toString(), "confix/couch"), fileOps, casStore)
+                fileOps.resolvePath(forgeHome.toString(), "confix/couch"), fileOps, casStore,
+                dictionaryCodec = { borg.trikeshed.isam.ZstdDictionaryCodec(it) })
         } else null
         val moduleContext = borg.trikeshed.module.ModuleContext(
             couch = couchDb,
@@ -1641,22 +1674,11 @@ object OroborosDaemon {
         }
         // ── Legal domain nodes: legal.ingest, legal.evidence ────────────
         moduleContext.lcncRunners["legal.ingest"] = borg.trikeshed.narsese.LegalNodes.ingestRunner(
-            brain = brainClient,
-            muxContext = htxElement + muxReactor,
+            curate = { moduleContext.lcncRunners[borg.trikeshed.lcnc.DocumentCurationLegos.CURATE] },
             cas = casStore,
-            kifSink = { kif ->
-                val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
-                daemonBlackboard.put("legal-kif/${cid.hex}", kif, "legal.ingest")
-                runCatching { kifBank.assertKif(kif) }
-                // Durable tee: the in-memory bank dies with the process; the
-                // couch ledger is what the council boot thaw re-asserts from.
-                runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "legal.ingest", "atMs" to HostSystem.currentTimeMillis()), null) }
-            },
         )
-        // Evidence-bank injection (§3/§5 gap): queries the shared kifBank for
-        // every fact legal.ingest asserted against this document's atom and
-        // folds it into the brief argue actually reads — closing the loop
-        // the report flagged as "nothing reads these entries back out".
+        // Historical KIF and prior rulings remain readable. New curation publishes
+        // through DocumentCurationWire's retained tuple plane, not a second KIF sink.
         moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
         // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
         //    REAL hermes-env model dialogs. The node family (mux.chat /
@@ -1909,39 +1931,11 @@ object OroborosDaemon {
         }
         // Per-case job nexus: every convened case gets its own lifecycle (the
         // boot TribunalInstance singleton above stays legacy-preset-only).
-        val councilCases = borg.trikeshed.lcnc.CouncilCaseRegistry(
-            moduleScope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
-        )
-        // The council's KIF sink: blackboard provenance + live bank + durable
-        // couch ledger (same tee shape as legal.ingest's sink above).
-        val councilKifSink: (String) -> Unit = { kif ->
-            val cid = borg.trikeshed.job.ContentId.of(kif.encodeToByteArray())
-            daemonBlackboard.put("legal-kif/${cid.hex}", kif, "council.record")
-            runCatching { kifBank.assertKif(kif) }
-            runCatching { couchDb.put("kif-ledger/${cid.hex}", mapOf("kif" to kif, "source" to "council", "atMs" to HostSystem.currentTimeMillis()), null) }
-        }
+        val councilCases = councilCaseRegistry(moduleScope, casStore, couchDb)
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.CouncilNodes.registry(
                 dialog = councilDialog,
-                seams = borg.trikeshed.lcnc.RecordSeams(
-                    casPut = { bytes -> casStore.put(bytes).value },
-                    blackboardPut = { key, fact, source -> daemonBlackboard.put(key, fact, source) },
-                    kifSink = councilKifSink,
-                    couchPut = { docId, body ->
-                        runCatching {
-                            val rev = couchDb.docJson(docId)?.get("_rev") as? String
-                            couchDb.put(docId, body, rev)
-                        }
-                    },
-                    recordRuling = councilCases::recordRuling,
-                    recordMistrial = councilCases::recordMistrial,
-                    blackboardGet = { key ->
-                        (daemonBlackboard.get(key) as? Map<*, *>)
-                            ?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }
-                    },
-                    couchGet = { docId -> couchDb.docJson(docId) },
-                    casGet = { cid -> runCatching { casStore.get(borg.trikeshed.job.ContentId(cid)) }.getOrNull() },
-                ),
+                seams = councilRecordSeams(casStore, couchDb, daemonBlackboard, kifBank, councilCases),
             ),
         )
         // ── WikiSkill (arXiv 2608.27454) as two legos: wiki.consolidate (the
@@ -2242,21 +2236,6 @@ object OroborosDaemon {
         borg.trikeshed.couch.viewserver.KotlinViewServer.install(pointcutAdapter)
 
 
-        // ── Memory bridge: routes memory-eligible reconcile files through
-        //    MemoryStore.put() so they get per-line spines and local aliases.
-        val ipfsBridge = borg.trikeshed.cas.IpfsBridge(casStore)
-        val memoryBridge = borg.trikeshed.util.oroboros.MemoryBridge(
-            memoryStore,
-            attachmentGateway,
-            ipfsBridge,
-        )
-
-        // ── Reactive git-state hub: JvmFileWatchReactorElement watches .git/**
-        //    and feeds the GitCouchGateway + git-state cache. This IS the
-        //    choreography — coroutine pipelines that react to filesystem
-        //    events, not blocking ProcessBuilder calls. ──
-        val gitState = GitStateCache(repoDir)
-        val cycleTriggers = Channel<Unit>(Channel.CONFLATED)
         val gitWatcher = FileWatchReactorElement(
             root = repoDir.absolutePath,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -2299,16 +2278,7 @@ object OroborosDaemon {
 
         // Working-tree plane: source and document files live under Couch/CAS,
         // independently of the `.git/**` identity plane above.
-        // ── Composable Reconcile Elements (CCEK) ──
-        val worktreeReconcileElement = borg.trikeshed.util.oroboros.element.WorktreeReconcileElement(
-            repoRoot = repoDir.absolutePath,
-            worktreeCouchGateway = worktreeCouchGateway,
-            couchIndexBridge = couchIndexBridge,
-            memoryBridge = memoryBridge,
-            headShaProvider = { gitState.headSha() },
-            parentJob = coroutineContext[kotlinx.coroutines.Job]
-        )
-        launch(Dispatchers.IO) { worktreeReconcileElement.open() }
+
 
         val gitReconcileElement = borg.trikeshed.util.oroboros.element.GitReconcileElement(
             forgeHome = repoDir.absolutePath,
@@ -2409,16 +2379,7 @@ object OroborosDaemon {
                 )
                 HostSystem.err("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
 
-                val worktreeSnap = worktreeCouchGateway.reconcile(
-                    repoRoot = repoDir.absolutePath,
-                    agentId = "oroboros",
-                    revision = headSha,
-                    sequence = HostSystem.currentTimeMillis(),
-                )
-                couchIndexBridge.indexReconciliation(
-                    WorktreeCouchGateway.WORKTREE_PREFIX,
-                    worktreeSnap.paths.size j { i: Int -> worktreeSnap.paths[i] },
-                )
+                val worktreeSnap = worktreeReconcileElement.sync()
                 projectScopes.registerPrimary(jfile(repoDir), worktreeSnap.paths.size)
                 HostSystem.err(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
@@ -2438,12 +2399,8 @@ object OroborosDaemon {
 
             val (headSha, worktreeSnap) = reconcileResult
 
-            // ── Memory bridge + belief seeding (degrades independently) ──
+            // ── Belief seeding (degrades independently) ──
             runCatching {
-                val bridged = memoryBridge.bridge(worktreeSnap, agentId = "oroboros")
-                HostSystem.err(
-                    "[OROBOROS] Memory bridge: $bridged memory files bridged (spines + local aliases)"
-                )
                 // ── Belief minting feed: epistemic signals from the memory plane land in the bag.
                 // FNV identity stays on the signal's CIDs; the BAG key gets the feature-coded
                 // AngularCodec coordinate so recallNear is real locality, not hash noise.
@@ -2590,8 +2547,12 @@ object OroborosDaemon {
                 healthJob.cancelAndJoin()
                 if (healthSock.exists()) healthSock.delete()
                 // Finish accepted guest turns while their blackboard/model/store dependencies are live.
-                hermesWire.drain()
-                couchWire.requestFactory?.drain()
+                runCatching { hermesWire.drain() }.onFailure {
+                    HostSystem.err("[OROBOROS] Hermes drain failed: ${it.message}")
+                }
+                runCatching { couchWire.requestFactory?.drain() }.onFailure {
+                    HostSystem.err("[OROBOROS] RequestFactory drain failed: ${it.message}")
+                }
                 // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
                 runCatching { blackboardFacts.close() }
                 runCatching { graalFacts.close() }
@@ -2602,6 +2563,7 @@ object OroborosDaemon {
                 // current pass before the runner registry, model clients, or stores close.
                 drainCuration(curatorFollowJob, curationIntake, moduleSupervisor)
                 projectScopes.drain()
+                runCatching { worktreeReconcileElement.drain() }
                 changesFacts.drain()
                 runCatching { kanbanJob.cancel() }
                 runCatching { kifTeeDisposer.close() }
@@ -2617,7 +2579,6 @@ object OroborosDaemon {
                 runCatching { incrementalViews.closeAll() }
                 runCatching { reportReactor.close() }
                 runCatching { memoryIndex.close() }
-                runCatching { worktreeReconcileElement.close() }
                 runCatching { gitReconcileElement.close() }
                 runCatching { worktreeWatcher.close() }
                 runCatching { gitWatcher.close() }
@@ -2631,21 +2592,98 @@ object OroborosDaemon {
         }
     }
 
+    /** Per-case commands and snapshot receipts share the daemon's existing storage owners. */
+    internal fun councilCaseRegistry(
+        scope: kotlinx.coroutines.CoroutineScope,
+        cas: borg.trikeshed.job.CasStore,
+        couch: borg.trikeshed.couch.Couch,
+    ): borg.trikeshed.lcnc.CouncilCaseRegistry {
+        require(couch.cas === cas) { "Council lifecycle and Couch must share CAS ownership" }
+        return borg.trikeshed.lcnc.CouncilCaseRegistry(scope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
+            componentFactories = { caseId -> borg.trikeshed.job.JobNexusComponentFactories(
+                casStoreFactory = borg.trikeshed.job.CasStoreFactory { cas },
+                walFactory = borg.trikeshed.job.JobLogFactory {
+                    borg.trikeshed.couch.CouchJobLog.open(couch,
+                        "council-log/${borg.trikeshed.job.ContentId.of(caseId.encodeToByteArray()).hex}")
+                },
+            ) })
+    }
+
+    /** Host adapters acknowledge persistence before exposing derived Council facts. */
+    internal fun councilRecordSeams(
+        cas: borg.trikeshed.job.CasStore,
+        couch: borg.trikeshed.couch.Couch,
+        blackboard: borg.trikeshed.graal.ConfixBlackboard,
+        kif: borg.trikeshed.kif.KifKnowledgeBase,
+        cases: borg.trikeshed.lcnc.CouncilCaseRegistry,
+    ): borg.trikeshed.lcnc.RecordSeams {
+        val couchPut: (String, Map<String, Any?>) -> Unit = { id, body ->
+            val rev = couch.docJson(id)?.get("_rev") as? String
+            borg.trikeshed.lcnc.RecordSeams.requireCouchWrite(id, couch.put(id, body, rev))
+        }
+        return borg.trikeshed.lcnc.RecordSeams(
+            casPut = { cas.put(it).value },
+            blackboardPut = { key, fact, source -> blackboard.put(key, fact, source) },
+            kifSink = { expression ->
+                val cid = borg.trikeshed.job.ContentId.of(expression.encodeToByteArray())
+                couchPut("kif-ledger/${cid.hex}", mapOf("kif" to expression, "source" to "council",
+                    "atMs" to HostSystem.currentTimeMillis()))
+                kif.assertKif(expression)
+                blackboard.put("legal-kif/${cid.hex}", expression, "council.record")
+            },
+            couchPut = couchPut,
+            recordRuling = cases::recordRuling,
+            recordMistrial = cases::recordMistrial,
+            blackboardGet = { key ->
+                (blackboard.get(key) as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to (v?.toString() ?: "") }
+            },
+            couchGet = couch::docJson,
+            casGet = { cid -> cas.get(borg.trikeshed.job.ContentId(cid)) },
+        )
+    }
+
+    private suspend fun CoroutineScope.worktreeReconciliation(
+        repoDir: File,
+        gateway: WorktreeCouchGateway,
+        index: borg.trikeshed.memory.CouchIndexBridge,
+        memory: borg.trikeshed.memory.MemoryStore,
+        attachments: CouchAttachmentGateway,
+        cas: borg.trikeshed.job.CasStore,
+        gitState: GitStateCache,
+    ): borg.trikeshed.util.oroboros.element.WorktreeReconcileElement {
+        val element = borg.trikeshed.util.oroboros.element.WorktreeReconcileElement(
+            repoRoot = repoDir.absolutePath,
+            worktreeCouchGateway = gateway,
+            couchIndexBridge = index,
+            memoryBridge = borg.trikeshed.util.oroboros.MemoryBridge(memory, attachments, borg.trikeshed.cas.IpfsBridge(cas)),
+            headShaProvider = { gitState.headSha() },
+            parentJob = coroutineContext[kotlinx.coroutines.Job],
+        )
+        element.open()
+        return element
+    }
+
     /** The console shares the daemon board and resolves the current reactor-owned model lease per call. */
     private fun hermesConsole(
         config: DaemonConfig,
         home: String,
         repoDir: File,
+        forgeHome: File,
         blackboard: borg.trikeshed.graal.ConfixBlackboard,
         htxElement: HtxElement,
         muxReactor: MuxReactorElement,
         socketScope: CoroutineScope,
-    ) = borg.trikeshed.hermes.HermesVmConsole(
-        root = java.nio.file.Paths.get(
-            config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
-                ?: File(Files.resolvePath(home, ".hermes/hermes-agent")).absolutePath
-                ?: error("no hermes root"),
-        ),
+        world: borg.trikeshed.btrfs.BtrfsWorldStore,
+        fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
+        panelId: String = "default",
+    ): borg.trikeshed.hermes.HermesVmConsole {
+        val runtime = File(forgeHome, "python/graalpy-25.3.4.1")
+        val source = config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
+            ?: File(forgeHome, "python/hermes-source").absolutePath
+        val workerHome = File(forgeHome, "hermes-graal")
+        fileOps.mkdirs(workerHome.absolutePath)
+        return borg.trikeshed.hermes.HermesVmConsole(
+        root = java.nio.file.Paths.get(source),
         sleeve = java.nio.file.Paths.get(
             config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
                 ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath
@@ -2653,9 +2691,33 @@ object OroborosDaemon {
         ),
         blackboard = blackboard,
         modelMuxProvider = { muxReactor.modelMux() },
-        muxContext = htxElement + muxReactor,
+        muxContext = htxElement + muxReactor + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
-    )
+        world = world,
+        workerConfiguration = borg.trikeshed.graal.subvm.PythonWorker(
+            timeoutMillis = 900_000,
+            workingDirectory = repoDir.absolutePath,
+            pythonPath = listOf(
+                source,
+                File(repoDir, "graalpy-sleeve/bridges").absolutePath,
+            ),
+            executable = File(runtime, "venv/bin/python").absolutePath,
+            arguments = listOf("hermes"),
+            environment = mapOf(
+                "HOME" to workerHome.absolutePath,
+                "XDG_STATE_HOME" to File(workerHome, ".local/state").absolutePath,
+                "HERMES_HOME" to workerHome.absolutePath,
+                "HERMES_RUNTIME_DIR" to File(workerHome, "runtime").absolutePath,
+                "HERMES_DISABLE_LAZY_INSTALLS" to "1",
+                "HERMES_EXIT_WATCHDOG_S" to "0",
+                "TERMINAL_CWD" to repoDir.absolutePath,
+                "TERM" to "xterm-256color",
+                "COLUMNS" to "100", "LINES" to "32",
+            ),
+        ),
+        panelId = panelId,
+        )
+    }
 
     /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */
     private fun openCouchStore(
@@ -2746,10 +2808,12 @@ object OroborosDaemon {
 
     private fun usage() {
         HostSystem.err(
-            """usage: OroborosDaemon [--once | --watch] [--interval-ms N] [--max-slots N] [--kanban-port N]
+            """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N]
               [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
+              --airgap: disable remote Jev/LLM calls; keep local BERT
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
+                   TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
               kanban-port default: 8888"""

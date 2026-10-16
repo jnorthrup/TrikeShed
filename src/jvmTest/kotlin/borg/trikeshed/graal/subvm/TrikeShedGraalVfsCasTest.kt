@@ -2,6 +2,7 @@ package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.btrfs.BtrfsWorldStore
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import java.nio.ByteBuffer
@@ -24,6 +25,49 @@ class TrikeShedGraalVfsCasTest {
     private fun vfs(world: BtrfsWorldStore, guest: String) = TrikeShedGraalVfs(
         world.fileOpsFor(guest), world.root, world.subvolumeFor(guest), guest, world.cas,
     )
+
+    @Test
+    fun batchPathValidationPreservesFilesAndGeneration() {
+        val mounted = vfs(BtrfsWorldStore.ofMemory(), "vm.batch")
+        val original = "original".encodeToByteArray()
+        mounted.put("/workspace/existing", original)
+        val manifest = mounted.btrfsForTools().manifestId("vm.batch")
+        val generation = mounted.generation()
+
+        assertFailsWith<IllegalArgumentException> {
+            mounted.put(s_[
+                "/workspace/existing" j "replacement".encodeToByteArray(),
+                "/workspace/new/file" j byteArrayOf(2),
+                "/" j byteArrayOf(3),
+            ])
+        }
+
+        assertEquals(generation, mounted.generation())
+        assertEquals(manifest, mounted.btrfsForTools().manifestId("vm.batch"))
+        assertContentEquals(original, mounted.fetch("/workspace/existing"))
+        assertNull(mounted.fetch("/workspace/new/file"))
+        assertFalse(mounted.btrfsForTools().isDirectory("vm.batch", "workspace/new"))
+    }
+
+    @Test
+    fun batchSnapshotPreservesBytesAfterLiveWrites() {
+        val mounted = vfs(BtrfsWorldStore.ofMemory(), "vm.batch")
+        val first = byteArrayOf(1, 2)
+        val second = byteArrayOf(3, 4)
+        mounted.put(s_[
+            "/workspace/first" j first,
+            "/workspace/nested/second" j second,
+        ])
+        assertTrue(mounted.snapshot("vm.batch.snapshot"))
+
+        mounted.put("/workspace/first", byteArrayOf(5))
+        mounted.put("/workspace/third", byteArrayOf(6))
+
+        assertContentEquals(byteArrayOf(5), mounted.fetch("/workspace/first"))
+        assertContentEquals(first, mounted.fetchSnapshot("vm.batch.snapshot", "/workspace/first"))
+        assertContentEquals(second, mounted.fetchSnapshot("vm.batch.snapshot", "/workspace/nested/second"))
+        assertNull(mounted.fetchSnapshot("vm.batch.snapshot", "/workspace/third"))
+    }
 
     @Test
     fun timestampAttributesSurviveRemountWithoutChangingCasIdentityOrAnotherGuest() {

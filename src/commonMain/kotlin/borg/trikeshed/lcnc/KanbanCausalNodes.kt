@@ -72,12 +72,14 @@ object KanbanCausalNodes {
                 "firingCid" to f.firingCid.value,
             )
         }).view.toList()
-        mapOf("firings" to out, "ruleCid" to decoded.singleOrNull()?.ruleCid?.value,
+        val evaluation = mapOf("firings" to out, "ruleCid" to decoded.singleOrNull()?.ruleCid?.value,
             "ruleCids" to (rete.rules α { it.ruleCid.value }).view.toList(), "rejected" to rejected,
             "rules" to specs.view.mapIndexed { i, spec -> spec + mapOf("ruleCid" to decoded[i].ruleCid.value,
                 "positiveEvidence" to decoded[i].evidence.positive, "negativeEvidence" to decoded[i].evidence.negative,
                 "evaluated" to decoded[i].isEternal) },
-            "assertions" to rawAssertions, "hypothetical" to true)
+            "assertions" to rawAssertions, "hypothetical" to true, "discount" to discount)
+        // One projection of the actual evaluation for authored prompt/facet consumers, not another evaluator.
+        evaluation + ("evaluation" to evaluation)
     }
 }
 

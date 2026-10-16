@@ -1,6 +1,8 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.pointcut.VmFacet
+import org.graalvm.polyglot.Context
+import org.graalvm.polyglot.Source
 
 /**
  * The GraalVM polyglot bounds this sub-VM is built on, as code rather than lore.
@@ -112,4 +114,16 @@ object GuestBounds {
         "js" -> JS; "python" -> PYTHON; "ruby" -> RUBY; "llvm" -> LLVM
         else -> throw IllegalArgumentException("unknown guest language $languageId")
     }
+}
+
+/** Refuse C extensions before GraalPy reserves its process-wide native C API state. */
+fun Context.withholdNativeModules(bounds: FacetBounds) {
+    if (bounds.facet != VmFacet.GRAAL_PYTHON) return
+    eval(Source.newBuilder("python", """
+        import _imp
+        def __trikeshed_native_module(spec, file=None):
+            raise ImportError('native module withheld in TrikeShed guest: ' + spec.name, name=spec.name)
+        _imp.create_dynamic = __trikeshed_native_module
+        del _imp, __trikeshed_native_module
+    """.trimIndent(), "guest-native-modules.py").internal(true).buildLiteral())
 }

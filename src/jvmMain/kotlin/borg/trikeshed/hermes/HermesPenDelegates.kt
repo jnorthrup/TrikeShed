@@ -6,7 +6,8 @@ import borg.trikeshed.parse.confix.confixDoc
 
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.graal.ConfixBlackboard
-import borg.trikeshed.graal.subvm.GraalBtrfsSupervisor
+import borg.trikeshed.graal.subvm.GuestIsolate
+import borg.trikeshed.graal.subvm.PythonSocketProvider
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.memory.GoalCoord
@@ -22,13 +23,16 @@ import borg.trikeshed.narsese.SemanticSignal
 import borg.trikeshed.narsese.TermIdentity
 import borg.trikeshed.ontology.zipper.PlaneAdapters
 import borg.trikeshed.vm.Teleported
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import modelmux.ModelMux
 import modelmux.acp.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.time.TimeSource
 
 /**
  * THE PEN — the hosted model's entire tool surface: typed host.call delegates
@@ -74,13 +78,17 @@ class HermesPen(
     /** Host-owned command identity; the guest cannot supply receipt attribution. */
     private val contextId: () -> String? = { null },
 ) {
+    companion object {
+        const val MODEL_WALL_MILLIS = 300_000L
+    }
+
     private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
 
-    fun install(guest: GraalBtrfsSupervisor, sockets: HermesSocketProvider? = null) {
+    fun install(guest: GuestIsolate, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
-        guest.delegate("mux_converse") { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
-        guest.delegate("mux_completion") { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { muxCompletion(args, cause) } } }
+        guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
+        guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { muxCompletion(args, cause) } } }
         guest.delegate("bag_recall") { args -> receipted("bag_recall", args) { bagRecall(args) } }
         guest.delegate("bag_assert") { args -> receipted("bag_assert", args) { bagAssert(args) } }
         guest.delegate("crumb_walk") { args -> receipted("crumb_walk", args) { crumbWalk(args) } }
@@ -94,7 +102,15 @@ class HermesPen(
         val n = seq.incrementAndGet()
         val cause = contextId()
         // Carry the verdict with the payload; a returned refusal is not a successful effect.
-        val outcome = runCatching { body(cause) }.getOrElse { refusal("error", it.message ?: it::class.simpleName.orEmpty()) }
+        val outcome = try {
+            body(cause)
+        } catch (interrupted: InterruptedException) {
+            throw interrupted
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Throwable) {
+            refusal("error", failure.message ?: failure::class.simpleName.orEmpty())
+        }
         val success = outcome.a
         val admission = bag?.intake?.trySend(
             BeliefIntake.Mint(
@@ -162,30 +178,40 @@ class HermesPen(
     }
 
     private suspend fun muxConverse(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
-        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
         val prompt = str(args, 1) ?: return refusal("bad-args", "mux_converse(modelId, prompt)")
-        val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause)
-        return result.fold(
-            onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
-                "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
-            onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
-        )
+        val timeout = MODEL_WALL_MILLIS - 5_000L // Leave the process crossing time to return its terminal reply.
+        val started = TimeSource.Monotonic.markNow()
+        return withTimeout(timeout) {
+            val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
+            val remaining = (timeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
+            val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause, timeoutMs = remaining)
+            result.fold(
+                onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
+                    "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
+                onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
+            )
+        }
     }
 
     private suspend fun muxCompletion(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
-        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
         val json = str(args, 1) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
-        val timeout = if (args.size == 2) borg.trikeshed.htx.HtxRequest.DEFAULT_TIMEOUT_MS
+        val timeout = if (args.size == 2) MODEL_WALL_MILLIS
             else (args.getOrNull(2) as? Teleported.Num)?.v?.takeIf { args.size == 3 && it > 0 }
-                ?.coerceAtMost(borg.trikeshed.htx.HtxRequest.DEFAULT_TIMEOUT_MS)
+                ?.coerceAtMost(MODEL_WALL_MILLIS)
                 ?: return refusal("bad-args", "mux_completion timeout must be positive milliseconds")
-        val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = timeout)
-        return result.fold(
-            onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
-            onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
-        )
+        val admittedTimeout = timeout.coerceAtMost(MODEL_WALL_MILLIS - 5_000L)
+        val started = TimeSource.Monotonic.markNow()
+        return withTimeout(admittedTimeout) {
+            val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
+            val remaining = (admittedTimeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
+            val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = remaining)
+            result.fold(
+                onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
+                onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },
+            )
+        }
     }
 
     private fun bagRecall(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {

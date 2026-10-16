@@ -309,13 +309,16 @@ suspend fun Panels.openGallery() {
                 if (el.dataset.kind == "preset") {
                     val hit = all.firstOrNull { it.name == name }; val doc = hit?.document
                     if (truthy(doc)) {
-                        load(fromConfix(doc)); panelName().value = name.replace(Regex("^preset-"), ""); syncBoard(name)
+                        if (!load(fromConfix(doc))) return@launchJs
+                        panelName().value = name.replace(Regex("^preset-"), ""); syncBoard(name)
                         // Land on the on-ramp: say what to change, and that backing out is safe.
                         status(str(if (truthy(hit.title)) hit.title else name) + " loaded — change first: " + str(if (truthy(hit.tweakFirst)) hit.tweakFirst else "anything") + " · ⌘Z undoes · ⇪ store keeps it")
-                    }
+                    } else { refuseLoad("Preset has no document: $name"); return@launchJs }
                 } else {
                     val resp = fetchJs("/api/panels/$name")
-                    if (truthy(resp.ok)) { load(awaitJs(resp.json())); panelName().value = name; status("loaded panels/$name"); syncBoard(name) }
+                    if (!truthy(resp.ok)) { refuseLoad("Stored panel unavailable: $name"); return@launchJs }
+                    if (!load(awaitJs(resp.json()))) return@launchJs
+                    panelName().value = name; status("loaded panels/$name"); syncBoard(name)
                 }
                 gal.remove(); armSources(automatic = true); runAll(null, automatic = true)
             }
@@ -361,9 +364,10 @@ suspend fun Panels.rdfTab(tab: String) {
                             val doc = awaitJs(rr.json())
                             if (!truthy(rr.ok) || truthy(doc.error)) msg.textContent = "apply refused: " + str(doc.error ?: rr.status)
                             else {
+                                if (!load(fromConfix(doc))) { msg.textContent = statusText(); return@launchJs }
                                 // load() re-renders this tab (debounced), which would erase the message; park it for that render.
                                 rdfNote = "canvas rebuilt from " + arr(doc.nodes).size + " nodes, " + arr(doc.wires).size + " cables"
-                                load(fromConfix(doc)); save(); armSources(automatic = true); msg.textContent = rdfNote
+                                armSources(automatic = true); msg.textContent = rdfNote
                             }
                         }
                         "nal" -> {

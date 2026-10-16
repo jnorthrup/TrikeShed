@@ -81,6 +81,17 @@ button.stop{border-color:var(--err);color:var(--err)}
 .params input,.params textarea,.params select{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:11px/1.4 inherit;padding:3px 5px;width:100%;user-select:text}
 .params textarea{resize:both;min-height:44px;white-space:pre}
 .result{margin:0 8px 6px;padding:5px 6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--dim);max-height:150px;max-width:340px;overflow:auto;white-space:pre;user-select:text;resize:both}
+.result:has(>.simulation){width:min(560px,calc(100vw - 48px));max-width:none;max-height:440px;white-space:normal;color:var(--ink)}
+.simulation{font:13px/1.5 var(--sans);overflow-wrap:anywhere}
+.simulation h4,.simulation h5{margin:6px 0;font-size:14px}
+.simulation p{margin:6px 0}
+.simulation details{margin:8px 0}.simulation summary{cursor:pointer}
+.simulation .ctree{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px}
+.simulation-controls,.simulation-support{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.simulation-controls{margin-top:12px}.simulation-controls select{max-width:100%;font:inherit}
+.simulation-firings article{border-top:1px solid var(--line);padding:10px 0}
+.simulation-support span{border:1px solid var(--line);padding:3px 8px;border-radius:4px;font-family:var(--mono)}
+.simulation blockquote{margin:8px 0;padding:6px 10px;border-left:3px solid var(--graal);white-space:pre-wrap}
 .node.wide{min-width:680px}
 .kboard{display:flex;gap:6px;padding:6px 8px 8px;overflow-x:auto}
 .kcol{flex:0 0 132px;background:var(--bg);border:1px solid var(--line);border-radius:4px;min-height:60px;padding:5px;transition:outline .1s}
@@ -195,7 +206,8 @@ button.stop{border-color:var(--err);color:var(--err)}
   color:var(--vm);font-size:8.5px;padding:0 6px;line-height:15px;white-space:nowrap}
 .node.scope>.ringlbl i{font-style:normal;color:var(--dim)}
 .node.scope.collapsed{min-width:140px;min-height:34px}
-.node.scope.collapsed .body,.node.scope.collapsed .params,.node.scope.collapsed .result{display:none}
+/* Collapsing hides the interior, not the ring's public ports. */
+.node.scope.collapsed>.childgrid{display:none}
 /* the ring's window: a clipping viewport onto its own microscopic canvas.
    Drag the header to move it, grab the corner to resize it, WHEEL inside to
    zoom it, drag its empty interior to pan it — the same physics as the main

@@ -295,7 +295,9 @@ class InProcessIsolateTest {
 
     @Test fun pythonNativePointcutsPreserveKeywordsMetadataAndGuestExceptions() {
         val seen = ArrayList<RootObservation>()
-        InProcessIsolate("py-keywords", VmFacet.GRAAL_PYTHON) { seen += it }.use { iso ->
+        // This verifies function semantics, including a cold inspect import, not the default wall limit.
+        // Dedicated watchdog tests retain their explicit short leases.
+        InProcessIsolate("py-keywords", VmFacet.GRAAL_PYTHON, Budget(wallMillis = 15_000)) { seen += it }.use { iso ->
             iso.eval("""
                 def label(value: int, /, *, prefix: str = 'v') -> str:
                     'Label a value.'

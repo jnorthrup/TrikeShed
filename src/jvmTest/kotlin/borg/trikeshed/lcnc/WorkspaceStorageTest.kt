@@ -5,6 +5,8 @@ import borg.trikeshed.couch.isam.*
 import borg.trikeshed.couch.persistence.*
 import borg.trikeshed.dag.*
 import borg.trikeshed.graal.ConfixBlackboard
+import borg.trikeshed.isam.*
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.module.WorkspaceService
 import borg.trikeshed.kanban.module.KanbanModule
 import borg.trikeshed.lib.*
@@ -20,14 +22,18 @@ import java.nio.file.Path
 import kotlin.test.*
 
 class WorkspaceStorageTest {
-    class Fixture(val root: Path, val scope: CoroutineScope) {
+    class Fixture(val root: Path, val scope: CoroutineScope, val dictionaries: Boolean = false) {
         val files = JvmFileOperations()
         val cas = FileCasStore(files, root.resolve("cas").toString())
         val commits = CouchCommitStore(cas, StorageDurability.DURABLE, files, root.resolve("couch").toString())
         val couch = Couch("workspace", CouchStoreFactory.durableCasBacked(cas, commits), cas,
             localBacking = commits.asLocalBacking())
         val location = root.resolve("dense").toString()
-        var storage = ConfixIsamElement(scope, couch.store.changes, location, files, cas)
+        val resolvedDictionaries = mutableListOf<ContentId>()
+        fun codec(): ((ByteArray) -> IsamLeafCodec)? = if (!dictionaries) null else { bytes ->
+            resolvedDictionaries.add(ContentId.of(bytes)); ZstdDictionaryCodec(bytes)
+        }
+        var storage = ConfixIsamElement(scope, couch.store.changes, location, files, cas, dictionaryCodec = codec())
         val board = ConfixBlackboard.empty()
         fun service(moduleScope: CoroutineScope = scope): WorkspaceService = WorkspaceService(ModuleContext(
             couch = couch, rete = ReteNetwork(), productions = ReteProductionRegistry(), beliefBag = null,
@@ -36,14 +42,14 @@ class WorkspaceStorageTest {
         ))
         suspend fun reopen() {
             storage.drain()
-            storage = ConfixIsamElement(scope, couch.store.changes, location, files, cas)
+            storage = ConfixIsamElement(scope, couch.store.changes, location, files, cas, dictionaryCodec = codec())
         }
         suspend fun close() { try { storage.drain() } finally { commits.close() } }
     }
 
-    suspend fun fixture(scope: CoroutineScope, body: suspend (Fixture) -> Unit) {
+    suspend fun fixture(scope: CoroutineScope, dictionaries: Boolean = false, body: suspend (Fixture) -> Unit) {
         val root = Files.createTempDirectory("workspace-storage-")
-        val fixture = Fixture(root, scope)
+        val fixture = Fixture(root, scope, dictionaries)
         try { body(fixture) } finally {
             fixture.close()
             Files.walk(root).use { paths -> paths.sorted(Comparator.reverseOrder()).forEach(Files::delete) }
@@ -104,6 +110,32 @@ class WorkspaceStorageTest {
         }
     }
 
+    @Test fun batchReceiptsStopAtTheDurableIndexedSequence() = runTest {
+        fixture(this) { f ->
+            val empty = request(f.service(), "PUT", mapOf("action" to "index-couch"))
+            assertNull(empty["through"])
+            assertEquals(0, (empty["imported"] as Number).toInt())
+            assertFalse(Files.exists(Path.of(f.location + ".store")))
+            repeat(3) { f.couch.put("case-$it", mapOf("review" to it), null) }
+            suspend fun batch(limit: Int, imported: Int, remaining: Int, sequence: Long) {
+                val receipt = request(f.service(), "PUT", mapOf("action" to "index-couch", "limit" to limit))
+                assertEquals(imported, (receipt["imported"] as Number).toInt())
+                assertEquals(remaining, (receipt["remaining"] as Number).toInt())
+                assertEquals(sequence, (receipt["through"] as Number).toLong(),
+                    "The receipt must not acknowledge source revisions absent from the dense projection")
+                val revisions = f.storage.catalog()["revisions"] as List<*>
+                assertEquals(sequence, ((revisions.first() as Map<*, *>)["sequence"] as Number).toLong())
+            }
+            batch(1, 1, 2, 0L)
+            f.reopen()
+            f.couch.put("case-3", mapOf("review" to 3), null)
+            batch(1, 1, 2, 1L)
+            batch(32, 2, 0, 3L)
+            f.reopen()
+            batch(32, 0, 0, 3L)
+        }
+    }
+
     @Test fun invalidRequestsNeverCreateTheDestination() = runTest {
         fixture(this) { f ->
             val service = f.service()
@@ -118,6 +150,19 @@ class WorkspaceStorageTest {
             val reduced = WorkspaceService(vmRuntimeTestContext(this@runTest))
             assertEquals(503, reduced.route("PUT", jsonOf(mapOf("action" to "index-couch"))).status)
             assertEquals(503, reduced.route("POST", jsonOf(missing)).status)
+        }
+    }
+
+    @Test fun unavailableDictionaryCannotSilentlyFallBackToPortableWrites() = runTest {
+        fixture(this) { f ->
+            f.couch.put("legal", mapOf("status" to "review"), null)
+            val head = Files.readAllBytes(f.root.resolve("couch/HEAD"))
+            val cid = f.cas.put("synthetic compression dictionary".encodeToByteArray())
+            val result = f.service().route("PUT", jsonOf(mapOf(
+                "action" to "index-couch", "dictionaryCid" to cid.value)))
+            assertEquals(400, result.status, "A host without a dictionary codec must refuse the selection")
+            assertFalse(Files.exists(Path.of(f.location + ".store")))
+            assertContentEquals(head, Files.readAllBytes(f.root.resolve("couch/HEAD")))
         }
     }
 
@@ -184,13 +229,22 @@ class WorkspaceStorageTest {
     // The optional browser inspection waits at most ten minutes; ordinary runs never wait.
     @org.junit.jupiter.api.Timeout(value = 11, unit = java.util.concurrent.TimeUnit.MINUTES)
     @Test fun workspaceHttpUsesTheOwnedDenseProjection() = runBlocking {
-        fixture(CoroutineScope(coroutineContext + Dispatchers.Default)) { f ->
+        fixture(CoroutineScope(coroutineContext + Dispatchers.Default), dictionaries = true) { f ->
+            val dictionaryCid = f.couch.blockPut("synthetic clinical legal review parties evidence".encodeToByteArray())
             f.couch.put("clinical-review", mapOf("patients" to listOf(
                 mapOf("name" to "Synthetic patient", "findings" to listOf("review", "pending")),
                 mapOf("name" to "Synthetic second patient", "findings" to listOf("review")))), null)
             val first = f.couch.put("legal-review", mapOf("parties" to listOf("claimant", "respondent"), "status" to "draft"), null)
             val second = f.couch.put("legal-review", mapOf("parties" to listOf("claimant", "respondent"), "status" to "reviewed"), first["rev"] as String)
             f.couch.delete("legal-review", second["rev"] as String)
+            val fileTreeUi = java.lang.System.getenv("LCNC_FILE_TREE_UI") == "1"
+            if (fileTreeUi) {
+                val world = borg.trikeshed.btrfs.BtrfsWorldStore.ofMemory(f.cas)
+                val mount = world.mount("review")
+                assertTrue(mount.createSubvolume("review"))
+                assertTrue(mount.writeFile("review", "case/医.txt", "synthetic file evidence".encodeToByteArray()))
+                assertTrue(borg.trikeshed.btrfs.VmWorldTeleport(f.couch, world).publish("review")["ok"] == true)
+            }
             val sourceHead = Files.readAllBytes(f.root.resolve("couch/HEAD"))
             val moduleJob = SupervisorJob(coroutineContext[Job])
             val service = f.service(CoroutineScope(f.scope.coroutineContext + moduleJob))
@@ -208,6 +262,8 @@ class WorkspaceStorageTest {
                 pointcuts.store, null, service.context.scope, pointcuts)
             val host = HypervisorVmHost()
             service.context.lcncRunners.putAll(PureNodes.registry { 123L })
+            service.context.lcncRunners["display"] = TribunalNodes.registry(
+                TribunalDialog { _, _, _ -> error("No model call expected") }).getValue("display")
             service.context.lcncRunners[SubVmLegos.POLYGLOT] = SubVmLegos.polyglot(host)
             service.context.lcncRunners[SubVmLegos.CAMEL] = SubVmLegos.camel(host)
             var module: ModuleHandle? = null
@@ -229,18 +285,25 @@ class WorkspaceStorageTest {
                             })
                             status = response.status; response.body.encodeToByteArray()
                         }
-                        "/api/lcnc/workspace", "/api/lcnc/contracts", "/api/lcnc/run", "/api/board" -> {
+                        "/api/lcnc/workspace", "/api/lcnc/contracts", "/api/lcnc/run", "/api/board",
+                        "/api/lcnc/concentric", "/api/lcnc/runs", "/api/lcnc/content",
+                        "/api/lcnc/run/debug", "/api/lcnc/run/cancel" -> {
                             val claim = requireNotNull(service.context.routes.match(path))
-                            val response = requireNotNull(runBlocking { claim.route(exchange.requestMethod, path,
+                            val response = requireNotNull(runBlocking { claim.route(exchange.requestMethod, exchange.requestURI.toString(),
                                 exchange.requestBody.readBytes().decodeToString(), null) })
                             status = response.status; response.body.encodeToByteArray()
                         }
-                        "/api/panels/presets" -> jsonOf(mapOf("presets" to emptyList<Any>())).encodeToByteArray()
+                        "/api/panels/presets" -> jsonOf(mapOf("presets" to LcncPresets.all().map { (name, doc) ->
+                            val info = LcncPresets.info(name)
+                            mapOf("name" to name, "title" to (info?.title ?: name), "does" to info?.does.orEmpty(),
+                                "needs" to info?.needs.orEmpty(), "see" to info?.see.orEmpty(),
+                                "tweakFirst" to info?.tweakFirst.orEmpty(), "document" to reify(doc))
+                        })).encodeToByteArray()
                         "/api/panels/language-check" -> jsonOf(mapOf("nodes" to emptyList<Any>(),
                             "wires" to emptyList<Any>(), "controls" to mapOf("humanOversight" to true))).encodeToByteArray()
                         "/api/panels/execution-check" -> jsonOf(mapOf("nodes" to listOf(
                             mapOf("id" to "source", "type" to "vm.polyglot", "x" to 30, "y" to 60,
-                                "params" to mapOf("language" to "js", "source" to "return input;",
+                                "params" to mapOf("language" to "js", "source" to "function reviewFlag(value) {\n  const score = value.score;\n  const reviewed = value.reviewed;\n  return {score: score, reviewed: reviewed};\n}\nreturn reviewFlag(input);",
                                     "input" to "{\"score\":1.25,\"reviewed\":false}")),
                             mapOf("id" to "result", "type" to "display", "x" to 400, "y" to 60,
                                 "params" to emptyMap<String, String>())),
@@ -318,9 +381,72 @@ class WorkspaceStorageTest {
                     assertEquals(400, refused.statusCode(), refused.body())
                 }
                 assertTrue(host.ids().none { host.get(it)?.isAlive == true })
-                if (System.getenv("LCNC_STORAGE_UI") == "1") {
+                // ids() includes revoked guests from the three function checks above.
+                // Native routes must neither allocate a guest nor revive one of those entries.
+                val nativeVmIds = host.ids()
+                for (language in listOf("java", "groovy")) {
+                    val capability = languages.map { it as Map<*, *> }.single { it["id"] == language }
+                    val native = assertIs<Map<*, *>>(capability["nativeConstruction"])
+                    assertEquals(true, native["available"], native["note"].toString())
+                    val nativeProgram = http("POST", jsonOf(mapOf("name" to "native-$language-http",
+                        "document" to native["document"], "inputs" to emptyMap<String, Any?>())), "/api/lcnc/run")
+                    assertEquals(200, nativeProgram.statusCode(), nativeProgram.body())
+                    val nativeReceipt = assertIs<Map<*, *>>(reify(nativeProgram.body()))
+                    assertNotNull(nativeReceipt["receiptCid"])
+                    val outputs = assertIs<Map<*, *>>(nativeReceipt["outputs"])
+                    val display = assertIs<Map<*, *>>(assertIs<Map<*, *>>(outputs["receipt"])["x"])
+                    assertEquals("human-reviewer: request-evidence", display["reply"])
+                    assertEquals("native-dsl", display["authoring"])
+                    assertEquals(language, display["language"])
+                    assertEquals(nativeVmIds, host.ids(), "Native HTTP execution must not allocate a VM")
+                    assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+                }
+                val nativeUi = System.getenv("LCNC_NATIVE_UI") == "1"
+                val pointcutUi = System.getenv("LCNC_POINTCUT_UI") == "1"
+                if (System.getenv("LCNC_STORAGE_UI") == "1" || nativeUi || pointcutUi || fileTreeUi) {
+                    val priorRuns = LcncRunHead.rows(service.context.blackboard.snapshot().values).map { it.runId }.toSet()
+                    println("LCNC_STORAGE_DICTIONARY=${dictionaryCid.value}")
                     println("LCNC_STORAGE_UI=$base/panels?load=language-check")
                     assertTrue(finished.await(10, java.util.concurrent.TimeUnit.MINUTES), "Browser check did not close")
+                    if (fileTreeUi) assertEquals(priorRuns,
+                        LcncRunHead.rows(service.context.blackboard.snapshot().values).map { it.runId }.toSet(),
+                        "File-tree inspection and indexing must not execute a panel graph")
+                    if (pointcutUi) {
+                        val runs = LcncRunHead.rows(service.context.blackboard.snapshot().values).filter { it.runId !in priorRuns }
+                        assertEquals(1, runs.size, "Receipt inspection must not execute another program")
+                        val run = runs.single()
+                        assertEquals("completed", run.status)
+                        val boardBeforeInspection = service.context.blackboard.snapshot()
+                        val frozen = reify(f.cas.get(ContentId(requireNotNull(run.programCid)))!!.decodeToString())
+                        val inspected = http("POST", jsonOf(mapOf("name" to "execution-check", "document" to frozen)))
+                        assertEquals(200, inspected.statusCode(), inspected.body())
+                        val discovered = (assertIs<Map<*, *>>(reify(inspected.body()))["runs"] as List<*>)
+                            .map { it as Map<*, *> }.single { it["runId"] == run.runId }
+                        assertEquals(run.receiptCid, discovered["receiptCid"])
+                        assertNull(discovered["programKey"], "Inline evidence must not acquire named-program membership")
+                        assertEquals(boardBeforeInspection, service.context.blackboard.snapshot())
+                        val evidence = reify(f.cas.get(ContentId(run.raw["invocationsCid"] as String))!!.decodeToString()) as Map<*, *>
+                        val invocation = (evidence["entries"] as List<*>).map { it as Map<*, *> }.single { it["nodeId"] == "source" }
+                        val runtime = invocation["runtime"] as Map<*, *>
+                        val roots = ((runtime["pointcuts"] as Map<*, *>)["roots"] as List<*>).map { it as Map<*, *> }
+                        assertTrue(roots.any { it["root"] == "reviewFlag" })
+                        assertEquals(nativeVmIds.size + 1, host.ids().size)
+                        assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+                    }
+                    if (nativeUi) {
+                        val runs = LcncRunHead.rows(service.context.blackboard.snapshot().values).filter { it.runId !in priorRuns }
+                        assertEquals(1, runs.size, "Loading and editing must not execute; exactly one explicit Run was requested")
+                        val run = runs.single()
+                        assertEquals("native-groovy-camel", run.program)
+                        assertNull(run.programKey, "Running unsaved source must not claim membership in a saved program")
+                        assertEquals("completed", run.status)
+                        assertNotNull(run.receiptCid)
+                        val output = assertIs<Map<*, *>>(assertIs<Map<*, *>>(run.raw["outputs"])["route"])
+                        assertEquals("reviewer-医: review-evidence", output["routed"])
+                        assertEquals("groovy", assertIs<Map<*, *>>(output["receipt"])["language"])
+                        assertEquals(nativeVmIds, host.ids(), "Native UI execution must not allocate a VM")
+                        assertTrue(host.ids().none { host.get(it)?.isAlive == true }, "Native UI must not leave a live VM")
+                    }
                 }
                 val indexed = http("PUT", jsonOf(mapOf("action" to "index-couch")))
                 assertEquals(200, indexed.statusCode(), indexed.body())

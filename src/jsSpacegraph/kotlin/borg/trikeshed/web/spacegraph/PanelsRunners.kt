@@ -145,7 +145,7 @@ finally:
             o("groups" to out)
         }),
         "dom.board" to Runner({ n, i ->
-            n._groups = if (truthy(i.groups)) i.groups else obj(); n._cols = if (truthy(i["columns?"])) i["columns?"] else null
+            n._groups = JSON.parse<dynamic>(JSON.stringify(i.groups ?: obj())); n._cols = if (truthy(i["columns?"])) i["columns?"] else null
             // a drag gesture fires downstream exactly once; no gesture emits NOTHING
             val mv = n._lastMove; n._lastMove = null
             if (truthy(mv)) o("move" to mv) else obj()
@@ -192,33 +192,7 @@ finally:
         // The concentric treesheet view: board sheet at the center, partitions one ring out,
         // orchestration outermost. SheetRef cells and child rings drill in, the crumb climbs out.
         "sheet.concentric" to Runner({ n, i ->
-            val idx = js("Object.create(null)")
-            val fetched = HashSet<String>()
-            suspend fun add(sh: dynamic) {
-                if (!truthy(sh)) return
-                if (truthy(sh.id)) { idx[sh.id] = sh; return }
-                if (!truthy(sh.sheet)) return
-                // Retained document outputs carry identities, not another copy of the parser's rows.
-                // Prefer one bounded page; legacy sheet families remain readable.
-                val href = str(sh.pageHref ?: sh.href)
-                if (fetched.add(href)) {
-                    for (sheet in readSheets(href)) idx[sheet.id] = sheet
-                }
-                require(truthy(idx[sh.sheet])) { "Referenced sheet is absent from its family: ${str(sh.sheet)}" }
-            }
-            try {
-                add(i.board)
-                for (sh in arr(i["byStatus?"])) add(sh)
-                for (sh in arr(i["byPriority?"])) add(sh)
-            } catch (e: dynamic) {
-                n._sheets = null; n._cur = null; n._orch = null
-                p.renderConcentric(n)
-                throw e
-            }
-            n._sheets = idx; n._sheetError = null; n._sheetRequest = null
-            n._orch = if (truthy(i["orchestration?"])) i["orchestration?"] else null
-            if (!truthy(n._cur) || !truthy(idx[n._cur])) n._cur = if (truthy(i.board)) i.board.id ?: i.board.sheet else i.board
-            n.el.querySelector(".result")?.remove()
+            p.loadConcentric(n, i.board, i["byStatus?"], i["byPriority?"], i["orchestration?"])
             obj()
         }, { n, _ -> p.renderConcentric(n) }),
         "graal.heap" to Runner({ n, _ -> val r = api("GET", "/api/graal/heap"); n._heap = r; o("heap" to r) }, { n, _ -> p.renderHeap(n) }),
@@ -227,6 +201,50 @@ finally:
             o("standings" to n._standings)
         }, { n, _ -> p.renderStandings(n) }),
     )
+}
+
+/** Shared presentation setup. Retained references are read, never sent back through a runner. */
+internal suspend fun Panels.loadConcentric(n: dynamic, board: dynamic, byStatus: dynamic,
+                                         byPriority: dynamic, orchestration: dynamic,
+                                         current: () -> Boolean = { true }): Boolean {
+    val canvas = graph
+    val request = obj()
+    val previous = n._cur
+    n._sheetRequest = request; n._sheetError = null
+    n._sheets = null; n._cur = null; n._orch = null
+    renderConcentric(n)
+    fun active(): Boolean = graph === canvas && n._sheetRequest === request &&
+        truthy(n.el.isConnected) && current()
+    val idx = js("Object.create(null)")
+    val fetched = HashSet<String>()
+    suspend fun add(sh: dynamic) {
+        if (!active() || !truthy(sh)) return
+        if (truthy(sh.id)) { idx[sh.id] = sh; return }
+        if (!truthy(sh.sheet)) return
+        val href = str(sh.pageHref ?: sh.href)
+        if (fetched.add(href)) for (sheet in readSheets(href)) idx[sheet.id] = sheet
+        if (active()) require(truthy(idx[sh.sheet])) { "Referenced sheet is absent from its family: ${str(sh.sheet)}" }
+    }
+    try {
+        add(board)
+        for (sh in arr(byStatus)) add(sh)
+        for (sh in arr(byPriority)) add(sh)
+        if (!active()) return false
+        n._sheets = idx; n._orch = orchestration
+        n._cur = if (truthy(previous) && truthy(idx[previous])) previous
+            else if (truthy(board)) board.id ?: board.sheet else board
+        n.el.querySelector(".result")?.remove()
+        return true
+    } catch (e: CancellationException) { throw e }
+    catch (e: dynamic) {
+        if (active()) n._sheetError = failureText(e)
+        throw e
+    } finally {
+        if (n._sheetRequest === request) {
+            n._sheetRequest = null
+            if (graph === canvas && truthy(n.el.isConnected) && current()) renderConcentric(n)
+        }
+    }
 }
 
 /** Shared read boundary for initial sheet references and navigation. No curation POST. */

@@ -25,13 +25,14 @@ class RequestFactoryReactorElementTest {
         val release = CompletableDeferred<Unit>()
         val processed = mutableListOf<String>()
         var closeCount = 0
+        var closedAfter: List<String>? = null
         val element = RequestFactoryReactorElement(
             processor = { payload ->
                 if (payload == "one") release.await()
                 processed += payload
                 "reply:$payload"
             },
-            closeProcessor = { closeCount++ },
+            closeProcessor = { closeCount++; closedAfter = processed.toList() },
             capacity = 1,
         )
         element.open()
@@ -57,6 +58,7 @@ class RequestFactoryReactorElementTest {
         assertEquals("reply:three", third.await())
         drain.await()
         assertEquals(listOf("one", "two", "three"), processed)
+        assertEquals(processed, closedAfter)
         assertEquals(ElementState.CLOSED, element.state)
         assertTrue(element.supervisor.isCompleted)
         assertEquals(1, closeCount)
@@ -97,7 +99,8 @@ class RequestFactoryReactorElementTest {
         element.open()
         val failed = async { runCatching { element.processRequest("fail") } }
         val succeeded = async { element.processRequest("next") }
-        assertSame(failure, failed.await().exceptionOrNull())
+        val receiptFailure = assertIs<IllegalArgumentException>(failed.await().exceptionOrNull())
+        assertEquals(failure.message, receiptFailure.message)
         assertEquals("next", succeeded.await())
         element.drain()
     }

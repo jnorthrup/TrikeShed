@@ -154,6 +154,8 @@ object HermesModelProvider {
 
         class ModelMuxClient:
             HERMES_SKIP_TRANSPORT_WRAP = True
+            HERMES_HOST_TRANSPORT = True
+            HERMES_HOST_TIMEOUT_SECONDS = ${HermesPen.MODEL_WALL_MILLIS / 1000}.0
 
             def __init__(self, **kwargs):
                 # ProviderProfile may pass native-client options. They confer no host authority.
@@ -185,9 +187,9 @@ object HermesModelProvider {
                 if timeout is not None and (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
                                             or not 0 < timeout <= 2147483):
                     raise ValueError('timeout must be positive seconds')
+                timeout = self.HERMES_HOST_TIMEOUT_SECONDS if timeout is None else min(timeout, self.HERMES_HOST_TIMEOUT_SECONDS)
                 args = (model, json.dumps(request, ensure_ascii=False, allow_nan=False))
-                if timeout is not None:
-                    args += (max(1, int(timeout * 1000)),)
+                args += (max(1, int(timeout * 1000)),)
                 completion = _record(_call('mux_completion', *args)['completion'])
                 return _Stream(completion) if stream else completion
 

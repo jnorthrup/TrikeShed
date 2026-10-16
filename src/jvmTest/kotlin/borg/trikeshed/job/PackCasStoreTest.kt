@@ -5,6 +5,74 @@ import java.nio.file.Files
 import kotlin.test.*
 
 class PackCasStoreTest {
+    @Test fun staleRefCanBePromotedToBlobAcrossReopen() {
+        val files = JvmFileOperations()
+        val root = files.createTempDir("pack-ref-promotion-")
+        try {
+            val path = files.resolvePath(root, "source")
+            val bytes = "original source".encodeToByteArray()
+            files.write(path, bytes)
+            val cid = PackCasStore(files, root).use { store ->
+                val cid = store.putFile(path)
+                assertContentEquals(bytes, store.get(cid))
+                files.write(path, "changed source length".encodeToByteArray())
+                assertNull(store.get(cid))
+                assertEquals(cid, store.put(bytes))
+                assertContentEquals(bytes, store.get(cid))
+                store.sync()
+                cid
+            }
+            files.deleteRecursively(path)
+            PackCasStore(files, root).use { store ->
+                assertContentEquals(bytes, store.get(cid))
+            }
+        } finally { files.deleteRecursively(root) }
+    }
+
+    @Test fun refCannotReplaceBlob() {
+        val files = JvmFileOperations()
+        val root = files.createTempDir("pack-blob-retention-")
+        try {
+            val path = files.resolvePath(root, "source")
+            val bytes = "stored bytes".encodeToByteArray()
+            files.write(path, bytes)
+            val cid = PackCasStore(files, root).use { store ->
+                val cid = store.put(bytes)
+                assertEquals(cid, store.putFile(path))
+                files.deleteRecursively(path)
+                assertContentEquals(bytes, store.get(cid))
+                store.sync()
+                cid
+            }
+            PackCasStore(files, root).use { store ->
+                assertContentEquals(bytes, store.get(cid))
+            }
+        } finally { files.deleteRecursively(root) }
+    }
+
+    @Test fun refCanReplaceRefPathAcrossReopen() {
+        val files = JvmFileOperations()
+        val root = files.createTempDir("pack-ref-replacement-")
+        try {
+            val first = files.resolvePath(root, "first")
+            val second = files.resolvePath(root, "second")
+            val bytes = "referenced bytes".encodeToByteArray()
+            files.write(first, bytes)
+            files.write(second, bytes)
+            val cid = PackCasStore(files, root).use { store ->
+                val cid = store.putFile(first)
+                assertEquals(cid, store.putFile(second))
+                files.deleteRecursively(first)
+                assertContentEquals(bytes, store.get(cid))
+                store.sync()
+                cid
+            }
+            PackCasStore(files, root).use { store ->
+                assertContentEquals(bytes, store.get(cid))
+            }
+        } finally { files.deleteRecursively(root) }
+    }
+
     @Test fun reopenCompactsRecoveredRunsWithoutRewritingThePack() {
         val files = JvmFileOperations()
         val root = Files.createTempDirectory("pack-recovery-").toString()

@@ -2,11 +2,14 @@ package borg.trikeshed.couch.isam
 
 import borg.trikeshed.couch.*
 import borg.trikeshed.couch.persistence.CouchCommitStore
+import borg.trikeshed.couch.persistence.asLocalBacking
+import borg.trikeshed.collections.associative.toAny
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.isam.*
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.get
@@ -54,6 +57,8 @@ class ConfixIsamCursorBridge(
     private val history = linkedMapOf<Long, ConfixIsamRevision>()
     private val heads = linkedMapOf<String, ConfixIsamRevision>()
     private var lastSequence = -1L
+    private var couchStore: CouchStore? = null
+    private var couchCommit = false
 
     init {
         try { for (frame in commits.recoveredFrames.view) retain(decode(frame)) }
@@ -94,8 +99,10 @@ class ConfixIsamCursorBridge(
     }
 
     /** Idempotent replay requires every identity component to agree, not merely the sequence number. */
-    fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax): ConfixIsamRevision = synchronizedLock(gate) {
+    fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax,
+            writer: IsamOperations = operations): ConfixIsamRevision = synchronizedLock(gate) {
         commits.checkOpen()
+        check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
         val bytes = source.copyOf()
         val cid = ContentId.of(bytes)
         replay(sequence, id, rev, cid, syntax)?.let { return@synchronizedLock it }
@@ -106,7 +113,7 @@ class ConfixIsamCursorBridge(
         val dataFile = if (geometry.size == 0) null else allocate(sequence)
         val artifacts = if (dataFile == null) emptyMap() else {
             val dataPath = path(dataFile)
-            operations.write(geometry, dataPath, emptyMap(), false)
+            writer.write(geometry, dataPath, emptyMap(), false)
             // Data groups were forced by ISAM. Atomic metadata publication also fsyncs their shared directory.
             files.writeAtomically("$dataPath.meta", files.readAllBytes("$dataPath.meta"))
             artifactNames(dataFile).associateWith { ContentId.of(files.readAllBytes(path(it))) }
@@ -114,7 +121,7 @@ class ConfixIsamCursorBridge(
         val entry = ConfixIsamRevision(sequence, id, rev, false, syntax, cid, dataFile, artifacts)
         // Verify physical projection before acknowledging it, including custom operation/codec owners.
         if (dataFile != null) {
-            val data = IsamDataFile(path(dataFile), operations = operations)
+            val data = IsamDataFile(path(dataFile), operations = writer)
             try {
                 data.open()
                 require(data.size == geometry.size) { "Confix geometry row count changed during publication" }
@@ -132,6 +139,7 @@ class ConfixIsamCursorBridge(
 
     fun delete(sequence: Long, id: String, rev: String): ConfixIsamRevision = synchronizedLock(gate) {
         commits.checkOpen()
+        check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
         replay(sequence, id, rev, null, null)?.let { return@synchronizedLock it }
         validate(sequence, id, rev)
         val entry = ConfixIsamRevision(sequence, id, rev, true, null, null, null, emptyMap())
@@ -141,16 +149,46 @@ class ConfixIsamCursorBridge(
     }
 
     /** Explicit Couch conversion preserves committed canonical bodies, sequences, revisions and tombstones. */
-    fun importFrames(frames: Series<CouchCommittedFrame>) {
+    fun importFrames(frames: Series<CouchCommittedFrame>, writer: IsamOperations = operations) {
         for (frame in frames.view) {
             require(frame.deleted == (frame.doc == null)) { "Invalid Couch frame body" }
             if (frame.deleted) delete(frame.sequence, frame.docId, frame.rev)
             else {
                 val doc = requireNotNull(frame.doc)
                 require(doc.id == frame.docId) { "Couch frame identity mismatch" }
-                put(frame.sequence, frame.docId, frame.rev, CouchStoreFactory.canonicalBody(doc), Syntax.CBOR)
+                put(frame.sequence, frame.docId, frame.rev, CouchStoreFactory.canonicalBody(doc), Syntax.CBOR, writer)
             }
         }
+    }
+
+    /**
+     * Couch protocol over this durable destination, not a migration of another database.
+     * Existing entries must be canonical Couch CBOR bodies; replay uses their dense Confix geometry.
+     * After binding, writes go through the shared Couch ingress, never the raw revision API.
+     * Heads remain memory projections. Closing this owner releases the durable writer lease.
+     */
+    fun couch(name: String): Couch = synchronizedLock(gate) {
+        commits.checkOpen()
+        val capture = commits::capture
+        val store = couchStore ?: CouchStoreFactory.committed(cas, revisions α { entry ->
+            val body = if (entry.deleted) null else {
+                require(entry.syntax == Syntax.CBOR) { "Couch requires canonical CBOR revisions" }
+                val doc = requireNotNull(document(entry.id, entry.rev))
+                val value = CanonicalCbor.item(requireNotNull(doc.rootCell)).toAny()
+                @Suppress("UNCHECKED_CAST")
+                val fields = requireNotNull(value as? Map<String, Any?>) { "Couch body must be an object" }
+                val body = requireNotNull(CouchStoreFactory.documentFromBody(fields)) { "Couch body requires _id" }
+                require(CouchStoreFactory.canonicalBody(body).contentEquals(doc.src.toArray())) { "Noncanonical Couch body" }
+                body
+            }
+            capture(CouchCommittedFrame(entry.sequence, entry.id, entry.rev, entry.deleted, body))
+        }) { frame -> synchronizedLock(gate) {
+            val captured = commits.capture(frame)
+            couchCommit = true
+            try { importFrames(s_[captured]) } finally { couchCommit = false }
+            captured
+        } }.also { couchStore = it }
+        Couch(name, store, cas, commits.asLocalBacking())
     }
 
     /** Each row's final cell is a nested cursor, not a JSON string masquerading as packed ISAM bytes. */

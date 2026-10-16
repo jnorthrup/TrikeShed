@@ -73,6 +73,32 @@ class CouchWireRouterRequestFactoryTest {
     }
 
     @Test
+    fun malformedInvocationAndOperationFieldsNeverBecomeCouchWrites() = runTest {
+        val db = database()
+        val rejected = """{"E":{"M":"malformed RequestFactory envelope"}}"""
+        val received = mutableListOf<String>()
+        val router = CouchWireRouter(db, "", requestFactoryHandler = object : RequestFactoryHandler {
+            override suspend fun processRequest(payload: String): String {
+                received += payload
+                return rejected
+            }
+        })
+        val payloads = listOf(
+            """{"_id":"bad-invocation","F":"factory","I":"malformed"}""",
+            """{"_id":"bad-operation","F":"factory","O":{}}""",
+        )
+        for (path in listOf("/trike/_relax", "/trike")) for (payload in payloads) {
+            val reply = router.handle("POST", path, payload.encodeToByteArray())!!
+            assertContentEquals(rejected.encodeToByteArray(), reply.bytes)
+            assertEquals(200, reply.status)
+        }
+        assertEquals(payloads + payloads, received)
+        assertEquals(0L, db.updateSeq)
+        assertEquals(null, db.docJson("bad-invocation"))
+        assertEquals(null, db.docJson("bad-operation"))
+    }
+
+    @Test
     fun processorExceptionsAreHttpFailuresAndCancellationPropagates() = runTest {
         val handler = object : RequestFactoryHandler {
             override suspend fun processRequest(payload: String): String {

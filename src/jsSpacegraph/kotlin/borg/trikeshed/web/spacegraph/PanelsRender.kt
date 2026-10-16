@@ -87,7 +87,7 @@ fun Panels.renderGroupedBoard(n: dynamic) {
         val c = document.createElement("div").asDynamic(); c.className = "kcol" + (if (over) " over" else "")
         c.dataset.group = col.id
         val h = document.createElement("h6").asDynamic()
-        h.innerHTML = "<span>${if (truthy(col.name)) col.name else col.id}</span><b>${items.size}${if (truthy(col.wipLimit)) "/" + str(col.wipLimit) else ""}</b>"
+        h.innerHTML = "<span>${esc(if (truthy(col.name)) col.name else col.id)}</span><b>${items.size}${if (truthy(col.wipLimit)) "/" + esc(col.wipLimit) else ""}</b>"
         val plus = document.createElement("s").asDynamic(); plus.textContent = "＋"; plus.title = "new card (modal — kanban.submit)"
         plus.style.cssText = "cursor:pointer;color:var(--ok);text-decoration:none;margin-left:6px"
         on(plus, "pointerdown", { e -> e.stopPropagation() })
@@ -100,7 +100,7 @@ fun Panels.renderGroupedBoard(n: dynamic) {
             card.dataset.jobid = it[idF]
             card.style.touchAction = "none" // pointer drag streams moves on touch too
             val title = it[titleF] ?: it[idF] ?: "?"; val sub = it[subF]; val badge = it[badgeF]
-            card.innerHTML = "<div>$title</div><div class=\"kid\">${if (sub != null && sub != title) sub else ""}${if (badge != null) " · " + str(badge) else ""}</div>"
+            card.innerHTML = "<div>${esc(title)}</div><div class=\"kid\">${if (sub != null && sub != title) esc(sub) else ""}${if (badge != null) " · " + esc(badge) else ""}</div>"
             // Pointer-event drag, NOT HTML5 DnD: works for mouse/trackpad/touch/pen alike.
             on(card, "pointerdown", { e ->
                 e.stopPropagation() // don't pan the canvas while grabbing a card
@@ -179,7 +179,12 @@ fun Panels.renderConcentric(n: dynamic) {
     var wrap = n.el.querySelector(".csheet")
     if (wrap == null) { wrap = document.createElement("div").asDynamic(); wrap.className = "csheet"; n.el.appendChild(wrap) }
     val idx = if (truthy(n._sheets)) n._sheets else obj(); val cur = idx[n._cur]
-    if (!truthy(cur)) { wrap.innerHTML = "<div class=\"kboard-status\">no sheets loaded — wire an inline sheet or retained sheet reference and run</div>"; return }
+    if (!truthy(cur)) {
+        wrap.innerHTML = if (truthy(n._sheetError)) "<div class=\"kboard-status\" role=\"alert\">" + escA(n._sheetError) + "</div>"
+            else if (truthy(n._sheetRequest)) "<div class=\"kboard-status\" role=\"status\">reading retained sheet…</div>"
+            else "<div class=\"kboard-status\">no sheets loaded — wire an inline sheet or retained sheet reference and run</div>"
+        return
+    }
     fun navigate(id: String, href: String, refresh: Boolean = false) {
         n._sheetRequest = null; n._sheetError = null
         if (truthy(idx[id]) && !refresh) { n._cur = id; renderConcentric(n) }
@@ -313,6 +318,9 @@ fun Panels.renderConcentric(n: dynamic) {
         }
         if (axes.isNotEmpty()) button("Clear indexes") { select(emptyList(), emptyList()) }
         wrap.insertBefore(controls, wrap.querySelector(".tablewrap"))
+    }
+    documentRulePageActions(wrap, cur) {
+        n._sheets === idx && idx[n._cur] === cur && n._sheetRequest == null && truthy(n.el.isConnected)
     }
     for (el in arr(wrap.querySelectorAll("[data-sheet]"))) on(el, "click", { e ->
         e.stopPropagation()
@@ -603,10 +611,11 @@ suspend fun Panels.diveInto(name: String) {
     val resp = fetchJs("/api/panels/" + encodeURIComponent(name))
     if (!truthy(resp.ok)) { status("dive failed: no such program '$name'"); return }
     val data = awaitJs(resp.json())
-    diveStack.add(name to serialize())
+    val previous = serialize()
+    if (!load(data)) return
+    diveStack.add(name to previous)
     crumbSync()
     panelName().value = name
-    load(data)
     status("diving into $name — ⌂ root or a breadcrumb segment to climb back out")
     syncBoard(name)
 }
@@ -614,8 +623,8 @@ suspend fun Panels.diveInto(name: String) {
 fun Panels.popTo(depth: Int) {
     if (depth >= diveStack.size) return
     val target = diveStack[depth]
+    if (!load(target.second)) return
     diveStack = diveStack.subList(0, depth).toMutableList()
     crumbSync()
     panelName().value = if (depth == 0) "" else diveStack[depth - 1].first
-    load(target.second)
 }

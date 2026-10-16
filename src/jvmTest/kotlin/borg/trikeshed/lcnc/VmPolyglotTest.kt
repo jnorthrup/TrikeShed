@@ -15,6 +15,41 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 class VmPolyglotTest {
+    @Test fun absentOrBrokenPointcutSupportDoesNotReplaceTheResultOrSkipRelease() = runBlocking {
+        for (unavailable in listOf(false, true)) for (fails in listOf(false, true)) {
+            var released = false
+            val failure = IllegalStateException("guest failure")
+            val host = object : VmHost {
+                override val languages = setOf(VmFacet.GRAAL_JS)
+                override fun spawn(spec: VmSpec) = object : VmHandle {
+                    override val id = spec.id
+                    override val facet = spec.facet
+                    override fun eval(source: String, name: String) = Teleported.Null
+                    override fun call(root: String, vararg args: Teleported): Teleported {
+                        if (fails) throw failure
+                        return Teleported.Bool(false)
+                    }
+                    override fun stats() = VmStats(evals = 1, calls = 1)
+                    override fun pointcuts(): VmPointcuts? {
+                        if (unavailable) error("profile reader failed")
+                        return null
+                    }
+                }
+                override fun revoke(id: String, reason: String) { released = true }
+            }
+            val ledger = LcncInvocationLedger()
+            val runner = LcncRunner(mapOf(SubVmLegos.POLYGLOT to SubVmLegos.polyglot(host))).apply { invocations = ledger }
+            val program = LcncProgram("observation", s_[LcncNode("fn", SubVmLegos.POLYGLOT,
+                mapOf("language" to "js", "source" to "return false;"))], emptySeriesOf())
+            if (fails) assertSame(failure, assertFails { runner.runProcedure(program) })
+            else assertEquals(false, runner.runProcedure(program).nodeOutputs.getValue("fn")["value"])
+            assertTrue(released)
+            val invocation = (ledger.snapshot()["entries"] as List<*>).single() as Map<*, *>
+            if (unavailable) assertEquals("unavailable", invocation["runtimeOmitted"])
+            else assertNull((invocation["runtime"] as Map<*, *>)["pointcuts"])
+        }
+    }
+
     @Test fun languageRouteConstructionsPreservePartyReportsAndRequireHumanReview() = runBlocking<Unit> {
         val host = HypervisorVmHost()
         try {
@@ -34,14 +69,47 @@ class VmPolyglotTest {
                 val program = preset.copy(nodes = preset.nodes α { node ->
                     if (node.id == "source") node.copy(params = mapOf("value" to jsonOf(input))) else node
                 })
-                val result = LcncRunner(runners).runProcedure(program, emptyMap())
+                val ledger = LcncInvocationLedger()
+                val result = LcncRunner(runners).apply { invocations = ledger }.runProcedure(program, emptyMap())
                 assertEquals(expected, result.nodeOutputs.getValue("function")["value"], language.id)
+                val invocation = (ledger.snapshot()["entries"] as List<*>).map { it as Map<*, *> }
+                    .single { it["nodeId"] == "function" }
+                val runtime = assertNotNull(invocation["runtime"] as? Map<*, *>, language.id)
+                assertEquals(result.nodeOutputs.getValue("function")["vmId"], runtime["vmId"])
+                assertEquals(language.id, runtime["language"])
+                assertEquals("before-release", runtime["capture"])
+                assertEquals(1L, (runtime["stats"] as Map<*, *>)["calls"])
+                val pointcuts = runtime["pointcuts"] as Map<*, *>
+                assertEquals("root-profiles", pointcuts["kind"])
+                assertTrue((pointcuts["roots"] as List<*>).isNotEmpty(), language.id)
                 val route = result.nodeOutputs.getValue("route")
                 assertEquals(true, route["ok"], language.id)
                 assertEquals(expected, reify(route["routed"] as String), language.id)
                 assertEquals(expected, result.nodeOutputs.getValue("value")["rendered"], language.id)
                 assertTrue(host.ids().none { host.get(it)?.isAlive == true }, language.id)
             }
+        } finally { host.close() }
+    }
+
+    @Test fun failedPolyglotInvocationRetainsOnlyItsOwnRootProfilesAfterRelease() = runBlocking {
+        val host = HypervisorVmHost()
+        try {
+            val other = host.spawn(VmSpec("unrelated", VmFacet.GRAAL_JS))
+            other.eval("function unrelatedRoot() { return 3; }; unrelatedRoot();", "unrelated.js")
+            val ledger = LcncInvocationLedger()
+            val node = LcncNode("failed-function", SubVmLegos.POLYGLOT, mapOf("language" to "js", "source" to
+                "function observedBeforeFailure() { return 7; }; observedBeforeFailure(); throw new Error('fixture failure');"))
+            val runner = LcncRunner(mapOf(SubVmLegos.POLYGLOT to SubVmLegos.polyglot(host))).apply { invocations = ledger }
+            assertFails { runner.runProcedure(LcncProgram("failed", s_[node], emptySeriesOf())) }
+            val invocation = (ledger.snapshot()["entries"] as List<*>).single() as Map<*, *>
+            assertEquals("failed", invocation["status"])
+            assertFalse(invocation.containsKey("outputs"))
+            val runtime = assertNotNull(invocation["runtime"] as? Map<*, *>)
+            val roots = ((runtime["pointcuts"] as Map<*, *>)["roots"] as List<*>).map { it as Map<*, *> }
+            assertTrue(roots.any { it["root"] == "observedBeforeFailure" }, roots.toString())
+            assertFalse(roots.any { it["root"] == "unrelatedRoot" })
+            assertFalse(host.get(runtime["vmId"] as String)!!.isAlive)
+            assertTrue(other.isAlive, "observing one invocation must not touch another guest")
         } finally { host.close() }
     }
 

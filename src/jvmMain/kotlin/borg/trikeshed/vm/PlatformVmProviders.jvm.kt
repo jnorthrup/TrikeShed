@@ -1,26 +1,15 @@
 package borg.trikeshed.vm
 
 import borg.trikeshed.graal.subvm.GuestBounds
+import borg.trikeshed.graal.subvm.GuestEnvironment
 import borg.trikeshed.graal.subvm.SubVmMain
 import borg.trikeshed.pointcut.VmFacet
-import java.io.BufferedReader
-import java.io.BufferedWriter
+import borg.trikeshed.userspace.nio.channels.spi.JvmProcessProtocolBinding
 import java.io.File
 
-/** A child process over stdin/stdout lines — the JVM's contribution to the process tier. */
-class JvmProcessPipe(command: List<String>) : ProcessPipe {
-    private val process: Process = ProcessBuilder(command).apply {
-        environment().clear()
-        environment().putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated())
-        redirectError(ProcessBuilder.Redirect.INHERIT)
-    }.start()
-    private val out: BufferedWriter = process.outputStream.bufferedWriter()
-    private val input: BufferedReader = process.inputStream.bufferedReader()
-    override val isAlive: Boolean get() = process.isAlive
-    override fun writeLine(line: String) { out.write(line); out.newLine(); out.flush() }
-    override fun readLine(): String? = input.readLine()
-    override fun kill() { process.destroyForcibly(); process.waitFor() }
-}
+/** Compatibility name; process effects live at the SPI and common userspace owns the protocol. */
+class JvmProcessPipe(command: List<String>) : ProcessPipe by
+    JvmProcessProtocolBinding(command, GuestEnvironment.curated())
 
 /** Tier 2 standalone: a `java … SubVmMain` child per guest (a whole Graal DAG launched as a process). */
 object JvmProcessIsolateProvider : VmProvider {

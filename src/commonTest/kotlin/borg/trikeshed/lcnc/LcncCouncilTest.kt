@@ -230,6 +230,7 @@ class LcncCouncilTest {
         assertEquals(1, store.mistrials.size, "recordMistrial spied")
         assertEquals("case-7", store.mistrials[0].first)
         assertTrue(store.rulings.isEmpty(), "no ruling recorded for a dead council")
+        assertTrue(store.kif.isEmpty(), "a dead council must not become prior-ruling evidence")
         val verdictBytes = store.cas.getValue(rep["verdictCid"] as String).decodeToString()
         assertTrue("[SEAT FAILED: council.ruling]" in verdictBytes, "the ruling banner IS the recorded verdict")
     }
@@ -250,6 +251,7 @@ class LcncCouncilTest {
         assertEquals("mistrial", rep["status"])
         assertEquals(1, store.mistrials.size, "recordMistrial spied")
         val transcript = store.cas.getValue(rep["transcriptCid"] as String).decodeToString()
+        assertTrue(store.kif.isEmpty(), "a declared mistrial must not become prior-ruling evidence")
         assertTrue(
             "MISTRIAL — proceedings void" in transcript,
             "the mistrial ring's fold lands on the transcript",

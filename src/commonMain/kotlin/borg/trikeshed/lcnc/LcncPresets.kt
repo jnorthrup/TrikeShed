@@ -1445,7 +1445,7 @@ object LcncPresets {
     }
 
     // ── legal-tribunal: extended preset-tribunal for legal review ─────
-    // legal.ingest (LLM propose + grounding gate) → kif.assert
+    // legal.ingest (canonical retained document curation) → legal.evidence
     // → sparql.query(evidence-bank) → tribunal LOOP/JOIN
     // → kg.ingest → display.
     // Extends preset-tribunal with legal system prompts and
@@ -1492,7 +1492,7 @@ object LcncPresets {
                     "Respondent contends section 7.2 is unconscionable under Cal. Civ. Code 1670.5."),
                     x = 30.0, y = 260.0),
                 LcncNode("n1", "legal.ingest",
-                    params = mapOf("maxTokens" to "2048", "brief" to "brief"),
+                    params = mapOf("brief" to "brief"),
                     x = 300.0, y = 60.0),
                 LcncNode("n1b", "legal.evidence", x = 190.0, y = 60.0),
                 LcncNode("n2", "mux.chat", params = mapOf(
@@ -1514,7 +1514,7 @@ object LcncPresets {
                 LcncNode("n6", "display", x = 1440.0, y = 60.0),
                 LcncNode("n7", "note", params = mapOf("text" to
                     "preset-legal-tribunal\n" +
-                    "legal.ingest (LLM propose + grounding gate)\n" +
+                    "legal.ingest (canonical retained document curation)\n" +
                     "-> legal.evidence (queries the shared KIF bank for\n" +
                     "   doc_<cid> facts, folds them into the brief)\n" +
                     "-> argue <-> rebut (LOOP <=3, MAD shape)\n" +

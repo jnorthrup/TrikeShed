@@ -10,6 +10,37 @@ import kotlinx.coroutines.async
 
 private fun types(e: dynamic): List<String> = arr(js("Array.from(e.dataTransfer.types)")).map { str(it) }
 
+/** Render the served ports and this ring's immediate formals, never a nested ring's locals. */
+fun Panels.renderPorts(n: dynamic) {
+    val body = n.el?.querySelector(":scope > .body") ?: return
+    val t = contract(n.type) ?: return
+    val ring = n.type == "scope" || arr(n.children).isNotEmpty()
+    val envelope = if (ring) contract("scope") ?: t else t
+    body.textContent = ""
+    for (dir in arrayOf("in", "out")) {
+        val served = arr(if (dir == "in") envelope.ins else envelope.outs).map { str(it) }
+        val formals = if (ring) arr(n.children).filter { it.type == "scope.$dir" }
+            .map { str(it.params?.name ?: "") }.filter { it.isNotEmpty() } else emptyList()
+        for (name in (served + formals).distinctBy { PatchKinds.bare(it) }) {
+            val kd = nodeKindOf(n, dir, name)
+            val row = document.createElement("div").asDynamic(); row.className = "row $dir"
+            val port = document.createElement("span").asDynamic()
+            port.className = "port " + PatchKinds.portClass(kd, kindAcceptance)
+            port.dataset.dir = dir; port.dataset.port = name; port.dataset.kind = kd ?: ""
+            port.title = "$name: ${kd ?: "untyped — mates with nothing"}"
+            if (truthy(t.effect)) port.classList.add("fx")
+            val label = document.createTextNode(name)
+            if (dir == "in") { row.appendChild(port); row.appendChild(label) }
+            else { row.appendChild(label); row.appendChild(port) }
+            on(port, "pointerdown", { e ->
+                e.stopPropagation(); e.preventDefault()
+                startWireDrag(n, dir, name, e)
+            })
+            body.appendChild(row)
+        }
+    }
+}
+
 /** Build a node's DOM: header, ring window or lane captions, ports, param editors, drag handle. */
 fun Panels.buildNode(n: dynamic) {
     val t = contract(n.type) ?: return // vocabulary is server-owned
@@ -30,8 +61,23 @@ fun Panels.buildNode(n: dynamic) {
     on(el, "pointermove", { e -> blip.move(e) })
     on(el, "pointerdown", { e -> blip.leave(e) })
     val collapse = hd.querySelectorAll("s")[0]
+    fun collapseState() {
+        collapse.setAttribute("aria-expanded", (!truthy(n.collapsed)).toString())
+        collapse.setAttribute("aria-label", if (truthy(n.collapsed)) "Expand node" else "Collapse node")
+    }
+    fun toggleCollapse() {
+        n.collapsed = !truthy(n.collapsed)
+        el.classList.toggle("collapsed", n.collapsed)
+        collapseState()
+        redraw()
+        save()
+    }
+    collapseState()
     on(collapse, "pointerdown", { e -> e.stopPropagation() })
-    on(collapse, "click", { e -> e.stopPropagation(); n.collapsed = el.classList.toggle("collapsed"); save() })
+    on(collapse, "click", { e -> e.stopPropagation(); toggleCollapse() })
+    on(collapse, "keydown", { e ->
+        if (e.key == "Enter" || e.key == " ") { e.preventDefault(); e.stopPropagation(); toggleCollapse() }
+    })
     if (isScope) {
         // the ring label: the frame identity — name + depth + the Key it runs under
         val depth = ringDepth(n)
@@ -71,23 +117,12 @@ fun Panels.buildNode(n: dynamic) {
         el.appendChild(seed); el.appendChild(emit)
     }
     val body = document.createElement("div").asDynamic(); body.className = "body"
-    for (name in arr(t.ins).map { str(it) }) {
-        val kd = kindOf(n.type, "in", name)
-        val r = document.createElement("div").asDynamic(); r.className = "row in"
-        r.innerHTML = "<span class=\"port ${portClass(n.type, "in", name)}\" data-dir=\"in\" data-port=\"$name\" data-kind=\"${kd ?: ""}\" title=\"$name: ${kd ?: "untyped — mates with nothing"}\"></span>$name"
-        body.appendChild(r)
-    }
-    for (name in arr(t.outs).map { str(it) }) {
-        val kd = kindOf(n.type, "out", name)
-        val r = document.createElement("div").asDynamic(); r.className = "row out"
-        r.innerHTML = "$name<span class=\"port ${portClass(n.type, "out", name)}\" data-dir=\"out\" data-port=\"$name\" data-kind=\"${kd ?: ""}\" title=\"$name: ${kd ?: "untyped — mates with nothing"}\"></span>"
-        body.appendChild(r)
-    }
     el.appendChild(body)
+    renderPorts(n)
     val ps = document.createElement("div").asDynamic(); ps.className = "params"
     for (k in keysOf(t.params)) {
         val def = t.params[k]
-        if (n.params[k] === undefined) n.params[k] = def.v ?: "" // loaded docs may omit params
+        if (n.params[k] === undefined && !truthy(def.optional)) n.params[k] = def.v ?: ""
         val lab = document.createElement("label").asDynamic(); lab.textContent = k; ps.appendChild(lab)
         if (truthy(def.cols) && num(def.cols.length) > 0) { ps.appendChild(listWidget(n, k, def)); continue }
         val inp: dynamic
@@ -96,13 +131,16 @@ fun Panels.buildNode(n: dynamic) {
             lateinit var fill: (Array<dynamic>) -> Unit
             fill = { list ->
                 val keep = n.params[k]; inp.textContent = ""
+                if (truthy(def.optsFrom)) {
+                    // Discovering a job must not select it for a command or rewrite saved scratch.
+                    val blank = document.createElement("option").asDynamic()
+                    blank.value = ""; blank.textContent = "Choose $k…"; inp.appendChild(blank)
+                }
                 for (o in list) { val op = document.createElement("option").asDynamic(); op.value = o; op.textContent = o; inp.appendChild(op) }
                 if (truthy(keep) && list.none { it == keep }) {
                     val op = document.createElement("option").asDynamic(); op.value = keep; op.textContent = keep; op.dataset.stale = "1"; inp.appendChild(op)
                 }
-                // A LIVE list with no value yet takes its first entry — and records it.
-                if (truthy(def.optsFrom) && !truthy(keep) && list.isNotEmpty()) { n.params[k] = list[0]; inp.value = list[0]; save() }
-                else inp.value = keep ?: list.getOrNull(0) ?: ""
+                inp.value = keep ?: ""
             }
             fill(arr(def.opts))
             // LIVE PICKLIST: optsFrom names a running source; the current value survives, marked stale.
@@ -110,25 +148,49 @@ fun Panels.buildNode(n: dynamic) {
                 inp.classList.add("live")
                 launchJs { try { val list = livePicklist(str(def.optsFrom), n); if (list.isNotEmpty()) fill(list.toTypedArray()) } catch (e: CancellationException) { throw e } catch (e: dynamic) {} }
             }
-            inp.value = n.params[k]
+            inp.value = n.params[k] ?: ""
         } else if (truthy(def.ta)) {
-            inp = document.createElement("textarea").asDynamic(); inp.value = n.params[k]
+            inp = document.createElement("textarea").asDynamic(); inp.value = n.params[k] ?: ""
             // Size to the text
             inp.rows = maxOf(3, minOf(16, str(n.params[k] ?: "").split("\n").size))
         } else {
-            inp = document.createElement("input").asDynamic(); if (truthy(def.ph) && str(def.ph).startsWith("secret:")) inp.type = "password"; inp.value = n.params[k]
+            inp = document.createElement("input").asDynamic(); if (truthy(def.ph) && str(def.ph).startsWith("secret:")) inp.type = "password"; inp.value = n.params[k] ?: ""
         }
         if (truthy(def.ph)) inp.placeholder = if (str(def.ph).startsWith("secret:")) str(def.ph).substring(7) else def.ph
-        on(inp, "input", { n.params[k] = inp.value; save() })
+        fun paramChanged() {
+            n.params[k] = inp.value
+            if ((n.type == "scope.in" || n.type == "scope.out") && (k == "name" || k == "kind")) {
+                renderPorts(n)
+                if (truthy(n._parentScope)) refreshRingChrome(n._parentScope)
+                redraw()
+            }
+            save()
+        }
+        on(inp, "input", { paramChanged() })
         on(inp, "pointerdown", { e -> e.stopPropagation() })
+        if (truthy(def.optional)) {
+            val present = document.createElement("input").asDynamic()
+            present.type = "checkbox"; present.checked = n.params[k] !== undefined
+            present.setAttribute("aria-label", "Use $k")
+            present.title = "Unchecked omits $k; checked includes its value, even empty text"
+            present.style.width = "auto"; present.style.marginLeft = "8px"
+            lab.appendChild(present)
+            inp.disabled = !truthy(present.checked)
+            on(present, "pointerdown", { e -> e.stopPropagation() })
+            on(present, "change", {
+                inp.disabled = !truthy(present.checked)
+                if (truthy(present.checked)) paramChanged()
+                else { js("Reflect.deleteProperty")(n.params, k); save() }
+            })
+        }
         // any dragged value drops into a plain param too
         on(inp, "dragover", { e -> if ("text/x-lcnc-value" in types(e)) { e.preventDefault(); e.stopPropagation() } })
         on(inp, "drop", { e ->
             val txt = str(e.dataTransfer.getData("text/x-lcnc-value"))
-            if (txt.isNotEmpty()) {
+            if (txt.isNotEmpty() && !truthy(inp.disabled)) {
                 e.preventDefault(); e.stopPropagation()
                 val v: dynamic = try { JSON.parse(txt) } catch (x: dynamic) { txt }
-                inp.value = if (typeOf(v) == "string") v else JSON.stringify(v); n.params[k] = inp.value; save()
+                inp.value = if (typeOf(v) == "string") v else JSON.stringify(v); paramChanged()
             }
         })
         ps.appendChild(inp)
@@ -144,7 +206,7 @@ fun Panels.buildNode(n: dynamic) {
     if (truthy(n.collapsed)) el.classList.add("collapsed")
     el.style.left = "${n.x}px"; el.style.top = "${n.y}px"
     world.appendChild(el)
-    on(hd, "dblclick", { e -> e.stopPropagation(); n.collapsed = !truthy(n.collapsed); el.classList.toggle("collapsed", n.collapsed); save() })
+    on(hd, "dblclick", { e -> e.stopPropagation(); toggleCollapse() })
     val sBtn = hd.querySelector("[aria-label='Delete node']")
     on(sBtn, "click", { removeNode(n.id) })
     on(sBtn, "keydown", { e -> if (e.key == "Enter" || e.key == " ") { e.preventDefault(); removeNode(n.id) } })
@@ -170,14 +232,6 @@ fun Panels.buildNode(n: dynamic) {
         up = { off(window, "pointermove", mv); off(window, "pointerup", up); save() }
         on(window, "pointermove", mv); on(window, "pointerup", up)
     })
-    // effect nodes carry the shape on every one of their ports
-    if (truthy(contract(n.type)?.effect)) for (pe in arr(el.querySelectorAll(".port"))) pe.classList.add("fx")
-    for (port in arr(el.querySelectorAll(".port"))) {
-        on(port, "pointerdown", { e ->
-            e.stopPropagation(); e.preventDefault()
-            startWireDrag(n, str(port.dataset.dir), str(port.dataset.port), e)
-        })
-    }
 }
 
 /** LIST widget: rows of {col:value}; the param VALUE is the JSON array text; a drop target for dragged values. */

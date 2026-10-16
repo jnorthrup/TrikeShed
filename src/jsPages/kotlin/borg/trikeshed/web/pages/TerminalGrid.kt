@@ -15,6 +15,7 @@ internal class TerminalGrid(private val hermes: Boolean) {
     var cursor: dynamic = js("({row:0,column:0,visible:true})")
     var lines: dynamic = js("[]")
     var lastCursorRow: dynamic = -1
+    var selecting = false
 
     private val ansi16 = if (hermes) TerminalPalette.HERMES_ANSI16 else TerminalPalette.VM_ANSI16
 
@@ -68,6 +69,7 @@ internal class TerminalGrid(private val hermes: Boolean) {
     }
 
     fun render(rowsToPaint: Collection<dynamic>) {
+        if (selecting) return
         normalize()
         val screen = byId("screen")
         for (rv in rowsToPaint) {

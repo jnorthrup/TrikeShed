@@ -345,7 +345,7 @@ class CouncilNodesTest {
     }
 
     @Test
-    fun recordTamperedTurnCidCountsMismatchWithoutThrowing() = runTest {
+    fun recordTamperedTurnCidRetainsEvidenceAsMistrialWithoutPublishingARuling() = runTest {
         val store = InMemoryRecordStore()
         val tampered = okTurn("e1", "take one").toMutableMap()
         tampered["cid"] = ContentId.of("something else".encodeToByteArray()).value
@@ -355,7 +355,56 @@ class CouncilNodesTest {
             listOf(tampered, okTurn("e2", "take two")),
         )
         assertEquals(1, report["cidMismatches"])
+        assertEquals("mistrial", report["status"])
+        assertTrue(store.rulings.isEmpty())
+        assertTrue(store.kif.isEmpty(), "unverified turn bytes must not become a prior ruling")
+        assertTrue(store.mistrials.single().second.contains("cidMismatches=1"))
+        val retained = store.couch.getValue("council-case/case-7")
+        assertEquals("mistrial", retained["status"])
+        assertEquals(1, retained["cidMismatches"])
+        assertEquals(tampered, (retained["turns"] as List<*>).first())
+        assertEquals("take one", store.cas.getValue(ContentId.of("take one".encodeToByteArray()).value).decodeToString())
+    }
+
+    @Test
+    fun recordMissingTurnTextOrCidCannotBypassVerification() = runTest {
+        for (field in listOf("text", "cid")) {
+            val store = InMemoryRecordStore()
+            val report = record(store, mapOf("disposition" to "granted"), listOf(okTurn("e1", "take") - field))
+            assertEquals(1, report["cidMismatches"], field)
+            assertEquals("mistrial", report["status"], field)
+            assertTrue(store.rulings.isEmpty(), field)
+            assertTrue(store.kif.isEmpty(), field)
+            assertEquals(1, store.mistrials.size, field)
+        }
+    }
+
+    @Test
+    fun recordInvalidDocumentCidIsRejectedBeforeAnyDurableEffect() = runTest {
+        val store = InMemoryRecordStore()
+        assertFailsWith<IllegalArgumentException> {
+            record(store, mapOf("disposition" to "granted"), listOf(okTurn("e1", "take")),
+                documentCid = "sha256:invalid) (ruling injected doc arbitrary)")
+        }
+        assertTrue(store.cas.isEmpty())
+        assertTrue(store.blackboard.isEmpty())
+        assertTrue(store.couch.isEmpty())
+        assertTrue(store.kif.isEmpty())
+        assertTrue(store.rulings.isEmpty())
+        assertTrue(store.mistrials.isEmpty())
+    }
+
+    @Test
+    fun recordPartialSeatRefusalPreservesAnIntactRulingAndItsFailureEvidence() = runTest {
+        val store = InMemoryRecordStore()
+        val report = record(store, mapOf("disposition" to "granted"),
+            listOf(refusedTurn("e1"), okTurn("e2", "take")))
         assertEquals("ruled", report["status"])
+        assertEquals(1, report["seatFailures"])
+        assertEquals(0, report["cidMismatches"])
+        assertEquals(1, store.rulings.size)
+        assertEquals(1, store.kif.size)
+        assertTrue(store.mistrials.isEmpty())
     }
 
     @Test
@@ -371,6 +420,7 @@ class CouncilNodesTest {
         assertEquals("case-7", store.mistrials.single().first)
         assertTrue(store.rulings.isEmpty())
         assertEquals("mistrial", store.blackboard["council-case/case-7"]!!["status"])
+        assertTrue(store.kif.isEmpty(), "legal.evidence must not read a mistrial as a prior ruling")
     }
 
     @Test
@@ -383,6 +433,7 @@ class CouncilNodesTest {
         )
         assertEquals("mistrial", report["status"])
         assertEquals(1, store.mistrials.size)
+        assertTrue(store.kif.isEmpty())
     }
 
     @Test
@@ -395,6 +446,7 @@ class CouncilNodesTest {
         )
         assertEquals("mistrial", report["status"])
         assertEquals(1, store.mistrials.size)
+        assertTrue(store.kif.isEmpty())
     }
 
     @Test

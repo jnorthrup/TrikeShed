@@ -6,6 +6,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.vm.Teleported
 import keymux.KeyMux
+import modelmux.Airgap
 import modelmux.acp.AcpCodec
 import modelmux.acp.AcpMessage
 import modelmux.acp.AcpResponse
@@ -66,6 +67,7 @@ class JvmHyperspaceRoutine(
     }
 
     override suspend fun chat(messages: Series<AcpMessage>): AcpResponse {
+        Airgap.requireRemote()
         val messagesJson = buildString {
             append("[")
             for (i in 0 until messages.size) {
@@ -83,6 +85,7 @@ class JvmHyperspaceRoutine(
     }
 
     private suspend fun hostLlmCall(mid: String, messagesJson: String): String {
+        Airgap.requireRemote()
         val rawKey = keyMux.get("llm.${mid}.key")
             ?: keyMux.get("llm.default.key")
             ?: keyMux.get("llm.${mid.substringBefore("/")}.key")
@@ -99,6 +102,7 @@ class JvmHyperspaceRoutine(
         val body = """{"model":"${mid.substringAfterLast("/")}","messages":$messagesJson,"tools":[]}"""
         val headers = htxHeaders("Authorization" j "Bearer $rawKey", "Content-Type" j "application/json")
         val req = parseHtxRequest(url = "$baseUrl/chat/completions", method = HtxMethod.POST, body = ByteSeries(body.encodeToByteArray())).copy(headers = headers)
+        Airgap.requireRemote()
         val resp = htx.request(req)
         val respBody = resp.body.toArray().decodeToString()
         if (resp.status !in 200..299) throw IllegalStateException("Hyperspace LLM call failed ${resp.status}")

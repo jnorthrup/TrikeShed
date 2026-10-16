@@ -29,6 +29,17 @@ class LcncPublisherTest {
 
     private fun publisher(board: ConfixBlackboard) = LcncPublisher(board, { emptyMap() }, null)
 
+    @Test
+    fun scopeDefaultPresenceIsPartOfTheServedParameterContract() {
+        val payload = publisher(ConfixBlackboard.empty()).vocabularyPayload()
+        val contract = (payload["contracts"] as List<*>).map { it as Map<*, *> }
+            .single { it["type"] == LcncContracts.SCOPE_IN }
+        val params = contract["params"] as Map<*, *>
+        assertEquals(true, (params["default"] as Map<*, *>)["optional"],
+            "absence must survive an editor load; an empty default is an explicit author choice")
+        assertEquals(false, (params["name"] as Map<*, *>)["optional"])
+    }
+
     private fun program(name: String, value: String) = LcncProgram(
         name,
         listOf(LcncNode("t", "text.value", params = mapOf("value" to value)), LcncNode("d", "display")).toSeries(),

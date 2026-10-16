@@ -19,17 +19,25 @@ object JavaSource {
     @JvmStatic
     fun invoke(body: String, input: String, name: String): Any? {
         require(body.isNotBlank() && body.encodeToByteArray().size <= 65_536) { "Invalid Java function body size" }
+        val source = "import java.util.*;\npublic final class $CLASS {\npublic static Object invoke(Object input) throws Exception {\n$body\n}\n}\n"
+        val function = compile(CLASS, source, name, BODY_LINE).getMethod("invoke", Any::class.java)
+        return try { function.invoke(null, reifyStrict(input)) }
+        catch (failure: InvocationTargetException) { throw (failure.cause ?: failure) }
+    }
+
+    /** Explicit roots only: ordinary functions remain JDK-only; native DSLs supply verified jars. */
+    internal fun compile(className: String, text: String, name: String, bodyLine: Int,
+                         classpath: List<java.io.File> = emptyList(),
+                         parent: ClassLoader = ClassLoader.getPlatformClassLoader()): Class<*> {
         val compiler = checkNotNull(ToolProvider.getSystemJavaCompiler()) { "Java source requires a JDK compiler" }
         val diagnostics = DiagnosticCollector<JavaFileObject>()
         val output = StringWriter()
         val bytecode = mutableMapOf<String, ByteArrayOutputStream>()
-        val source = object : SimpleJavaFileObject(URI.create("string:///$CLASS.java"), JavaFileObject.Kind.SOURCE) {
-            override fun getCharContent(ignoreEncodingErrors: Boolean): CharSequence =
-                "import java.util.*;\npublic final class $CLASS {\npublic static Object invoke(Object input) throws Exception {\n$body\n}\n}\n"
+        val source = object : SimpleJavaFileObject(URI.create("string:///$className.java"), JavaFileObject.Kind.SOURCE) {
+            override fun getCharContent(ignoreEncodingErrors: Boolean): CharSequence = text
         }
         compiler.getStandardFileManager(diagnostics, Locale.ROOT, StandardCharsets.UTF_8).use { files ->
-            // The compiler sees the JDK, not TrikeShed's own implementation classpath.
-            files.setLocationFromPaths(StandardLocation.CLASS_PATH, emptyList())
+            files.setLocationFromPaths(StandardLocation.CLASS_PATH, classpath.map { it.toPath() })
             files.setLocationFromPaths(StandardLocation.SOURCE_PATH, emptyList())
             val memory = object : ForwardingJavaFileManager<StandardJavaFileManager>(files) {
                 override fun getJavaFileForOutput(location: JavaFileManager.Location, className: String,
@@ -44,19 +52,17 @@ object JavaSource {
             val errors = diagnostics.diagnostics.filter { it.kind == Diagnostic.Kind.ERROR }
             require(compiled == true && errors.isEmpty()) {
                 errors.joinToString("\n") { diagnostic ->
-                    "$name.java:${(diagnostic.lineNumber - BODY_LINE + 1).coerceAtLeast(1)}:${diagnostic.columnNumber}: ${diagnostic.getMessage(Locale.ROOT)}"
+                    "$name.java:${(diagnostic.lineNumber - bodyLine + 1).coerceAtLeast(1)}:${diagnostic.columnNumber}: ${diagnostic.getMessage(Locale.ROOT)}"
                 }.ifBlank { "$name.java: compilation failed: $output" }
             }
         }
         // Only in-memory bytes live in this loader; no jar/file handles or shared class cache.
-        val loader = object : ClassLoader(ClassLoader.getPlatformClassLoader()) {
+        val loader = object : ClassLoader(parent) {
             override fun findClass(name: String): Class<*> {
                 val bytes = bytecode[name]?.toByteArray() ?: throw ClassNotFoundException(name)
                 return defineClass(name, bytes, 0, bytes.size)
             }
         }
-        val function = loader.loadClass(CLASS).getMethod("invoke", Any::class.java)
-        return try { function.invoke(null, reifyStrict(input)) }
-        catch (failure: InvocationTargetException) { throw (failure.cause ?: failure) }
+        return loader.loadClass(className)
     }
 }

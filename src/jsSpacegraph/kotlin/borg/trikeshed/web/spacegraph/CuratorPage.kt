@@ -44,6 +44,8 @@ object CuratorPage {
     private var drag: DoubleArray? = null
     private var down: DoubleArray? = null
     private var panelKey = ""
+    private var airgap = false
+    private var airgapPending = false
 
     fun mount() {
         host = document.getElementById("curator") as HTMLElement
@@ -157,7 +159,7 @@ object CuratorPage {
         fun found(title: String, q: String, rows: List<Map<*, *>>) {
             val at = ++shownAt; tocAt = -3
             show(title, rows, -1)
-            if (!truthy(rank.checked) || rows.isEmpty()) return
+            if (airgap || airgapPending || !truthy(rank.checked) || rows.isEmpty()) return
             toc.insertAdjacentHTML("afterbegin", dim("asking Jev…"))
             val body = jsonOf(mapOf("q" to q, "rows" to rows))
             launchJs {
@@ -213,7 +215,50 @@ object CuratorPage {
             }
             nodes = scope.nodes; epoch = scope.epoch
         }
+        val button = document.getElementById("curator-airgap").asDynamic()
+        button.addEventListener("click", { _: dynamic ->
+            if (airgap || airgapPending) return@addEventListener
+            val rankDisabled = truthy(rank.disabled)
+            airgapPending = true; button.disabled = true
+            rank.disabled = true; rank.checked = false
+            jevControls()
+            launchJs {
+                try {
+                    val r = fetchJs("/api/curation/airgap", objOf { it.method = "POST" })
+                    val v = reify(str(awaitJs(r.text()))) as Map<*, *>
+                    if (!truthy(r.ok) || v["disabled"] != true) throw Error(v["error"]?.toString() ?: "airgap was not enabled")
+                    airgapPending = false
+                    gate(rank, v)
+                } catch (e: dynamic) {
+                    airgapPending = false; button.disabled = airgap
+                    rank.disabled = airgap || rankDisabled
+                    jevControls()
+                    if (!airgap) { button.textContent = "Retry airgap"; button.title = "Airgap failed: " + failureText(e) }
+                }
+            }
+        })
         gate(rank)
+    }
+
+    private fun gate(rank: dynamic, v: Map<*, *>) {
+        airgap = airgap || v["disabled"] == true
+        val ready = !airgap && !airgapPending && v["ready"] == true
+        val why = if (airgap) "Jev is disabled in airgap mode"
+            else (if (ready) "Jev orders the rows found · " else "Jev unavailable: ") + v["reason"]
+        rank.disabled = !ready; rank.title = why; rank.parentElement.title = why
+        if (!ready) rank.checked = false
+        val button = document.getElementById("curator-airgap").asDynamic()
+        button.disabled = airgap || airgapPending
+        button.textContent = if (airgap) "Airgap · Jev off" else "Airgap"
+        button.title = if (airgap) why else "Switch Jev off for this daemon"
+        button.setAttribute("aria-pressed", airgap.toString())
+        jevControls()
+    }
+
+    private fun jevControls() {
+        val disabled = airgap || airgapPending
+        document.getElementById("curator-panel")?.setAttribute("data-airgap", disabled.toString())
+        document.querySelector("#curator-panel form.ask input")?.asDynamic()?.disabled = disabled
     }
 
     /** The Jev box [rank] is live once the daemon's startup question to Jev came back as known; else it stays off, titled why. */
@@ -222,11 +267,12 @@ object CuratorPage {
             try {
                 val r = fetchJs("/api/curation/rank")
                 val v = reify(str(awaitJs(r.text()))) as Map<*, *>
-                val ready = v["ready"] == true
-                val why = (if (ready) "Jev orders the rows found · " else "Jev unavailable: ") + v["reason"]
-                rank.disabled = !ready; rank.title = why; rank.parentElement.title = why
-                if (v["reason"] == "probing") window.setTimeout({ gate(rank) }, 3_000)
-            } catch (e: dynamic) { rank.title = "Jev unavailable: " + failureText(e) }
+                gate(rank, v)
+                if (!airgap && v["reason"] == "probing") window.setTimeout({ gate(rank) }, 3_000)
+            } catch (e: dynamic) {
+                rank.title = "Jev unavailable: " + failureText(e)
+                document.getElementById("curator-airgap").asDynamic().disabled = airgap || airgapPending
+            }
         }
     }
 
@@ -261,6 +307,7 @@ object CuratorPage {
     private fun ask() {
         val el = document.getElementById("curator-panel") ?: return
         fun put(form: dynamic, q: String) {
+            if (airgap || airgapPending) return
             // The answer belongs to the page asked from: kept under its key, and written into whichever panel shows it then.
             val key = readingKey
             fun show(html: String) {
@@ -374,7 +421,7 @@ object CuratorPage {
         val book = key.removePrefix("book.curate/").substringBeforeLast('/')
         val heading = key.substringAfterLast('/')
         val had = shown[key]
-        if (had != null) { el.innerHTML = had; restore(el, key) } else el.innerHTML = "<p class='dim'>reading ${heading.replace("<", "&lt;")}…</p>"
+        if (had != null) { el.innerHTML = had; restore(el, key); jevControls() } else el.innerHTML = "<p class='dim'>reading ${heading.replace("<", "&lt;")}…</p>"
         launchJs {
             try {
                 val r = fetchJs("/api/curation/section?book=" + encodeURIComponent(book) + "&section=" + encodeURIComponent(heading))
@@ -382,7 +429,7 @@ object CuratorPage {
                 val v = reify(body) as Map<*, *>
                 val html = if (v.containsKey("error")) "<p class='dim'>${v["error"]}</p>" else narchy.spacegraph.CuratorReading.html(v)
                 if (!v.containsKey("error")) { shown.remove(key); shown[key] = html; if (shown.size > KEPT) shown.remove(shown.keys.first()) }
-                if (readingKey == key && html != had) { el.innerHTML = html; restore(el, key) }
+                if (readingKey == key && html != had) { el.innerHTML = html; restore(el, key); jevControls() }
             } catch (e: dynamic) { if (readingKey == key && had == null) el.innerHTML = "<p class='dim'>reading failed: ${failureText(e)}</p>" }
         }
     }

@@ -28,6 +28,8 @@ internal class LcncRunService(
     private val vocabulary: () -> Map<String, LcncPortContract>,
 ) {
     private val active = ConcurrentHashMap<String, Job>()
+    private data class DebugRun(val runId: String, val control: LcncDebug)
+    private val debuggers = ConcurrentHashMap<String, DebugRun>()
     private val slots = Semaphore(3)
     private val admission = Mutex()
     private val drained = CompletableDeferred<Unit>()
@@ -159,9 +161,59 @@ internal class LcncRunService(
 
     fun cancel(runId: String): Boolean = active[runId]?.let { it.cancel(CancellationException("cancelled by user")); true } ?: false
 
+    suspend fun debug(method: String, path: String, body: String): HttpResponse {
+        if (method !in listOf("GET", "POST")) return response(405, mapOf("error" to "method_not_allowed"))
+        if (body.length > 4096 || path.length > 4096) return response(413, mapOf("error" to "payload_limit"))
+        val request = if (method == "GET") borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            else runCatching { reify(body) as? Map<*, *> }.getOrNull()
+                ?: return response(400, mapOf("error" to "bad_json"))
+        val token = request["token"] as? String ?: return response(400, mapOf("error" to "debug_token_required"))
+        val expected = request["runId"] as? String
+        if ((method == "POST" || request.containsKey("runId")) &&
+            (expected == null || !Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}").matches(expected)))
+            return response(400, mapOf("error" to "debug_run_id_required"))
+        val run = debuggers[token]
+        if (run == null || (expected != null && run.runId != expected)) {
+            // Exact durable identity only: no named-program lookup or latest-run substitution.
+            val receipt = if (method == "GET" && expected != null)
+                (ctx.blackboard.get("lcnc/run/$expected") as? Map<*, *>)?.filterKeys {
+                    it in setOf("runId", "status", "programCid", "receiptCid", "invocationsCid", "finishedAtMs", "error")
+                } else null
+            return response(if (run == null) 404 else 409, mapOf(
+                "error" to if (run == null) "debug_run_not_active" else "debug_run_identity_mismatch",
+                "receipt" to receipt,
+            ))
+        }
+        if (method == "GET") {
+            val receipt = ctx.blackboard.get("lcnc/run/${run.runId}") as? Map<*, *>
+            return response(200, run.control.snapshot() + mapOf("runId" to run.runId,
+                "programCid" to receipt?.get("programCid"), "timeoutIncludesPauses" to true))
+        }
+        val command = when (request["action"]) {
+            "step" -> LcncDebug.Command.STEP
+            "continue" -> LcncDebug.Command.CONTINUE
+            "source-into" -> LcncDebug.Command.SOURCE_INTO
+            "source-over" -> LcncDebug.Command.SOURCE_OVER
+            "source-out" -> LcncDebug.Command.SOURCE_OUT
+            "source-line" -> LcncDebug.Command.SOURCE_LINE
+            else -> return response(400, mapOf("error" to "invalid_debug_command"))
+        }
+        val ordinal = (request["ordinal"] as? Number)?.toDouble()
+        if (ordinal == null || !ordinal.isFinite() || ordinal < 1 || ordinal > Int.MAX_VALUE || ordinal % 1 != 0.0)
+            return response(400, mapOf("error" to "invalid_debug_ordinal"))
+        val line = (request["line"] as? Number)?.toDouble()
+        if (command == LcncDebug.Command.SOURCE_LINE &&
+            (line == null || !line.isFinite() || line < 1 || line > Int.MAX_VALUE || line % 1 != 0.0))
+            return response(400, mapOf("error" to "invalid_debug_line"))
+        val accepted = try { run.control.command(ordinal.toInt(), command, line?.toInt()) }
+            catch (_: IllegalArgumentException) { return response(400, mapOf("error" to "invalid_debug_line")) }
+        return response(if (accepted) 202 else 409, mapOf("ok" to accepted, "runId" to run.runId))
+    }
+
     suspend fun drain() = withContext(NonCancellable) {
         admission.withLock {
             draining = true
+            for (run in debuggers.values) run.control.drain()
             if (admittedRuns == 0) drained.complete(Unit)
         }
         drained.await()
@@ -170,12 +222,23 @@ internal class LcncRunService(
     suspend fun execute(name: String, program: LcncProgram, named: Boolean, inputs: Map<String, Any?>, request: Map<*, *>): HttpResponse {
         val runId = UUID.randomUUID().toString()
         val jobId = "lcnc/run/$runId"
+        val token = request["debugToken"] as? String
+        if (request.containsKey("debugToken") && (token == null ||
+                !Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}").matches(token)))
+            return response(400, mapOf("error" to "invalid_debug_token"))
+        val debug = token?.let { LcncDebug() }
         // Admission covers the interval before the cancellable execution Job is registered.
         val admitted = admission.withLock {
-            if (draining || !slots.tryAcquire()) false
-            else { admittedRuns++; true }
+            if (token != null && debuggers.containsKey(token)) 409
+            else if (draining || !slots.tryAcquire()) 429
+            else {
+                admittedRuns++
+                if (token != null) debuggers[token] = DebugRun(runId, checkNotNull(debug))
+                200
+            }
         }
-        if (!admitted) return response(429, mapOf("ok" to false, "error" to "execution_capacity"))
+        if (admitted != 200) return response(admitted, mapOf("ok" to false,
+            "error" to if (admitted == 409) "debug_token_active" else "execution_capacity"))
         try {
             return coroutineScope {
                 active[runId] = currentCoroutineContext().job
@@ -261,7 +324,7 @@ internal class LcncRunService(
                     }
                     val result = withTimeout(timeoutMs) {
                         val hostContext = ctx.scope.coroutineContext.minusKey(Job) +
-                            ctx.muxContext.minusKey(Job) + currentCoroutineContext()
+                            ctx.muxContext.minusKey(Job) + currentCoroutineContext() + (debug ?: kotlin.coroutines.EmptyCoroutineContext)
                         val binding = ctx.ccekBinding
                         if (binding == null) withContext(hostContext) { walker.runProcedure(frozen, inputs) }
                         else {
@@ -322,6 +385,8 @@ internal class LcncRunService(
         } finally {
             withContext(NonCancellable) {
                 admission.withLock {
+                    debug?.close()
+                    if (token != null) debuggers.remove(token)
                     active.remove(runId)
                     slots.release()
                     admittedRuns--

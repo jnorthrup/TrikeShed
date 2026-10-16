@@ -51,7 +51,6 @@ data class WorkspaceSnapshot(
     val cid: String get() = ContentId.of(bytes).value
 
     /** Key order without java.util.TreeMap: the same on every target. */
-    /* ⚡ Bolt: Use associateBy to avoid intermediate Pair allocations during map sorting and normalization */
     private fun <V> Map<String, V>.sorted(): Map<String, V> = entries.sortedBy { it.key }.associateBy({ it.key }, { it.value })
 
     private fun normalize(v: Any?): Any? = when (v) {

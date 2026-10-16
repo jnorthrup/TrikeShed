@@ -35,11 +35,13 @@ import borg.trikeshed.lib.size
  *    strict type check all see the same late-bound vocabulary.
  */
 enum class LcncBindingKind {
+    /** Structural scope operations dispatched by LcncRunner, not registry lambdas. */
+    INTERPRETER,
     /** A Kotlin lambda in the registry — provenance is the class that made it. */
     KOTLIN,
     /** A stored program with formal ports, loaded by name when the walk reaches it. */
     COMPOSITE,
-    /** A contract with no runner — `js`, `display`: the canvas renders it, the daemon skips it. */
+    /** No registry, interpreter or stored-program binding in this vocabulary. Not proof of executability. */
     UNBOUND,
 }
 
@@ -66,6 +68,9 @@ object LcncWrappers {
             if (!seen.add(type)) return
             val runner = registry[type]
             when {
+                type == LcncContracts.SCOPE_IN || type == LcncContracts.SCOPE_OUT ||
+                    (type == LcncContracts.SCOPE && runner == null) ->
+                    out.add(LcncBinding(type, LcncBindingKind.INTERPRETER, "LcncRunner"))
                 runner != null -> {
                     val by = provenance(runner)
                     out.add(LcncBinding(type, LcncBindingKind.KOTLIN, by))

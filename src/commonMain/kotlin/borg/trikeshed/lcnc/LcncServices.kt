@@ -35,6 +35,9 @@ object SurfaceCallKey : LcncServiceKey<SurfaceNodes.Call>("SurfaceCallKey")
 interface LcncServiceBinding {
     val requiredKeys: Series<CoroutineContext.Key<*>>
     val providedKeys: Series<CoroutineContext.Key<*>>
+
+    /** Borrow the composed bindings for observation without dispatching the node or closing providers. */
+    suspend fun <T> withServices(body: suspend () -> T): T
 }
 
 class LcncOwnerJob(val job: Job?) : AbstractCoroutineContextElement(Key) {
@@ -65,13 +68,40 @@ fun <E : CoroutineContext.Element> boundLcnc(defaultElement: E, delegate: LcncNo
         override val providedKeys: Series<CoroutineContext.Key<*>> =
             prependKey(key, (delegate as? LcncServiceBinding)?.providedKeys)
 
-        override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+        override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> =
+            withBinding { delegate.execute(node, inputs) }
+
+        override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean =
+            withBinding { delegate.sourceDebugging(node, inputs) }
+
+        override suspend fun <T> withServices(body: suspend () -> T): T = withBinding {
+            val services = delegate as? LcncServiceBinding
+            if (services == null) body() else services.withServices(body)
+        }
+
+        private suspend fun <T> withBinding(body: suspend () -> T): T {
             val current = currentCoroutineContext()
             val bound = current[key] ?: defaultElement
             val ownerJob = current[LcncOwnerJob]?.job ?: current[Job]
-            return withContext(bound + LcncOwnerJob(ownerJob)) { delegate.execute(node, inputs) }
+            return lcncContext(bound + LcncOwnerJob(ownerJob), body)
         }
     }
+
+/** Preserve the body failure without changing withContext's child cancellation and join. */
+internal suspend fun <T> lcncContext(context: CoroutineContext, body: suspend () -> T): T {
+    var original: Throwable? = null
+    try {
+        return withContext(context) {
+            try { body() } catch (failure: Throwable) {
+                original = failure
+                throw failure
+            }
+        }
+    } catch (failure: Throwable) {
+        // Coroutine debug stack recovery can copy a throwable at the context boundary.
+        throw original ?: failure
+    }
+}
 
 // Element erases its key's result type; each element's own key supplies that type identity.
 @Suppress("UNCHECKED_CAST")

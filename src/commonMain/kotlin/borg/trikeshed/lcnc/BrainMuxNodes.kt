@@ -6,6 +6,7 @@ import borg.trikeshed.parse.jsonOf
 import keymux.CouchKeyStore
 import keymux.KeyMux
 import modelmux.ModelMux
+import modelmux.Airgap
 import modelmux.MuxCallContext
 import modelmux.MuxCallRecord
 import modelmux.acp.AcpMessage
@@ -489,6 +490,7 @@ ${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served
         temperature: Double,
         headers: List<Pair<String, String>>,
     ): Result<String> = try {
+        Airgap.requireRemote()
         val bodyMap = linkedMapOf<String, Any?>(
             "model" to model,
             "max_tokens" to maxTokens,
@@ -509,6 +511,7 @@ ${if (cached) """<div style="color:#6b7280;font-size:12px;margin-top:6px">served
         ).copy(headers = htxHeaders(*allHdrs))
         val htx = currentCoroutineContext()[HtxKey]
             ?: error("No HtxKey found in coroutine context for directHtxChat")
+        Airgap.requireRemote()
         val resp = htx.requestResult(htxReq).getOrThrow()
         val respBody = resp.body.toArray().decodeToString()
         val parsed = reify(respBody) as? Map<*, *>
