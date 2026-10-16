@@ -186,7 +186,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <h1>Oroboros Board</h1>
   <span class="seq" id="seq"></span>
   <span class="spacer"></span>
-  <button id="importBtn">Import a plan…</button>
+  <button id="importBtn" title="Import a plan or bullet list into cards" aria-label="Import a plan">Import a plan…</button>
 </header>
 <div id="board"></div>
 <div id="ticker">
@@ -200,8 +200,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <p>Paste a plan or to-do list. Every bullet line (<code>-</code>, <code>*</code>, or <code>1.</code>) becomes a card. Re-importing the same list is safe — duplicates are skipped.</p>
   <textarea id="importText" placeholder="- Ship the release notes&#10;- Review the tribunal preset&#10;- Archive stale cards" aria-label="Import text"></textarea>
   <div class="row">
-    <button id="importCancel">Cancel</button>
-    <button class="primary" id="importGo">Import</button>
+    <button id="importCancel" aria-label="Cancel import">Cancel</button>
+    <button class="primary" id="importGo" aria-label="Import plan cards">Import</button>
   </div>
 </dialog>
 
