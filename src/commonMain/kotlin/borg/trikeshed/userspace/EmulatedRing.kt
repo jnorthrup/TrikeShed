@@ -21,9 +21,13 @@ private enum class RingMark { STAGED, SETTLED, SEEN, REPEATED }
 /** Common bounded SQ/CQ coordinator. Platform backends execute effects only.
  * Synchronous callers serialize access; coroutine callers use FunctionalUringFacade.
  *
- * The opened entries bound the SQ and the unreaped CQ, as a kernel ring's do; work in flight is bounded apart by
- * [inFlightLimit]. One table holds every userData from prep until its CQE is reaped, so admission, duplicate
- * rejection and settlement are O(1) whatever the number of deferred watches.
+ * Two bounds, kept apart. The opened entries bound admission: prep is refused while the SQ and the unreaped CQ
+ * together hold that many, so one submit dispatches at most entries SQEs. [inFlightLimit] bounds identities: one
+ * table holds every userData from prep until its CQE is reaped (staged + in flight + unreaped <= [inFlightLimit]),
+ * so a ring of 256 entries carries 64,000 deferred watches. Deferred work completes when it completes, so more than
+ * entries CQEs, up to [inFlightLimit], can wait unreaped; like a kernel ring's NODROP overflow, that refuses new
+ * submissions until the caller reaps. Admission, duplicate rejection and settlement are O(1) whatever the number of
+ * deferred watches.
  */
 internal class EmulatedRing(
     private val backend: UserspaceChannelBackend,

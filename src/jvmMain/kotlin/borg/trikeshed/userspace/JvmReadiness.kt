@@ -11,8 +11,9 @@ private const val OUT = 0x4
 private const val ERR = 0x8
 private const val HUP = 0x10
 private const val NVAL = 0x20
+/** [JvmReadiness.Interest.armed] bit of an epoll registration armed with no event bits: ERR and HUP still fire. */
+private const val ARMED = 0x100
 private const val EPOLL_CTL_ADD = 1
-private const val EPOLL_CTL_DEL = 2
 private const val EPOLL_CTL_MOD = 3
 private const val EPOLLONESHOT = 1 shl 30
 private const val EVFILT_READ = -1
@@ -49,7 +50,13 @@ internal fun readinessCrossover(): Int =
  * hovers at the boundary from migrating on every wait. Descriptors that are not sockets (files, pipes) stay with
  * poll(2), whose answer for them the kernel sets do not give; the kernel set's own descriptor then joins that poll.
  *
- * Callers serialize every call (the backend's monitor); nothing here locks.
+ * epoll arms a watch with no event bits as error-only interest, which still reports POLLERR and POLLHUP as poll(2)
+ * does. kqueue expresses neither POLLPRI nor error-only interest, so on Darwin such sockets stay with poll(2) in
+ * kernel mode too. Darwin's poll(2), itself built on kqueue, registers no filter for events 0 and so never reports
+ * POLLHUP there; every record asks for POLLHUP explicitly, which POSIX makes implicit.
+ *
+ * The arena of poll records and kernel events is owned: [close] frees it. Callers serialize every call (the
+ * backend's monitor); nothing here locks.
  */
 internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
     /** The watches on one operating-system descriptor. */
@@ -64,6 +71,8 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         var generation = -1
         /** Index in the active list; -1 while no watch is held. */
         var slot = -1
+        /** In kernel mode, served by poll(2): the kernel set cannot express its union (Darwin: PRI, or no IN/OUT). */
+        var polled = false
 
         fun union(): Int {
             var mask = 0
@@ -104,11 +113,16 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
     var watchedSockets = 0
         private set
     private var otherCount = 0
+    /** Sockets with [Interest.polled] set: the kernel-mode poll(2) records skip the socket scan while it is 0. */
+    private var polledCount = 0
     var kernel = false
         private set
     private var kfd = -1
     private var generation = 0
-    private val arena = Arena.ofAuto()
+    /** POLLHUP asked for in every record where poll(2) does not imply it. */
+    private val hupRequest = if (darwin) HUP else 0
+    private val arena = Arena.ofShared()
+    private var closed = false
     private var records: MemorySegment = arena.allocate(8L * 16, 8)
     private var recordInterests = arrayOfNulls<Interest>(16)
     private var recordCount = 0
@@ -149,6 +163,7 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
     }
 
     fun watch(token: Long, descriptor: JvmDescriptor, fd: Int, mask: Int, connect: Boolean, sink: Sink) {
+        check(!closed) { "readiness is closed" }
         val interest = interest(descriptor, fd, sink)
         if (interest.count == interest.tokens.size) {
             val grown = interest.count * 2
@@ -163,7 +178,7 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         if (connect) interest.connectCount++
         byToken.put(token, interest)
         if (interest.slot < 0) activate(interest)
-        if (kernel && interest.socket) arm(interest, sink) else dirty = true
+        place(interest, sink)
         switchIfCrossed(sink)
     }
 
@@ -191,6 +206,7 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
 
     /** One wait of at most [timeoutMillis] (0 polls, negative blocks); readiness reaches [sink]. */
     fun wait(timeoutMillis: Int, sink: Sink) {
+        check(!closed) { "readiness is closed" }
         waits++
         if (kernel) {
             val now = System.nanoTime()
@@ -204,7 +220,9 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
                     k = minOf(k, watchedSockets) - 1
                 }
             }
-            if (otherCount == 0) kernelWait(timeoutMillis, sink) else pollWait(timeoutMillis, sink)
+            if (dirty) rebuild()
+            // Only the kernel set's own record: nothing needs poll(2).
+            if (recordCount == 1) kernelWait(timeoutMillis, sink) else pollWait(timeoutMillis, sink)
         } else pollWait(timeoutMillis, sink)
         switchIfCrossed(sink)
     }
@@ -216,10 +234,17 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         "readiness.switches" to switches, "readiness.scanned" to scanned, "readiness.maxEvents" to maxEvents.toLong(),
     )
 
+    /** Closes the kernel set and frees the arena; the caller ends held watches first (the backend's drain does). */
     fun close() {
+        if (closed) return
+        closed = true
         if (kfd >= 0) JvmSocketSyscalls.close(kfd)
         kfd = -1
         kernel = false
+        records = MemorySegment.NULL
+        events = MemorySegment.NULL
+        recordCount = 0
+        arena.close()
     }
 
     private fun osFd(descriptor: JvmDescriptor): Int = when (descriptor) {
@@ -247,7 +272,8 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
             interest.slot = otherCount
             others[otherCount++] = interest
         }
-        dirty = true
+        // A kernel-set socket has no poll(2) record; place() marks it if it needs one.
+        if (!kernel || !interest.socket) dirty = true
     }
 
     private fun deactivate(interest: Interest) {
@@ -260,7 +286,11 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
             others[slot] = last; last.slot = slot; others[otherCount] = null
         }
         interest.slot = -1
-        dirty = true
+        if (interest.polled) {
+            interest.polled = false
+            polledCount--
+            dirty = true
+        } else if (!kernel || !interest.socket) dirty = true
     }
 
     private fun release(interest: Interest, sink: Sink, res: Int) {
@@ -280,8 +310,30 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         if (interest.count == 0) {
             // A kernel registration left armed fires once more at most and is ignored: no call spent disarming it.
             if (interest.slot >= 0) deactivate(interest)
-        } else if (kernel && interest.socket) arm(interest, sink)
-        else dirty = true
+        } else place(interest, sink)
+    }
+
+    /** Whether the kernel set can serve [interest]'s union exactly: epoll always; kqueue only IN/OUT without PRI. */
+    private fun kernelServes(interest: Interest): Boolean {
+        if (!interest.socket) return false
+        if (linux) return true
+        val union = interest.union()
+        return union and PRI == 0 && union and (IN or OUT) != 0
+    }
+
+    /** After [interest]'s watches changed: armed in the kernel set, or its poll(2) record marked stale. */
+    private fun place(interest: Interest, sink: Sink) {
+        if (!kernel || !interest.socket) {
+            dirty = true
+            return
+        }
+        val polled = !kernelServes(interest)
+        if (polled != interest.polled) {
+            interest.polled = polled
+            polledCount += if (polled) 1 else -1
+            dirty = true
+        }
+        if (!polled) arm(interest, sink)
     }
 
     private fun switchIfCrossed(sink: Sink) {
@@ -300,10 +352,12 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         }
         kernel = true
         switches++
+        polledCount = 0
         var k = 0
         while (k < watchedSockets) {
             val interest = sockets[k]!!
-            arm(interest, sink)
+            interest.polled = !kernelServes(interest)
+            if (interest.polled) polledCount++ else arm(interest, sink)
             if (k < watchedSockets && sockets[k] === interest) k++
         }
         dirty = true
@@ -315,13 +369,15 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         kfd = -1
         kernel = false
         switches++
+        for (k in 0 until watchedSockets) sockets[k]!!.polled = false
+        polledCount = 0
         dirty = true
     }
 
     private fun arm(interest: Interest, sink: Sink) {
         val union = interest.union()
-        val want = if (linux) union and (IN or PRI or OUT)
-            else (if (union and (IN or PRI) != 0) IN else 0) or (union and OUT)
+        // Linux arms every held watch, error-only interest included; Darwin gets here with IN/OUT only (place()).
+        val want = if (linux) union and (IN or PRI or OUT) or ARMED else union and (IN or OUT)
         val current = if (interest.generation == generation) interest.armed else 0
         if (want == current) return
         val result = if (linux) epollArm(interest, want) else kqueueArm(interest, want, current)
@@ -331,13 +387,8 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
     private fun epollArm(interest: Interest, want: Int): Int {
         val registered = interest.generation == generation
         controls++
-        if (want == 0) {
-            val removed = JvmSocketSyscalls.epollCtl(kfd, EPOLL_CTL_DEL, interest.fd, 0, change, packed)
-            interest.generation = -1
-            interest.armed = 0
-            return if (removed == -2 || removed == -9) 0 else removed
-        }
-        val events = want or EPOLLONESHOT
+        // No event bits is error-only interest: epoll_ctl adds EPOLLERR and EPOLLHUP to every registration.
+        val events = (want and (IN or PRI or OUT)) or EPOLLONESHOT
         var result = JvmSocketSyscalls.epollCtl(kfd, if (registered) EPOLL_CTL_MOD else EPOLL_CTL_ADD, interest.fd, events, change, packed)
         if (result == -2 && registered) {
             controls++
@@ -402,12 +453,14 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
             if (revents == 0) continue
             val interest = recordInterests[r]
             if (interest == null) kernelWait(0, sink)
+            // POLLNVAL from a descriptor closed outside the ring ends its watches as the scan before the call would.
+            else if (interest.slot >= 0 && revents and NVAL != 0 && !interest.descriptor.isOpen()) release(interest, sink, -9)
             else if (interest.slot >= 0) dispatch(interest, revents, sink)
         }
     }
 
     private fun rebuild() {
-        val total = (if (kernel) 1 else watchedSockets) + otherCount
+        val total = watchedSockets + otherCount + 1
         if (records.byteSize() < total * 8L) {
             var size = records.byteSize() / 8
             while (size < total) size *= 2
@@ -418,11 +471,12 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
         fun put(fd: Int, mask: Int, interest: Interest?) {
             val at = recordCount * 8L
             records.set(ValueLayout.JAVA_INT, at, fd)
-            records.set(ValueLayout.JAVA_SHORT, at + 4, (mask and 0x3f).toShort())
+            records.set(ValueLayout.JAVA_SHORT, at + 4, ((mask and 0x3f) or hupRequest).toShort())
             records.set(ValueLayout.JAVA_SHORT, at + 6, 0)
             recordInterests[recordCount++] = interest
         }
-        if (!kernel) for (k in 0 until watchedSockets) sockets[k]!!.let { put(it.fd, it.union(), it) }
+        if (!kernel || polledCount > 0)
+            for (k in 0 until watchedSockets) sockets[k]!!.let { if (!kernel || it.polled) put(it.fd, it.union(), it) }
         for (k in 0 until otherCount) others[k]!!.let { put(it.fd, it.union(), it) }
         if (kernel && kfd >= 0) put(kfd, IN, null)
         for (r in recordCount until recordInterests.size) recordInterests[r] = null

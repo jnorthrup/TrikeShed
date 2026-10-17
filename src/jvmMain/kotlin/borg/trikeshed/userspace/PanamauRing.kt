@@ -275,6 +275,8 @@ private const val CANCEL_ANY = 1 shl 2
 internal class PanamauChannelBackend(
     private val ring: PanamaRing,
     private val emulated: JvmUserspaceChannelBackend = JvmUserspaceChannelBackend("emulated: delegate of the FFM io_uring ring"),
+    /** How long [cancelPending] waits for the kernel's cancellation CQEs. */
+    private val cancelWaitNanos: Long = 5_000_000_000L,
 ) : UserspaceChannelBackend {
     /** A kernel SQE between submission and CQE: what its CQE must still do. */
     private class Native(val submission: UringSubmission, val osFd: Int, val scratch: MemorySegment?, val epoch: Int)
@@ -560,11 +562,13 @@ internal class PanamauChannelBackend(
         if (inFlight.size > 0) {
             internalOp(OP_ASYNC_CANCEL, -1, 0L, CANCEL_ANY or CANCEL_ALL)
             // Cancellation completes in the kernel; collect every terminal CQE so drain finds them reapable.
-            val deadline = System.nanoTime() + 5_000_000_000L
+            val deadline = System.nanoTime() + cancelWaitNanos
             flush(0, -1L)
             drainCq()
-            while (inFlight.size > 0 && System.nanoTime() < deadline) {
-                flush(1, 10_000_000L)
+            while (inFlight.size > 0) {
+                val remaining = deadline - System.nanoTime()
+                if (remaining <= 0L) break
+                flush(1, minOf(remaining, 10_000_000L))
                 drainCq()
             }
         }
@@ -592,10 +596,17 @@ internal class PanamauChannelBackend(
         return order.size j { UringCompletion(order[it], byToken.getValue(order[it]), 0) }
     }
 
+    /**
+     * Ends the kernel ring once every SQE it holds has its terminal CQE. While the kernel may still write into a
+     * staging segment or a caller's buffer, nothing is unmapped or freed: close throws, and may be called again.
+     */
     @Synchronized
     override fun close() {
         if (closed) return
         cancelPending()
+        check(inFlight.size == 0) {
+            "${inFlight.size} io_uring operations lack a terminal CQE after cancellation; ring and staging retained"
+        }
         closed = true
         ring.close()
         emulated.close()

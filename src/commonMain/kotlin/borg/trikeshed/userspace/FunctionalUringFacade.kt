@@ -62,6 +62,11 @@ public interface UserspaceChannelBackend {
     fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
     fun unregisterBuffers(): Result<Unit> = unsupported()
 
+    /**
+     * Releases what the backend itself holds once its deferred work has terminal CQEs. Descriptors that CQEs returned
+     * (OPENAT, SOCKET, ACCEPT) and descriptors it only borrowed belong to the caller and stay open, as they do when an
+     * io_uring is closed.
+     */
     fun close() {}
 }
 

@@ -78,25 +78,34 @@ class JvmUserspaceChannelBackendTest {
         }
     }
 
+    /**
+     * UserspaceChannelBackend.close: a descriptor an OPENAT CQE returned belongs to the caller, as io_uring leaves it,
+     * and so does one the backend only borrowed. Closing the backend (twice) closes neither; the caller closes both.
+     */
     @Test
-    fun backendDrainClosesOwnedDescriptorsButNotBorrowedFiles() {
+    fun returnedAndBorrowedDescriptorsOutliveTheBackend() {
         val path = Files.createTempFile("uring-owner-", ".bin")
         val backend = openUserspaceChannelBackend(8)
         val borrowed = UserFiles.open(path.toString(), readOnly = false)
+        var returned: File? = null
         try {
             val fd = backend.execute(Submissions.openat(path.toString(), 2, 1))
             assertTrue(fd > 0 && fd != borrowed.id)
-            val owned = File.fromFd(fd)
-            assertTrue(owned.isOpen())
+            returned = File.fromFd(fd)
+            assertTrue(returned.isOpen())
             assertEquals(0, backend.execute(Submissions.fsync(borrowed.id, 2)))
             backend.close()
-            assertFalse(owned.isOpen())
+            assertTrue(returned.isOpen())
             assertTrue(borrowed.isOpen())
             backend.close()
+            assertTrue(returned.isOpen())
         } finally {
+            returned?.close()
             borrowed.close()
             backend.close()
             Files.deleteIfExists(path)
         }
+        assertFalse(requireNotNull(returned).isOpen())
+        assertFalse(borrowed.isOpen())
     }
 }

@@ -2,9 +2,17 @@ package borg.trikeshed.collections
 
 /**
  * Long keys to non-null values by open addressing: linear probing, backward-shift removal (no tombstones), keys
- * unboxed in a LongArray. Load stays at or under 3/4 of a power-of-two capacity, which only grows.
+ * unboxed in a LongArray. Load stays at or under 3/4 of a power-of-two capacity, which only grows, to at most
+ * [MAX_CAPACITY] slots holding [MAX_SIZE] bindings.
  */
 class LongTable<V : Any>(expected: Int = 8) {
+    companion object {
+        /** The largest power of two an Int-indexed array holds. */
+        const val MAX_CAPACITY: Int = 1 shl 30
+        /** The bindings [MAX_CAPACITY] slots hold at 3/4 load. */
+        const val MAX_SIZE: Int = MAX_CAPACITY / 4 * 3
+    }
+
     private var keys: LongArray
     private var values: Array<Any?>
     private var mask: Int
@@ -12,7 +20,8 @@ class LongTable<V : Any>(expected: Int = 8) {
         private set
 
     init {
-        require(expected >= 0) { "negative expected size" }
+        // Checked before sizing: past MAX_SIZE the doubling below would overflow Int and never end.
+        require(expected in 0..MAX_SIZE) { "expected size $expected outside 0..$MAX_SIZE" }
         var capacity = 8
         while (capacity * 3L < expected * 4L) capacity = capacity shl 1
         keys = LongArray(capacity)
@@ -39,23 +48,25 @@ class LongTable<V : Any>(expected: Int = 8) {
 
     operator fun contains(key: Long): Boolean = get(key) != null
 
-    /** Binds [key] to [value]; the value it replaced, or null. */
+    /** Binds [key] to [value]; the value it replaced, or null. Replacing a binding never grows the table. */
     @Suppress("UNCHECKED_CAST")
     fun put(key: Long, value: V): V? {
-        if ((size + 1) * 4L > values.size * 3L) grow()
         var i = home(key)
         while (true) {
-            val v = values[i]
-            if (v == null) {
-                keys[i] = key; values[i] = value; size++
-                return null
-            }
+            val v = values[i] ?: break
             if (keys[i] == key) {
                 values[i] = value
                 return v as V
             }
             i = (i + 1) and mask
         }
+        if ((size + 1) * 4L > values.size * 3L) {
+            grow()
+            i = home(key)
+            while (values[i] != null) i = (i + 1) and mask
+        }
+        keys[i] = key; values[i] = value; size++
+        return null
     }
 
     /** Unbinds [key]; the value it held, or null. */
@@ -110,6 +121,7 @@ class LongTable<V : Any>(expected: Int = 8) {
     @PublishedApi internal fun slotValue(i: Int): Any? = values[i]
 
     private fun grow() {
+        check(values.size < MAX_CAPACITY) { "LongTable holds at most $MAX_SIZE bindings" }
         val oldKeys = keys
         val oldValues = values
         keys = LongArray(oldKeys.size * 2)
