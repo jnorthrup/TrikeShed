@@ -45,6 +45,15 @@ class JvmReadinessTest {
 
         fun next(): Long = token++
 
+        /** Submits and keeps whatever CQEs are already available, so the CQ never holds the next batch back. */
+        fun flush() {
+            ring.submit().getOrThrow()
+            while (true) {
+                val completion = ring.peekCqe().getOrThrow() ?: return
+                assertNull(cqes.put(completion.userData, completion.res), "second CQE for ${completion.userData}")
+            }
+        }
+
         /** Submits what is staged and collects CQEs until [wanted] tokens have one each. */
         fun settle(vararg wanted: Long): Map<Long, Int> {
             ring.submit().getOrThrow()
@@ -84,7 +93,7 @@ class JvmReadinessTest {
             val connects = LongArray(count) { f.next() }
             for (k in 0 until count step 8) {
                 for (j in k until minOf(count, k + 8)) ring.prepConnect(clients[j], address.address(), 16, connects[j]).getOrThrow()
-                ring.submit().getOrThrow()
+                f.flush()
             }
             for (token in connects) assertEquals(0, f.settle(token).getValue(token))
             // The listener is non-blocking: an empty backlog answers -EAGAIN, and a POLLIN watch waits for more.
@@ -100,7 +109,7 @@ class JvmReadinessTest {
             val watches = LongArray(count) { f.next() }
             for (k in 0 until count step 8) {
                 for (j in k until minOf(count, k + 8)) ring.prepPollAdd(servers[j], 1, watches[j]).getOrThrow()
-                ring.submit().getOrThrow()
+                f.flush()
             }
             assertNull(ring.peekCqe().getOrThrow())
             if (readiness != null) {
@@ -116,7 +125,7 @@ class JvmReadinessTest {
             val again = LongArray(count) { f.next() }
             for (k in 0 until count step 8) {
                 for (j in k until minOf(count, k + 8)) ring.prepPollAdd(servers[j], 1, again[j]).getOrThrow()
-                ring.submit().getOrThrow()
+                f.flush()
             }
             for (k in 0 until count / 2) {
                 assertEquals(0, f.one { ring.prepPollRemove(again[k], it) })
@@ -131,19 +140,18 @@ class JvmReadinessTest {
                 assertEquals(0, readiness.watches)
                 if (crossover in 1 until count) assertTrue(readiness.switches >= 2, "switched ${readiness.switches} times")
             }
-            for (k in servers.indices) if (k != closed) assertEquals(0, f.one { ring.prepClose(servers[k], it) })
-            assertEquals(0, f.one { ring.prepClose(listener, it) })
-            for (k in 4 until count) assertEquals(0, f.one { ring.prepClose(clients[k], it) })
-            // Drain ends unready watches with -ECANCELED; the ring then admits nothing more.
+            // Drain ends unready watches (peers still open, nothing to read) with -ECANCELED; then nothing is admitted.
             val idle = LongArray(4) { f.next() }
             for (k in idle.indices) ring.prepPollAdd(clients[k], 1, idle[k]).getOrThrow()
             ring.submit().getOrThrow()
             ring.drain().getOrThrow()
-            for (token in idle) assertEquals(-125, assertNotNull(ring.peekCqe().getOrThrow()).res.also { _ -> })
+            for (token in idle) assertEquals(-125, assertNotNull(ring.peekCqe().getOrThrow()).res)
             assertNull(ring.peekCqe().getOrThrow())
             assertTrue(ring.prepPollAdd(clients[0], 1, f.next()).isFailure)
             // Descriptors outlive the ring; the caller closes them.
-            for (k in 0 until 4) assertEquals(0, JvmFileTable.close(clients[k]))
+            for (k in servers.indices) if (k != closed) assertEquals(0, JvmFileTable.close(servers[k]))
+            assertEquals(0, JvmFileTable.close(listener))
+            for (fd in clients) assertEquals(0, JvmFileTable.close(fd))
         }
         ring.close().getOrThrow()
     }

@@ -312,15 +312,29 @@ internal class PanamauChannelBackend(
         else -> -1
     }
 
+    /** Batch tokens whose CQE submitBatch must return: file transfers and NOP, synchronous under every executor. */
+    private var synchronous = LongArray(16)
+
     @Synchronized
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
         val results = ArrayList<SelectionResult>(submissions.size)
+        var waitFor = 0
         for (sub in submissions) {
             val immediate = stage(sub)
             if (immediate != null) results.add(SelectionResult(immediate, sub.userData))
+            else if (sub.opcode == UringOp.NOP || (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) &&
+                JvmFileTable.descriptor(sub.fd) !is JvmSocketDescriptor) {
+                if (waitFor == synchronous.size) synchronous = synchronous.copyOf(waitFor * 2)
+                synchronous[waitFor++] = sub.userData
+            }
         }
         flush(0, -1L)
         drainCq()
+        // A buffered file write can be punted to io-wq; the batch still settles it, as emulation and JNI do.
+        while ((0 until waitFor).any { synchronous[it] in inFlight }) {
+            flush(1, -1L)
+            drainCq()
+        }
         while (completions.isNotEmpty()) results.add(completions.removeFirst())
         return results
     }
@@ -495,6 +509,9 @@ internal class PanamauChannelBackend(
         val sub = native.submission
         return when (sub.opcode) {
             UringOp.ACCEPT -> if (res < 0) res else JvmFileTable.register(JvmSocketDescriptor(res))
+            // The kernel always reports EPOLLRDHUP (IO_POLL_UNMASK); the portable vocabulary is the POLL bits 0x3f, and
+            // the peer's shutdown reaches the next RECV as its zero-byte completion under either executor.
+            UringOp.POLL_ADD -> if (res < 0) res else res and 0x3f
             UringOp.READ, UringOp.RECV, UringOp.WRITE, UringOp.SEND -> {
                 val buffer = sub.buffer
                 val scratch = native.scratch
