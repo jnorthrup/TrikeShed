@@ -132,16 +132,15 @@ data class KanbanGraphValidation(val errors: List<KanbanGraphError>) { val valid
 
 fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRegistry()): KanbanGraphValidation {
     val errors = mutableListOf<KanbanGraphError>()
-    // Bolt: avoid O(N) allocation when iterating Series by removing .toList()
-    val laneIds = lanes.map { it.id }
+    val laneSet = HashSet<String>(lanes.size).apply { lanes.forEach { add(it.id) } }
     val seenOrders = mutableSetOf<Int>()
     lanes.forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
     val seenIds = mutableSetOf<String>()
     val seenShapes = mutableSetOf<String>()
     edges.forEach { edge ->
         if (!seenIds.add(edge.id)) errors += KanbanGraphError.DuplicateEdge(edge.id)
-        if (!laneIds.contains(edge.from)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.from)
-        if (!laneIds.contains(edge.to)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.to)
+        if (!laneSet.contains(edge.from)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.from)
+        if (!laneSet.contains(edge.to)) errors += KanbanGraphError.MissingEndpoint(edge.id, edge.to)
         val shape = "${edge.from}|${edge.to}|${edge.condition?.predicate}|${edge.mode}|${edge.group}"
         if (!seenShapes.add(shape)) errors += KanbanGraphError.DuplicateEdge(edge.id)
         edge.condition?.let { if (predicates.resolve(it.predicate) == null) errors += KanbanGraphError.UnresolvedPredicate(edge.id, it.predicate) }
@@ -186,7 +185,7 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
         edges.forEach { if (it.from == id) visit(it.to, path + id) }
         marks[id] = 2
     }
-    laneIds.forEach { visit(it, emptyList()) }
+    laneSet.forEach { visit(it, emptyList()) }
     return KanbanGraphValidation(errors)
 }
 
