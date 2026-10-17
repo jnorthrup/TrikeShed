@@ -2,48 +2,40 @@ package borg.trikeshed.userspace
 
 import borg.trikeshed.userspace.nio.ByteBuffer
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryLayout.PathElement.groupElement
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
-import java.lang.invoke.MethodHandle
 
 /** POSIX socket effects for the JVM emulated ring; sockaddr and errno stay portable above it. */
 internal object JvmSocketSyscalls {
     private val linux = System.getProperty("os.name").lowercase().contains("linux")
     private val darwin = System.getProperty("os.name").lowercase().contains("mac")
-    private val linker by lazy {
-        if (!linux && !darwin) TODO("JVM socket actual requires a Winsock backend on this host")
-        Linker.nativeLinker()
-    }
     private val int = ValueLayout.JAVA_INT
-    private val long = ValueLayout.JAVA_LONG
-    private val pointer = ValueLayout.ADDRESS
     private val stateLayout = Linker.Option.captureStateLayout()
     private val errnoOffset = stateLayout.byteOffset(groupElement("errno"))
-    private fun function(name: String, descriptor: FunctionDescriptor): MethodHandle = linker.downcallHandle(
-        linker.defaultLookup().find(name).orElseThrow { UnsupportedOperationException("libc $name is unavailable") },
-        descriptor, Linker.Option.captureCallState("errno"),
-    )
-    private val socketCall by lazy { function("socket", FunctionDescriptor.of(int, int, int, int)) }
-    private val bindCall by lazy { function("bind", FunctionDescriptor.of(int, int, pointer, int)) }
-    private val listenCall by lazy { function("listen", FunctionDescriptor.of(int, int, int)) }
-    private val acceptCall by lazy { function("accept", FunctionDescriptor.of(int, int, pointer, pointer)) }
-    private val connectCall by lazy { function("connect", FunctionDescriptor.of(int, int, pointer, int)) }
-    private val closeCall by lazy { function("close", FunctionDescriptor.of(int, int)) }
-    private val shutdownCall by lazy { function("shutdown", FunctionDescriptor.of(int, int, int)) }
-    private val recvCall by lazy { function("recv", FunctionDescriptor.of(long, int, pointer, long, int)) }
-    private val sendCall by lazy { function("send", FunctionDescriptor.of(long, int, pointer, long, int)) }
-    private val pollCall by lazy { function("poll", FunctionDescriptor.of(int, pointer, if (linux) long else int, int)) }
-    private val getOptionCall by lazy { function("getsockopt", FunctionDescriptor.of(int, int, int, int, pointer, pointer)) }
-    private val setOptionCall by lazy { function("setsockopt", FunctionDescriptor.of(int, int, int, int, pointer, int)) }
-    private val socketNameCall by lazy { function("getsockname", FunctionDescriptor.of(int, int, pointer, pointer)) }
-    private val peerNameCall by lazy { function("getpeername", FunctionDescriptor.of(int, int, pointer, pointer)) }
-    private val fcntlCall by lazy { linker.downcallHandle(
-        linker.defaultLookup().find("fcntl").orElseThrow(), FunctionDescriptor.of(int, int, int, int),
-        Linker.Option.captureCallState("errno"), Linker.Option.firstVariadicArg(2),
-    ) }
+    private fun symbol(name: String): MemorySegment {
+        if (!linux && !darwin) TODO("JVM socket actual requires a Winsock backend on this host")
+        return libcSymbol(name)
+    }
+
+    // One holder per function, resolved when its class first initializes (the address is a static final the JIT folds);
+    // LibcDowncall's build-time handle carries the call.
+    private object Socket { @JvmField val at = symbol("socket") }
+    private object Bind { @JvmField val at = symbol("bind") }
+    private object Listen { @JvmField val at = symbol("listen") }
+    private object Accept { @JvmField val at = symbol("accept") }
+    private object Connect { @JvmField val at = symbol("connect") }
+    private object Close { @JvmField val at = symbol("close") }
+    private object Shutdown { @JvmField val at = symbol("shutdown") }
+    private object Recv { @JvmField val at = symbol("recv") }
+    private object Send { @JvmField val at = symbol("send") }
+    private object Poll { @JvmField val at = symbol("poll") }
+    private object GetOption { @JvmField val at = symbol("getsockopt") }
+    private object SetOption { @JvmField val at = symbol("setsockopt") }
+    private object SocketName { @JvmField val at = symbol("getsockname") }
+    private object PeerName { @JvmField val at = symbol("getpeername") }
+    private object Fcntl { @JvmField val at = symbol("fcntl") }
 
     private fun errno(value: Int): Int = if (linux) value else when (value) {
         35 -> 11; 36 -> 115; 37 -> 114; 38 -> 88; 39 -> 89; 40 -> 90
@@ -63,15 +55,15 @@ internal object JvmSocketSyscalls {
 
     private fun configure(fd: Int): Int {
         val state = errnoState.get()
-        val flags = status(state, fcntlCall.invokeExact(state, fd, 3, 0) as Int)
+        val flags = status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 3, 0) as Int)
         if (flags < 0) return flags
-        val nonblocking = status(state, fcntlCall.invokeExact(state, fd, 4, flags or if (linux) 0x800 else 4) as Int)
+        val nonblocking = status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 4, flags or if (linux) 0x800 else 4) as Int)
         if (nonblocking < 0) return nonblocking
-        val cloexec = status(state, fcntlCall.invokeExact(state, fd, 2, 1) as Int)
+        val cloexec = status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 2, 1) as Int)
         if (cloexec < 0) return cloexec
         if (darwin) return Arena.ofConfined().use { arena ->
             val enabled = arena.allocate(int).also { it.set(int, 0, 1) }
-            status(state, setOptionCall.invokeExact(state, fd, 0xffff, 0x1022, enabled, 4) as Int) // SO_NOSIGPIPE
+            status(state, LibcDowncall.SETSOCKOPT.invokeExact(SetOption.at, state, fd, 0xffff, 0x1022, enabled, 4) as Int) // SO_NOSIGPIPE
         }
         return 0
     }
@@ -80,7 +72,7 @@ internal object JvmSocketSyscalls {
         if (type and (0xf or 0x800 or 0x80000).inv() != 0) return -22
         val family = if (darwin && domain == 10) 30 else domain
         val state = errnoState.get()
-        val fd = status(state, socketCall.invokeExact(state, family, type and 0xf, protocol) as Int)
+        val fd = status(state, LibcDowncall.SOCKET.invokeExact(Socket.at, state, family, type and 0xf, protocol) as Int)
         if (fd < 0) return fd
         val configured = configure(fd)
         if (configured < 0) { close(fd); return configured }
@@ -118,11 +110,11 @@ internal object JvmSocketSyscalls {
     }
 
     fun bind(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
-        val state = errnoState.get(); status(state, bindCall.invokeExact(state, fd, addr, size) as Int)
+        val state = errnoState.get(); status(state, LibcDowncall.FD_ADDRESS_LENGTH.invokeExact(Bind.at, state, fd, addr, size) as Int)
     }
-    fun listen(fd: Int, backlog: Int): Int { val state = errnoState.get(); return status(state, listenCall.invokeExact(state, fd, backlog) as Int) }
-    fun close(fd: Int): Int { val state = errnoState.get(); return status(state, closeCall.invokeExact(state, fd) as Int) }
-    fun shutdown(fd: Int, how: Int): Int { val state = errnoState.get(); return status(state, shutdownCall.invokeExact(state, fd, how) as Int) }
+    fun listen(fd: Int, backlog: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD_INT.invokeExact(Listen.at, state, fd, backlog) as Int) }
+    fun close(fd: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD.invokeExact(Close.at, state, fd) as Int) }
+    fun shutdown(fd: Int, how: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD_INT.invokeExact(Shutdown.at, state, fd, how) as Int) }
 
     /** GETSOCKNAME's borrowed output window, with the same Linux sockaddr framing as BIND/CONNECT. */
     fun name(fd: Int, buffer: ByteBuffer?, length: Int, peer: Int): Int {
@@ -131,8 +123,8 @@ internal object JvmSocketSyscalls {
             val storage = arena.allocate(128, 8)
             val size = arena.allocate(int).also { it.set(int, 0, 128) }
             val state = errnoState.get()
-            val result = status(state, (if (peer == 0) socketNameCall else peerNameCall)
-                .invokeExact(state, fd, storage, size) as Int)
+            val result = status(state, LibcDowncall.FD_ADDRESS_ADDRESS
+                .invokeExact(if (peer == 0) SocketName.at else PeerName.at, state, fd, storage, size) as Int)
             if (result < 0) return@use result
             val count = size.get(int, 0)
             if (count !in 2..128) return@use -75
@@ -152,7 +144,7 @@ internal object JvmSocketSyscalls {
 
     fun accept(fd: Int): Int {
         val state = errnoState.get()
-        val client = status(state, acceptCall.invokeExact(state, fd, MemorySegment.NULL, MemorySegment.NULL) as Int)
+        val client = status(state, LibcDowncall.FD_ADDRESS_ADDRESS.invokeExact(Accept.at, state, fd, MemorySegment.NULL, MemorySegment.NULL) as Int)
         if (client < 0) return client
         val configured = configure(client)
         if (configured < 0) { close(client); return configured }
@@ -161,7 +153,7 @@ internal object JvmSocketSyscalls {
 
     /** -EINPROGRESS retains completion ownership in the backend; this call never waits. */
     fun connectStart(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
-        val state = errnoState.get(); status(state, connectCall.invokeExact(state, fd, addr, size) as Int)
+        val state = errnoState.get(); status(state, LibcDowncall.FD_ADDRESS_LENGTH.invokeExact(Connect.at, state, fd, addr, size) as Int)
     }
 
     /** Query only after POLLOUT/POLLERR/POLLHUP; zero before readiness does not prove connection. */
@@ -169,7 +161,7 @@ internal object JvmSocketSyscalls {
         val error = arena.allocate(int)
         val bytes = arena.allocate(int).also { it.set(int, 0, 4) }
         val state = errnoState.get()
-        val queried = status(state, getOptionCall.invokeExact(state, fd, if (linux) 1 else 0xffff,
+        val queried = status(state, LibcDowncall.GETSOCKOPT.invokeExact(GetOption.at, state, fd, if (linux) 1 else 0xffff,
             if (linux) 4 else 0x1007, error, bytes) as Int)
         if (queried < 0) queried else -errno(error.get(int, 0))
     }
@@ -184,7 +176,7 @@ internal object JvmSocketSyscalls {
         return JvmFileSyscalls.native(maxOf(1, length)) { bytes ->
             if (!read) MemorySegment.copy(MemorySegment.ofArray(heap), start.toLong(), bytes, 0, length.toLong())
             val state = errnoState.get()
-            val result = status(state, (if (read) recvCall else sendCall).invokeExact(state, fd, bytes, length.toLong(),
+            val result = status(state, LibcDowncall.RECV.invokeExact(if (read) Recv.at else Send.at, state, fd, bytes, length.toLong(),
                 if (!read && linux) 0x4000 else 0) as Long) // MSG_NOSIGNAL
             if (result > 0) {
                 if (read) MemorySegment.copy(bytes, 0, MemorySegment.ofArray(heap), start.toLong(), result.toLong())
@@ -204,8 +196,8 @@ internal object JvmSocketSyscalls {
             records.set(ValueLayout.JAVA_SHORT, index * 8L + 6, 0)
         }
         val state = errnoState.get()
-        val result = status(state, if (linux) pollCall.invokeExact(state, records, fds.size.toLong(), timeout) as Int
-            else pollCall.invokeExact(state, records, fds.size, timeout) as Int)
+        val result = status(state, if (linux) LibcDowncall.POLL.invokeExact(Poll.at, state, records, fds.size.toLong(), timeout) as Int
+            else LibcDowncall.POLL.invokeExact(Poll.at, state, records, fds.size, timeout) as Int)
         return result to IntArray(fds.size) { records.get(ValueLayout.JAVA_SHORT, it * 8L + 6).toInt() and 0xffff }
     }
 }

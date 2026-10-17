@@ -9,10 +9,13 @@ import kotlinx.cinterop.*
 internal actual class NativeUringAdapter actual constructor(entries: Int, mode: UringBackendMode?) {
     private val ring = LinuxLiburingFacade()
     private val mode = mode ?: UringBackendMode.parse(platform.posix.getenv("TRIKESHED_URING_MODE")?.toKString())
+    // `this.mode`: the constructor parameter of the same name is null when TRIKESHED_URING_MODE selects.
     private val opened: Result<Unit> = when {
-        mode == UringBackendMode.EMULATED -> Result.failure(UnsupportedOperationException("TRIKESHED_URING_MODE=emulated"))
+        this.mode == UringBackendMode.EMULATED -> Result.failure(UnsupportedOperationException("TRIKESHED_URING_MODE=emulated"))
         LINUX_NATIVE_URING_LEVEL == 0 -> Result.failure(UnsupportedOperationException("LINUX_NATIVE_URING_LEVEL=0"))
-        else -> ring.open(entries, 0).mapCatching { ring.probeExecution().getOrThrow() }
+        // SUBMIT_ALL where the kernel has it (5.18), so one enter can wait for every CQE of a batch; plain otherwise.
+        else -> ring.open(entries, SETUP_SUBMIT_ALL).let { if (it.isFailure && ring.setupErrno == 22) ring.open(entries, 0) else it }
+            .mapCatching { ring.probeExecution().getOrThrow() }
     }
     private val requests = mutableMapOf<Long, Pair<UringSubmission, Pinned<ByteArray>?>>()
     private val cancellations = mutableMapOf<Long, Long>()
@@ -20,11 +23,14 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
     private var nextUserData = 0L
     private var transportFailure: String? = null
     private var completed = mutableListOf<UringCompletion>()
+    /** [executeBatch]'s CQE results by SQE index, and the buffers it pins until they are reaped. */
+    private var batchResults: CPointer<IntVar>? = null
+    private val batchPins = arrayOfNulls<Pinned<ByteArray>>(BATCH_LIMIT)
     private val discoveredCapabilities: Long = if (opened.isSuccess) UringOp.entries.fold(0L) { bits, op ->
         if (op in encoded && ring.supports(op)) bits or op.mask else bits
     } else 0L
     init {
-        if (mode == UringBackendMode.NATIVE) {
+        if (this.mode == UringBackendMode.NATIVE) {
             opened.getOrThrow()
             if (discoveredCapabilities == 0L) {
                 ring.close().getOrThrow()
@@ -49,7 +55,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
             val buffer = submission.buffer
             // Path operations get their own NUL-terminated copy; STATX keeps the caller's window,
             // which already holds the path's NUL and the struct statx the kernel writes.
-            val copied = submission.opcode in pathOps
+            val copied = submission.opcode of pathOps
             val bytes = if (copied && buffer != null) {
                 ByteArray(submission.len + 1).also {
                     buffer.array().copyInto(it, 0, buffer.arrayOffset() + buffer.position(),
@@ -59,10 +65,13 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
             val start = if (copied) 0 else
                 (buffer?.arrayOffset() ?: 0) + (buffer?.position() ?: 0)
             val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
-            val prepared = runCatching {
+            val prepared = try {
                 val address = if (pinned != null && start < bytes!!.size)
                     pinned.addressOf(start).rawValue.toLong() else submission.addr
-                ring.prepSubmission(submission.copy(userData = token), address).getOrThrow()
+                ring.prepSubmission(submission, address, token)
+            } catch (failure: Throwable) {
+                pinned?.unpin()
+                throw failure
             }
             if (prepared.isFailure) {
                 pinned?.unpin()
@@ -74,6 +83,53 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
     }
 
     actual fun isPending(userData: Long): Boolean = requests.values.any { it.first.userData == userData }
+
+    actual fun awaitCompletion(timeoutMicros: Long) {
+        if (opened.isFailure || requests.isEmpty() || transportFailure != null) return
+        enter()
+        ring.awaitCqe(timeoutMicros)
+    }
+
+    actual fun executeBatch(submissions: List<UringSubmission>, results: IntArray): Boolean {
+        val count = submissions.size
+        if (opened.isFailure || transportFailure != null || count == 0 || count > BATCH_LIMIT || count > results.size ||
+            requests.isNotEmpty() || cancellations.isNotEmpty() || completed.isNotEmpty() ||
+            ring.pendingSubmissions != 0 || ring.submissionSpace < count) return false
+        val scratch = batchResults ?: nativeHeap.allocArray<IntVar>(BATCH_LIMIT).also { batchResults = it }
+        var prepared = 0
+        try {
+            try {
+                while (prepared < count) {
+                    val submission = submissions[prepared]
+                    if (capabilities and submission.opcode.mask == 0L || submission.opcode of pathOps) break
+                    val buffer = submission.buffer
+                    val bytes = buffer?.array()
+                    val start = if (buffer == null) 0 else buffer.arrayOffset() + buffer.position()
+                    val pinned = bytes?.takeIf { it.isNotEmpty() }?.pin()
+                    batchPins[prepared] = pinned
+                    val address = if (pinned != null && start < bytes.size) pinned.addressOf(start).rawValue.toLong() else submission.addr
+                    if (!ring.prepIndexed(submission, address, prepared)) break
+                    prepared++
+                }
+            } catch (failure: Throwable) {
+                ring.unprepIndexed(prepared)
+                throw failure
+            }
+            if (prepared < count) {
+                ring.unprepIndexed(prepared)
+                return false
+            }
+            // Returns only once every CQE is reaped: the pins below are released after the kernel is done with them.
+            if (ring.submitReap(count, scratch) != 0) transportFailure = "foreign CQE during a batch"
+            for (index in 0 until count) results[index] = scratch[index]
+            return true
+        } finally {
+            for (index in 0..minOf(prepared, count - 1)) {
+                batchPins[index]?.unpin()
+                batchPins[index] = null
+            }
+        }
+    }
 
     private fun enter() {
         if (ring.pendingSubmissions == 0) return
@@ -95,7 +151,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
                     break
                 }
                 val completion = received.getOrNull() ?: break
-                if (cancellations.remove(completion.userData) != null) {
+                if (cancellations.isNotEmpty() && cancellations.remove(completion.userData) != null) {
                     if (completion.res != 0 && completion.res != -platform.posix.ENOENT &&
                         completion.res != -platform.posix.EALREADY) {
                         record(IllegalStateException("io_uring cancellation failed: ${completion.res}"))
@@ -110,8 +166,8 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
                 // The cancellation CQE never releases this borrow. Only this
                 // original request's terminal CQE proves the kernel is finished.
                 request.second?.unpin()
-                cancelled.remove(completion.userData)
-                completed.add(completion.copy(userData = request.first.userData))
+                if (cancelled.isNotEmpty()) cancelled.remove(completion.userData)
+                completed.add(UringCompletion(request.first.userData, completion.res, completion.flags))
             }
             // Report malformed CQEs after examining this CQ batch. Keep every
             // valid terminal result available to the caller's cleanup reaper.
@@ -151,13 +207,17 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
 
     actual fun close() {
         check(requests.isEmpty()) { "io_uring requests must settle before closing their ring" }
+        batchResults?.let { nativeHeap.free(it) }
+        batchResults = null
         ring.close().getOrThrow()
         cancellations.clear()
         cancelled.clear()
     }
 
     private companion object {
-        val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+        /** The most SQEs [executeBatch] takes. */
+        const val BATCH_LIMIT = 64
+        val pathOps = UringOp.caps(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
         // POLL_REMOVE and URING_CMD stay with the common backend: it holds the requests a removal names, and the
         // probe reports URING_CMD without its socket commands.
         val encoded = setOf(UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,

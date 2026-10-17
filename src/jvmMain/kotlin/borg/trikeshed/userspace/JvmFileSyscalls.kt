@@ -17,12 +17,10 @@ import borg.trikeshed.userspace.UringOp.Companion.STATX_SIZE
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
 import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
 import java.lang.foreign.Linker
 import java.lang.foreign.MemoryLayout.PathElement.groupElement
 import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
-import java.lang.invoke.MethodHandle
 
 /**
  * POSIX file effects for the JVM emulated ring, beside [JvmSocketSyscalls]: Linux O_*, AT_* and
@@ -34,43 +32,38 @@ internal object JvmFileSyscalls {
     val darwin = System.getProperty("os.name").lowercase().contains("mac")
     val posix: Boolean get() = linux || darwin
     val arm64 = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
-    private val linker: Linker get() {
-        if (!posix) TODO("JVM file actual requires a Win32 backend on this host")
-        return Linker.nativeLinker()
-    }
     private val int = ValueLayout.JAVA_INT
     private val long = ValueLayout.JAVA_LONG
     private val short = ValueLayout.JAVA_SHORT
-    private val pointer = ValueLayout.ADDRESS
     private val stateLayout = Linker.Option.captureStateLayout()
     private val errnoOffset = stateLayout.byteOffset(groupElement("errno"))
-    private fun function(name: String, descriptor: FunctionDescriptor, vararg options: Linker.Option): MethodHandle = linker.downcallHandle(
-        linker.defaultLookup().find(name).orElseThrow { UnsupportedOperationException("libc $name is unavailable") },
-        descriptor, Linker.Option.captureCallState("errno"), *options,
-    )
+    private fun symbol(name: String): MemorySegment {
+        if (!posix) TODO("JVM file actual requires a Win32 backend on this host")
+        return libcSymbol(name)
+    }
 
-    // One holder per call, linked when its class first initializes: the handle is a static final, a constant the JIT
-    // folds into each call site. A `by lazy` handle reads through SynchronizedLazyImpl.getValue, whose profile every
-    // lazy in the process shares; Graal then inlined this file's linking code into unrelated hot loops.
-    private object Openat { val call = function("openat", FunctionDescriptor.of(int, int, pointer, int, int), Linker.Option.firstVariadicArg(3)) }
-    private object Pread { val call = function("pread", FunctionDescriptor.of(long, int, pointer, long, long)) }
-    private object Pwrite { val call = function("pwrite", FunctionDescriptor.of(long, int, pointer, long, long)) }
-    private object Read { val call = function("read", FunctionDescriptor.of(long, int, pointer, long)) }
-    private object Write { val call = function("write", FunctionDescriptor.of(long, int, pointer, long)) }
-    private object Fsync { val call = function("fsync", FunctionDescriptor.of(int, int)) }
-    private object Fdatasync { val call = function(if (linux) "fdatasync" else "fsync", FunctionDescriptor.of(int, int)) }
-    private object Ftruncate { val call = function("ftruncate", FunctionDescriptor.of(int, int, long)) }
-    private object Close { val call = function("close", FunctionDescriptor.of(int, int)) }
-    private object Statx { val call = function("statx", FunctionDescriptor.of(int, int, pointer, int, int, pointer)) }
-    private object Fstat { val call = function(if (arm64) "fstat" else "fstat\$INODE64", FunctionDescriptor.of(int, int, pointer)) }
-    private object Fstatat { val call = function(if (arm64) "fstatat" else "fstatat\$INODE64", FunctionDescriptor.of(int, int, pointer, pointer, int)) }
-    private object Mkdirat { val call = function("mkdirat", FunctionDescriptor.of(int, int, pointer, if (darwin) short else int)) }
-    private object Renameat { val call = function("renameat", FunctionDescriptor.of(int, int, pointer, int, pointer)) }
-    private object Unlinkat { val call = function("unlinkat", FunctionDescriptor.of(int, int, pointer, int)) }
-    private object Flock { val call = function("flock", FunctionDescriptor.of(int, int, int)) }
-    private object Geteuid { val call: MethodHandle = linker.downcallHandle(linker.defaultLookup().find("geteuid").orElseThrow(), FunctionDescriptor.of(int)) }
-    private object Syscall { val call = function("syscall", FunctionDescriptor.of(long, long, long, pointer, long), Linker.Option.firstVariadicArg(1)) }
-    private object Getdirentries { val call = function("__getdirentries64", FunctionDescriptor.of(long, int, pointer, long, pointer)) }
+    // One holder per function, resolved when its class first initializes: the address is a static final the JIT folds
+    // into each call site, and LibcDowncall's build-time handle carries the call. A `by lazy` address would read through
+    // SynchronizedLazyImpl.getValue, whose profile every lazy in the process shares.
+    private object Openat { @JvmField val at = symbol("openat") }
+    private object Pread { @JvmField val at = symbol("pread") }
+    private object Pwrite { @JvmField val at = symbol("pwrite") }
+    private object Read { @JvmField val at = symbol("read") }
+    private object Write { @JvmField val at = symbol("write") }
+    private object Fsync { @JvmField val at = symbol("fsync") }
+    private object Fdatasync { @JvmField val at = symbol(if (linux) "fdatasync" else "fsync") }
+    private object Ftruncate { @JvmField val at = symbol("ftruncate") }
+    private object Close { @JvmField val at = symbol("close") }
+    private object Statx { @JvmField val at = symbol("statx") }
+    private object Fstat { @JvmField val at = symbol(if (arm64) "fstat" else "fstat\$INODE64") }
+    private object Fstatat { @JvmField val at = symbol(if (arm64) "fstatat" else "fstatat\$INODE64") }
+    private object Mkdirat { @JvmField val at = symbol("mkdirat") }
+    private object Renameat { @JvmField val at = symbol("renameat") }
+    private object Unlinkat { @JvmField val at = symbol("unlinkat") }
+    private object Flock { @JvmField val at = symbol("flock") }
+    private object Geteuid { @JvmField val at = symbol("geteuid") }
+    private object Syscall { @JvmField val at = symbol("syscall") }
+    private object Getdirentries { @JvmField val at = symbol("__getdirentries64") }
 
     /** Darwin errno to Linux numbering, as [JvmSocketSyscalls] maps it for sockets. */
     private fun errno(value: Int): Int = if (linux) value else when (value) {
@@ -100,7 +93,7 @@ internal object JvmFileSyscalls {
 
     fun openat(dfd: Int, path: String, flags: Int, mode: Int): Int {
         val host = openFlags(flags) ?: return -22
-        return path(path) { name -> val state = errnoState.get(); status(state, Openat.call.invokeExact(state, dirfd(dfd), name, host, mode) as Int) }
+        return path(path) { name -> val state = errnoState.get(); status(state, LibcDowncall.OPENAT.invokeExact(Openat.at, state, dirfd(dfd), name, host, mode) as Int) }
     }
 
     /**
@@ -118,8 +111,8 @@ internal object JvmFileSyscalls {
     }
 
     // malloc/free without errno capture: native memory a transfer overwrites, which Arena.allocate would clear first.
-    private object Malloc { val call: MethodHandle = linker.downcallHandle(linker.defaultLookup().find("malloc").orElseThrow(), FunctionDescriptor.of(pointer, long)) }
-    private object Free { val call: MethodHandle = linker.downcallHandle(linker.defaultLookup().find("free").orElseThrow(), FunctionDescriptor.ofVoid(pointer)) }
+    private object Malloc { @JvmField val at = symbol("malloc") }
+    private object Free { @JvmField val at = symbol("free") }
 
     /**
      * [length] bytes of native memory for one transfer, to [action]: the calling thread's [window], or past [WINDOW_CAP]
@@ -138,13 +131,13 @@ internal object JvmFileSyscalls {
     }
 
     fun malloc(length: Long): MemorySegment {
-        val address = Malloc.call.invokeExact(length) as MemorySegment
+        val address = LibcDowncall.MALLOC.invokeExact(Malloc.at, length) as MemorySegment
         if (address.address() == 0L) throw OutOfMemoryError("malloc($length)")
         return address.reinterpret(length)
     }
 
     fun free(block: MemorySegment) {
-        Free.call.invoke(block)
+        LibcDowncall.FREE.invoke(Free.at, block)
     }
 
     /** pread/pwrite through a native copy of the heap window; offset -1 uses the descriptor position. */
@@ -161,41 +154,41 @@ internal object JvmFileSyscalls {
     fun transfer(fd: Int, native: MemorySegment, length: Int, offset: Long, read: Boolean): Int {
         val state = errnoState.get()
         val result = when {
-            offset == -1L && read -> Read.call.invokeExact(state, fd, native, length.toLong()) as Long
-            offset == -1L -> Write.call.invokeExact(state, fd, native, length.toLong()) as Long
-            read -> Pread.call.invokeExact(state, fd, native, length.toLong(), offset) as Long
-            else -> Pwrite.call.invokeExact(state, fd, native, length.toLong(), offset) as Long
+            offset == -1L && read -> LibcDowncall.READ.invokeExact(Read.at, state, fd, native, length.toLong()) as Long
+            offset == -1L -> LibcDowncall.READ.invokeExact(Write.at, state, fd, native, length.toLong()) as Long
+            read -> LibcDowncall.PREAD.invokeExact(Pread.at, state, fd, native, length.toLong(), offset) as Long
+            else -> LibcDowncall.PREAD.invokeExact(Pwrite.at, state, fd, native, length.toLong(), offset) as Long
         }
         return status(state, result)
     }
 
     fun fsync(fd: Int, datasync: Boolean): Int {
         val state = errnoState.get()
-        return status(state, (if (datasync) Fdatasync.call else Fsync.call).invokeExact(state, fd) as Int)
+        return status(state, LibcDowncall.FD.invokeExact(if (datasync) Fdatasync.at else Fsync.at, state, fd) as Int)
     }
 
-    fun ftruncate(fd: Int, length: Long): Int { val state = errnoState.get(); return status(state, Ftruncate.call.invokeExact(state, fd, length) as Int) }
+    fun ftruncate(fd: Int, length: Long): Int { val state = errnoState.get(); return status(state, LibcDowncall.FTRUNCATE.invokeExact(Ftruncate.at, state, fd, length) as Int) }
 
-    fun close(fd: Int): Int { val state = errnoState.get(); return status(state, Close.call.invokeExact(state, fd) as Int) }
+    fun close(fd: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD.invokeExact(Close.at, state, fd) as Int) }
 
-    fun flock(fd: Int, operation: Int): Int { val state = errnoState.get(); return status(state, Flock.call.invokeExact(state, fd, operation) as Int) }
+    fun flock(fd: Int, operation: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD_INT.invokeExact(Flock.at, state, fd, operation) as Int) }
 
-    fun geteuid(): UInt = (Geteuid.call.invokeExact() as Int).toUInt()
+    fun geteuid(): UInt = (LibcDowncall.GETEUID.invokeExact(Geteuid.at) as Int).toUInt()
 
     fun mkdirat(dfd: Int, path: String, mode: Int): Int = path(path) { name ->
         val state = errnoState.get()
-        status(state, if (darwin) Mkdirat.call.invokeExact(state, dirfd(dfd), name, mode.toShort()) as Int
-            else Mkdirat.call.invokeExact(state, dirfd(dfd), name, mode) as Int)
+        status(state, if (darwin) LibcDowncall.MKDIRAT.invokeExact(Mkdirat.at, state, dirfd(dfd), name, mode.toShort()) as Int
+            else LibcDowncall.MKDIRAT.invokeExact(Mkdirat.at, state, dirfd(dfd), name, mode) as Int)
     }
 
     fun renameat(oldDfd: Int, oldPath: String, newDfd: Int, newPath: String): Int = path(oldPath) { from ->
-        path(newPath) { to -> val state = errnoState.get(); status(state, Renameat.call.invokeExact(state, dirfd(oldDfd), from, dirfd(newDfd), to) as Int) }
+        path(newPath) { to -> val state = errnoState.get(); status(state, LibcDowncall.RENAMEAT.invokeExact(Renameat.at, state, dirfd(oldDfd), from, dirfd(newDfd), to) as Int) }
     }
 
     fun unlinkat(dfd: Int, path: String, flags: Int): Int {
         if (flags and AT_REMOVEDIR.inv() != 0) return -22
         val host = if (flags and AT_REMOVEDIR != 0) (if (darwin) 0x80 else 0x200) else 0
-        return path(path) { name -> val state = errnoState.get(); status(state, Unlinkat.call.invokeExact(state, dirfd(dfd), name, host) as Int) }
+        return path(path) { name -> val state = errnoState.get(); status(state, LibcDowncall.UNLINKAT.invokeExact(Unlinkat.at, state, dirfd(dfd), name, host) as Int) }
     }
 
     /**
@@ -207,15 +200,15 @@ internal object JvmFileSyscalls {
         val state = errnoState.get()
         if (linux) {
             val buffer = arena.allocate(STATX_SIZE.toLong(), 8)
-            val result = status(state, Statx.call.invokeExact(state, dirfd(dfd), arena.allocateFrom(path), flags, mask, buffer) as Int)
+            val result = status(state, LibcDowncall.STATX.invokeExact(Statx.at, state, dirfd(dfd), arena.allocateFrom(path), flags, mask, buffer) as Int)
             if (result == 0) MemorySegment.copy(buffer, 0, MemorySegment.ofArray(out), at.toLong(), STATX_SIZE.toLong())
             return result
         }
         val stat = arena.allocate(144, 8)
         val result = if (path.isEmpty()) {
             if (flags and AT_EMPTY_PATH == 0) return -2
-            status(state, Fstat.call.invokeExact(state, dfd, stat) as Int)
-        } else status(state, Fstatat.call.invokeExact(state, dirfd(dfd), arena.allocateFrom(path), stat,
+            status(state, LibcDowncall.FSTAT.invokeExact(Fstat.at, state, dfd, stat) as Int)
+        } else status(state, LibcDowncall.FSTATAT.invokeExact(Fstatat.at, state, dirfd(dfd), arena.allocateFrom(path), stat,
             if (flags and AT_SYMLINK_NOFOLLOW != 0) 0x20 else 0) as Int)
         if (result != 0) return result
         fun i32(offset: Long) = stat.get(int, offset)
@@ -257,12 +250,12 @@ internal object JvmFileSyscalls {
     fun getdents(fd: Int, out: ByteArray, at: Int, length: Int): Int = native(maxOf(1, length)) { native ->
         val state = errnoState.get()
         if (linux) {
-            val result = status(state, Syscall.call.invokeExact(state, if (arm64) 61L else 217L, fd.toLong(), native, length.toLong()) as Long)
+            val result = status(state, LibcDowncall.SYSCALL.invokeExact(Syscall.at, state, if (arm64) 61L else 217L, fd.toLong(), native, length.toLong()) as Long)
             if (result > 0) MemorySegment.copy(native, 0, MemorySegment.ofArray(out), at.toLong(), result.toLong())
             return result
         }
         val result = Arena.ofConfined().use { arena ->
-            status(state, Getdirentries.call.invokeExact(state, fd, native, length.toLong(), arena.allocate(long)) as Long)
+            status(state, LibcDowncall.GETDIRENTRIES.invokeExact(Getdirentries.at, state, fd, native, length.toLong(), arena.allocate(long)) as Long)
         }
         if (result <= 0) return result
         val records = ByteBuffer.wrap(out, at, length).order(ByteOrder.nativeOrder())

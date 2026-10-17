@@ -40,6 +40,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     private val directories = mutableMapOf<Int, CPointer<DIR>>()
     /** CONNECTs whose connect(2) is in progress: writable or failed, SO_ERROR settles them. */
     private val connecting = mutableSetOf<Long>()
+    /** [kernelBatch]'s CQE results by SQE index. */
+    private val batchResults = IntArray(INLINE_LIMIT)
     override val nativeCapabilities: Long get() = native.capabilities
     override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
@@ -55,8 +57,77 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     override fun unregisterBuffers(): Result<Unit> = synchronized(lock) { native.unregisterBuffers() }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = synchronized(lock) {
-        admit(submissions)
-        takeCompletions()
+        settleInline(submissions) ?: kernelBatch(submissions) ?: run {
+            admit(submissions)
+            // A kernel ring completes NOPs and cached transfers inside the submitting enter: hand those back now.
+            if (pending.isNotEmpty()) poll()
+            takeCompletions()
+        }
+    }
+
+    /**
+     * The queue's results without the queue. With nothing outstanding, a batch whose SQEs the emulation completes at
+     * once (no kernel-ring op, no op that waits for readiness, no POLL_REMOVE) settles in submission order, which is all
+     * the queue does with it. Null when the batch needs the queue: outstanding requests, such an op, a repeated
+     * userData, or more SQEs than entries.
+     */
+    private fun settleInline(submissions: List<UringSubmission>): List<SelectionResult>? {
+        val count = submissions.size
+        if (count > entries || count > INLINE_LIMIT || queued.isNotEmpty() || pending.isNotEmpty() ||
+            completed.isNotEmpty() || results.isNotEmpty()) return null
+        val queuedOps = native.capabilities or waits or UringOp.POLL_REMOVE.mask
+        for (index in 0 until count) {
+            val sub = submissions[index]
+            if (sub.opcode of queuedOps) return null
+            for (prior in 0 until index) if (submissions[prior].userData == sub.userData) return null
+        }
+        val out = ArrayList<SelectionResult>(count)
+        for (index in 0 until count) {
+            val sub = submissions[index]
+            val buffer = sub.buffer
+            val res = validate(sub) ?: if (buffer != null && sub.len > buffer.remaining()) -22 else emulate(sub)
+            if (res > 0 && sub.opcode of transferOps) {
+                check(res <= sub.len) { "completion exceeds submitted buffer window" }
+                buffer!!.position(buffer.position() + res)
+            }
+            out.add(SelectionResult(res, sub.userData))
+        }
+        return out
+    }
+
+    /**
+     * One kernel enter for a batch the kernel ring settles without a peer: with nothing outstanding, SQEs of
+     * [kernelBatchOps] the ring carries (READ and WRITE at an offset), each valid, distinct in userData and independent
+     * of the others, go to the kernel together and are reaped before this returns, in submission order. Null when the
+     * batch needs the queue.
+     */
+    private fun kernelBatch(submissions: List<UringSubmission>): List<SelectionResult>? {
+        val count = submissions.size
+        val kernel = native.capabilities and kernelBatchOps
+        if (kernel == 0L || count == 0 || count > entries || count > INLINE_LIMIT || queued.isNotEmpty() ||
+            pending.isNotEmpty() || completed.isNotEmpty() || results.isNotEmpty()) return null
+        for (index in 0 until count) {
+            val sub = submissions[index]
+            if (!(sub.opcode of kernel) || (sub.opcode of positioned && sub.offset < 0) || validate(sub) != null) return null
+            val buffer = sub.buffer
+            if (buffer != null && sub.len > buffer.remaining()) return null
+            for (prior in 0 until index) {
+                val other = submissions[prior]
+                if (other.userData == sub.userData || dependsOn(sub, other)) return null
+            }
+        }
+        if (!native.executeBatch(submissions, batchResults)) return null
+        val out = ArrayList<SelectionResult>(count)
+        for (index in 0 until count) {
+            val sub = submissions[index]
+            val res = batchResults[index]
+            if (res > 0 && sub.opcode of transferOps) {
+                check(res <= sub.len) { "completion exceeds submitted buffer window" }
+                sub.buffer!!.position(sub.buffer.position() + res)
+            }
+            out.add(SelectionResult(res, sub.userData))
+        }
+        return out
     }
 
     private fun admit(
@@ -64,8 +135,13 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         receivers: Map<Long, CompletableDeferred<UringCompletion>> = emptyMap(),
     ) {
         require(queued.size + pending.size + submissions.size <= entries) { "submission queue full" }
-        val tokens = (queued.map { it.userData } + pending.keys).toMutableSet()
-        require(submissions.all { tokens.add(it.userData) }) { "duplicate outstanding userData" }
+        if (queued.isEmpty() && pending.isEmpty() && submissions.size <= INLINE_LIMIT) {
+            for (index in submissions.indices) for (prior in 0 until index)
+                require(submissions[prior].userData != submissions[index].userData) { "duplicate outstanding userData" }
+        } else {
+            val tokens = (queued.map { it.userData } + pending.keys).toMutableSet()
+            require(submissions.all { tokens.add(it.userData) }) { "duplicate outstanding userData" }
+        }
         results.putAll(receivers)
         for (submission in submissions) {
             val invalid = validate(submission)
@@ -80,13 +156,16 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         require(minComplete >= 0)
         val results = mutableListOf<SelectionResult>()
         do {
+            var kernel = false
             val outstanding = synchronized(lock) {
                 poll()
                 results.addAll(takeCompletions())
+                kernel = pending.isNotEmpty()
                 queued.isNotEmpty() || pending.isNotEmpty()
             }
             if (results.size >= minComplete || !outstanding) break
-            usleep(1000u)
+            // SQEs in the kernel: wait there for the next CQE (bounded, so emulated waits still re-poll each ms).
+            if (kernel) synchronized(lock) { native.awaitCompletion(1000) } else usleep(1000u)
         } while (true)
         return results
     }
@@ -172,13 +251,13 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
         if (sub.len < 0) return -22
         val buffer = sub.buffer
-        if (sub.opcode in bufferOps) {
+        if (sub.opcode of bufferOps) {
             if (buffer == null) return -22
             if (sub.len > buffer.remaining()) return -22
             if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX ||
                     sub.opcode == UringOp.GETDENTS) && buffer.isReadOnly()) return -22
         }
-        if (sub.opcode in positioned && sub.offset < -1) return -22
+        if (sub.opcode of positioned && sub.offset < -1) return -22
         if (sub.opcode == UringOp.STATX) {
             // The path's len bytes, its NUL, then the struct statx this call writes.
             val start = buffer!!.arrayOffset() + buffer.position()
@@ -186,7 +265,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                 buffer.array()[start + sub.len] != 0.toByte() || (start until start + sub.len).any { buffer.array()[it] == 0.toByte() } ||
                 sub.operationFlags and (UringOp.AT_SYMLINK_NOFOLLOW or UringOp.AT_EMPTY_PATH or 0x800).inv() != 0) return -22
         }
-        if (sub.opcode in pathOps && (sub.len == 0 || sub.addr != 0L)) return -22
+        if (sub.opcode of pathOps && (sub.len == 0 || sub.addr != 0L)) return -22
         if (sub.opcode == UringOp.FTRUNCATE && sub.offset < 0) return -22
         if (sub.opcode == UringOp.OPENAT) {
             if (sub.len == 0 || sub.offset < 0 || sub.offset > Int.MAX_VALUE || sub.offset.toInt() and OPEN_FLAGS.inv() != 0) return -22
@@ -199,6 +278,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     }
 
     private fun dispatch() {
+        if (queued.isEmpty()) return
         val nativeBatch = mutableListOf<UringSubmission>()
         val blocked = mutableListOf<UringSubmission>()
         val iterator = queued.iterator()
@@ -219,7 +299,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                 nativeBatch.add(submission)
             } else {
                 val result = emulate(submission)
-                if (result == -11 && submission.opcode in waits) {
+                if (result == -11 && submission.opcode of waits) {
                     blocked.add(submission)
                 } else {
                     iterator.remove()
@@ -241,37 +321,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         }
     }
 
-    private fun dependsOn(next: UringSubmission, prior: UringSubmission): Boolean {
-        val nextBuffer = next.buffer
-        val priorBuffer = prior.buffer
-        if (nextBuffer != null && priorBuffer != null) {
-            if (nextBuffer === priorBuffer) return true
-            if (nextBuffer.array() === priorBuffer.array()) {
-                val start = nextBuffer.arrayOffset() + nextBuffer.position()
-                val previous = priorBuffer.arrayOffset() + priorBuffer.position()
-                if (start.toLong() < previous.toLong() + prior.len && previous.toLong() < start.toLong() + next.len) return true
-            }
-        }
-        if (next.addr != 0L && prior.addr != 0L && next.len > 0 && prior.len > 0 &&
-            next.opcode in memoryOps && prior.opcode in memoryOps &&
-            next.addr.toULong() < prior.addr.toULong() + prior.len.toULong() &&
-            prior.addr.toULong() < next.addr.toULong() + next.len.toULong()) return true
-        if (next.fd != prior.fd || next.opcode == UringOp.NOP || prior.opcode == UringOp.NOP ||
-            next.opcode == UringOp.MADVISE || prior.opcode == UringOp.MADVISE) return false
-        if (next.opcode in barriers || prior.opcode in barriers) return true
-        if (next.opcode == UringOp.OPENAT || prior.opcode == UringOp.OPENAT) return false
-        if (next.opcode in positioned && prior.opcode in positioned) {
-            if (next.offset == -1L || prior.offset == -1L) return true
-            if (next.opcode in reads && prior.opcode in reads) return false
-            return if (next.offset <= prior.offset) prior.offset - next.offset < next.len
-                else next.offset - prior.offset < prior.len
-        }
-        return (next.opcode in reads && prior.opcode in reads) ||
-            (next.opcode in writes && prior.opcode in writes)
-    }
-
     private fun complete(sub: UringSubmission, completion: UringCompletion) {
-        if (completion.res > 0 && sub.opcode in transferOps) {
+        if (completion.res > 0 && sub.opcode of transferOps) {
             check(completion.res <= sub.len) { "completion exceeds submitted buffer window" }
             sub.buffer!!.position(sub.buffer.position() + completion.res)
         }
@@ -591,12 +642,17 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     private companion object {
         const val OPEN_FLAGS = 3 or UringOp.O_CREAT or UringOp.O_EXCL or UringOp.O_TRUNC or UringOp.O_APPEND or UringOp.O_NONBLOCK or
             UringOp.O_DIRECTORY or UringOp.O_NOFOLLOW or UringOp.O_CLOEXEC
-        val transferOps = setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.GETDENTS)
-        val pathOps = setOf(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
-        val bufferOps = pathOps + setOf(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX, UringOp.GETDENTS,
-            UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD)
+        val transferOps = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.GETDENTS)
+        val pathOps = UringOp.caps(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
+        val bufferOps = pathOps or UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX,
+            UringOp.GETDENTS, UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD)
         /** Operations the kernel ring completes only when ready: their emulation leaves them queued while it reports -EAGAIN. */
-        val waits = setOf(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD)
+        val waits = UringOp.caps(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD)
+        /** Batch size up to which [settleInline] and [kernelBatch] check userData pairwise. */
+        const val INLINE_LIMIT = 64
+        /** Ops a kernel ring completes without waiting on a peer: [kernelBatch] settles them in one enter. */
+        val kernelBatchOps = UringOp.caps(UringOp.NOP, UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
+            UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.FADVISE, UringOp.MADVISE)
         /** Linux SOCK_NONBLOCK | SOCK_CLOEXEC. */
         const val SOCKET_FLAGS = 0x800 or 0x80000
         val linux = Platform.osFamily == OsFamily.LINUX
@@ -605,11 +661,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
 
         /** A Linux address family as the host's. */
         fun hostFamily(family: Int): Int? = when (family) { 2 -> AF_INET; 10 -> AF_INET6; 1 -> AF_UNIX; else -> null }
-        val barriers = setOf(UringOp.CLOSE, UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.STATX)
-        val positioned = setOf(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
-        val memoryOps = positioned + UringOp.MADVISE
-        val reads = setOf(UringOp.READ, UringOp.READ_FIXED, UringOp.RECV)
-        val writes = setOf(UringOp.WRITE, UringOp.WRITE_FIXED, UringOp.SEND)
+        val positioned = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED)
     }
 }
 

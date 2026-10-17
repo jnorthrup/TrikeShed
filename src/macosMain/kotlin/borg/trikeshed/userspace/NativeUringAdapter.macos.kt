@@ -12,6 +12,8 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
         check(submissions.isEmpty()) { "Darwin has no Linux io_uring kernel" }
     }
     actual fun reapCompletions(): List<UringCompletion> = emptyList()
+    actual fun awaitCompletion(timeoutMicros: Long) {}
+    actual fun executeBatch(submissions: List<UringSubmission>, results: IntArray): Boolean = false
     actual fun isPending(userData: Long): Boolean = false
     actual fun cancelPending(userData: Set<Long>?) {}
     actual fun fadvise(fd: Int, offset: Long, length: Int, advice: Int): Int {

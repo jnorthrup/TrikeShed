@@ -11,8 +11,18 @@ import borg.trikeshed.userspace.nio.ByteOrder
 import kotlin.js.jsTypeOf
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import org.khronos.webgl.Float64Array
+import org.khronos.webgl.Int32Array
+import org.khronos.webgl.get
+import org.khronos.webgl.set
 
 private val nodeFs: dynamic get() = runCatching { fs }.getOrNull()
+
+/** executeBatch's control fields per SQE (uring_node.c BATCH_FIELDS): opcode, fd, start, length, offset. */
+private const val NODE_BATCH_FIELDS = 5
+/** SQEs per executeBatch call; the addon splits a run into enters of at most its SQ depth. */
+private const val NODE_BATCH_LIMIT = 64
+private const val NOT_BATCHED = Int.MIN_VALUE
 
 internal fun nodeUringInteger(value: Long): dynamic {
     val text = value.toString()
@@ -346,6 +356,18 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
     private val owned = mutableSetOf<Int>()
     private val emulated = JsUserspaceChannelBackend()
     private var closed = false
+    /** Whether the module carries executeBatch (uring_node.c); an older build settles every SQE through execute. */
+    private val batching = jsTypeOf(module.executeBatch) == "function"
+    /** The ops one kernel submission carries (uring_node.c `batched`), as the probe found them; by ordinal, since a
+     * Long mask test allocates on Kotlin/JS. */
+    private val batched = (UringOp.caps(UringOp.NOP, UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE) and
+        nativeCapabilities).let { mask -> BooleanArray(UringOp.entries.size) { mask and UringOp.entries[it].mask != 0L } }
+    /** The run being gathered for one kernel submission, with each SQE's OS descriptor. */
+    private val run = ArrayList<UringSubmission>(NODE_BATCH_LIMIT)
+    private val runFds = IntArray(NODE_BATCH_LIMIT)
+    private val control = Float64Array(NODE_BATCH_LIMIT * NODE_BATCH_FIELDS)
+    private val arrays = arrayOfNulls<ByteArray>(NODE_BATCH_LIMIT)
+    private val results = Int32Array(NODE_BATCH_LIMIT)
 
     private fun execute(sub: UringSubmission): Int {
         if (closed) return -9
@@ -384,14 +406,72 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
         return result
     }
 
-    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-        submissions.map { SelectionResult(execute(it), it.userData) }
-    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        val results = Array(submissions.size) { index ->
-            val sub = submissions[index]
-            UringCompletion(sub.userData, execute(sub), 0)
+    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+        if (!batching) return submissions.map { SelectionResult(execute(it), it.userData) }
+        val out = ArrayList<SelectionResult>(submissions.size)
+        for (sub in submissions) {
+            val fd = batchFd(sub)
+            if (fd == NOT_BATCHED) {
+                flush(out)
+                out.add(SelectionResult(execute(sub), sub.userData))
+                continue
+            }
+            // A kernel submission runs its SQEs in any order: an SQE that orders after one in the run starts the next.
+            if (run.size == NODE_BATCH_LIMIT || run.any { dependsOn(sub, it) }) flush(out)
+            runFds[run.size] = fd
+            run.add(sub)
         }
-        return results.size j { results[it] }
+        flush(out)
+        return out
+    }
+
+    /** [sub]'s OS descriptor when it passes execute's checks unchanged and a kernel batch can carry it, else [NOT_BATCHED]. */
+    private fun batchFd(sub: UringSubmission): Int {
+        if (closed || sub.flags != 0 || !batched[sub.opcode.ordinal] || sub.addr != 0L || sub.operationFlags != 0)
+            return NOT_BATCHED
+        val descriptor = JsFileTable.descriptor(sub.fd)
+        if (descriptor != null && descriptor.module == null) return NOT_BATCHED
+        if (sub.opcode == UringOp.NOP) return descriptor?.fd ?: sub.fd
+        if (descriptor == null) return NOT_BATCHED
+        if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) {
+            val buffer = sub.buffer ?: return NOT_BATCHED
+            if (sub.len < 0 || sub.len > buffer.remaining() || sub.offset < -1) return NOT_BATCHED
+            if (sub.opcode == UringOp.READ && buffer.isReadOnly()) return NOT_BATCHED
+        }
+        return descriptor.fd
+    }
+
+    /** Runs the gathered run as one kernel submission, appending one result per SQE in order. */
+    private fun flush(out: MutableList<SelectionResult>) {
+        val count = run.size
+        if (count == 0) return
+        for (index in 0 until count) {
+            val sub = run[index]
+            val field = index * NODE_BATCH_FIELDS
+            val buffer = if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) sub.buffer else null
+            control[field] = sub.opcode.code.toDouble()
+            control[field + 1] = runFds[index].toDouble()
+            control[field + 2] = if (buffer == null) 0.0 else (buffer.arrayOffset() + buffer.position()).toDouble()
+            control[field + 3] = sub.len.toDouble()
+            control[field + 4] = sub.offset.toDouble()
+            arrays[index] = buffer?.array()
+        }
+        val refused = module.executeBatch(handle, count, control, arrays, results) as Int
+        for (index in 0 until count) {
+            val sub = run[index]
+            arrays[index] = null
+            val result = if (refused < 0) refused else results[index]
+            val buffer = sub.buffer
+            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE))
+                buffer.position(buffer.position() + result)
+            out.add(SelectionResult(result, sub.userData))
+        }
+        run.clear()
+    }
+
+    override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
+        val settled = submitBatch(List(submissions.size) { submissions[it] })
+        return settled.size j { UringCompletion(settled[it].userData, settled[it].res, 0) }
     }
     override fun close() {
         if (closed) return

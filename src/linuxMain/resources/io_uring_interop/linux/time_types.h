@@ -4,7 +4,9 @@
 
 #include <linux/types.h>
 
-/* TrikeShed cinterop: the K/N sysroot's kernel 4.9 posix_types.h predates __kernel_time64_t (5.1). */
+/* TrikeShed cinterop: the K/N sysroot's kernel 4.9 posix_types.h predates __kernel_old_time_t (5.6) and
+ * __kernel_time64_t (5.1); these are asm-generic/posix_types.h's definitions. */
+typedef __kernel_long_t __kernel_old_time_t;
 typedef long long __kernel_time64_t;
 
 struct __kernel_timespec {

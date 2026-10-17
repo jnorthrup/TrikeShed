@@ -46,10 +46,15 @@ internal actual object LiburingImpl : LiburingFacade by LiburingSession()
  */
 internal const val LINUX_NATIVE_URING_LEVEL: Int = 1
 
+/** IORING_SETUP_SUBMIT_ALL (Linux 5.18): an SQE that fails to issue does not stop the ones after it. */
+internal const val SETUP_SUBMIT_ALL: Int = 0x80
+
 
 /** Each userspace backend owns one of these rings. The legacy singleton is separate. */
 internal class LinuxLiburingFacade : LiburingFacade {
     private var ring: CPointer<io_uring>? = null
+    /** [peekCqe]'s out-parameter, allocated on first use and freed with the ring. */
+    private var cqeSlot: CPointerVar<io_uring_cqe>? = null
     private var inFlight = 0
     private val requests = mutableMapOf<Long, Int>()
     private var probe: CPointer<zlinux_uring.io_uring_probe>? = null
@@ -57,6 +62,9 @@ internal class LinuxLiburingFacade : LiburingFacade {
         private set
     /** The errno io_uring_queue_init or the probe registration of [open] failed with. */
     var setupErrno: Int? = null
+        private set
+    /** Whether [open] set the ring up with IORING_SETUP_SUBMIT_ALL: one enter submits every queued SQE. */
+    var submitAll: Boolean = false
         private set
     fun supports(op: UringOp): Boolean = op.code >= 0 && probe?.let {
         zlinux_uring.io_uring_opcode_supported(it, op.code) != 0
@@ -76,6 +84,8 @@ internal class LinuxLiburingFacade : LiburingFacade {
         }
         ring = allocated.ptr
         features = allocated.features
+        setupErrno = null
+        submitAll = flags and SETUP_SUBMIT_ALL != 0
         probe = zlinux_uring.io_uring_get_probe_ring(allocated.ptr)
         if (probe == null) {
             val probeError = platform.posix.errno
@@ -213,24 +223,29 @@ internal class LinuxLiburingFacade : LiburingFacade {
 
     override fun peekCqe(): Result<UringCompletion?> {
         val currentRing = ring ?: return failure("liburing ring is not open")
-        memScoped {
-            val cqe = alloc<CPointerVar<io_uring_cqe>>()
-            var rc: Int
-            do { rc = io_uring_peek_cqe(currentRing, cqe.ptr) } while (rc == -platform.posix.EINTR)
-            if (rc == -platform.posix.EAGAIN) return Result.success(null)
-            if (rc < 0) return failure("io_uring_peek_cqe failed", rc)
-            val ready = cqe.value ?: return Result.success(null)
-            val completion = ready.toCompletion()
-            io_uring_cqe_seen(currentRing, ready)
-            settled(completion.userData)
-            publish(completion)
-            return Result.success(completion)
-        }
+        // One CQE pointer slot per ring, not a malloc'd scope per peek.
+        val cqe = cqeSlot ?: nativeHeap.alloc<CPointerVar<io_uring_cqe>>().also { cqeSlot = it }
+        var rc: Int
+        do { rc = io_uring_peek_cqe(currentRing, cqe.ptr) } while (rc == -platform.posix.EINTR)
+        if (rc == -platform.posix.EAGAIN) return Result.success(null)
+        if (rc < 0) return failure("io_uring_peek_cqe failed", rc)
+        val ready = cqe.value ?: return Result.success(null)
+        val completion = ready.toCompletion()
+        io_uring_cqe_seen(currentRing, ready)
+        settled(completion.userData)
+        publish(completion)
+        return Result.success(completion)
     }
 
     override fun cqAdvance(count: Int) {
         // waitCqe/peekCqe transfer ownership and advance exactly once.
         require(count >= 0)
+    }
+
+    /** Waits up to [timeoutMicros] for a CQE without consuming it: 0 once one is ready, -ETIME at the timeout. */
+    fun awaitCqe(timeoutMicros: Long): Int {
+        val currentRing = ring ?: return -platform.posix.EBADF
+        return zlinux_uring.k_io_uring_await_cqe(currentRing, timeoutMicros)
     }
 
     override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
@@ -271,6 +286,8 @@ internal class LinuxLiburingFacade : LiburingFacade {
         io_uring_queue_exit(currentRing)
         nativeHeap.free(currentRing.rawValue)
         ring = null
+        cqeSlot?.let { nativeHeap.free(it.rawPtr) }
+        cqeSlot = null
         requests.clear()
         inFlight = 0
         handlers.clear()
@@ -295,46 +312,85 @@ internal class LinuxLiburingFacade : LiburingFacade {
         return if (rc < 0) failure("io_uring_unregister_buffers failed", rc) else Result.success(Unit)
     }
 
-    fun prepSubmission(sub: UringOp.Companion.UringSubmission, address: Long): Result<Unit> {
+    fun prepSubmission(sub: UringOp.Companion.UringSubmission, address: Long, userData: Long = sub.userData): Result<Unit> {
         if (sub.flags != 0) return failure("SQE flags unsupported", -95)
         if (!supports(sub.opcode)) return failure("opcode not supported by kernel probe", -95)
-        return prepare(sub.userData) { sqe ->
-            val ptr = address.toCPointer<ByteVar>()
-            when (sub.opcode) {
-                UringOp.NOP -> zlinux_uring.io_uring_prep_nop(sqe)
-                UringOp.OPENAT -> zlinux_uring.io_uring_prep_openat(sqe, sub.fd, ptr, openFlags(sub.offset.toInt()), sub.operationFlags.toUInt())
-                UringOp.STATX -> zlinux_uring.io_uring_prep_statx(sqe, sub.fd, ptr, sub.operationFlags, sub.offset.toUInt(),
-                    (address + sub.len + 1).toCPointer<cnames.structs.statx>())
-                UringOp.MKDIRAT -> zlinux_uring.io_uring_prep_mkdirat(sqe, sub.fd, ptr, sub.operationFlags.toUInt())
-                UringOp.UNLINKAT -> zlinux_uring.io_uring_prep_unlinkat(sqe, sub.fd, ptr, sub.operationFlags)
-                UringOp.RENAMEAT -> {
-                    // Both paths ride NUL-separated in the one copied buffer.
-                    val window = requireNotNull(sub.buffer)
-                    val start = window.arrayOffset() + window.position()
-                    val split = (0 until sub.len).first { window.array()[start + it] == 0.toByte() }
-                    zlinux_uring.io_uring_prep_renameat(sqe, sub.fd, ptr, sub.offset.toInt(),
-                        (address + split + 1).toCPointer<ByteVar>(), sub.operationFlags.toUInt())
-                }
-                UringOp.READ -> io_uring_prep_read(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
-                UringOp.WRITE -> io_uring_prep_write(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
-                UringOp.READ_FIXED -> zlinux_uring.io_uring_prep_read_fixed(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong(), sub.bufferIndex)
-                UringOp.WRITE_FIXED -> zlinux_uring.io_uring_prep_write_fixed(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong(), sub.bufferIndex)
-                UringOp.FADVISE -> zlinux_uring.io_uring_prep_fadvise(sqe, sub.fd, sub.offset.toULong(), sub.len.toUInt(), sub.operationFlags)
-                UringOp.MADVISE -> zlinux_uring.io_uring_prep_madvise(sqe, ptr, sub.len.toUInt(), sub.operationFlags)
-                UringOp.SEND -> zlinux_uring.io_uring_prep_send(sqe, sub.fd, ptr, sub.len.toULong(), 0)
-                UringOp.RECV -> zlinux_uring.io_uring_prep_recv(sqe, sub.fd, ptr, sub.len.toULong(), 0)
-                UringOp.CLOSE -> io_uring_prep_close(sqe, sub.fd)
-                UringOp.FSYNC -> io_uring_prep_fsync(sqe, sub.fd, sub.operationFlags.toUInt())
-                UringOp.FTRUNCATE -> io_uring_prep_ftruncate(sqe, sub.fd, sub.offset)
-                UringOp.SOCKET -> io_uring_prep_socket(sqe, sub.fd, sub.offset.toInt(), sub.len, 0u)
-                UringOp.BIND -> io_uring_prep_bind(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
-                UringOp.LISTEN -> io_uring_prep_listen(sqe, sub.fd, sub.len)
-                UringOp.ACCEPT -> io_uring_prep_accept(sqe, sub.fd, null, null, sub.operationFlags)
-                UringOp.CONNECT -> io_uring_prep_connect(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
-                UringOp.SHUTDOWN -> io_uring_prep_shutdown(sqe, sub.fd, sub.len)
-                UringOp.POLL_ADD -> io_uring_prep_poll_add(sqe, sub.fd, sub.operationFlags.toUInt())
-                else -> error("No native encoder for ${sub.opcode}")
+        return prepare(userData) { sqe -> encode(sqe, sub, address) }
+    }
+
+    /**
+     * [sub] into the next SQE with user_data [index], outside the per-request bookkeeping: [submitReap] settles it
+     * before anything else enters this ring. False, with no SQE taken, when the ring is closed, the SQ is full or the
+     * kernel lacks the op.
+     */
+    fun prepIndexed(sub: UringOp.Companion.UringSubmission, address: Long, index: Int): Boolean {
+        val currentRing = ring ?: return false
+        if (sub.flags != 0 || !supports(sub.opcode)) return false
+        val sqe = io_uring_get_sqe(currentRing) ?: return false
+        try { encode(sqe, sub, address) } catch (error: Throwable) {
+            currentRing.pointed.sq.sqe_tail--
+            throw error
+        }
+        sqe.pointed.user_data = index.toULong()
+        return true
+    }
+
+    /** Returns the last [count] SQEs [prepIndexed] took, none of them submitted yet. */
+    fun unprepIndexed(count: Int) {
+        val currentRing = ring ?: return
+        currentRing.pointed.sq.sqe_tail -= count.toUInt()
+    }
+
+    /**
+     * Submits the [count] SQEs [prepIndexed] filled (indices 0 until [count]) in one enter and writes each CQE's res
+     * at its index in [results]; returns once all of them are reaped, with the number of other CQEs met (0 normally).
+     */
+    fun submitReap(count: Int, results: CPointer<IntVar>): Int =
+        zlinux_uring.k_io_uring_submit_reap(checkNotNull(ring) { "liburing ring is not open" }, count.toUInt(),
+            if (submitAll) 1 else 0, results)
+
+    private fun encode(sqe: CPointer<zlinux_uring.io_uring_sqe>, sub: UringOp.Companion.UringSubmission, address: Long) {
+        val ptr = address.toCPointer<ByteVar>()
+        when (sub.opcode) {
+            UringOp.NOP -> zlinux_uring.io_uring_prep_nop(sqe)
+            UringOp.OPENAT -> zlinux_uring.io_uring_prep_openat(sqe, sub.fd, ptr, openFlags(sub.offset.toInt()), sub.operationFlags.toUInt())
+            UringOp.STATX -> zlinux_uring.io_uring_prep_statx(sqe, sub.fd, ptr, sub.operationFlags, sub.offset.toUInt(),
+                (address + sub.len + 1).toCPointer<cnames.structs.statx>())
+            UringOp.MKDIRAT -> zlinux_uring.io_uring_prep_mkdirat(sqe, sub.fd, ptr, sub.operationFlags.toUInt())
+            UringOp.UNLINKAT -> zlinux_uring.io_uring_prep_unlinkat(sqe, sub.fd, ptr, sub.operationFlags)
+            UringOp.RENAMEAT -> {
+                // Both paths ride NUL-separated in the one copied buffer.
+                val window = requireNotNull(sub.buffer)
+                val start = window.arrayOffset() + window.position()
+                val split = (0 until sub.len).first { window.array()[start + it] == 0.toByte() }
+                zlinux_uring.io_uring_prep_renameat(sqe, sub.fd, ptr, sub.offset.toInt(),
+                    (address + split + 1).toCPointer<ByteVar>(), sub.operationFlags.toUInt())
             }
+            UringOp.READ -> {
+                io_uring_prep_read(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
+                zlinux_uring.k_io_uring_nowait_if_nonblocking(sqe, sub.fd, sub.offset)
+            }
+            UringOp.WRITE -> {
+                io_uring_prep_write(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong())
+                zlinux_uring.k_io_uring_nowait_if_nonblocking(sqe, sub.fd, sub.offset)
+            }
+            UringOp.READ_FIXED -> zlinux_uring.io_uring_prep_read_fixed(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong(), sub.bufferIndex)
+            UringOp.WRITE_FIXED -> zlinux_uring.io_uring_prep_write_fixed(sqe, sub.fd, ptr, sub.len.toUInt(), sub.offset.toULong(), sub.bufferIndex)
+            UringOp.FADVISE -> zlinux_uring.io_uring_prep_fadvise(sqe, sub.fd, sub.offset.toULong(), sub.len.toUInt(), sub.operationFlags)
+            UringOp.MADVISE -> zlinux_uring.io_uring_prep_madvise(sqe, ptr, sub.len.toUInt(), sub.operationFlags)
+            UringOp.SEND -> zlinux_uring.io_uring_prep_send(sqe, sub.fd, ptr, sub.len.toULong(), 0)
+            UringOp.RECV -> zlinux_uring.io_uring_prep_recv(sqe, sub.fd, ptr, sub.len.toULong(), 0)
+            UringOp.CLOSE -> io_uring_prep_close(sqe, sub.fd)
+            UringOp.FSYNC -> io_uring_prep_fsync(sqe, sub.fd, sub.operationFlags.toUInt())
+            UringOp.FTRUNCATE -> io_uring_prep_ftruncate(sqe, sub.fd, sub.offset)
+            UringOp.SOCKET -> io_uring_prep_socket(sqe, sub.fd, sub.offset.toInt(), sub.len, 0u)
+            UringOp.BIND -> io_uring_prep_bind(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
+            UringOp.LISTEN -> io_uring_prep_listen(sqe, sub.fd, sub.len)
+            UringOp.ACCEPT -> io_uring_prep_accept(sqe, sub.fd, null, null, sub.operationFlags)
+            UringOp.CONNECT -> io_uring_prep_connect(sqe, sub.fd, ptr?.reinterpret(), sub.len.toUInt())
+            UringOp.SHUTDOWN -> io_uring_prep_shutdown(sqe, sub.fd, sub.len)
+            UringOp.POLL_ADD -> io_uring_prep_poll_add(sqe, sub.fd, sub.operationFlags.toUInt())
+            else -> error("No native encoder for ${sub.opcode}")
         }
     }
 
@@ -364,6 +420,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
     }
 
     private fun publish(completion: UringCompletion) {
+        if (handlers.isEmpty()) return
         handlers[completion.userData]?.toTypedArray()?.forEach { handler ->
             runCatching { handler(completion) }
         }

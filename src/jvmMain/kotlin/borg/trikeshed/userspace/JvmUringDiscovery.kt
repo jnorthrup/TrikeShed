@@ -61,8 +61,8 @@ private fun probeJvmUringBackend(entries: Int, mode: UringBackendMode): UringBac
         }
         phase = UringProbePhase.LOAD
         System.load(candidate.toString())
-        if (JvmUring.abiVersion() != 4)
-            return unavailable(UringProbeState.ABI_MISMATCH, "JNI bridge protocol must be version 4 (struct statx, Linux O_* flags)", module, phase)
+        if (JvmUring.abiVersion() != 5)
+            return unavailable(UringProbeState.ABI_MISMATCH, "JNI bridge protocol must be version 5 (struct statx, Linux O_* flags, executeBatch)", module, phase)
         phase = UringProbePhase.SETUP
         val handle = JvmUring.open(entries)
         if (handle <= 0L) {
