@@ -64,7 +64,12 @@ class JvmReadinessTest {
                 assertNull(ring.waitCqeTimeout(200_000_000L).getOrThrow(), "zero-mask watch fired on data")
                 peer.setSoLinger(true, 0)
                 peer.close()
-                f.settle(watch).getValue(watch)
+                val first = f.settle(watch).getValue(watch)
+                // The reset persists: a second zero-mask watch on the descriptor re-arms and fires the same way.
+                val again = f.next()
+                ring.prepPollAdd(server, 0, again).getOrThrow()
+                assertEquals(first, f.settle(again).getValue(again), "re-armed zero-mask watch")
+                first
             }
         } finally {
             ring.close().getOrThrow()
@@ -105,6 +110,37 @@ class JvmReadinessTest {
             }
         } finally {
             ring.close().getOrThrow()
+        }
+    }
+
+    /**
+     * Watches whose union changes on one descriptor: a POLLPRI watch (which Darwin's kernel mode serves by poll(2))
+     * stays pending while an OUT watch on the same socket fires, and is then removed. Same answers in both modes.
+     */
+    @Test fun unionChangesOnOneDescriptor() {
+        for (crossover in intArrayOf(Int.MAX_VALUE, 0)) {
+            val readiness = JvmReadiness(crossover)
+            val ring = EmulatedRing(JvmUserspaceChannelBackend(readiness = readiness))
+            ring.open(8, 0).getOrThrow()
+            try {
+                val f = Fixture(ring)
+                peered(ring, f) { server, _ ->
+                    val pri = f.next()
+                    ring.prepPollAdd(server, 0x2, pri).getOrThrow()
+                    ring.submit().getOrThrow()
+                    assertNull(ring.waitCqeTimeout(100_000_000L).getOrThrow(), "PRI fired without urgent data")
+                    assertEquals(crossover == 0, readiness.kernel)
+                    val out = f.next()
+                    ring.prepPollAdd(server, 0x4, out).getOrThrow()
+                    assertEquals(0x4, f.settle(out).getValue(out) and 0x4, "OUT beside a pending PRI watch, crossover $crossover")
+                    assertTrue(pri !in f.cqes)
+                    assertEquals(0, f.one { ring.prepPollRemove(pri, it) })
+                    assertEquals(-125, f.settle(pri).getValue(pri))
+                    assertEquals(0, readiness.watches)
+                }
+            } finally {
+                ring.close().getOrThrow()
+            }
         }
     }
 

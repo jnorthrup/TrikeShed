@@ -333,7 +333,8 @@ internal class JvmReadiness(val crossover: Int = readinessCrossover()) {
             polledCount += if (polled) 1 else -1
             dirty = true
         }
-        if (!polled) arm(interest, sink)
+        // A polled record carries the union, which just changed even when the interest stays polled.
+        if (polled) dirty = true else arm(interest, sink)
     }
 
     private fun switchIfCrossed(sink: Sink) {
