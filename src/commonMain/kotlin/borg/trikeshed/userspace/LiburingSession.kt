@@ -25,6 +25,7 @@ internal class LiburingSession(
     private var ring: EmulatedRing? = null
 
     private fun open(): LiburingFacade? = ring
+    override val availability: String get() = ring?.availability ?: "not open"
     private fun notOpen(): Result<Unit> = Result.failure(IllegalStateException("ring is not open"))
     private fun notOpenInt(): Result<Int> = Result.failure(IllegalStateException("ring is not open"))
 

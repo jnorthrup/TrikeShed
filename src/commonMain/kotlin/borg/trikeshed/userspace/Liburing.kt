@@ -94,6 +94,9 @@ interface LiburingFacade {
     /** Occupancy and execution counters of the ring and its backend, for traces and benchmarks. */
     fun counters(): Map<String, Long> = emptyMap()
 
+    /** What executes this ring's SQEs (a kernel io_uring, emulation), as its backend describes itself. */
+    val availability: String get() = "unknown"
+
     /** Kernel registration of native memory, or retained common emulation when unsupported. */
     fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
 

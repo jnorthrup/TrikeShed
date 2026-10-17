@@ -386,6 +386,7 @@ internal class EmulatedRing(
         "ring.sq" to sq.size.toLong(), "ring.flights" to flights.toLong(), "ring.cq" to cq.size.toLong(),
         "ring.identities" to identities.size.toLong(),
     ) + backend.counters()
+    override val availability: String get() = backend.availability
     override fun cqAdvance(count: Int) { require(count >= 0) }
 
     override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
