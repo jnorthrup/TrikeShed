@@ -32,6 +32,8 @@ import javax.net.ssl.TrustManagerFactory
 class JvmTlsCodecBackend @JvmOverloads constructor(
     /** Optional byte-codec engine provision: callers own in-memory identity and peer trust policy. */
     private val engineFactory: ((TlsConfig, TlsFlowState) -> SSLEngine)? = null,
+    /** The SSLContexts this backend's engines come from, one per identity, with their explicit reload. */
+    val contexts: JvmTlsContexts = JvmTlsContexts(),
 ) : TlsCodecBackend {
     private data class EngineHandle(
         val engine: SSLEngine,
@@ -219,126 +221,23 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
             EngineHandle(createEngine(config, state))
         }
 
+    /** An engine per connection; the identity's SSLContext is built once and shared ([contexts]). */
+    private fun createEngine(config: TlsConfig, state: TlsFlowState): SSLEngine {
+        engineFactory?.let { return it(config, state) }
+        val peer = state.route.b
+        return contexts.engine(config, state.route.a, peer.a, peer.b)
+    }
+
+    /** A client route with an empty host makes an engine without SNI or session resumption. */
+    override fun recordSession(config: TlsConfig, route: TlsRoute): TlsRecordSession =
+        JvmTlsRecordSession(engineFactory?.invoke(config, TlsFlowState(route))
+            ?: contexts.engine(config, route.a, route.b.a.takeIf { it.isNotEmpty() }, route.b.b))
+
     private fun beginHandshake(handle: EngineHandle) {
         if (!handle.started) {
             handle.engine.beginHandshake()
             handle.started = true
         }
-    }
-
-    private fun createEngine(
-        config: TlsConfig,
-        state: TlsFlowState,
-    ): SSLEngine {
-        engineFactory?.let { return it(config, state) }
-        val role = state.route.a
-        val peer = state.route.b
-        val context = createSslContext(config, role)
-        val engine = if (role == TlsRole.CLIENT) {
-            context.createSSLEngine(peer.a, peer.b)
-        } else {
-            context.createSSLEngine()
-        }
-
-        engine.useClientMode = role == TlsRole.CLIENT
-
-        val enabledProtocols = config.protocols
-            .toList()
-            .mapNotNull(::protocolNameOf)
-            .filter { it in engine.supportedProtocols.toSet() }
-            .toTypedArray()
-        if (enabledProtocols.isNotEmpty()) {
-            engine.enabledProtocols = enabledProtocols
-        }
-
-        val enabledCipherSuites = config.cipherSuites
-            .toList()
-            .mapNotNull(::cipherSuiteNameOf)
-            .filter { it in engine.supportedCipherSuites.toSet() }
-            .toTypedArray()
-        if (enabledCipherSuites.isNotEmpty()) {
-            engine.enabledCipherSuites = enabledCipherSuites
-        }
-
-        val parameters = engine.sslParameters
-        val alpnProtocols = (config.alpnProtocols.size j { i: Int -> applicationProtocolNameOf(config.alpnProtocols[i]) }).toArray()
-        if (alpnProtocols.isNotEmpty()) {
-            parameters.applicationProtocols = alpnProtocols
-        }
-        val namedGroups = (config.supportedGroups.size j { i: Int -> namedGroupOf(config.supportedGroups[i]) }).toArray()
-        if (namedGroups.isNotEmpty()) {
-            parameters.namedGroups = namedGroups
-        }
-        if (role == TlsRole.CLIENT && config.hostnameVerification) {
-            parameters.endpointIdentificationAlgorithm = "HTTPS"
-        }
-        engine.sslParameters = parameters
-
-        when (config.clientAuth) {
-            ClientAuth.NONE -> {
-                engine.needClientAuth = false
-                engine.wantClientAuth = false
-            }
-            ClientAuth.REQUESTED -> engine.wantClientAuth = true
-            ClientAuth.REQUIRED -> engine.needClientAuth = true
-        }
-
-        return engine
-    }
-
-    private fun createSslContext(
-        config: TlsConfig,
-        role: TlsRole,
-    ): SSLContext {
-        val context = SSLContext.getInstance("TLS")
-        context.init(
-            keyManagers(config, role),
-            trustManagers(config),
-            null,
-        )
-        return context
-    }
-
-    private fun keyManagers(
-        config: TlsConfig,
-        role: TlsRole,
-    ): Array<KeyManager>? {
-        if (config.certificateFile == null || config.privateKeyFile == null) {
-            check(role != TlsRole.SERVER) {
-                "Server TLS requires certificateFile and privateKeyFile."
-            }
-            return null
-        }
-
-        val certs = loadCertificates(Path.of(config.certificateFile))
-        val privateKey = loadPrivateKey(Path.of(config.privateKeyFile), certs.first().publicKey.algorithm)
-        // In-memory KeyStore; use a randomly generated password if none provided
-        val password = (config.privateKeyPassword ?: run {
-            val bytes = ByteArray(16)
-            SecureRandom().nextBytes(bytes)
-            Base64.getEncoder().encodeToString(bytes)
-        }).toCharArray()
-        val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-        keyStore.load(null, null)
-        keyStore.setKeyEntry("tls", privateKey, password, certs.toTypedArray())
-
-        val factory = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm())
-        factory.init(keyStore, password)
-        return factory.keyManagers
-    }
-
-    private fun trustManagers(config: TlsConfig): Array<TrustManager> {
-        val factory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        val trustStore = config.trustStore?.let {
-            KeyStore.getInstance(KeyStore.getDefaultType()).apply {
-                load(null, null)
-                loadCertificates(Path.of(it)).forEachIndexed { index, cert ->
-                    setCertificateEntry("trust-$index", cert)
-                }
-            }
-        }
-        factory.init(trustStore)
-        return factory.trustManagers
     }
 
     private suspend fun unwrapDownstream(
@@ -487,76 +386,6 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
             sessionOf(engine) != null &&
             !engine.isOutboundDone
 
-    private fun sessionOf(engine: SSLEngine): TlsSession? {
-        val session = engine.session ?: return null
-        val protocol = protocolOf(session.protocol) ?: return null
-        val cipherSuite = cipherSuiteOf(session.cipherSuite) ?: return null
-        val peerCertificate = try {
-            (session.peerCertificates.firstOrNull() as? X509Certificate)?.let {
-                TlsPeerCertificate(
-                    subject = it.subjectX500Principal?.name,
-                    issuer = it.issuerX500Principal?.name,
-                )
-            }
-        } catch (_: SSLPeerUnverifiedException) {
-            null
-        }
-        val verified = try {
-            session.peerCertificates.isNotEmpty()
-        } catch (_: SSLPeerUnverifiedException) {
-            false
-        }
-        return TlsSession(
-            protocol = protocol,
-            cipherSuite = cipherSuite,
-            peerCertificate = peerCertificate,
-            verified = verified,
-            applicationProtocol = TlsApplicationProtocol.entries.firstOrNull { it.wireName == engine.applicationProtocol },
-        )
-    }
-
-    private fun loadCertificates(path: Path): List<X509Certificate> {
-        val text = Files.readString(path)
-        val blocks = pemBlocks(text, "CERTIFICATE")
-        check(blocks.isNotEmpty()) { "No certificates found in $path" }
-        val factory = CertificateFactory.getInstance("X.509")
-        return blocks.map { block ->
-            ByteArrayInputStream(block).use {
-                factory.generateCertificate(it) as X509Certificate
-            }
-        }
-    }
-
-    private fun loadPrivateKey(
-        path: Path,
-        preferredAlgorithm: String,
-    ): PrivateKey {
-        val text = Files.readString(path)
-        check("BEGIN ENCRYPTED PRIVATE KEY" !in text) {
-            "Encrypted private keys are not supported yet for $path"
-        }
-        val block = pemBlocks(text, "PRIVATE KEY").firstOrNull()
-            ?: error("Expected PKCS#8 private key in $path")
-        val spec = PKCS8EncodedKeySpec(block)
-        return sequenceOf(preferredAlgorithm, "RSA", "EC", "DSA")
-            .distinct()
-            .firstNotNullOfOrNull { algorithm ->
-                runCatching { KeyFactory.getInstance(algorithm).generatePrivate(spec) }.getOrNull()
-            }
-            ?: error("Could not decode private key in $path")
-    }
-
-    private fun pemBlocks(
-        text: String,
-        label: String,
-    ): List<ByteArray> =
-        Regex(
-            "-----BEGIN $label-----(.*?)-----END $label-----",
-            setOf(RegexOption.DOT_MATCHES_ALL),
-        ).findAll(text).map { match ->
-            Base64.getMimeDecoder().decode(match.groupValues[1])
-        }.toList()
-
     private suspend fun runDelegatedTasks(engine: SSLEngine) {
         while (engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NEED_TASK) {
             val task = engine.delegatedTask ?: break
@@ -565,55 +394,6 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
             }
         }
     }
-
-    private fun protocolNameOf(protocol: TlsProtocol): String =
-        when (protocol) {
-            TlsProtocol.TLS13 -> "TLSv1.3"
-            TlsProtocol.TLS12 -> "TLSv1.2"
-        }
-
-    private fun protocolOf(name: String?): TlsProtocol? =
-        when (name) {
-            "TLSv1.3" -> TlsProtocol.TLS13
-            "TLSv1.2" -> TlsProtocol.TLS12
-            else -> null
-        }
-
-    private fun cipherSuiteNameOf(cipherSuite: TlsCipherSuite): String =
-        when (cipherSuite) {
-            TlsCipherSuite.TLS_AES_128_GCM_SHA256 -> "TLS_AES_128_GCM_SHA256"
-            TlsCipherSuite.TLS_AES_256_GCM_SHA384 -> "TLS_AES_256_GCM_SHA384"
-            TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256 -> "TLS_CHACHA20_POLY1305_SHA256"
-            TlsCipherSuite.ECDHE_RSA_AES128_GCM_SHA256 -> "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
-            TlsCipherSuite.ECDHE_RSA_AES256_GCM_SHA384 -> "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
-            TlsCipherSuite.ECDHE_ECDSA_CHACHA20_POLY1305 -> "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256"
-            TlsCipherSuite.ECDHE_ECDSA_AES128_GCM_SHA256 -> "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
-            TlsCipherSuite.ECDHE_ECDSA_AES256_GCM_SHA384 -> "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384"
-        }
-
-    private fun cipherSuiteOf(name: String?): TlsCipherSuite? =
-        when (name) {
-            "TLS_AES_128_GCM_SHA256" -> TlsCipherSuite.TLS_AES_128_GCM_SHA256
-            "TLS_AES_256_GCM_SHA384" -> TlsCipherSuite.TLS_AES_256_GCM_SHA384
-            "TLS_CHACHA20_POLY1305_SHA256" -> TlsCipherSuite.TLS_CHACHA20_POLY1305_SHA256
-            "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" -> TlsCipherSuite.ECDHE_RSA_AES128_GCM_SHA256
-            "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384" -> TlsCipherSuite.ECDHE_RSA_AES256_GCM_SHA384
-            "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256" -> TlsCipherSuite.ECDHE_ECDSA_CHACHA20_POLY1305
-            "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256" -> TlsCipherSuite.ECDHE_ECDSA_AES128_GCM_SHA256
-            "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384" -> TlsCipherSuite.ECDHE_ECDSA_AES256_GCM_SHA384
-            else -> null
-        }
-
-    private fun namedGroupOf(group: TlsSupportedGroup): String =
-        when (group) {
-            TlsSupportedGroup.X25519 -> "x25519"
-            TlsSupportedGroup.P256 -> "secp256r1"
-            TlsSupportedGroup.P384 -> "secp384r1"
-            TlsSupportedGroup.P521 -> "secp521r1"
-        }
-
-    private fun applicationProtocolNameOf(protocol: TlsApplicationProtocol): String =
-        protocol.wireName
 
     private fun packetBufferSize(engine: SSLEngine): Int =
         engine.session?.packetBufferSize ?: 17 * 1024
