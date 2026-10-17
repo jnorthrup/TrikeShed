@@ -47,6 +47,13 @@ public interface UserspaceChannelBackend {
     fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
     /** Consume deferred CQEs; zero polls, a positive minimum waits for completion. */
     fun reapCompletions(minComplete: Int = 0): List<SelectionResult> = emptyList()
+    /**
+     * [reapCompletions] that waits at most [timeoutNanos] for [minComplete] CQEs. A backend without a timed wait
+     * polls once instead of waiting.
+     */
+    fun reapCompletions(minComplete: Int, timeoutNanos: Long): List<SelectionResult> = reapCompletions(0)
+    /** Execution counters (readiness waits, kernel calls, mechanism switches), for traces and benchmarks. */
+    fun counters(): Map<String, Long> = emptyMap()
     /** Quiesce deferred effects and make their terminal cancellation CQEs reapable. */
     fun cancelPending() {}
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>

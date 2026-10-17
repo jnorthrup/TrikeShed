@@ -9,12 +9,13 @@ import java.nio.file.Path
  *
  * 0 = emulation only (POSIX-shaped JDK primitives servicing SQEs)
  * 1 = JNI bridge to the kernel ring (probe still validates ELF/ABI/NOP)
+ * 2 = with no JNI module, the FFM ring (PanamauRing.kt): sockets and descriptors as SQEs, probe-confirmed
  *
  * The facade surface is byte-identical above either level; going more native
  * means raising this const, never adding a second API. The runtime probe
  * cannot exceed the level pinned here — the const is the ceiling.
  */
-internal const val JVM_NATIVE_URING_LEVEL: Int = 1
+internal const val JVM_NATIVE_URING_LEVEL: Int = 2
 
 /**
  * Discovery of the repo's JNI execution module for [requested], by default the process's (the trikeshed.uring.mode
@@ -53,8 +54,23 @@ private fun probeJvmUringBackend(entries: Int, mode: UringBackendMode): UringBac
                 .firstOrNull { Files.isRegularFile(it) }
         }
         module = candidate?.toString()
-        if (candidate == null || !Files.exists(candidate))
-            return unavailable(UringProbeState.MODULE_ABSENT, "No trikeshed_uring JNI module found", module)
+        if (candidate == null || !Files.exists(candidate)) {
+            if (JVM_NATIVE_URING_LEVEL < 2)
+                return unavailable(UringProbeState.MODULE_ABSENT, "No trikeshed_uring JNI module found", module)
+            // Level 2: the FFM ring needs no module. It must set up here and confirm its operations by probe.
+            val ffm = "ffm:io_uring"
+            phase = UringProbePhase.SETUP
+            val ring = try { openPanamaRing(entries) } catch (failure: PanamaRingException) {
+                return unavailable(uringErrnoState(failure.errno), failure.message ?: "io_uring_setup failed", ffm, phase, failure.errno)
+            }
+            phase = UringProbePhase.OPERATIONS
+            if (ring.features and PanamaRing.FEAT_EXT_ARG == 0) {
+                ring.close()
+                return unavailable(UringProbeState.KERNEL_UNSUPPORTED, "io_uring lacks IORING_FEAT_EXT_ARG (Linux 5.11)", ffm, phase)
+            }
+            val backend = PanamauChannelBackend(ring)
+            return probeUringBackend(host, ffm, backend).also { if (it.backend == null) backend.close() }
+        }
         val header = Files.newInputStream(candidate).use { it.readNBytes(20) }
         uringElfCompatibility(header, host.architecture)?.let {
             return unavailable(it, "JNI module ELF class, byte order or machine does not match ${host.architecture}", module)

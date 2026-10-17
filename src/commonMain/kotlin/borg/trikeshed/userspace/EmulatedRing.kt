@@ -1,7 +1,7 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.collections.LongTable
 import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Twin
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
@@ -9,13 +9,35 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 
+/**
+ * Identities one ring may hold between prep and reap. Deferred watches (one or two per idle socket) are bounded by
+ * this, not by the SQ depth: two directions per descriptor at Linux's default nr_open (1,048,576).
+ */
+const val URING_IN_FLIGHT_LIMIT: Int = 1 shl 21
+
+/** Identity states besides an in-flight [EmulatedRing] record. */
+private enum class RingMark { STAGED, SETTLED, SEEN, REPEATED }
+
 /** Common bounded SQ/CQ coordinator. Platform backends execute effects only.
  * Synchronous callers serialize access; coroutine callers use FunctionalUringFacade.
+ *
+ * The opened entries bound the SQ and the unreaped CQ, as a kernel ring's do; work in flight is bounded apart by
+ * [inFlightLimit]. One table holds every userData from prep until its CQE is reaped, so admission, duplicate
+ * rejection and settlement are O(1) whatever the number of deferred watches.
  */
-internal class EmulatedRing(private val backend: UserspaceChannelBackend) : LiburingFacade {
+internal class EmulatedRing(
+    private val backend: UserspaceChannelBackend,
+    private val inFlightLimit: Int = URING_IN_FLIGHT_LIMIT,
+) : LiburingFacade {
+    /** An SQE between dispatch and its terminal CQE, with the effect the backend executes for it. */
+    private class Flight(val submission: UringSubmission, val effect: UringSubmission)
     private val sq = ArrayDeque<UringSubmission>()
     private val cq = ArrayDeque<UringCompletion>()
-    private val inFlight = mutableMapOf<Long, Twin<UringSubmission>>()
+    /** userData to [RingMark.STAGED], a [Flight], or [RingMark.SETTLED]. */
+    private val identities = LongTable<Any>()
+    private var flights = 0
+    /** Duplicate detection within one backend result list; emptied before [settle] returns. */
+    private val seen = LongTable<RingMark>()
     private val handlers = mutableMapOf<Long, MutableList<(UringCompletion) -> Unit>>()
     private var capacity = 0
     private var draining = false
@@ -33,12 +55,11 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         check(capacity > 0 && !closed && !draining) { "ring is not accepting submissions" }
         check(!executing) { "ring is executing" }
         failure?.let { throw it }
-        check(sq.size + cq.size + inFlight.size < capacity) { "submission queue full" }
+        check(sq.size + cq.size < capacity) { "submission queue full" }
+        check(identities.size < inFlightLimit) { "in-flight limit $inFlightLimit reached" }
         require(submission.len >= 0) { "negative transfer length" }
-        require(submission.userData !in inFlight && sq.none { it.userData == submission.userData } &&
-            cq.none { it.userData == submission.userData }) {
-            "duplicate outstanding userData"
-        }
+        require(submission.userData !in identities) { "duplicate outstanding userData" }
+        identities.put(submission.userData, RingMark.STAGED)
         sq.addLast(submission)
     }
 
@@ -84,6 +105,15 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
 
     override fun prepPollRemove(targetUserData: Long, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.POLL_REMOVE, -1, targetUserData, 0, 0L, 0, userData))
+
+    override fun prepSend(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.SEND, fd, bufAddress, len, 0L, userData = userData, operationFlags = flags))
+
+    override fun prepRecv(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.RECV, fd, bufAddress, len, 0L, userData = userData, operationFlags = flags))
+
+    override fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
+        stage(UringSubmission(UringOp.ASYNC_CANCEL, -1, targetUserData, 0, 0L, 0, userData))
 
     override fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> =
         stage(UringSubmission(UringOp.SHUTDOWN, fd, 0L, how, 0L, 0, userData))
@@ -169,7 +199,9 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     override fun unregisterBuffers(): Result<Unit> = runCatching {
         check(capacity > 0 && !closed && !executing) { "ring is not available for unregistration" }
         check(sq.none { it.bufferIndex >= 0 }) { "registered buffers still have staged requests" }
-        check(inFlight.values.none { it.a.bufferIndex >= 0 }) { "registered buffers still have executing requests" }
+        var executingFixed = false
+        identities.forEach { _, state -> if (state is Flight && state.submission.bufferIndex >= 0) executingFixed = true }
+        check(!executingFixed) { "registered buffers still have executing requests" }
         val memory = registeredMemory
         check(memory != null || registeredBuffers != null) { "no buffers registered" }
         if (memory != null) {
@@ -216,11 +248,11 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         check(capacity > 0 && !closed && !executing) { "ring is not available for submission" }
         failure?.let { throw it }
         if (sq.isEmpty()) return@runCatching 0
-        val batch = Array(sq.size) { sq.removeFirst() }.toSeries()
+        val batch = Array(sq.size) { sq.removeFirst() }
         var dispatched = false
         executing = true
         try {
-            // List is the platform compatibility boundary; the owned snapshot remains Series.
+            // List is the platform compatibility boundary: the effects array itself, viewed, not copied.
             val effects = Array(batch.size) { index ->
                 val submission = batch[index]
                 if (submission.bufferIndex < 0 || (kernelRegistered && submission.memory != null &&
@@ -237,24 +269,25 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
                     submission.copy(opcode = if (submission.opcode == UringOp.READ_FIXED) UringOp.READ else UringOp.WRITE,
                         buffer = buffer, bufferIndex = -1, addr = 0L)
                 }
-            }.toSeries()
-            for (i in 0 until batch.size) inFlight[batch[i].userData] = batch[i] j effects[i]
+            }
+            for (i in batch.indices) identities.put(batch[i].userData, Flight(batch[i], effects[i]))
+            flights += batch.size
             dispatched = true
-            val results = backend.submitBatch(List(effects.size) { effects[it] })
+            val results = backend.submitBatch(effects.asList())
             settle(results)
-            check((0 until batch.size).none {
-                val submission = batch[it]
-                submission.userData in inFlight && !deferred(submission)
-            }) { "backend did not settle every submission" }
+            val deferredMask = backend.deferredCapabilities
+            for (submission in batch) check(!inFlight(submission.userData) || deferred(submission, deferredMask)) {
+                "backend did not settle every submission"
+            }
             failure?.let { throw it }
             batch.size
         } catch (error: Throwable) {
             // A failed call settles its synchronous borrows. Deferred work remains owned until
             // a terminal CQE arrives, including cancellation during drain. Never retry effects.
-            for (i in 0 until batch.size) {
-                val submission = batch[i]
-                if (!dispatched) cq.addLast(UringCompletion(submission.userData, -5, 0))
-                else if (submission.userData in inFlight && !deferred(submission)) {
+            val deferredMask = backend.deferredCapabilities
+            for (submission in batch) {
+                if (!dispatched) settled(UringCompletion(submission.userData, -5, 0))
+                else if (inFlight(submission.userData) && !deferred(submission, deferredMask)) {
                     complete(SelectionResult(-5, submission.userData))
                 }
             }
@@ -265,8 +298,16 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         }
     }
 
-    private fun deferred(submission: UringSubmission): Boolean =
-        backend.deferredCapabilities and (inFlight[submission.userData]?.b?.opcode ?: submission.opcode).mask != 0L
+    private fun inFlight(userData: Long): Boolean = identities[userData] is Flight
+
+    private fun deferred(submission: UringSubmission, deferredMask: Long = backend.deferredCapabilities): Boolean =
+        deferredMask and ((identities[submission.userData] as? Flight)?.effect?.opcode ?: submission.opcode).mask != 0L
+
+    /** A terminal CQE enters the CQ; its identity stays held until the CQE is reaped. */
+    private fun settled(completion: UringCompletion) {
+        identities.put(completion.userData, RingMark.SETTLED)
+        cq.addLast(completion)
+    }
 
     private fun failed(error: Throwable) {
         val previous = failure
@@ -274,7 +315,11 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     }
 
     private fun complete(result: SelectionResult) {
-        val (submission, effect) = requireNotNull(inFlight.remove(result.userData))
+        val flight = requireNotNull(identities[result.userData] as? Flight)
+        identities.put(result.userData, RingMark.SETTLED)
+        flights--
+        val submission = flight.submission
+        val effect = flight.effect
         val res = try {
             if (effect.opcode == UringOp.READ && submission.opcode == UringOp.READ_FIXED &&
                 submission.memory != null && result.res > 0) {
@@ -292,32 +337,36 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     }
 
     private fun settle(results: List<SelectionResult>) {
-        val identities = mutableSetOf<Long>()
-        val duplicates = mutableSetOf<Long>()
+        if (results.isEmpty()) return
         for (result in results) {
-            if (!identities.add(result.userData)) duplicates.add(result.userData)
-            if (result.userData !in inFlight || result.userData in duplicates) {
+            val repeated = seen.put(result.userData, RingMark.SEEN) != null
+            if (repeated) seen.put(result.userData, RingMark.REPEATED)
+            if (!inFlight(result.userData) || repeated) {
                 failed(IllegalStateException("backend completion identity mismatch"))
             }
         }
         for (result in results) {
-            if (result.userData in inFlight) {
-                complete(if (result.userData in duplicates) SelectionResult(-5, result.userData) else result)
+            if (inFlight(result.userData)) {
+                complete(if (seen[result.userData] === RingMark.REPEATED) SelectionResult(-5, result.userData) else result)
             }
         }
+        for (result in results) seen.remove(result.userData)
     }
 
-    private fun reap(minComplete: Int): Result<UringCompletion?> = runCatching {
+    private fun reap(minComplete: Int, timeoutNanos: Long = -1L): Result<UringCompletion?> = runCatching {
         check(capacity > 0 && !closed) { "ring is not open" }
         check(!executing) { "ring is executing" }
-        if (cq.isEmpty() && inFlight.isNotEmpty()) {
+        if (cq.isEmpty() && flights > 0) {
             executing = true
-            try { settle(backend.reapCompletions(minComplete)) }
+            try {
+                settle(if (timeoutNanos < 0L) backend.reapCompletions(minComplete) else backend.reapCompletions(minComplete, timeoutNanos))
+            }
             catch (error: Throwable) { failed(error); throw error }
             finally { executing = false }
         }
         val completion = cq.removeFirstOrNull() ?: return@runCatching null
-        handlers[completion.userData]?.toTypedArray()?.forEach { handler ->
+        identities.remove(completion.userData)
+        if (handlers.isNotEmpty()) handlers[completion.userData]?.toTypedArray()?.forEach { handler ->
             // Observers cannot turn an executed transfer into another errno or byte count.
             runCatching { handler(completion) }
         }
@@ -326,6 +375,13 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
 
     override fun waitCqe(): Result<UringCompletion?> = reap(1)
     override fun peekCqe(): Result<UringCompletion?> = reap(0)
+    override fun waitCqeTimeout(timeoutNanos: Long): Result<UringCompletion?> =
+        if (timeoutNanos < 0L) Result.failure(IllegalArgumentException("negative timeout")) else reap(1, timeoutNanos)
+
+    override fun counters(): Map<String, Long> = linkedMapOf(
+        "ring.sq" to sq.size.toLong(), "ring.flights" to flights.toLong(), "ring.cq" to cq.size.toLong(),
+        "ring.identities" to identities.size.toLong(),
+    ) + backend.counters()
     override fun cqAdvance(count: Int) { require(count >= 0) }
 
     override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
@@ -343,14 +399,14 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         draining = true
         var error = submit().exceptionOrNull()
         if (error != null) {
-            while (sq.isNotEmpty()) cq.addLast(UringCompletion(sq.removeFirst().userData, -5, 0))
+            while (sq.isNotEmpty()) settled(UringCompletion(sq.removeFirst().userData, -5, 0))
         }
-        if (inFlight.isNotEmpty()) {
+        if (flights > 0) {
             executing = true
             try {
                 backend.cancelPending()
                 settle(backend.reapCompletions(0))
-                check(inFlight.isEmpty()) { "backend did not settle deferred submissions during drain" }
+                check(flights == 0) { "backend did not settle deferred submissions during drain" }
             } catch (drainError: Throwable) {
                 failed(drainError)
                 if (error == null) error = drainError
@@ -363,7 +419,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         if (closed) return Result.success(Unit)
         if (executing) return Result.failure(IllegalStateException("ring is executing"))
         var error = drain().exceptionOrNull()
-        if (inFlight.isNotEmpty()) return Result.failure(requireNotNull(error))
+        if (flights > 0) return Result.failure(requireNotNull(error))
         if (registeredMemory != null || registeredBuffers != null) {
             unregisterBuffers().exceptionOrNull()?.let { if (error == null) error = it }
         }
@@ -386,6 +442,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
 
     private fun reapBeforeClose() {
         val completion = cq.removeFirst()
+        identities.remove(completion.userData)
         handlers[completion.userData]?.toTypedArray()?.forEach { handler -> runCatching { handler(completion) } }
     }
 }

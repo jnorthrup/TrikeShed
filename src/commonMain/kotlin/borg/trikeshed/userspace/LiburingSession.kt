@@ -3,6 +3,21 @@ package borg.trikeshed.userspace
 import borg.trikeshed.lib.Series
 import borg.trikeshed.userspace.nio.ByteBuffer
 
+/**
+ * A ring its caller owns, apart from the [Liburing] singleton: SQ/CQ depth [entries] over the backend [mode] selects
+ * (null: the process's TRIKESHED_URING_MODE). The caller closes it, which drains deferred work first.
+ */
+fun openLiburingFacade(entries: Int, mode: UringBackendMode? = null): LiburingFacade {
+    require(entries > 0) { "entries must be positive" }
+    val backend = openUserspaceChannelBackend(entries, mode)
+    val ring = EmulatedRing(backend)
+    try { ring.open(entries, 0).getOrThrow() } catch (failure: Throwable) {
+        backend.close()
+        throw failure
+    }
+    return ring
+}
+
 /** Lifecycle adapter for the public singleton. Every platform stages through the common ring. */
 internal class LiburingSession(
     private val openBackend: (Int) -> UserspaceChannelBackend = ::openUserspaceChannelBackend,
@@ -80,6 +95,15 @@ internal class LiburingSession(
     override fun peekCqe(): Result<UringCompletion?> =
         open()?.peekCqe() ?: Result.failure(IllegalStateException("ring is not open"))
     override fun cqAdvance(count: Int) { open()?.cqAdvance(count) }
+    override fun prepSend(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        open()?.prepSend(fd, bufAddress, len, flags, userData) ?: notOpen()
+    override fun prepRecv(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        open()?.prepRecv(fd, bufAddress, len, flags, userData) ?: notOpen()
+    override fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
+        open()?.prepCancel(targetUserData, userData) ?: notOpen()
+    override fun waitCqeTimeout(timeoutNanos: Long): Result<UringCompletion?> =
+        open()?.waitCqeTimeout(timeoutNanos) ?: Result.failure(IllegalStateException("ring is not open"))
+    override fun counters(): Map<String, Long> = open()?.counters() ?: emptyMap()
 
     override fun registerFanoutHandler(token: Long, handler: (UringCompletion) -> Unit) {
         ring?.registerFanoutHandler(token, handler)

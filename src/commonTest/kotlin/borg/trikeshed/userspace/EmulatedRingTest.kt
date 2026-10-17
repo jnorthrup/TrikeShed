@@ -371,7 +371,9 @@ class EmulatedRingTest {
         assertFailsWith<IllegalStateException> { memory.close() }
         ring.prepClose(6, 2).getOrThrow()
         assertEquals(1, ring.submit().getOrThrow())
-        assertTrue(ring.prepClose(7, 3).isFailure)
+        // The deferred read holds an identity, not SQ/CQ depth: with one CQE unreaped, one SQE still fits.
+        ring.prepClose(7, 3).getOrThrow()
+        assertTrue(ring.prepClose(8, 4).isFailure)
         assertEquals(UringCompletion(2, 0, 0), ring.waitCqe().getOrThrow())
         requireNotNull(backend.pending.single().buffer).put(0, 42)
         backend.pending.clear()
@@ -382,6 +384,38 @@ class EmulatedRingTest {
         assertNull(ring.peekCqe().getOrThrow())
         ring.unregisterBuffers().getOrThrow()
         memory.close()
+        ring.close().getOrThrow()
+    }
+
+    @Test fun deferredWatchesOutnumberEntriesWithinTheInFlightLimit() {
+        val backend = Backend().also { it.deferredCapabilities = UringOp.POLL_ADD.mask }
+        val ring = EmulatedRing(backend, inFlightLimit = 100)
+        ring.open(4, 0).getOrThrow()
+        // 100 watches through a 4-deep SQ: the depth bounds each batch, the in-flight limit bounds identities.
+        for (batch in 0 until 25) {
+            for (k in 0 until 4) ring.prepPollAdd(3, 1, (batch * 4 + k).toLong()).getOrThrow()
+            assertTrue(ring.prepPollAdd(3, 1, 1000).isFailure)
+            assertEquals(4, ring.submit().getOrThrow())
+        }
+        assertEquals(100, backend.pending.size)
+        assertTrue(ring.prepPollAdd(3, 1, 100).isFailure)
+        // One watch fires; its identity is free only once its CQE is reaped.
+        backend.pending.removeAll { it.userData == 42L }
+        backend.ready.add(SelectionResult(1, 42))
+        assertEquals(UringCompletion(42, 1, 0), ring.waitCqe().getOrThrow())
+        assertTrue(ring.prepPollAdd(3, 1, 7).isFailure)
+        ring.prepPollAdd(3, 1, 42).getOrThrow()
+        assertTrue(ring.prepPollAdd(3, 1, 100).isFailure)
+        assertEquals(1, ring.submit().getOrThrow())
+        // Drain ends every deferred watch exactly once.
+        ring.drain().getOrThrow()
+        val ended = HashSet<Long>()
+        while (true) {
+            val completion = ring.waitCqe().getOrThrow() ?: break
+            assertEquals(-125, completion.res)
+            assertTrue(ended.add(completion.userData))
+        }
+        assertEquals(100, ended.size)
         ring.close().getOrThrow()
     }
 

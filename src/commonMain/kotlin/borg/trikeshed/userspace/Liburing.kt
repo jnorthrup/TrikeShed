@@ -79,6 +79,21 @@ interface LiburingFacade {
     /** io_uring_prep_shutdown(sqe, fd, how). */
     fun prepShutdown(fd: Int, how: Int, userData: Long): Result<Unit> = unsupported()
 
+    /** io_uring_prep_send: [len] bytes at [bufAddress] to a connected stream socket; res is the count sent. */
+    fun prepSend(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_recv: at most [len] bytes into [bufAddress]; res is the count, 0 at end of stream. */
+    fun prepRecv(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_prep_cancel64 with no flags: [targetUserData] ends with -ECANCELED, this SQE with 0 or -ENOENT. */
+    fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> = unsupported()
+
+    /** io_uring_wait_cqe_timeout: the next CQE, or null when [timeoutNanos] pass without one. */
+    fun waitCqeTimeout(timeoutNanos: Long): Result<UringCompletion?> = unsupported()
+
+    /** Occupancy and execution counters of the ring and its backend, for traces and benchmarks. */
+    fun counters(): Map<String, Long> = emptyMap()
+
     /** Kernel registration of native memory, or retained common emulation when unsupported. */
     fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
 
@@ -252,6 +267,18 @@ object Liburing : LiburingFacade by LiburingImpl {
     override fun waitCqe(): Result<UringCompletion?> = LiburingImpl.waitCqe().map { observe(it) }
 
     override fun peekCqe(): Result<UringCompletion?> = LiburingImpl.peekCqe().map { observe(it) }
+
+    override fun waitCqeTimeout(timeoutNanos: Long): Result<UringCompletion?> =
+        LiburingImpl.waitCqeTimeout(timeoutNanos).map { observe(it) }
+
+    override fun prepSend(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.SEND, fd, bufAddress, len, 0L, userData = userData, operationFlags = flags))) LiburingImpl.prepSend(fd, bufAddress, len, flags, userData) else vetoed()
+
+    override fun prepRecv(fd: Int, bufAddress: Long, len: Int, flags: Int, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.RECV, fd, bufAddress, len, 0L, userData = userData, operationFlags = flags))) LiburingImpl.prepRecv(fd, bufAddress, len, flags, userData) else vetoed()
+
+    override fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
+        if (admit(UringSubmission(UringOp.ASYNC_CANCEL, -1, targetUserData, 0, 0L, 0, userData))) LiburingImpl.prepCancel(targetUserData, userData) else vetoed()
 }
 
 /** A SUBMIT program refused this submission. EPERM, surfaced rather than swallowed. */
