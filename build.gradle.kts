@@ -384,6 +384,9 @@ kotlin {
             // The default hierarchy template is disabled; connect the shared Linux sources.
             val linuxMain = maybeCreate("linuxMain").apply {
                 dependsOn(posixMain)
+                // resources/liburing is the liburing source tree buildLiburing compiles, not a klib resource; its man
+                // pages hold symlinks to pages the vendored tree omits, which processResources cannot follow.
+                resources.exclude("liburing/**")
             }
             val linuxTest = maybeCreate("linuxTest").apply { dependsOn(posixTest) }
             for (target in listOf("linuxX64", "linuxArm64")) {
