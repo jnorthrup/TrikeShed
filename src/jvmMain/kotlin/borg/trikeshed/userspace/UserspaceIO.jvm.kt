@@ -535,12 +535,13 @@ internal class JvmUserspaceChannelBackend(
             sub.offset < 0 || sub.len < 0 || sub.operationFlags !in 0..5 -> -22
             sub.operationFlags != ADVICE_WILLNEED -> 0
             else -> {
-                // WILLNEED reads the range through, as the JDK-channel path does; no residency is claimed.
+                // WILLNEED reads the range through, as the JDK-channel path does; no residency is claimed. The bytes land
+                // in the thread's native window and stay there: no heap scratch is allocated (and cleared) per advice.
                 val end = if (sub.len == 0) JvmFileSyscalls.size(fd) else sub.offset + sub.len
-                val scratch = ByteArray(4096)
+                val window = JvmFileSyscalls.window(4096)
                 var at = sub.offset
                 while (at < end) {
-                    val n = JvmFileSyscalls.transfer(fd, scratch, 0, minOf(4096L, end - at).toInt(), at, true)
+                    val n = JvmFileSyscalls.transfer(fd, window, minOf(4096L, end - at).toInt(), at, true)
                     if (n <= 0) break
                     at += n
                 }
@@ -558,8 +559,9 @@ internal class JvmUserspaceChannelBackend(
         if (sub.operationFlags != ADVICE_WILLNEED) return 0
         val length = if (sub.len == 0) (channel.size() - sub.offset) else sub.len.toLong()
         if (length <= 0L) return 0
-        // A page-sized touch per page is enough to fault the range in; the bytes are discarded.
-        val scratch = java.nio.ByteBuffer.allocate(4096)
+        // A page-sized touch per page is enough to fault the range in; the bytes are discarded into a direct view of the
+        // thread's native window, which the channel reads into without a temporary buffer of its own.
+        val scratch = JvmFileSyscalls.window(4096).asSlice(0, 4096).asByteBuffer()
         var at = sub.offset
         val end = sub.offset + length
         while (at < end) {

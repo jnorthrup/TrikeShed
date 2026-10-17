@@ -46,12 +46,42 @@ class EmulatedRingRecycler<R : Any>(private val depthOf: (R) -> Int, private val
     fun release(ring: R) { released += ring }
 }
 
+/** The block emulated staging is sized in: one page. */
+const val EMULATED_BLOCK_BYTES: Int = 4096
+
 /**
- * A recycled block still holds its previous owner's bytes. A transfer that wrote [written] bytes from [start] into a
- * block ending at [end] leaves [start + written, end) stale: zero exactly that tail, never the whole block, and nothing
- * when the transfer filled it.
+ * Emulation-owned blocks: the staging of a fixed-buffer transfer that the backend cannot address in place. A new array
+ * is a memzero on every runtime (the JVM, JS, Wasm and Kotlin/Native all clear one) that the transfer then overwrites,
+ * so blocks are recycled instead, by power-of-two size from one [EMULATED_BLOCK_BYTES] page up, last released first
+ * (the block most likely still in cache), and never zeroed on release or reuse.
+ *
+ * No reused byte leaves a block. A write fills [0, len) from the caller's memory before the backend reads it; a read's
+ * block goes back to the caller only up to its completion, so the one block a short read leaves partially written keeps
+ * its stale remainder inside the emulation. Caller windows are never zeroed either: past the completion they keep what
+ * the caller left there, as the kernel ring leaves them (UringFileConformance). One owner thread; no locks; at most
+ * [hold] blocks of a size are kept.
  */
-fun ByteArray.zeroTail(start: Int, written: Int, end: Int) {
-    val from = start + maxOf(written, 0)
-    if (from < end) fill(0, from, end)
+class EmulatedBlocks(private val hold: Int = 8) {
+    private val shelves = arrayOfNulls<ArrayList<ByteArray>>(31)
+
+    /** Blocks kept for reuse. */
+    val held: Int get() = shelves.sumOf { it?.size ?: 0 }
+
+    /** A block of at least [length] bytes, as its last owner left it. */
+    fun acquire(length: Int): ByteArray {
+        require(length >= 0)
+        if (length > 1 shl 30) return ByteArray(length)
+        val shelf = 32 - (maxOf(length, EMULATED_BLOCK_BYTES) - 1).countLeadingZeroBits()
+        val kept = shelves[shelf]
+        return if (kept.isNullOrEmpty()) ByteArray(1 shl shelf) else kept.removeAt(kept.size - 1)
+    }
+
+    /** Takes [block] back uncleared; one [acquire] did not size, or one past [hold], is left to the collector. */
+    fun release(block: ByteArray) {
+        val size = block.size
+        if (size < EMULATED_BLOCK_BYTES || size and (size - 1) != 0) return
+        val shelf = size.countTrailingZeroBits()
+        val kept = shelves[shelf] ?: ArrayList<ByteArray>().also { shelves[shelf] = it }
+        if (kept.size < hold) kept += block
+    }
 }

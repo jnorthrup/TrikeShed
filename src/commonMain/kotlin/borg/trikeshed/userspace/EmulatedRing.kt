@@ -22,6 +22,8 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
     private var closed = false
     private var executing = false
     private var failure: Throwable? = null
+    /** Staging for fixed transfers the backend cannot address in place: recycled, never cleared. */
+    private var blocks = EmulatedBlocks(0)
     internal val isClosed: Boolean get() = closed
 
     /** The separator between renameat's two paths, by code point so the source stays ASCII. */
@@ -53,6 +55,7 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         require(entries > 0) { "entries must be positive" }
         require(flags == 0) { "setup flags are unsupported by the common facade" }
         capacity = entries
+        blocks = EmulatedBlocks(entries)
     }
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
@@ -223,8 +226,10 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
                 if (submission.bufferIndex < 0 || (kernelRegistered && submission.memory != null &&
                         backend.supportsFixedBuffer(submission.fd))) submission
                 else {
+                    // Staged through a recycled block, not a new array: the write fills [0, len) before dispatch, and
+                    // complete() copies a read out only up to its completion, so the block's earlier bytes stay here.
                     val memory = submission.memory
-                    val buffer = submission.buffer ?: ByteBuffer(submission.len).also {
+                    val buffer = submission.buffer ?: ByteBuffer.wrap(blocks.acquire(submission.len), 0, submission.len).also {
                         if (submission.opcode == UringOp.WRITE_FIXED) {
                             requireNotNull(memory).read(0, it.array(), 0, submission.len)
                         }
@@ -280,6 +285,8 @@ internal class EmulatedRing(private val backend: UserspaceChannelBackend) : Libu
         } catch (error: Throwable) {
             failed(error)
             -5 // EIO: the completed read could not be delivered to its registered memory.
+        } finally {
+            if (submission.buffer == null && effect !== submission) effect.buffer?.let { blocks.release(it.array()) }
         }
         cq.addLast(UringCompletion(result.userData, res, 0))
     }

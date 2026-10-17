@@ -177,15 +177,17 @@ internal object JvmSocketSyscalls {
     fun transfer(fd: Int, buffer: ByteBuffer?, length: Int, read: Boolean, flags: Int): Int {
         if (buffer == null || length < 0 || length > buffer.remaining() || read && buffer.isReadOnly()) return -22
         if (flags != 0) return -95
-        return Arena.ofConfined().use { arena ->
-            val bytes = arena.allocate(maxOf(1, length).toLong())
-            val start = buffer.arrayOffset() + buffer.position()
-            if (!read) MemorySegment.copy(MemorySegment.ofArray(buffer.array()), start.toLong(), bytes, 0, length.toLong())
+        val heap = buffer.array()
+        val start = buffer.arrayOffset() + buffer.position()
+        // The thread's native window, uncleared: a send copies its bytes in first, and a recv is copied out only up to
+        // what it received, so the window's earlier bytes never reach the buffer.
+        return JvmFileSyscalls.native(maxOf(1, length)) { bytes ->
+            if (!read) MemorySegment.copy(MemorySegment.ofArray(heap), start.toLong(), bytes, 0, length.toLong())
             val state = errnoState.get()
             val result = status(state, (if (read) recvCall else sendCall).invokeExact(state, fd, bytes, length.toLong(),
                 if (!read && linux) 0x4000 else 0) as Long) // MSG_NOSIGNAL
             if (result > 0) {
-                if (read) MemorySegment.copy(bytes, 0, MemorySegment.ofArray(buffer.array()), start.toLong(), result.toLong())
+                if (read) MemorySegment.copy(bytes, 0, MemorySegment.ofArray(heap), start.toLong(), result.toLong())
                 buffer.position(buffer.position() + result)
             }
             result
@@ -193,8 +195,9 @@ internal object JvmSocketSyscalls {
     }
 
     /** pollfd has the same fd/int, events/short, revents/short layout on Linux and Darwin. */
-    fun poll(fds: IntArray, masks: IntArray, timeout: Int): Pair<Int, IntArray> = Arena.ofConfined().use { arena ->
-        val records = arena.allocate(maxOf(1, fds.size).toLong() * 8, 4)
+    fun poll(fds: IntArray, masks: IntArray, timeout: Int): Pair<Int, IntArray> {
+        // Every byte of every record is written before the call, so the records take the thread's window, uncleared.
+        val records = JvmFileSyscalls.window(maxOf(1, fds.size) * 8)
         for (index in fds.indices) {
             records.set(int, index * 8L, fds[index])
             records.set(ValueLayout.JAVA_SHORT, index * 8L + 4, masks[index].toShort())
@@ -203,6 +206,6 @@ internal object JvmSocketSyscalls {
         val state = errnoState.get()
         val result = status(state, if (linux) pollCall.invokeExact(state, records, fds.size.toLong(), timeout) as Int
             else pollCall.invokeExact(state, records, fds.size, timeout) as Int)
-        result to IntArray(fds.size) { records.get(ValueLayout.JAVA_SHORT, it * 8L + 6).toInt() and 0xffff }
+        return result to IntArray(fds.size) { records.get(ValueLayout.JAVA_SHORT, it * 8L + 6).toInt() and 0xffff }
     }
 }

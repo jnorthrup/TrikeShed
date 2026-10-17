@@ -31,8 +31,8 @@ internal actual object ChannelsImpl {
 
 /**
  * The WASI ring: an emulated ring whose SQEs this process services through WASI preview 1 host calls, one CQE per SQE
- * before submitBatch returns. WASI has no kernel ring, so NATIVE is refused. A READ that fills less than its block zeroes
- * only the block's unread tail; a full block is handed back untouched.
+ * before submitBatch returns. WASI has no kernel ring, so NATIVE is refused. A READ stores only the bytes it read: past
+ * its completion the window keeps what the caller left there, as the kernel ring leaves it.
  */
 internal class WasiUserspaceChannelBackend(val entries: Int) : UserspaceChannelBackend {
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ, UringOp.WRITE,
@@ -55,7 +55,6 @@ internal class WasiUserspaceChannelBackend(val entries: Int) : UserspaceChannelB
                 val buffer = sub.buffer ?: return -14
                 val start = buffer.arrayOffset() + buffer.position()
                 val n = Wasi.pread(sub.fd, buffer.array(), start, sub.len, sub.offset)
-                buffer.array().zeroTail(start, n, start + sub.len)
                 if (n > 0) buffer.position(buffer.position() + n)
                 n
             }

@@ -117,11 +117,39 @@ internal object JvmFileSyscalls {
         return Arena.ofAuto().allocate(size, 8).also { windows.set(it) }
     }
 
-    /** pread/pwrite through a native copy of the heap window; offset -1 uses the descriptor position. */
-    fun transfer(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int {
-        if (length > WINDOW_CAP) return Arena.ofConfined().use { arena -> transfer(fd, arena.allocate(length.toLong()), bytes, start, length, offset, read) }
-        return transfer(fd, window(length), bytes, start, length, offset, read)
+    // malloc/free without errno capture: native memory a transfer overwrites, which Arena.allocate would clear first.
+    private object Malloc { val call: MethodHandle = linker.downcallHandle(linker.defaultLookup().find("malloc").orElseThrow(), FunctionDescriptor.of(pointer, long)) }
+    private object Free { val call: MethodHandle = linker.downcallHandle(linker.defaultLookup().find("free").orElseThrow(), FunctionDescriptor.ofVoid(pointer)) }
+
+    /**
+     * [length] bytes of native memory for one transfer, to [action]: the calling thread's [window], or past [WINDOW_CAP]
+     * a malloc'd block freed after it. Neither is cleared. Arena.allocate writes zeros over every byte it hands out, and a
+     * transfer overwrites them: a write copies its bytes in first, a read is copied out only up to what it read, so no
+     * earlier transfer's bytes leave this memory.
+     */
+    inline fun <T> native(length: Int, action: (MemorySegment) -> T): T {
+        if (length <= WINDOW_CAP) return action(window(length))
+        val block = malloc(length.toLong())
+        try {
+            return action(block)
+        } finally {
+            free(block)
+        }
     }
+
+    fun malloc(length: Long): MemorySegment {
+        val address = Malloc.call.invokeExact(length) as MemorySegment
+        if (address.address() == 0L) throw OutOfMemoryError("malloc($length)")
+        return address.reinterpret(length)
+    }
+
+    fun free(block: MemorySegment) {
+        Free.call.invoke(block)
+    }
+
+    /** pread/pwrite through a native copy of the heap window; offset -1 uses the descriptor position. */
+    fun transfer(fd: Int, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int =
+        native(length) { transfer(fd, it, bytes, start, length, offset, read) }
 
     fun transfer(fd: Int, native: MemorySegment, bytes: ByteArray, start: Int, length: Int, offset: Long, read: Boolean): Int {
         if (!read) MemorySegment.copy(MemorySegment.ofArray(bytes), start.toLong(), native, 0, length.toLong())
@@ -226,16 +254,16 @@ internal object JvmFileSyscalls {
      * getdents64 into [out]: Linux's syscall itself; Darwin's __getdirentries64 records rewritten as
      * linux_dirent64 (d_ino, d_off, d_reclen, d_type, d_name), each no longer than its source record.
      */
-    fun getdents(fd: Int, out: ByteArray, at: Int, length: Int): Int = Arena.ofConfined().use { arena ->
-        val native = arena.allocate(maxOf(1, length).toLong(), 8)
+    fun getdents(fd: Int, out: ByteArray, at: Int, length: Int): Int = native(maxOf(1, length)) { native ->
         val state = errnoState.get()
         if (linux) {
             val result = status(state, Syscall.call.invokeExact(state, if (arm64) 61L else 217L, fd.toLong(), native, length.toLong()) as Long)
             if (result > 0) MemorySegment.copy(native, 0, MemorySegment.ofArray(out), at.toLong(), result.toLong())
             return result
         }
-        val base = arena.allocate(long)
-        val result = status(state, Getdirentries.call.invokeExact(state, fd, native, length.toLong(), base) as Long)
+        val result = Arena.ofConfined().use { arena ->
+            status(state, Getdirentries.call.invokeExact(state, fd, native, length.toLong(), arena.allocate(long)) as Long)
+        }
         if (result <= 0) return result
         val records = ByteBuffer.wrap(out, at, length).order(ByteOrder.nativeOrder())
         var read = 0L

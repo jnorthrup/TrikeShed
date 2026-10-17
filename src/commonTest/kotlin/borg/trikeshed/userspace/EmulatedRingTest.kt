@@ -160,6 +160,37 @@ class EmulatedRingTest {
         ring.close().getOrThrow()
     }
 
+    @Test fun fixedFallbackRecyclesItsStagingUnclearedAndCopiesOutOnlyTheCompletion() {
+        val staged = mutableListOf<ByteArray>()
+        val backend = Backend().also {
+            it.effect = { sub ->
+                val buffer = requireNotNull(sub.buffer)
+                staged += buffer.array()
+                if (staged.size == 1) { for (i in 0 until sub.len) buffer.put(i, 33); sub.len }
+                else { buffer.put(0, 44); 1 }
+            }
+        }
+        val raw = ByteArray(8) { 7 }
+        val memory = MemoryMapping(Memory(raw), 3)
+        val ring = EmulatedRing(backend)
+        ring.open(1, 0).getOrThrow()
+        ring.registerBuffers(arrayOf(memory).toSeries()).getOrThrow()
+        ring.prepReadFixed(5, 0, 8, 0, 1).getOrThrow()
+        ring.submit().getOrThrow()
+        assertEquals(8, ring.peekCqe().getOrThrow()?.res)
+        raw.fill(7)
+        ring.prepReadFixed(5, 0, 8, 0, 2).getOrThrow()
+        ring.submit().getOrThrow()
+        assertEquals(1, ring.peekCqe().getOrThrow()?.res)
+        assertSame(staged[0], staged[1], "the second read reuses the first read's staging block")
+        assertEquals(33.toByte(), staged[1][1], "a recycled block is not cleared")
+        assertTrue(raw.contentEquals(byteArrayOf(44, 7, 7, 7, 7, 7, 7, 7)),
+            "only the completed byte leaves the block; its earlier bytes stay in the emulation")
+        ring.unregisterBuffers().getOrThrow()
+        memory.close()
+        ring.close().getOrThrow()
+    }
+
     @Test fun commonFallbackCopiesWriteBytesBeforeDispatch() {
         val backend = Backend().also {
             it.effect = { sub ->
