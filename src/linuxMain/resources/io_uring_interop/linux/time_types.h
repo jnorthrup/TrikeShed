@@ -4,6 +4,9 @@
 
 #include <linux/types.h>
 
+/* TrikeShed cinterop: the K/N sysroot's kernel 4.9 posix_types.h predates __kernel_time64_t (5.1). */
+typedef long long __kernel_time64_t;
+
 struct __kernel_timespec {
 	__kernel_time64_t       tv_sec;                 /* seconds */
 	long long               tv_nsec;                /* nanoseconds */
