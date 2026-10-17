@@ -1,0 +1,37 @@
+package borg.trikeshed.userspace.nio.file.spi
+
+import borg.trikeshed.common.Files
+import borg.trikeshed.userspace.UringOp
+import borg.trikeshed.userspace.wasi.Wasi
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+
+/** FileOperations over WASI preview 1 descriptors and the preopened directories. */
+class WasiFileOperations : FileOperations {
+    override fun open(path: String, readOnly: Boolean): Int =
+        Wasi.open(path.encodeToByteArray(), if (readOnly) UringOp.O_RDONLY else UringOp.O_RDWR or UringOp.O_CREAT)
+    override fun close(fd: Int): Int = Wasi.close(fd)
+    override fun size(fd: Int): Long = Wasi.stat(fd)?.size ?: -1L
+
+    override fun readAllLines(f: String) = Files.readAllLines(f)
+    override fun readAllBytes(f: String) = Files.readAllBytes(f)
+    override fun readString(f: String) = Files.readString(f)
+    override fun write(f: String, bytes: ByteArray) { Files.write(f, bytes) }
+    override fun write(f: String, lines: List<String>) { Files.write(f, lines) }
+    override fun write(f: String, string: String) { Files.write(f, string) }
+    override fun cwd() = Files.cwd()
+    override fun exists(f: String) = Files.exists(f)
+    override fun lastModified(filename: String): Long = Files.lastModified(filename)
+    override fun streamLines(f: String, bs: Int) = Files.streamLines(f, bs)
+    override fun iterateLines(f: String, bs: Int) = Files.iterateLines(f, bs)
+    override fun listDir(p: String) = Files.listDir(p)
+    override fun isDir(p: String) = Files.isDir(p)
+    override fun isFile(p: String) = Files.isFile(p)
+    override fun mkdirs(p: String) { Files.mkdirs(p) }
+    override fun deleteRecursively(p: String) { Files.deleteRecursively(p) }
+    override fun resolvePath(vararg p: String) = Files.resolvePath(*p)
+    override fun readZip(p: String) = Files.readZip(p)
+    override fun createTempDir(p: String) = Files.createTempDir(p)
+}
+
+internal actual val fileIoContext: CoroutineContext get() = EmptyCoroutineContext

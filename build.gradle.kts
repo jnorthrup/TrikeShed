@@ -27,6 +27,8 @@ plugins {
     kotlin("plugin.serialization") version "2.4.21"
     kotlin("plugin.compose") version "2.4.21"
     id("org.jetbrains.compose") version "1.11.1"
+    kotlin("plugin.allopen") version "2.4.21"
+    id("org.jetbrains.kotlinx.benchmark") version "0.5.0"
 }
 
 // Compose UI is a JVM-only surface in this multiplatform project.  The Kotlin
@@ -170,6 +172,18 @@ kotlin {
         }
         binaries.executable()
     }
+
+    // WASI preview 1 (wasmtime, node): files through the preopened directories, no sockets, no JS host.
+    @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
+    wasmWasi {
+        nodejs()
+        binaries.executable()
+    }
+    // compose-gradle-plugin 1.11.1 treats every JS-IR target as a web application and asks each of its binaries for a
+    // link sync task (configureWebApplication.kt:100); a WASI binary has none. Compose web stays on js and wasmJs.
+    @Suppress("DEPRECATION")
+    project.extensions.getByType<org.jetbrains.compose.ComposeExtension>().extensions
+        .getByType<org.jetbrains.compose.web.WebExtension>().targets(targets.getByName("js"), targets.getByName("wasmJs"))
 
     // ── Host-detected native targets — ACTIVE PLATFORM ONLY ─────────────────
     // No mobile shit: ios/watchos/tvos removed (dead targets that only produced
@@ -389,7 +403,10 @@ kotlin {
         val nonPosixMain = maybeCreate("nonPosixMain").apply { dependsOn(commonMain) }
         findByName("jvmMain")?.dependsOn(nonPosixMain)
         findByName("jsMain")?.dependsOn(nonPosixMain)
-        findByName("wasmJsMain")?.dependsOn(nonPosixMain)
+        // wasmMain: actuals shared by wasmJs and wasmWasi (no JS interop); each target adds its host bindings.
+        val wasmMain = maybeCreate("wasmMain").apply { dependsOn(nonPosixMain) }
+        findByName("wasmJsMain")?.dependsOn(wasmMain)
+        findByName("wasmWasiMain")?.dependsOn(wasmMain)
 
         // Source Set Hierarchy Documentation:
         // - posixMain: Code shared across posix platforms (macOS, Linux)
@@ -1963,4 +1980,44 @@ tasks.register<JavaExec>("uringBenchmarkJvm") {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     systemProperty("java.library.path", layout.buildDirectory.dir("native/jvm").get().asFile.absolutePath)
     providers.gradleProperty("uringBenchmarkArgs").orNull?.let { setArgsString(it) }
+}
+
+// ── Uring benchmarks through kotlinx-benchmark (JMH on the JVM) ──────────────────────────────────────────────────────
+// src/commonBench/kotlin holds the workload; each target compiles it in its own "bench" compilation, associated with
+// main. Configuration "main" runs the emulated rings everywhere; "native" runs the kernel ring where one exists
+// (linuxX64 kexe, JVM through libtrikeshed_uring.so): `./gradlew <target>BenchBenchmark`, `<target>BenchNativeBenchmark`.
+val benchTargetNames = setOf("jvm", "js", "wasmJs", "wasmWasi", "macos", "linuxX64", "linuxArm64")
+kotlin {
+    targets.matching { it.name in benchTargetNames }.all {
+        val main = compilations.getByName("main")
+        compilations.create("bench") {
+            associateWith(main)
+            defaultSourceSet {
+                kotlin.srcDir("src/commonBench/kotlin")
+                dependencies { implementation("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.5.0") }
+            }
+        }
+    }
+}
+
+allOpen { annotation("org.openjdk.jmh.annotations.State") }
+
+benchmark {
+    configurations {
+        named("main") {
+            warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
+            param("mode", "emulated")
+        }
+        register("native") {
+            warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
+            param("mode", "native")
+        }
+    }
+    targets { kotlin.targets.matching { it.name in benchTargetNames }.all { register("${this.name}Bench") } }
+}
+
+// JMH forks inherit the host VM's options: native access, and the JNI ring module where Linux builds it.
+tasks.matching { it.name.startsWith("jvmBench") && it is JavaExec }.configureEach {
+    this as JavaExec
+    jvmArgs("--enable-native-access=ALL-UNNAMED", "-Djava.library.path=" + layout.buildDirectory.dir("native/jvm").get().asFile.absolutePath)
 }
