@@ -78,7 +78,12 @@ internal class PanamaRing private constructor(
     private val wait: MemorySegment = arena.allocate(48, 8)
     private var closed = false
     /** Opcodes the running kernel reports supported (IORING_REGISTER_PROBE), as a bit per opcode number. */
-    val supported: LongArray = probe()
+    val supported: LongArray = try {
+        probe()
+    } catch (failure: Throwable) {
+        arena.close()
+        throw failure
+    }
 
     companion object {
         const val FEAT_SINGLE_MMAP = 1
@@ -107,6 +112,8 @@ internal class PanamaRing private constructor(
                 }
                 if (fd < 0) throw PanamaRingException(-fd.toInt(), "io_uring_setup failed: errno ${-fd}")
                 val ring = fd.toInt()
+                // Each mapping made so far, unmapped again if a later step fails (SINGLE_MMAP maps sq and cq once).
+                val mapped = ArrayList<MemorySegment>(3)
                 try {
                     val sqEntries = params.get(ValueLayout.JAVA_INT, 0)
                     val cqEntries = params.get(ValueLayout.JAVA_INT, 4)
@@ -117,17 +124,20 @@ internal class PanamaRing private constructor(
                     val sq: MemorySegment
                     val cq: MemorySegment
                     if (features and FEAT_SINGLE_MMAP != 0) {
-                        sq = PanamauRingSyscalls.map(maxOf(sqRingSize, cqRingSize), ring, 0L)
+                        sq = PanamauRingSyscalls.map(maxOf(sqRingSize, cqRingSize), ring, 0L).also(mapped::add)
                         cq = sq
                     } else {
-                        sq = PanamauRingSyscalls.map(sqRingSize, ring, 0L)
-                        cq = PanamauRingSyscalls.map(cqRingSize, ring, 0x8000000L)
+                        sq = PanamauRingSyscalls.map(sqRingSize, ring, 0L).also(mapped::add)
+                        cq = PanamauRingSyscalls.map(cqRingSize, ring, 0x8000000L).also(mapped::add)
                     }
-                    val sqes = PanamauRingSyscalls.map(64L * sqEntries, ring, 0x10000000L)
+                    val sqes = PanamauRingSyscalls.map(64L * sqEntries, ring, 0x10000000L).also(mapped::add)
                     return PanamaRing(ring, features, sqEntries, cqEntries, sq, cq, sqes,
                         u32(40), u32(44), sq.get(ValueLayout.JAVA_INT, u32(48)), u32(64),
                         u32(80), u32(84), cq.get(ValueLayout.JAVA_INT, u32(88)), u32(100))
                 } catch (failure: Throwable) {
+                    for (segment in mapped.asReversed()) {
+                        runCatching { PanamauRingSyscalls.unmap(segment) }.exceptionOrNull()?.let(failure::addSuppressed)
+                    }
                     JvmSocketSyscalls.close(ring)
                     throw failure
                 }
@@ -278,8 +288,12 @@ internal class PanamauChannelBackend(
     /** How long [cancelPending] waits for the kernel's cancellation CQEs. */
     private val cancelWaitNanos: Long = 5_000_000_000L,
 ) : UserspaceChannelBackend {
-    /** A kernel SQE between submission and CQE: what its CQE must still do. */
-    private class Native(val submission: UringSubmission, val osFd: Int, val scratch: MemorySegment?, val epoch: Int)
+    /**
+     * A kernel SQE between submission and CQE: what its CQE must still do. [kernel] is the user_data the SQE carries,
+     * from this backend's own counter; [submission] is the caller's operation, or null for this backend's own
+     * (the cancellations a CLOSE or a drain issues).
+     */
+    private class Native(val submission: UringSubmission?, val osFd: Int, val scratch: MemorySegment?, val epoch: Int, val kernel: Long)
 
     override val capabilities: Long get() = jvmUringOperations
     override val nativeCapabilities: Long = listOf(
@@ -293,13 +307,16 @@ internal class PanamauChannelBackend(
             "kernel executes ${UringOp.entries.filter { nativeCapabilities and it.mask != 0L }.joinToString(",")}; " +
             "other operations emulated"
 
+    /** Caller token -> its operation in the kernel. Caller tokens are any Long; they never reach the kernel. */
     private val inFlight = LongTable<Native>()
+    /** Kernel identity -> operation, for every SQE in the kernel (the caller's and this backend's own). */
+    private val byKernel = LongTable<Native>()
+    private var nextKernel = 1L
     /** Kernel SQEs per OS descriptor: a CLOSE first cancels what the kernel still holds on it. */
     private var onFd = IntArray(1024)
     /** Bumped by each CLOSE of the descriptor: an SQE of an older epoch cancelled since then ends with EBADF. */
     private var fdEpoch = IntArray(1024)
     private val completions = ArrayDeque<SelectionResult>()
-    private var internal = Long.MIN_VALUE
     private var internalInFlight = 0
     private val arena = Arena.ofShared()
     private var closed = false
@@ -371,9 +388,10 @@ internal class PanamauChannelBackend(
             OP_NOP -> {}
             OP_POLL_REMOVE, OP_ASYNC_CANCEL -> {
                 // Watches the emulation holds (JDK channels) are cancelled there.
-                if (sub.addr !in inFlight) return delegate(sub)
+                val target = inFlight[sub.addr] ?: return delegate(sub)
                 if (code == OP_ASYNC_CANCEL && (sub.operationFlags != 0 || sub.len != 0 || sub.offset != 0L)) return delegate(sub)
-                address = sub.addr
+                // The kernel knows the target by its kernel identity, not by the caller's token.
+                address = target.kernel
             }
             else -> {
                 osFd = osFd(sub.fd)
@@ -416,12 +434,15 @@ internal class PanamauChannelBackend(
             }
         }
         if (ring.space() <= 0) flush(0, -1L)
-        check(ring.push(code, osFd, offset, address, length, operationFlags, sub.userData)) { "io_uring SQ full after enter" }
+        val kernel = nextKernel++
+        check(ring.push(code, osFd, offset, address, length, operationFlags, kernel)) { "io_uring SQ full after enter" }
         if (osFd >= onFd.size) {
             onFd = onFd.copyOf(maxOf(osFd + 1, onFd.size * 2))
             fdEpoch = fdEpoch.copyOf(onFd.size)
         }
-        inFlight.put(sub.userData, Native(sub, osFd, scratch, if (osFd >= 0) fdEpoch[osFd] else 0))
+        val native = Native(sub, osFd, scratch, if (osFd >= 0) fdEpoch[osFd] else 0, kernel)
+        inFlight.put(sub.userData, native)
+        byKernel.put(kernel, native)
         if (osFd >= 0) onFd[osFd]++
         return null
     }
@@ -471,11 +492,12 @@ internal class PanamauChannelBackend(
         return own
     }
 
+    /** This backend's own SQE (a cancellation): a kernel identity like any other, with no caller token behind it. */
     private fun internalOp(code: Int, osFd: Int, address: Long, operationFlags: Int) {
-        var token = internal++
-        while (token in inFlight) token = internal++
         if (ring.space() <= 0) flush(0, -1L)
-        check(ring.push(code, osFd, 0L, address, 0, operationFlags, token)) { "io_uring SQ full after enter" }
+        val kernel = nextKernel++
+        check(ring.push(code, osFd, 0L, address, 0, operationFlags, kernel)) { "io_uring SQ full after enter" }
+        byKernel.put(kernel, Native(null, -1, null, 0, kernel))
         internalInFlight++
     }
 
@@ -491,24 +513,27 @@ internal class PanamauChannelBackend(
     }
 
     private fun drainCq() {
-        ring.reap { userData, res, _ ->
+        ring.reap { kernel, res, _ ->
             reaped++
-            val native = inFlight.remove(userData)
-            if (native == null) {
-                if (internalInFlight > 0 && userData < 0) internalInFlight--
+            val native = byKernel.remove(kernel) ?: return@reap
+            val sub = native.submission
+            if (sub == null) {
+                internalInFlight--
                 return@reap
             }
+            inFlight.remove(sub.userData)
             if (native.osFd >= 0) onFd[native.osFd]--
             // A watch the CLOSE of its descriptor cancelled reports EBADF, as the emulated executor does.
             val closedUnder = res == -125 && native.osFd >= 0 && native.epoch != fdEpoch[native.osFd]
-            completions.addLast(SelectionResult(if (closedUnder) -9 else finish(native, res), userData))
+            completions.addLast(SelectionResult(if (closedUnder) -9 else finish(native, res), sub.userData))
+            // Only now, at its terminal CQE, does the kernel stop writing the staging segment.
             native.scratch?.let(::recycle)
         }
     }
 
     /** Completes what the kernel result implies: an accepted descriptor joins the table, read bytes reach the heap. */
     private fun finish(native: Native, res: Int): Int {
-        val sub = native.submission
+        val sub = native.submission!!
         return when (sub.opcode) {
             UringOp.ACCEPT -> if (res < 0) res else JvmFileTable.register(JvmSocketDescriptor(res))
             // The kernel always reports EPOLLRDHUP (IO_POLL_UNMASK); the portable vocabulary is the POLL bits 0x3f, and
@@ -576,7 +601,8 @@ internal class PanamauChannelBackend(
 
     @Synchronized
     override fun counters(): Map<String, Long> = linkedMapOf(
-        "native.inFlight" to inFlight.size.toLong(), "native.enters" to enters, "native.submitted" to submitted,
+        "native.inFlight" to inFlight.size.toLong(), "native.internalInFlight" to internalInFlight.toLong(),
+        "native.enters" to enters, "native.submitted" to submitted,
         "native.reaped" to reaped, "native.features" to ring.features.toLong(),
     ) + emulated.counters()
 

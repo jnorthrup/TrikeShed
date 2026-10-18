@@ -656,9 +656,14 @@ actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): U
     require(entries > 0)
     val discovery = discoverJvmUringBackend(entries, mode)
     val selected = discovery.backend ?: JvmUserspaceChannelBackend(discovery.report.description)
+    // The probe's verdict and what was actually selected (the FFM ring, the JNI module, or emulation) with the
+    // operations its kernel executes: a native label or a kernel NOP alone does not show native network I/O.
+    val report = discovery.report
+    val described = "${report.description}; probe module=${report.module ?: "none"} phase=${report.phase}; " +
+        "selected: ${selected.availability}; kernel ops 0x${selected.nativeCapabilities.toString(16)}"
     return object : UserspaceChannelBackend by selected {
-        override val probeReport = discovery.report
-        override val availability = discovery.report.description
+        override val probeReport = report
+        override val availability = described
     }
 }
 
