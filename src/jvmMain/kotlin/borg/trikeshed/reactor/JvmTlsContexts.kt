@@ -19,6 +19,7 @@ import javax.net.ssl.KeyManagerFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLPeerUnverifiedException
+import javax.net.ssl.SSLSession
 import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 
@@ -213,27 +214,44 @@ internal fun namedGroupOf(group: TlsSupportedGroup): String = when (group) {
 }
 
 /** The negotiated session as the TLS vocabulary names it; null before a protocol and suite are agreed. */
-internal fun sessionOf(engine: SSLEngine): TlsSession? {
-    val session = engine.session ?: return null
+internal fun sessionOf(engine: SSLEngine): TlsSession? = engine.session?.let { sessionOf(engine, it) }
+
+/**
+ * [session]'s metadata in the TLS vocabulary. The peer certificates are asked for once: without a client certificate
+ * the JDK answers by constructing and throwing an SSLPeerUnverifiedException.
+ */
+internal fun sessionOf(engine: SSLEngine, session: SSLSession): TlsSession? {
     val protocol = protocolOf(session.protocol) ?: return null
     val cipherSuite = cipherSuiteOf(session.cipherSuite) ?: return null
-    val peerCertificate = try {
-        (session.peerCertificates.firstOrNull() as? X509Certificate)?.let {
-            TlsPeerCertificate(subject = it.subjectX500Principal?.name, issuer = it.issuerX500Principal?.name)
-        }
+    val peers = try {
+        session.peerCertificates
     } catch (_: SSLPeerUnverifiedException) {
         null
     }
-    val verified = try {
-        session.peerCertificates.isNotEmpty()
-    } catch (_: SSLPeerUnverifiedException) {
-        false
-    }
+    val first = peers?.firstOrNull() as? X509Certificate
     return TlsSession(
         protocol = protocol,
         cipherSuite = cipherSuite,
-        peerCertificate = peerCertificate,
-        verified = verified,
+        peerCertificate = first?.let { TlsPeerCertificate(subject = it.subjectX500Principal?.name, issuer = it.issuerX500Principal?.name) },
+        verified = peers != null && peers.isNotEmpty(),
         applicationProtocol = TlsApplicationProtocol.entries.firstOrNull { it.wireName == engine.applicationProtocol },
     )
+}
+
+/**
+ * An engine's negotiated metadata, derived once per SSLSession object. The engine returns the same session object
+ * until another handshake completes (a renegotiation gives a new one), so a record path derives nothing per record.
+ */
+internal class TlsSessionCache {
+    private var source: SSLSession? = null
+    private var value: TlsSession? = null
+
+    fun of(engine: SSLEngine): TlsSession? {
+        val current = engine.session ?: return null
+        if (current !== source) {
+            value = sessionOf(engine, current)
+            source = current
+        }
+        return value
+    }
 }

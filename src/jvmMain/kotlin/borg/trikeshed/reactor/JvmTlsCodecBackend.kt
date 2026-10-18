@@ -38,7 +38,10 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
     private data class EngineHandle(
         val engine: SSLEngine,
         var started: Boolean = false,
-    )
+    ) {
+        /** The negotiated metadata, derived once per SSLSession rather than per record. */
+        val sessions = TlsSessionCache()
+    }
 
     private data class DownstreamOutcome(
         val plaintext: ByteArray,
@@ -59,7 +62,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
         val outboundCiphertext = drainHandshakeCiphertext(handle.engine)
         val next = state.copy(
             lifecycle = lifecycleFor(handle, closed = false),
-            session = sessionOf(handle.engine),
+            session = handle.sessions.of(handle.engine),
             pendingUpstreamCiphertext = ByteSeries(outboundCiphertext),
         )
 
@@ -95,7 +98,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
 
         val plaintext = payload.toArray()
         val ciphertext = wrapApplicationCiphertext(handle.engine, plaintext)
-        val session = sessionOf(handle.engine) ?: state.session
+        val session = handle.sessions.of(handle.engine) ?: state.session
         val next = state.copy(
             lifecycle = lifecycleFor(handle, closed = false),
             session = session,
@@ -137,7 +140,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
         val incoming = payload.toArray()
         val combined = state.pendingDownstreamCiphertext.toArray() + incoming
         val outcome = unwrapDownstream(handle.engine, combined)
-        val session = sessionOf(handle.engine) ?: state.session
+        val session = handle.sessions.of(handle.engine) ?: state.session
         val next = state.copy(
             lifecycle = lifecycleFor(handle, closed = outcome.closed),
             session = session,
@@ -191,7 +194,7 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
         val handle = engineHandle(config, state)
         handle.engine.closeOutbound()
         val ciphertext = drainCloseCiphertext(handle.engine)
-        val session = sessionOf(handle.engine) ?: state.session
+        val session = handle.sessions.of(handle.engine) ?: state.session
         engines.remove(state.connectionOrdinal)
 
         val next = state.copy(
@@ -377,14 +380,14 @@ class JvmTlsCodecBackend @JvmOverloads constructor(
         when {
             closed || handle.engine.isInboundDone && handle.engine.isOutboundDone -> TlsConnectionState.CLOSED
             !handle.started -> TlsConnectionState.CREATED
-            handshakeComplete(handle.engine) -> TlsConnectionState.OPEN
+            handshakeComplete(handle) -> TlsConnectionState.OPEN
             else -> TlsConnectionState.NEGOTIATING
         }
 
-    private fun handshakeComplete(engine: SSLEngine): Boolean =
-        engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING &&
-            sessionOf(engine) != null &&
-            !engine.isOutboundDone
+    private fun handshakeComplete(handle: EngineHandle): Boolean =
+        handle.engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NOT_HANDSHAKING &&
+            handle.sessions.of(handle.engine) != null &&
+            !handle.engine.isOutboundDone
 
     private suspend fun runDelegatedTasks(engine: SSLEngine) {
         while (engine.handshakeStatus == SSLEngineResult.HandshakeStatus.NEED_TASK) {
