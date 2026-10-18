@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
+import borg.trikeshed.graal.subvm.GuestEnvironment
 import kotlinx.coroutines.*
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -107,7 +108,7 @@ class JvmProcessProtocolPipes private constructor(
                     val arguments = command(transport?.port, transport?.token)
                     require(arguments.isNotEmpty() && arguments[0].isNotBlank()) { "Process command is missing" }
                     val builder = ProcessBuilder(arguments)
-                    builder.environment().apply { clear(); putAll(environment) }
+                    builder.environment().apply { clear(); putAll(environment.filterKeys { GuestEnvironment.deliberate(it) != GuestEnvironment.Disposition.BLOCKED }) }
                     workingDirectory?.let { builder.directory(File(it)) }
                     if (inheritError) builder.redirectError(ProcessBuilder.Redirect.INHERIT)
                     builder.redirectErrorStream(mergeError)

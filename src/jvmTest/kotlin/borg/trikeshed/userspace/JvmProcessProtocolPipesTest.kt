@@ -127,11 +127,27 @@ class JvmProcessProtocolPipesTest {
         }
     }
 
+    @Test fun secretKeysAreFilteredFromProcessProtocolPipesEnvironment(): Unit = runBlocking {
+        withTimeout(15_000) {
+            val pipes = JvmProcessProtocolPipes.open(
+                { port, token -> command("echo", port, token) },
+                mapOf("MY_API_KEY" to "secret-leak", "OWN_VAR" to "explicit-fixture"), protocolTimeoutMillis = 5_000,
+            )
+            try {
+                pipes.closeInput()
+                pipes.closeProtocolInput()
+                val result = bytes(pipes::readProtocol).decodeToString()
+                assertContains(result, "|explicit-fixture|")
+                assertFalse(result.contains("secret-leak"))
+            } finally { pipes.close() }
+        }
+    }
+
     @Test fun socketProtocolPreservesPhysicalStdinAndTerminalOutputs(): Unit = runBlocking {
         withTimeout(15_000) {
             val pipes = JvmProcessProtocolPipes.open(
                 { port, token -> command("echo", port, token) },
-                mapOf("OWN_API_KEY" to "explicit-fixture"), protocolTimeoutMillis = 5_000,
+                mapOf("OWN_VAR" to "explicit-fixture"), protocolTimeoutMillis = 5_000,
             )
             try {
                 assertTrue(pipes.separateProtocol)
@@ -227,7 +243,7 @@ object JvmProcessProtocolChild {
                 val terminal = System.`in`.readAllBytes().decodeToString()
                 val protocol = socket.getInputStream().readAllBytes().decodeToString()
                 socket.getOutputStream().apply {
-                    write("$terminal|${System.getenv("OWN_API_KEY")}|$protocol".encodeToByteArray())
+                    write("$terminal|${System.getenv("OWN_VAR")}|$protocol".encodeToByteArray())
                     flush()
                 }
             }
