@@ -356,7 +356,13 @@ fun <T> seriesOf(list: List<T>): Series<T> = list.toSeries()
 @Suppress("UNCHECKED_CAST")
 fun seriesOfAny(list: List<Any?>): Series<Any?> = list.toSeries()
 
-fun ByteArray.toSeries(): Series<Byte> = size j ::get
+fun ByteArray.toSeries(): Series<Byte> = ByteArraySeries(this)
+
+/**
+ * A ByteArray as a Series, a live view as `size j ::get` is: readers that know this class take [bytes] after one type
+ * test instead of a boxed oracle call per byte.
+ */
+class ByteArraySeries(val bytes: ByteArray) : Joined<Int, (Int) -> Byte>(bytes.size, bytes::get)
 fun ShortArray.toSeries(): Series<Short> = size j ::get
 fun IntArray.toSeries(): Series<Int> = size j ::get
 fun LongArray.toSeries(): Series<Long> = size j ::get

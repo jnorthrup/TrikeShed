@@ -66,7 +66,8 @@ enum class Syntax {
 
     fun scan0(src: Series<Byte>): Join<Cursor, FlatIndex> {
         // One read of the source into a primitive array; the scan below indexes it with no boxed calls.
-        val chars = CharArray(src.size) { src[it].toInt().toChar() }
+        val bytes = (src as? ByteArraySeries)?.bytes
+        val chars = if (bytes != null) CharArray(bytes.size) { bytes[it].toInt().toChar() } else CharArray(src.size) { src[it].toInt().toChar() }
         val opens = series()
         val closes = series()
         val tags = ChunkedMutableSeries<IOMemento>()

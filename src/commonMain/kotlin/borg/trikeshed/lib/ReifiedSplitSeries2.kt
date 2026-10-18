@@ -20,8 +20,8 @@ import kotlin.jvm.JvmName
 class ReifiedSplitSeries2<A, B>(val leftSeries: Series<A>, val rightSeries: Series<B>) : Series2<A, B> {
 
     override val a: Int get() = minOf(leftSeries.a, rightSeries.a)
-    override val b: (Int) -> Join<A, B>
-        get() = { i -> leftSeries[i] j rightSeries[i] }
+    /** Built once: reading [b] allocates nothing (each element read still makes its Join). */
+    override val b: (Int) -> Join<A, B> = { i -> leftSeries[i] j rightSeries[i] }
 
     // ── Column selection ──────────────────────────────────────────────
 
