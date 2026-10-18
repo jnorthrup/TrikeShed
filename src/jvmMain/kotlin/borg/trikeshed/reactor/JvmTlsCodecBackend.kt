@@ -30,10 +30,13 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
 
 class JvmTlsCodecBackend @JvmOverloads constructor(
-    /** Optional byte-codec engine provision: callers own in-memory identity and peer trust policy. */
-    private val engineFactory: ((TlsConfig, TlsFlowState) -> SSLEngine)? = null,
     /** The SSLContexts this backend's engines come from, one per identity, with their explicit reload. */
     val contexts: JvmTlsContexts = JvmTlsContexts(),
+    /**
+     * Optional byte-codec engine provision: callers own in-memory identity and peer trust policy. Last, so the
+     * trailing-lambda form `JvmTlsCodecBackend { config, state -> engine }` still binds here.
+     */
+    private val engineFactory: ((TlsConfig, TlsFlowState) -> SSLEngine)? = null,
 ) : TlsCodecBackend {
     private data class EngineHandle(
         val engine: SSLEngine,

@@ -49,7 +49,9 @@ interface TlsRecordSession {
 
     /**
      * Plaintext [bytes] in [from, to) as records into [sink], or held behind the engine (see [pendingPlaintext]).
-     * Anything but [TlsSendOutcome.ACCEPTED] leaves the bytes with the caller.
+     * [TlsSendOutcome.BACKPRESSURE] and [TlsSendOutcome.NOT_ESTABLISHED] take none of the bytes; [TlsSendOutcome.CLOSED]
+     * ends the session, and when a failure ends it midway through a multi-record send, records of a prefix may
+     * already be in the sink.
      */
     fun send(bytes: ByteArray, from: Int, to: Int, sink: TlsRecordSink): TlsSendOutcome
 
@@ -71,7 +73,10 @@ enum class TlsSendOutcome {
     /** None of it: the handshake has not finished. */
     NOT_ESTABLISHED,
 
-    /** The session is closed or closing: nothing more of it reaches the peer. */
+    /**
+     * The session is closed or closing. Refused up front (already closed or closing) it takes none of the bytes; a
+     * failure during this send may leave records of a prefix in the sink, after which nothing more reaches the peer.
+     */
     CLOSED,
 }
 
