@@ -969,6 +969,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         // The parties the work defines for itself, as each section's parse finds them (a preamble's come first): its
         // pronouns read as those nouns, so "you may …" is a party's norm.
         val parties = LinkedHashMap<String, PartyAliases.Party>()
+        val partyClass = HashMap<String, Int>()
         val cites = SectionShapes.cites(cut)
         // The notes' prose, read by the same parser: what the curator holds the work to. Its statements are
         // conventions for the reading (their bearers' classes steer senses) and the measure of conformance.
@@ -1010,6 +1011,13 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             val t0 = System.currentTimeMillis()
             val doc = nlp.analyze(sec)
             for ((alias, party) in PartyAliases.of(doc)) parties.putIfAbsent(alias, party)
+            // A party's class is the noun sense every one of its aliases shares ("user" and "customer": Human), else
+            // its named-entity tag's: the contract's own definition picks the sense, no guess among the lexicon's.
+            for ((noun, aliases) in parties.entries.groupBy({ it.value.noun }, { it.key })) if (noun !in partyClass) {
+                val shared = aliases.map { SumoCorpus.nounSenses(it).toSet() }.filter { it.isNotEmpty() }.reduceOrNull { a, b -> a intersect b }
+                val ner = parties.values.first { it.noun == noun }.ner
+                (shared?.firstOrNull() ?: NER_CLASS[ner]?.let { SumoCorpus.classifier.classId(it)?.value })?.let { partyClass[noun] = it }
+            }
             val read = bertReading(name, sentences(sec, doc, parties), evidenceBooks, evidence)
             files.writeAtomically(readingFile(name, k).absolutePath, jsonOf(read).encodeToByteArray())
             val found = NormClauses.extract(doc, generic, parties)
@@ -1023,6 +1031,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                     .filterIsInstance<Map<*, *>>().firstOrNull { it["lemma"] == c.head && it["by"] == "bert" }
                 val learned = this@ConstellationNodes.typed(c.head, crafted) ?:
                     this@ConstellationNodes.typed(c.head.removeSuffix("s"), crafted)
+                partyClass[c.head]?.let { typed[c] = it; continue }
                 typed[c] = if (learned == null && neural != null)
                     SumoCorpus.classifier.classId(neural["class"].toString())?.value ?: bearerClass(c, nouns, believed, crafted)
                 else bearerClass(c, nouns, believed, crafted)

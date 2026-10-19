@@ -82,8 +82,9 @@ data class NormStatement(
     )
 
     companion object {
+        /** The clause's object keeps its oblique ("ask user for user password"): what it qualifies is part of the norm. */
         fun of(c: NormClause, classOf: (NormClause) -> Int = { -1 }) =
-            NormStatement(c.subject, Modality.of(c), c.verb, c.obj, c.condition, classOf(c))
+            NormStatement(c.subject, Modality.of(c), c.verb, listOfNotNull(c.obj, c.oblique).joinToString(" ").ifEmpty { null }, c.condition, classOf(c))
     }
 }
 

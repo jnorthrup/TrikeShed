@@ -36,7 +36,7 @@ data class NormClause(
 object NormClauses {
     private val modals = setOf("will", "must", "may", "shall", "should", "can", "cannot", "would", "ought")
     private val negators = setOf("not", "never", "no", "n't")
-    private val modifiers = arrayOf("compound", "amod", "nmod:poss")
+    private val modifiers = arrayOf("compound", "amod", "nmod:poss", "nummod")
     private val conditionMarks = setOf("if", "when", "unless", "until", "where", "whenever", "before", "after", "upon")
 
     /**
@@ -118,9 +118,8 @@ object NormClauses {
                             v.lemma.lowercase()).joinToString(" ")
                     }
                 }
-                // The other subjects of the verb are their own clauses' words, not words this one dropped. The oblique is
-                // not part of the statement's identity, so its words count as dropped.
-                val kept = (subjects.mapNotNull { tokens[it.dependent]?.let(::phrase) } + listOfNotNull(verb.lemma.lowercase(), obj?.let(::phrase), condition))
+                // The other subjects of the verb are their own clauses' words, not words this one dropped.
+                val kept = (subjects.mapNotNull { tokens[it.dependent]?.let(::phrase) } + listOfNotNull(verb.lemma.lowercase(), obj?.let(::phrase), obl, condition))
                     .flatMap { it.split(' ', '_') }.toSet()
                 val words = span(verb).filter(::content)
                 out.add(NormClause(
