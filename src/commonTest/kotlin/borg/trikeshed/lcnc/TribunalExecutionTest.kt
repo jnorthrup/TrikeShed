@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.get
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -11,9 +13,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
- * The tribunal execution gate. The preset was a document whose node types
- * (mux.chat / kg.ingest / display) had NO in-process runner — the first
- * sweep threw LcncUnknownNodeType. This test proves the fix:
+ * The tribunal execution gate: mux.chat / tribunal.record / display
+ * run through the same executor, with retained prose distinct from KG assertions.
  *
  *  - every tribunal node type is contract-declared AND registry-served,
  *  - the preset EXECUTES end to end through the one executor with a
@@ -31,7 +32,7 @@ class TribunalExecutionTest {
     private fun preset(): LcncProgram =
         LcncProgramConfix.fromJson("preset-tribunal", LcncPresets.all().getValue("preset-tribunal"))
 
-    private fun runner(program: LcncProgram): LcncRunner {
+    private fun runner(program: LcncProgram, cas: CasStore = CasStore.inMemory()): LcncRunner {
         val registry = mutableMapOf<String, LcncNodeRunner>()
         // The tribunal seat — the model dialog the hermes-env seam stands in for.
         val dialog = TribunalDialog { node, system, prompt ->
@@ -40,11 +41,8 @@ class TribunalExecutionTest {
             // answered) second.
             (system + "::" + prompt) to (node.params["job"] ?: node.id)
         }
-        val ingested = mutableListOf<String>()
-        registry.putAll(TribunalNodes.registry(dialog) { verdict ->
-            ingested.add(verdict)
-            verdict
-        })
+        registry.putAll(CouncilNodes.registry(CouncilDialog { error("unexpected Council seat") }))
+        registry.putAll(TribunalNodes.registry(dialog, tribunalRecord(cas) { it.value }))
         // The canned motion literal the preset ships (t0/n12 sockets): one
         // shared source, PureNodes' text.value runner.
         registry["text.value"] = PureNodes.registry { 0L }["text.value"]!!
@@ -60,7 +58,7 @@ class TribunalExecutionTest {
         }
         // The three tribunal seats are the gap this test fixes: each needs an
         // in-process runner, else the first sweep throws LcncUnknownNodeType.
-        for (t in setOf("mux.chat", "kg.ingest", "display")) {
+        for (t in setOf("mux.chat", "tribunal.record", "display")) {
             assertTrue(t in types, "preset-tribunal must still use '$t'")
             assertTrue(t in TribunalNodes.servedTypes(), "tribunal type '$t' must have an in-process runner")
         }
@@ -69,10 +67,11 @@ class TribunalExecutionTest {
     @Test
     fun tribunalRunsEndToEndThroughTheOneExecutor() = runTest {
         val program = preset()
+        val cas = CasStore.inMemory()
         // The human-oversight brief enters as the ROOT frame binding `brief`
         // (the preset's first seat reads it through the frame chain — the
         // warm base). runProcedure's args ARE the root bindings.
-        val result = runner(program).runProcedure(
+        val result = runner(program, cas).runProcedure(
             program,
             args = mapOf("brief" to "the motion: admit the record as evidence"),
         )
@@ -99,6 +98,7 @@ class TribunalExecutionTest {
         val report = (result.nodeOutputs["n5"]!!["report"]) as Map<*, *>
         assertEquals(verdict, report["text"])
         val cid = report["cid"] as String
+        assertEquals(verdict, cas.get(ContentId(cid))!!.decodeToString(), "digest alone is not recording")
         assertTrue(cid.startsWith("sha256:") && cid.length == 71, "verdict cid must be content-addressed")
         assertEquals(verdict.length, report["chars"], "report carries the verdict length")
         // display passed the report through unchanged.

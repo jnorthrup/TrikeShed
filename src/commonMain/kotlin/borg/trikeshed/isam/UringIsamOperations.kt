@@ -1,5 +1,6 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.context.*
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -13,7 +14,6 @@ import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.OpenOption
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.sync.Mutex
 
 internal typealias IsamChannelFactory = (String, Set<OpenOption>) -> FileChannel
 
@@ -246,20 +246,27 @@ class UringIsamDataReader internal constructor(
     }
 }
 
-/** [leafBytes] > 0 writes every group file as zstd seekable leaves of that many bytes (see [IsamLeaves]). */
+/**
+ * [leafBytes] > 0 writes every group file as zstd seekable leaves (see [IsamLeaves]).
+ * [Synchronization.NONE] requires the owner to serialize writes on any host;
+ * the default serializes synchronous writes from shared callers.
+ */
 class UringIsamOperations internal constructor(
     private val channelFactory: IsamChannelFactory,
     private val readMode: IsamReadMode = IsamReadMode.CHANNEL,
     val leafBytes: Int = 0,
     val leafCodec: IsamLeafCodec = ZstdLeafCodec,
+    val synchronization: Synchronization = Synchronization.MONITOR,
 ) : IsamOperations {
     constructor(readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0,
-                leafCodec: IsamLeafCodec = ZstdLeafCodec) : this(::openIsamChannel, readMode, leafBytes, leafCodec)
+                leafCodec: IsamLeafCodec = ZstdLeafCodec, synchronization: Synchronization = Synchronization.MONITOR) :
+        this(::openIsamChannel, readMode, leafBytes, leafCodec, synchronization)
     constructor(scope: CoroutineScope, readMode: IsamReadMode = IsamReadMode.CHANNEL, leafBytes: Int = 0,
-                leafCodec: IsamLeafCodec = ZstdLeafCodec) :
-        this({ path, options -> FileChannel.open(scope, path, options) }, readMode, leafBytes, leafCodec)
+                leafCodec: IsamLeafCodec = ZstdLeafCodec, synchronization: Synchronization = Synchronization.MONITOR) :
+        this({ path, options -> FileChannel.open(scope, path, options) }, readMode, leafBytes, leafCodec, synchronization)
     private val metadataFiles = IsamFileOperations(channelFactory)
-    private val lock = Mutex()
+    private val lock = synchronization.lock()
+    private var writing = false
 
     override fun metadata(metafile: IsamMetaFileReader): IsamMetaFileReader =
         metafile.withDefaultFiles(metadataFiles) { path -> FileBackedStringpool(path, 64, channelFactory, leafCodec) }
@@ -396,8 +403,9 @@ class UringIsamOperations internal constructor(
             throw caught
         } finally { closeChannels(channels.values, failure) }
     }
-    private inline fun <T> exclusive(operation: () -> T): T {
-        check(lock.tryLock()) { "Concurrent ISAM writes require serialization by their owner" }
-        try { return operation() } finally { lock.unlock() }
+    private inline fun <T> exclusive(operation: () -> T): T = synchronize(lock) {
+        check(!writing) { "An ISAM write is already active" }
+        writing = true
+        try { operation() } finally { writing = false }
     }
 }

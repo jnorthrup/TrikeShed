@@ -105,9 +105,14 @@ class WorktreeCouchGateway(
             // and another plane (the Git mirror under `<prefix>.git/`) may own it.
             val relative = path.removePrefix(prefix)
             if (relative.split('/').any { it in excludedSegments } ||
-                excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") } || excludedPath(relative)) continue
-            attachments.deleteAttachment(path, ref.revision)
-            deletedPaths.add(path)
+                excludedRelativePrefixes.any { relative == it || relative.startsWith("$it/") }) continue
+            // excludedPath is not a directory another plane owns: it is THIS plane's content
+            // exclusion (HermesCorpus traces). A doc already absorbed under it is an orphan the
+            // walk can never re-claim — before this branch, ~1.7M ghost filenodes absorbed
+            // before the trace exclusion existed could never be cleared by any reconcile, and
+            // the terrain showed files long gone. Tombstone the doc; the source file on disk
+            // stays a retained file, untouched.
+            if (attachments.deleteAttachment(path, ref.revision)) deletedPaths.add(path)
         }
 
         return Snapshot(revision, currentLogicalPaths.sorted(), deletedPaths.sorted(), skippedDirs.sorted(), skippedFiles.sorted())

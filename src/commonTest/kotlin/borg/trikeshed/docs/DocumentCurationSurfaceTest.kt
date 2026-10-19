@@ -4,6 +4,21 @@ import borg.trikeshed.parse.reify
 import kotlin.test.*
 
 class DocumentCurationSurfaceTest {
+    @Test fun retainedAttemptAndStageLinksPinCborWithoutLoadingOrExecutingAProgram() {
+        val cid = "sha256:" + "a".repeat(64)
+        val stage = "sha256:" + "b".repeat(64)
+        val result = assertNotNull(DocumentSurface.curationResult(reify("""{
+            "receiptCid":"$cid","record":{"toolReceipts":[{"stage":"MODEL","status":"FAILURE","receiptCid":"$stage"}]}
+        }""")))
+        val html = DocumentSurface.curationResultHtml(result)
+        for (id in listOf(cid, stage)) assertContains(html, "/panels?content=$id&amp;syntax=CBOR")
+        assertContains(html, "MODEL · failed")
+        assertFalse(html.contains("?load="))
+        assertEquals("", DocumentSurface.curationConfixLink("javascript:alert(1)", "unsafe"))
+        assertEquals("", DocumentSurface.curationConfixLink(null, "missing"))
+        assertContains(DocumentSurface.curationConfixLink(cid, "<label>"), "&lt;label&gt;")
+    }
+
     fun render(record: String): String = DocumentSurface.curationResultHtml(assertNotNull(
         DocumentSurface.curationResult(reify("""{"receiptCid":"sha256:attempt","record":$record}"""))))
 

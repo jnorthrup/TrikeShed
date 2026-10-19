@@ -129,7 +129,7 @@ object AgentNodes {
             maxBytes = pick("maxBytes").toIntOrNull()?.coerceIn(4096, 64 * 1024 * 1024) ?: DEFAULT_MAX_BYTES,
             retain = pick("retain").equals("true", ignoreCase = true),
             runId = runId,
-            jobId = jobId,
+            jobId = jobId.ifBlank { pick("jobId").trim() },
         )
     }
 
@@ -140,12 +140,17 @@ object AgentNodes {
         },
         RUN to boundLcnc(AgentRunsKey(runs), boundLcnc(AgentRunIdKey(mintRunId)) { ids, node, inputs ->
             val request = requestOf(node, inputs, ids.value())
+            require(request.runId.isNotBlank()) { "agent.run: run identity is empty" }
             require(request.agent.isNotEmpty()) { "agent.run: no agent named (wire agent? or set the agent param)" }
             require(request.brief.isNotEmpty()) { "agent.run: no brief wired or in params" }
             val result = AgentRunsKey.require().run(request)
+            check(result.runId == request.runId && result.jobId == request.jobId && result.agent == request.agent) {
+                "agent.run: result identity does not match the dispatched request"
+            }
             mapOf(
                 "summary" to result.summary, "transcriptCid" to result.transcriptCid, "patchCid" to result.patchCid,
                 "exit" to result.exit, "ok" to result.ok, "error" to result.error, "runId" to result.runId, "truncated" to result.truncated,
+                "jobId" to result.jobId, "receipt" to result.receipt(),
             )
         }),
     )

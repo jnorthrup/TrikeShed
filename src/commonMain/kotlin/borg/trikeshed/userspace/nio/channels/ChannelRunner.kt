@@ -8,18 +8,23 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * ChannelRunner — reactor-based channel event loop.
@@ -48,6 +53,7 @@ class ChannelRunner(
     private var polling: Job? = null
     private var dispatching: Job? = null
     private var dispatchFailure: Throwable? = null
+    private val control = Channel<Unit>(1)
 
     /** Open a TCP listener socket and register for accept events.
      *  Used by servers. The returned fd is a ServerSocketChannel-equivalent. */
@@ -162,31 +168,50 @@ class ChannelRunner(
         state = ElementState.ACTIVE
         val signals = Channel<ReactorSignal>(16)
         val ownedScope = CoroutineScope(scope.coroutineContext + owner + channelOps + reactorOps)
-        dispatching = ownedScope.launch {
-            for (signal in signals) {
-                try {
-                    onSignal(signal)
-                } catch (failure: Throwable) {
-                    if (dispatchFailure == null) dispatchFailure = failure
-                    stop()
-                }
-                if (Interest.READ in signal.ready) {
-                    readers.remove(signal.fd)?.complete(1)
-                }
-                if (Interest.WRITE in signal.ready) {
-                    val queue = writers[signal.fd]
-                    if (queue != null && queue.isNotEmpty()) {
-                        queue.removeAt(0).complete(Unit)
+        dispatching = ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            withContext(NonCancellable) {
+                for (signal in signals) {
+                    try {
+                        onSignal(signal)
+                    } catch (failure: Throwable) {
+                        if (dispatchFailure == null) dispatchFailure = failure
+                        stop()
+                    }
+                    if (Interest.READ in signal.ready) {
+                        readers.remove(signal.fd)?.complete(1)
+                    }
+                    if (Interest.WRITE in signal.ready) {
+                        val queue = writers[signal.fd]
+                        if (queue != null && queue.isNotEmpty()) {
+                            queue.removeAt(0).complete(Unit)
+                        }
                     }
                 }
             }
         }
-        return ownedScope.launch {
+        return ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 while (isActive && state == ElementState.ACTIVE) {
-                    val ready = reactorOps.poll(minOf(pollTimeout, 10.milliseconds))
-                    for (signal in ready) signals.send(signal)
-                    if (ready.isEmpty()) yield()
+                    var ready: List<ReactorSignal>? = null
+                    coroutineScope {
+                        val reactor = requireNotNull(currentCoroutineContext()[ReactorOperations])
+                        val observation = async(start = CoroutineStart.UNDISPATCHED) {
+                            reactor.poll(pollTimeout).also { ready = it }
+                        }
+                        try {
+                            select {
+                                control.onReceive { }
+                                observation.onAwait { }
+                            }
+                        } finally {
+                            withContext(NonCancellable) {
+                                observation.cancelAndJoin()
+                                // Returned readiness belongs to this runner even when stop wins the selection.
+                                ready?.let { for (signal in it) signals.send(signal) }
+                            }
+                        }
+                    }
+                    if (ready?.isEmpty() == true) yield()
                 }
             } finally {
                 signals.close()
@@ -196,6 +221,7 @@ class ChannelRunner(
 
     fun stop() {
         if (state < ElementState.DRAINING) state = ElementState.DRAINING
+        control.trySend(Unit)
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
@@ -220,6 +246,7 @@ class ChannelRunner(
             try { socketRing.close() } finally {
                 supervisor?.complete()
                 supervisor?.join()
+                control.close()
                 state = ElementState.CLOSED
             }
         }

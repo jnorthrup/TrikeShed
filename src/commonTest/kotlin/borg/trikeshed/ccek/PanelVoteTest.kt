@@ -1,12 +1,7 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.lcnc.PanelVote
-import borg.trikeshed.lcnc.VoteBallot
-import borg.trikeshed.lcnc.VoteVerdict
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import borg.trikeshed.lcnc.*
+import kotlin.test.*
 
 /**
  * Phase 6 gate, W5.1: the vote reducer. Quorum is weighted; failures abstain;
@@ -111,5 +106,50 @@ class PanelVoteTest {
             listOf(ok("s1", "a", false), ok("s2", "b", false), failed("s3", "c", "x")), 1.0,
         ).triage()
         assertEquals("abort", abort, "explicit rejection dominates abstention in triage")
+    }
+
+    @Test
+    fun nonfiniteQuorumWeightsAndOverflowCannotProduceAVerdict() {
+        val ballots = listOf(ok("a", "judge", true), ok("b", "reviewer", false))
+        for (invalid in listOf(-1.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)) {
+            assertFailsWith<IllegalArgumentException> { PanelVote.reduce(ballots, invalid) }
+            assertFailsWith<IllegalArgumentException> { PanelVote.reduce(ballots, 1.0) { invalid } }
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PanelVote.reduce(ballots, 1.0) { Double.MAX_VALUE }
+        }
+    }
+
+    @Test
+    fun ballotWeightsApplyByDefaultAndExplicitWeightSelectionStillOverridesThem() {
+        val ballots = listOf(ok("a", "judge", true).copy(weight = 2.0), ok("b", "reviewer", false),
+            failed("c", "observer", "timeout").copy(weight = 3.0))
+        val weighted = PanelVote.reduce(ballots, 1.5)
+        assertEquals(VoteVerdict.ACCEPTED, weighted.verdict)
+        assertEquals(PanelVoteTally(2.0, 1.0, 3.0), weighted.tally)
+        assertTrue(weighted.quorumMet)
+        assertEquals(VoteVerdict.REJECTED, PanelVote.reduce(ballots, 1.5) { 1.0 }.verdict)
+    }
+
+    @Test
+    fun blankSeatCannotContributeAnAnonymousVote() {
+        assertFailsWith<IllegalArgumentException> {
+            PanelVote.reduce(listOf(ok("  ", "judge", true)), 1.0)
+        }
+    }
+
+    @Test
+    fun transcriptRecordsEffectiveWeightsWithoutChangingCallerBallotsOrRepeatingSelection() {
+        val ballots = listOf(ok("judge", "judge", true), ok("reviewer", "reviewer", false))
+        var selections = 0
+        val result = PanelVote.reduce(ballots, 1.5) {
+            selections++
+            if (it.seat == "judge") 2.0 else 1.0
+        }
+        assertEquals(PanelVoteTally(2.0, 1.0, 0.0), result.tally)
+        assertEquals(listOf(2.0, 1.0), result.transcript.map { it.weight })
+        assertEquals(listOf(1.0, 1.0), ballots.map { it.weight })
+        assertEquals(2, selections)
+        assertEquals(VoteVerdict.ACCEPTED, result.verdict)
     }
 }

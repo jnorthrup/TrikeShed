@@ -11,7 +11,7 @@ import unittest
 
 
 BRIDGE = Path(__file__).resolve().parents[1] / "bridges" / "trikeshed_cli_worker.py"
-REPOSITORY = "https://github.com/jnorthrup/hermes-trikeshed-graal.git"
+REPOSITORY = "https://github.com/jnorthrup/hermes-trikeshed-graalpy.git"
 
 
 class SourcePinTest(unittest.TestCase):

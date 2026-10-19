@@ -14,6 +14,8 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,6 +39,8 @@ sealed class BeliefIntake {
         /** The Narsese surface of the signal, when the minter knows it. A belief
          *  shown as a bare angular is a mistake; carry the expression with it. */
         val gloss: String? = null,
+        /** Optional processed acknowledgement; admission alone is not completion. */
+        val completion: CompletableDeferred<Unit>? = null,
     ) : BeliefIntake()
 
     /** Evidence delta onto an existing angular; budget untouched. */
@@ -149,8 +153,42 @@ class BeliefBagElement(
         }
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
         CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
-            for (cmd in intake) handle(cmd)
+            var failure: Throwable? = null
+            try {
+                for (cmd in intake) {
+                    val completion = (cmd as? BeliefIntake.Mint)?.completion
+                    try {
+                        handle(cmd)
+                        completion?.complete(Unit)
+                    } catch (t: Throwable) {
+                        failure = t
+                        completion?.completeExceptionally(t)
+                        if (completion == null || t is CancellationException) throw t
+                        // A failed append may follow an in-memory mutation. Stop the
+                        // writer; the finally block fails all admitted acknowledgements.
+                        break
+                    }
+                }
+            } catch (t: Throwable) {
+                failure = t
+                throw t
+            } finally {
+                intake.close(failure)
+                val stopped = failure ?: IllegalStateException("belief intake closed")
+                while (true) {
+                    val pending = intake.tryReceive().getOrNull() ?: break
+                    (pending as? BeliefIntake.Mint)?.completion?.completeExceptionally(stopped)
+                }
+            }
         }
+    }
+
+    /** Await the existing single writer, including its WAL append/flush policy. */
+    suspend fun submit(cmd: BeliefIntake.Mint) {
+        requireState(ElementState.ACTIVE)
+        val completion = CompletableDeferred<Unit>()
+        intake.send(cmd.copy(completion = completion))
+        completion.await()
     }
 
     override suspend fun drain() {

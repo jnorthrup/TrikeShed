@@ -3,13 +3,13 @@ package borg.trikeshed.isam
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 
-/** The owner supplies its CAS and platform codec. No global dictionary registry or separate I/O path.
+/** The owner supplies its CAS and may override the portable codec. No global registry or separate I/O path.
  * [dictionary] selects new writes; a reader resolves each file's recorded CID, including older dictionaries.
  * The owner must retain referenced CAS objects for the lifetime of those files.
  */
 class CasLeafCodec(
     val cas: CasStore,
-    val codec: (ByteArray) -> IsamLeafCodec,
+    val codec: (ByteArray) -> IsamLeafCodec = ::DictionaryLeafCodec,
     override val dictionary: ContentId? = null,
 ) : IsamLeafCodec {
     override fun resolve(dictionary: ContentId): IsamLeafCodec {

@@ -1,19 +1,18 @@
 package borg.trikeshed.graal
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.*
 import borg.trikeshed.cursor.BlackboardContext
-import borg.trikeshed.dag.FactId
-import borg.trikeshed.dag.PlaneFacts
-import borg.trikeshed.dag.ReteNetwork
+import borg.trikeshed.dag.*
 import borg.trikeshed.job.ContentId
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.launch
+import borg.trikeshed.userspace.concurrency.Channel
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
+import kotlin.concurrent.atomics.AtomicBoolean
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -36,15 +35,10 @@ import kotlin.coroutines.CoroutineContext
  * rather than the sequence. `atMs` therefore reads as "when this version
  * landed".
  *
- * Diff basis. `ConfixBlackboard.changes` emits a one-key doc for the key just
- * put and cannot describe a removal (its `doc.remove` is a no-op), and its
- * DROP_OLDEST buffer can lose the hint under burst — so, like
- * BlackboardWire.emitDeltas, the stream is only a WAKE. [drainKeys] re-diffs
- * `keys()` against a per-key (provenance stamp, value reference, versionCid)
- * record: an unchanged stamp and the same value object mean the key was not
- * put again since last drain and cost nothing; a new stamp (or a new object
- * under the same millisecond stamp) re-flattens and re-hashes, and the fact is
- * modified only when the cid moved. Keys absent from `keys()` are retracted.
+ * Diff basis. [ConfixBlackboard.revisions] wakes a bounded, serial projection
+ * of one atomic [ConfixBlackboard.snapshot]. Per-key revisions avoid re-hashing
+ * unchanged entries; content cids still suppress same-value re-put evaluation.
+ * Values and provenance always come from the same snapshot, including removals.
  *
  * Loop guard. The admit predicate defaults to [BlackboardNamespaces.admitByDefault],
  * which refuses the rule-firing outputs (`kanban/rule/`, `narsese/curation/`,
@@ -58,12 +52,17 @@ import kotlin.coroutines.CoroutineContext
  * never used: it would run this element's writes on the putter's thread — and a
  * putter is, in the daemon, the production sink running inside
  * `ReteNetwork.evaluateRules` under the network's non-reentrant write lock.
- * The wake is a CONFLATED channel fed from the `changes` flow on this element's
- * own coroutine; every Rete write happens on the drain coroutine.
+ * A one-slot userspace Channel coalesces wakeups, never facts: each pass reads
+ * current state. All Rete writes are serialized with manual [drainKeys] calls.
  *
- * CCEK element: collects on [open], drains on the element supervisor, stops
- * collecting on [close]. No clock (stamps come from the board), no sockets.
+ * For an opened owner, [drain] joins the revision captured at entry, detaches the
+ * collector, and joins queued work before completing the supervisor. Producers
+ * must drain first. This joins Rete writes and synchronous production delivery,
+ * not downstream actions independently admitted by a production sink. A failed
+ * projection remains a failed barrier/close, never a successful watermark.
+ * No clock (stamps come from the board), no sockets.
  */
+@OptIn(ExperimentalAtomicApi::class)
 class BlackboardChangesFactElement(
     private val blackboard: ConfixBlackboard,
     private val rete: ReteNetwork,
@@ -130,104 +129,171 @@ class BlackboardChangesFactElement(
 
     override val key: CoroutineContext.Key<*> get() = Key
 
-    /** What a key looked like at its last drain; the diff basis. */
-    private class Known(val stamp: Long, val value: Any?, val cid: ContentId)
+    private class Known(val revision: Long, val cid: ContentId)
+    private class Projection(val owner: BlackboardChangesFactElement) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<Projection>
+    }
+    private data class Progress(val revision: Long = -1, val failure: Throwable? = null, val closed: Boolean = false)
 
-    private val wake = Channel<Unit>(Channel.CONFLATED)
+    private val wake = Channel.buffered<Unit>(1)
+    private val lifecycle = Mutex()
+    private val projection = Mutex()
+    private val progress = MutableStateFlow(Progress())
+    private val accepting = AtomicBoolean(true)
     private var collector: Job? = null
-    /** Every key currently in working memory, with its diff record. */
+    private var consumer: Job? = null
+    @Volatile private var unsubscribing = false
     private val known = HashMap<String, Known>()
 
-    /** Keys turned into fact ops (assert, modify, retract) so far. */
+    /** Successfully completed fact operations, not downstream action receipts. */
     var factsApplied: Long = 0L
         private set
 
-    /** Drain passes run so far (each is one full keys() diff). */
+    /** Atomic snapshot projection passes attempted. */
     var drains: Long = 0L
         private set
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
-        val scope = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default)
-        // replay=1 on changes hands the collector the current board at attach, so the
-        // first wake arrives without waiting for a put.
-        collector = scope.launch {
+    private fun failed(cause: Throwable) {
+        progress.update { if (it.failure == null) it.copy(failure = cause) else it }
+    }
+
+    private suspend fun checkCallback() {
+        check(currentCoroutineContext()[Projection]?.owner !== this) {
+            "A blackboard projection cannot join itself"
+        }
+    }
+
+    override suspend fun open() = lifecycle.withLock {
+        if (state != ElementState.CREATED) return@withLock
+        check(accepting.load()) { "Blackboard projection admission stopped" }
+        progress.value.failure?.let { throw it }
+        supervisor.ensureActive()
+        state = ElementState.OPEN
+        val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
+        collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                blackboard.changes.collect { wake.trySend(Unit) }
-            } catch (_: kotlinx.coroutines.CancellationException) {
+                blackboard.revisions.collect { wake.kChannel.trySend(Unit) }
+            } catch (cause: Throwable) {
+                if (!unsubscribing) {
+                    failed(cause)
+                    wake.close()
+                }
             }
         }
-        scope.launch {
+        consumer = scope.launch {
             try {
-                drainKeys()
-                for (unit in wake) drainKeys()
-            } catch (_: kotlinx.coroutines.CancellationException) {
+                for (unit in wake.kChannel) projection.withLock { projectSnapshot() }
+            } catch (cause: Throwable) {
+                failed(cause)
+            } finally {
+                wake.close()
+                progress.update { it.copy(closed = true) }
             }
         }
         state = ElementState.ACTIVE
     }
 
-    /**
-     * Diff the board against [known] and apply every difference. Safe to call
-     * repeatedly and from a test without [open] (no dispatcher race). Named as the
-     * couch tendon names `drainFrames`: `drain()` is the element lifecycle verb.
-     */
+    /** Serial explicit pass, also usable before open; stopped owners reject new work. */
     suspend fun drainKeys() {
-        drains++
-        // The blackboard's maps are single-writer/unguarded-read: a keys() snapshot can
-        // throw mid-grow under a concurrent writer. Dropping one pass is safe — the next
-        // wake re-diffs.
-        val keys = runCatching { blackboard.keys() }.getOrNull() ?: return
-        val live = HashSet<String>(keys.size * 2)
-        for (k in keys) {
-            live.add(k)
-            if (!admit(k)) {
-                // Admit-flip retraction: a key we once admitted that the list now refuses must
-                // LEAVE working memory — otherwise a stale version keeps matching.
-                if (known.remove(k) != null) {
-                    rete.retract(FactId(board.id, k))
-                    factsApplied++
-                }
-                continue
+        checkCallback()
+        currentCoroutineContext().ensureActive()
+        projection.withLock {
+            check(accepting.load()) {
+                "Blackboard projection admission stopped"
             }
-            // get/getProvenance are separate reads; a remove between keys() and here shows as
-            // a missing provenance and is picked up as a vanished key on the next pass.
-            val provenance = blackboard.getProvenance(k)
-            if (provenance == null) {
-                live.remove(k)
-                continue
-            }
-            val value = blackboard.get(k)
-            val prior = known[k]
-            if (prior != null && prior.stamp == provenance.timestamp && prior.value === value) continue
-            val fields = fieldsOf(k, value, provenance)
-            val cid = versionOf(fields)
-            val factId = FactId(board.id, k)
-            if (prior == null) {
-                rete.assert(factId, fields, cid, board)
-                factsApplied++
-            } else if (prior.cid != cid) {
-                rete.modify(factId, fields, cid)
-                factsApplied++
-            }
-            known[k] = Known(provenance.timestamp, value, cid)
-        }
-        if (known.size > live.size || known.keys.any { it !in live }) {
-            // Collected first: retract suspends, and known is this coroutine's to mutate.
-            val vanished = known.keys.filter { it !in live }
-            for (k in vanished) {
-                known.remove(k)
-                rete.retract(FactId(board.id, k))
-                factsApplied++
-            }
+            // The admitted pass belongs to this supervisor, not its caller's waiting job.
+            withContext(supervisor + this@BlackboardChangesFactElement) { projectSnapshot() }
         }
     }
 
-    override suspend fun close() {
-        collector?.cancel()
-        collector = null
-        wake.close()
-        super.close()
+    private suspend fun projectSnapshot(): Unit = withContext(Projection(this@BlackboardChangesFactElement)) {
+        progress.value.failure?.let { throw it }
+        try {
+            drains++
+            val snapshot = blackboard.snapshot()
+            val live = snapshot.values.keys
+            for ((k, value) in snapshot.values) {
+                if (!admit(k)) {
+                    if (known[k] != null) {
+                        rete.retract(FactId(board.id, k))
+                        known.remove(k)
+                        factsApplied++
+                    }
+                    continue
+                }
+                val provenance = checkNotNull(snapshot.provenance[k])
+                val prior = known[k]
+                if (prior != null && prior.revision == provenance.revision) continue
+                val fields = fieldsOf(k, value, provenance)
+                val cid = versionOf(fields)
+                val factId = FactId(board.id, k)
+                if (prior == null) {
+                    rete.assert(factId, fields, cid, board)
+                    factsApplied++
+                } else if (prior.cid != cid) {
+                    rete.modify(factId, fields, cid)
+                    factsApplied++
+                }
+                known[k] = Known(provenance.revision, cid)
+            }
+            for (k in known.keys.filter { it !in live }) {
+                rete.retract(FactId(board.id, k))
+                known.remove(k)
+                factsApplied++
+            }
+            progress.update { it.copy(revision = snapshot.revision) }
+        } catch (cause: Throwable) {
+            failed(cause)
+            throw cause
+        }
     }
+
+    /** Completion means the Rete calls returned, not merely that a wakeup was accepted. */
+    suspend fun awaitRevision(revision: Long) {
+        checkCallback()
+        require(revision >= 0) { "Blackboard revision must be nonnegative" }
+        val observed = progress.first { it.revision >= revision || it.failure != null || it.closed }
+        observed.failure?.let { throw it }
+        check(observed.revision >= revision) { "Blackboard projection closed before revision $revision" }
+    }
+
+    override suspend fun drain(): Unit = withContext(NonCancellable) {
+        checkCallback()
+        accepting.store(false)
+        lifecycle.withLock {
+            if (state == ElementState.CLOSED) {
+                progress.value.failure?.let { throw it }
+                return@withLock
+            }
+            val revision = blackboard.snapshot().revision
+            state = ElementState.DRAINING
+            var failure = progress.value.failure
+            suspend fun release(action: suspend () -> Unit) {
+                try { action() }
+                catch (cause: Throwable) {
+                    val first = failure
+                    if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
+                }
+            }
+            if (consumer != null) {
+                // Also covers a writer between its atomic publication and revision notification.
+                wake.kChannel.trySend(Unit)
+                release { awaitRevision(revision) }
+            }
+            unsubscribing = true
+            release { collector?.cancelAndJoin() }
+            wake.close()
+            release { consumer?.join() }
+            release { projection.withLock { } }
+            supervisor.complete()
+            release { supervisor.join() }
+            progress.value.failure?.let { if (failure == null) failure = it }
+            failure?.let { failed(it) }
+            progress.update { it.copy(closed = true) }
+            state = ElementState.CLOSED
+            failure?.let { throw it }
+        }
+    }
+
+    override suspend fun close() = drain()
 }

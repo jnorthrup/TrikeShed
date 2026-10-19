@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.vm.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import kotlin.test.*
@@ -46,6 +47,77 @@ class LcncDebugTest {
             assertFalse(debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, 8))
             assertEquals(borg.trikeshed.vm.VmDebugAction.Line(8), hold.await())
         } finally { hold.cancelAndJoin(); debug.close() }
+    }
+
+    @Test fun authoredLineCommandsTranslateOnlyTheCurrentHeldMapping() = runTest {
+        val debug = LcncDebug()
+        try {
+            for ((start, count, total) in listOf(Triple(5, 3, 8), Triple(Int.MAX_VALUE - 1, 2, Int.MAX_VALUE))) {
+                for (line in 1..count) {
+                    val hold = async { debug.sourceCheckpoint(1, "guest", mapOf("lineCount" to total,
+                        "authored" to mapOf("generatedStartLine" to start, "lineCount" to count))) }
+                    try {
+                        runCurrent()
+                        val pause = debug.snapshot()
+                        val ordinal = pause["ordinal"] as Int
+                        for (invalid in listOf(null, -1, 0, count + 1)) {
+                            assertFailsWith<IllegalArgumentException> {
+                                debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, invalid, VmSourceCoordinates.AUTHORED)
+                            }
+                            assertEquals(pause, debug.snapshot())
+                            assertFalse(hold.isCompleted)
+                        }
+                        assertFalse(debug.command(ordinal - 1, LcncDebug.Command.SOURCE_LINE, count + 1, VmSourceCoordinates.AUTHORED))
+                        assertEquals(pause, debug.snapshot())
+                        assertTrue(debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, line, VmSourceCoordinates.AUTHORED))
+                        assertFalse(debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, line, VmSourceCoordinates.AUTHORED))
+                        assertEquals(VmDebugAction.Line(start + (line - 1)), hold.await())
+                    } finally { hold.cancelAndJoin() }
+                }
+            }
+        } finally { debug.close() }
+    }
+
+    @Test fun unavailableOrInvalidAuthoredMappingsLeaveTheSourceHeld() = runTest {
+        val debug = LcncDebug()
+        val mappings = listOf(null, "unavailable", emptyMap<String, Any?>(),
+            mapOf("generatedStartLine" to 5), mapOf("lineCount" to 3),
+            mapOf("generatedStartLine" to "5", "lineCount" to 3),
+            mapOf("generatedStartLine" to 5, "lineCount" to "3"),
+            mapOf("generatedStartLine" to 1.5, "lineCount" to 3),
+            mapOf("generatedStartLine" to 5, "lineCount" to 2.5),
+            mapOf("generatedStartLine" to 0, "lineCount" to 3),
+            mapOf("generatedStartLine" to -1, "lineCount" to 3),
+            mapOf("generatedStartLine" to 5, "lineCount" to 0),
+            mapOf("generatedStartLine" to 5, "lineCount" to -1),
+            mapOf("generatedStartLine" to 9, "lineCount" to 1),
+            mapOf("generatedStartLine" to 7, "lineCount" to 3),
+            mapOf("generatedStartLine" to 2147483648L, "lineCount" to 1),
+            mapOf("generatedStartLine" to 1, "lineCount" to 2147483648L))
+        val observations = listOf(mapOf<String, Any?>("lineCount" to 8)) +
+            mappings.map { mapOf("lineCount" to 8, "authored" to it) } + listOf(
+                mapOf("lineCount" to Int.MAX_VALUE,
+                    "authored" to mapOf("generatedStartLine" to Int.MAX_VALUE, "lineCount" to 2)),
+                mapOf("lineCount" to 8.5, "authored" to mapOf("generatedStartLine" to 5, "lineCount" to 3)))
+        try {
+            for (observation in observations) {
+                val hold = async { debug.sourceCheckpoint(1, "guest", observation) }
+                try {
+                    runCurrent()
+                    val pause = debug.snapshot()
+                    val ordinal = pause["ordinal"] as Int
+                    assertFalse(debug.command(ordinal - 1, LcncDebug.Command.SOURCE_LINE, 1, VmSourceCoordinates.AUTHORED))
+                    assertFailsWith<IllegalArgumentException> {
+                        debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, 1, VmSourceCoordinates.AUTHORED)
+                    }
+                    assertEquals(pause, debug.snapshot(), observation.toString())
+                    assertFalse(hold.isCompleted)
+                    // Generated coordinates do not depend on authored metadata, including malformed metadata.
+                    assertTrue(debug.command(ordinal, LcncDebug.Command.SOURCE_LINE, 8, VmSourceCoordinates.GENERATED))
+                    assertEquals(VmDebugAction.Line(8), hold.await())
+                } finally { hold.cancelAndJoin() }
+            }
+        } finally { debug.close() }
     }
 
     @Test fun sourceCommandsUseTheSamePauseSequenceAndDrainReleasesTheCallback() = runTest {

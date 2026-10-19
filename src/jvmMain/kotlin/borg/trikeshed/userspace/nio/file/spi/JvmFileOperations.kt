@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.FileVisitResult
 import java.nio.file.Files as NioFiles
 import java.nio.file.LinkOption
+import java.nio.file.NoSuchFileException
 import java.nio.file.OpenOption
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -236,6 +237,10 @@ class JvmFileOperations : FileOperations {
         NioFiles.createDirectories(pathOf(path))
     }
 
+    override fun createDirectory(path: String) {
+        NioFiles.createDirectory(pathOf(path))
+    }
+
     override fun deleteRecursively(path: String) {
         val p = pathOf(path)
         if (!NioFiles.exists(p)) return
@@ -265,6 +270,25 @@ class JvmFileOperations : FileOperations {
         } else {
             Paths.get(cwd()).resolve(joined).normalize().toString()
         }
+    }
+
+    override fun canonicalPath(path: String): String {
+        val expanded = if (path.startsWith("~")) path.replaceFirst("~", System.getProperty("user.home")) else path
+        var parent = pathOf(expanded).toAbsolutePath()
+        val suffix = mutableListOf<Path>()
+        while (true) {
+            try {
+                NioFiles.readAttributes(parent, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
+                break
+            } catch (_: NoSuchFileException) { }
+            val name = requireNotNull(parent.fileName) { "Filesystem path has no existing ancestor" }
+            require(name.toString() != "..") { "Cannot canonicalize a missing parent component" }
+            if (name.toString() != ".") suffix.add(name)
+            parent = requireNotNull(parent.parent) { "Filesystem path has no existing ancestor" }
+        }
+        var canonical = parent.toRealPath()
+        for (name in suffix.asReversed()) canonical = canonical.resolve(name)
+        return canonical.toString()
     }
 
     override fun readZip(path: String): List<Join<String, ByteArray>> =

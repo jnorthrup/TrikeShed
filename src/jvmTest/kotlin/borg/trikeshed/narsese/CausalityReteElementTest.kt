@@ -98,6 +98,11 @@ class CausalityReteElementTest {
         val duplicate = rete.fireLive()
         assertEquals(0, duplicate.size, "the same rule and premise must not inflate evidence twice")
 
+        rete.register(antecedent.angular, "fire", "another-object")
+        assertEquals(0, rete.fireLive().size,
+            "Changing registered provenance at an existing angular address must not reopen live support")
+        assertEquals(1L, rete.snapshot().offered)
+
         // the consequent landed in the bag at discounted evidence
         val snapshot = bag.snapshot()
         val consequent = snapshot.values.firstOrNull { it.angular == landed[0].a }

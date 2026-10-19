@@ -8,6 +8,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
     actual val capabilities: Long = 0L
     actual val availability: String = "emulated: Darwin has no Linux io_uring kernel"
     actual val setupErrno: Int? = null
+    actual val completionFd: Int = -1
     actual fun submit(submissions: List<UringSubmission>) {
         check(submissions.isEmpty()) { "Darwin has no Linux io_uring kernel" }
     }

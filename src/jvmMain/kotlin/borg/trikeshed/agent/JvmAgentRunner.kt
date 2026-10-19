@@ -2,7 +2,6 @@ package borg.trikeshed.agent
 
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.AgentCliInfo
 import borg.trikeshed.lcnc.AgentNodes
 import borg.trikeshed.lcnc.AgentRunRequest
@@ -10,12 +9,13 @@ import borg.trikeshed.lcnc.AgentRunResult
 import borg.trikeshed.lcnc.AgentRuns
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import borg.trikeshed.userspace.nio.channels.spi.JvmProcessProtocolPipes
+import borg.trikeshed.userspace.nio.file.spi.*
+import borg.trikeshed.userspace.nio.process.*
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.*
 import modelmux.Airgap
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * One bounded coding-agent run on this host (Forge genesis, Cut A).
@@ -29,8 +29,8 @@ import java.util.concurrent.TimeUnit
  * and the patch go to CAS and to attachment documents so they outlive a restart; the receipt
  * lands on the blackboard as `agent/run/<runId>`; the scratch is removed unless retained.
  *
- * Every blocking call runs on the IO dispatcher; no wait is unbounded; a budget kill takes
- * the process tree down. The git subprocesses of this lane are an explicit, scoped exception
+ * Common userspace owns bounded byte delivery, input, exit and cleanup; a budget kill
+ * revokes the process tree and joins its pipe stages. The git subprocesses are a scoped exception
  * to the daemon's no-git rule.
  */
 class JvmAgentRunner(
@@ -52,12 +52,14 @@ class JvmAgentRunner(
 
     override suspend fun roster(): List<AgentCliInfo> = rosterRows
 
-    override suspend fun run(request: AgentRunRequest): AgentRunResult = withContext(Dispatchers.IO) {
+    override suspend fun run(request: AgentRunRequest): AgentRunResult = withContext(fileIoContext) {
         Airgap.requireRemote()
-        runBlockingIo(request)
+        val context = currentCoroutineContext()
+        val files = context[FileOperations] ?: context[NioSupervisor]?.service<FileOperations>() ?: JvmFileOperations()
+        run(request, files)
     }
 
-    private suspend fun runBlockingIo(request: AgentRunRequest): AgentRunResult {
+    private suspend fun run(request: AgentRunRequest, files: FileOperations): AgentRunResult {
         val runId = request.runId.ifBlank { mintRunId() }
         val started = clock()
         val info = rosterRows.firstOrNull { it.id == request.agent }
@@ -67,74 +69,112 @@ class JvmAgentRunner(
         }
         val cli = definitions(info)
         val source = if (request.repo.isNotBlank()) File(request.repo) else repoDir
-        val scratchRoot = File(forgeHome, "agents/$runId")
+        val agentsRoot = File(forgeHome, "agents")
+        val scratchRoot = File(agentsRoot, runId)
         val repo = File(scratchRoot, "repo")
         var result = AgentRunResult(runId = runId, jobId = request.jobId, agent = info.id, cli = info.path, version = info.version, model = request.model,
             repo = source.absolutePath, scratch = scratchRoot.absolutePath, retained = request.retain, startedAtMs = started, budgetSeconds = request.budgetSeconds)
-        try {
-            if (forgeHome.canonicalPath.startsWith(source.canonicalPath + File.separator)) {
-                return finish(result.copy(finishedAtMs = clock(), error = "the forge home ${forgeHome.absolutePath} sits inside the repo ${source.absolutePath}; a scratch clone there would be absorbed"))
-            }
-            if (!File(source, ".git").exists()) return finish(result.copy(finishedAtMs = clock(), error = "not a git repository: ${source.absolutePath}"))
-            scratchRoot.mkdirs()
-            val clone = exec(listOf("git", "clone", "--shared", "--no-tags", "-q", source.absolutePath, repo.absolutePath), scratchRoot, 120_000L, 65_536)
-            if (clone.exit != 0) return finish(result.copy(finishedAtMs = clock(), error = "git clone failed (${clone.exit}): ${clone.text().take(400)}"))
-            val base = exec(listOf("git", "rev-parse", "HEAD"), repo, 30_000L, 4096).text().trim()
-            result = result.copy(base = base)
-            val briefFile = File(scratchRoot, "brief.md").apply { writeText(request.brief) }
-            val lastMessage = File(scratchRoot, "last.md")
-
-            // The agent itself, bounded by its budget.
-            val command = cli.command(repo, request.model, lastMessage, request.brief)
-            val env = AgentEnvironment.build(environment, listOf(File(info.path).parent ?: "/usr/bin") + toolDirs, AgentEnvironment.GIT + extraEnvironment)
-            val pb = ProcessBuilder(command).directory(repo).redirectErrorStream(true)
-            pb.environment().clear(); pb.environment().putAll(env)
-            Airgap.requireRemote()
-            val process = pb.start()
-            val capture = BoundedCapture(request.maxBytes)
-            val drain = Thread { runCatching { process.inputStream.use { capture.drain(it) } } }.apply { isDaemon = true; start() }
-            if (cli.briefOnStdin) {
-                Thread { runCatching { process.outputStream.use { it.write(request.brief.toByteArray()); it.write('\n'.code) } } }.apply { isDaemon = true; start() }
-            } else runCatching { process.outputStream.close() }
-            val finished = process.waitFor(request.budgetSeconds.toLong(), TimeUnit.SECONDS)
-            var killed = false
-            if (!finished) { killed = true; killTree(process) }
-            drain.join(5_000L)
-            val exit = if (finished) process.exitValue() else -1
-
-            // What changed: the staged diff against the base.
-            exec(listOf("git", "add", "-A"), repo, 60_000L, 65_536)
-            val diff = exec(listOf("git", "diff", "--cached", "--binary", "--no-color", base), repo, 60_000L, 16 * 1024 * 1024)
-            val patch = diff.bytes
-            // `diff --git a/<path> b/<path>` — take the b-side, which is the path after the change.
-            val files = patch.decodeToString().lineSequence().filter { it.startsWith("diff --git ") }
-                .mapNotNull { line -> line.substringAfterLast(" b/", "").takeIf { it.isNotBlank() } }
-                // Bolt: replace distinct().toList() with toCollection(LinkedHashSet()) to avoid intermediate allocation
-                .toCollection(LinkedHashSet()).toList()
-            val filesChanged = files.size
-
-            val transcript = capture.bytes() + (if (capture.dropped > 0) "\n[truncated: ${capture.dropped} bytes over the ${request.maxBytes} byte cap were dropped]\n".toByteArray() else ByteArray(0))
-            val summary = lastMessage.takeIf { it.isFile && it.length() > 0 }?.readText()?.trim()?.ifEmpty { null }
-                ?: transcript.decodeToString().trim().takeLast(AgentNodes.SUMMARY_CHARS)
-            val transcriptCid = cas.put(transcript).value
-            val patchCid = if (patch.isNotEmpty()) cas.put(patch).value else ""
-            result = result.copy(finishedAtMs = clock(), exit = exit, killed = killed, bytes = capture.total, kept = capture.kept, truncated = capture.dropped > 0,
-                transcriptCid = transcriptCid, patchCid = patchCid, patchBytes = patch.size.toLong(), filesChanged = filesChanged, files = files, summary = summary,
-                error = if (killed) "budget of ${request.budgetSeconds}s exceeded; the process tree was killed" else "")
-            attachments?.let { att ->
-                fun put(name: String, type: String, bytes: ByteArray) {
-                    val cid = cas.put(bytes)
-                    att.putAttachment(OroborosAttachmentRef(path = "agents/$runId/$name", contentType = type, length = bytes.size.toLong(), contentId = cid, agentId = "agent-lane", revision = info.id, sequence = clock()), bytes)
+        val owner = currentCoroutineContext()
+        var cancellation: CancellationException? = null
+        var scratchAdmitted = false
+        var completed = kotlin.run execution@ {
+            try {
+                require(runId.isNotBlank() && runId != "." && runId != ".." && runId.none { it == '/' || it == '\\' || it == '\u0000' }) {
+                    "agent run identity must be one path component"
                 }
-                put("brief.md", "text/markdown", briefFile.readBytes())
-                put("transcript.md", "text/markdown", transcript)
-                if (patch.isNotEmpty()) put("patch.diff", "text/x-diff", patch)
+                val sourcePath = files.canonicalPath(source.path)
+                val homePath = files.canonicalPath(forgeHome.path)
+                if (homePath == sourcePath || homePath.startsWith(sourcePath.trimEnd(File.separatorChar) + File.separator)) {
+                    return@execution result.copy(finishedAtMs = clock(), error = "the forge home ${forgeHome.absolutePath} sits inside the repo ${source.absolutePath}; a scratch clone there would be absorbed")
+                }
+                if (!files.exists(File(source, ".git").path)) return@execution result.copy(finishedAtMs = clock(), error = "not a git repository: ${source.absolutePath}")
+                val agentsPath = files.canonicalPath(agentsRoot.path)
+                if (agentsPath == sourcePath || agentsPath.startsWith(sourcePath.trimEnd(File.separatorChar) + File.separator)) {
+                    return@execution result.copy(finishedAtMs = clock(), error = "the agents directory ${agentsRoot.absolutePath} sits inside the repo ${source.absolutePath}; a scratch clone there would be absorbed")
+                }
+                files.mkdirs(agentsRoot.path)
+                files.createDirectory(scratchRoot.path)
+                scratchAdmitted = true
+                val clone = exec(listOf("git", "clone", "--shared", "--no-tags", "-q", source.absolutePath, repo.absolutePath), scratchRoot, 120_000L, 65_536)
+                if (clone.timedOut || clone.exit != 0) return@execution result.copy(finishedAtMs = clock(), error = "git clone failed (${clone.exit}): ${clone.text().take(400)}")
+                val base = git(listOf("rev-parse", "HEAD"), repo, 30_000L, 4096).text().trim()
+                check(base.isNotBlank()) { "git rev-parse returned no HEAD" }
+                result = result.copy(base = base)
+                val briefFile = File(scratchRoot, "brief.md")
+                files.write(briefFile.path, request.brief)
+                val lastMessage = File(scratchRoot, "last.md")
+
+                // The agent itself, bounded by its budget.
+                val command = cli.command(repo, request.model, lastMessage, request.brief)
+                val env = AgentEnvironment.build(environment, listOf(File(info.path).parent ?: "/usr/bin") + toolDirs, AgentEnvironment.GIT + extraEnvironment)
+                Airgap.requireRemote()
+                val capture = exec(command, repo, request.budgetSeconds.toLong() * 1000L, request.maxBytes,
+                    if (cli.briefOnStdin) (request.brief + "\n").encodeToByteArray() else null, env)
+                val transcript = capture.bytes + (if (capture.dropped > 0)
+                    "\n[truncated: ${capture.dropped} bytes over the ${request.maxBytes} byte cap were dropped]\n".encodeToByteArray()
+                    else byteArrayOf())
+                val summary = if (files.isFile(lastMessage.path)) files.readString(lastMessage.path).trim().ifEmpty { null } else null
+                val transcriptCid = cas.put(transcript).value
+                result = result.copy(finishedAtMs = clock(), exit = capture.exit, killed = capture.timedOut,
+                    bytes = capture.total, kept = capture.kept, truncated = capture.dropped > 0,
+                    transcriptCid = transcriptCid, summary = summary ?: transcript.decodeToString().trim().takeLast(AgentNodes.SUMMARY_CHARS),
+                    error = if (capture.timedOut) "budget of ${request.budgetSeconds}s exceeded; the process tree was killed" else "")
+
+                // What changed: the staged diff against the base.
+                git(listOf("add", "-A"), repo, 60_000L, 65_536)
+                val diff = git(listOf("diff", "--cached", "--binary", "--no-color", base), repo, 60_000L, 16 * 1024 * 1024)
+                check(diff.dropped == 0L) { "git diff exceeded the patch capture limit" }
+                val patch = diff.bytes
+                // `diff --git a/<path> b/<path>` — take the b-side, which is the path after the change.
+                val changed = patch.decodeToString().lineSequence().filter { it.startsWith("diff --git ") }
+                    .mapNotNull { line -> line.substringAfterLast(" b/", "").takeIf { it.isNotBlank() } }
+                    // Bolt: replace distinct().toList() with toCollection(LinkedHashSet()) to avoid intermediate allocation
+                    .toCollection(LinkedHashSet()).toList()
+                val filesChanged = changed.size
+
+                result = result.copy(patchCid = if (patch.isNotEmpty()) cas.put(patch).value else "",
+                    patchBytes = patch.size.toLong(), filesChanged = filesChanged, files = changed)
+                attachments?.let { att ->
+                    fun put(name: String, type: String, bytes: ByteArray) {
+                        val cid = cas.put(bytes)
+                        att.putAttachment(OroborosAttachmentRef(path = "agents/$runId/$name", contentType = type, length = bytes.size.toLong(), contentId = cid, agentId = "agent-lane", revision = info.id, sequence = clock()), bytes)
+                    }
+                    put("brief.md", "text/markdown", files.readAllBytes(briefFile.path))
+                    put("transcript.md", "text/markdown", transcript)
+                    if (patch.isNotEmpty()) put("patch.diff", "text/x-diff", patch)
+                }
+                result.copy(finishedAtMs = clock())
+            } catch (cancelled: CancellationException) {
+                cancellation = cancelled
+                result.copy(finishedAtMs = clock(), error = "agent run cancelled: ${cancelled.message.orEmpty()}")
+            } catch (t: Throwable) {
+                result.copy(finishedAtMs = clock(), error = "agent run failed: ${t::class.simpleName}: ${t.message}")
             }
-            return finish(result)
-        } catch (t: Throwable) {
-            return finish(result.copy(finishedAtMs = clock(), error = "agent run failed: ${t::class.simpleName}: ${t.message}"))
-        } finally {
-            if (!request.retain) runCatching { scratchRoot.deleteRecursively() }
+        }
+        // Publication follows required cleanup of admitted scratch, outside the execution catch paths.
+        return withContext(NonCancellable + fileIoContext) {
+            var cleanupFailure: Throwable? = null
+            if (scratchAdmitted && !request.retain) try { files.deleteRecursively(scratchRoot.path) }
+            catch (failure: Throwable) { cleanupFailure = failure }
+            if (cancellation == null) try { owner.ensureActive() }
+            catch (cancelled: CancellationException) {
+                cancellation = cancelled
+                val error = "agent run cancelled: ${cancelled.message.orEmpty()}"
+                completed = completed.copy(error = if (completed.error.isEmpty()) error else "${completed.error}; $error")
+            }
+            cleanupFailure?.let { failure ->
+                cancellation?.let { if (failure !== it) it.addSuppressed(failure) }
+                val error = "scratch cleanup failed: ${failure::class.simpleName}: ${failure.message}"
+                completed = completed.copy(error = if (completed.error.isEmpty()) error else "${completed.error}; $error")
+            }
+            completed = completed.copy(finishedAtMs = clock())
+            val cancelled = cancellation
+            if (cancelled != null) {
+                try { finish(completed) }
+                catch (failure: Throwable) { if (failure !== cancelled) cancelled.addSuppressed(failure) }
+                throw cancelled
+            }
+            finish(completed)
         }
     }
 
@@ -143,43 +183,28 @@ class JvmAgentRunner(
         return result
     }
 
-    private class Exec(val exit: Int, val bytes: ByteArray, val timedOut: Boolean) { fun text(): String = bytes.decodeToString() }
-
-    /** A bounded subprocess for the git steps: whitelisted env, capped output, forced kill on timeout. */
-    private fun exec(command: List<String>, cwd: File, timeoutMs: Long, maxBytes: Int): Exec {
-        val pb = ProcessBuilder(command).directory(cwd).redirectErrorStream(true)
-        pb.environment().clear(); pb.environment().putAll(AgentEnvironment.build(environment, toolDirs, AgentEnvironment.GIT))
-        val p = pb.start()
-        runCatching { p.outputStream.close() }
-        val capture = BoundedCapture(maxBytes)
-        val drain = Thread { runCatching { p.inputStream.use { capture.drain(it) } } }.apply { isDaemon = true; start() }
-        val finished = p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
-        if (!finished) killTree(p)
-        drain.join(5_000L)
-        return Exec(if (finished) p.exitValue() else -1, capture.bytes(), !finished)
-    }
-
-    private fun killTree(p: Process) {
-        runCatching { p.descendants().forEach { it.destroyForcibly() } }
-        p.destroyForcibly()
-        runCatching { p.waitFor(5, TimeUnit.SECONDS) }
-    }
-
-    /** Keeps the first [cap] bytes, keeps draining past it, counts what it dropped. */
-    private class BoundedCapture(private val cap: Int) {
-        private val buffer = ByteArrayOutputStream()
-        var total: Long = 0; private set
-        var kept: Long = 0; private set
-        val dropped: Long get() = total - kept
-        fun drain(input: java.io.InputStream) {
-            val chunk = ByteArray(8192)
-            while (true) {
-                val n = input.read(chunk); if (n < 0) break
-                total += n
-                val room = (cap - kept).coerceAtLeast(0L).toInt()
-                if (room > 0) { val take = minOf(room, n); buffer.write(chunk, 0, take); kept += take }
-            }
+    /** Every git helper must complete before its bytes can describe a repository or patch. */
+    private suspend fun git(args: List<String>, cwd: File, timeoutMs: Long, maxBytes: Int): ProcessCapture {
+        val result = exec(listOf("git") + args, cwd, timeoutMs, maxBytes)
+        check(!result.timedOut && result.exit == 0) {
+            "git ${args.first()} failed (${if (result.timedOut) "timeout" else result.exit}): ${result.text().take(400)}"
         }
-        fun bytes(): ByteArray = buffer.toByteArray()
+        return result
+    }
+
+    private suspend fun exec(command: List<String>, cwd: File, timeoutMs: Long, maxBytes: Int,
+                             stdin: ByteArray? = null,
+                             env: Map<String, String> = AgentEnvironment.build(environment, toolDirs, AgentEnvironment.GIT)): ProcessCapture {
+        require(command.isNotEmpty() && maxBytes >= 0 && timeoutMs > 0)
+        val pipes = JvmProcessProtocolPipes.open(command = { _, _ -> command }, environment = env,
+            workingDirectory = cwd.absolutePath, mergeError = true)
+        val channel = try { ProcessCaptureChannel(currentCoroutineContext(), pipes, stdin, maxBytes, timeoutMs) }
+        catch (failure: Throwable) {
+            withContext(NonCancellable) {
+                try { pipes.close() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+            }
+            throw failure
+        }
+        return channel.await()
     }
 }

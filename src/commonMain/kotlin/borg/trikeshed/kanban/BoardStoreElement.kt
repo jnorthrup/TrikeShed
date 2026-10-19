@@ -1,6 +1,7 @@
 package borg.trikeshed.kanban
 
 import borg.trikeshed.parse.reify
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.causal.CausalEdgeKind
@@ -16,11 +17,13 @@ import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobReducer
 import borg.trikeshed.job.JobSnapshot
 import borg.trikeshed.util.oroboros.LexicalMemory
+import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -33,14 +36,19 @@ import kotlin.coroutines.CoroutineContext
  * BoardWalPort — the thin ordering log under the board (durability contract:
  * CAS payloads, the WAL carries only `jobId TAB cid` records; group commit =
  * ONE flush per drained batch; torn tails truncate on replay).
- * JVM implementation: JvmBoardWal over JvmDurableAppendLog.
+ * [BoardFileWal] retains the legacy frames over userspace positional I/O.
  */
 interface BoardWalPort {
+    val durability: StorageDurability get() = StorageDurability.VOLATILE
+
     /** Append one record (no flush — the element batches). Returns the sequence. */
     fun append(record: ByteArray): Long
 
     /** The single per-batch flush (group commit). */
     fun flush()
+
+    /** Release the log after admitted board commands and their flush have finished. */
+    fun close() = Unit
 
     suspend fun replay(onRecord: suspend (Long, ByteArray) -> Unit)
 }
@@ -95,6 +103,8 @@ data class BoardCommitted(
      * print for this commit. 0 = the command carried no stamp (a seed or a test).
      */
     val atMs: Long = 0L,
+    /** One root LCNC execution budget, shared by its validated nested runs. */
+    val executionFamily: String = "",
 )
 
 /** One card = one row (the SoA projection reads these; strings only at the wire). */
@@ -129,7 +139,15 @@ data class CardRow(
     val parent: String = "",
     /** Rebuildable pointer to this row's latest command in the existing CAS/WAL. */
     val commandCid: ContentId? = null,
+    /** Empty for ordinary cards and legacy independent runs. */
+    val executionFamily: String = "",
+    /** Retained service parent; ordinary cards use [parent] instead. */
+    val parentRunId: String? = null,
 )
+
+/** Ordinary cards and LCNC execution families occupy disjoint WIP units. */
+fun boardWipUnit(jobId: String, executionFamily: String): String =
+    if (executionFamily.isEmpty()) "card/$jobId" else "lcnc/$executionFamily"
 
 /**
  * BoardStoreElement — D2: ONE card store. `/api/invoke` maps → [InvokeLowering]
@@ -204,21 +222,45 @@ class BoardStoreElement(
 
     val lastSequence: Long get() = published.sequence
 
+    /** A replayable pointer needs both its payload and ordering log to survive restart. */
+    val durability: StorageDurability get() =
+        if (cas.durability == StorageDurability.DURABLE && wal?.durability == StorageDurability.DURABLE)
+            StorageDurability.DURABLE else StorageDurability.VOLATILE
+
     // ── lifecycle ─────────────────────────────────────────────────────
 
     override suspend fun open() {
+        check(failure == null) { "Board store failed; create a new owner before reopening" }
         super.open()
-        wal?.replay { seq, record ->
-            val text = record.decodeToString()
-            val tab = text.indexOf('\t')
-            if (tab > 0) {
+        try {
+            wal?.replay { seq, record ->
+                check(seq > sequence) { "Non-monotonic board WAL sequence: $seq after $sequence" }
+                val text = record.decodeToString(throwOnInvalidSequence = true)
+                // The legacy writer permits TAB inside job IDs; the final TAB separates the CID.
+                val tab = text.lastIndexOf('\t')
+                check(tab > 0) { "Invalid board WAL pointer at sequence $seq" }
+                val jobId = text.substring(0, tab)
                 val cid = ContentId(text.substring(tab + 1))
-                val payload = withContext(Dispatchers.Unconfined) { cas.get(cid) }
-                if (payload != null) {
-                    val raw = runCatching { reify(payload) as? Map<*, *> }.getOrNull()
-                    if (raw != null) applyOne(raw, durable = false, replaySeq = seq, replayCid = cid)
+                val payload = checkNotNull(withContext(Dispatchers.Unconfined) { cas.get(cid) }) {
+                    "Missing board WAL payload at sequence $seq: ${cid.value}"
+                }
+                check(ContentId.of(payload) == cid) { "Board WAL payload digest mismatch at sequence $seq: ${cid.value}" }
+                val raw = checkNotNull(reifyStrict(payload.decodeToString(throwOnInvalidSequence = true)) as? Map<*, *>) {
+                    "Board WAL command is not an object at sequence $seq"
+                }
+                when (val result = applyOne(raw, durable = false, replaySeq = seq, replayCid = cid, replayJobId = jobId)) {
+                    is BoardApply.Committed -> Unit
+                    is BoardApply.Rejected -> error("Board WAL command rejected at sequence $seq: ${result.reason}")
                 }
             }
+        } catch (caught: Throwable) {
+            failure = caught
+            intake.close(caught)
+            while (true) (intake.tryReceive().getOrNull() ?: break).reply?.completeExceptionally(caught)
+            withContext(NonCancellable) {
+                try { close() } catch (cleanup: Throwable) { if (cleanup !== caught) caught.addSuppressed(cleanup) }
+            }
+            throw caught
         }
         published = Published(rows, sequence)
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
@@ -230,7 +272,11 @@ class BoardStoreElement(
                 val events = ArrayList<PendingCommit>()
                 try {
                     val results = batch.map { applyOne(it.raw, durable = true, pending = events) }
-                    if (events.isNotEmpty()) withContext(Dispatchers.Unconfined) { wal?.flush() }
+                    if (events.isNotEmpty()) withContext(Dispatchers.Unconfined) {
+                        // The flushed WAL names these payloads; publish its pointers only after CAS is durable.
+                        cas.sync()
+                        wal?.flush()
+                    }
                     events.forEach { publishCommit(it) }
                     published = Published(rows, sequence)
                     // Acknowledgments and causal fanout are released only after the durability barrier.
@@ -257,6 +303,12 @@ class BoardStoreElement(
         super.drain()
     }
 
+    override suspend fun close() {
+        intake.close()
+        consumer?.join()
+        try { wal?.close() } finally { super.close() }
+    }
+
     // ── the spine (single consumer; also the replay path with durable=false) ──
 
     private data class PendingCommit(val event: BoardCommitted, val raw: Map<*, *>)
@@ -267,7 +319,7 @@ class BoardStoreElement(
         appendCausal(event.jobId, event.command, event.snapshot, event.cid, commit.raw)
     }
 
-    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null, replayCid: ContentId? = null, pending: MutableList<PendingCommit>? = null): BoardApply {
+    private suspend fun applyOne(incoming: Map<*, *>, durable: Boolean, replaySeq: Long? = null, replayCid: ContentId? = null, replayJobId: String? = null, pending: MutableList<PendingCommit>? = null): BoardApply {
         // Delta (reaper): the transition clock is part of the WAL truth. The live path
         // stamps `atMs` into the raw map before it is serialized, and advanceRow reads
         // it back — so a replay re-derives the SAME lastMoveMs. Before this, replay
@@ -279,6 +331,7 @@ class BoardStoreElement(
             is InvokeLowering.Outcome.Lowered -> o.command
         }
         val jobId = lowered.jobId.value
+        check(replayJobId == null || replayJobId == jobId) { "Board WAL job identity mismatch at sequence $replaySeq" }
 
         // Board guards the reducer can't see — refuse BEFORE reducer state mutates.
         boardGuard(lowered, raw)?.let { return BoardApply.Rejected(lowered.idempotencyKey, it) }
@@ -301,7 +354,11 @@ class BoardStoreElement(
         if (seq > sequence) sequence = seq
 
         val prev = rows[jobId]
-        val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)?.copy(commandCid = cid)
+        val row = advanceRow(prev, jobId, raw, lowered, snapshot, seq)?.copy(
+            commandCid = cid,
+            parentRunId = if (prev?.executionFamily.isNullOrEmpty())
+                (raw["lcncRun"] as? Map<*, *>)?.get("parentRunId") as? String else prev?.parentRunId,
+        )
         rows = if (row == null) rows - jobId else rows + (jobId to row)
 
         // Positional insert: a move carrying beforeJobId lands BETWEEN cards, not
@@ -328,6 +385,7 @@ class BoardStoreElement(
             spec = row?.spec ?: "",
             parent = row?.parent ?: "",
             atMs = (raw["atMs"] as? Number)?.toLong() ?: 0L,
+            executionFamily = row?.executionFamily.orEmpty(),
         )
         val commit = PendingCommit(event, raw)
         if (pending != null) pending.add(commit) else publishCommit(commit)
@@ -358,42 +416,87 @@ class BoardStoreElement(
      * [raw] is the intake map (the WAL truth) — a Move may carry `"actor"` (who
      * is moving); it is read here and nowhere else.
      */
-    private fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? = when (cmd) {
-        is JobCommand.Move -> {
-            val target = BoardCol.fromWire(cmd.toColumn.value)
-            val limit = target?.wipLimit
-            if (limit != null && rows.values.count { it.col == target && it.jobId != cmd.jobId.value } >= limit)
-                "WIP limit ${limit} full for '${target.wire}'"
-            // Delta 2026-09-04 (verifier finding): ARCHIVED is a settling column too, and a
-            // re-owning Move was a two-step way around the gate — both go through the guards.
-            else if (target == BoardCol.DONE || target == BoardCol.ARCHIVED) claimGuard(cmd.jobId.value, raw) ?: ownerGuard(cmd.jobId.value, raw, target)
-            else ownerGuard(cmd.jobId.value, raw, target)
-        }
-
-        // `complete`/`done` lowers to Complete → lifecycle closed → DONE: the same gate, or a
-        // claimant could close its own card by the lifecycle verb instead of the column.
-        is JobCommand.Complete -> claimGuard(cmd.jobId.value, raw)
-
-        // `cancel` / `retract` settle a card to ARCHIVED: claimed work in RUNNING is released
-        // by its judge or reaper, never cancelled out from under them (verifier finding).
-        is JobCommand.Cancel, is JobCommand.Retract -> claimGuard(cmd.jobId.value, raw)
-
-        is JobCommand.Start -> {
-            val limit = BoardCol.RUNNING.wipLimit
-            if (limit != null && rows.values.count { it.col == BoardCol.RUNNING && it.jobId != cmd.jobId.value } >= limit)
-                "WIP limit ${limit} full for 'running'" else null
-        }
-
-        is JobCommand.Submit -> {
-            orphanGuard(cmd.jobId.value, raw) ?: if (cmd.dependencies.isEmpty()) null
-            else {
-                // First caller of the KanbanTypes verbs: refuse a dependency cycle at the door.
-                val board = boardOf(extra = cmd)
-                if (board.hasCycle()) "dependency cycle via ${cmd.jobId.value}" else null
+    private fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? {
+        executionFamilyGuard(cmd.jobId.value, raw)?.let { return it }
+        return when (cmd) {
+            is JobCommand.Move -> {
+                val target = BoardCol.fromWire(cmd.toColumn.value)
+                val wip = target?.let { wipGuard(it, cmd.jobId.value, raw) }
+                if (wip != null) wip
+                // Delta 2026-09-04 (verifier finding): ARCHIVED is a settling column too, and a
+                // re-owning Move was a two-step way around the gate — both go through the guards.
+                else if (target == BoardCol.DONE || target == BoardCol.ARCHIVED) claimGuard(cmd.jobId.value, raw) ?: ownerGuard(cmd.jobId.value, raw, target)
+                else ownerGuard(cmd.jobId.value, raw, target)
             }
-        }
 
-        else -> null
+            // `complete`/`done` lowers to Complete → lifecycle closed → DONE: the same gate, or a
+            // claimant could close its own card by the lifecycle verb instead of the column.
+            is JobCommand.Complete -> claimGuard(cmd.jobId.value, raw)
+
+            // `cancel` / `retract` settle a card to ARCHIVED: claimed work in RUNNING is released
+            // by its judge or reaper, never cancelled out from under them (verifier finding).
+            is JobCommand.Cancel, is JobCommand.Retract -> claimGuard(cmd.jobId.value, raw)
+
+            is JobCommand.Start -> {
+                wipGuard(BoardCol.RUNNING, cmd.jobId.value, raw)
+            }
+
+            is JobCommand.Submit -> {
+                orphanGuard(cmd.jobId.value, raw) ?: if (cmd.dependencies.isEmpty()) null
+                else {
+                    // First caller of the KanbanTypes verbs: refuse a dependency cycle at the door.
+                    val board = boardOf(extra = cmd)
+                    if (board.hasCycle()) "dependency cycle via ${cmd.jobId.value}" else null
+                }
+            }
+
+            else -> null
+        }
+    }
+
+    private fun executionFamily(jobId: String, raw: Map<*, *>): String {
+        val previous = rows[jobId]
+        val owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else previous?.owner
+        if (owner != "lcnc-runner") return ""
+        val receipt = raw["lcncRun"] as? Map<*, *>
+        return (receipt?.get("executionFamily") as? String) ?: previous?.executionFamily.orEmpty()
+    }
+
+    /** Family membership follows retained LCNC run identities and cannot move between roots. */
+    private fun executionFamilyGuard(jobId: String, raw: Map<*, *>): String? {
+        val previous = rows[jobId]
+        val owner = if (raw.containsKey("owner")) (raw["owner"] as? String)?.trim().orEmpty() else previous?.owner
+        if (!previous?.executionFamily.isNullOrEmpty() && owner != "lcnc-runner")
+            return "LCNC execution family owner cannot change"
+        val priorFamily = previous?.executionFamily.orEmpty()
+        val receipt = raw["lcncRun"] as? Map<*, *>
+            ?: return if (priorFamily.isEmpty()) null else "LCNC execution receipt is required"
+        if (!receipt.containsKey("executionFamily"))
+            return if (priorFamily.isEmpty()) null else "LCNC execution family is required"
+        val family = receipt["executionFamily"] as? String
+        val runId = receipt["runId"] as? String
+        if (owner != "lcnc-runner" || runId.isNullOrBlank() || jobId != "lcnc/run/$runId" ||
+            family == null || !family.startsWith("lcnc/run/") || family.removePrefix("lcnc/run/").isBlank())
+            return "invalid LCNC execution family"
+        if (priorFamily.isNotEmpty()) return when {
+            priorFamily != family -> "LCNC execution family cannot change"
+            receipt["parentRunId"] != previous?.parentRunId -> "LCNC execution parent cannot change"
+            else -> null
+        }
+        if (family == jobId) return if (receipt["parentRunId"] == null) null else "LCNC root cannot inherit itself"
+        val parentId = (receipt["parentRunId"] as? String)?.takeIf { it.isNotBlank() }
+            ?: return "LCNC execution family requires a parent run"
+        val parent = rows["lcnc/run/$parentId"]
+        return if (parent?.owner == "lcnc-runner" && parent.executionFamily == family) null
+            else "LCNC execution family does not match its parent run"
+    }
+
+    private fun wipGuard(target: BoardCol, jobId: String, raw: Map<*, *>): String? {
+        val limit = target.wipLimit ?: return null
+        val occupied = rows.values.asSequence().filter { it.col == target && it.jobId != jobId }
+            .map { boardWipUnit(it.jobId, it.executionFamily) }.toSet()
+        val unit = boardWipUnit(jobId, executionFamily(jobId, raw))
+        return if (unit !in occupied && occupied.size >= limit) "WIP limit $limit full for '${target.wire}'" else null
     }
 
     /**
@@ -511,6 +614,13 @@ class BoardStoreElement(
         snapshot: JobSnapshot,
         seq: Long,
     ): CardRow? {
+        // An edit changes metadata, not the lifecycle projection, claim or transition clock.
+        if (cmd is JobCommand.Update) return checkNotNull(prev).copy(
+            title = cmd.title ?: prev.title,
+            priority = cmd.priority ?: prev.priority,
+            revision = snapshot.revision,
+            lastSequence = seq,
+        )
         // The stamped transition clock (live: stamped just now; replay: what the WAL says).
         val now = (raw["atMs"] as? Number)?.toLong() ?: clock()
         val col = when (cmd) {
@@ -548,6 +658,7 @@ class BoardStoreElement(
             // A blank or absent key keeps the previous value — a re-submit that only sets
             // dependencies (the fan-out join) must not detach a child from its tree.
             parent = (raw["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: prev?.parent ?: "",
+            executionFamily = executionFamily(jobId, raw),
         )
     }
 

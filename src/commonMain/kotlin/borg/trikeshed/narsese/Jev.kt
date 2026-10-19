@@ -42,6 +42,30 @@ object Jev {
         }
     }
 
-    /** The noul of answer [id], or 0. */
-    fun noulOf(answers: Map<*, *>, id: String): Double = ((answers[id] as? Map<*, *>)?.get("noul") as? Number)?.toDouble() ?: 0.0
+    /** A missing, refused or malformed answer is unknown; it cannot supply negative evidence. */
+    fun noulOf(answers: Map<*, *>, id: String): Double =
+        requireNotNull(((answers[id] as? Map<*, *>)?.get("noul") as? Number)?.toDouble()
+            ?.takeIf { it.isFinite() && it in 0.0..1.0 }) { "No valid noul for question '$id'" }
+
+    /** Validate the normalized answer against the exact question before retaining or using it. */
+    fun answerOf(answers: Map<*, *>, id: String, question: Map<String, Any?>): Map<*, *> {
+        val answer = requireNotNull(answers[id] as? Map<*, *>) { "No answer for question '$id'" }
+        require(answer["type"] == null || answer["type"] == question["type"]) { "Answer type differs for question '$id'" }
+        when (question["type"]) {
+            "noul" -> noulOf(answers, id)
+            "choice" -> {
+                val criteria = requireNotNull(question["criteria"] as? Map<*, *>) { "No choice criteria for question '$id'" }
+                require(criteria.isNotEmpty() && criteria.keys.all { it is String }) { "Invalid choice criteria for question '$id'" }
+                val probabilities = requireNotNull(answer["probabilities"] as? Map<*, *>) { "No probabilities for question '$id'" }
+                require(probabilities.keys == criteria.keys) { "Choice probabilities differ from criteria for question '$id'" }
+                for (value in probabilities.values) require((value as? Number)?.toDouble()
+                    ?.let { it.isFinite() && it in 0.0..1.0 } == true) { "Invalid choice probability for question '$id'" }
+                require((answer["confidence"] as? Number)?.toDouble()
+                    ?.let { it.isFinite() && it in 0.0..1.0 } == true) { "Invalid choice confidence for question '$id'" }
+                require(answer["choice"] is String && answer["choice"] in criteria) { "Invalid choice for question '$id'" }
+            }
+            else -> error("Unsupported question type '${question["type"]}'")
+        }
+        return answer
+    }
 }

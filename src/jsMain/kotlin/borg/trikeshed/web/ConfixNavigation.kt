@@ -1,9 +1,10 @@
 package borg.trikeshed.web
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.parse.confix.Syntax
 import org.w3c.dom.url.URLSearchParams
 
-/** Links select existing immutable JSON; they never carry a program to load or execute. */
+/** Links select existing immutable content; they never carry a program to load or execute. */
 object ConfixNavigation {
     fun path(text: String): Array<Any> {
         require(text.length <= 8192) { "Confix path exceeds the link budget" }
@@ -22,20 +23,28 @@ object ConfixNavigation {
         }.toTypedArray()
     }
 
-    fun href(cid: String, path: String = "[]"): String {
+    fun href(cid: String, path: String = "[]", syntax: Syntax = Syntax.JSON): String {
+        require(syntax == Syntax.JSON || syntax == Syntax.CBOR) { "Unsupported retained syntax" }
         val query = URLSearchParams()
         query.set("content", ContentId(cid).value)
         query.set("path", JSON.stringify(this.path(path)))
+        if (syntax != Syntax.JSON) query.set("syntax", syntax.name)
         return "/panels?$query"
     }
 
-    fun requested(query: URLSearchParams): Boolean = query.has("content") || query.has("path")
+    fun requested(query: URLSearchParams): Boolean = query.has("content") || query.has("path") || query.has("syntax")
 
-    fun source(query: URLSearchParams): Pair<String, Array<Any>> {
+    fun source(query: URLSearchParams): Triple<String, Array<Any>, Syntax> {
         require(query.getAll("content").size == 1 && query.getAll("path").size <= 1 &&
+            query.getAll("syntax").size <= 1 &&
             !query.has("load") && !query.has("documentTask") && !DebugNavigation.requested(query)) {
             "Choose one retained content ID, not a program, task or debugger load"
         }
-        return ContentId(requireNotNull(query.get("content"))).value to path(query.get("path") ?: "[]")
+        val syntax = when (query.get("syntax")) {
+            null, "JSON" -> Syntax.JSON
+            "CBOR" -> Syntax.CBOR
+            else -> error("Retained syntax must be JSON or CBOR")
+        }
+        return Triple(ContentId(requireNotNull(query.get("content"))).value, path(query.get("path") ?: "[]"), syntax)
     }
 }

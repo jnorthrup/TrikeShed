@@ -1,6 +1,8 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.landscape.LandscapeNavigation
+import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.web.*
 import borg.trikeshed.web.patch.PatchKinds
 import borg.trikeshed.web.patch.PatchRing
@@ -16,6 +18,12 @@ import org.w3c.dom.HTMLElement
  * same document the daemon reads.
  */
 class Panels : PatchSurface {
+    internal val page = PanelsPage { status("Page action failed: " + failureText(it)) }
+    internal fun launchJs(block: suspend () -> Unit) { page.submit(block) }
+    internal fun later(ms: Int, block: () -> Unit): Int = page.later(ms, block)
+    internal var rdfTimer = 0
+    fun close() = page.close()
+
     /** wires: {from:[nodeId,port], to:[nodeId,port]} */
     override var graph: dynamic = objOf { it.nodes = jsArray(); it.wires = jsArray(); it.seq = 1 }
     override val view: dynamic = objOf { it.x = 60; it.y = 60; it.z = 1 }
@@ -37,12 +45,19 @@ class Panels : PatchSurface {
     var autosave = true
     var documentRevision = 0
     var programRunning = false
-    var liveRuns = 0
+    internal var programAdmission: PanelsAdmission? = null
+    var sourceRevision = 0
+    var pulseReceipt: String? = null
+    var pulseProgram: LcncProgram? = null
     var lastProgramRun: dynamic = null
 
     val history by lazy { PanelsHistory(this) }
     val facets by lazy { PanelsFacets(this) }
+    val cases by lazy { PanelsCases(this) }
+    val workgroups by lazy { PanelsWorkgroups(this) }
     val debugger by lazy { PanelsDebug(this) }
+    val sourceEditor by lazy { PanelsSource(this) }
+    val sprites by lazy { PanelsSprites(this) }
     val shakeOwner by lazy { PanelsShakeOwner(this) }
     val layoutOwner by lazy { PanelsLayoutOwner(this) }
     var workspace: SpaceGraphWorkspace? = null
@@ -302,26 +317,57 @@ class Panels : PatchSurface {
     }
 
     /** a cable is type-safe when Kotlin's served relation accepts it */
-    fun wireKindOk(w: dynamic): Boolean {
+    fun wireKindOk(w: dynamic, resolved: ((dynamic, String, String) -> String?)? = null): Boolean {
         val s = node(w.from[0]); val d = node(w.to[0])
         if (s == null || d == null) return false
-        return kindsCompatible(nodeKindOf(s, "out", str(w.from[1])), nodeKindOf(d, "in", str(w.to[1])))
+        val resolve = resolved ?: try { portKindResolver() } catch (_: dynamic) { return false }
+        return kindsCompatible(resolve(s, "out", str(w.from[1])), resolve(d, "in", str(w.to[1])))
     }
 
     fun scopePath(n: dynamic): List<String> { val path = ArrayList<String>(); var q = n._parentScope; while (truthy(q)) { path.add(0, str(q.id)); q = q._parentScope }; return path }
+
+    /** One gesture's wired graph, shared by all its port queries; construction-time lookup remains declared. */
+    fun portKindResolver(program: LcncProgram = boardDefinition()): (dynamic, String, String) -> String? {
+        val contracts = LcncContracts.all().associateBy { it.type }
+        val indexed = mutableMapOf<String, LcncNode>()
+        fun visit(nodes: Series<LcncNode>) {
+            for (node in nodes.view) { indexed[node.id] = node; visit(node.children) }
+        }
+        visit(program.nodes)
+        val resolve = LcncTypeCheck.portKindResolver(program, contracts, LcncFacts.of(contracts.values))
+        return { node, direction, port ->
+            val typed = indexed[str(node.id)]
+            if (typed == null || typed.type !in contracts && typed.children.size == 0) nodeKindOf(node, direction, port)
+            else resolve(typed, direction, PatchKinds.bare(port)).let { if (it.generic) "*" else it.kind }
+        }
+    }
 
     /** Shared authoring operation: both projections obey the same kind and containment rules. */
     fun connectPanelPorts(from: dynamic, to: dynamic): Boolean {
         val src = node(from[0]); val dst = node(to[0])
         if (src == null || dst == null || src === dst) return false
-        val sk = nodeKindOf(src, "out", str(from[1])); val dk = nodeKindOf(dst, "in", str(to[1]))
-        if (!kindsCompatible(sk, dk)) {
-            status("kind mismatch: " + str(src.type) + "." + str(from[1]) + " emits " + (sk ?: "untyped") + ", " + str(dst.type) + "." + str(to[1]) + " wants " + (dk ?: "untyped")); return false
-        }
-        if (!PatchKinds.reaches(scopePath(src), scopePath(dst))) {
-            status("ring boundary: data flows lateral or inward — yields leave through scope.out"); return false
-        }
-        graph.wires = arr(graph.wires).filter { w -> !(w.to[0] == to[0] && w.to[1] == to[1]) }.toTypedArray()
+        val fromPort = PatchKinds.bare(str(from[1])); val toPort = PatchKinds.bare(str(to[1]))
+        if (arr(graph.wires).any { w -> w.from[0] == from[0] && PatchKinds.bare(str(w.from[1])) == fromPort &&
+                w.to[0] == to[0] && PatchKinds.bare(str(w.to[1])) == toPort }) return false
+        val cardinality = contract(dst.type)?.cardinality
+        val many = cardinality != null && cardinality[toPort] == "MANY"
+        try {
+            val current = boardDefinition()
+            val vocabulary = LcncContracts.all().associateBy { it.type }
+            val baseline = LcncTypeCheck.check(current, vocabulary, strict = false).toSet()
+            val retained = if (many) current.wires else current.wires.filter {
+                !(it.toNode == str(to[0]) && PatchKinds.bare(it.toPort) == toPort)
+            }
+            val candidate = LcncWire(str(from[0]), str(from[1]), str(to[0]), str(to[1]))
+            val trial = current.copy(wires = (retained.size + 1) j { i: Int ->
+                if (i < retained.size) retained[i] else candidate
+            })
+            val introduced = LcncTypeCheck.check(trial, vocabulary, strict = false).filter { it !in baseline }
+            if (introduced.isNotEmpty()) { status(introduced.joinToString("\n") { it.render() }); return false }
+        } catch (failure: dynamic) { status("Connection refused: " + failureText(failure)); return false }
+        if (!many) graph.wires = arr(graph.wires).filter { w ->
+            !(w.to[0] == to[0] && PatchKinds.bare(str(w.to[1])) == toPort)
+        }.toTypedArray()
         graph.wires.push(wire(from[0], from[1], to[0], to[1])); redraw(); save(); return true
     }
 
@@ -399,6 +445,7 @@ class Panels : PatchSurface {
         wiresSvg.innerHTML = ""
         redrawConcentric()
         val wires = arr(graph.wires)
+        val resolve = try { portKindResolver() } catch (_: dynamic) { null }
         wires.forEachIndexed { idx, wr ->
             val a = portCenter(str(wr.from[0]), "out", str(wr.from[1])); val b = portCenter(str(wr.to[0]), "in", str(wr.to[1]))
             if (a == null || b == null) return@forEachIndexed
@@ -406,10 +453,12 @@ class Panels : PatchSurface {
             val path = svg("path")
             PatchNavigation.wireCurve(path, a, b, viewport, view); path.classList.add("live")
             val srcN = node(wr.from[0])
-            val tc = PatchKinds.kindColor[if (srcN != null) portClass(srcN.type, "out", str(wr.from[1])) else ""]
+            val tc = PatchKinds.kindColor[if (srcN != null && resolve != null)
+                PatchKinds.portClass(resolve(srcN, "out", str(wr.from[1])), kindAcceptance)
+                else if (srcN != null) portClass(srcN.type, "out", str(wr.from[1])) else ""]
             if (tc != null) path.style.stroke = tc
             if (str(wr.from[0]) in shake.starved) path.classList.add("starved")
-            if (!wireKindOk(wr)) {
+            if (!wireKindOk(wr, resolve)) {
                 path.classList.add("mismatch")
                 val t = svg("title")
                 t.textContent = "kind mismatch — this cable feeds nothing: " + arr(wr.from).joinToString(".") { str(it) } + " → " + arr(wr.to).joinToString(".") { str(it) }

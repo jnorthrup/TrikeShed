@@ -1,9 +1,15 @@
 package borg.trikeshed.module
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
 import java.net.URLClassLoader
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
 /**
  * ModuleSupervisor — owns the proxy-ctor lifecycle. Attach is `Class.forName`
@@ -25,12 +31,20 @@ class ModuleSupervisor(
     private val mutex = Mutex()
     private val handles = LinkedHashMap<String, ModuleHandle>()
     private val loaders = HashMap<String, URLClassLoader>()
+    private class Retirement(val handle: ModuleHandle, val loader: URLClassLoader?) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<Retirement>
+        val completion = CompletableDeferred<Result<Unit>>()
+    }
+    private val retiring = HashMap<String, Retirement>()
 
     suspend fun attach(fqcn: String): ModuleHandle = mutex.withLock {
         val (cls, loader) = loadClass(fqcn)
         val module = cls.getDeclaredConstructor().newInstance() as? ForgeModule
             ?: throw IllegalArgumentException("$fqcn is not a ForgeModule")
-        require(!handles.containsKey(module.id)) { "module '${module.id}' already attached" }
+        if (handles.containsKey(module.id) || retiring.containsKey(module.id)) {
+            loader?.close()
+            throw IllegalArgumentException("module '${module.id}' already attached or draining")
+        }
         val handle = try {
             module.open(ctx)
         } catch (e: Throwable) {
@@ -47,7 +61,7 @@ class ModuleSupervisor(
 
     /** Pre-built instance path (boot-time defaults like KanbanModule — no reflection round-trip). */
     suspend fun attach(module: ForgeModule): ModuleHandle = mutex.withLock {
-        require(!handles.containsKey(module.id)) { "module '${module.id}' already attached" }
+        require(!handles.containsKey(module.id) && !retiring.containsKey(module.id)) { "module '${module.id}' already attached or draining" }
         val handle = try {
             module.open(ctx)
         } catch (e: Throwable) {
@@ -61,12 +75,40 @@ class ModuleSupervisor(
     }
 
     suspend fun detach(moduleId: String): Boolean {
-        val handle = mutex.withLock { handles.remove(moduleId) } ?: return false
-        runCatching { handle.drain() }
-        val released = ctx.routes.release(moduleId)
-        runCatching { handle.close() }
-        mutex.withLock { loaders.remove(moduleId) }?.let { runCatching { it.close() } }
-        receipt("module/detached", moduleId, mapOf("routesReleased" to released))
+        var owns = false
+        val retirement = mutex.withLock {
+            retiring[moduleId] ?: handles.remove(moduleId)?.let { handle ->
+                Retirement(handle, loaders.remove(moduleId)).also { retiring[moduleId] = it; owns = true }
+            }
+        } ?: return false
+        if (!owns) check(currentCoroutineContext()[Retirement]?.completion?.isCompleted != false) {
+            "A module retirement cannot join another active retirement"
+        }
+        if (owns) withContext(NonCancellable + retirement) {
+            val failures = mutableListOf<Throwable>()
+            suspend fun attempt(action: suspend () -> Unit) {
+                try { action() } catch (failure: Throwable) { failures.add(failure) }
+            }
+            var released = emptyList<String>()
+            attempt { retirement.handle.drain() }
+            attempt { released = ctx.routes.release(moduleId) }
+            attempt { retirement.handle.close() }
+            attempt { retirement.loader?.close() }
+            attempt {
+                if (failures.isEmpty()) receipt("module/detached", moduleId, mapOf("routesReleased" to released))
+                else receipt("module/detach-failed", moduleId, mapOf("routesReleased" to released,
+                    "error" to (failures[0].message ?: failures[0].toString())))
+            }
+            val result = if (failures.isEmpty()) Result.success(Unit) else Result.failure(
+                IllegalStateException("module '$moduleId' detach failed", failures[0]).also { failure ->
+                    failures.drop(1).forEach(failure::addSuppressed)
+                })
+            mutex.withLock {
+                if (retiring[moduleId] === retirement) retiring.remove(moduleId)
+                retirement.completion.complete(result)
+            }
+        }
+        retirement.completion.await().getOrThrow()
         return true
     }
 
@@ -75,8 +117,14 @@ class ModuleSupervisor(
     }
 
     suspend fun drainAll() {
-        val ids = mutex.withLock { handles.keys.toList() }
-        for (id in ids) detach(id)
+        withContext(NonCancellable) {
+            val ids = mutex.withLock { (handles.keys + retiring.keys).distinct() }
+            val failures = mutableListOf<Throwable>()
+            for (id in ids) try { detach(id) } catch (failure: Throwable) { failures.add(failure) }
+            if (failures.isNotEmpty()) throw IllegalStateException("module drain failed", failures[0]).also { failure ->
+                failures.drop(1).forEach(failure::addSuppressed)
+            }
+        }
     }
 
     private fun loadClass(fqcn: String): Pair<Class<*>, URLClassLoader?> {

@@ -174,10 +174,9 @@ class LcncMatingTest {
     }
 
     @Test
-    fun mateRejectsDuplicateInputConnection() {
-        // Build a program where http.get already receives a wire on its trigger? input.
-        // n1 (timer) → n2 (http.get) on trigger?. Then try to mate n3 → http.get.trigger?
-        // (different source, same target type+port). The target-side check must block it.
+    fun mateCreatesASeparateTargetWhenThatTypeIsAlreadyConnected() {
+        // Cardinality belongs to one socket on one node. The new http.get
+        // receives its own trigger even when another instance is connected.
         val timer1 = LcncNode("n1", "timer")
         val timer2 = LcncNode("n3", "timer")
         val httpGet = LcncNode("n2", "http.get")
@@ -185,11 +184,9 @@ class LcncMatingTest {
         val wire = LcncWire("n1", "tick", "n2", "trigger?")
         val program = LcncProgram("test", listOf(timer1, httpGet, timer2).toSeries(), listOf(wire).toSeries())
 
-        assertFailsWith<IllegalArgumentException> {
-            // n3.tick is unique (source-side passes), but http.get.trigger? is already
-            // occupied (target-side catches it). One wire per ONE-cardinality input.
-            LcncMating.mate(program, "n3", "tick", "http.get", 300.0, 60.0)
-        }
+        val mated = LcncMating.mate(program, "n3", "tick", "http.get", 300.0, 60.0)
+        assertTrue(mated.wire.toNode != "n2")
+        assertEquals(2, mated.program.wires.size)
     }
 
     @Test

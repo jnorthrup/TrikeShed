@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <uv.h>
 
 #if IO_URING_VERSION_MAJOR < 2 || (IO_URING_VERSION_MAJOR == 2 && IO_URING_VERSION_MINOR < 15)
 #error "The Node adapter requires the vendored liburing 2.15 or later"
@@ -32,6 +33,14 @@ static void nowait_if_nonblocking(struct io_uring_sqe *sqe, int fd, int64_t offs
 }
 
 /* Handles are per-environment identities, never unchecked caller pointers. */
+struct node_request {
+    struct node_request *next;
+    int32_t id;
+    int op;
+    napi_ref bytes;
+    char *path;
+};
+
 struct node_ring {
     uint64_t id;
     struct io_uring ring;
@@ -41,6 +50,12 @@ struct node_ring {
     bool exited;
     /* IORING_SETUP_SUBMIT_ALL: one enter submits every queued SQE, so it may wait for all of their CQEs. */
     bool submit_all;
+    napi_env env;
+    struct node_request *requests;
+    uv_poll_t *poller;
+    napi_deferred wake;
+    napi_ref promise;
+    int submit_error;
 };
 
 struct node_uring {
@@ -102,7 +117,7 @@ static bool implemented(int op) {
 
 static napi_value abi_version(napi_env env, napi_callback_info info) {
     (void)info;
-    return integer(env, 1);
+    return integer(env, 2);
 }
 
 static napi_value platform(napi_env env, napi_callback_info info) {
@@ -136,11 +151,11 @@ static napi_value ring_open(napi_env env, napi_callback_info info) {
     if (!state || state->next_id == INT64_MAX) return bigint(env, -EMFILE);
     struct node_ring *ring = calloc(1, sizeof(*ring));
     if (!ring) return bigint(env, -ENOMEM);
-    /* SUBMIT_ALL (5.18) keeps one failed SQE from stranding the rest of a batch; COOP_TASKRUN (5.19) completes
-     * io-wq work at the waiter's next kernel entry instead of interrupting it. Older kernels refuse them: plain ring. */
+    /* SUBMIT_ALL (5.18) keeps one failed SQE from stranding the rest of a batch. A plain ring on older kernels.
+     * No SQPOLL or deferred task work: the CQ fd must wake Node's existing event loop. */
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
-    params.flags = IORING_SETUP_SUBMIT_ALL | IORING_SETUP_COOP_TASKRUN;
+    params.flags = IORING_SETUP_SUBMIT_ALL;
     int result = io_uring_queue_init_params((unsigned)entries, &ring->ring, &params);
     if (result == 0) ring->submit_all = true;
     else if (result == -EINVAL) result = io_uring_queue_init((unsigned)entries, &ring->ring, 0);
@@ -152,6 +167,18 @@ static napi_value ring_open(napi_env env, napi_callback_info info) {
         free(ring);
         return bigint(env, result);
     }
+    uv_loop_t *loop;
+    ring->poller = malloc(sizeof(*ring->poller));
+    if (!ring->poller || napi_get_uv_event_loop(env, &loop) != napi_ok ||
+        uv_poll_init(loop, ring->poller, ring->ring.ring_fd) != 0) {
+        free(ring->poller);
+        io_uring_free_probe(ring->probe);
+        io_uring_queue_exit(&ring->ring);
+        free(ring);
+        return bigint(env, -ENOMEM);
+    }
+    ring->env = env;
+    ring->poller->data = ring;
     ring->id = ++state->next_id;
     ring->next = state->rings;
     state->rings = ring;
@@ -187,7 +214,7 @@ static int posix_execute(int op, int fd, void *bytes, unsigned len, int64_t offs
     return result < 0 ? -errno : result;
 }
 
-/* ABI1 borrows Int8Array bytes synchronously until the matching terminal CQE.
+/* The synchronous compatibility export borrows Int8Array bytes until the matching terminal CQE.
  * Kernel-unsupported opcodes execute the POSIX effect against the same fd.
  */
 static napi_value execute(napi_env env, napi_callback_info info) {
@@ -201,6 +228,7 @@ static napi_value execute(napi_env env, napi_callback_info info) {
         !int64(env, args[6], &offset) || !int64(env, args[7], &user_data)) return integer(env, -EINVAL);
     struct node_ring *ring = ring_of(env, args[0]);
     if (!ring || ring->failed || ring->exited) return integer(env, -EBADF);
+    if (ring->requests) return integer(env, -EBUSY);
     if (!implemented(op)) return integer(env, -EOPNOTSUPP);
     if (start < 0 || length < 0) return integer(env, -EINVAL);
     bool transfer = op == IORING_OP_READ || op == IORING_OP_WRITE;
@@ -244,7 +272,9 @@ static napi_value execute(napi_env env, napi_callback_info info) {
         case IORING_OP_FSYNC: io_uring_prep_fsync(sqe, fd, 0); break;
         case IORING_OP_FTRUNCATE: io_uring_prep_ftruncate(sqe, fd, offset); break;
     }
-    io_uring_sqe_set_data64(sqe, (uint64_t)user_data);
+    /* execute is exclusive with deferred requests. Its private tag cannot collide with cancellation CQEs (NULL). */
+    (void)user_data;
+    io_uring_sqe_set_data64(sqe, UINT64_MAX);
     for (;;) {
         result = io_uring_submit(&ring->ring);
         if (result >= 0) break;
@@ -270,7 +300,11 @@ static napi_value execute(napi_env env, napi_callback_info info) {
             nanosleep(&delay, NULL);
             continue;
         }
-        if (io_uring_cqe_get_data64(cqe) != (uint64_t)user_data) {
+        if (io_uring_cqe_get_data64(cqe) == 0) {
+            io_uring_cqe_seen(&ring->ring, cqe);
+            continue;
+        }
+        if (io_uring_cqe_get_data64(cqe) != UINT64_MAX) {
             ring->failed = true;
             io_uring_cqe_seen(&ring->ring, cqe);
             continue;
@@ -288,29 +322,37 @@ finish:
     return integer(env, result);
 }
 
-#define BATCH_FIELDS 5
+#define BATCH_FIELDS 6
 #define BATCH_CHUNK 64
 
-/* The operations executeBatch carries; path and descriptor-lifecycle ops keep the one-SQE execute. */
-static bool batched(int op) {
-    switch (op) {
-        case IORING_OP_NOP: case IORING_OP_READ: case IORING_OP_WRITE: case IORING_OP_FSYNC:
-        case IORING_OP_FTRUNCATE: return true;
-        default: return false;
-    }
+static bool scalar32(double value, int32_t *result) {
+    if (!(value >= INT32_MIN && value <= INT32_MAX)) return false;
+    *result = (int32_t)value;
+    return value == *result;
 }
 
-/* executeBatch(handle, count, control, arrays, results): control is a Float64Array of BATCH_FIELDS per SQE (opcode,
- * fd, start, length, offset), arrays a JS Array holding each READ/WRITE's Int8Array, results an Int32Array that
- * receives each CQE's res. Up to BATCH_CHUNK SQEs (and no more than the SQ holds) go to the kernel in one enter, which
- * also waits for their CQEs; the typed arrays' bytes stay borrowed until then. 0, or -errno when the ring refused
- * the whole batch. */
-static napi_value execute_batch(napi_env env, napi_callback_info info) {
+static bool scalar_offset(double value, int64_t *result) {
+    /* Float64 control carries exact JS integers. Larger offsets use execute's BigInt ABI. */
+    if (!(value >= -9007199254740991.0 && value <= 9007199254740991.0)) return false;
+    *result = (int64_t)value;
+    return value == *result;
+}
+
+static void request_free(napi_env env, struct node_request *request) {
+    if (request->bytes) napi_delete_reference(env, request->bytes);
+    free(request->path);
+    free(request);
+}
+
+/* ABI2: control fields are opcode, fd, start, length, offset, transport id. JS user_data never narrows to Float64.
+ * A zero result admits all SQEs; results[i] is zero for a borrowed SQE and a negative errno for a rejected one.
+ * References and path copies are released only while reaping terminal CQEs. */
+static napi_value submit_batch(napi_env env, napi_callback_info info) {
     napi_value args[5];
     size_t count = 5;
     int32_t total;
     if (napi_get_cb_info(env, info, &count, args, NULL, NULL) != napi_ok || count != 5 ||
-        !int32(env, args[1], &total) || total < 0) return integer(env, -EINVAL);
+        !int32(env, args[1], &total) || total < 0 || total > BATCH_CHUNK) return integer(env, -EINVAL);
     struct node_ring *ring = ring_of(env, args[0]);
     if (!ring || ring->failed || ring->exited) return integer(env, -EBADF);
     napi_typedarray_type type;
@@ -328,99 +370,219 @@ static napi_value execute_batch(napi_env env, napi_callback_info info) {
         return integer(env, -EINVAL);
     const double *control = control_data;
     int32_t *results = results_data;
-    int32_t limit = ring->ring.sq.ring_entries < BATCH_CHUNK ? (int32_t)ring->ring.sq.ring_entries : BATCH_CHUNK;
-    for (int32_t base = 0; base < total; ) {
-        int32_t n = total - base < limit ? total - base : limit;
-        int32_t *res = results + base;
-        bool done[BATCH_CHUNK];
-        if (ring->failed || ring->exited) {
-            for (int32_t i = 0; i < n; i++) res[i] = -EBADF;
-            base += n;
-            continue;
+    for (int32_t i = 0; i < total; i++) {
+        const double *f = control + (size_t)i * BATCH_FIELDS;
+        int32_t op, fd, start, len, id;
+        int64_t offset;
+        results[i] = -EINVAL;
+        if (!scalar32(f[0], &op) || !scalar32(f[1], &fd) || !scalar32(f[2], &start) ||
+            !scalar32(f[3], &len) || !scalar_offset(f[4], &offset) || !scalar32(f[5], &id) || id <= 0 ||
+            start < 0 || len < 0) continue;
+        if (!implemented(op) || !io_uring_opcode_supported(ring->probe, op)) { results[i] = -EOPNOTSUPP; continue; }
+        bool duplicate = false;
+        for (struct node_request *request = ring->requests; request; request = request->next)
+            if (request->id == id) duplicate = true;
+        if (duplicate) continue;
+        struct node_request *request = calloc(1, sizeof(*request));
+        if (!request) { results[i] = -ENOMEM; continue; }
+        request->id = id;
+        request->op = op;
+        void *bytes = NULL;
+        if (op == IORING_OP_READ || op == IORING_OP_WRITE || op == IORING_OP_OPENAT) {
+            napi_value element, element_buffer;
+            napi_typedarray_type element_type;
+            size_t capacity, element_offset;
+            if (napi_get_element(env, args[3], (uint32_t)i, &element) != napi_ok ||
+                napi_get_typedarray_info(env, element, &element_type, &capacity, &bytes, &element_buffer,
+                    &element_offset) != napi_ok ||
+                (element_type != napi_int8_array && element_type != napi_uint8_array) ||
+                (size_t)start > capacity || (size_t)len > capacity - (size_t)start ||
+                napi_create_reference(env, element, 1, &request->bytes) != napi_ok) {
+                request_free(env, request);
+                continue;
+            }
+            if (bytes) bytes = (unsigned char *)bytes + start;
         }
-        napi_handle_scope scope;
-        if (napi_open_handle_scope(env, &scope) != napi_ok) return integer(env, -ENOMEM);
-        bool borrows = false;
-        int prepared = 0;
-        for (int32_t i = 0; i < n; i++) {
-            const double *f = control + (size_t)(base + i) * BATCH_FIELDS;
-            int op = (int)f[0], fd = (int)f[1];
-            int32_t start = (int32_t)f[2], len = (int32_t)f[3];
-            int64_t offset = (int64_t)f[4];
-            done[i] = true;
-            if (!batched(op) || !io_uring_opcode_supported(ring->probe, op)) { res[i] = -EOPNOTSUPP; continue; }
-            if (start < 0 || len < 0) { res[i] = -EINVAL; continue; }
-            void *bytes = NULL;
-            if (op == IORING_OP_READ || op == IORING_OP_WRITE) {
-                napi_value element, element_buffer;
-                napi_typedarray_type element_type;
-                size_t capacity, element_offset;
-                if (napi_get_element(env, args[3], (uint32_t)(base + i), &element) != napi_ok ||
-                    napi_get_typedarray_info(env, element, &element_type, &capacity, &bytes, &element_buffer,
-                        &element_offset) != napi_ok ||
-                    (element_type != napi_int8_array && element_type != napi_uint8_array) ||
-                    (size_t)start > capacity || (size_t)len > capacity - (size_t)start || offset < -1) {
-                    res[i] = -EINVAL;
-                    continue;
-                }
-                if (bytes) bytes = (unsigned char *)bytes + start;
-            }
-            if (op == IORING_OP_FTRUNCATE && offset < 0) { res[i] = -EINVAL; continue; }
-            /* The SQ is empty between calls and n <= its entries. */
-            struct io_uring_sqe *sqe = io_uring_get_sqe(&ring->ring);
-            if (!sqe) { res[i] = -EBUSY; continue; }
-            switch (op) {
-                case IORING_OP_NOP: io_uring_prep_nop(sqe); break;
-                case IORING_OP_READ: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-                case IORING_OP_WRITE: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-                case IORING_OP_FSYNC: io_uring_prep_fsync(sqe, fd, 0); break;
-                case IORING_OP_FTRUNCATE: io_uring_prep_ftruncate(sqe, fd, offset); break;
-            }
-            io_uring_sqe_set_data64(sqe, (uint64_t)i);
-            if (op != IORING_OP_NOP) borrows = true;
-            done[i] = false;
-            prepared++;
+        if (((op == IORING_OP_READ || op == IORING_OP_WRITE) && offset < -1) ||
+            (op == IORING_OP_FTRUNCATE && offset < 0)) { request_free(env, request); continue; }
+        if (op == IORING_OP_OPENAT) {
+            if (fd != AT_FDCWD || len == 0 || offset < 0 ||
+                (offset & ~(3LL | O_CREAT | O_EXCL | O_TRUNC)) || (offset & 3) == 3 ||
+                memchr(bytes, 0, (size_t)len)) { request_free(env, request); continue; }
+            request->path = malloc((size_t)len + 1);
+            if (!request->path) { request_free(env, request); results[i] = -ENOMEM; continue; }
+            memcpy(request->path, bytes, (size_t)len);
+            request->path[len] = 0;
+            bytes = request->path;
         }
-        int reaped = 0;
-        while (reaped < prepared) {
-            /* Without SUBMIT_ALL an SQE that fails to issue leaves its successors queued for the next enter, so
-             * that ring waits for one CQE at a time. */
-            int rc = io_uring_submit_and_wait(&ring->ring, ring->submit_all ? (unsigned)(prepared - reaped) : 1);
-            if (rc < 0 && rc != -EINTR) {
-                if (!borrows) {
-                    /* NOPs borrow no memory and own no descriptor: a refused enter can fail them safely. */
-                    io_uring_queue_exit(&ring->ring);
-                    ring->failed = ring->exited = true;
-                    for (int32_t i = 0; i < n; i++) if (!done[i]) { res[i] = rc; done[i] = true; }
-                    break;
-                }
-                /* Never release a borrow after an uncertain enter failure: liburing resubmits only the still-pending
-                 * SQ tail, and the CQ is drained until every prepared SQE reports. */
-                ring->failed = true;
-                const struct timespec delay = { .tv_sec = 0, .tv_nsec = 100000000 };
-                nanosleep(&delay, NULL);
-            }
-            unsigned head, seen = 0;
-            struct io_uring_cqe *cqe;
-            io_uring_for_each_cqe(&ring->ring, head, cqe) {
-                uint64_t i = io_uring_cqe_get_data64(cqe);
-                if (i < (uint64_t)n && !done[i]) { res[i] = cqe->res; done[i] = true; reaped++; }
-                else ring->failed = true;
-                seen++;
-            }
-            io_uring_cq_advance(&ring->ring, seen);
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&ring->ring);
+        if (!sqe) { request_free(env, request); results[i] = -EBUSY; continue; }
+        switch (op) {
+            case IORING_OP_NOP: io_uring_prep_nop(sqe); break;
+            case IORING_OP_OPENAT: io_uring_prep_openat(sqe, fd, bytes, (int)offset, 0666); break;
+            case IORING_OP_CLOSE: io_uring_prep_close(sqe, fd); break;
+            case IORING_OP_READ: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
+            case IORING_OP_WRITE: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
+            case IORING_OP_FSYNC: io_uring_prep_fsync(sqe, fd, 0); break;
+            case IORING_OP_FTRUNCATE: io_uring_prep_ftruncate(sqe, fd, offset); break;
         }
-        napi_close_handle_scope(env, scope);
-        if (ring->failed && !ring->exited) {
+        io_uring_sqe_set_data(sqe, request);
+        request->next = ring->requests;
+        ring->requests = request;
+        results[i] = 0;
+    }
+    int result;
+    do { result = io_uring_submit(&ring->ring); } while (result == -EINTR);
+    /* An enter error cannot relinquish a possibly admitted borrow. Reap retries the remaining SQ tail. */
+    if (result < 0) {
+        ring->failed = true;
+        ring->submit_error = result;
+        bool nops = true;
+        for (struct node_request *request = ring->requests; request; request = request->next)
+            if (request->op != IORING_OP_NOP) nops = false;
+        if (nops) {
+            /* A refused startup NOP owns no descriptor or borrowed bytes, so its setup failure is terminal. */
             io_uring_queue_exit(&ring->ring);
             ring->exited = true;
         }
-        base += n;
     }
     return integer(env, 0);
 }
 
+static napi_value reap_completions(napi_env env, napi_callback_info info) {
+    napi_value args[2], result;
+    size_t count = 2;
+    int32_t minimum = 0;
+    if (napi_get_cb_info(env, info, &count, args, NULL, NULL) != napi_ok || count < 1 ||
+        (count == 2 && (!int32(env, args[1], &minimum) || minimum < 0))) return NULL;
+    struct node_ring *ring = ring_of(env, args[0]);
+    if (!ring) { napi_throw_error(env, NULL, "Node uring ring is closed"); return NULL; }
+    if (napi_create_array(env, &result) != napi_ok) return NULL;
+    if (ring->exited) {
+        uint32_t index = 0;
+        while (ring->requests) {
+            struct node_request *request = ring->requests;
+            ring->requests = request->next;
+            napi_set_element(env, result, index++, integer(env, request->id));
+            napi_set_element(env, result, index++, integer(env, ring->submit_error ? ring->submit_error : -EBADF));
+            request_free(env, request);
+        }
+        return result;
+    }
+    if (minimum > 0 && ring->requests) {
+        /* Explicit synchronous compatibility wait (including the startup NOP probe). Async callers always pass zero. */
+        unsigned outstanding = 0;
+        for (struct node_request *request = ring->requests; request; request = request->next) outstanding++;
+        int status;
+        do { status = io_uring_submit_and_wait(&ring->ring, (unsigned)minimum < outstanding ? (unsigned)minimum : outstanding); }
+        while (status == -EINTR);
+    } else {
+        if (io_uring_sq_ready(&ring->ring)) io_uring_submit(&ring->ring);
+        /* Enter with GETEVENTS for overflow/task work without waiting for an individual CQE. */
+        io_uring_get_events(&ring->ring);
+    }
+    unsigned head, seen = 0;
+    uint32_t index = 0;
+    struct io_uring_cqe *cqe;
+    io_uring_for_each_cqe(&ring->ring, head, cqe) {
+        struct node_request *completed = io_uring_cqe_get_data(cqe);
+        if (completed) {
+            struct node_request **slot = &ring->requests;
+            while (*slot && *slot != completed) slot = &(*slot)->next;
+            if (*slot) {
+                napi_set_element(env, result, index++, integer(env, completed->id));
+                napi_set_element(env, result, index++, integer(env, cqe->res));
+                *slot = completed->next;
+                request_free(env, completed);
+            } else ring->failed = true;
+        }
+        seen++;
+    }
+    io_uring_cq_advance(&ring->ring, seen);
+    return result;
+}
+
+static void wake_ring(struct node_ring *ring) {
+    if (!ring->wake) return;
+    uv_poll_stop(ring->poller);
+    napi_value value;
+    napi_get_undefined(ring->env, &value);
+    napi_resolve_deferred(ring->env, ring->wake, value);
+    napi_delete_reference(ring->env, ring->promise);
+    ring->wake = NULL;
+    ring->promise = NULL;
+}
+
+static void completion_ready(uv_poll_t *poller, int status, int events) {
+    (void)status; (void)events;
+    struct node_ring *ring = poller->data;
+    napi_handle_scope scope;
+    if (napi_open_handle_scope(ring->env, &scope) != napi_ok) return;
+    wake_ring(ring);
+    napi_close_handle_scope(ring->env, scope);
+}
+
+/* Level-triggered poll of the CQ fd parks Node's existing event loop; no polling task or timeout. */
+static napi_value await_completions(napi_env env, napi_callback_info info) {
+    napi_value args[1], promise;
+    size_t count = 1;
+    if (napi_get_cb_info(env, info, &count, args, NULL, NULL) != napi_ok || count != 1) return NULL;
+    struct node_ring *ring = ring_of(env, args[0]);
+    if (!ring || ring->exited) { napi_throw_error(env, NULL, "Node uring ring is closed"); return NULL; }
+    if (ring->wake) {
+        napi_get_reference_value(env, ring->promise, &promise);
+        return promise;
+    }
+    if (napi_create_promise(env, &ring->wake, &promise) != napi_ok ||
+        napi_create_reference(env, promise, 1, &ring->promise) != napi_ok) return NULL;
+    if (io_uring_cq_ready(&ring->ring)) wake_ring(ring);
+    else {
+        int result = uv_poll_start(ring->poller, UV_READABLE, completion_ready);
+        if (result < 0) {
+            napi_value failure;
+            napi_create_error(env, NULL, string(env, uv_strerror(result)), &failure);
+            napi_reject_deferred(env, ring->wake, failure);
+            napi_delete_reference(env, ring->promise);
+            ring->wake = NULL;
+            ring->promise = NULL;
+        }
+    }
+    return promise;
+}
+
+static napi_value cancel_wait(napi_env env, napi_callback_info info) {
+    napi_value args[1];
+    size_t count = 1;
+    if (napi_get_cb_info(env, info, &count, args, NULL, NULL) != napi_ok || count != 1) return integer(env, -EINVAL);
+    struct node_ring *ring = ring_of(env, args[0]);
+    if (!ring) return integer(env, -EBADF);
+    wake_ring(ring);
+    return integer(env, 0);
+}
+
+static napi_value cancel_pending(napi_env env, napi_callback_info info) {
+    napi_value args[1];
+    size_t count = 1;
+    if (napi_get_cb_info(env, info, &count, args, NULL, NULL) != napi_ok || count != 1) return integer(env, -EINVAL);
+    struct node_ring *ring = ring_of(env, args[0]);
+    if (!ring || ring->exited) return integer(env, -EBADF);
+    for (struct node_request *request = ring->requests; request; request = request->next) {
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&ring->ring);
+        if (!sqe) { io_uring_submit(&ring->ring); sqe = io_uring_get_sqe(&ring->ring); }
+        if (!sqe) break;
+        io_uring_prep_cancel(sqe, request, 0);
+        io_uring_sqe_set_data(sqe, NULL);
+    }
+    io_uring_submit(&ring->ring);
+    return integer(env, 0);
+}
+
+static void poller_free(uv_handle_t *handle) { free(handle); }
+
 static void ring_free(struct node_ring *ring) {
+    wake_ring(ring);
+    uv_poll_stop(ring->poller);
+    uv_close((uv_handle_t *)ring->poller, poller_free);
     io_uring_free_probe(ring->probe);
     if (!ring->exited) io_uring_queue_exit(&ring->ring);
     free(ring);
@@ -434,6 +596,7 @@ static napi_value ring_close(napi_env env, napi_callback_info info) {
     struct node_uring *state = context(env);
     struct node_ring *ring = ring_of(env, args[0]);
     if (!state || !ring) return integer(env, -EBADF);
+    if (ring->requests) return integer(env, -EBUSY);
     struct node_ring **slot = &state->rings;
     while (*slot != ring) slot = &(*slot)->next;
     *slot = ring->next;
@@ -447,6 +610,22 @@ static void finalize(napi_env env, void *data, void *hint) {
     while (state->rings) {
         struct node_ring *ring = state->rings;
         state->rings = ring->next;
+        /* Environment shutdown cannot abandon borrowed typed arrays. Cancel and join the kernel effects. */
+        while (ring->requests) {
+            struct io_uring_sqe *sqe = io_uring_get_sqe(&ring->ring);
+            if (sqe) {
+                io_uring_prep_cancel(sqe, ring->requests, 0);
+                io_uring_sqe_set_data(sqe, NULL);
+                io_uring_submit(&ring->ring);
+            }
+            struct io_uring_cqe *cqe;
+            if (io_uring_wait_cqe(&ring->ring, &cqe) < 0) continue;
+            struct node_request *completed = io_uring_cqe_get_data(cqe);
+            struct node_request **slot = &ring->requests;
+            while (*slot && *slot != completed) slot = &(*slot)->next;
+            if (*slot) { *slot = completed->next; request_free(env, completed); }
+            io_uring_cqe_seen(&ring->ring, cqe);
+        }
         ring_free(ring);
     }
     free(state);
@@ -464,7 +643,11 @@ static napi_value initialize(napi_env env, napi_value exports) {
         { "open", NULL, ring_open, NULL, NULL, NULL, napi_default, NULL },
         { "supports", NULL, supports, NULL, NULL, NULL, napi_default, NULL },
         { "execute", NULL, execute, NULL, NULL, NULL, napi_default, NULL },
-        { "executeBatch", NULL, execute_batch, NULL, NULL, NULL, napi_default, NULL },
+        { "submitBatch", NULL, submit_batch, NULL, NULL, NULL, napi_default, NULL },
+        { "reapCompletions", NULL, reap_completions, NULL, NULL, NULL, napi_default, NULL },
+        { "awaitCompletions", NULL, await_completions, NULL, NULL, NULL, napi_default, NULL },
+        { "cancelWait", NULL, cancel_wait, NULL, NULL, NULL, napi_default, NULL },
+        { "cancelPending", NULL, cancel_pending, NULL, NULL, NULL, napi_default, NULL },
         { "close", NULL, ring_close, NULL, NULL, NULL, napi_default, NULL },
     };
     if (napi_define_properties(env, exports, sizeof(properties) / sizeof(properties[0]), properties) != napi_ok)

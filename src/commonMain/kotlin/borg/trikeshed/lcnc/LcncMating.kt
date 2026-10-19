@@ -1,12 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.view
+import borg.trikeshed.lib.*
 
 /**
  * Kotlin-owned mating operation over the contract vocabulary. Pointer geometry and
@@ -75,22 +69,55 @@ object LcncMating {
     }
 
     /**
-     * Infer a wire only when exactly one kind-compatible port pair exists.
+     * Infer a wire only when exactly one legal port pair exists in this program.
      * Multiple pairs are returned as evidence; no arbitrary first-pair guess.
-     * The pairs are `(outKind from ?p ?K)` × `(inKind to ?q ?L)` where the
-     * tuple rule accepts K into L.
+     * Existing bindings determine kinds; the checker owns scope and type rules.
      */
     fun autoWire(program: LcncProgram, fromId: String, toId: String): LcncAutoWireResult {
         val from = node(program, fromId)
         val to = node(program, toId)
-        val candidates = LcncFacts.of(LcncContracts.all()).autoWire(from.type, to.type)
+        if (fromId == toId) return LcncAutoWireResult(null, emptyList())
+        val contracts = LcncContracts.all().associateBy { it.type }
+        val facts = LcncFacts.of(contracts.values)
+        val kind = LcncTypeCheck.portKindResolver(program, contracts, facts)
+        val baseline = LcncTypeCheck.check(program, contracts).toSet()
+        val candidates = mutableListOf<LcncAutoWireCandidate>()
+        for (output in LcncTypeCheck.outputsOf(from, contracts)) {
+            val fromPort = output.removeSuffix("?")
+            val source = kind(from, "out", fromPort)
+            if (source.kind == null && !source.generic) continue
+            val sourceCardinality = contracts[from.type]?.cardinality?.get(fromPort) ?: LcncCardinality.ONE
+            if (sourceCardinality != LcncCardinality.MANY && program.wires.view.any {
+                    it.fromNode == fromId && it.fromPort.removeSuffix("?") == fromPort
+                }) continue
+            for (input in LcncTypeCheck.inputsOf(to, contracts)) {
+                val toPort = input.removeSuffix("?")
+                // Iteration changes the ring's yields; it is always an authored choice.
+                if (input == LcncTypeCheck.RING_EACH) continue
+                val target = kind(to, "in", toPort)
+                if (target.kind == null && !target.generic || !facts.accepts(source, target)) continue
+                val targetCardinality = contracts[to.type]?.cardinality?.get(toPort) ?: LcncCardinality.ONE
+                if (program.wires.view.any {
+                        it.toNode == toId && it.toPort.removeSuffix("?") == toPort &&
+                            (targetCardinality != LcncCardinality.MANY ||
+                                it.fromNode == fromId && it.fromPort.removeSuffix("?") == fromPort)
+                    }) continue
+                val candidate = LcncWire(fromId, output, toId, input)
+                val wires = (program.wires.size + 1) j { i: Int ->
+                    if (i < program.wires.size) program.wires[i] else candidate
+                }
+                // Also reject a binding that would make an existing cable invalid.
+                if (LcncTypeCheck.check(program.copy(wires = wires), contracts).any { it !in baseline }) continue
+                candidates.add(LcncAutoWireCandidate(output, input, source.kind ?: LcncKinds.UNRESOLVED))
+            }
+        }
         val wire = candidates.singleOrNull()?.let { LcncWire(fromId, it.fromPort, toId, it.toPort) }
         return LcncAutoWireResult(wire, candidates)
     }
 
     /**
      * Drag-to-blank narrowing, resolved through the ONE type authority
-     * ([LcncTypeCheck.portKind]) so the menu and the drop agree.
+     * ([LcncTypeCheck.portKindResolver]) so the menu and the drop agree.
      *
      * Reading the kind straight out of `outputKinds` made this node-blind: a
      * ring's per-name port is declared by its `scope.out` child, never by the
@@ -115,8 +142,11 @@ object LcncMating {
         // guess (the checker, by contrast, leaves such a port unresolved).
         val ring = source.children.size > 0 || !source.subprogram.isNullOrBlank() || !source.params["program"].isNullOrBlank()
         if (kindOverride == null && source.type !in contracts && !ring) return emptyList()
+        if (kindOverride == null && LcncTypeCheck.outputsOf(source, contracts).none {
+                it.removeSuffix("?") == sourcePort.removeSuffix("?")
+            }) return emptyList()
         val sourceKind = kindOverride
-            ?: LcncTypeCheck.portKind(source, "out", sourcePort.removeSuffix("?"), contracts, facts)
+            ?: LcncTypeCheck.portKindResolver(program, contracts, facts)(source, "out", sourcePort)
         if (sourceKind.kind == null && !sourceKind.generic) return emptyList()
         val kind = if (sourceKind.generic) LcncKinds.UNRESOLVED else sourceKind.kind!!
         // `(inKind ?T ?p ?K)` where K accepts an output of `kind` — vocabulary order.
@@ -125,12 +155,17 @@ object LcncMating {
             .distinctBy { it.type to it.inputPort }
     }
 
-    /** True when the source port is a ring parameter that declared no kind. */
-    fun genericSource(program: LcncProgram, sourceNode: String, sourcePort: String): Boolean =
-        LcncTypeCheck.portKind(
-            node(program, sourceNode), "out", sourcePort.removeSuffix("?"),
-            LcncContracts.all().associateBy { it.type },
+    /** True when the source port has no declared or cable-derived kind. */
+    fun genericSource(program: LcncProgram, sourceNode: String, sourcePort: String): Boolean {
+        val source = node(program, sourceNode)
+        val contracts = LcncContracts.all().associateBy { it.type }
+        if (LcncTypeCheck.outputsOf(source, contracts).none {
+                it.removeSuffix("?") == sourcePort.removeSuffix("?")
+            }) return false
+        return LcncTypeCheck.portKindResolver(program, contracts, LcncFacts.of(contracts.values))(
+            source, "out", sourcePort,
         ).generic
+    }
 
     /**
      * The mate-menu ordering — the drag-cable-to-empty-space popup's list:
@@ -176,7 +211,10 @@ object LcncMating {
         targetY: Double,
     ): LcncMatedProgram {
         val source = node(program, sourceNode)
-        require(sourcePort.removeSuffix("?") in (LcncContracts.find(source.type)?.outputs ?: emptyList())) {
+        val contracts = LcncContracts.all().associateBy { it.type }
+        require(LcncTypeCheck.outputsOf(source, contracts).any {
+            it.removeSuffix("?") == sourcePort.removeSuffix("?")
+        }) {
             "unknown source output: ${source.type}.$sourcePort"
         }
         val candidate = compatibleTypes(program, sourceNode, sourcePort)
@@ -185,29 +223,13 @@ object LcncMating {
         val id = freshNodeId(program)
         val targetNode = LcncNode(id, candidate.type, x = targetX, y = targetY)
         val wire = LcncWire(sourceNode, sourcePort, id, candidate.inputPort)
-        // Duplicate guard: a ONE-cardinality output can only fan out to ONE wire,
-        // and a ONE-cardinality input can only receive ONE wire. Check BOTH sides
-        // using the existing wire graph (not the fresh `id` which is always new).
-        val srcCard = LcncContracts.find(source.type)?.cardinality?.get(sourcePort.removeSuffix("?")) ?: LcncCardinality.ONE
-        if (srcCard == LcncCardinality.ONE) {
-            // Bolt: use .view to iterate Series zero-allocation instead of creating an ArrayList.
-            require(program.wires.view.none { it.fromNode == sourceNode && it.fromPort == sourcePort }) {
-                "source output already wired: ${source.type}.$sourcePort (ONE cardinality)"
-            }
-        }
-        val tgtCard = LcncContracts.find(targetType)?.cardinality?.get(candidate.inputPort.removeSuffix("?")) ?: LcncCardinality.ONE
-        if (tgtCard == LcncCardinality.ONE) {
-            val existingType = mutableMapOf<String, String>()
-            // Bolt: zero allocation Series iteration.
+        // The target is a new node; occupancy belongs to an instance, never its type.
+        val srcCard = contracts[source.type]?.cardinality?.get(sourcePort.removeSuffix("?")) ?: LcncCardinality.ONE
+        if (srcCard != LcncCardinality.MANY) {
             require(program.wires.view.none {
-                it.toPort == candidate.inputPort && run {
-                    val t = existingType.getOrPut(it.toNode) {
-                        runCatching { node(program, it.toNode).type }.getOrDefault("")
-                    }
-                    t == targetType
-                }
+                it.fromNode == sourceNode && it.fromPort.removeSuffix("?") == sourcePort.removeSuffix("?")
             }) {
-                "target input already connected: ${candidate.type}.${candidate.inputPort} (ONE cardinality)"
+                "source output already wired: ${source.type}.$sourcePort ($srcCard cardinality)"
             }
         }
         val point = LcncPatchMatingPoint(
@@ -216,31 +238,58 @@ object LcncMating {
             fromPort = sourcePort,
             toNode = id,
             toPort = candidate.inputPort,
-            cardinality = LcncContracts.find(source.type)?.cardinality?.get(sourcePort.removeSuffix("?")) ?: LcncCardinality.ONE,
-            function = LcncContracts.find(candidate.type)?.functions?.get(candidate.inputPort.removeSuffix("?"))?.firstOrNull() ?: "identity",
+            cardinality = srcCard,
+            function = contracts[candidate.type]?.functions?.get(candidate.inputPort.removeSuffix("?"))?.firstOrNull() ?: "identity",
         ).validate()
         val controls = program.controls.addMatingPoint(point)
-        // Bolt: zero allocation element append with the infix `j` operator instead of toList().plus()
-        val nodes = (program.nodes.size + 1) j { i: Int -> if (i < program.nodes.size) program.nodes[i] else targetNode }
+        val nodes = checkNotNull(mate(program.nodes, sourceNode, targetNode))
         val wires = (program.wires.size + 1) j { i: Int -> if (i < program.wires.size) program.wires[i] else wire }
         // W2.4: seq must clear the fresh id — "n3" ⇒ seq ≥ 4 — or the browser's
         // next addNode("n"+G.seq++) would collide with the mated node.
         val freshNum = id.removePrefix("n").toIntOrNull() ?: 0
         val nextSeq = maxOf(program.seq, freshNum + 1)
-        return LcncMatedProgram(
-            program.copy(nodes = nodes, wires = wires, controls = controls, seq = nextSeq),
-            wire, point,
-        )
+        val result = program.copy(nodes = nodes, wires = wires, controls = controls, seq = nextSeq)
+        val baseline = LcncTypeCheck.check(program, contracts).toSet()
+        require(LcncTypeCheck.check(result, contracts).none { it !in baseline }) { "mated wire violates the program's port or scope contracts" }
+        return LcncMatedProgram(result, wire, point)
     }
 
     private fun node(program: LcncProgram, id: String): LcncNode =
-        program.nodes.view.firstOrNull { it.id == id } // Bolt: zero allocation Series iteration
+        node(program.nodes, id)
             ?: error("unknown source node: $id")
 
+    private fun node(nodes: Series<LcncNode>, id: String): LcncNode? {
+        for (n in nodes.view) {
+            if (n.id == id) return n
+            node(n.children, id)?.let { return it }
+        }
+        return null
+    }
+
+    /** A new mate is a sibling of its source, retaining the source's enclosing frame. */
+    private fun mate(nodes: Series<LcncNode>, sourceId: String, target: LcncNode): Series<LcncNode>? {
+        if (nodes.view.any { it.id == sourceId })
+            return (nodes.size + 1) j { i: Int -> if (i < nodes.size) nodes[i] else target }
+        for (node in nodes.view) {
+            val children = mate(node.children, sourceId, target) ?: continue
+            return nodes α { if (it.id == node.id) it.copy(children = children) else it }
+        }
+        return null
+    }
+
     private fun freshNodeId(program: LcncProgram): String {
-        // Bolt: read size property directly, and use .view zero-allocation iterator.
-        var n = program.nodes.size + 1
-        while (program.nodes.view.any { it.id == "n$n" }) n++
+        var n = maxOf(1, program.seq)
+        fun visit(nodes: Series<LcncNode>) {
+            for (node in nodes.view) {
+                node.id.takeIf { it.startsWith("n") }?.removePrefix("n")?.toIntOrNull()?.let {
+                    require(it < Int.MAX_VALUE - 1) { "node sequence exhausted" }
+                    n = maxOf(n, it + 1)
+                }
+                visit(node.children)
+            }
+        }
+        visit(program.nodes)
+        require(n < Int.MAX_VALUE) { "node sequence exhausted" }
         return "n$n"
     }
 

@@ -23,7 +23,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 sealed class VmTerminalEvent {
     abstract val vmId: String
     data class Manual(override val vmId: String, val signal: LcncUserSignal) : VmTerminalEvent()
-    data class Causal(override val vmId: String, val emission: CausalMediaEmission) : VmTerminalEvent()
+    data class Causal(override val vmId: String, val emission: CausalMediaEmission, val terminal: Map<String, Any?>) : VmTerminalEvent()
     data class Phase(override val vmId: String, val phase: String, val detail: String) : VmTerminalEvent()
 }
 
@@ -69,7 +69,7 @@ class VmTerminalSession(
 
     fun complete(value: Teleported, input: ManualMediaInput, timestampMs: Long = System.currentTimeMillis()) {
         if (value != Teleported.Null) output("$value\r\n", input.signal.id, timestampMs)
-        emitCausal(panel.causalCompleted(input.signal.id, timestampMs, value.cid.value))
+        synchronized(lock) { emitCausal(panel.causalCompleted(input.signal.id, timestampMs, value.cid.value)) }
         output(prompt(), input.signal.id, timestampMs)
         cause.compareAndSet(input.signal.id, null)
     }
@@ -77,7 +77,7 @@ class VmTerminalSession(
     fun fail(error: Throwable, input: ManualMediaInput, timestampMs: Long = System.currentTimeMillis()) {
         val message = error.message ?: error.toString()
         output("\u001b[31m$message\u001b[0m\r\n", input.signal.id, timestampMs)
-        emitCausal(panel.causalFailed(input.signal.id, timestampMs, message))
+        synchronized(lock) { emitCausal(panel.causalFailed(input.signal.id, timestampMs, message)) }
         output(prompt(), input.signal.id, timestampMs)
         cause.compareAndSet(input.signal.id, null)
     }
@@ -108,6 +108,7 @@ class VmTerminalSession(
     fun snapshotMap(): Map<String, Any?> = synchronized(lock) {
         val snapshot = panel.snapshot()
         linkedMapOf(
+            "sequence" to panel.signalSequence,
             "vmId" to vmId,
             "facet" to facet.id,
             "tier" to tier,
@@ -131,7 +132,7 @@ class VmTerminalSession(
     }
 
     fun terminalMetaMap(): Map<String, Any?> = synchronized(lock) {
-        panel.snapshot(scrollbackRows = 0).let { snapshot -> mapOf(
+        panel.terminal.let { snapshot -> mapOf(
             "revision" to snapshot.revision,
             "columns" to snapshot.columns,
             "rows" to snapshot.rows,
@@ -141,7 +142,7 @@ class VmTerminalSession(
     }
 
     fun summaryMap(): Map<String, Any?> = synchronized(lock) {
-        val snapshot = panel.snapshot(scrollbackRows = 0)
+        val snapshot = panel.terminal
         mapOf(
             "vmId" to vmId,
             "facet" to facet.id,
@@ -160,7 +161,7 @@ class VmTerminalSession(
 
     private fun emitCausal(emission: CausalMediaEmission) {
         land(emission.signal)
-        emit(VmTerminalEvent.Causal(vmId, emission))
+        emit(VmTerminalEvent.Causal(vmId, emission, terminalMetaMap()))
     }
 
     private fun emit(event: VmTerminalEvent) {

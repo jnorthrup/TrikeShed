@@ -265,7 +265,7 @@ class VmWire(
                         "vmId" to event.vmId,
                         "signal" to event.emission.signal.toMap(),
                         "patches" to event.emission.patches.view.map { it.toMap() },
-                        "terminal" to registry[event.vmId]?.terminalMetaMap(),
+                        "terminal" to event.terminal,
                     )
                     is VmTerminalEvent.Phase -> mapOf("kind" to "phase", "vmId" to event.vmId, "phase" to event.phase, "detail" to event.detail)
                 }

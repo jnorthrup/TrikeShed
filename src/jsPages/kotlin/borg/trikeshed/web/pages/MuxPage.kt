@@ -50,6 +50,17 @@ object MuxPage {
     private var calls: dynamic = null
     private var sessions: dynamic = null
     private var detail: dynamic = null
+    private var breadcrumbContexts: dynamic = null
+    private var breadcrumbContext: String? = null
+    private var breadcrumbSubmission: dynamic = null
+    private var breadcrumbCalls: dynamic = null
+    private var breadcrumbHorizon: dynamic = null
+    private var keyedModels: dynamic = null
+    private var breadcrumbSession: dynamic = null
+    /** context NUL id -> the recall slider's presence and the breadcrumb tool's answer at it. */
+    private val recallPresence = HashMap<String, Double>()
+    private val recalls = HashMap<String, dynamic>()
+    private var recallDrag = false
     private var selected: Double? = null
     private var tab = "conversation"
     private var modelsSelected = LinkedHashSet<String>()
@@ -66,7 +77,45 @@ object MuxPage {
 
     private fun q(s: String): HTMLElement? = document.querySelector(s) as HTMLElement?
     private fun qq(s: String): HTMLElement = document.querySelector(s) as HTMLElement
-    private fun rosterRows(): dynamic = catalogRoster ?: roster
+    private fun selectedContext(): String? = if (page == "sessions") selected?.let { str(it) } else breadcrumbContext
+
+    private fun breadcrumbRows(): List<dynamic> {
+        val contexts = list(breadcrumbContexts)
+        val known = list(sessions)
+        val rows = known.map { session ->
+            val retained = contexts.firstOrNull { it.context == str(session.id) }
+            val row = js("Object").assign(obj(), retained ?: obj())
+            row.context = str(session.id)
+            row.title = session.title
+            row
+        }
+        return rows + contexts.filter { context -> known.none { str(it.id) == context.context } }
+    }
+    private fun rosterRows(): dynamic {
+        if (roster == null && catalogRoster == null) return null
+        val catalog = list(catalogRoster)
+        val matched = mutableSetOf<String>()
+        val rows = list(roster).map { row ->
+            val model = catalog.firstOrNull {
+                it.base == row.base && (it.model == row.model || it.wireModel == row.model)
+            }
+            if (model == null) row else {
+                matched.add(str(model.model))
+                val merged = js("Object").assign(obj(), row, model)
+                merged.envVar = row.envVar
+                merged
+            }
+        }
+        return (rows + catalog.filter { str(it.model) !in matched }).toTypedArray()
+    }
+
+    private fun credential(row: dynamic): String = if (row.auth == "none") badge("", "Not required") else
+        badge(if (truthy(row.keyPresent)) "good" else "bad", if (truthy(row.keyPresent)) "Present" else "Missing")
+
+    private fun credentialIdentity(row: dynamic): String = if (row.auth == "none") "" else listOfNotNull(
+        strOrEmpty(row.keyId).takeIf { it.isNotEmpty() },
+        strOrEmpty(row.envVar).takeIf { it.isNotEmpty() && it != strOrEmpty(row.keyId) },
+    ).joinToString("") { "<small class=\"mono\">${esc(it)}</small>" }
     private fun esc(v: dynamic): String = MuxCore.escape(strOrEmpty(v))
     private fun icon(name: String) = "<i data-lucide=\"$name\"></i>"
     private fun btn(action: String, label: String, symbol: String, extra: String = "") =
@@ -157,14 +206,21 @@ object MuxPage {
         if (!force && (!live || document.asDynamic().hidden == true)) return
         busy = true
         val catalog = force || nowMs() - lastCatalog > 20000
+        val initialContext = breadcrumbContexts == null && breadcrumbContext == null
         val sources = ArrayList<Triple<String, String, (dynamic) -> Unit>>()
         sources.add(Triple("Activity", "/api/mux/activity") { r -> calls = if (truthy(r.calls)) r.calls else js("[]") })
         sources.add(Triple("Sessions", "/api/mux/sessions") { r -> sessions = if (truthy(r.sessions)) r.sessions else js("[]") })
         sources.add(Triple("Quota", "/api/mux/standings") { r -> standings = if (truthy(r.standings)) r.standings else js("[]"); quotaAt = r.atMs })
+        if (page != "stats") {
+            sources.add(Triple("Model contexts", "/v1/breadcrumbs") { r ->
+                breadcrumbContexts = if (truthy(r.contexts)) r.contexts else js("[]")
+            })
+        }
         if (catalog) {
             sources.add(Triple("Credentials", "/api/mux/keys") { r -> roster = if (truthy(r.roster)) r.roster else js("[]") })
             sources.add(Triple("Models", "/api/mux/catalog") { r -> models = if (truthy(r.models)) r.models else js("[]"); catalogRoster = if (truthy(r.roster)) r.roster else null })
             sources.add(Triple("Endpoints", "/api/mux/endpoints") { r -> endpoints = if (truthy(r.user)) r.user else js("[]") })
+            if (page == "keys") sources.add(Triple("Keyed models", "/api/mux/discovery") { r -> keyedModels = r })
         }
         val jobs = sources.map { (name, path, apply) ->
             pageScope.async {
@@ -173,6 +229,16 @@ object MuxPage {
         }
         jobs.forEach { it.await() }
         if (catalog) lastCatalog = nowMs()
+        if (page != "sessions" && initialContext && breadcrumbContext == null) {
+            val recent = breadcrumbRows().maxByOrNull { num(it.submittedAtMs) }
+            breadcrumbContext = if (recent == null) null else str(recent.context)
+        }
+        if (page != "sessions" && breadcrumbContext != null && breadcrumbRows().none { it.context == breadcrumbContext }) {
+            breadcrumbContext = null; breadcrumbSubmission = null; breadcrumbCalls = null; breadcrumbHorizon = null
+            errors.remove("Breadcrumbs")
+            errors.remove("Context routing")
+            errors.remove("Context cleaner")
+        }
         if (page == "sessions" && selected == null) { val f = list(sessions).firstOrNull { !truthy(it.archived) }; selected = if (f == null) null else num(f.id) }
         val id = selected
         if (page == "sessions" && id != null) {
@@ -180,6 +246,44 @@ object MuxPage {
                 val d = request("/api/mux/sessions?id=" + str(id))
                 if (selected == id) { detail = d; errors.remove("Session") }
             } catch (e: Throwable) { errors["Session"] = e.message ?: "" }
+        }
+        val context = selectedContext()
+        if (page == "sessions") breadcrumbSession = detail
+        else if (page != "stats" && context != null && list(sessions).any { str(it.id) == context }) {
+            try {
+                val value = request("/api/mux/sessions?id=" + (js("encodeURIComponent")(context) as String))
+                if (selectedContext() == context) { breadcrumbSession = value; errors.remove("Context session") }
+            } catch (e: Throwable) {
+                if (selectedContext() == context) { breadcrumbSession = null; errors["Context session"] = e.message ?: "" }
+            }
+        } else {
+            breadcrumbSession = null
+            errors.remove("Context session")
+        }
+        if (page != "stats" && context != null && list(breadcrumbContexts).any { it.context == context }) {
+            try {
+                val value = request("/v1/breadcrumbs?context=" + (js("encodeURIComponent")(context) as String) + "&view=submitted")
+                if (selectedContext() == context) { breadcrumbSubmission = value; errors.remove("Breadcrumbs") }
+            } catch (e: Throwable) {
+                if (selectedContext() == context) { breadcrumbSubmission = null; errors["Breadcrumbs"] = e.message ?: "" }
+            }
+            try {
+                val value = request("/v1/breadcrumbs?context=" + (js("encodeURIComponent")(context) as String) + "&view=routing")
+                if (selectedContext() == context) { breadcrumbCalls = value; errors.remove("Context routing") }
+            } catch (e: Throwable) {
+                if (selectedContext() == context) { breadcrumbCalls = null; errors["Context routing"] = e.message ?: "" }
+            }
+            try {
+                val value = request("/v1/breadcrumbs?context=" + (js("encodeURIComponent")(context) as String) + "&view=horizon")
+                if (selectedContext() == context) { breadcrumbHorizon = value; errors.remove("Context cleaner") }
+            } catch (e: Throwable) {
+                if (selectedContext() == context) { breadcrumbHorizon = null; errors["Context cleaner"] = e.message ?: "" }
+            }
+        } else if (page != "stats") {
+            breadcrumbSubmission = null; breadcrumbCalls = null; breadcrumbHorizon = null
+            errors.remove("Breadcrumbs")
+            errors.remove("Context routing")
+            errors.remove("Context cleaner")
         }
         lastPoll = nowMs(); busy = false; render()
         if (pending) { pending = false; launchPage { poll(true) } }
@@ -194,7 +298,8 @@ object MuxPage {
         val ss = if (sessions == null) null else list(sessions)
         val active = ss?.count { isActive(it.status) && !truthy(it.parentId) }
         val ros = rosterRows()
-        val ready = if (ros != null) list(ros).filter { truthy(it.keyPresent) }.map { str(if (truthy(it.envVar)) it.envVar else it.name) }.toSet().size else null
+        val ready = if (ros != null) list(ros).filter { it.auth != "none" && truthy(it.keyPresent) }
+            .map { str(if (truthy(it.keyId)) it.keyId else if (truthy(it.envVar)) it.envVar else it.name) }.toSet().size else null
         val st = if (standings == null) null else list(standings)
         val rows: List<List<String>> = if (page == "keys") listOf(
             listOf("Credentials present", count(ready), if (ros != null) list(ros).size.toString() + " roster entries" else "Waiting for credentials", "key-round"),
@@ -211,6 +316,8 @@ object MuxPage {
     }
 
     private fun catalogStanding(row: dynamic): dynamic {
+        if (row.auth == "none") return null
+        if (truthy(row.keyId)) return list(standings).firstOrNull { it.keyId == row.keyId }
         val cs = list(calls).filter { it.model == row.model }
         val keyIds = cs.mapNotNull { if (truthy(it.keyId)) str(it.keyId) else null }.toSet()
         val providers = cs.map { strOrEmpty(it.provider) }.toSet()
@@ -227,30 +334,55 @@ object MuxPage {
             "\"><span style=\"width:" + str(used * 100) + "%\"></span></span>"
     }
 
+    /** provider -> key -> models, as each provider's /models endpoint answered under its resolved key. */
+    private fun keyedTree(): String {
+        val tree = keyedModels ?: return empty(if (errors.containsKey("Keyed models")) "Providers could not be asked" else "Asking providers for their models", "key-round")
+        val providers = list(tree.providers)
+        if (providers.isEmpty()) return empty("No provider key resolves in this daemon", "key-round")
+        return "<p class=\"muted\">Listed ${esc(time(tree.atMs))}.</p>" + providers.joinToString("") { p ->
+            val ms = list(p.models)
+            val routed = ms.count { truthy(it.inRoster) }
+            "<details class=\"keyed-provider\"><summary><strong>${esc(p.provider)}</strong> <span class=\"mono\">${esc(p.base)}</span> " +
+                "<span class=\"mono\">${esc(p.key)}</span> <small>${esc(p.keySource)}</small> " +
+                (if (truthy(p.error)) badge("bad", p.error) else badge("good", "${ms.size} models · $routed in roster")) + "</summary>" +
+                (if (ms.isEmpty()) "" else "<div class=\"table-wrap\"><table><thead><tr><th>Model</th><th>Context</th><th>Tier</th><th>Routing</th></tr></thead><tbody>" +
+                    ms.joinToString("") { m ->
+                        "<tr><td class=\"mono\">${esc(m.id)}</td><td class=\"mono\">${if (num(m.contextWindow) > 0) count(m.contextWindow) else "--"}</td>" +
+                            "<td>${if (truthy(m.freeTier)) badge("good", "Free") else badge("", "Paid or unquoted")}</td>" +
+                            "<td>${if (truthy(m.inRoster)) badge("good", "In roster") else badge("", "Listed only")}</td></tr>"
+                    } + "</tbody></table></div>") + "</details>"
+        }
+    }
+
     private fun renderKeys() {
+        html("#discoveryRows", keyedTree())
         val search = (qq("#keySearch") as HTMLInputElement).value.lowercase()
         val status = (qq("#keyStatus") as HTMLSelectElement).value
         val rows = list(rosterRows()).filter {
-            listOf(strOrEmpty(it.name), strOrEmpty(it.model), strOrEmpty(it.envVar)).joinToString(" ").lowercase().contains(search) &&
-                (status == "all" || (if (status == "ready") truthy(it.keyPresent) else !truthy(it.keyPresent)))
+            listOf(strOrEmpty(it.name), strOrEmpty(it.model), strOrEmpty(it.keyId), strOrEmpty(it.envVar)).joinToString(" ").lowercase().contains(search) &&
+                (status == "all" || (if (status == "ready") it.auth != "none" && truthy(it.keyPresent)
+                else if (status == "none") it.auth == "none" else it.auth != "none" && !truthy(it.keyPresent)))
         }
         html("#keyRows", if (rows.isNotEmpty()) rows.joinToString("") { r ->
             val s = catalogStanding(r)
             val qv = quota(s)
             val present = truthy(r.keyPresent)
+            val noCredential = r.auth == "none"
+            val catalogued = list(models).any { it.model == r.model && it.base == r.base }
             val exhausted = s != null && !truthy(s.usable)
             "<tr><td><strong>${esc(r.name)}</strong><small class=\"mono\">${esc(r.model)}</small></td><td>" +
-                badge(if (present) "good" else "bad", if (present) "Present" else "Missing") + "<small class=\"mono\">${esc(r.envVar)}</small></td><td>" +
-                badge(if (exhausted) "bad" else if (present) "good" else "", if (exhausted) "Exhausted" else if (present) "Available" else "Unbound") + "</td><td>" + quotaCell(s) +
+                credential(r) + credentialIdentity(r) + "</td><td>" +
+                badge(if (exhausted) "bad" else "", if (exhausted) "Exhausted" else if (catalogued && (present || noCredential)) "In roster" else if (catalogued) "Unbound" else "Outside model roster") + "</td><td>" + quotaCell(s) +
                 "</td><td class=\"mono\">" + (if (qv.status == "refreshing") "Refreshing" else MuxCore.duration(qv.resetMs)) + "</td><td class=\"mono\">" + count(s?.accessCount) + "</td></tr>"
         } else "<tr><td colspan=\"6\">" + empty(if (roster != null) "No matching credentials" else "Credential roster unavailable", "key-round") + "</td></tr>")
         val eps = list(endpoints)
         html("#endpointRows", if (eps.isNotEmpty()) eps.mapIndexed { index, r ->
-            val bound = list(models).any { it.base == r.base && it.model == r.model }
+            val bound = list(models).any { it.base == r.base && (it.model == r.model || it.wireModel == r.model) }
             val enabled = r.flags?.enabled != false
-            "<tr><td><strong>${esc(r.name)}</strong><small>${esc(r.base)}</small></td><td class=\"mono\">${esc(r.model)}</td><td class=\"mono\">${esc(r.envVar)}</td><td>" +
+            val hosted = enabled && r.auth == "none" && bound
+            "<tr><td><strong>${esc(r.name)}</strong><small>${esc(r.base)}</small></td><td class=\"mono\">${esc(r.model)}</td><td class=\"mono\">${if (r.auth == "none") "None" else esc(r.envVar)}</td><td>" +
                 badge(if (enabled) "good" else "", if (enabled) "Enabled" else "Disabled") + (if (truthy(r.flags?.preferred)) " " + badge("", "Preferred") else "") + "</td><td>" +
-                badge(if (bound) "good" else "queued", if (bound) "In roster" else "Registry only") + "</td><td><div class=\"toolbar\">" +
+                badge(if (bound || hosted) "good" else "queued", if (hosted) "Hosted" else if (bound) "In roster" else "Registry only") + "</td><td><div class=\"toolbar\">" +
                 btn("edit-endpoint", "Edit " + strOrEmpty(r.name), "pencil", "data-index=\"$index\"") + btn("delete-endpoint", "Remove " + strOrEmpty(r.name), "trash-2", "data-index=\"$index\"") + "</div></td></tr>"
         }.joinToString("") else "<tr><td colspan=\"6\">" + empty(if (endpoints != null) "No registered endpoints" else "Endpoint registry unavailable", "key-round") + "</td></tr>")
     }
@@ -262,12 +394,11 @@ object MuxPage {
         qq("#modelCount").textContent = if (models != null) all.size.toString() else ""
         html("#modelRows", if (rows.isNotEmpty()) rows.joinToString("") { m ->
             val model = strOrEmpty(m.model)
-            val present = list(rosterRows()).any { it.model == m.model && truthy(it.keyPresent) }
             val sel = model in modelsSelected
             val t = totals(list(calls).filter { it.model == m.model })
             "<tr class=\"" + (if (sel) "selected" else "") + "\"><td class=\"check-cell\"><input type=\"checkbox\" data-model=\"${esc(model)}\" aria-label=\"Select ${esc(model)}\" " +
                 (if (sel) "checked" else "") + "></td><td><strong class=\"mono\" title=\"${esc(model)}\">${esc(model)}</strong><small>${esc(m.name)}</small></td><td>" +
-                badge(if (present) "good" else "", if (present) "Present" else "Unresolved") + "</td><td class=\"mono\">" + count(t.attempts) + "</td><td class=\"mono\">" + MuxCore.duration(t.medianMs) + "</td></tr>"
+                credential(m) + credentialIdentity(m) + "</td><td class=\"mono\">" + count(t.attempts) + "</td><td class=\"mono\">" + MuxCore.duration(t.medianMs) + "</td></tr>"
         } else "<tr><td colspan=\"5\">" + empty(if (models != null) "No matching models" else "Model roster unavailable") + "</td></tr>")
         val runSession = qq("#runSession") as HTMLSelectElement
         val prior = runSession.value
@@ -276,6 +407,146 @@ object MuxPage {
         val opts = runSession.options
         if ((0 until opts.length).any { (opts.item(it).asDynamic().value as String) == prior }) runSession.value = prior
         selection()
+    }
+
+    private fun breadcrumbMetadata(content: dynamic): String {
+        if (!isString(content)) return ""
+        val value: dynamic = try { JSON.parse<dynamic>(str(content)) } catch (_: Throwable) { return "" }
+        fun projection(row: dynamic): Boolean = row != null && isString(row.id) && isString(row.source) &&
+            isNumber(row.presence) && (row.presence as Double).isFinite() && num(row.presence) in 0.0..1.0 &&
+            (row.content == null || isString(row.content))
+        val rows: List<dynamic> = if (projection(value)) listOf<dynamic>(value) else if (value != null && isString(value.skill))
+            list(value.breadcrumbs).filter { projection(it) } else emptyList()
+        return rows.joinToString("") { row ->
+            "<div class=\"breadcrumb-fields\"><span>ID <b class=\"mono\">${esc(row.id)}</b></span>" +
+                "<span>Source <b class=\"mono\">${esc(row.source)}</b></span><span>Presence <b>${esc(row.presence)}</b></span></div>"
+        }
+    }
+
+    /**
+     * The context cleaner over the breadcrumb trail: the overflow band, then every record in the order it was laid, a turn's
+     * breadcrumbs inside it, each holding its particulate summary at its current presence and a recall from 0 to 1.
+     */
+    private fun cleaner(context: String?): String {
+        val h = breadcrumbHorizon
+        if (context == null) return empty("Select a model session or context to inspect its context cleaner", "eraser")
+        if (h == null || h.context != context) return empty(
+            if (errors.containsKey("Context cleaner")) "Context cleaner unavailable" else "Loading context cleaner", "eraser")
+        val band = str(h.band)
+        val tone = when (band) { "scale_back" -> "bad"; "hold" -> "queued"; else -> "good" }
+        val rate = num(h.errorRate)
+        val head = "<div class=\"detail-meta\"><span>Band ${badge(tone, band.replace('_', ' '))}</span>" +
+            "<span>Overflow rate <b>${esc((rate * 100).asDynamic().toFixed(1))}%</b> of ${count(h.turns)} / ${count(h.window)} turns</span>" +
+            "<span>Last prompt <b>${count(h.lastTokens)}</b> of ${count(h.budgetTokens)} tokens</span>" +
+            (if (truthy(h.bandAtMs)) "<span>Since ${esc(time(h.bandAtMs))}</span>" else "") + "</div>"
+        val rows = list(h.records)
+        if (rows.isEmpty()) return head + empty("No records are retained in this context", "eraser")
+        return head + "<ol class=\"trail\">" + rows.withIndex().joinToString("") { (index, r) ->
+            val id = str(r.id)
+            val key = context + "\u0000" + id
+            val presence = num(r.presence)
+            val gain = num(r.gain)
+            val depth = num(r.depth)
+            val bar = if (presence < 0.3) "bad" else if (presence < 0.7) "warn" else ""
+            val chosen = recallPresence[key] ?: (round(presence * 20) / 20)
+            val recalled = recalls[key]
+            val particles = strOrEmpty(r.content)
+            "<li class=\"crumb\" style=\"margin-left:${depth * 22}px\"><div class=\"crumb-head\"><span class=\"mono muted\">${index + 1}</span>" +
+                "<strong class=\"mono\" title=\"${esc(id)}\">${if (depth > 0) "↳ " else ""}${esc(id)}</strong>" +
+                "<small class=\"mono\">${esc(r.source)}${if (num(r.children) > 0) " · carries ${count(r.children)}" else ""}</small>" +
+                "<span class=\"progress $bar\"><span style=\"width:${(presence * 100).asDynamic().toFixed(1)}%\"></span></span>" +
+                "<small>presence ${esc(presence.asDynamic().toFixed(3))}</small>" +
+                (if (gain == 0.0) badge("bad", "dropped") else "<small>gain ${esc(gain.asDynamic().toFixed(3))}</small>") +
+                "<small>${MuxCore.duration(num(r.ageMs))} · ${count(r.chars)} chars</small></div>" +
+                "<p class=\"crumb-particles\">${if (particles.isEmpty()) "<span class=\"muted\">Reference only</span>" else esc(particles)}</p>" +
+                "<label class=\"crumb-recall\">Recall<input type=\"range\" min=\"0\" max=\"1\" step=\"0.05\" value=\"$chosen\" data-recall=\"${esc(id)}\" " +
+                "aria-label=\"Recall ${esc(id)} from 0 to 1 of its original\"><output>${chosen.asDynamic().toFixed(2)}</output></label>" +
+                (if (recalled == null) "" else "<pre class=\"crumb-recalled\" aria-label=\"Recalled at ${esc(recalled.presence)}\">" +
+                    (if (recalled.content == null) "Reference only" else esc(recalled.content)) + "</pre>") + "</li>"
+        } + "</ol>"
+    }
+
+    private fun crumb(rows: dynamic, id: String): dynamic {
+        for (row in list(rows)) {
+            if (row.id == id) return row
+            val nested = crumb(row.breadcrumbs, id)
+            if (nested != null) return nested
+        }
+        return null
+    }
+
+    /** The breadcrumb tool from the panel: resize [id] to [presence] of its original and keep the trail's answer. */
+    private suspend fun recall(context: String, id: String, presence: Double) {
+        val body: dynamic = obj(); body.context = context; body.id = id; body.presence = presence
+        try {
+            val found = crumb(request("/v1/breadcrumbs", body).breadcrumbs, id)
+            val r: dynamic = obj(); r.presence = presence; r.content = found?.content
+            recalls[context + "\u0000" + id] = r
+            errors.remove("Recall")
+        } catch (e: Throwable) { errors["Recall"] = e.message ?: "" }
+        poll(true)
+    }
+
+    private fun renderBreadcrumbs() {
+        val contexts = breadcrumbRows()
+        val selector = qq("#breadcrumbContext") as HTMLSelectElement
+        html(selector, "<option value=\"\">Select a context</option>" + contexts.joinToString("") {
+            "<option value=\"${esc(it.context)}\">" +
+                (if (truthy(it.title)) "${esc(it.title)} · " else "") + esc(it.context) +
+                (if (it.records != null) " · ${count(it.records)} retained" else " · No retained context") + "</option>"
+        })
+        val context = selectedContext()
+        selector.value = context ?: ""
+        selector.disabled = contexts.isEmpty()
+        val runTarget = qq("#breadcrumbRunTarget")
+        runTarget.hidden = page != "models"
+        if (page == "models") {
+            val runSession = qq("#runSession") as HTMLSelectElement
+            val target = if (runSession.value.isEmpty()) "a new session" else
+                "session " + strOrEmpty(runSession.options.item(runSession.selectedIndex)?.textContent)
+            runTarget.textContent = if (context != null && runSession.value == context) "Runs continue this session."
+                else (if (context != null) "Inspection only. " else "") + "Run target: $target."
+        }
+        val submission = breadcrumbSubmission
+        val session = list(sessions).firstOrNull { str(it.id) == context }
+        html("#breadcrumbMeta", (if (session != null) "<span>Session <b>${esc(session.title)}</b></span>" else "") +
+            (if (context != null) "<span>Context <b class=\"mono\">${esc(context)}</b></span>" else "") +
+            if (submission != null && submission.context == context && submission.atMs != null)
+            "<span>Model <b class=\"mono\">${esc(submission.model)}</b></span><span>Submitted ${esc(date(submission.atMs))}</span>" +
+                "<span>${count(submission.messageCount)} tool messages</span>" else "")
+        val contextCalls: List<dynamic> = if (context == null) emptyList() else {
+            val stored = if (breadcrumbSession != null && str(breadcrumbSession.id) == context) list(breadcrumbSession.calls) else emptyList()
+            val retained = if (breadcrumbCalls != null && breadcrumbCalls.context == context) list(breadcrumbCalls.calls) else emptyList()
+            val liveCalls = list(calls).filter {
+                it.contextId == context || (it.conversationId != null && str(it.conversationId) == context)
+            }
+            MuxCore.uniqueBy(liveCalls + stored + retained) {
+                strOrEmpty(it.model) + ":" + strOrEmpty(it.id) + ":" + strOrEmpty(it.startedAt)
+            }
+                .sortedBy { num(it.startedAt) }
+        }
+        html("#breadcrumbRouting", if (context == null) empty("Select a model session or context to inspect routing")
+            else attemptsTable(contextCalls))
+        if (!recallDrag) html("#breadcrumbCleaner", cleaner(context))
+        val content = when {
+            breadcrumbContexts == null -> empty("Model contexts unavailable", "messages-square")
+            contexts.isEmpty() -> empty("No model sessions or contexts are available", "messages-square")
+            context == null -> empty("Select a model session or context", "messages-square")
+            list(breadcrumbContexts).none { it.context == context } -> empty("No submitted model context is retained for this session", "messages-square")
+            submission == null || submission.context != context -> empty(
+                if (errors.containsKey("Breadcrumbs")) "Submitted context unavailable" else "Loading submitted context", "messages-square")
+            submission.atMs == null || submission.reason == "not_submitted" -> empty("No model request has been submitted for this context", "messages-square")
+            submission.exact != true -> empty(
+                if (submission.reason == "capacity") "Submitted tool messages exceeded the inspection limit; their content is unavailable"
+                else "Exact submitted tool messages are unavailable", "messages-square")
+            list(submission.messages).isEmpty() -> empty("The latest model request contained no tool messages", "messages-square")
+            else -> list(submission.messages).joinToString("") { message ->
+                val body = if (isString(message.content)) str(message.content) else JSON.stringify(message.content, null, 2)
+                "<article class=\"breadcrumb-message\"><h3>Tool result <span class=\"mono\">${esc(message.tool_call_id)}</span></h3>" +
+                    breadcrumbMetadata(message.content) + "<pre>${esc(body)}</pre></article>"
+            }
+        }
+        html("#breadcrumbMessages", content)
     }
 
     private fun selection() {
@@ -293,11 +564,12 @@ object MuxPage {
 
     private fun attemptsTable(cs: List<dynamic>): String {
         if (cs.isEmpty()) return empty("No attempts in this view", "chart-no-axes-combined")
-        return "<div class=\"table-wrap\"><table><thead><tr><th>Time / session</th><th>Model / key</th><th>Status</th><th>Input</th><th>Output</th><th>Latency</th><th>Cache</th></tr></thead><tbody>" +
+        return "<div class=\"table-wrap\"><table><thead><tr><th>Time / session</th><th>Model / provider / key</th><th>Status</th><th>Input</th><th>Output</th><th>Latency</th><th>Cache</th></tr></thead><tbody>" +
             cs.reversed().joinToString("") { c ->
                 "<tr><td><strong class=\"mono\">" + time(c.startedAt) + "</strong><small>" +
-                    (if (truthy(c.conversationId)) "<a href=\"/mux/sessions?id=" + str(c.conversationId) + "\">Session " + str(c.conversationId) + "</a>" else esc(if (truthy(c.assessmentId)) c.assessmentId else "External call")) +
-                    "</small></td><td><strong class=\"mono\" title=\"${esc(c.model)}\">${esc(c.model)}</strong><small class=\"mono\">" + esc(if (truthy(c.keyId)) c.keyId else c.provider) +
+                    (if (truthy(c.conversationId)) "<a href=\"/mux/sessions?id=" + str(c.conversationId) + "\">Session " + str(c.conversationId) + "</a>" else esc(if (truthy(c.contextId)) c.contextId else "External call")) +
+                    "</small>" + (if (truthy(c.assessmentId)) "<small>Assessment ${esc(c.assessmentId)}</small>" else "") +
+                    "</td><td><strong class=\"mono\" title=\"${esc(c.model)}\">${esc(c.model)}</strong><small>${esc(c.provider)}</small><small class=\"mono\">" + esc(if (truthy(c.keyId)) c.keyId else "No credential recorded") +
                     "</small></td><td>" + badge(c.status) + "<small>" + esc(if (truthy(c.httpStatus)) "HTTP " + str(c.httpStatus) else if (truthy(c.error)) c.error else "") +
                     "</small></td><td class=\"mono\">" + count(c.inputTokens) + "</td><td class=\"mono\">" + count(c.outputTokens) + "</td><td class=\"mono\">" +
                     MuxCore.duration((if (c.endedAt == null) nowMs() else num(c.endedAt)) - num(c.startedAt)) + "</td><td>" +
@@ -462,6 +734,7 @@ object MuxPage {
         showErrors(); metrics(); renderRecent()
         if (page == "keys") renderKeys()
         if (page == "models") { renderModelRows(); html("#modelActivity", attemptsTable(list(calls).takeLast(6))) }
+        if (page != "stats") renderBreadcrumbs()
         if (page == "sessions") renderSessions()
         if (page == "stats") renderStats()
         icons()
@@ -488,6 +761,9 @@ object MuxPage {
         form.reset()
         val el: dynamic = form.asDynamic().elements
         for (key in listOf("name", "base", "model", "envVar")) el[key].value = if (entry != null && truthy(entry[key])) entry[key] else ""
+        el.auth.value = if (entry?.auth == "none") "none" else "required"
+        el.envVar.required = el.auth.value == "required"
+        el.envVar.disabled = el.auth.value == "none"
         el.name.readOnly = entry != null
         el.enabled.checked = entry?.flags?.enabled != false
         el.preferred.checked = truthy(entry?.flags?.preferred)
@@ -524,11 +800,21 @@ object MuxPage {
             "select-session" -> {
                 selected = js("Number")(b.getAttribute("data-id")) as Double
                 window.history.replaceState(null, "", "?id=" + str(selected))
-                detail = null; detailShell = null; renderSessions(); launchPage { poll(true) }; return
+                detail = null; detailShell = null; breadcrumbSubmission = null; breadcrumbCalls = null
+                errors.remove("Breadcrumbs"); errors.remove("Context session"); errors.remove("Context routing")
+                renderSessions(); renderBreadcrumbs(); launchPage { poll(true) }; return
             }
             "session-tab" -> { tab = b.getAttribute("data-tab") ?: tab; renderSessions(); icons(); return }
             "deselect-model" -> { modelsSelected.remove(b.getAttribute("data-model")); renderModelRows(); icons(); return }
             "export-activity" -> { val v: dynamic = obj(); v.atMs = nowMs(); v.calls = calls; v.standings = standings; exportJson(v, "mux-activity.json"); return }
+            "refresh-discovery" -> {
+                launchPage {
+                    try { keyedModels = request("/api/mux/discovery?refresh=1"); errors.remove("Keyed models") }
+                    catch (e: Throwable) { errors["Keyed models"] = e.message ?: "" }
+                    renderKeys(); icons()
+                }
+                return
+            }
             "export-session" -> { exportJson(detail, "session-" + str(selected) + ".json"); return }
             "rename" -> {
                 (qq("#renameForm") as HTMLFormElement).asDynamic().elements.title.value = detail.title
@@ -567,7 +853,20 @@ object MuxPage {
                     modelsSelected.add(model)
                 } else modelsSelected.remove(model)
                 renderModelRows(); icons()
+            } else if (target != null && target.matches("[data-recall]")) {
+                recallDrag = false
+                val context = selectedContext() ?: return@addEventListener
+                launchPage { recall(context, target.getAttribute("data-recall") ?: "", js("Number")(target.value) as Double) }
             }
+        })
+        document.addEventListener("input", { event: Event ->
+            val target = event.target as? HTMLInputElement ?: return@addEventListener
+            val id = target.getAttribute("data-recall") ?: return@addEventListener
+            val context = selectedContext() ?: return@addEventListener
+            val presence = js("Number")(target.value) as Double
+            recallDrag = true
+            recallPresence[context + "\u0000" + id] = presence
+            (target.nextElementSibling as? HTMLElement)?.textContent = presence.asDynamic().toFixed(2) as String
         })
         qq("#liveToggle").onclick = {
             live = !live
@@ -586,6 +885,30 @@ object MuxPage {
             renderModelRows(); icons()
         }
         q("#maxTokens")?.oninput = { selection() }
+        q("#runSession")?.onchange = {
+            breadcrumbContext = (qq("#runSession") as HTMLSelectElement).value.takeIf { it.isNotEmpty() }
+            breadcrumbSubmission = null; breadcrumbCalls = null
+            errors.remove("Breadcrumbs")
+            errors.remove("Context session")
+            errors.remove("Context routing")
+            renderBreadcrumbs()
+            launchPage { poll(true) }
+        }
+        q("#breadcrumbContext")?.onchange = {
+            breadcrumbContext = (qq("#breadcrumbContext") as HTMLSelectElement).value.takeIf { it.isNotEmpty() }
+            if (page == "models" && breadcrumbContext != null) {
+                val runSession = qq("#runSession") as HTMLSelectElement
+                val options = runSession.options
+                if ((0 until options.length).any { options.item(it).asDynamic().value == breadcrumbContext })
+                    runSession.value = breadcrumbContext!!
+            }
+            breadcrumbSubmission = null; breadcrumbCalls = null
+            errors.remove("Breadcrumbs")
+            errors.remove("Context session")
+            errors.remove("Context routing")
+            renderBreadcrumbs()
+            launchPage { poll(true) }
+        }
         (q("#runForm") as HTMLFormElement?)?.onsubmit = { event: Event ->
             event.preventDefault()
             val ms = modelsSelected.toList()
@@ -619,6 +942,8 @@ object MuxPage {
                     val el: dynamic = form.asDynamic().elements
                     val payload: dynamic = obj()
                     for (k in listOf("name", "base", "model", "envVar")) payload[k] = (el[k].value as String).trim()
+                    payload.auth = el.auth.value
+                    if (payload.auth == "none") payload.envVar = ""
                     val flags: dynamic = obj(); flags.enabled = el.enabled.checked; flags.preferred = el.preferred.checked
                     payload.flags = flags
                     request("/api/mux/endpoints", payload)
@@ -630,6 +955,11 @@ object MuxPage {
                 }
             }
             null
+        }
+        (qq("#endpointForm") as HTMLFormElement).onchange = {
+            val el: dynamic = (qq("#endpointForm") as HTMLFormElement).asDynamic().elements
+            el.envVar.required = el.auth.value == "required"
+            el.envVar.disabled = el.auth.value == "none"
         }
         (qq("#renameForm") as HTMLFormElement).onsubmit = { event: Event ->
             event.preventDefault()
@@ -663,12 +993,15 @@ object MuxPage {
         qq("#eyebrow").textContent = eyebrow
         qq("#breadcrumb").textContent = "Workspace / $title"
         qq("#${page}View").hidden = false
+        qq("#breadcrumbsView").hidden = page == "stats"
+        qq("#breadcrumbSelection").hidden = page == "sessions"
         val navs = document.querySelectorAll("[data-page=\"$page\"]")
         for (i in 0 until navs.length) (navs.item(i) as Element).setAttribute("aria-current", "page")
         html("#pageActions", if (page == "keys") "<a href=\"/mux/stats\">Quota activity " + icon("arrow-up-right") + "</a>"
         else if (page == "stats") btn("export-activity", "Export activity", "download")
         else "<button class=\"primary\" data-action=\"new\">" + icon("plus") + "New session</button>")
         selected = URLSearchParams(window.location.search).get("id")?.let { (js("Number")(it) as Double).takeIf { n -> n != 0.0 && !n.isNaN() } }
+        breadcrumbContext = URLSearchParams(window.location.search).get("context")?.takeIf { it.isNotBlank() }
         render()
         launchPage { poll(true) }
         fun loop() { launchPage { poll(); setTimeout(2000) { loop() } } }

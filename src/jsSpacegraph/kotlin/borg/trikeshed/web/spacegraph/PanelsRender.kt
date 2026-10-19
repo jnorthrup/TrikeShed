@@ -1,12 +1,16 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.lcnc.LcncDomForm
+import borg.trikeshed.lcnc.LcncProgram
+import borg.trikeshed.lcnc.LcncProgramConfix
+import borg.trikeshed.parse.reify
 import kotlinx.browser.document
 import kotlinx.browser.window
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.*
 
 /** cursor-tree widget: collapsible tree rendering of any JSON doc; every value drags OUT of it */
-fun renderTree(v: dynamic, key: String, depth: Int): dynamic {
+fun Panels.renderTree(v: dynamic, key: String, depth: Int): dynamic {
     val d = document.createElement("div").asDynamic(); d.className = "ctree"
     if (depth > 0) d.style.marginLeft = "10px"
     val isObj = v != null && typeOf(v) == "object"
@@ -41,10 +45,32 @@ fun renderTree(v: dynamic, key: String, depth: Int): dynamic {
     d.append(hd, kids); return d
 }
 
-fun copyText(s: String) {
-    val clip = window.navigator.asDynamic().clipboard
-    if (clip != null && clip.writeText != null) clip.writeText(s).catch { _: dynamic -> fallbackCopy(s) }
-    else fallbackCopy(s)
+fun Panels.copyText(s: String) {
+    val settled = CompletableDeferred<Boolean>()
+    if (page.submit {
+        val invocation = currentCoroutineContext()[Job]
+        val copied = withContext(NonCancellable) { settled.await() }
+        invocation?.ensureActive()
+        if (!copied && !page.closing) fallbackCopy(s)
+    } == null) return
+    // A cancelled worker can discard queued actions; this bounded child still joins native settlement.
+    CoroutineScope(Dispatchers.Main + page.element.supervisor).launch(start = CoroutineStart.UNDISPATCHED) {
+        withContext(NonCancellable) { settled.await() }
+    }
+    // Keep writeText and synchronous fallback inside the accepted DOM gesture.
+    var pending = false
+    try {
+        val clip = window.navigator.asDynamic().clipboard
+        if (clip != null && clip.writeText != null) {
+            clip.writeText(s).then(
+                { _: dynamic -> settled.complete(true); Unit },
+                { _: dynamic -> settled.complete(false); Unit },
+            )
+            pending = true
+        } else fallbackCopy(s)
+    } finally {
+        if (!pending) settled.complete(true)
+    }
 }
 
 fun fallbackCopy(s: String) {
@@ -78,6 +104,15 @@ fun Panels.renderGroupedBoard(n: dynamic) {
     if (wrap == null) { wrap = document.createElement("div").asDynamic(); wrap.className = "kboard"; n.el.appendChild(wrap) }
     var status = n.el.querySelector(".kboard-status")
     if (status == null) { status = document.createElement("div").asDynamic(); status.className = "kboard-status"; n.el.appendChild(status) }
+    var actions = n.el.querySelector(".kboard-actions")
+    if (actions == null) { actions = document.createElement("div").asDynamic(); actions.className = "kboard-actions"; n.el.appendChild(actions) }
+    actions.textContent = ""
+    if (truthy(n._lastOut?.fields) && truthy(n._lastOut?.events)) {
+        val create = document.createElement("button").asDynamic(); create.textContent = "Create item"
+        on(create, "pointerdown", { e -> e.stopPropagation() })
+        on(create, "click", { e -> e.stopPropagation(); openBoardForm(n, "", null) })
+        actions.appendChild(create)
+    }
     wrap.textContent = ""
     val total = keysOf(groups).sumOf { num(groups[it].length).toInt() }
     status.textContent = "$total items across ${cols.size} groups"
@@ -88,11 +123,6 @@ fun Panels.renderGroupedBoard(n: dynamic) {
         c.dataset.group = col.id
         val h = document.createElement("h6").asDynamic()
         h.innerHTML = "<span>${esc(if (truthy(col.name)) col.name else col.id)}</span><b>${items.size}${if (truthy(col.wipLimit)) "/" + esc(col.wipLimit) else ""}</b>"
-        val plus = document.createElement("s").asDynamic(); plus.textContent = "＋"; plus.title = "new card (modal — kanban.submit)"
-        plus.style.cssText = "cursor:pointer;color:var(--ok);text-decoration:none;margin-left:6px"
-        on(plus, "pointerdown", { e -> e.stopPropagation() })
-        on(plus, "click", { e -> e.stopPropagation(); openCardModal(n, str(col.id), null) })
-        h.appendChild(plus)
         c.appendChild(h)
         for (it in items) {
             val card = document.createElement("div").asDynamic()
@@ -105,10 +135,23 @@ fun Panels.renderGroupedBoard(n: dynamic) {
             on(card, "pointerdown", { e ->
                 e.stopPropagation() // don't pan the canvas while grabbing a card
                 if (e.button != 0) return@on
+                val captured = JSON.parse<dynamic>(JSON.stringify(it))
+                val definition = boardDefinition()
+                val sourceId = str(n._lastOut?.events ?: "")
                 val sx = num(e.clientX); val sy = num(e.clientY); var ghost: dynamic = null
-                fun colUnder(ev: dynamic): dynamic { val t = document.elementFromPoint(num(ev.clientX), num(ev.clientY)).asDynamic(); return t?.closest(".kcol") }
+                fun colUnder(ev: dynamic): dynamic {
+                    val t = document.elementFromPoint(num(ev.clientX), num(ev.clientY)).asDynamic()?.closest(".kcol")
+                    return if (t != null && truthy(wrap.contains(t))) t else null
+                }
                 lateinit var onMove: (dynamic) -> Unit
                 lateinit var onUp: (dynamic) -> Unit
+                var released: () -> Unit = {}
+                fun clear() {
+                    page.off(window, "pointermove", onMove); page.off(window, "pointerup", onUp); page.off(window, "pointercancel", onUp)
+                    for (k in arr(wrap.querySelectorAll(".kcol"))) k.classList.remove("dragover")
+                    card.style.opacity = ""
+                    ghost?.remove()
+                }
                 onMove = { ev ->
                     var go = true
                     if (ghost == null) {
@@ -129,13 +172,10 @@ fun Panels.renderGroupedBoard(n: dynamic) {
                     }
                 }
                 onUp = { ev ->
-                    off(window, "pointermove", onMove); off(window, "pointerup", onUp); off(window, "pointercancel", onUp)
-                    for (k in arr(wrap.querySelectorAll(".kcol"))) k.classList.remove("dragover")
-                    card.style.opacity = ""
+                    released(); clear()
                     if (ghost != null) {
-                        ghost.remove()
                         val kc = colUnder(ev); val to = kc?.dataset?.group
-                        if (truthy(to)) {
+                        if (ev.type != "pointercancel" && truthy(to)) {
                             // the card whose top half the pointer is above becomes the insert-before target
                             var beforeJobId: dynamic = null
                             for (el2 in arr(kc.querySelectorAll(".kcard"))) {
@@ -144,30 +184,31 @@ fun Panels.renderGroupedBoard(n: dynamic) {
                                 if (num(ev.clientY) < num(r2.top) + num(r2.height) / 2) { beforeJobId = if (truthy(el2.dataset.jobid)) el2.dataset.jobid else null; break }
                             }
                             if (!(to == col.id && beforeJobId == null)) {
-                                // Optimistic local move AT the pointed position; the next tick reconciles truth.
-                                val fromArr = if (truthy(n._groups[col.id])) n._groups[col.id] else jsArray()
-                                val idx = arr(fromArr).indexOfFirst { x -> x[idF] == it[idF] }
-                                if (idx >= 0) {
-                                    val moved = fromArr.splice(idx, 1)[0]
-                                    if (!truthy(n._groups[to])) n._groups[to] = jsArray()
-                                    val dst = n._groups[to]
-                                    val at = if (beforeJobId != null) arr(dst).indexOfFirst { x -> x[idF] == beforeJobId } else -1
-                                    if (at >= 0) dst.splice(at, 0, moved) else dst.push(moved)
-                                    arr(dst).forEachIndexed { i, x -> if (truthy(x) && typeOf(x) == "object") x.order = i }
-                                    renderGroupedBoard(n)
-                                }
                                 val st = n.el.querySelector(".kboard-status")
                                 if (st != null) st.textContent = str(it[idF]) + ": " + str(col.id) + " → " + str(to) + (if (beforeJobId != null) " (before " + str(beforeJobId) + ")" else "") + " (downstream deciding…)"
-                                val mv = obj(); mv.itemId = it[idF]; mv.item = it; mv.from = col.id; mv.to = to; mv.beforeJobId = beforeJobId
-                                n._lastMove = mv
-                                launchJs { runAll(str(n.id)) } // this node's own downstream chain sees the gesture
+                                val mv = obj(); mv.itemId = captured[idF]; mv.item = captured; mv.from = col.id; mv.to = to; mv.beforeJobId = beforeJobId
+                                if (sourceId.isNotEmpty()) {
+                                    mv.id = str(js("crypto.randomUUID()")); mv.target = n.id; mv.kind = "move"
+                                    emitDomEvent(sourceId, mv, definition) { run ->
+                                        if (page.closing) return@emitDomEvent
+                                        val result = domVerdict(run, str(n.id), str(mv.id))
+                                        val text = if (result?.verdict == "committed") "Move committed"
+                                            else if (result?.verdict == "rejected") "Move rejected: " + str(result.reason)
+                                            else str(run?.notAdmitted ?: "Move outcome unknown; inspect run records before retrying")
+                                        n.el.querySelector(".kboard-status")?.textContent = text
+                                    }
+                                } else {
+                                    n._lastMove = mv
+                                    admitPulse(str(n.id))
+                                }
                             }
                         }
                     }
                 }
-                on(window, "pointermove", onMove); on(window, "pointerup", onUp); on(window, "pointercancel", onUp)
+                page.on(window, "pointermove", onMove); page.on(window, "pointerup", onUp); page.on(window, "pointercancel", onUp)
+                released = page.own { clear() }
             })
-            on(card, "dblclick", { e -> e.stopPropagation(); openCardModal(n, str(col.id), it) }) // modal CRUD
+            on(card, "dblclick", { e -> e.stopPropagation(); openBoardForm(n, str(col.id), it) })
             c.appendChild(card)
         }
         wrap.appendChild(c)
@@ -451,7 +492,7 @@ fun Panels.renderButtonNode(n: dynamic) {
     if (b == null) {
         b = document.createElement("button").asDynamic(); b.className = "bigbtn"
         on(b, "pointerdown", { e -> e.stopPropagation() })
-        on(b, "click", { n._pressedAt = now(); launchJs { runAll(str(n.id)) } })
+        on(b, "click", { n._pressedAt = now(); admitPulse(str(n.id)) })
         n.el.appendChild(b)
     }
     b.textContent = "▸ " + str(if (truthy(p(n, "label"))) p(n, "label") else "press")
@@ -465,7 +506,7 @@ fun Panels.renderSliderNode(n: dynamic) {
         val r = document.createElement("input").asDynamic(); r.type = "range"
         val lab = document.createElement("span").asDynamic(); lab.className = "slval"
         on(r, "pointerdown", { e -> e.stopPropagation() })
-        on(r, "input", { n._sval = r.value; lab.textContent = r.value; launchJs { runAll(str(n.id)) } })
+        on(r, "input", { n._sval = r.value; lab.textContent = r.value; admitPulse(str(n.id)) })
         w.appendChild(r); w.appendChild(lab); n.el.appendChild(w); n._srange = r; n._slab = lab
     }
     val r = n._srange
@@ -485,108 +526,160 @@ fun Panels.ensureMedia(n: dynamic, url: String): dynamic {
         m.style.cssText = if (isVideo) "display:block;width:100%;max-width:640px;margin:0 8px 8px;border-radius:6px;background:#000"
         else "display:block;width:calc(100% - 16px);margin:0 8px 8px"
         on(m, "pointerdown", { e -> e.stopPropagation() })
-        on(m, "ended", { n._endedAt = now(); launchJs { runAll(str(n.id)) } })
+        on(m, "ended", { n._endedAt = now(); admitPulse(str(n.id)) })
+        for (event in arrayOf("play", "pause", "seeked")) on(m, event, {
+            if (!programRunning) admitPulse(str(n.id))
+        })
         n.el.appendChild(m); n._media = m
     }
     return n._media
 }
 
-/**
- * The ring executes IN the daemon. A source OUTSIDE the ring is replicated into the posted document
- * as a scope.in carrying its already-computed value (the inward warm base).
- */
-suspend fun Panels.runScope(n: dynamic, i: dynamic): dynamic {
-    val guard = i["when?"]
-    if (guard == false || guard == "false") return obj()
-    val args = if (truthy(i["args?"]) && typeOf(i["args?"]) == "object") i["args?"] else obj()
-    val named = p(n, "program")
-    val descIds = HashSet<String>()
-    fun walk(m: dynamic) { for (c in arr(m.children)) { descIds.add(str(c.id)); walk(c) } }
-    walk(n)
-    val intra = arr(graph.wires).filter { w -> str(w.from[0]) in descIds && str(w.to[0]) in descIds && wireKindOk(w) }
-    val inbound = arr(graph.wires).filter { w -> str(w.from[0]) !in descIds && str(w.to[0]) in descIds && w.from[0] != n.id && wireKindOk(w) }
-    val synth = ArrayList<dynamic>(); val synthWires = ArrayList<dynamic>(); val seen = HashSet<String>()
-    for (w in inbound) {
-        val key = str(w.from[0]) + "·" + str(w.from[1])
-        if (seen.add(key)) {
-            val src = node(w.from[0])
-            var v: dynamic = if (src != null && truthy(src._lastOut)) src._lastOut[w.from[1]] else undefined
-            if (v === undefined) continue
-            if (typeOf(v) == "object") v = JSON.stringify(v)
-            val params = obj(); params.name = "__in_$key"; params["default"] = str(v)
-            val sn = obj(); sn.id = key; sn.type = "scope.in"; sn.params = params
-            synth.add(sn)
-        }
-        synthWires.add(wire(key, "value", w.to[0], w.to[1]))
+/** Apply exactly the media operation in this receipt, never a graph or retained command. */
+suspend fun Panels.renderMedia(n: dynamic, rendered: dynamic) {
+    val url = str(rendered.url)
+    val media = ensureMedia(n, url)
+    if (media.getAttribute("data-src") != url) { media.setAttribute("data-src", url); media.src = url }
+    if (rendered.volume != null) {
+        val volume = num(rendered.volume)
+        media.volume = if (volume.isFinite()) volume.coerceIn(0.0, 1.0) else 0.0
     }
-    val body = obj()
-    if (truthy(named)) { body.program = named; body.inputs = args }
-    else {
-        body.name = (if (truthy(panelName().value)) str(panelName().value) else "ring") + ":" + str(n.id)
-        val doc = obj(); doc.nodes = (synth + arr(n.children).map { nodeDoc(it) }).toTypedArray(); doc.wires = (intra + synthWires).toTypedArray()
-        body.document = doc; body.inputs = args
-    }
-    val r = api("POST", "/api/lcnc/run", body)
-    if (r.ok != true) throw PatchRefusal(if (truthy(r.error)) r.error else "ring run failed")
-    for (c in arr(n.children)) { // the warm base lands on the bands
-        val out = if (truthy(r.outputs)) r.outputs[c.id] else undefined
-        if (out !== undefined && truthy(c.el)) {
-            c.el.classList.remove("err", "running"); c.el.classList.add("ok")
-            if (truthy(out) && keysOf(out).isNotEmpty()) setResult(c, out)
-        }
-    }
-    // daemon shape: a ring's outputs are its yields PLUS the composed map
-    val returns = if (truthy(r.returns)) r.returns else obj()
-    val out = spread(returns); out.returns = returns
-    return out
+    if (rendered.rewind != null) media.currentTime = 0
+    if (rendered.stop != null) media.pause()
+    if (rendered.play != null) try { awaitJs(media.play()) }
+    catch (e: CancellationException) { throw e }
+    catch (e: dynamic) { setResult(n, "Autoplay blocked — press the element's play control once") }
 }
 
-/** modal CRUD for board cards — create via kanban.submit, move via kanban.move: the daemon's own verbs */
-fun Panels.openCardModal(n: dynamic, colId: String, item: dynamic) {
-    val isNew = item == null
-    val cols = (if (truthy(n._cols) && num(n._cols.length) > 0) arr(n._cols).map { str(it.id) } else keysOf(if (truthy(n._groups)) n._groups else obj()).toList()).sorted()
-    val d = document.createElement("div").asDynamic()
-    d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;display:flex;align-items:center;justify-content:center"
-    d.innerHTML = "<div style=\"background:var(--panel);border:1px solid var(--graal);border-radius:8px;padding:16px 18px;width:380px;color:var(--ink)\">" +
-        "<b style=\"color:var(--graal)\">" + (if (isNew) "new card" else "card " + str(item.id) + " · rev " + str(item.revision ?: "—")) + "</b>" +
-        "<div style=\"margin:10px 0 3px;color:var(--dim);font-size:10px\">TITLE</div><input data-cm=\"title\" style=\"width:100%\">" +
-        "<div style=\"margin:8px 0 3px;color:var(--dim);font-size:10px\">PRIORITY</div><select data-cm=\"pri\"><option>0</option><option>1</option><option>2</option></select>" +
-        (if (isNew) "" else "<div style=\"margin:8px 0 3px;color:var(--dim);font-size:10px\">COLUMN</div><select data-cm=\"col\">" + cols.joinToString("") { c -> "<option" + (if (c == colId) " selected" else "") + ">" + c + "</option>" } + "</select>") +
-        "<div style=\"margin-top:14px;display:flex;gap:8px;justify-content:flex-end\"><button data-cm=\"cancel\">cancel</button><button data-cm=\"ok\" style=\"border-color:var(--ok);color:var(--ok)\">" + (if (isNew) "create" else "apply") + "</button></div></div>"
-    document.body!!.appendChild(d)
-    fun el(s: String): dynamic = d.querySelector("[data-cm=\"$s\"]")
-    el("title").value = if (!isNew) (item.title ?: "") else ""
-    el("pri").value = str(if (!isNew) (item.priority ?: 2) else 2)
-    val close = { d.remove() }
-    el("cancel").onclick = close; d.onclick = { e: dynamic -> if (e.target === d) close() }
-    for (x in arr(d.querySelectorAll("input,select,button"))) on(x, "pointerdown", { e -> e.stopPropagation() })
-    el("ok").onclick = {
-        launchJs {
-            if (isNew) {
-                val title = str(el("title").value).trim()
-                if (title.isEmpty()) { el("title").focus(); return@launchJs }
-                val params = obj(); params.jobId = ""; params.title = title; params.priority = el("pri").value; params.idempotencyKey = "panel-modal-" + str(now())
-                val body = obj(); body.type = "kanban.submit"; body.inputs = obj(); body.params = params
-                val r = api("POST", "/api/lcnc/run", body)
-                // ok:true only means the RUNNER ran — the store's verdict is outputs.accepted.
-                val acc = truthy(r.ok) && truthy(r.outputs) && r.outputs.accepted != false
-                status(if (acc) "card landed: " + title + " (" + str(r.outputs.jobId ?: "") + ")"
-                else "submit REFUSED: " + str(if (truthy(r.outputs) && truthy(r.outputs.reason)) r.outputs.reason else r.error ?: JSON.stringify(r).take(120)))
-            } else {
-                val to = str(el("col").value)
-                if (to.isNotEmpty() && to != str(item.status ?: colId)) {
-                    val cmd = obj(); cmd.jobId = item.id; cmd.toColumn = to; cmd.expectedRevision = item.revision
-                    cmd.idempotencyKey = "panel-modal-" + str(item.id) + "-" + str(item.revision ?: 0) + "-" + to
-                    val inputs = obj(); inputs.command = cmd; inputs["command?"] = cmd
-                    val body = obj(); body.type = "kanban.move"; body.params = obj(); body.inputs = inputs
-                    val r = api("POST", "/api/lcnc/run", body)
-                    status(if (truthy(r.ok)) "moved " + str(item.id) + " → " + to else "move failed: " + str(r.error ?: JSON.stringify(r)))
-                }
-            }
-            close(); runAll(null)
-        }
+/** Browser observation, not an inferred execution result. Non-finite media metadata is absent. */
+fun mediaState(media: dynamic): dynamic = objOf {
+    it.url = media.getAttribute("data-src"); it.playing = !truthy(media.paused)
+    val time = num(media.currentTime); val duration = num(media.duration)
+    if (time.isFinite()) it.t = time
+    if (duration.isFinite()) it.duration = duration
+}
+
+fun Panels.boardDefinition(): LcncProgram =
+    LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix()))
+
+/** Capture at the DOM boundary, then use the ordinary retained-program admission. */
+fun Panels.emitDomEvent(sourceId: String, event: dynamic, definition: LcncProgram, done: (dynamic) -> Unit) {
+    fun refusal(): String? = when {
+        page.closing -> "Page is closing; gesture was not admitted"
+        programRunning || programAdmission != null -> "Gesture not admitted while awaiting another receipt"
+        !LcncProgramConfix.sameDefinition(definition, boardDefinition()) -> "Program changed; reopen the form after Run"
+        node(sourceId)?.type != "dom.events" || truthy(node(sourceId)?._parentScope) -> "Missing root DOM event source"
+        pulseReceipt == null -> "Choose Run or Live first; gesture was not admitted"
+        else -> null
     }
-    later(0) { el("title").focus() }
+    val refused = refusal()
+    if (refused != null) { done(objOf { it.notAdmitted = refused }); return }
+    val pulse = objOf { it.nodeId = sourceId; it.outputs = objOf { out -> out.event = JSON.parse<dynamic>(JSON.stringify(event)) } }
+    val admission = reserveProgram(pulse = pulse, source = node(sourceId))
+    if (admission == null) done(objOf { it.notAdmitted = statusText() })
+    else queueProgram(admission, done)
+}
+
+fun domVerdict(run: dynamic, target: String, eventId: String): dynamic {
+    if (run?.ok != true || run.status != "completed") return null
+    val outputs = run.outputs ?: return null
+    val results = outputs[target]?.result
+    if (!isArray(results)) return null
+    val matches = arr(results).filter { it?.idempotencyKey == eventId && str(it.verdict) in setOf("committed", "rejected") }
+    return if (matches.size == 1) matches.single() else null
+}
+
+/** The form edits the authored scalar parameter schema, not a second board API. */
+fun Panels.openBoardForm(n: dynamic, group: String, item: dynamic) {
+    if (page.closing || document.querySelector("[data-board-form]") != null) return
+    val fields = n._lastOut?.fields ?: return
+    val sourceId = str(n._lastOut?.events ?: "")
+    if (sourceId.isEmpty()) return
+    val specs = try { LcncDomForm.fields(reify(JSON.stringify(fields))) }
+        catch (e: dynamic) { status("Form schema refused: " + failureText(e)); return }
+    val definition = boardDefinition()
+    val captured = if (item == null) null else JSON.parse<dynamic>(JSON.stringify(item))
+    val d = document.createElement("div").asDynamic()
+    d.setAttribute("data-board-form", str(n.id)); d.setAttribute("role", "dialog"); d.setAttribute("aria-modal", "true")
+    d.setAttribute("aria-label", if (captured == null) "Create item" else "Edit item")
+    d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99;display:flex;align-items:center;justify-content:center"
+    val box = document.createElement("div").asDynamic()
+    box.style.cssText = "background:var(--panel);border:1px solid var(--graal);border-radius:8px;padding:18px;width:380px;color:var(--ink);max-height:85vh;overflow:auto"
+    val title = document.createElement("h3"); title.textContent = if (captured == null) "Create item" else "Edit item"
+    box.appendChild(title)
+    val inputs = mutableMapOf<String, dynamic>()
+    val original = mutableMapOf<String, String>()
+    for ((name, spec) in specs) {
+        val label = document.createElement("label").asDynamic()
+        label.textContent = spec.ph.ifBlank { name }; label.style.cssText = "display:block;margin:10px 0"
+        val input = document.createElement(if (spec.opts.isNotEmpty()) "select" else if (spec.ta) "textarea" else "input").asDynamic()
+        input.setAttribute("data-field", name); input.style.cssText = "display:block;width:100%;margin-top:4px"
+        if (spec.opts.isNotEmpty()) for (value in spec.opts) {
+            val option = document.createElement("option").asDynamic(); option.value = value; option.textContent = value
+            input.appendChild(option)
+        }
+        val initial = if (captured == null) spec.v else str(captured[name] ?: "")
+        input.value = initial; original[name] = initial; inputs[name] = input
+        label.appendChild(input); box.appendChild(label)
+    }
+    val message = document.createElement("p").asDynamic(); message.setAttribute("role", "status"); box.appendChild(message)
+    val cancel = document.createElement("button").asDynamic(); cancel.textContent = "Cancel"
+    val apply = document.createElement("button").asDynamic(); apply.textContent = if (captured == null) "Create" else "Apply"
+    box.appendChild(cancel); box.appendChild(apply); d.appendChild(box); document.body!!.appendChild(d)
+    var busy = false
+    var disposed = false
+    val bindings = mutableListOf<() -> Unit>()
+    var release: () -> Unit = {}
+    fun dispose() {
+        if (disposed) return
+        disposed = true
+        while (bindings.isNotEmpty()) bindings.removeAt(bindings.lastIndex).invoke()
+        release()
+        d.remove()
+    }
+    fun bind(target: dynamic, type: String, handler: (dynamic) -> Unit) {
+        page.on(target, type, handler)
+        bindings.add { page.off(target, type, handler) }
+    }
+    release = page.own { dispose() }
+    fun close() { if (!busy) dispose() }
+    bind(cancel, "click", { close() })
+    bind(d, "click", { e -> if (e.target === d) close() })
+    bind(d, "pointerdown", { e -> e.stopPropagation() })
+    bind(d, "keydown", { e -> if (e.key == "Escape") close() })
+    bind(apply, "click", {
+        if (disposed || page.closing || busy || truthy(apply.disabled)) return@bind
+        val values = obj()
+        for ((name, spec) in specs) {
+            val value = str(inputs.getValue(name).value)
+            if ((!spec.optional && value.isBlank()) || (spec.opts.isNotEmpty() && value !in spec.opts)) {
+                message.textContent = "Required or invalid value: " + spec.ph.ifBlank { name }
+                inputs.getValue(name).focus(); return@bind
+            }
+            if (captured == null || value != original[name]) values[name] = value
+        }
+        if (keysOf(values).isEmpty()) { message.textContent = "No changes; nothing was submitted"; return@bind }
+        // All mutable form values and the opening item/revision are captured before queue admission.
+        val event = objOf {
+            it.id = str(js("crypto.randomUUID()")); it.target = n.id; it.kind = if (captured == null) "create" else "edit"
+            it.item = captured; it.group = group; it.fields = values
+        }
+        busy = true; apply.disabled = true; cancel.disabled = true
+        message.textContent = "Awaiting a committed or rejected verdict…"
+        emitDomEvent(sourceId, event, definition) { run ->
+            if (disposed || page.closing) return@emitDomEvent
+            busy = false; cancel.disabled = false
+            val verdict = domVerdict(run, str(n.id), str(event.id))
+            when {
+                verdict?.verdict == "committed" -> dispose()
+                verdict?.verdict == "rejected" -> message.textContent =
+                    "Rejected: " + str(verdict.reason ?: "command refused") + ". Close and reopen before retrying."
+                run?.notAdmitted != null -> { message.textContent = run.notAdmitted; apply.disabled = false }
+                else -> message.textContent = "Outcome unknown. Inspect run records before retrying; no automatic retry."
+            }
+        }
+    })
+    inputs.values.firstOrNull()?.focus()
 }
 
 // ── fractal dive: a program.ref node is a window onto another graph at the SAME zoom/pan surface ──

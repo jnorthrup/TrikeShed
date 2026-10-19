@@ -94,7 +94,7 @@ class BertAlgebraTest {
         val row = vector.asManifold(angular, budget)
         assertEquals(angular, row.b(ManifoldK.Angular))
         assertEquals(budget, row.b(ManifoldK.Budget))
-        val tensor = assertIs<Tensor<Float>>(row.b(ManifoldK.Payload))
+        val tensor = assertIs<MetaSeries<Tensor, Float>>(row.b(ManifoldK.Payload))
         assertSame(tensor, row.b(ManifoldK.Payload))
         assertEquals(2, tensor.a[0])
         values[1] = -9f

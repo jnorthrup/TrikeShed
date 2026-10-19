@@ -1,6 +1,7 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.lcnc.LcncProgramConfix
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
 import kotlinx.browser.localStorage
@@ -12,73 +13,6 @@ import kotlinx.coroutines.cancelAndJoin
 
 // ── execution ─────────────────────────────────────────────────────────────
 fun Panels.inputsOf(id: dynamic): List<dynamic> = arr(graph.wires).filter { it.to[0] == id }
-
-/** ring children run in the daemon's frame; the client walk sequences top-level nodes only */
-fun Panels.topo(): List<dynamic> {
-    val order = ArrayList<String>(); val mark = HashMap<String, String>()
-    fun visit(id: String) {
-        if (mark[id] == "t") return; if (mark[id] == "p") throw PatchRefusal("cycle at $id")
-        val nd = node(id)
-        if (nd == null || truthy(nd._parentScope)) { mark[id] = "t"; return }
-        mark[id] = "p"
-        for (w in inputsOf(id)) visit(str(w.from[0]))
-        // a ring depends on every outside source feeding its interior
-        if (truthy(nd.children) && num(nd.children.length) > 0) {
-            val dIds = HashSet<String>()
-            fun wk(m: dynamic) { for (c in arr(m.children)) { dIds.add(str(c.id)); wk(c) } }
-            wk(nd)
-            for (w in arr(graph.wires)) if (str(w.to[0]) in dIds && str(w.from[0]) !in dIds) visit(str(w.from[0]))
-        }
-        mark[id] = "t"; order.add(id)
-    }
-    for (n in nodes()) if (!truthy(n._parentScope)) visit(str(n.id))
-    return order.map { node(it) }
-}
-
-suspend fun Panels.runNode(n: dynamic, cache: dynamic): dynamic {
-    val attempt = objOf {
-        it.node = JSON.stringify(executionNode(n)); it.at = js("new Date().toISOString()")
-        it.state = "waiting for inputs"; it.inputs = "{}"
-    }
-    n._lastAttempt = attempt
-    n._lastOut = undefined // A failed or skipped rerun must not seed a later partial run.
-    val t = contract(n.type); val r = runners[str(n.type)]
-    if (t == null || r == null) { attempt.state = "unavailable runner"; return undefined }
-    val inputs = obj()
-    for (w in inputsOf(n.id)) {
-        if (!wireKindOk(w)) continue // a mismatched cable feeds nothing
-        val src = cache[w.from[0]]
-        if (src === undefined) { attempt.state = "waiting for upstream " + str(w.from[0]); return undefined }
-        inputs[w.to[1]] = src[w.from[1]]
-    }
-    attempt.inputs = executionPreview(inputs)
-    for (name in arr(t.ins).map { str(it) }) if (!name.endsWith("?") && inputs[name] === undefined) {
-        attempt.state = "missing input $name"; return undefined
-    }
-    attempt.state = "running"
-    n.el.classList.remove("ok", "err"); n.el.classList.add("running")
-    try {
-        val out = r.run(n, inputs)
-        attempt.state = "returned"; attempt.outputs = executionPreview(out)
-        n.el.classList.remove("running"); n.el.classList.add("ok")
-        n._lastOut = out // memo for partial runs
-        val render = r.render
-        if (render != null) render(n, out)
-        else if (!truthy(t.sink) && n.type != "display" && out !== undefined && keysOf(out).isNotEmpty()) setResult(n, out)
-        return out
-    } catch (e: CancellationException) {
-        attempt.state = "cancelled"
-        n._lastOut = undefined
-        n.el.classList.remove("running")
-        throw e
-    } catch (e: dynamic) {
-        attempt.state = "failed"; attempt.error = failureText(e)
-        n._lastOut = undefined
-        n.el.classList.remove("running"); n.el.classList.add("err")
-        setResult(n, "ERROR: " + failureText(e))
-        return undefined
-    }
-}
 
 /** Bounded display only; never used to feed another node or persisted as a receipt. */
 fun executionNode(n: dynamic): dynamic = objOf {
@@ -96,76 +30,112 @@ fun executionPreview(value: dynamic): String {
 fun executionOmitted(value: dynamic): Boolean = value != null && typeOf(value.truncated) == "string" &&
     isArray(value.keys) && keysOf(value).size == 2
 
-/** One authored program, one daemon admission. Rendering never invokes another runner. */
-suspend fun Panels.runProgram(debug: Boolean = false) {
-    if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
-    if (programRunning) { status("A program run is already awaiting its receipt"); return }
-    stopSources()
-    if (liveRuns > 0) { status("Sources stopped; wait for the current live sweep to finish, then choose Run"); return }
-    val document = JSON.stringify(toConfix())
-    val request = JSON.stringify(objOf {
-        it.name = str(panelName().value).ifBlank { "canvas" }
-        it.document = JSON.parse(document); it.inputs = obj()
-        if (debug) it.debugToken = debugger.start()
-    })
-    for (n in nodes()) {
-        n._lastOut = undefined; n.el.classList.remove("ok", "err")
-        n._sheets = null; n._sheetRequest = null; n._sheetError = null; n._cur = null; n._orch = null
-        n._groups = null; n._cols = null; n._lastMove = null; n._heap = null; n._standings = null
-        for (el in arr(n.el.querySelectorAll(".result,.csheet,.kboard,.kboard-status,canvas.heapmap,.heapstat"))) el.remove()
-        n.el.querySelector(".gaugeval")?.textContent = "—"
-    }
-    programRunning = true
-    byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true
-    byId("debugBtn")?.disabled = true
-    status("Running the authored program once · sources stopped · awaiting durable receipt…")
-    try {
-        val response = coroutineScope {
-            val observer = if (debug) launch { debugger.observe() } else null
-            try { fetchJs("/api/lcnc/run", jsonInit("POST", request)) }
-            finally { observer?.cancelAndJoin() }
-        }
-        val result: dynamic = JSON.parse(PatchRead.text(response))
-        // Failures after admission have receipts too. Never retry through individual node runners.
-        if (result?.receiptCid != null && result.runId != null && result.programCid != null) {
-            lastProgramRun = result
-            var displayError = ""
-            try { if (JSON.stringify(toConfix()) == document) programOutputs(result, document) }
-            catch (e: dynamic) { displayError = " · canvas output display failed: " + failureText(e) }
-            facets.tab = "execution"
-            if (facets.drawer == null) facets.toggle() else facets.show("execution")
-            status("Program " + str(result.status) + " · " + str(result.runId) + " · receipt in Evidence; live sources remain stopped" + displayError)
-        } else {
-            status("Program request returned HTTP " + str(response.status) + " without a receipt: " +
-                str(result?.error ?: result?.detail ?: "unrecognized response") + ". No automatic retry.")
-        }
-    } catch (e: CancellationException) {
-        status("Program response interrupted; daemon outcome is unknown. Inspect run records before retrying.")
-        throw e
-    } catch (e: dynamic) {
-        status("Program response unavailable; daemon outcome is unknown: " + failureText(e) +
-            ". Inspect run records before retrying; no automatic retry.")
-    } finally {
-        programRunning = false
-        byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
-        byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
-        byId("debugBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
-        if (debug) debugger.finish()
-    }
+/** One authored program or one root pulse, one daemon admission. No browser graph executor. */
+suspend fun Panels.runProgram(debug: Boolean = false, live: Boolean = false, pulse: dynamic = undefined): dynamic {
+    val selected = reserveProgram(debug, live, pulse) ?: return null
+    return runAdmittedProgram(selected)
 }
 
-/** Complete root-frame outputs may seed later gestures; omission markers and nested traces may not. */
+internal suspend fun Panels.runAdmittedProgram(selected: PanelsAdmission): dynamic {
+    val debug = selected.debug
+    val live = selected.live
+    try {
+        if (!currentProgram(selected)) {
+            val reason = "Queued gesture no longer matches its admitted frame; it was not replayed"
+            status(reason)
+            return objOf { it.notAdmitted = reason }
+        }
+        val isPulse = selected.pulse != null
+        val pulse = if (isPulse) JSON.parse<dynamic>(selected.pulse!!) else undefined
+        val canvas = selected.canvas
+        val document = selected.document
+        val name = selected.name
+        val program = selected.program
+        val base = selected.baseReceipt
+        if (!isPulse) stopSources()
+        val sourceEpoch = sourceRevision
+        val request = JSON.stringify(objOf {
+            it.name = name; it.document = JSON.parse(document); it.inputs = obj()
+            if (isPulse) { it.baseReceiptCid = base; it.pulse = pulse }
+            if (debug) it.debugToken = debugger.start()
+        })
+        // No unknown or failed outcome can continue from an earlier base.
+        pulseReceipt = null; pulseProgram = null
+        if (!isPulse) for (n in nodes()) {
+            n._lastOut = undefined; n.el.classList.remove("ok", "err")
+            n._sheets = null; n._sheetRequest = null; n._sheetError = null; n._cur = null; n._orch = null
+            n._groups = null; n._cols = null; n._lastMove = null; n._heap = null; n._standings = null
+            for (el in arr(n.el.querySelectorAll(".result,.csheet,.kboard,.kboard-status,.kboard-actions,canvas.heapmap,.heapstat"))) el.remove()
+            n.el.querySelector(".gaugeval")?.textContent = "—"
+        }
+        programRunning = true
+        byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
+        status(if (isPulse) "Pulse admitted for " + str(pulse.nodeId) + " · awaiting durable receipt…"
+            else "Running the authored program once · awaiting durable receipt…")
+        try {
+            val response = coroutineScope {
+                val observer = if (debug) launch { debugger.observe() } else null
+                try { fetchJs("/api/lcnc/run", jsonInit("POST", request)) }
+                finally { observer?.cancelAndJoin() }
+            }
+            val result: dynamic = JSON.parse(PatchRead.text(response))
+            if (result?.receiptCid != null && result.runId != null && result.programCid != null) {
+                lastProgramRun = result
+                val current = !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(program,
+                    LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix())))
+                if (current && result.ok == true && result.status == "completed" && result.rootStateCid != null) {
+                    pulseReceipt = str(result.receiptCid); pulseProgram = program
+                }
+                var displayError = ""
+                try { if (current) programOutputs(result, JSON.stringify(toConfix())) }
+                catch (e: CancellationException) { throw e }
+                catch (e: dynamic) { displayError = " · canvas output display failed: " + failureText(e) }
+                facets.selectedReceipt = result
+                facets.tab = "execution"
+                if (!isPulse && facets.drawer == null) facets.toggle()
+                else if (facets.drawer != null) facets.show("execution")
+                if (pulseReceipt == null) stopSources()
+                else if (live && sourceRevision == sourceEpoch) armSources()
+                status((if (isPulse) "Pulse " else "Program ") + str(result.status) + " · " + str(result.runId) +
+                    " · receipt in Evidence" + (if (pulseReceipt == null) " · no resumable frame; sources stopped" else "") + displayError)
+            } else {
+                stopSources()
+                status("Request returned HTTP " + str(response.status) + " without a receipt: " +
+                    str(result?.error ?: result?.detail ?: "unrecognized response") + ". No automatic retry.")
+            }
+            return result
+        } catch (e: CancellationException) {
+            pulseReceipt = null; pulseProgram = null; stopSources()
+            status("Response interrupted; daemon outcome is unknown. Inspect run records before retrying.")
+            throw e
+        } catch (e: dynamic) {
+            pulseReceipt = null; pulseProgram = null; stopSources()
+            status("Response unavailable; daemon outcome is unknown: " + failureText(e) +
+                ". Inspect run records before retrying; no automatic retry.")
+        } finally {
+            programRunning = false
+            byId("runBtn").disabled = truthy(graph.controls?.inspectionOnly)
+            byId("liveBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+            byId("debugBtn")?.disabled = truthy(graph.controls?.inspectionOnly)
+            if (debug) debugger.finish()
+        }
+        return null
+    } finally { releaseProgram(selected) }
+}
+
+/** Receipt outputs are presentation only. The daemon's retained frame owns every later input. */
 suspend fun Panels.programOutputs(run: dynamic, document: String) {
     val outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
-    fun current(): Boolean = graph === canvas && JSON.stringify(toConfix()) == document
-    // Seed complete outputs before asynchronous sheet reads; renderers never dispatch execution.
+    fun current(): Boolean = !page.closing && graph === canvas && JSON.stringify(toConfix()) == document
+    // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
+        n._lastOut = undefined
         val out = outputs[n.id]
         if (out == null || typeOf(out) != "object" || isArray(out)) continue
         if (executionOmitted(out)) {
-            setResult(n, "Program output omitted: " + str(out.truncated) + ". Inspect the receipt; this value cannot feed a live input.")
+            setResult(n, "Program output omitted: " + str(out.truncated) + ". Inspect the receipt; this preview is not executable state.")
             continue
         }
         n._lastOut = out
@@ -180,12 +150,13 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
             when (str(n.type)) {
                 "sheet.concentric" -> loadConcentric(n, out.rendered, out.byStatus, out.byPriority, out.orchestration, ::current)
                 "dom.board" -> {
-                    // Gestures mutate their page-owned view, never the retained output/memo.
+                    // Display snapshots do not feed execution or claim optimistic commits.
                     n._groups = JSON.parse<dynamic>(JSON.stringify(out.rendered ?: obj()))
                     n._cols = out.columns
                     renderGroupedBoard(n)
                 }
                 "display" -> setResult(n, out.x)
+                "media.player" -> if (out.rendered != null) renderMedia(n, out.rendered)
                 "gauge" -> {
                     val value = out.x
                     n.el.querySelector(".gaugeval").textContent = if (typeOf(value) == "number" && num(value) > 9999)
@@ -224,46 +195,22 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
     if (failures.isNotEmpty()) throw PatchRefusal(failures.joinToString("; "))
 }
 
-suspend fun Panels.runAll(fromId: String?, automatic: Boolean = false) {
-    if (truthy(graph.controls?.inspectionOnly)) { status("Inspection-only construction; execution is disabled"); return }
-    if (automatic && truthy(graph.controls?.humanOversight)) { status("Loaded for review — choose Run to execute"); return }
-    if (programRunning) { status("Live trigger not admitted while awaiting the program receipt; it will not be replayed"); return }
-    liveRuns++
-    try {
-        status("running live…")
-        for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.live"))) w.classList.add("flow")
-        var order: List<dynamic>
-        try { order = topo() } catch (e: CancellationException) { throw e } catch (e: dynamic) { status(failureText(e)); return }
-        if (fromId != null) { // restrict to downstream closure of fromId
-            val keep = HashSet<String>(); keep.add(fromId); var grew = true
-            while (grew) { grew = false; for (w in arr(graph.wires)) if (str(w.from[0]) in keep && str(w.to[0]) !in keep) { keep.add(str(w.to[0])); grew = true } }
-            order = order.filter { str(it.id) in keep }
-        }
-        val cache = obj()
-        if (fromId != null) {
-            // seed required inputs outside the closure from the last live sweep's memo
-            for (n in nodes()) if (!order.contains(n) && n._lastOut !== undefined) cache[n.id] = n._lastOut
-        }
-        for (n in order) { val out = runNode(n, cache); if (out !== undefined) cache[n.id] = out }
-        resolveTopLevelOverlaps() // result trees grow nodes — keep them clear of each other
-        redraw()
-        val failures = order.count { truthy(it.el.classList.contains("err")) }
-        status(if (failures > 0) "Live sweep has $failures failed node(s) — inspect the marked nodes"
-            else "Live sweep done " + js("new Date().toLocaleTimeString()").unsafeCast<String>())
-    } finally {
-        liveRuns--
-        for (w in arr(wiresSvg.asDynamic().querySelectorAll("path.flow"))) w.classList.remove("flow")
-    }
+/** Capture one page-owned observation; commonMain selects and executes its downstream frame. */
+fun Panels.runAll(fromId: String?, automatic: Boolean = false) {
+    if (fromId == null) {
+        if (automatic) { status("Loaded for review · choose Run or Live to execute"); return }
+        admitProgram(live = true)
+    } else admitPulse(fromId)
 }
 
-/** Loading under human oversight cannot arm timers/SSE; explicit Live can. */
+/** Only explicit Live, after a completed receipt, can arm timer/SSE sources. */
 fun Panels.armSources(automatic: Boolean = false) {
-    if (programRunning || truthy(graph.controls?.inspectionOnly) || automatic && truthy(graph.controls?.humanOversight)) return
+    if (page.closing || automatic || pulseReceipt == null || truthy(graph.controls?.inspectionOnly)) return
     for (n in nodes()) {
         if (truthy(n._parentScope)) continue // the daemon owns the frame
         if (truthy(contract(n.type)?.source) && n.type == "timer" && !truthy(n._timer)) {
             val sec = num(p(n, "seconds")); val s = maxOf(1.0, if (sec.isNaN() || sec == 0.0) 5.0 else sec)
-            n._timer = window.setInterval({ launchJs { runAll(str(n.id)) } }, (s * 1000).toInt())
+            n._timer = window.setInterval({ admitPulse(str(n.id)) }, (s * 1000).toInt())
         }
         if (n.type == "graal.events" && !truthy(n._es)) {
             // pointcut-driven dataflow: every matching graal event re-fires this node's downstream
@@ -272,7 +219,7 @@ fun Panels.armSources(automatic: Boolean = false) {
                 val f = p(n, "filter")
                 if (!(truthy(f) && !str(ev.data ?: "").contains(str(f)))) {
                     n._lastEvent = try { JSON.parse(str(ev.data)) } catch (x: dynamic) { ev.data }
-                    launchJs { runAll(str(n.id)) }
+                    admitPulse(str(n.id))
                 }
             }
         }
@@ -283,7 +230,7 @@ fun Panels.armSources(automatic: Boolean = false) {
                 val d: dynamic = try { JSON.parse(str(ev.data)) } catch (x: dynamic) { null }
                 if (d != null && !(truthy(p(n, "vmId")) && d.vmId != p(n, "vmId")) && !(truthy(p(n, "kind")) && d.kind != p(n, "kind"))) {
                     n._lastEvent = d
-                    launchJs { runAll(str(n.id)) }
+                    admitPulse(str(n.id))
                 }
             }
         }
@@ -291,6 +238,7 @@ fun Panels.armSources(automatic: Boolean = false) {
 }
 
 fun Panels.stopSources() {
+    sourceRevision++
     for (n in nodes()) {
         if (truthy(n._timer)) { window.clearInterval(n._timer); n._timer = null }
         if (truthy(n._es)) { n._es.close(); n._es = null }
@@ -331,11 +279,15 @@ fun Panels.saveDoc() {
  * of keystrokes in one field collapses into a single step (same node/wire shape inside 600ms).
  */
 class PanelsHistory(private val p: Panels) {
+    private fun launchJs(block: suspend () -> Unit) = p.launchJs(block)
     val undo = ArrayList<String>(); val redo = ArrayList<String>()
     private val max = 200
     var restoring = false
     var lastDoc: String? = null
     private var lastPushMs = 0.0
+
+    /** Explicit Apply is one undo step, separate from adjacent inline typing. */
+    fun boundary() { lastPushMs = Double.NEGATIVE_INFINITY }
 
     private fun shapeKey(o: dynamic): String =
         arr(o.nodes).joinToString(",") { str(it.id) + ":" + str(it.type) } + "|" + arr(o.wires).joinToString(",") { str(it.from) + ">" + str(it.to) }
@@ -365,7 +317,7 @@ class PanelsHistory(private val p: Panels) {
             lastDoc = JSON.stringify(p.serialize())
         } finally { restoring = false }
         if (p.autosave) try { localStorage.setItem(STORE_KEY, lastDoc!!) } catch (e: dynamic) {}
-        launchJs { p.runAll(null, automatic = true) }
+        p.runAll(null, automatic = true)
         return true
     }
 
@@ -388,8 +340,10 @@ class PanelsHistory(private val p: Panels) {
 
 
 fun Panels.load(data: dynamic): Boolean {
+    if (page.closing) return false
     loadFailure(data)?.let { return refuseLoad(it) }
     byId("panelLoadRefusal")?.remove()
+    pulseReceipt = null; pulseProgram = null; sourceRevision++
     shakeOwner.parentRevision++
     for (n in nodes()) { if (truthy(n._timer)) window.clearInterval(n._timer); if (truthy(n._es)) { n._es.close(); n._es = null }; n.el.remove() }
     val g = obj(); g.nodes = jsArray(); g.wires = jsArray(); g.seq = if (truthy(data.seq)) data.seq else 1
@@ -483,6 +437,7 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
         require(truthy(response.ok)) { "HTTP ${str(response.status)}" }
         val payload = awaitJs(response.json())
         require(payload != null && isArray(payload.contracts) && num(payload.contracts.length) > 0) { "No contract vocabulary returned" }
+        if (page.closing) return false
         val list = arr(payload.contracts)
         val acc = if (truthy(payload.kindAcceptance)) payload.kindAcceptance else obj()
         val acceptance = keysOf(acc).associateWith { k -> arr(acc[k]).map { str(it) } }
@@ -500,10 +455,12 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
                 val q = obj()
                 q.v = d.v ?: ""
                 q.optional = truthy(d.optional)
+                q.code = truthy(d.code)
                 q.opts = if (truthy(d.opts) && num(d.opts.length) > 0) d.opts else undefined
                 q.optsFrom = if (truthy(d.optsFrom)) d.optsFrom else undefined
                 q.ta = if (truthy(d.ta)) d.ta else undefined; q.ph = if (truthy(d.ph)) d.ph else undefined
                 q.cols = if (truthy(d.cols) && num(d.cols.length) > 0) d.cols else undefined
+                q.colsParam = if (truthy(d.colsParam)) d.colsParam else undefined
                 ps[k] = q
             }
             c.params = ps
@@ -511,8 +468,8 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
         }
         contracts = m
         kindAcceptance = acceptance; kindRefinements = refinements; kindHierarchy = hierarchy
-        // Fallback parity: every hydrated type with no explicit browser runner dispatches to the daemon
-        for (t in keysOf(m)) if (!runners.containsKey(t)) runners[t] = serverRun(t)
+        // Hydration only adds presentation slots. Execution never dispatches a per-node browser runner.
+        for (t in keysOf(m)) if (!runners.containsKey(t)) runners[t] = Runner()
         for (t in arrayOf("document.curate", "document.tasks", "document.sheet")) runners[t]?.render = { n, out ->
             renderDocumentReview(n, out)
         }

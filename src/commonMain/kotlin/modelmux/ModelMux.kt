@@ -8,7 +8,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.userspace.reactor.CacheLookup
 import borg.trikeshed.modelmux.ModelResponseReceipt
-import borg.trikeshed.parse.confix.ConfixDoc
+import borg.trikeshed.parse.confix.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlin.uuid.ExperimentalUuidApi
@@ -26,6 +26,9 @@ typealias RouteResult = Join<Series<ModelEntry>, AcpAction>
 
 /** The mux: models j router */
 typealias ModelMuxCore = Join<Series<ModelEntry>, ModelRouter>
+
+/** Upstream status is separate from diagnostics so HTTP hosts can relay it without exposing response bodies. */
+class ModelHttpFailure(val status: Int, message: String) : IllegalStateException(message)
 
 // ═══════════════════════════════════════════
 // Model Router — capability-based selection
@@ -65,7 +68,7 @@ enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 @OptIn(ExperimentalUuidApi::class)
 class LlmSession(
     val model: ModelEntry,
-    private val authKey: String,
+    private val authKey: String?,
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
     val sessionId: String = defaultSecureIdGenerator.generateHexId("sess", 16),
@@ -90,6 +93,7 @@ class LlmSession(
 
     /** Build HTTP headers with auth */
     fun authHeaders(): Series<Join<String, String>> {
+        if (authKey == null) return s_["Content-Type" j "application/json"]
         val (headerName, headerVal) = when {
             "anthropic" in baseUrl -> "x-api-key" to authKey
             else -> "Authorization" to "Bearer $authKey"
@@ -130,11 +134,12 @@ class ModelMux internal constructor(
     private val cacheCascade: CacheCascade = CacheCascade.EXACT_ONLY,
     /** Configured selection, independent of catalog order and previous responses. */
     val defaultModel: String? = null,
+    private val configuredAuth: Map<String, LlmAuth> = emptyMap(),
+    private val configuredKeys: Map<String, KeyMux> = emptyMap(),
+    val activity: MuxActivity = MuxActivity(),
 ) {
     private val models: Series<ModelEntry> get() = core.a
     private val router: ModelRouter get() = core.b
-
-    val activity = MuxActivity()
 
     /**
      * Observer sink for [ModelSelectionEvent]. Null by default. Single-writer: set once, before
@@ -189,8 +194,8 @@ class ModelMux internal constructor(
         // A provider-tagged card resolves against the provider's pooled
         // credential (one key serves every model that provider hosts) before
         // falling to the per-model lookup untagged cards have always used.
-        val binding = keyMux.resolveLlm(card.id, card.providerTag,
-            configuredBaseUrls[modelId] ?: "https://api.openai.com/v1")
+        val binding = credentialMux(modelId).resolveLlm(card.id, card.providerTag,
+            configuredBaseUrls[modelId] ?: "https://api.openai.com/v1", auth(modelId))
             ?: return Result.failure(IllegalStateException("need(key): no auth key for model: $modelId"))
         val session = LlmSession(entry, binding.authKey, binding.baseUrl, keyId = binding.keyId)
         session.open()
@@ -202,10 +207,12 @@ class ModelMux internal constructor(
      * the SAME fallback chain [session] uses to resolve the key VALUE:
      * provider tag → model id → default. Never returns the secret itself —
      * the returned string is the binding path (`llm.<provider>.key`), which is
-     * the ledger identity quota metering keys on. Null = no binding resolves,
-     * i.e. the same condition under which [session] refuses to open.
+     * the ledger identity quota metering keys on. Null means no binding resolves,
+     * or the model explicitly uses credential-free authentication.
      */
     private suspend fun resolveKeyId(card: AcpModelCard): String? {
+        if (auth(card.id) == LlmAuth.NONE) return null
+        val keyMux = credentialMux(card.id)
         val providerTag = card.providerTag
         if (providerTag != null && keyMux.get("llm.$providerTag.key") != null) return "llm.$providerTag.key"
         if (keyMux.get("llm.${card.id}.key") != null) return "llm.${card.id}.key"
@@ -310,9 +317,14 @@ class ModelMux internal constructor(
         decode: (String) -> T,
     ): Result<T> {
         val attribution = currentCoroutineContext()[MuxCallContext]
+        val sessionContext = contextId ?: attribution?.conversationId?.toString()
+        val breadcrumbs = currentCoroutineContext()[BreadcrumbElement]
+        val breadcrumbId = sessionContext?.takeIf { it.isNotBlank() && it.length <= 128 }
+        val admission = currentCoroutineContext()[BreadcrumbAdmission]?.takeIf { it.owner === breadcrumbs && it.id == breadcrumbId }
+        var breadcrumb: BreadcrumbContext? = admission?.context
         val callActivity = attribution?.activity ?: activity
         val provider = models.view.firstOrNull { it.a == modelId }?.b?.providerTag ?: modelId
-        val callId = callActivity.start(modelId, provider, attribution, assessmentId ?: contextId)
+        val callId = callActivity.start(modelId, provider, attribution, assessmentId ?: contextId, sessionContext)
         val startedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         var receipt: ModelResponseReceipt? = null
         var keyId: String? = null
@@ -320,7 +332,14 @@ class ModelMux internal constructor(
         try {
             currentCoroutineContext().ensureActive()
             Airgap.requireRemote()
-            val result = chatCall(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl, encode, decode) { r, k ->
+            if (breadcrumbs != null && breadcrumbId != null && admission == null) {
+                try {
+                    withContext(NonCancellable) { breadcrumb = breadcrumbs.transact(breadcrumbId) { it } }
+                }
+                catch (_: BreadcrumbCapacityException) { /* Observation cannot block an admitted model call. */ }
+            }
+            currentCoroutineContext().ensureActive()
+            val result = chatCall(modelId, assessmentId ?: contextId, sessionContext, breadcrumb, timeoutMs, expectedBaseUrl, encode, decode) { r, k ->
                 receipt = r
                 keyId = k
             }
@@ -352,6 +371,13 @@ class ModelMux internal constructor(
                 runCatching { attribution?.onReceipt?.invoke(completed) }
                 callActivity.finish(callId, receipt, keyId, failure)?.let { finished ->
                     runCatching { attribution?.onFinished?.invoke(finished) }
+                    if (breadcrumbs != null && breadcrumbId != null && breadcrumb != null) {
+                        try {
+                            breadcrumbs.transact(breadcrumbId, create = false) {
+                                if (it === breadcrumb) it.record(finished)
+                            }
+                        } catch (_: BreadcrumbContextNotFoundException) { /* Deleted while the provider was answering. */ }
+                    }
                 }
             }
         }
@@ -361,6 +387,7 @@ class ModelMux internal constructor(
         modelId: String,
         assessmentId: String?,
         contextId: String?,
+        breadcrumb: BreadcrumbContext?,
         timeoutMs: Long,
         expectedBaseUrl: String?,
         encode: (String) -> String,
@@ -410,13 +437,13 @@ class ModelMux internal constructor(
             // Every identity this mux is willing to answer from, exact first.
             // EXACT_ONLY (the default) makes this a one-element list and the
             // behaviour byte-identical to before strategies existed.
-            val cacheIds = cacheCascade.identities(json)
+            val cacheIds = cacheIdentities(session, json)
 
             if (reactor != null) {
                 // First hit wins, and exact is always tried first — the cheapest
                 // correct answer outranks the most permissive one.
                 var hit: CacheLookup.Hit? = null
-                for ((_, id) in cacheIds) {
+                for ((_, id) in cacheIds.view) {
                     val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000)
                     if (lookup is CacheLookup.Hit) { hit = lookup; break }
                 }
@@ -443,7 +470,7 @@ class ModelMux internal constructor(
             }
 
             val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/chat/completions"
+            val url = "${session.baseUrl.trimEnd('/')}/chat/completions"
             val htxHeaders = htxHeaders(*session.authHeaders().toArray())
             val htxReq = parseHtxRequest(
                 url = url,
@@ -452,6 +479,16 @@ class ModelMux internal constructor(
             ).copy(headers = htxHeaders, timeoutMs = timeoutMs)
 
             Airgap.requireRemote()
+            val breadcrumbs = currentCoroutineContext()[BreadcrumbElement]
+            if (breadcrumbs != null && contextId != null && breadcrumb != null) {
+                try {
+                    breadcrumbs.transact(contextId, create = false) {
+                        if (it === breadcrumb) {
+                            it.submit(BreadcrumbModelHost.submission(modelId, confixDoc(json), BreadcrumbTimestamp(it.clock())))
+                        }
+                    }
+                } catch (_: BreadcrumbContextNotFoundException) { /* This session was released after admission. */ }
+            }
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
             httpStatus = resp.status
@@ -477,15 +514,12 @@ class ModelMux internal constructor(
                         error = IllegalStateException("HTTP ${resp.status}"),
                     )
                 )
-                // 429 → rotate: the current credential is rate-limited; the next
-                // session() call must resolve a different key from the persist pool.
-                // rotate() cycles through PersistSource entries and invalidates
-                // the CachedKeySource so the fresh value is read, not the stale one.
+                // 429: the credential is rate-limited; the next session() resolves the pool's next key.
                 if (resp.status == 429 && keyId != null) {
-                    runCatching { keyMux.rotate(keyId) }
+                    runCatching { credentialMux(modelId).rotate(keyId) }
                         .onFailure { println("[MODELMUX] rotate($keyId) failed: ${it.message}") }
                 }
-                return Result.failure(IllegalStateException("ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
+                return Result.failure(ModelHttpFailure(resp.status, "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
             }
 
             val parsed = decode(respBody)
@@ -500,7 +534,7 @@ class ModelMux internal constructor(
                 // each relaxed bucket. A later request differing only in formatting
                 // then hits without a second purchase — which is the whole return on
                 // running a cascade at all.
-                for ((_, id) in cacheIds) {
+                for ((_, id) in cacheIds.view) {
                     reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000, payload = respBody)
                 }
             }
@@ -580,7 +614,7 @@ class ModelMux internal constructor(
 
             val json = AcpCodec.encodeRequest(req)
             val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/chat/completions"
+            val url = "${session.baseUrl.trimEnd('/')}/chat/completions"
             val htxHeaders = htxHeaders(*meta.b.b.toArray())
             val htxReq = parseHtxRequest(
                 url = url,
@@ -641,9 +675,9 @@ class ModelMux internal constructor(
             // Same cascade as chat(): embeddings of a re-wrapped paragraph are the
             // same embeddings, and paying twice for that was the same defect.
             val requestHash = cacheCascade.primary(json)
-            val cacheIds = cacheCascade.identities(json)
+            val cacheIds = cacheIdentities(session, json)
             if (reactor != null) {
-                for ((_, id) in cacheIds) {
+                for ((_, id) in cacheIds.view) {
                     val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000)
                     if (lookup is CacheLookup.Hit) {
                         return parseEmbeddings(lookup.entry.payload, texts)
@@ -652,7 +686,7 @@ class ModelMux internal constructor(
             }
 
             val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
-            val url = "${session.baseUrl}/embeddings"
+            val url = "${session.baseUrl.trimEnd('/')}/embeddings"
             val htxHeaders = htxHeaders(*meta.b.b.toArray())
             val htxReq = parseHtxRequest(
                 url = url,
@@ -672,7 +706,7 @@ class ModelMux internal constructor(
                     latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0
                 )
                 if (resp.status in 200..299) {
-                    for ((_, id) in cacheIds) {
+                    for ((_, id) in cacheIds.view) {
                         reactor.cacheApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000, payload = respBody)
                     }
                 }
@@ -697,6 +731,30 @@ class ModelMux internal constructor(
         models.view.firstOrNull { it.a == modelId }?.b?.let { resolveKeyId(it) }
 
     fun configuredBaseUrl(modelId: String): String? = configuredBaseUrls[modelId]
+
+    fun auth(modelId: String): LlmAuth = configuredAuth[modelId] ?: LlmAuth.REQUIRED
+
+    private fun credentialMux(modelId: String): KeyMux = configuredKeys[modelId] ?: keyMux
+
+    /** Cache scope includes the resolved destination; receipts continue to identify the exact request bytes. */
+    private fun cacheIdentities(session: LlmSession, json: String): Series<Twin<String>> {
+        val destination = session.baseUrl.trimEnd('/')
+        return cacheCascade.identities(json).toSeries() α { (strategy, id) ->
+            strategy j ContentId.of("$destination\u0000$id".encodeToByteArray()).value
+        }
+    }
+
+    /** Extend a catalog, isolating new credentials while preserving inherited bindings, quota and cache policy. */
+    fun withModels(keyMux: KeyMux = this.keyMux, block: ModelMuxBuilder.() -> Unit): ModelMux {
+        val added = ModelMuxBuilder(keyMux).apply(block).build()
+        require(added.models.view.none { entry -> models.view.any { it.a == entry.a } }) { "Duplicate model id" }
+        val combined: Series<ModelEntry> = (models.size + added.models.size) j { index ->
+            if (index < models.size) models[index] else added.models[index - models.size]
+        }
+        return ModelMux(combined j router, this.keyMux, configuredBaseUrls + added.configuredBaseUrls,
+            quotaLegion, cacheCascade, defaultModel, configuredAuth + added.configuredAuth,
+            configuredKeys + added.models.view.associate { it.a to keyMux }, activity)
+    }
 
     fun listModels(vararg cap: String): Series<AcpModelCard> {
         val cards = models.α { it.b }
@@ -803,7 +861,12 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
          * `openrouter/z-ai/glm-5.2` goes out on the wire and earns a 400.
          */
         wireModel: String? = null,
+        /** Credential-free hosts must have an explicit destination; default keys never reach them. */
+        auth: LlmAuth = LlmAuth.REQUIRED,
     ): ModelMuxBuilder = apply {
+        require(auth != LlmAuth.NONE || !baseUrl.isNullOrBlank()) {
+            "Credential-free models require an explicit baseUrl"
+        }
         val capSeries = caps.toSeries()
         val action = if ("chat" in caps) "chat" else if ("embed" in caps) "embed" else "complete"
         val tags = buildList {
@@ -818,17 +881,19 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         val meta: AcpMeta = version j (action j headers)
         val card: AcpModelCard = id j (capSeries j meta)
         models.add(id j card)
+        pendingAuth[id] = auth
         if (baseUrl != null) {
             pendingUrls[id] = baseUrl
         }
     }
 
     private val pendingUrls = mutableMapOf<String, String>()
+    private val pendingAuth = mutableMapOf<String, LlmAuth>()
 
     internal fun build(): ModelMux {
         require(defaultModel == null || models.any { it.a == defaultModel }) { "Default model is not in the catalog" }
         val core: ModelMuxCore = models.toSeries() j CapabilityRouter
-        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion, cascade, defaultModel)
+        return ModelMux(core, keyMux, pendingUrls.toMap(), quotaLegion, cascade, defaultModel, pendingAuth.toMap())
     }
 }
 

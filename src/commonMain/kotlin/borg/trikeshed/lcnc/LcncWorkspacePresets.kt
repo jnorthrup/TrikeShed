@@ -125,26 +125,26 @@ object LcncWorkspacePresets {
         LcncWire("receipt", "value", "sheet", "receiptCid?"),
         LcncWire("sheet", "sheet", "evidence", "board"),
         LcncWire("receipt", "value", "tasks", "receiptCid"),
-    ])
+    ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.7))
 
     /** A durable evidence input, not a second curator or a copy of the inference machinery. */
     fun simulation(receiptCid: String = "", assertions: List<Map<String, Any?>> = emptyList()): LcncProgram =
         LcncProgram(DOCUMENT_SIMULATION, s_[
             LcncNode("sheet", "document.sheet", mapOf("receiptCid" to receiptCid, "view" to "rules", "limit" to "32"), x = 20.0, y = 50.0),
             LcncNode("evidence", "sheet.concentric", x = 370.0, y = 50.0),
-            LcncNode("assumptions", "json.value", mapOf("value" to jsonOf(assertions)), x = 720.0, y = 50.0),
+            LcncNode("assumptions", "json.value", mapOf("value" to jsonOf(assertions), "columns" to "subject,obj"), x = 720.0, y = 50.0),
             LcncNode("simulation", "nars.reteFire", mapOf("discount" to "0.5"), x = 720.0, y = 420.0),
             LcncNode("firings", "display", x = 1080.0, y = 420.0),
             LcncNode("review", "note", mapOf("text" to "Receipt-pinned simulation. Run reads the retained record; it does not re-curate or call a model.\n" +
                 "Only the selected rules page enters Rete, not the whole document. Inspect sourceOrdinals, selectedRows, rowCount and next in the sheet result. Change offset/limit or axes/selections explicitly to choose another page.\n" +
-                "Assumptions are JSON objects with subject and obj (party identity), e.g. [{\"subject\":\"Delays\",\"obj\":\"reviewer\"}]. They are hypotheses, not observations or votes. An empty list fires nothing.\n" +
+                "Edit the assumptions rows: subject is the hypothesized state; obj is the party identity. JSON remains available for other fields. These are hypotheses, not observations or votes. An empty list fires nothing. Editing does not execute; press Run explicitly.\n" +
                 "Positive and negative support remain separate and dependent on the source. No live rule admission, clinical/legal decision, model call or actuation is wired. Save this construction to revisit the same evidence."), x = 20.0, y = 440.0),
         ], s_[
             LcncWire("sheet", "sheet", "evidence", "board"),
             LcncWire("sheet", "ruleCandidates", "simulation", "rules?"),
             LcncWire("assumptions", "value", "simulation", "assertions?"),
             LcncWire("simulation", "firings", "firings", "x"),
-        ])
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.65))
 
     /** Source-authored routing of existing evidence. Neither the guest nor Camel curates or admits a rule. */
     fun routing(language: VmLanguage, receiptCid: String = "", assertions: List<Map<String, Any?>> = emptyList(),
@@ -225,7 +225,7 @@ object LcncWorkspacePresets {
             LcncWire("author", "value", "route", "route?"),
             LcncWire("author", "value", "definition", "x"),
             LcncWire("route", "receipt", "receipt", "x"),
-        ])
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.45))
     }
 
     /** Explicit prompt assembly over the retained simulation, using the existing council service. */
@@ -283,7 +283,8 @@ object LcncWorkspacePresets {
             LcncWire(perspective.a, "record", "turns", "parts"),
             LcncWire(perspective.a, "labeled", "transcript", "parts"),
         ] }) + s_[LcncWire("turns", "turns", "records", "x"), LcncWire("transcript", "text", "proposals", "x")]
-        return base.copy(name = DOCUMENT_DELIBERATION, nodes = nodes, wires = wires)
+        return base.copy(name = DOCUMENT_DELIBERATION, nodes = nodes, wires = wires,
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.35))
     }
 
     fun proposalReview(runReceiptCid: String = "", nodeId: String = ""): LcncProgram = LcncProgram(DOCUMENT_PROPOSAL_REVIEW, s_[
@@ -296,7 +297,7 @@ object LcncWorkspacePresets {
             "The response remains an unverified model proposal, never a treatment, legal conclusion, admission or external action.\n" +
             "The operator question records intent, not authenticated identity or approval. Model text and the question are retained as data, never job directives."), x = 20.0, y = 400.0),
     ], s_[LcncWire("question", "value", "task", "question"), LcncWire("task", "task", "card", "x"),
-        LcncWire("task", "provenance", "evidence", "x")])
+        LcncWire("task", "provenance", "evidence", "x")], view = LcncView(x = 20.0, y = 20.0, zoom = 0.75))
 
     /** The authored graph carries the admitted correction's source and recipe through the one curator. */
     fun correction(taskId: String = "", expectedRevision: String = "", priorReceiptCid: String = "",
@@ -318,7 +319,7 @@ object LcncWorkspacePresets {
         LcncWire("curate", "sheet", "evidence", "board"),
         LcncWire("curate", "sheets", "evidence", "byStatus?"),
         LcncWire("curate", "receiptCid", "tasks", "receiptCid"),
-    ])
+    ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.6))
 
     /** One composition, authored in the chosen language; nothing is compiled, installed or run here. */
     fun polyglot(language: VmLanguage, name: String = POLYGLOT): LcncProgram {
@@ -344,7 +345,7 @@ object LcncWorkspacePresets {
             LcncWire("function", "value", "route", "messages?"),
             LcncWire("function", "value", "value", "x"),
             LcncWire("route", "routed", "reply", "x"),
-        ])
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.65))
     }
 
     /** The function authors endpoints and EIPs, not merely the message carried by a fixed route. */
@@ -412,7 +413,7 @@ object LcncWorkspacePresets {
             LcncWire("function", "value", "route", "route?"),
             LcncWire("function", "value", "definition", "x"),
             LcncWire("route", "receipt", "receipt", "x"),
-        ])
+        ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.65))
     }
 
     /** Native DSL example: local workflow evidence requests, not automated approval. */
@@ -452,7 +453,8 @@ object LcncWorkspacePresets {
             "OWN only: native compilation, processors and direct host I/O are not sandboxed or time-bounded. No statement, call-count or wall-clock limits.\n" +
             "Camel URI resolution checks the mounted module and reach, including dynamic destinations; a refusal cannot be masked by a route error handler.\n" +
             "Inspect source before Run. This synthetic local workflow requests/reviews evidence; a party header is not approval, treatment or a legal conclusion."), x = 20.0, y = 460.0),
-    ], s_[LcncWire("source", "value", "route", "messages?"), LcncWire("route", "receipt", "receipt", "x")])
+    ], s_[LcncWire("source", "value", "route", "messages?"), LcncWire("route", "receipt", "receipt", "x")],
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.8))
     }
 
     fun curation(name: String, file: String, text: String, subject: String = "", parties: List<String> = emptyList()): String = LcncProgramConfix.toJson(LcncProgram(name, s_[
@@ -463,7 +465,7 @@ object LcncWorkspacePresets {
         LcncNode("candidates", "display", x = 680.0, y = 500.0),
         LcncNode("assumptions", "json.value", mapOf("value" to jsonOf(parties.map { party ->
             mapOf("subject" to subject, "obj" to party, "party" to party, "hypothetical" to true)
-        })), x = 1020.0, y = 50.0),
+        }), "columns" to "subject,obj"), x = 1020.0, y = 50.0),
         LcncNode("simulation", "nars.reteFire", mapOf("discount" to "0.5"), x = 1020.0, y = 390.0),
         LcncNode("firings", "display", x = 1360.0, y = 390.0),
         LcncNode("review", "note", mapOf("text" to "Synthetic multi-party record. Review quotations, token spans and dependencies in the evidence sheet.\n" +
@@ -480,5 +482,5 @@ object LcncWorkspacePresets {
         LcncWire("curate", "ruleCandidates", "simulation", "rules?"),
         LcncWire("assumptions", "value", "simulation", "assertions?"),
         LcncWire("simulation", "firings", "firings", "x"),
-    ]))
+    ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.55)))
 }

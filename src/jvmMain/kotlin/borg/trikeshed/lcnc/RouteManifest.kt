@@ -100,6 +100,7 @@ object RouteManifest {
             RouteEntry("GET", "/api/archives/content", "one restored entry's bytes, CID-verified, by cid and entry"),
             RouteEntry("GET", "/api/lcnc/kanban", "active LCNC sheets"),
             RouteEntry("GET", "/api/lcnc/concentric", "modules + rings + wizard roster"),
+            RouteEntry("GET", "/api/lcnc/workgroups", "live declared program workgroups, frozen program identities and registration refusals"),
             RouteEntry("POST", "/api/lcnc/kanban/move", "move a card to a new column"),
             RouteEntry("GET", "/api/lcnc/contracts", "late-bound LCNC vocabulary: contracts + composites, kind hierarchy, bindings"),
             RouteEntry("GET", "/api/lcnc/workspace", "workspace facets, bound runners and installed language capabilities"),

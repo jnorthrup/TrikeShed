@@ -13,6 +13,7 @@ import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
+import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.job.CasStore
@@ -21,8 +22,9 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.userspace.nio.file.spi.FileOperations
+import borg.trikeshed.userspace.nio.file.spi.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,6 +76,7 @@ class ProjectScopes(
         val minted: Int,
         /** Docs in the project's own database (0 for the pre-db prefix scopes). */
         val docs: Int = 0,
+        val decisionProvider: DecisionProvider? = null,
     )
 
     @Volatile
@@ -82,13 +85,31 @@ class ProjectScopes(
 
     fun list(): List<Scope> = scopes
 
+    private val documentProviders = java.util.concurrent.ConcurrentHashMap<Pair<String, String>, DecisionProvider>()
+    fun decisionProvider(project: String, id: String): DecisionProvider? = documentProviders[project to id]
+        ?: scopes.firstOrNull { it.name == project }?.decisionProvider
+
+    /** An explicit document request persists independently of later project selections. */
+    fun admitDocument(project: String, id: String, provider: DecisionProvider? = decisionProvider(project, id)) {
+        require(!borg.trikeshed.lcnc.ProjectNodes.twin(id) && !id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX) &&
+            id.substringAfterLast('.', "").lowercase() in ProjectMiner.MINEABLE) { "Document format is not supported for curation: $id" }
+        val pdb = requireNotNull(projectDbs?.get(project)) { "no project db '$project'" }
+        val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
+        val intake = requireNotNull(onDocument) { "Document curation intake is not available" }
+        if (provider != null) {
+            manifestFileFor(project)?.appendText("$id\t${ref.contentId.value}\t${ref.length}\t${provider.id}\n")
+            documentProviders[project to id] = provider
+        }
+        intake.invoke(project, id, provider)
+    }
+
     /** The primary repo registers as scope zero (already absorbed by the daemon's own choreography). */
     fun registerPrimary(repoDir: File, paths: Int) {
         val s = Scope(repoDir.name.lowercase(), repoDir.absolutePath, "git", WorktreeCouchGateway.WORKTREE_PREFIX, paths, 0)
         scopes = listOf(s) + scopes.filter { it.name != s.name }
     }
 
-    suspend fun mount(rawPath: String): Scope = mutex.withLock {
+    suspend fun mount(rawPath: String, decisionProvider: DecisionProvider? = null): Scope = mutex.withLock {
         val dir = File(rawPath.removePrefix("file://")).canonicalFile
         require(dir.isDirectory) { "not a directory: $rawPath" }
         // Sanitize, don't refuse: "My PDFs" mounts as "my-pdfs" — boom, not a regex lecture.
@@ -129,13 +150,19 @@ class ProjectScopes(
             via = scopeGateway,
             docId = { if (registry != null) it.removePrefix(prefix) else it },
         )
-        ledgerAppend(name, kind, sourceDir.absolutePath)
+        ledgerAppend(name, kind, sourceDir.absolutePath, decisionProvider)
 
         val scope = Scope(
             name, sourceDir.absolutePath, kind, prefix, snap.paths.size, 0,
             docs = projectDbs?.get(name)?.docCount ?: 0,
+            decisionProvider = decisionProvider,
         )
         scopes = scopes + scope
+        manifestFileFor(name)?.takeIf { it.isFile }?.forEachLine { line ->
+            val parts = line.split('\t')
+            parts.getOrNull(3)?.takeIf { it.isNotBlank() }?.let { documentProviders[name to parts[0]] = DecisionProvider.of(it) }
+        }
+        onDocument?.let { hook -> for (i in 0 until snap.paths.size) hook(name, snap.paths[i], this.decisionProvider(name, snap.paths[i])) }
         scope
     }
 
@@ -143,10 +170,10 @@ class ProjectScopes(
      * Browser-drop lane: modern Chrome never reveals a dropped folder's host
      * path (no file:// uri-list), so the client WALKS the hierarchy and uploads
      * the bytes. An uploaded project db persists via a per-db manifest
-     * (relpath TAB cid TAB length) beside the ledger — blobs are already CAS
+     * (relpath TAB cid TAB length TAB decisionProvider?) beside the ledger — blobs are already CAS
      * citizens, so boot rebuilds the db from the manifest alone.
      */
-    suspend fun beginUpload(rawName: String, kind: String = "assets"): Scope = mutex.withLock {
+    suspend fun beginUpload(rawName: String, kind: String = "assets", decisionProvider: DecisionProvider? = null): Scope = mutex.withLock {
         val registry = projectDbs ?: throw IllegalStateException("project dbs not wired")
         val name = rawName.lowercase().replace(Regex("[^a-z0-9._-]+"), "-").trim('-', '.')
         require(name.isNotBlank()) { "name '$rawName' sanitizes to nothing" }
@@ -163,17 +190,18 @@ class ProjectScopes(
                 borg.trikeshed.couch.CouchWireRouter(db, attachmentPrefix = "")),
         )
         manifestFileFor(name)?.parentFile?.mkdirs()
-        ledgerAppend(name, k, "@upload")
-        val scope = Scope(name, "@upload", k, "$name/", 0, 0, docs = 0)
+        ledgerAppend(name, k, "@upload", decisionProvider)
+        val scope = Scope(name, "@upload", k, "$name/", 0, 0, docs = 0, decisionProvider = decisionProvider)
         scopes = scopes + scope
         scope
     }
 
     /** Told of every document an upload lands (never its twins): the intake that reads and curates it. */
-    @Volatile var onDocument: ((project: String, id: String) -> Unit)? = null
+    @Volatile var onDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
 
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
-    fun uploadPut(name: String, relPath: String, bytes: ByteArray): borg.trikeshed.job.ContentId {
+    fun uploadPut(name: String, relPath: String, bytes: ByteArray,
+                  decisionProvider: DecisionProvider? = decisionProvider(name, relPath.trim('/'))): borg.trikeshed.job.ContentId {
         val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
         val rel = relPath.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$relPath'" }
@@ -201,11 +229,13 @@ class ProjectScopes(
             source = landed,
         )
         manifestFileFor(name)?.let { mf ->
-            runCatching { mf.appendText("$rel\t${cid.value}\t${bytes.size}\n") }
+            mf.parentFile?.mkdirs()
+            mf.appendText("$rel\t${cid.value}\t${bytes.size}" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
         }
+        decisionProvider?.let { documentProviders[name to rel] = it }
         scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
         if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
-            onDocument?.invoke(name, rel)
+            onDocument?.invoke(name, rel, decisionProvider)
         return cid
     }
 
@@ -225,6 +255,7 @@ class ProjectScopes(
         fun taken(id: String) = id == rel || id.startsWith("$rel/") || borg.trikeshed.lcnc.ProjectNodes.twinOf(id) == rel
         val ids = pdb.store.ids().let { s -> (0 until s.a).map { s.b(it) } }.filter { taken(it) && !pdb.store.head.isDeleted(it) }
         for (id in ids) pdb.store.delete(id)
+        documentProviders.keys.removeIf { it.first == name && taken(it.second) }
         manifestFileFor(name)?.takeIf { it.isFile }?.let { mf ->
             mf.writeText(mf.readLines().filter { it.isNotBlank() && !taken(it.substringBefore('\t')) }.joinToString("") { it + "\n" })
         }
@@ -232,8 +263,8 @@ class ProjectScopes(
             val dir = File(fr, name)
             for (id in ids) File(dir, id).delete()
             File(dir, rel).takeIf { it.isDirectory }?.deleteRecursively()
-            for (id in ids) File(fr, ".ocr/$name/${id.replace('/', '_')}").takeIf { it.isDirectory }?.deleteRecursively()
         }
+        for (id in ids) ProjectMiner.ocrDir(name, id).takeIf { it.isDirectory }?.deleteRecursively()
         scopes = scopes.map { if (it.name == name) it.copy(paths = maxOf(0, it.paths - ids.size), docs = pdb.docCount) else it }
         for (id in ids) if (!borg.trikeshed.lcnc.ProjectNodes.twin(id)) onRemoved?.invoke(name, id)
         System.err.println("[OROBOROS] project db $name: removed ${ids.size} docs under $rel")
@@ -305,16 +336,17 @@ class ProjectScopes(
      * SKIPPED, never allowed to abort the replay — one bad line once zeroed a
      * whole db's remount (whisper.cpp, 2026-08-25).
      */
-    private suspend fun remountUpload(name: String, kind: String = "assets"): Boolean {
+    private suspend fun remountUpload(name: String, kind: String = "assets", decisionProvider: DecisionProvider? = null): Boolean {
         val mf = manifestFileFor(name) ?: return false
         if (!mf.exists()) return false
-        val scope = beginUploadInternal(name, kind) ?: return false
+        val scope = beginUploadInternal(name, kind, decisionProvider) ?: return false
         var docs = 0
         var skipped = 0
         for (line in mf.readLines()) {
             runCatching {
                 val parts = line.split('\t')
                 if (parts.size < 2) return@runCatching
+                parts.getOrNull(3)?.takeIf { it.isNotBlank() }?.let { documentProviders[name to parts[0]] = DecisionProvider.of(it) }
                 val pdb = projectDbs?.get(name) ?: return@runCatching
                 // Durable heads already hold it at this content: no second revision per boot.
                 if (pdb.store.get(parts[0])?.fields?.any { it.name == "contentId" && it.value == parts[1] } == true) { docs++; return@runCatching }
@@ -343,13 +375,13 @@ class ProjectScopes(
         scopes = scopes.map { if (it.name == name) it.copy(paths = docs, docs = projectDbs?.get(name)?.docCount ?: docs) else it }
         // A remounted document is offered again: the intake passes what it already curated and reads the rest.
         onDocument?.let { hook -> for (line in mf.readLines()) line.substringBefore('\t').takeIf { it.isNotEmpty() }?.let { rel ->
-            if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) hook(name, rel)
+            if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) hook(name, rel, this.decisionProvider(name, rel))
         } }
         return true
     }
 
     /** beginUpload minus the ledger write (replay path). Null when already mounted/refused. */
-    private fun beginUploadInternal(name: String, kind: String = "assets"): Scope? {
+    private fun beginUploadInternal(name: String, kind: String = "assets", decisionProvider: DecisionProvider? = null): Scope? {
         val registry = projectDbs ?: return null
         if (scopes.any { it.name == name } || registry.refusalFor(name) != null) return null
         val store = projectStore(name)
@@ -359,7 +391,7 @@ class ProjectScopes(
             ProjectDb(name, "@upload", kind, db, store, gateway,
                 borg.trikeshed.couch.CouchWireRouter(db, attachmentPrefix = "")),
         )
-        val scope = Scope(name, "@upload", kind, "$name/", 0, 0)
+        val scope = Scope(name, "@upload", kind, "$name/", 0, 0, decisionProvider = decisionProvider)
         scopes = scopes + scope
         return scope
     }
@@ -370,6 +402,7 @@ class ProjectScopes(
         if (!had) return false
         projectDbs?.remove(name)
         scopes = scopes.filter { it.name != name }
+        documentProviders.keys.removeIf { it.first == name }
         ledgerFile?.takeIf { it.exists() }?.let { f ->
             runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
         }
@@ -387,14 +420,14 @@ class ProjectScopes(
         for ((name, store) in commits.entries.toList()) if (commits.remove(name, store)) store.close()
     }
 
-    /** Append to the mount ledger (name TAB kind TAB path), deduped by name. */
-    private fun ledgerAppend(name: String, kind: String, path: String) {
+    /** Append to the mount ledger (name TAB kind TAB path TAB decisionProvider?), deduped by name. */
+    private fun ledgerAppend(name: String, kind: String, path: String, decisionProvider: DecisionProvider? = null) {
         val f = ledgerFile ?: return
         runCatching {
             f.parentFile?.mkdirs()
             val existing = if (f.exists()) f.readLines() else emptyList()
             if (existing.none { it.substringBefore('\t') == name }) {
-                f.appendText("$name\t$kind\t$path\n")
+                f.appendText("$name\t$kind\t$path" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
             }
         }
     }
@@ -408,14 +441,15 @@ class ProjectScopes(
             val parts = line.split('\t')
             if (parts.size < 3) continue
             val (name, kind, path) = parts
+            val decisionProvider = parts.getOrNull(3)?.takeIf { it.isNotBlank() }?.let { DecisionProvider.of(it) }
             if (scopes.any { it.name == name }) continue
             // uploads are path-@upload (older ledgers: kind "upload"): rebuild from manifest+CAS
             if (path == "@upload" || kind == "upload") {
-                if (runCatching { remountUpload(name, if (kind == "upload") "assets" else kind) }.getOrDefault(false)) ok++
+                if (runCatching { remountUpload(name, if (kind == "upload") "assets" else kind, decisionProvider) }.getOrDefault(false)) ok++
                 continue
             }
             if (!File(path).isDirectory) continue
-            runCatching { mount(path) }.onSuccess { ok++ }
+            runCatching { mount(path, decisionProvider) }.onSuccess { ok++ }
                 .onFailure { System.err.println("[OROBOROS] project db remount failed for $name: ${it.message}") }
         }
         return ok
@@ -466,7 +500,14 @@ class PatchWire(
      */
     private val programs: borg.trikeshed.lcnc.ProgramLedger? = null,
 ) {
-    private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext, catalogProvider, sessionSnapshot)
+    private suspend fun modelCatalog() = hostedCatalog(catalogProvider?.invoke() ?: brain.modelMux())
+    private val breadcrumbContexts = muxContext[modelmux.BreadcrumbElement] ?: modelmux.BreadcrumbElement(
+        store = sessionSnapshot?.let { snapshot ->
+            modelmux.BreadcrumbFileStore(JvmFileOperations(),
+                File(snapshot.absoluteFile.parentFile, "breadcrumbs").path)
+        },
+    )
+    private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext + breadcrumbContexts, ::modelCatalog, sessionSnapshot)
 
     suspend fun route(
         method: String,
@@ -475,6 +516,21 @@ class PatchWire(
         respond: (suspend (ByteArray) -> Unit)?,
     ): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
+        if (p == "/v1/models" || p == "/v1/chat/completions" || p.startsWith("/v1/breadcrumbs")) {
+            val httpMethod = borg.trikeshed.htx.HtxMethod.entries.firstOrNull { it.name == method }
+                ?: return json(mapOf("error" to "method_not_allowed"), 405)
+            val body = if (text.startsWith("$method ")) text.substringAfter("\r\n\r\n", text.substringAfter("\n\n", "")) else text
+            val response = withContext(muxContext.minusKey(kotlinx.coroutines.Job) + kotlinx.coroutines.currentCoroutineContext()) {
+                val mux = modelCatalog()
+                modelmux.BreadcrumbModelHost(mux, breadcrumbContexts).handle(borg.trikeshed.htx.parseHtxRequest(
+                    "http://localhost$path", method = httpMethod,
+                    body = borg.trikeshed.lib.ByteSeries(body.encodeToByteArray()),
+                ))
+            }
+            if (response != null) return JvmKanbanServer.HttpResponse(
+                response.status, response.body.toArray().decodeToString(), "application/json; charset=utf-8",
+            )
+        }
         muxSessions.route(method, path, text)?.let { return it }
         return when {
             method == "GET" && p == "/api/mux/models" -> json(
@@ -522,16 +578,27 @@ class PatchWire(
                 val req = parse(text)
                 val name = req["name"]?.toString()?.lowercase()?.trim().orEmpty()
                 if (!name.matches(Regex("^[a-z0-9][a-z0-9._-]*$"))) return json(mapOf("error" to "bad name"), 400)
+                val auth = req["auth"]?.toString() ?: "required"
+                if (auth !in setOf("none", "required")) return json(mapOf("error" to "auth must be none or required"), 400)
+                val base = req["base"]?.toString()?.trim()?.trimEnd('/').orEmpty()
+                val endpointModel = req["model"]?.toString()?.trim().orEmpty()
+                val envVar = req["envVar"]?.toString()?.trim().orEmpty()
+                if ((!base.startsWith("http://") && !base.startsWith("https://")) || endpointModel.isBlank())
+                    return json(mapOf("error" to "base URL and model are required"), 400)
+                if (auth == "required" && !envVar.matches(Regex("[A-Za-z_][A-Za-z0-9_]*")))
+                    return json(mapOf("error" to "authenticated endpoints require an envVar"), 400)
                 val entry = mapOf(
                     "name" to name,
-                    "base" to (req["base"]?.toString() ?: ""),
-                    "model" to (req["model"]?.toString() ?: ""),
-                    "envVar" to (req["envVar"]?.toString() ?: ""),
+                    "base" to base,
+                    "model" to endpointModel,
+                    "envVar" to envVar,
+                    "auth" to auth,
                     "flags" to ((req["flags"] as? Map<*, *>)?.entries?.associate { it.key.toString() to (it.value == true) } ?: emptyMap()),
                 )
                 val next = loadEndpointRegistry(att).filter { it["name"] != name } + listOf(entry)
                 saveEndpointRegistry(att, next)
-                json(mapOf("verdict" to "ok", "count" to next.size))
+                val hosted = auth == "none" && (entry["flags"] as? Map<*, *>)?.get("enabled") != false
+                json(mapOf("verdict" to "ok", "count" to next.size, "hosted" to hosted))
             }
             method == "DELETE" && p.startsWith("/api/mux/endpoints/") -> {
                 val att = attachments ?: return json(mapOf("error" to "store not wired"), 503)
@@ -548,8 +615,11 @@ class PatchWire(
                 val req = parse(text)
                 val prompt = req["prompt"]?.toString() ?: return json(mapOf("error" to "prompt required"), 400)
                 val system = req["system"]?.toString()
-                val maxTokens = (req["maxTokens"] as? Number)?.toInt() ?: 512
-                val temperature = (req["temperature"] as? Number)?.toDouble() ?: 0.2
+                val options = try {
+                    borg.trikeshed.modelmux.BrainChatOptions.parse(req)
+                } catch (invalid: IllegalArgumentException) {
+                    return json(mapOf("error" to "invalid_chat_options", "detail" to invalid.message), 400)
+                }
                 // Plan step 5: the caller may carry a conversation identity.
                 // With one, the wire sends cid + delta — the prompt rides the
                 // rolling frame chain instead of a stateless rebuilt
@@ -568,27 +638,36 @@ class PatchWire(
                     }
                 }
                 val result = runCatching {
-                    withContext(muxContext) { brain.chat(messages, maxTokens, temperature, contextId) }
+                    withContext(muxContext.minusKey(kotlinx.coroutines.Job) + kotlinx.coroutines.currentCoroutineContext()) {
+                        brain.chat(options, messages, contextId)
+                    }
                 }
                 result.fold(
                     onSuccess = {
                         val resp = mutableMapOf<String, Any?>(
                             "verdict" to "ok",
-                            "model" to brain.lastModel(),
-                            "content" to it,
+                            "model" to it.second,
+                            "content" to it.first,
                         )
                         if (contextId != null) {
                             // the child cid the NEXT call appends to:
                             // cid_child = H(cid_parent ++ answer)
                             val child = Frame.append(
                                 Frame(cid = ContentId(contextId), parent = null, turn = ByteArray(0)),
-                                it.encodeToByteArray(),
+                                it.first.encodeToByteArray(),
                             )
                             resp["contextId"] = child.cid.value
                         }
                         json(resp)
                     },
-                    onFailure = { json(mapOf("verdict" to "mux-error", "detail" to (it.message ?: it.toString())), 502) },
+                    onFailure = {
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        if (it is IllegalArgumentException) {
+                            json(mapOf("error" to "invalid_chat_options", "detail" to it.message), 400)
+                        } else {
+                            json(mapOf("verdict" to "mux-error", "detail" to (it.message ?: it.toString())), 502)
+                        }
+                    },
                 )
             }
 
@@ -682,7 +761,7 @@ class PatchWire(
                 mapOf(
                     "scopes" to scopes.list().map {
                         mapOf("name" to it.name, "path" to it.path, "kind" to it.kind, "prefix" to it.prefix,
-                            "paths" to it.paths, "minted" to it.minted, "docs" to it.docs)
+                            "paths" to it.paths, "minted" to it.minted, "docs" to it.docs, "decisionProvider" to it.decisionProvider?.id)
                     },
                 ),
             )
@@ -920,6 +999,12 @@ class PatchWire(
                 val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
                 val rest = p.removePrefix("/api/projects/")
                 val name = rest.substringBefore('/'); val id = java.net.URLDecoder.decode(rest.substringAfter("ingest/"), "UTF-8")
+                val provider = runCatching { parse(text)["decisionProvider"]?.let { DecisionProvider.of(it.toString()) }
+                    ?: scopes.decisionProvider(name, id) }.getOrElse { return json(mapOf("error" to it.message), 400) }
+                if (provider != null) return runCatching { scopes.admitDocument(name, id, provider) }.fold(
+                    { json(mapOf("verdict" to "queued", "project" to name, "id" to id, "decisionProvider" to provider.id), 202) },
+                    { json(mapOf("error" to it.message), 400) },
+                )
                 val bg = mountScope
                 if (bg == null) runCatching { m.ingest(name, id) }.fold({ json(it) }, { json(mapOf("error" to (it.message ?: "")), 400) })
                 else {
@@ -962,15 +1047,18 @@ class PatchWire(
             method == "POST" && p == "/api/projects" -> {
                 val req = parse(text)
                 val mountPath = req["path"]?.toString() ?: return json(mapOf("error" to "path required"), 400)
+                val provider = runCatching { req["decisionProvider"]?.let { DecisionProvider.of(it.toString()) } }
+                    .getOrElse { return json(mapOf("error" to it.message), 400) }
                 val dir = java.io.File(mountPath.removePrefix("file://"))
                 if (!dir.isDirectory) return json(mapOf("verdict" to "refused", "detail" to "not a directory: $mountPath"), 400)
                 val bg = mountScope
                 if (bg == null) {
                     // inline (test) path
-                    runCatching { scopes.mount(mountPath) }.fold(
+                    runCatching { scopes.mount(mountPath, provider) }.fold(
                         onSuccess = {
                             json(mapOf("verdict" to "ok", "name" to it.name, "kind" to it.kind,
-                                "prefix" to it.prefix, "paths" to it.paths, "minted" to it.minted, "docs" to it.docs))
+                                "prefix" to it.prefix, "paths" to it.paths, "minted" to it.minted, "docs" to it.docs,
+                                "decisionProvider" to it.decisionProvider?.id))
                         },
                         onFailure = { json(mapOf("verdict" to "refused", "detail" to (it.message ?: "")), 400) },
                     )
@@ -978,12 +1066,12 @@ class PatchWire(
                     // detached: 202 now, poll GET /api/projects (or the graal map's dbs) for landing
                     System.err.println("[OROBOROS] project db mount begun (detached): $mountPath")
                     bg.launch {
-                        runCatching { scopes.mount(mountPath) }.fold(
+                        runCatching { scopes.mount(mountPath, provider) }.fold(
                             onSuccess = { System.err.println("[OROBOROS] project db mounted: ${it.kind} ${it.name} (${it.paths} paths, ${it.docs} docs)") },
                             onFailure = { System.err.println("[OROBOROS] project db mount REFUSED for $mountPath: ${it.message}") },
                         )
                     }
-                    json(mapOf("verdict" to "mounting", "path" to mountPath), 202)
+                    json(mapOf("verdict" to "mounting", "path" to mountPath, "decisionProvider" to provider?.id), 202)
                 }
             }
 
@@ -998,6 +1086,25 @@ class PatchWire(
                 (reify(bytes) as? List<*>)?.mapNotNull { it as? Map<String, Any?> }
             }.getOrNull()
         } ?: emptyList()
+
+    /** Dynamic registry hosts are credential-free; authenticated destinations come from the operator catalog. */
+    private fun hostedCatalog(base: modelmux.ModelMux): modelmux.ModelMux {
+        val entries = attachments?.let(::loadEndpointRegistry).orEmpty().filter {
+            it["auth"] == "none" && (it["flags"] as? Map<*, *>)?.get("enabled") != false
+        }
+        if (entries.isEmpty()) return base
+        return base.withModels(keymux.KeyMux {}) {
+            for (entry in entries) {
+                val name = entry["name"] as? String ?: continue
+                val id = entry["model"] as? String ?: continue
+                val url = entry["base"] as? String ?: continue
+                if (name.isBlank() || id.isBlank() || url.isBlank()) continue
+                borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(url)
+                model("host/$name/$id", setOf("chat", "tools"), baseUrl = url,
+                    provider = "host:$name", wireModel = id, auth = keymux.LlmAuth.NONE)
+            }
+        }
+    }
 
     private fun saveEndpointRegistry(att: CouchAttachmentGateway, entries: List<Map<String, Any?>>) {
         val bytes = jsonOf(entries).encodeToByteArray()

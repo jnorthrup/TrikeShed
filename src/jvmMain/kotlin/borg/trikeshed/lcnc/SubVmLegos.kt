@@ -51,6 +51,7 @@ object SubVmLegos {
         ctx.lcncRunners[CAMEL] = camel(host)
         ctx.lcncRunners[GRAALCE] = graalce(host)
         ctx.lcncRunners[POLYGLOT] = polyglot(host)
+        ctx.lcncRunners["js"] = VmRuntimeNodes.expression(ctx.lcncRunners.getValue(POLYGLOT))
         ctx.lcncRunners[CORENLP_EXTRACT] = corenlpExtract(host)
         ctx.lcncRunners[MODULES] = modules()
         ctx.lcncRunners[CAMEL_CATALOG] = camelCatalog()

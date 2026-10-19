@@ -16,6 +16,38 @@ import kotlin.coroutines.coroutineContext
 
 class ModelMuxTest {
 
+    @Test fun cacheSeparatesResolvedDestinationsAndNormalizesTrailingSlash() = runTest {
+        val destination = TestKeySource(value = "https://first.invalid/v1")
+        val mux = ModelMux(KeyMux {
+            bind("llm.fixture.key", TestKeySource())
+            bind("llm.fixture.base_url", destination)
+        }) { model("fixture", setOf("chat"), provider = "fixture") }
+        var calls = 0
+        val htx = openHtxElement(routeService = FakeHtxRouteService { request ->
+            calls++
+            HtxResponse(200, ByteSeries(
+                """{"choices":[{"message":{"content":"${request.target.host}"}}]}""".encodeToByteArray()))
+        })
+        val reactor = MuxReactorElement()
+        try {
+            withContext(htx + reactor) {
+                suspend fun chat() = mux.chat("fixture", s_["user" j "same request"]).getOrThrow().a
+                assertEquals("first.invalid", chat())
+                val requestHash = mux.lastReceipt!!.requestHash
+                assertEquals("first.invalid", chat())
+                assertEquals(true, mux.lastReceipt?.cachedHit)
+                destination.value = "https://second.invalid/v1"
+                assertEquals("second.invalid", chat())
+                assertEquals(false, mux.lastReceipt?.cachedHit)
+                assertEquals(requestHash, mux.lastReceipt?.requestHash, "Receipt identity stays the request's exact bytes")
+                destination.value = "https://second.invalid/v1/"
+                assertEquals("second.invalid", chat())
+                assertEquals(true, mux.lastReceipt?.cachedHit)
+            }
+            assertEquals(2, calls)
+        } finally { try { reactor.close() } finally { htx.close() } }
+    }
+
     @Test fun chatOptionsReachTransportOnlyWhenSelectedAndHaveDistinctCacheIdentities() = runTest {
         val bodies = SeriesBuffer<String>()
         val htx = openHtxElement(routeService = FakeHtxRouteService { request ->
@@ -208,6 +240,6 @@ class ModelMuxTest {
         assertTrue(result.isFailure)
         val exception = result.exceptionOrNull()
         assertTrue(exception is NoSuchElementException)
-        assertEquals("Model not found: non-existent-model", exception.message)
+        assertEquals("need(model): model not found: non-existent-model", exception.message)
     }
 }

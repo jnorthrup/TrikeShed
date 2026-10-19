@@ -23,7 +23,8 @@ class SpatialHashGrid(
 
     private fun hashPoint(point: Series<Double>): Series<Int> {
         require(point.size == dimensions)
-        return point α { coordinate -> floor(coordinate / cellSize).toInt() }
+        val extent = cellSize
+        return point α { coordinate -> floor(coordinate / extent).toInt() }
     }
 
     private fun cellKey(cell: Series<Int>): Long {

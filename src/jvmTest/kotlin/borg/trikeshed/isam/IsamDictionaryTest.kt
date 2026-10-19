@@ -124,4 +124,30 @@ class IsamDictionaryTest {
         assertFails { codec.decoder()(frame, ByteArray(original.size + 1)) }
         assertFails { codec.decoder()(frame.copyOf(frame.size - 1), decoded) }
     }
+
+    @Test fun portableAndNativeCodecsInteroperateForRawAndTrainedDictionaries() {
+        val samples = Array(128) { i -> "${terms[i % 2]} case=$i; party=${i % 7}; provenance=source-${i % 11}".encodeToByteArray() }
+        val trained = ByteArray(1024)
+        val length = Zstd.trainFromBuffer(samples, trained)
+        check(!Zstd.isError(length)) { Zstd.getErrorName(length) }
+        for (bytes in listOf(samples[17], trained.copyOf(length.toInt()))) {
+            val portable = DictionaryLeafCodec(bytes)
+            val native = ZstdDictionaryCodec(bytes)
+            assertEquals(native.dictionary, portable.dictionary)
+            val encode = portable.encoder()
+            val decode = portable.decoder()
+            for (source in listOf(byteArrayOf(), byteArrayOf(1), samples[17], samples[33],
+                ByteArray(3 * ZSTD_BLOCK_MAX + 19) { samples[17][it % samples[17].size] })) {
+                val nativeFrame = native.encoder()(source, source.size)
+                val portableFrame = encode(source, source.size)
+                val restored = ByteArray(source.size)
+                decode(nativeFrame, restored)
+                assertContentEquals(source, restored)
+                native.decoder()(portableFrame, restored)
+                assertContentEquals(source, restored)
+                decode(portableFrame, restored)
+                assertContentEquals(source, restored)
+            }
+        }
+    }
 }

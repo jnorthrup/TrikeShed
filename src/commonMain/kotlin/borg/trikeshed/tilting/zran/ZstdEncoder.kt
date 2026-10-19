@@ -2,10 +2,11 @@ package borg.trikeshed.tilting.zran
 
 /**
  * RFC 8878 frame encoder: hash-chain LZ77 with lazy matching and repeat offsets, Huffman
- * literals, FSE sequences. Matches stay inside their block, so every block is self-contained.
+ * literals, FSE sequences. Matches stay inside their block, except for optional dictionary
+ * history preceding the first block. Subsequent blocks do not need dictionary history.
  * Reusable: one instance keeps its match tables and entropy scratch.
  */
-class ZstdEncoder(val depth: Int = 16) {
+class ZstdEncoder(val depth: Int = 16, val dictionary: ZstdDictionary? = null) {
     var head = IntArray(0)
     var chain = IntArray(0)
     var hashLog = 0
@@ -31,6 +32,7 @@ class ZstdEncoder(val depth: Int = 16) {
 
     /** One frame holding src[off, off + len); Single_Segment when it fits one block. */
     fun compress(src: ByteArray, off: Int = 0, len: Int = src.size - off, checksum: Boolean = true): ByteArray {
+        require(off >= 0 && len >= 0 && off <= src.size - len) { "zstd: invalid input slice" }
         var dst = ByteArray(len + (len ushr 7) + 64)
         var p = 0
         dst.put32(p, ZSTD_MAGIC); p += 4
@@ -40,21 +42,33 @@ class ZstdEncoder(val depth: Int = 16) {
             len < 65536 + 256 -> 1
             else -> 2
         }
-        dst[p++] = ((fcsFlag shl 6) or ((if (single) 1 else 0) shl 5) or ((if (checksum) 1 else 0) shl 2)).toByte()
+        val dictionaryId = dictionary?.id ?: 0L
+        dst[p++] = ((fcsFlag shl 6) or ((if (single) 1 else 0) shl 5) or
+            ((if (checksum) 1 else 0) shl 2) or if (dictionaryId != 0L) 3 else 0).toByte()
         if (!single) dst[p++] = (7 shl 3).toByte() // window 128 KiB
+        if (dictionaryId != 0L) { dst.put32(p, dictionaryId.toInt()); p += 4 }
         when (fcsFlag) {
             0 -> dst[p++] = len.toByte()
             1 -> { dst.put16(p, len - 256); p += 2 }
             else -> { dst.put32(p, len); p += 4 }
         }
         rep[0] = 1; rep[1] = 4; rep[2] = 8
+        dictionary?.repeats?.copyInto(rep)
         var at = off
         val end = off + len
         do {
             val n = minOf(ZSTD_BLOCK_MAX, end - at)
             val last = at + n == end
             if (dst.size < p + n + 8 + 2 * 3) dst = dst.copyOf(maxOf(dst.size * 2, p + n + 64))
-            p = block(src, at, n, last, dst, p)
+            val history = dictionary?.content?.takeIf { at == off && n >= 32 }
+            if (history != null) {
+                // Bound match-finder scratch to two blocks, independently of the supplied dictionary size.
+                val prefix = minOf(history.size, ZSTD_BLOCK_MAX)
+                val input = ByteArray(prefix + n)
+                history.copyInto(input, 0, history.size - prefix)
+                src.copyInto(input, prefix, at, at + n)
+                p = block(input, prefix, n, last, dst, p, prefix)
+            } else p = block(src, at, n, last, dst, p)
             at += n
         } while (at < end)
         if (checksum) {
@@ -65,11 +79,11 @@ class ZstdEncoder(val depth: Int = 16) {
     }
 
     /** Emits one block at dst[p]: compressed when smaller, else RLE or raw. */
-    fun block(src: ByteArray, start: Int, n: Int, last: Boolean, dst: ByteArray, p: Int): Int {
+    fun block(src: ByteArray, start: Int, n: Int, last: Boolean, dst: ByteArray, p: Int, history: Int = 0): Int {
         val lastBit = if (last) 1 else 0
         if (n >= 32) {
             rep.copyInto(saved)
-            sequences(src, start, n)
+            sequences(src, start, n, history)
             val size = entropy()
             if (size in 1 until n) {
                 dst.put24(p, lastBit or (2 shl 1) or (size shl 3))
@@ -161,28 +175,29 @@ class ZstdEncoder(val depth: Int = 16) {
     }
 
     /** Parses src[start, start + n) into sequences and literals. */
-    fun sequences(src: ByteArray, start: Int, n: Int) {
+    fun sequences(src: ByteArray, start: Int, n: Int, history: Int = 0) {
         val end = start + n
-        hashLog = (highbit(n) + 1).coerceIn(10, 17)
+        val base = start - history
+        hashLog = (highbit(n + history) + 1).coerceIn(10, 17)
         if (head.size != 1 shl hashLog) head = IntArray(1 shl hashLog)
         head.fill(-1)
-        if (chain.size < n) chain = IntArray(n)
+        if (chain.size < n + history) chain = IntArray(n + history)
         nbSeq = 0
         litN = 0
         var anchor = start
         var i = start
-        var inserted = start
+        var inserted = base
         val last = end - 4
         while (i <= last) {
-            while (inserted < i) { val h = hash(src, inserted); chain[inserted - start] = head[h]; head[h] = inserted; inserted++ }
-            search(src, start, end, i, i - anchor)
+            while (inserted < i) { val h = hash(src, inserted); chain[inserted - base] = head[h]; head[h] = inserted; inserted++ }
+            search(src, base, end, i, i - anchor)
             if (bestLen < 4) { i++; continue }
             var len = bestLen
             var off = bestOff
             var gain = bestGain
             while (i + 1 <= last) {
-                val h = hash(src, i); if (inserted == i) { chain[i - start] = head[h]; head[h] = i; inserted++ }
-                search(src, start, end, i + 1, i + 1 - anchor)
+                val h = hash(src, i); if (inserted == i) { chain[i - base] = head[h]; head[h] = i; inserted++ }
+                search(src, base, end, i + 1, i + 1 - anchor)
                 if (bestLen >= 4 && bestGain > gain + 4) { i++; len = bestLen; off = bestOff; gain = bestGain } else break
             }
             emit(src, anchor, i, len, off)

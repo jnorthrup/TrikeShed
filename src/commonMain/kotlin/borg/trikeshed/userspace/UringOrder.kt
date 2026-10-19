@@ -35,6 +35,14 @@ private fun UringOp.writes(): Boolean = when (this) {
 internal fun dependsOn(next: UringSubmission, prior: UringSubmission): Boolean {
     val nextBuffer = next.buffer
     val priorBuffer = prior.buffer
+    if (next.opcode == UringOp.OPENAT && prior.opcode == UringOp.OPENAT && next.fd == prior.fd &&
+        (next.offset or prior.offset) and (UringOp.O_CREAT or UringOp.O_TRUNC).toLong() != 0L &&
+        nextBuffer != null && priorBuffer != null && next.len == prior.len && next.len > 0 &&
+        next.len <= nextBuffer.remaining() && prior.len <= priorBuffer.remaining()) {
+        val start = nextBuffer.arrayOffset() + nextBuffer.position()
+        val previous = priorBuffer.arrayOffset() + priorBuffer.position()
+        if ((0 until next.len).all { nextBuffer.array()[start + it] == priorBuffer.array()[previous + it] }) return true
+    }
     if (nextBuffer != null && priorBuffer != null) {
         if (nextBuffer === priorBuffer) return true
         if (nextBuffer.array() === priorBuffer.array()) {

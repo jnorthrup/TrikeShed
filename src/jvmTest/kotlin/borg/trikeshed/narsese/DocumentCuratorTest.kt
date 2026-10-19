@@ -17,6 +17,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
+import borg.trikeshed.lib.Series
 import borg.trikeshed.modelmux.*
 import borg.trikeshed.modelmux.ModelUsage
 import borg.trikeshed.modelmux.Prompt
@@ -897,7 +898,7 @@ class DocumentCuratorTest {
             model: suspend (Prompt) -> ModelResponse = { response(envelope(proposal())) },
             observer: DocumentCuratorObserver? = null, capacity: Int = 2,
             rete: CausalityReteElement? = null,
-            toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf()): DocumentCuratorElement {
+            toolOntology: Series<String> = emptySeriesOf()): DocumentCuratorElement {
             val session = DocumentModelFixture.open(modelId = "requested-model", responder = model)
             sessions.add(session)
             return DocumentCuratorElement.create(CoroutineScope(scope.coroutineContext + session.htx + session.reactor),

@@ -6,6 +6,7 @@ import borg.trikeshed.lcnc.LcncTrail
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.narsese.ConstellationNodes
+import borg.trikeshed.narsese.DecisionProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -28,8 +29,15 @@ class CurationIntake(
     private val runners: () -> Map<String, LcncNodeRunner>,
     val constellations: () -> ConstellationNodes?,
     private val scope: CoroutineScope,
+    private val selectedProvider: (String, String) -> DecisionProvider? = { _, _ -> null },
+    private val settled: suspend () -> Unit = { constellations()?.releaseDecision() },
+    /** What a scored document's referenced links reach, landed as documents of their own scopes ([LinkGrab]). */
+    private val grab: suspend (Doc) -> Unit = {},
+    private val score: suspend (DecisionProvider, String) -> Unit = { provider, book ->
+        requireNotNull(constellations()) { "Curation is not available" }.forProvider(provider).ingestScore(book)
+    },
 ) {
-    data class Doc(val project: String, val id: String)
+    data class Doc(val project: String, val id: String, val decisionProvider: DecisionProvider? = null)
 
     /** Per project: documents queued, curated, failed, and the last failure. */
     class Tally {
@@ -47,6 +55,7 @@ class CurationIntake(
     private val admission = Any()
     private val inFlight = ConcurrentHashMap.newKeySet<Doc>()
     private val tallies = ConcurrentHashMap<String, Tally>()
+    private val providerTallies = ConcurrentHashMap<Pair<String, DecisionProvider>, Tally>()
     private val reading = kotlinx.coroutines.sync.Mutex()
 
     private val worker = scope.launch {
@@ -70,7 +79,10 @@ class CurationIntake(
         check(tallies.values.all { it.pending == 0 }) { "Document curation stopped with unfinished admitted work" }
     }
 
-    fun status(): Map<String, Any?> = tallies.toSortedMap().mapValues { it.value.toMap() }
+    fun status(): Map<String, Any?> = tallies.toSortedMap().mapValues { (project, tally) ->
+        tally.toMap() + ("providers" to providerTallies.entries.filter { it.key.first == project }
+            .associate { it.key.second.id to (it.value.toMap() + ("decisionProvider" to it.key.second.id)) })
+    }
 
     /** Every document of every mounted project: what a boot resumes. Curated documents pass through at once. */
     suspend fun resume() {
@@ -79,20 +91,20 @@ class CurationIntake(
 
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
     fun forget(project: String, id: String) {
-        val d = Doc(project, id)
-        synchronized(admission) { if (inFlight.contains(d)) removed.add(d) }
+        synchronized(admission) { removed.addAll(inFlight.filter { it.project == project && it.id == id }) }
     }
     private val removed = ConcurrentHashMap.newKeySet<Doc>()
 
     /** Queue one landed document. PDFs and the miner's other formats curate; twins and the rest do not. */
-    fun offer(project: String, id: String) {
+    fun offer(project: String, id: String, decisionProvider: DecisionProvider? = selectedProvider(project, id)) {
         if (id.endsWith(ProjectNodes.EXTRACT_SUFFIX) || id.endsWith(ProjectNodes.NOTES_SUFFIX) || id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
-        val d = Doc(project, id)
+        val d = Doc(project, id, decisionProvider)
         synchronized(admission) {
             check(!queue.isClosedForSend) { "Document curation intake is draining" }
             if (!inFlight.add(d)) return
             tallies.computeIfAbsent(project) { Tally() }.queued.incrementAndGet()
+            decisionProvider?.let { providerTallies.computeIfAbsent(project to it) { Tally() }.queued.incrementAndGet() }
             pending.add(d)
             queue.trySend(Unit).getOrThrow()
         }
@@ -100,22 +112,41 @@ class CurationIntake(
 
     private suspend fun read(d: Doc) {
         val t = tallies.getValue(d.project)
+        val providerTally = d.decisionProvider?.let { providerTallies.getValue(d.project to it) }
         val constellation = d.project
-        if (removed.remove(d)) { inFlight.remove(d); t.queued.decrementAndGet(); return }
+        if (removed.remove(d)) {
+            t.queued.decrementAndGet(); providerTally?.queued?.decrementAndGet()
+            finish(d)
+            return
+        }
+        var r = emptyMap<String, LcncNodeRunner>()
+        val params = mapOf("constellation" to constellation) +
+            (d.decisionProvider?.let { mapOf("decisionProvider" to it.id) } ?: emptyMap())
         try {
-            val nodes = constellations()
-            val r = runners()
+            val root = constellations()
+            val nodes = d.decisionProvider?.let { root?.ingestAccess(it) } ?: root
+            r = if (d.decisionProvider != null && nodes != null)
+                LinkedHashMap<String, LcncNodeRunner>().also { nodes.register(it) } else runners()
             fun runner(type: String) = r[type] ?: error("no runner '$type'")
             val text = corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text
                 ?: error("no text read from ${d.id}")
             // Held only when curated from this very text: a re-read source curates again by itself.
-            if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) { t.curated.incrementAndGet(); return }
+            if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) {
+                d.decisionProvider?.let { provider -> reading.withLock {
+                    score(provider, d.id)
+                    runner(ConstellationNodes.JOIN).run(
+                        LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to d.id))
+                } }
+                t.curated.incrementAndGet(); providerTally?.curated?.incrementAndGet()
+                if (d.decisionProvider != null) grabbing(d)
+                return
+            }
             val notes = corpus.read(d.project, d.id + ProjectNodes.NOTES_SUFFIX, 262_144)?.text
             val doc = mapOf("project" to d.project, "id" to d.id)
             reading.withLock {
             LcncTrail.live.run("intake/${d.project}")
             val curated = runner(ConstellationNodes.CURATE).run(
-                LcncNode("curate", ConstellationNodes.CURATE, params = mapOf("constellation" to constellation)),
+                LcncNode("curate", ConstellationNodes.CURATE, params = params),
                 buildMap {
                     put("text", text); put("doc", doc)
                     notes?.let { put("conventions", ProjectNodes.conventions(it)); put("notes", ProjectNodes.prose(it)) }
@@ -123,23 +154,46 @@ class CurationIntake(
             )
             val book = curated["book"] ?: error("book.curate returned no book")
             runner(ConstellationNodes.JOIN).run(
-                LcncNode("join", ConstellationNodes.JOIN, params = mapOf("constellation" to constellation)), mapOf("book" to book))
-            t.curated.incrementAndGet()
+                LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
+            d.decisionProvider?.let {
+                score(it, book.toString())
+                runner(ConstellationNodes.JOIN).run(
+                    LcncNode("join", ConstellationNodes.JOIN, params = params), mapOf("book" to book))
+            }
+            t.curated.incrementAndGet(); providerTally?.curated?.incrementAndGet()
             System.err.println("[INTAKE] ${d.project}/${d.id}: ${curated["statements"]} statements from ${curated["sections"]} sections")
             }
+            if (d.decisionProvider != null) grabbing(d)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Throwable) {
             t.failed.incrementAndGet(); t.note = "${d.id}: ${e.message ?: e}"
+            providerTally?.let { it.failed.incrementAndGet(); it.note = t.note }
             System.err.println("[INTAKE] ${d.project}/${d.id} FAILED: ${e.message ?: e}")
         } finally {
-            synchronized(admission) { inFlight.remove(d); removed.remove(d) }
+            finish(d)
         }
         if (t.pending == 0) runCatching {
-            reading.withLock { runners()[ConstellationNodes.BRIEF]?.run(
-                LcncNode("brief", ConstellationNodes.BRIEF, params = mapOf("constellation" to constellation, "page" to "true")), emptyMap()) }
+            reading.withLock { r[ConstellationNodes.BRIEF]?.run(
+                LcncNode("brief", ConstellationNodes.BRIEF, params = params + ("page" to "true")), emptyMap()) }
             System.err.println("[INTAKE] ${d.project}: ${t.curated} curated, ${t.failed} failed — brief published")
         }.onFailure { System.err.println("[INTAKE] ${d.project}: brief failed: ${it.message}") }
+    }
+
+    /** A scored document's links are fetched beside the reading lane, never holding it. */
+    private fun grabbing(d: Doc) {
+        scope.launch { runCatching { grab(d) }.onFailure { System.err.println("[GRAB] ${d.project}/${d.id} failed: ${it.message ?: it}") } }
+    }
+
+    private suspend fun finish(d: Doc) {
+        val idle = synchronized(admission) {
+            removed.remove(d)
+            inFlight.remove(d) && inFlight.isEmpty()
+        }
+        if (idle) kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            runCatching { settled() }
+                .onFailure { System.err.println("[INTAKE] inference release failed: ${it.message}") }
+        }
     }
 
     companion object {
@@ -149,13 +203,29 @@ class CurationIntake(
          */
         fun install(nodes: ConstellationNodes, ctx: borg.trikeshed.module.ModuleContext, corpus: JvmProjectCorpus,
                     scopes: ProjectScopes, scope: CoroutineScope): CurationIntake {
-            val intake = CurationIntake(corpus, { ctx.lcncRunners }, { nodes }, scope)
-            scopes.onDocument = { project, id -> intake.offer(project, id) }
+            val links = LinkGrab(nodes, corpus, scopes, ctx.muxContext)
+            val intake = CurationIntake(corpus, { ctx.lcncRunners }, { nodes }, scope, scopes::decisionProvider,
+                grab = { d -> links.grab(d.project, d.id, d.decisionProvider) })
+            scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
             scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
             ctx.routes.claim("language", "/api/intake") { method, _, _, _ ->
                 if (method != "GET") borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 else borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, borg.trikeshed.parse.jsonOf(intake.status()))
+            }
+            // A dragged link roots a group: POST {url, decisionProvider?} → {verdict, name, id}.
+            ctx.routes.claim("language", "/api/projects/link") { method, _, text, _ ->
+                if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                val q = runCatching { borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text)) }.getOrDefault(emptyMap())
+                val url = q["url"]?.toString()?.trim().orEmpty()
+                runCatching {
+                    links.root(url, q["decisionProvider"]?.toString()?.takeIf { it.isNotBlank() }?.let(DecisionProvider::of))
+                }.fold(
+                    onSuccess = { (name, id) -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200,
+                        borg.trikeshed.parse.jsonOf(mapOf("verdict" to "ok", "name" to name, "id" to id))) },
+                    onFailure = { borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(400,
+                        borg.trikeshed.parse.jsonOf(mapOf("verdict" to "refused", "detail" to (it.message ?: it.toString())))) },
+                )
             }
             return intake
         }

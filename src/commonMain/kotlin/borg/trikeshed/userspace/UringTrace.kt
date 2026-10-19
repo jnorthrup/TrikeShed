@@ -52,20 +52,31 @@ internal class UringTraceBackend(
     val trace: UringTrace,
 ) : UserspaceChannelBackend by backend {
     private val id = traceChannel.fetchAndAdd(1)
+    private val outstanding = mutableMapOf<Long, UringSubmission>()
     init { trace.channel(id, backend.availability, backend.nativeCapabilities) }
 
-    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
-        submissions.forEach { trace.submit(id, it) }
+    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
+        submit(submissions) { backend.submitBatch(submissions) }
+
+    override fun submitDeferredBatch(submissions: List<UringSubmission>): List<SelectionResult> =
+        submit(submissions) { backend.submitDeferredBatch(submissions) }
+
+    private fun completed(results: List<SelectionResult>) = results.also {
+        it.forEach { result -> outstanding.remove(result.userData)?.let { trace.complete(id, it, result.res) } }
+    }
+
+    private inline fun submit(submissions: List<UringSubmission>, effect: () -> List<SelectionResult>): List<SelectionResult> {
+        submissions.forEach { trace.submit(id, it); outstanding[it.userData] = it }
         return try {
-            backend.submitBatch(submissions).also { completed ->
-                val source = submissions.associateBy { it.userData }
-                completed.forEach { result -> source[result.userData]?.let { trace.complete(id, it, result.res) } }
-            }
+            completed(effect())
         } catch (failure: Throwable) {
             submissions.forEach { trace.failed(id, it, failure.toString()) }
             throw failure
         }
     }
+
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> =
+        completed(backend.reapCompletions(minComplete))
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
         for (i in 0 until submissions.size) trace.submit(id, submissions[i])

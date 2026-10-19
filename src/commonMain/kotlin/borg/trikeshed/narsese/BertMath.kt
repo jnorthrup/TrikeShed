@@ -11,7 +11,7 @@ operator fun BertMatrix.get(row: Int, column: Int): Float {
     return b[row * a.b + column]
 }
 
-val BertMatrix.tensor: Tensor<Float> get() = shapeOf(a.a, a.b) j { index: Shape ->
+val BertMatrix.tensor: MetaSeries<Tensor, Float> get() = shapeOf(a.a, a.b) j { index: Shape ->
     require(index.size == 2) { "BERT matrix indices must have rank two" }
     this[index[0], index[1]]
 }

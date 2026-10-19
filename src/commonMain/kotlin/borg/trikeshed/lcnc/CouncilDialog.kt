@@ -1,5 +1,10 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
+import borg.trikeshed.modelmux.*
+import kotlinx.coroutines.*
+import kotlin.coroutines.CoroutineContext
+
 /**
  * One seat's model call, fully described — everything the daemon needs to
  * route the call (preferred model, token budget, temperature, spend-receipt
@@ -41,11 +46,28 @@ sealed interface SeatOutcome {
 /**
  * The council's model seam — injectable so the whole council runs green in
  * tests with zero model spend (design brief: "Test seam"). The daemon binds
- * it to `BrainClient.chatSeat(...)` under the mux context; tests script it.
+ * it to [modelMuxCouncilDialog] under the mux context; tests script it.
  * A well-behaved dialog returns [SeatOutcome.Refused] rather than throwing,
  * but the `council.seat` runner guards either way: a throwing dialog is
  * caught and becomes a Refused banner on the record.
  */
 fun interface CouncilDialog {
     suspend fun seat(call: SeatCall): SeatOutcome
+}
+
+/** An explicit endpoint/model list bounds failover; otherwise the existing preference applies. */
+fun modelMuxCouncilDialog(brain: BrainClient, muxContext: CoroutineContext): CouncilDialog = CouncilDialog { call ->
+    try {
+        val answer = withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
+            val options = BrainChatOptions.parse(mapOf("models" to call.node.params["models"],
+                "maxTokens" to call.maxTokens, "temperature" to call.temperature))
+            val messages = listOf("system" to call.system, "user" to call.prompt)
+            if (options.models.size > 0) brain.chat(options, messages, call.contextId.takeIf { it.isNotBlank() })
+            else brain.chatSeat(messages, call.maxTokens, call.temperature, call.contextId.takeIf { it.isNotBlank() }, call.preferredModel)
+        }
+        SeatOutcome.Ok(answer.first, answer.second)
+    } catch (failure: CancellationException) { throw failure }
+    catch (failure: Throwable) {
+        SeatOutcome.Refused(failure.message ?: failure.toString(), (failure as? BrainNoRoute)?.attempts ?: emptyList())
+    }
 }

@@ -1,10 +1,27 @@
 package borg.trikeshed.web
 
 import org.w3c.dom.url.URLSearchParams
+import borg.trikeshed.parse.confix.Syntax
 import kotlin.test.*
 
 class ConfixNavigationTest {
     val cid = "sha256:" + "a".repeat(64)
+
+    @Test fun canonicalCborLinksRetainAnExplicitSyntaxAndRejectAmbiguousSelections() {
+        val href = ConfixNavigation.href(cid, "[\"receipt\"]", Syntax.CBOR)
+        val (content, path, syntax) = ConfixNavigation.source(URLSearchParams(href.substringAfter('?')))
+        assertEquals(cid, content)
+        assertContentEquals(arrayOf<Any>("receipt"), path)
+        assertEquals(Syntax.CBOR, syntax)
+        assertEquals(Syntax.JSON, ConfixNavigation.source(URLSearchParams("content=$cid")).third)
+        for (raw in listOf("syntax=CBOR", "content=$cid&syntax=", "content=$cid&syntax=YAML",
+            "content=$cid&syntax=CBOR&syntax=JSON", "content=$cid&syntax=CBOR&load=preset")) {
+            val query = URLSearchParams(raw)
+            assertTrue(ConfixNavigation.requested(query))
+            assertFails { ConfixNavigation.source(query) }
+        }
+        assertFails { ConfixNavigation.href(cid, syntax = Syntax.YAML) }
+    }
 
     @Test fun linksPreserveKeysAndOrdinalsWithoutLoadingAProgram() {
         val path = "[\"lcncRun\",\"outputs\",\"fn.雪&+/#\\\"\",0,\"\"]"

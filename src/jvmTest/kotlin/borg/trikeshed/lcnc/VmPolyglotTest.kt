@@ -15,6 +15,33 @@ import kotlinx.coroutines.runBlocking
 import kotlin.test.*
 
 class VmPolyglotTest {
+    @Test fun panelExpressionsUseTheOwnedPolyglotInvocationAndLeaveNoGuest() = runBlocking {
+        val host = HypervisorVmHost()
+        try {
+            val context = vmRuntimeTestContext(this)
+            SubVmLegos.register(context)
+            val expression = context.lcncRunners.getValue("js")
+            val input = mapOf("itemId" to "synthetic-雪", "to" to "review", "item" to mapOf("revision" to 3))
+            val node = LcncNode("shape", "js", mapOf("expr" to
+                "{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,dom:typeof document}"))
+            kotlinx.coroutines.withContext(VmHostKey(host)) {
+                val ledger = LcncInvocationLedger()
+                val runner = LcncRunner(mapOf("js" to expression)).apply { invocations = ledger }
+                val program = LcncProgram("expression", s_[LcncNode("input", "scope.in", mapOf("name" to "input")), node],
+                    s_[LcncWire("input", "value", "shape", "x")])
+                val result = runner.runProcedure(program, mapOf("input" to input))
+                // The VM boundary preserves Teleported.Num(Long), unlike generic JSON reification.
+                assertEquals(mapOf("jobId" to "synthetic-雪", "toColumn" to "review", "expectedRevision" to 3L, "dom" to "undefined"),
+                    result.nodeOutputs["shape"]?.get("y"))
+                val invocation = (ledger.snapshot()["entries"] as List<*>).map { it as Map<*, *> }.single { it["nodeId"] == "shape" }
+                assertEquals("js", (invocation["runtime"] as Map<*, *>)["language"])
+                assertTrue(host.ids().none { host.get(it)?.isAlive == true })
+                assertFails { expression.run(node.copy(params = mapOf("expr" to "(() => { throw new Error('fixture'); })()")), mapOf("x" to input)) }
+                assertTrue(host.ids().none { host.get(it)?.isAlive == true }, "failed expressions also release their guest")
+            }
+        } finally { host.close() }
+    }
+
     @Test fun absentOrBrokenPointcutSupportDoesNotReplaceTheResultOrSkipRelease() = runBlocking {
         for (unavailable in listOf(false, true)) for (fails in listOf(false, true)) {
             var released = false

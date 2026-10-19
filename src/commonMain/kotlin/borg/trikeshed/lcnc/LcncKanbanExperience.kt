@@ -11,6 +11,7 @@ import borg.trikeshed.kanban.BoardStoreElement
 import borg.trikeshed.kanban.KanbanGraph
 import borg.trikeshed.kanban.KanbanGraphConfix
 import borg.trikeshed.kanban.toBoardMap
+import borg.trikeshed.kanban.boardWipUnit
 import borg.trikeshed.parse.confix.confixDoc
 import kotlinx.coroutines.CompletableDeferred
 import borg.trikeshed.lib.toList
@@ -47,13 +48,14 @@ class LcncKanbanExperience(
      */
     fun boardView(title: String = "Oroboros board", store: BoardStoreElement = this.store): Map<String, Any?> {
         val seq = store.lastSequence
-        val base = borg.trikeshed.kanban.BoardCursor.of(store.cards()).toBoardMap(seq, title)
+        val rows = store.cards().associateBy { it.jobId }
+        val base = borg.trikeshed.kanban.BoardCursor.of(rows.values).toBoardMap(seq, title)
         val garnish = attention?.invoke(store).orEmpty()
         val items = (base["items"] as List<*>).map { item ->
             val m = item as Map<*, *>
             val id = m["id"].toString()
-            val row = store.card(id)
-            m + mapOf(
+            val row = rows[id]
+            val fields = m + mapOf(
                 "owner" to row?.owner.orEmpty(),
                 "dependencies" to (row?.dependencies ?: emptyList<String>()),
                 "tags" to (row?.tags ?: emptyList<String>()),
@@ -63,8 +65,15 @@ class LcncKanbanExperience(
                 // children under their parent and count "k/N children done" from one body.
                 "parent" to row?.parent.orEmpty(),
             ) + garnish[id].orEmpty()
+            if (row != null && row.executionFamily.isNotBlank()) fields + ("executionFamily" to row.executionFamily) else fields
         }
-        return base + ("items" to items)
+        val units = mutableMapOf<String, MutableSet<String>>()
+        for (row in rows.values) units.getOrPut(row.col.wire) { mutableSetOf() }.add(boardWipUnit(row.jobId, row.executionFamily))
+        val columns = (base["columns"] as List<*>).map { column ->
+            val fields = column as Map<*, *>
+            fields + ("wipCount" to (units[fields["id"].toString()]?.size ?: 0))
+        }
+        return base + mapOf("items" to items, "columns" to columns)
     }
 
     /** Current board plus the two useful concentric partitions. */
@@ -72,14 +81,13 @@ class LcncKanbanExperience(
         // One committed store projection feeds both the gesture surface and the
         // concentric sheets. Keeping this boundary in Kotlin means the browser
         // never groups cards, invents statuses, or reshapes commands.
-        val board = borg.trikeshed.kanban.BoardCursor.of(store.cards())
         val orchestration = graph()
         val orchestrationMap = reify(KanbanGraphConfix.toJson(orchestration))
         return mapOf(
             "board" to LcncOperationalSheets.board(store).toLcncMap(),
             "byStatus" to LcncOperationalSheets.byStatus(store).map(SheetSeed::toLcncMap),
             "byPriority" to LcncOperationalSheets.byPriority(store).map(SheetSeed::toLcncMap),
-            "boardView" to board.toBoardMap(store.lastSequence, "Kanban board (live)"),
+            "boardView" to boardView("Kanban board (live)", store),
             "orchestration" to orchestrationMap,
             // Bolt: Avoid intermediate O(N) list allocations by replacing .toList() with .view
             "laneOrder" to orchestration.lanes.view.sortedBy { it.order }.map { it.id },
@@ -116,6 +124,10 @@ class LcncKanbanExperience(
                     buildMap {
                         put("type", "submit")
                         put("jobId", jobId)
+                        // Submit's optional optimistic precondition belongs to the store.
+                        // Preserve its value (and absence); dropping it permits stale writes.
+                        (c["expectedRevision"] ?: node.params["expectedRevision"])
+                            ?.let { put("expectedRevision", it) }
                         // Absent stays absent, same as priority/tags/owner below.
                         // `title ?: jobId` meant an edit that only touched tags
                         // OVERWROTE the card's title with its own id — advanceRow's
@@ -155,6 +167,15 @@ class LcncKanbanExperience(
                     },
                 )
             },
+            "kanban.update" to boundLcnc(store) { store, node, inputs ->
+                // Preserve omission, explicit invalid values and mixed commands for the canonical
+                // lowering to decide. A field picker here would silently accept a partial edit.
+                val params = node.params.filterKeys {
+                    it in setOf("jobId", "expectedRevision", "idempotencyKey", "title", "priority")
+                }
+                val wired = wiredCommand(inputs).entries.associate { it.key.toString() to it.value }
+                command(store, params + wired + ("type" to "update"))
+            },
             "kanban.move" to boundLcnc(store) { store, node, inputs ->
                 val c = wiredCommand(inputs)
                 val jobId = c["jobId"]?.toString() ?: c["itemId"]?.toString() ?: node.params["jobId"]
@@ -165,8 +186,10 @@ class LcncKanbanExperience(
                         put("type", "move")
                         put("jobId", jobId)
                         put("toColumn", required(node, c, "toColumn"))
-                        // JSON numbers may arrive as 3.0; the reducer consumes a long.
-                        put("expectedRevision", required(node, c, "expectedRevision").toDouble().toLong())
+                        // Preserve the supplied precondition, including explicit invalid/null values.
+                        // Canonical lowering owns integer validation on every target.
+                        put("expectedRevision", if (c.containsKey("expectedRevision")) c["expectedRevision"]
+                            else node.params["expectedRevision"])
                         put("idempotencyKey", required(node, c, "idempotencyKey"))
                         // Positional insert: land BEFORE this card in the target column.
                         c["beforeJobId"]?.toString()?.takeIf { it.isNotBlank() }?.let { put("beforeJobId", it) }

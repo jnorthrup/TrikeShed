@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.spi
 
+import borg.trikeshed.context.Synchronization
 import borg.trikeshed.userspace.nio.channels.spi.WasmChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.WasmProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.WasmReactorOperations
@@ -9,7 +10,7 @@ import borg.trikeshed.htx.HtxReactorElement
 import borg.trikeshed.reactor.StubTlsCodecBackend
 import kotlin.coroutines.CoroutineContext
 
-actual fun platformNioProviders(): List<CoroutineContext.Element> {
+actual fun platformNioProviders(reactorSynchronization: Synchronization): List<CoroutineContext.Element> {
     val channelOperations = WasmChannelOperations()
     val tlsBackend = StubTlsCodecBackend()
     return listOf(

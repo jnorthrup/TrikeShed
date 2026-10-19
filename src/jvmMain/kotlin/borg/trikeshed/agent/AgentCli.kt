@@ -1,10 +1,12 @@
 package borg.trikeshed.agent
 
 import borg.trikeshed.lcnc.AgentCliInfo
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import borg.trikeshed.userspace.nio.channels.spi.JvmProcessProtocolPipes
+import borg.trikeshed.userspace.nio.file.spi.*
+import borg.trikeshed.userspace.nio.process.ProcessCaptureChannel
+import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.*
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * The roster of coding-agent CLIs on this host: which binaries exist, how each is run
@@ -60,9 +62,11 @@ class AgentCli(
         }
 
         /** A resolved roster: every known id, found or not, with the reason it is not offered. */
-        suspend fun probe(enabled: Set<String>, dirs: List<String> = candidateDirs(), versionTimeoutMs: Long = 5_000L): List<AgentCliInfo> = withContext(Dispatchers.IO) {
+        suspend fun probe(enabled: Set<String>, dirs: List<String> = candidateDirs(), versionTimeoutMs: Long = 5_000L): List<AgentCliInfo> = withContext(fileIoContext) {
+            val context = currentCoroutineContext()
+            val files = context[FileOperations] ?: context[NioSupervisor]?.service<FileOperations>() ?: JvmFileOperations()
             KNOWN.map { id ->
-                val found = dirs.asSequence().map { File(it, id) }.firstOrNull { it.isFile && it.canExecute() }
+                val found = dirs.asSequence().map { File(it, id) }.firstOrNull { files.isFile(it.path) && it.canExecute() }
                 when {
                     found == null -> AgentCliInfo(id, "", "", enabled = false, why = "not installed in ${dirs.take(3).joinToString(", ")} or on PATH")
                     id !in enabled -> AgentCliInfo(id, found.absolutePath, version(found, versionTimeoutMs), enabled = false, why = "installed; enable with --agents")
@@ -75,15 +79,23 @@ class AgentCli(
             }
         }
 
-        /** `<binary> --version`, bounded, first line only; empty on any failure. Blocking, so IO-dispatched by the caller. */
-        fun version(binary: File, timeoutMs: Long): String = runCatching {
-            val p = ProcessBuilder(binary.absolutePath, "--version").redirectErrorStream(true).apply { environment().clear(); environment().putAll(AgentEnvironment.build(System.getenv(), listOf(binary.parent))) }.start()
-            val out = StringBuilder()
-            val reader = Thread { runCatching { p.inputStream.bufferedReader().use { r -> r.lineSequence().take(4).forEach { out.append(it).append('\n') } } } }
-            reader.isDaemon = true; reader.start()
-            if (!p.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) { p.destroyForcibly(); p.waitFor(1, TimeUnit.SECONDS) }
-            reader.join(500)
-            out.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().take(120)
-        }.getOrDefault("")
+        /** `<binary> --version`, bounded capture through the same owned process boundary as agent runs. */
+        suspend fun version(binary: File, timeoutMs: Long): String = try {
+            require(timeoutMs > 0)
+            val pipes = JvmProcessProtocolPipes.open(command = { _, _ -> listOf(binary.absolutePath, "--version") },
+                environment = AgentEnvironment.build(System.getenv(), listOf(binary.parent)), mergeError = true)
+            val capture = try { ProcessCaptureChannel(currentCoroutineContext(), pipes, maxBytes = 16_384, timeoutMillis = timeoutMs) }
+            catch (failure: Throwable) {
+                withContext(NonCancellable) {
+                    try { pipes.close() } catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
+                }
+                throw failure
+            }
+            val result = capture.await()
+            if (result.timedOut || result.exit != 0) ""
+            else result.text().lineSequence().take(4).firstOrNull { it.isNotBlank() }?.trim().orEmpty().take(120)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) { "" }
     }
 }

@@ -156,7 +156,11 @@ object SectionShapes {
 
     /** A book's sections, each one's carried ordinal, and the believed shapes that cut them (empty: paragraphs). */
     class Sections(val believed: List<Shape>, val texts: List<String>, val ordinals: List<LongArray?>,
-                   val genre: Genre? = null) {
+                   val genre: Genre? = null,
+                   /** The heading each section opens with, where the text declares its headings ([declared]). */
+                   val headings: List<String>? = null,
+                   /** Each section's path through the declared headings above it, `Part › 1. Title › 1.1. Head`. */
+                   val paths: List<String>? = null) {
         val shape: Shape? get() = believed.firstOrNull()
     }
 
@@ -230,9 +234,11 @@ object SectionShapes {
 
     /**
      * Sections of [text] at the believed heading shape. An occurrence that heads nothing (a contents
-     * entry) folds into the next; with no believed shape the sections are paragraphs.
+     * entry) folds into the next; with no believed shape the sections are paragraphs. Headings the text
+     * declares come first ([declared]): a shape is judged only where the text states none.
      */
     fun sections(text: String): Sections {
+        declared(text)?.let { return it }
         val t = tuples(text)
         // The strongest believed shape cuts; the others stay as candidates the caller can read.
         val believed = shapes(t).filter { it.belief.expectation() > .5f }
@@ -308,6 +314,89 @@ object SectionShapes {
 
     private val HEADWORD = Regex("^([A-Z][A-Z'\\- ]{1,40}[A-Z])[.,]")
     const val MIN_ENTRIES = 200
+
+    /**
+     * The sections [text] declares, when it declares at least [MIN_DECLARED] headings past its first line; else null.
+     * A declared heading is an ATX line (`#`…`######`, its markup level) or a paragraph led by a `**bold**` run-in head —
+     * numbered, or closed by a period or colon — as [MarkupStreams] writes what a page's markup states; a run-in head
+     * restating the heading just above it is that heading's text, not another heading. Every heading cuts, and each
+     * section keeps its path through the headings above it, nested by numbering before looks:
+     *  - a heading continuing an open series (`APPENDIX 3` after `APPENDIX 2`, `1.2.` after `1.1.`) is its sibling,
+     *    whatever its markup level;
+     *  - one restarting at 1 a series its parent has already run (`1. Coinbase Card` after `9.`, `APPENDIX 4`) opens
+     *    under the heading just before it;
+     *  - else its markup level places it: a numbered run-in head at 6 plus its number's depth, an unnumbered one a leaf
+     *    under the heading before it.
+     * A heading with no text of its own lives on in its children's paths.
+     */
+    fun declared(text: String): Sections? {
+        val lines = text.lines()
+        class Head(val line: Int, val level: Int, val title: String, val leaf: Boolean) {
+            val series: String?; val n: Int
+            init {
+                val dotted = number.find(title)?.takeIf { it.range.first == 0 }?.value?.split('.')
+                val labelled = if (dotted == null) LABEL.find(title) else null
+                series = dotted?.let { "#" + it.dropLast(1).joinToString(".") } ?: labelled?.groupValues?.get(1)?.uppercase()
+                n = dotted?.last()?.toIntOrNull() ?: labelled?.groupValues?.get(2)?.let(::ordinal) ?: 0
+            }
+        }
+        fun same(a: String, b: String) = a.trimEnd(' ', '.', ':').lowercase() == b.trimEnd(' ', '.', ':').lowercase()
+        val heads = ArrayList<Head>()
+        for ((i, l) in lines.withIndex()) {
+            val atx = ATX.find(l)
+            if (atx != null) { heads.add(Head(i, atx.groupValues[1].length, atx.groupValues[2].trim(), false)); continue }
+            val lead = RUN_IN.find(l) ?: continue
+            val title = lead.groupValues[1].trim()
+            if (title.none { it.isLetterOrDigit() }) continue
+            val prior = heads.lastOrNull()
+            if (prior != null && ATX.matches(lines[prior.line]) && same(prior.title, title)) continue
+            val marked = number.find(title)?.takeIf { it.range.first == 0 }
+            val closed = title.endsWith('.') || title.endsWith(':') || lead.groupValues[2].isNotEmpty()
+            if (marked == null && !(closed && title.split(' ').size <= RUN_IN_WORDS)) continue
+            heads.add(Head(i, if (marked != null) 6 + marked.value.split('.').size else 0, title + lead.groupValues[2], marked == null))
+        }
+        if (heads.count { it.line > 0 } < MIN_DECLARED) return null
+        val texts = ArrayList<String>(); val ords = ArrayList<LongArray?>(); val titles = ArrayList<String>(); val paths = ArrayList<String>()
+        if (heads[0].line > 0) clean((0 until heads[0].line).joinToString("\n") { lines[it] }.replace("**", "")).takeIf { it.isNotEmpty() }
+            ?.let { texts.add(it); ords.add(null); titles.add(Book.heading(it)); paths.add("") }
+        val open = ArrayList<Head>()
+        // Per parent (null: the text itself), the last number each series of its children reached.
+        val ran = HashMap<Head?, HashMap<String, Int>>()
+        for ((k, h) in heads.withIndex()) {
+            if (!h.leaf) {
+                val sibling = if (h.series != null) open.indexOfLast { it.series == h.series && it.n == h.n - 1 } else -1
+                if (sibling >= 0) while (open.size > sibling) open.removeAt(open.size - 1)
+                else {
+                    val before = ArrayList(open)
+                    while (open.isNotEmpty() && open.last().level >= h.level) open.removeAt(open.size - 1)
+                    val restarts = h.series != null && h.n == 1 && (ran[open.lastOrNull()]?.get(h.series) ?: 0) > 1
+                    if (restarts && before.size > open.size) { open.clear(); open.addAll(before) }
+                }
+                h.series?.let { ran.getOrPut(open.lastOrNull()) { HashMap() }[it] = h.n }
+            }
+            val path = (open.map { it.title } + h.title).joinToString(" › ")
+            if (!h.leaf) open.add(h)
+            val from = h.line; val until = if (k + 1 < heads.size) heads[k + 1].line else lines.size
+            val body = clean((from + 1 until until).joinToString("\n") { lines[it] }.replace("**", ""))
+            val section = if (ATX.matches(lines[from])) (if (body.isEmpty()) "" else h.title + "\n\n" + body)
+                else clean(lines[from].replace("**", "") + "\n" + body)
+            if (section.isEmpty()) continue
+            texts.add(section); titles.add(h.title); paths.add(path)
+            ords.add(number.find(h.title)?.takeIf { it.range.first == 0 }?.value?.split('.')?.map { it.toLong() }?.toLongArray())
+        }
+        return Sections(emptyList(), texts, ords, genre(texts, texts.size), titles, paths)
+    }
+
+    private val ATX = Regex("^(#{1,6})[ \\t]+(\\S.*?)[ \\t]*#*[ \\t]*$")
+    private val RUN_IN = Regex("^\\*\\*(.+?)\\*\\*([:.]?)")
+    /** A division label opening a heading: a word and its number, roman numeral or letter (`APPENDIX 4`, `Part IV`, `Exhibit A`). */
+    private val LABEL = Regex("^([A-Za-z]+)\\s+(\\d+|[IVXLCDM]+|[A-Z])(?=$|[\\s.:,)\\-–—])")
+    /** A label's number: digits, a letter's place in the alphabet (`Exhibit C`), or an uppercase roman numeral (`Part IV`, `Part X`). */
+    private fun ordinal(s: String): Int = s.toIntOrNull() ?: if (s.length == 1 && s[0] !in "IVX") s[0] - 'A' + 1 else FrontMatter.roman(s)
+    /** Declared headings past a text's first line below which its structure is judged by shape instead. */
+    const val MIN_DECLARED = 3
+    /** Longest unnumbered bold lead read as a run-in head, in words. */
+    const val RUN_IN_WORDS = 12
 
     fun clean(s: String) = s.replace(Regex("(\\w)-\n(\\w)"), "$1$2").replace(Regex("\\s+"), " ").trim()
 }

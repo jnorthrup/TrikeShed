@@ -70,4 +70,37 @@ class ConstellationBertTest {
         assertEquals("original", File(books, "book.jev.history/same-revision/0.json").readText())
         assertEquals("new", File(source, "0.json").readText())
     }
+
+    @Test fun retentionArchivesEveryProviderAndTheSharedReadingWithoutMixingLabels() {
+        val books = directory.toFile()
+        val reading = File(books, "book.readings/0.json").apply { parentFile.mkdirs() }
+        val readingBytes = """[{"text":"The bank holds an account."}]""".encodeToByteArray()
+        reading.writeBytes(readingBytes)
+        val senses = mapOf(DecisionProvider.JEV to "FinancialOrganization", DecisionProvider.OPENAI to "RiverBank", DecisionProvider.JEVA to "LandArea")
+        val original = DecisionProvider.entries.associateWith { provider ->
+            val table = File(books, "book.${provider.tableSuffix}/0.json").apply { parentFile.mkdirs() }
+            val bytes = jsonOf(mapOf("senses" to listOf(mapOf("lemma" to "bank", "sentence" to "The bank holds an account.",
+                "source" to "shared-source", "probabilities" to mapOf(senses.getValue(provider) to 0.9, "none" to 0.1)))))
+                .encodeToByteArray()
+            table.writeBytes(bytes)
+            bytes
+        }
+        val corpus = BertSenseCorpus(files, books.path, DecisionProvider.OPENAI.tableSuffix)
+        val retained = corpus.retain("book", "all-providers", DecisionProvider.entries.map { it.tableSuffix }.toSeries())
+        assertEquals(1 + DecisionProvider.entries.size, retained.size)
+        assertEquals(1 + DecisionProvider.entries.size, retained.view.toSet().size)
+        assertFalse(reading.exists())
+        assertContentEquals(readingBytes, File(books, "book.readings.history/all-providers/0.json").readBytes())
+        assertEquals(listOf("all-providers"), File(books, "book.readings.history").listFiles().orEmpty().map { it.name })
+        for (provider in DecisionProvider.entries) {
+            assertFalse(File(books, "book.${provider.tableSuffix}").exists())
+            val archived = File(books, "book.${provider.tableSuffix}.history/all-providers/0.json")
+            assertContentEquals(original.getValue(provider), archived.readBytes())
+            val labels = BertSenseCorpus(files, books.path, provider.tableSuffix).labels(s_["book"])
+            assertEquals(1, labels.size)
+            assertEquals(senses.getValue(provider), labels[0].sense)
+            assertEquals("shared-source", labels[0].source)
+            assertEquals(archived.path, labels[0].table)
+        }
+    }
 }

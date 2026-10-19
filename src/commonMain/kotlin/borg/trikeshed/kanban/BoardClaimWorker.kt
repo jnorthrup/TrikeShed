@@ -299,7 +299,12 @@ class BoardClaimWorker(
         val answer: Map<String, Any?> = try {
             if (agentInfo != null) {
                 // The lane: the agent works a scratch clone; its last message is the reply the judge reads.
-                val r = lane!!.run(AgentRunRequest(agent = agentInfo.id, brief = briefText, model = model, budgetSeconds = agentBudget, runId = agentRunId, jobId = jobId))
+                val request = AgentRunRequest(agent = agentInfo.id, brief = briefText, model = model,
+                    budgetSeconds = agentBudget, runId = agentRunId, jobId = jobId)
+                val r = lane!!.run(request)
+                check(r.runId == request.runId && r.jobId == request.jobId && r.agent == request.agent) {
+                    "agent claim: result identity does not match the dispatched request"
+                }
                 agentResult = r
                 mapOf(
                     "ok" to r.ok, "content" to r.summary, "model" to r.model.ifBlank { agentInfo.id },

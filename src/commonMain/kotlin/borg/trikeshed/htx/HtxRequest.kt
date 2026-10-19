@@ -302,45 +302,55 @@ fun ByteArray.indexOfHeaderBoundary(): Int {
 
 private fun decodeChunkedBody(encodedBody: ByteArray): ByteArray {
     val decoded = ArrayList<Byte>()
-    var offset = 0
-
-    while (offset < encodedBody.size) {
-        val lineEnd = encodedBody.indexOfCrLf(offset)
-        if (lineEnd < 0) {
-            return encodedBody
-        }
-        val chunkLine = encodedBody.decodeToString(offset, lineEnd)
-        val chunkSize = chunkLine.substringBefore(';').trim().toIntOrNull(16) ?: return encodedBody
-        offset = lineEnd + 2
-
-        if (chunkSize == 0) {
-            return ByteArray(decoded.size) { decoded[it] }
-        }
-
-        val chunkEnd = offset + chunkSize
-        if (chunkEnd > encodedBody.size) {
-            return encodedBody
-        }
-
-        for (i in offset until chunkEnd) {
+    require(HtxChunkFraming().advance(encodedBody) { start, end ->
+        for (i in start until end) {
             decoded += encodedBody[i]
         }
-
-        offset = chunkEnd
-        if (offset + 1 >= encodedBody.size ||
-            encodedBody[offset] != '\r'.code.toByte() ||
-            encodedBody[offset + 1] != '\n'.code.toByte()
-        ) {
-            return encodedBody
-        }
-        offset += 2
-    }
-
-    return encodedBody
+    }) { "Incomplete HTTP chunked body" }
+    return ByteArray(decoded.size) { decoded[it] }
 }
 
-private fun ByteArray.indexOfCrLf(start: Int): Int {
-    for (i in start until size - 1) {
+/** Incremental HTTP chunk framing; offsets address the retained wire buffer, including trailers. */
+internal class HtxChunkFraming(private var offset: Int = 0) {
+    private var chunkSize = -1
+    private var trailers = false
+    private var complete = false
+
+    fun advance(bytes: ByteArray, limit: Int = bytes.size, body: (Int, Int) -> Unit = { _, _ -> }): Boolean {
+        while (!complete) {
+            if (trailers || chunkSize < 0) {
+                val lineEnd = bytes.indexOfCrLf(offset, limit)
+                if (lineEnd < 0) return false
+                val line = bytes.decodeToString(offset, lineEnd)
+                offset = lineEnd + 2
+                if (trailers) {
+                    if (line.isEmpty()) complete = true
+                    else require(parseHeaderLine(line) != null) { "Invalid HTTP chunk trailer" }
+                } else {
+                    val hex = line.substringBefore(';').trim()
+                    require(hex.isNotEmpty() && hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+                        "Invalid HTTP chunk size"
+                    }
+                    chunkSize = requireNotNull(hex.toIntOrNull(16)) { "HTTP chunk size exceeds supported range" }
+                    trailers = chunkSize == 0
+                }
+            } else {
+                if (chunkSize > limit - offset - 2) return false
+                val end = offset + chunkSize
+                require(bytes[end] == '\r'.code.toByte() && bytes[end + 1] == '\n'.code.toByte()) {
+                    "Invalid HTTP chunk data terminator"
+                }
+                body(offset, end)
+                offset = end + 2
+                chunkSize = -1
+            }
+        }
+        return true
+    }
+}
+
+private fun ByteArray.indexOfCrLf(start: Int, limit: Int = size): Int {
+    for (i in start until limit - 1) {
         if (this[i] == '\r'.code.toByte() && this[i + 1] == '\n'.code.toByte()) {
             return i
         }

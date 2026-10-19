@@ -255,7 +255,9 @@ def start(call, model=None, resume=None, rows=32, columns=100):
     from hermes_cli.config import load_config_readonly
     configured = load_config_readonly().get("model") or {}
     options = {"model": model} if model else {}
-    if configured.get("provider") == mux.PROVIDER:
+    # A fresh hosted terminal uses the daemon's model lease; an explicit Hermes
+    # model configuration keeps its own provider selection.
+    if not configured or (isinstance(configured, dict) and configured.get("provider") == mux.PROVIDER):
         options.update(model=mux.select_model(model), provider=mux.PROVIDER, base_url=mux.BASE_URL)
     store = acquire()
     try:

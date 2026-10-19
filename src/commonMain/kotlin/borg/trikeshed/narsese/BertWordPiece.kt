@@ -19,11 +19,14 @@ class BertWordPiece(vocabulary: Series<String>, val maxLength: Int = 512) {
     constructor(vocabulary: String, maxLength: Int = 512) :
         this(parseVocabulary(vocabulary), maxLength)
 
+    /** An empty line holds its id but matches no fragment (law-trained vocabularies carry one). */
     val vocabulary: Map<String, Int> = buildMap {
         vocabulary.view.forEachIndexed { index, word ->
-            require(word.isNotEmpty() && put(word, index) == null) { "Duplicate or empty BERT vocabulary entry" }
+            require(word.isEmpty() || put(word, index) == null) { "Duplicate BERT vocabulary entry" }
         }
     }
+    /** Vocabulary lines, the embedding rows they index (empty lines included). */
+    val rows = vocabulary.size
     val unknown = requireNotNull(this.vocabulary["[UNK]"]) { "BERT vocabulary lacks [UNK]" }
     val cls = requireNotNull(this.vocabulary["[CLS]"]) { "BERT vocabulary lacks [CLS]" }
     val sep = requireNotNull(this.vocabulary["[SEP]"]) { "BERT vocabulary lacks [SEP]" }

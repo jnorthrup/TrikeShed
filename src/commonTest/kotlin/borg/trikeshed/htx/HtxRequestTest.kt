@@ -5,6 +5,7 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toList
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class HtxRequestTest {
     @Test
@@ -30,6 +31,15 @@ class HtxRequestTest {
 
         assertEquals(200, response.status)
         assertEquals("hello world", response.body.asString())
+    }
+
+    @Test
+    fun rejectsIncompleteOrMalformedChunkFramingInsteadOfReturningWireBytes() {
+        for (body in listOf("10\r\n", "1\r\nx\r\n0\r\n", "1\r\nx!\r\n0\r\n\r\n", "z\r\n")) {
+            assertFailsWith<IllegalArgumentException> {
+                parseHtxResponse(ByteSeries("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n$body"))
+            }
+        }
     }
 
     @Test

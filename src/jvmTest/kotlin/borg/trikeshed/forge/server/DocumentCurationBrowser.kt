@@ -26,13 +26,13 @@ internal suspend fun retainedDocumentBrowser(context: ModuleContext, cid: Conten
                     path == "/_test/finish" -> { finished.countDown(); "{}".encodeToByteArray() }
                     path == "/_test/observations" -> jsonOf(observations()).encodeToByteArray()
                     path == "/api/projects" -> "{\"scopes\":[]}".encodeToByteArray()
-                    path == "/documents" || path.endsWith(".js") || path.endsWith(".css") -> {
+                    path in setOf("/documents", "/panels") || path.endsWith(".js") || path.endsWith(".css") -> {
                         mime = when {
                             path.endsWith(".js") -> "application/javascript"
                             path.endsWith(".css") -> "text/css"
                             else -> "text/html"
                         }
-                        val resource = if (path == "/documents") "web/documents.html" else "web$path"
+                        val resource = if (path in setOf("/documents", "/panels")) "web$path.html" else "web$path"
                         requireNotNull(DocumentCurationWire::class.java.classLoader.getResourceAsStream(resource)) { resource }
                             .use { it.readBytes() }
                     }

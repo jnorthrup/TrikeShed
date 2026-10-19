@@ -5,6 +5,52 @@ import kotlinx.coroutines.*
 import kotlin.test.*
 
 class VmSourceDebugTest {
+    @Test fun authoredCoordinatesFollowTheEmittedBodyWithoutChangingGeneratedBreakpoints() = runBlocking {
+        for ((language, source) in listOf(
+            VmLanguage.JAVASCRIPT to "let count = 0;\nfor (let i = 0; i < 3; i++) {\n  count += 1;\n}\nreturn count;",
+            VmLanguage.PYTHON to "count = 0\nfor i in range(3):\n    count += 1\nreturn count",
+            VmLanguage.RUBY to "count = 0\n3.times do\n  count += 1\nend\nreturn count",
+        )) {
+            HypervisorVmHost().use { host ->
+                val guest = host.spawn(VmSpec("authored-${language.id}", checkNotNull(language.facet)))
+                val program = VmLanguageProgram(language, source)
+                val body = source.lines()
+                val first = program.declaration().lineSequence().indexOfFirst { it.trim() == body.first().trim() } + 1
+                val target = first + 2
+                var stops = 0
+                try {
+                    val result = program.evaluate(guest, Teleported.Null, "authored-source",
+                        debug = VmDebugRequest(currentCoroutineContext()) { pause ->
+                            stops++
+                            val authored = assertIs<Map<*, *>>(pause["authored"], "${language.id}: missing authored-body coordinates")
+                            assertEquals(first, authored["generatedStartLine"])
+                            assertEquals(body.size, authored["lineCount"])
+                            assertEquals("generated-guest-source", pause["coordinates"])
+                            val at = pause["line"] as Int
+                            assertEquals((at - first + 1).takeIf { it in 1..body.size }, authored["line"])
+                            val lines = authored["sourceLines"] as List<*>
+                            assertTrue(lines.size <= 17)
+                            if (lines.isNotEmpty()) {
+                                val start = authored["lineStart"] as Int
+                                lines.forEachIndexed { index, text -> assertEquals(body[start + index - 1], text) }
+                            }
+                            if (stops == 1) VmDebugAction.Line(target) else {
+                                assertEquals(2, stops)
+                                val resolved = if (language == VmLanguage.RUBY) 2 else 3
+                                assertEquals(resolved, authored["line"])
+                                assertEquals(mapOf("hit" to true, "requestedLine" to 3, "resolvedLine" to resolved), authored["breakpoint"])
+                                assertEquals(mapOf("hit" to true, "requestedLine" to target, "resolvedLine" to first + resolved - 1), pause["breakpoint"])
+                                VmDebugAction.CONTINUE
+                            }
+                        })
+                    assertEquals(Teleported.Num(3), result)
+                    assertEquals(2, stops)
+                } finally { host.revoke(guest.id, "test complete") }
+                assertFalse(guest.isAlive)
+            }
+        }
+    }
+
     @Test fun rubyTailExpressionExposesItsBlockEntryBoundary() = runBlocking {
         HypervisorVmHost().use { host ->
             val guest = host.spawn(VmSpec("ruby-loop-statements", borg.trikeshed.pointcut.VmFacet.GRAAL_RUBY))

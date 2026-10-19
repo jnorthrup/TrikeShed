@@ -89,4 +89,49 @@ class WikiReadWireTest {
         }
         assertTrue(before.contentEquals(File(plane, "index.md").readBytes()))
     }
+
+    @Test
+    fun wikiPagesLinkTheStoredCurationsAndOfferEscapedSource() = withPlane { plane, wire ->
+        File(plane, "index.md").writeText("# Curations\n\n[Retrieval](skills/retrieval.md)\n")
+        File(plane, "skills/retrieval.md").writeText("# Retrieval\n\n<script>alert(1)</script>\n")
+        val index = assertNotNull(runBlocking { wire.route("GET", "/wiki", ByteArray(0)) })
+        assertEquals(200, index.status)
+        assertEquals("text/html; charset=utf-8", index.contentType)
+        assertTrue("/wiki?page=skills%2Fretrieval.md" in index.body)
+        val article = assertNotNull(runBlocking { wire.route("GET", "/wiki?page=skills%2Fretrieval.md", ByteArray(0)) })
+        assertEquals(200, article.status)
+        assertTrue("What links here" in article.body)
+        assertTrue("/wiki?page=index.md" in article.body)
+        assertTrue("<script>alert(1)</script>" !in article.body)
+        val source = assertNotNull(runBlocking { wire.route("GET", "/wiki?page=skills%2Fretrieval.md&source=1", ByteArray(0)) })
+        assertEquals(200, source.status)
+        assertTrue("&lt;script&gt;alert(1)&lt;/script&gt;" in source.body)
+        for (method in listOf("POST", "PUT", "DELETE")) {
+            assertEquals(405, runBlocking { wire.route(method, "/wiki", ByteArray(0)) }?.status)
+        }
+    }
+
+    @Test
+    fun unicodeArticleLinksRoundTripThroughBothReadSurfaces() = withPlane { plane, wire ->
+        val text = "# Café 日本語\n"
+        File(plane, "Café 日本語.md").writeText(text)
+        val encoded = "Caf%C3%A9%20%E6%97%A5%E6%9C%AC%E8%AA%9E.md"
+        val raw = assertNotNull(runBlocking { wire.route("GET", "/api/wiki/read?path=$encoded", ByteArray(0)) })
+        assertEquals(200, raw.status)
+        assertEquals(text, raw.payloadBytes.decodeToString())
+        val page = assertNotNull(runBlocking { wire.route("GET", "/wiki?page=$encoded", ByteArray(0)) })
+        assertEquals(200, page.status)
+        assertTrue("Café 日本語" in page.body)
+    }
+
+    @Test
+    fun wikiMissingAndUnavailableStatesAreNotSuccessfulArticles() = withPlane { plane, wire ->
+        val missing = assertNotNull(runBlocking { wire.route("GET", "/wiki?page=../outside.txt", ByteArray(0)) })
+        assertEquals(404, missing.status)
+        assertTrue("not in the plane" !in missing.body)
+        val absent = WikiReadWire { File(plane, "absent") }
+        val unavailable = assertNotNull(runBlocking { absent.route("GET", "/wiki", ByteArray(0)) })
+        assertEquals(503, unavailable.status)
+        assertEquals("text/html; charset=utf-8", unavailable.contentType)
+    }
 }

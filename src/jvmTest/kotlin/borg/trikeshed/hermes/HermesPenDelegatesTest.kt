@@ -19,7 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import keymux.KeyMux
 import keymux.TestKeySource
-import modelmux.ModelMux
+import modelmux.*
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -145,9 +145,10 @@ class HermesPenDelegatesTest {
             model("fixture", caps = setOf("chat", "tools"), baseUrl = "https://fixture.invalid/v1")
         }
         val blackboard = ConfixBlackboard.empty()
+        val breadcrumbs = BreadcrumbElement()
         try {
             guest().use { g ->
-                HermesPen(blackboard, modelMux = mux, muxContext = htx).install(g)
+                HermesPen(blackboard, modelMux = mux, muxContext = htx + breadcrumbs).install(g)
                 val out = g.eval("""
                     import json
                     request = {
@@ -157,7 +158,7 @@ class HermesPenDelegatesTest {
                         ],
                         'tools': [{'type':'function','function':{'name':'lookup','parameters':{'type':'object'}}}]
                     }
-                    structured = json.loads(host.call('mux_completion', 'fixture', json.dumps(request)))
+                    structured = json.loads(host.call('mux_completion', 'fixture', json.dumps(request), 1500, 'hermes-session'))
                     assert structured['verdict'] == 'ok', structured
                     text = json.loads(host.call('mux_converse', 'fixture', 'hello'))
                     (structured['verdict'], structured['completion']['choices'][0]['message']['tool_calls'][0]['id'],
@@ -171,7 +172,51 @@ class HermesPenDelegatesTest {
             assertEquals("call-1", request.value("messages", 1, "tool_call_id"))
             assertEquals("µ 🦉", request.value("messages", 1, "content"))
             assertEquals("lookup", request.value("tools", 0, "function", "name"))
+            assertEquals(null, request.getAt("tools", 1), "Observation must not advertise a tool Hermes cannot execute")
+            assertEquals(null, request.getAt("breadcrumb_context"))
+            val submitted = BreadcrumbModelHost(mux, breadcrumbs).handle(parseHtxRequest(
+                "http://localhost/v1/breadcrumbs?context=hermes-session&view=submitted", method = HtxMethod.GET))!!
+            assertEquals(200, submitted.status)
+            val snapshot = confixDoc(submitted.body.toArray().decodeToString())
+            assertEquals(true, snapshot.value("exact"))
+            assertEquals("call-1", snapshot.value("messages", 0, "tool_call_id"))
+            assertEquals(request.value("messages", 1, "content"), snapshot.value("messages", 0, "content"))
             assertEquals(true, (blackboard.get("hermes/python/pen/mux_completion/1") as Map<*, *>)["ok"])
+        } finally { htx.close() }
+    }
+
+    @Test
+    fun guestCompletionWithoutSessionKeepsOnlyAssessmentIdentity() = runBlocking {
+        var calls = 0
+        val htx = openHtxElement(routeService = object : HtxRouteService {
+            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
+                calls++
+                val reply = HtxResponse(200, body = ByteSeries(
+                    """{"choices":[{"message":{"role":"assistant","content":"answer"}}]}""".encodeToByteArray()))
+                return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request, response = reply))
+            }
+        })
+        val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
+            model("fixture", caps = setOf("chat"), baseUrl = "https://fixture.invalid/v1")
+        }
+        val breadcrumbs = BreadcrumbElement()
+        try {
+            guest().use { g ->
+                HermesPen(ConfixBlackboard.empty(), modelMux = mux, muxContext = htx + breadcrumbs,
+                    contextId = { "input-cause" }).install(g)
+                assertEquals(Teleported.Bool(true), g.eval("""
+                    import json
+                    request = {'messages':[{'role':'user','content':'hello'}]}
+                    result = json.loads(host.call('mux_completion', 'fixture', json.dumps(request), 1500, ''))
+                    assert result['verdict'] == 'ok', result
+                    True
+                """.trimIndent(), "pen-sessionless-completion.py"))
+            }
+            assertEquals(1, calls)
+            val call = mux.activity.snapshot().single()
+            assertEquals("input-cause", call.assessmentId)
+            assertEquals(null, call.contextId)
+            assertEquals(0, breadcrumbs.snapshot().size)
         } finally { htx.close() }
     }
 

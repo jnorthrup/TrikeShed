@@ -89,19 +89,19 @@ class CouchAttachmentGateway(
         )
     }
 
-    fun deleteAttachment(path: String, revision: String) {
-        val doc = couchStore.get(path) ?: return
+    /** Tombstone [path] when it still carries [revision]; false when it is already gone or has moved on. */
+    fun deleteAttachment(path: String, revision: String): Boolean {
+        val doc = couchStore.get(path) ?: return false
         val currentRev = doc.fields.find { it.name == "revision" }?.value as? String
-        if (currentRev == revision) {
-            val tombstone = Document(
-                id = path,
-                fields = listOf(
-                    Field("deleted", "true"),
-                    Field("revision", revision)
-                )
+        if (currentRev != revision) return false
+        val tombstone = Document(
+            id = path,
+            fields = listOf(
+                Field("deleted", "true"),
+                Field("revision", revision)
             )
-            couchStore.put(tombstone, couchStore.head.getRev(path))
-        }
+        )
+        return couchStore.put(tombstone, couchStore.head.getRev(path))
     }
 
     fun listAttachments(prefix: String): List<OroborosAttachmentRef> {

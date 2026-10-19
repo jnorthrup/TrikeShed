@@ -127,8 +127,8 @@ class LcncPublisher(
                 "params" to c.params.mapValues { p ->
                     mapOf(
                         "v" to p.value.v, "opts" to p.value.opts, "optsFrom" to p.value.optsFrom,
-                        "ta" to p.value.ta, "ph" to p.value.ph,
-                        "cols" to p.value.cols, "optional" to p.value.optional,
+                        "ta" to p.value.ta, "ph" to p.value.ph, "code" to p.value.code,
+                        "cols" to p.value.cols, "colsParam" to p.value.colsParam, "optional" to p.value.optional,
                     )
                 },
                 "source" to c.isSource, "sink" to c.isSink, "wide" to c.wide, "effect" to c.isEffect,

@@ -12,7 +12,6 @@ import keymux.EnvVarSource
 import keymux.FixedKeySource
 import keymux.HarnessRegistry
 import keymux.KeyMux
-import keymux.harness
 import modelmux.Airgap
 import modelmux.ModelEntry
 import modelmux.ModelMux
@@ -50,8 +49,7 @@ class BrainNoRoute(val attempts: List<String>) :
  * the system prompt.
  *
  * The routing/key design is authoritative here: provider selection goes through
- * ModelMux and credential resolution goes through KeyMux. Environment variables
- * are used only to discover which bootstrap bindings exist.
+ * ModelMux and environment credential resolution goes through KeyMux.
  *
  * When an external [keyMux] and/or [modelMux] are provided, BrainClient uses
  * those shared instances — the MuxReactor tracks quota, leases, and provider
@@ -61,11 +59,8 @@ class BrainNoRoute(val attempts: List<String>) :
  * DISCOVERY (external keyMux): when an external [keyMux] is provided, the
  * endpoint roster is NOT env-gated — the full [rosterInto] table is admitted,
  * stably ordered so env-present providers come first ([orderEnvFirst]), and
- * per-call resolution through the shared KeyMux/harness lane decides key
- * presence at chat time. Harness-file-only setups (~/.hermes/.env, auth.json
- * via keymux `harness()`) therefore yield a full roster with per-call key
- * resolution instead of an empty roster. Standalone mode (keyMux == null)
- * keeps the historic env-gated [discoverEndpoints] behaviour unchanged.
+ * per-call resolution through the shared KeyMux decides key presence at chat
+ * time. Standalone mode (keyMux == null) uses env-gated [discoverEndpoints].
  */
 open class BrainClient(
     /** If non-null, overrides auto-discovery and uses a single endpoint. */
@@ -76,8 +71,7 @@ open class BrainClient(
     /**
      * External KeyMux — shared with the daemon. When provided, provider discovery
      * is UN-GATED: the full roster is admitted (env-present providers ordered
-     * first) and this key pool resolves credentials per call — harness-file-only
-     * setups get a full roster instead of an empty one — while the MuxReactor
+     * first) and KeyMux resolves credentials per call while the MuxReactor
      * tracks all key accesses. Null = create internal KeyMux from env
      * (standalone mode, env-gated discovery unchanged).
      */
@@ -204,10 +198,8 @@ open class BrainClient(
          * [HarnessRegistry] provider id sharing [envVar], when one exists — auto-derived,
          * never hand-mapped, so a wrong tag can't silently route a call to the wrong
          * provider's key. Passed to [modelmux.ModelMuxBuilder.model] as `provider` so
-         * [modelmux.ModelMux.session] resolves via the pooled `llm.<provider>.key` path —
-         * the one [keymux.HarnessSource] actually answers from the operator's real
-         * credential stores (hermes profile .env/auth.json, codex, opencode), not just
-         * this class's own literal per-model-id bindings ([buildKeyMux], standalone-only).
+         * [modelmux.ModelMux.session] resolves `llm.<provider>.key` through the
+         * provider's environment aliases, alongside the per-model bindings in [buildKeyMux].
          */
         val provider: String? = providerTagFor(envVar),
     )
@@ -215,7 +207,7 @@ open class BrainClient(
     private val endpoints: List<EndpointSpec> = when {
         apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
         // External keyMux: the full roster is admitted (env-present providers
-        // first) — per-call KeyMux/harness resolution decides key presence.
+        // first) — per-call KeyMux resolution decides key presence.
         this.keyMux != null -> orderEnvFirst(fullRoster())
         else -> discoverEndpoints()
     }
@@ -344,7 +336,27 @@ open class BrainClient(
         if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
 
         return withTimeout(outerBudgetMs()) {
-            chatInner(messages, maxTokens, temperature, contextId)
+            chatInner(messages, maxTokens, temperature, contextId).first
+        }
+    }
+
+    /** An authored route list is an allowlist, not a preference for unrestricted failover. */
+    internal fun selectEndpoints(models: Series<EndpointModel>): List<EndpointSpec> = models.view.map { pair ->
+        endpoints.firstOrNull { it.name == pair.a && it.model == pair.b }
+            ?: throw IllegalArgumentException("Unknown endpoint/model pair: ${pair.a}/${pair.b}")
+    }.distinct()
+
+    /** Returns the answering model with this call, without reading shared lastModel state. */
+    open suspend fun chat(
+        options: BrainChatOptions,
+        messages: List<Pair<String, String>>,
+        contextId: String? = null,
+    ): Pair<String, String> {
+        val selected = if (options.models.size == 0) null else selectEndpoints(options.models)
+        Airgap.requireRemote()
+        if (endpoints.isEmpty()) error("Brain: no provider endpoints discovered")
+        return withTimeout(outerBudgetMs()) {
+            chatInner(messages, options.maxTokens, options.temperature, contextId, selected)
         }
     }
 
@@ -379,12 +391,15 @@ open class BrainClient(
         maxTokens: Int,
         temperature: Double,
         contextId: String?,
-    ): String {
+        selected: List<EndpointSpec>? = null,
+    ): Pair<String, String> {
         var lastError = "all providers exhausted"
         val routed = internalModelMux.route("conflict-resolve").a
-        for (modelId in orderedModelIds(routed)) {
+        val modelIds = orderedModelIds(routed)
+        val candidates = selected?.filter { it.model in modelIds } ?: modelIds.mapNotNull(endpointByModel::get)
+        for (endpoint in candidates) {
             currentCoroutineContext().ensureActive()
-            val endpoint = endpointByModel[modelId] ?: continue
+            val modelId = endpoint.model
             if (endpoint.name in retiredVerdicts) continue
 
             // Route through ModelMux.chat() — uses HtxKey from coroutine context,
@@ -398,13 +413,14 @@ open class BrainClient(
                         assessmentId = contextId,
                         maxTokens = maxTokens,
                         temperature = temperature,
+                        expectedBaseUrl = if (selected == null) null else endpoint.base,
                     ).getOrThrow() // chat() is already Result-shaped; unwrap so fold sees AcpResponse, not Result<Result<…>>
                 }
             }
             result.fold(
                 onSuccess = { response ->
                     lastGoodModelId = modelId
-                    return response.a  // AcpResponse.a = full_text content
+                    return response.a to modelId // This invocation's content and provenance.
                 },
                 onFailure = { t ->
                     if (t is Airgap.Rejection) throw t
@@ -517,9 +533,7 @@ open class BrainClient(
             endpoints.forEach { endpoint ->
                 bind("llm.${endpoint.model}.key", EnvVarSource(endpoint.envVar))
             }
-            // Harness fallback: when an endpoint's own env var is absent, the key can
-            // still resolve from hermes .env / codex / opencode credential stores.
-            harness()
+            env()
         }
     }
 

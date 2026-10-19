@@ -2,247 +2,399 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.*
 import borg.trikeshed.parse.jsonOf
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.concurrent.Volatile
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
 
-/**
- * CouncilCaseRegistry — the per-case job nexus for council rulings.
- *
- * The legacy tribunal boots ONE [TribunalInstance] singleton whose lanes are
- * the preset's kanban lanes; a second case advanced through it would collide
- * with the first (the singleton regression). The council instead opens a
- * lazy per-case nexus: each case gets its own [borg.trikeshed.job.JobSupervisorElement]
- * (schema → CAS → WAL → reducer) wrapped in a [TribunalInstance] — reusing
- * the schema gate and awaitCommit verbatim, no TribunalInstance edits — under
- * a per-case child scope so eviction can cancel the whole pipeline.
- *
- * Lifecycle per case: seeded on the first record call — `submit`, then the
- * nexus rete's own auto-start (JobDependencyProduction starts dependency-free
- * submitted jobs; an explicit start is issued only when no auto-start lands) —
- * then exactly ONE terminal advance: `complete` (ruling) or `fail`
- * (mistrial). Idempotency is two-layer: the registry caches the snapshot cid
- * per evidence-complete command digest and returns it WITHOUT re-advancing.
- * Receipts and lifecycle are recovered from the supplied command log on open;
- * the reducer's own idempotencyKey dedupe backstops the live cache.
- * A per-case [Mutex] serializes concurrent recorders, so two parallel
- * recordings of the same verdict land exactly one advance.
- *
- * Close-after-commit: a terminal entry is closed for further commits but
- * RETAINED for idempotency reads; when live entries exceed [cap], the oldest
- * terminal entries are evicted by cancelling their child scope (the leak the
- * boot singleton never had to face — the council convenes many cases).
- * An evicted case still answers [recordedCid] from cache.
- *
- * Every advance failure (schema rejection, stale revision, reducer reject)
- * surfaces as a thrown exception naming the case — loud, never swallowed.
- */
+/** One per-case nexus and mutex, borrowing the caller's storage and parent lifetime. */
 class CouncilCaseRegistry(
     private val scope: CoroutineScope,
     private val plan: ConfixFacetPlan,
     private val cap: Int = 64,
     private val componentFactories: (String) -> JobNexusComponentFactories = { JobNexusComponentFactories() },
 ) {
+    private val parentJob = requireNotNull(scope.coroutineContext[Job]) { "CouncilCaseRegistry requires a parent Job" }
+    init { require(cap > 0) { "Council case capacity must be positive" } }
+    private val ownerJob: CompletableJob = SupervisorJob(parentJob)
 
-    private inner class CaseEntry(val caseId: String) {
+    class Capacity(val limit: Int) : IllegalStateException("Council case capacity exhausted: $limit")
+    class Missing(val caseId: String) : IllegalStateException("Unknown council case: $caseId")
+
+    /** Every access belongs to the active callback; no command/event channel or mutable owner escapes. */
+    class Case internal constructor(
+        val caseId: String,
+        val jobId: JobId,
+        private val nexus: JobSupervisorElement,
+        private val cas: CasStore,
+        private val guard: suspend () -> Unit,
+        private val readOnly: Boolean,
+        private val seedCase: suspend (String, String) -> Unit,
+    ) {
+        data class Commit(val cid: ContentId, val snapshot: JobSnapshot)
+        @Volatile private var valid = true
+        private val commands = Mutex()
+        internal fun expire() { valid = false }
+        private suspend fun checkOwner() { currentCoroutineContext().ensureActive(); check(valid) { "Council case view expired" }; guard() }
+        private fun checkMutable() {
+            check(!readOnly && nexus.snapshot(jobId)?.lifecycle !in setOf("closed", "failed")) {
+                "Council case view is read-only"
+            }
+        }
+        suspend fun seed(seedKey: String, startKey: String) = commands.withLock {
+            checkOwner()
+            checkMutable()
+            withContext(NonCancellable) { seedCase(seedKey, startKey) }
+        }
+        suspend fun snapshot(): JobSnapshot? { checkOwner(); return nexus.snapshot(jobId) }
+        suspend fun snapshotCid(): ContentId? { checkOwner(); return nexus.snapshotCid(jobId.value) }
+        suspend fun receipt(key: String): ContentId? { checkOwner(); return nexus.receipt(key) }
+
+        /** One admitted command owns its matching event and authenticated receipt before releasing the gate. */
+        suspend fun advance(command: JobCommand): Commit = commands.withLock {
+            checkOwner()
+            checkMutable()
+            require(command.jobId == jobId) { "Council case command names another job" }
+            check(nexus.receipt(command.idempotencyKey) == null) { "Council case request already accepted: ${command.idempotencyKey}" }
+            // Admission owns delivery and acknowledgement even if the caller is then cancelled.
+            withContext(NonCancellable) {
+                nexus.submit(command)
+                while (true) {
+                    val event = nexus.committed.receive()
+                    if (event.idempotencyKey != command.idempotencyKey) continue
+                    val eventJob = when (event) {
+                        is JobEvent.Accepted -> event.jobId
+                        is JobEvent.Rejected -> event.jobId
+                    }
+                    check(eventJob == jobId) { "Council case acknowledgement names another job" }
+                    check(event is JobEvent.Accepted) { "Council case '${caseId}': command rejected: $event" }
+                    val cid = checkNotNull(nexus.receipt(command.idempotencyKey)) { "Accepted council case request has no receipt" }
+                    val bytes = checkNotNull(cas.get(cid)) { "Council case receipt is missing: $cid" }
+                    check(ContentId.of(bytes) == cid) { "Council case receipt digest mismatch: $cid" }
+                    val snapshot = CanonicalCbor.decodeJobSnapshot(bytes)
+                    check(snapshot.jobId == jobId) { "Council case receipt names another job" }
+                    snapshot.stateCid?.let { cas.verifyState(it) }
+                    return@withContext Commit(cid, snapshot)
+                }
+                error("Council case acknowledgement loop ended")
+            }
+        }
+    }
+
+    private class Call(val registry: CouncilCaseRegistry, val caseId: String, val parent: Call?) : AbstractCoroutineContextElement(Key) {
+        companion object Key : CoroutineContext.Key<Call>
+    }
+
+    private fun Call?.contains(registry: CouncilCaseRegistry, caseId: String? = null): Boolean {
+        var call = this
+        while (call != null) {
+            if (call.registry === registry && (caseId == null || call.caseId == caseId)) return true
+            call = call.parent
+        }
+        return false
+    }
+
+    private inner class CaseEntry(val caseId: String, factories: JobNexusComponentFactories) {
         val jobId = "case/$caseId"
-        val childJob: Job = SupervisorJob(scope.coroutineContext[Job])
+        val childJob: CompletableJob = SupervisorJob(ownerJob)
         val childScope = CoroutineScope(scope.coroutineContext + childJob)
-        val instance = try { TribunalInstance(
-            JobNexusFactory.open(
-                spec = JobNexusSpec(),
-                bindings = JobNexusBindings(parentScope = childScope, componentFactories = componentFactories(caseId)),
-            ),
-            plan,
-            listOf(jobId),
-        ) } catch (failure: Throwable) {
+        private var caseCas: CasStore? = null
+        val cas: CasStore get() = checkNotNull(caseCas)
+        val instance = try {
+            val bound = JobNexusComponentFactories(factories.scopeFactory,
+                CasStoreFactory { factories.casStoreFactory().also { caseCas = it } }, factories.walFactory,
+                factories.indexFactory, factories.reteFactory, factories.projectionFactory, factories.checkpointFactory)
+            TribunalInstance(JobNexusFactory.open(JobNexusSpec(),
+                JobNexusBindings(parentScope = childScope, componentFactories = bound)), plan, listOf(jobId))
+        } catch (failure: Throwable) {
             childJob.cancel()
             throw failure
         }
+        init {
+            // A dispatcher may cancel an unstarted reactor before its catch can close these channels.
+            childJob.invokeOnCompletion { cause -> if (cause != null) instance.nexus.cancel(cause) }
+        }
         val mutex = Mutex()
-
-        /** idempotency key → the snapshot cid that record returned. */
         val recordedByKey = mutableMapOf<String, String>()
         var terminal = instance.lifecycle(jobId) in setOf("closed", "failed")
         var lastRecordedCid: String? = if (terminal) instance.snapshotCid(jobId) else null
         var seeded = instance.lifecycle(jobId) == "active" || terminal
         var terminalAt = 0L
+        var pins = 0
+        var closing = false
+        var closed: CompletableDeferred<Unit>? = null
         var evicted = false
     }
 
     private val entriesLock = Mutex()
     private val entries = LinkedHashMap<String, CaseEntry>()
+    private val operations = MutableStateFlow(0)
+    private val drained = CompletableDeferred<Result<Unit>>()
+    @Volatile private var accepting = true
+    @Volatile private var aborted = false
+    private var drainStarted = false
     private var terminalClock = 0L
 
     private companion object {
-        /** Bound on waiting for the nexus rete's auto-start commit (ms). */
         const val AUTO_START_WAIT_MS = 2_000
     }
 
-    /**
-     * Record the case's ruling: advance its job to `closed` and return the
-     * committed snapshot cid. Idempotent per (caseId, verdictCid, transcriptCid) — a repeat
-     * returns the cached cid without advancing the job again.
-     */
-    suspend fun recordRuling(caseId: String, verdictCid: String, transcriptCid: String): String =
-        record(
-            caseId = caseId,
-            idempotencyKey = ContentId.of(jsonOf(listOf("council-ruling", caseId, verdictCid, transcriptCid)).encodeToByteArray()).value,
-            operation = "complete",
-            reason = "",
-        )
+    suspend fun recordRuling(caseId: String, verdictCid: String, transcriptCid: String): String = record(
+        caseId, ContentId.of(jsonOf(listOf("council-ruling", caseId, verdictCid, transcriptCid)).encodeToByteArray()).value,
+        "complete", "",
+    )
 
-    /**
-     * Record a mistrial: advance the case's job through the `fail` operation
-     * (lifecycle `failed`) with [reason] on the record. Idempotent per
-     * (caseId, reason).
-     */
-    suspend fun recordMistrial(caseId: String, reason: String): String =
-        record(
-            caseId = caseId,
-            idempotencyKey = ContentId.of(jsonOf(listOf("council-mistrial", caseId, reason)).encodeToByteArray()).value,
-            operation = "fail",
-            reason = reason,
-        )
+    suspend fun recordMistrial(caseId: String, reason: String): String = record(
+        caseId, ContentId.of(jsonOf(listOf("council-mistrial", caseId, reason)).encodeToByteArray()).value,
+        "fail", reason,
+    )
 
-    /** Entries whose nexus is still alive (not evicted). */
-    fun liveCases(): Int = entries.values.count { !it.evicted }
-
-    /** The snapshot cid a terminal record returned — answers from cache even after eviction. */
+    fun liveCases(): Int = if (aborted) 0 else entries.values.count { !it.evicted }
     fun recordedCid(caseId: String): String? = entries[caseId]?.lastRecordedCid
-
-    /** Tracked lifecycle of the case's job, when the case is known. */
     fun lifecycle(caseId: String): String? = entries[caseId]?.let { it.instance.lifecycle(it.jobId) }
-
-    /** Committed revision of the case's job, when the case is known. */
     fun revision(caseId: String): Long? = entries[caseId]?.let { it.instance.revision(it.jobId) }
 
-    /** Cancel every live case's nexus and child scope (shutdown / test teardown). */
-    fun close() {
-        for (entry in entries.values) evict(entry)
-    }
-
-    private suspend fun record(
-        caseId: String,
-        idempotencyKey: String,
-        operation: String,
-        reason: String,
-    ): String {
-        val entry = entriesLock.withLock { entries.getOrPut(caseId) { CaseEntry(caseId) } }
-        val cid = entry.mutex.withLock {
-            // Idempotency first: a repeat of a recorded key answers from cache
-            // WITHOUT re-advancing — even on an evicted (cancelled) entry.
-            entry.recordedByKey[idempotencyKey]?.let { return@withLock it }
-            entry.instance.nexus.receipt(idempotencyKey)?.let { return@withLock it.value }
-            if (entry.terminal) throw IllegalStateException(
-                "council case '$caseId' is closed for commits " +
-                    "(already terminal: ${entry.instance.lifecycle(entry.jobId)}); " +
-                    "new record '$idempotencyKey' refused",
-            )
-
-            // Lazy seed on the first record: submit → start (root at revision 1,
-            // active at revision 2) through the schema-gated advance.
-            if (!entry.seeded) {
-                seed(entry)
-                entry.seeded = true
-            }
-
-            drainCommitted(entry)
-            advanceLoud(entry, operation, idempotencyKey, entry.instance.revision(entry.jobId) ?: 1L, reason)
-            val snapshotCid = entry.instance.snapshotCid(entry.jobId)
-                ?: throw IllegalStateException("council case '$caseId': no snapshot cid after '$operation' commit")
-            entry.recordedByKey[idempotencyKey] = snapshotCid
-            entry.lastRecordedCid = snapshotCid
-            entry.terminal = true
-            entry.terminalAt = ++terminalClock
-            snapshotCid
+    /** The callback includes its actual execution and later ordinary run receipt persistence. */
+    suspend fun <T> withCase(caseId: String, create: Boolean, body: suspend (Case) -> T): T {
+        var borrowed: Case? = null
+        return withEntry(caseId, create, { borrowed?.expire() }) { entry ->
+            val call = checkNotNull(currentCoroutineContext()[Call])
+            val view = Case(caseId, JobId.of(entry.jobId), entry.instance.nexus, entry.cas,
+                guard = { check(currentCoroutineContext()[Call] === call) { "Council case view belongs to another callback" } },
+                readOnly = entry.evicted || entry.terminal || entry.instance.lifecycle(entry.jobId) in setOf("closed", "failed"),
+                seedCase = { seedKey, startKey ->
+                    if (!entry.seeded) {
+                        seed(entry, seedKey, startKey)
+                        entry.seeded = true
+                    }
+                })
+            borrowed = view
+            body(view)
         }
-        evictOverCap()
-        return cid
     }
 
-    /**
-     * Seed the case's job to `active`. The nexus's rete registers
-     * [borg.trikeshed.dag.JobDependencyProduction] by default, which
-     * AUTO-STARTS a dependency-free submitted job by injecting its own
-     * `Start` command — racing it with an explicit start poisons the
-     * committed-event stream with the loser's rejection. So: submit, then
-     * WAIT for the auto-start commit (bounded, loud on timeout), falling
-     * back to an explicit start only if no auto-start ever lands.
-     */
-    private suspend fun seed(entry: CaseEntry) {
+    private suspend fun <T> withEntry(caseId: String, create: Boolean, exit: () -> Unit = {}, body: suspend (CaseEntry) -> T): T {
+        require(caseId.isNotBlank()) { "Empty council case id" }
+        currentCoroutineContext().ensureActive()
+        val caller = currentCoroutineContext()[Call]
+        check(!caller.contains(this, caseId)) { "Council case '$caseId' cannot enter itself" }
+        val entry = acquire(caseId, create)
+        try {
+            return entry.mutex.withLock {
+                check(!aborted && parentJob.isActive && (entry.childJob.isActive ||
+                    entry.evicted && entry.terminal && entry.childJob.isCompleted)) { "Council case owner stopped" }
+                withContext(Call(this, caseId, caller)) { body(entry) }
+            }
+        } finally {
+            exit() // Expire the view after structured children settle, before unpinning or suspending.
+            withContext(NonCancellable) {
+                entriesLock.withLock {
+                    check(entry.pins > 0 && operations.value > 0)
+                    if (!entry.terminal && entry.instance.lifecycle(entry.jobId) in setOf("closed", "failed")) {
+                        entry.terminal = true
+                        entry.lastRecordedCid = entry.instance.snapshotCid(entry.jobId)
+                        entry.terminalAt = ++terminalClock
+                    }
+                    entry.pins--
+                    operations.value--
+                }
+            }
+        }
+    }
+
+    private suspend fun acquire(caseId: String, create: Boolean): CaseEntry {
+        entriesLock.withLock {
+            check(accepting && !aborted && parentJob.isActive) { "Council case admission stopped" }
+            operations.value++ // Includes an admitted open/eviction preparation before its entry pin exists.
+        }
+        try {
+            while (true) {
+                var victim: CaseEntry? = null
+                var closing: Deferred<Unit>? = null
+                var inactive: CaseEntry? = null
+                val found = entriesLock.withLock {
+                    check(!aborted && parentJob.isActive) { "Council case owner stopped during admission" }
+                    entries[caseId]?.let { entry ->
+                        if (entry.closing) closing = checkNotNull(entry.closed)
+                        else { entry.pins++; return@withLock entry }
+                        return@withLock null
+                    }
+                    if (entries.values.count { !it.evicted } >= cap) {
+                        victim = entries.values.filter { !it.evicted && !it.closing && it.terminal && it.pins == 0 }
+                            .minByOrNull { it.terminalAt }
+                        val selected = victim ?: throw Capacity(cap)
+                        selected.closing = true
+                        selected.closed = CompletableDeferred()
+                        return@withLock null
+                    }
+                    val source = componentFactories(caseId)
+                    val factories = if (create) source else {
+                        val log = source.walFactory()
+                        if (log.replay().none()) throw Missing(caseId)
+                        JobNexusComponentFactories(source.scopeFactory, source.casStoreFactory, JobLogFactory { log },
+                            source.indexFactory, source.reteFactory, source.projectionFactory, source.checkpointFactory)
+                    }
+                    // The global lock reserves capacity before any child/nexus allocation.
+                    check(!aborted && parentJob.isActive) { "Council case owner stopped during preparation" }
+                    val entry = CaseEntry(caseId, factories)
+                    entries[caseId] = entry
+                    if (aborted || !parentJob.isActive || !entry.childJob.isActive) {
+                        entry.closing = true
+                        entry.closed = CompletableDeferred()
+                        inactive = entry
+                        null
+                    } else { entry.pins++; entry }
+                }
+                if (found != null) return found
+                inactive?.let {
+                    closeEntry(it)
+                    error("Council case parent stopped during open")
+                }
+                closing?.await()
+                victim?.let { closeEntry(it) }
+            }
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) { entriesLock.withLock { operations.value-- } }
+            throw failure
+        }
+    }
+
+    private suspend fun record(caseId: String, key: String, operation: String, reason: String): String {
+        // Immutable terminal cache reads survive abort/drain; lookup shares the writers' lock.
+        val recorded = entriesLock.withLock {
+            val entry = entries[caseId] ?: return@withLock null
+            entry.recordedByKey[key] ?: if (entry.terminal && entry.instance.nexus.snapshot(entry.jobId)?.stateCid == null)
+                entry.instance.nexus.receipt(key)?.value else null
+        }
+        if (recorded != null) return recorded
+        return withEntry(caseId, true) { entry ->
+            withContext(NonCancellable) {
+                entry.recordedByKey[key]?.let { return@withContext it }
+                check(entry.instance.nexus.snapshot(entry.jobId)?.stateCid == null) {
+                    "council case '$caseId' has an FSM head; terminal-only record refused"
+                }
+                entry.instance.nexus.receipt(key)?.let { return@withContext it.value }
+                check(!entry.terminal) { "council case '$caseId' is closed for commits (already terminal)" }
+                if (!entry.seeded) {
+                    seed(entry, "council-case-$caseId", "council-case-$caseId-start")
+                    entry.seeded = true
+                }
+                drainCommitted(entry)
+                advanceLoud(entry, operation, key, checkNotNull(entry.instance.revision(entry.jobId)), reason)
+                val cid = checkNotNull(entry.instance.snapshotCid(entry.jobId)) { "council case '$caseId': missing terminal snapshot" }
+                entriesLock.withLock {
+                    entry.recordedByKey[key] = cid
+                    entry.lastRecordedCid = cid
+                    entry.terminal = true
+                    entry.terminalAt = ++terminalClock
+                }
+                cid
+            }
+        }
+    }
+
+    private suspend fun seed(entry: CaseEntry, seedKey: String, startKey: String) {
         val recovered = entry.instance.lifecycle(entry.jobId)
         check(recovered == null || recovered == "submitted") { "Cannot seed council case '${entry.caseId}' from '$recovered'" }
         if (recovered == "submitted") {
-            // Replay restores the reducer, not live Rete activations. Do not submit twice.
-            advanceLoud(entry, "start", "council-case-${entry.caseId}-start", requireNotNull(entry.instance.revision(entry.jobId)))
+            advanceLoud(entry, "start", startKey, checkNotNull(entry.instance.revision(entry.jobId)))
             return
         }
-        advanceLoud(entry, "submit", "council-case-${entry.caseId}", 0L)
+        advanceLoud(entry, "submit", seedKey, 0L)
         var waitedMs = 0
         while (entry.instance.lifecycle(entry.jobId) != "active" && waitedMs < AUTO_START_WAIT_MS) {
             delay(1)
             waitedMs++
         }
         if (entry.instance.lifecycle(entry.jobId) != "active") {
-            // No auto-starter in this nexus build — start explicitly.
             drainCommitted(entry)
-            advanceLoud(entry, "start", "council-case-${entry.caseId}-start", entry.instance.revision(entry.jobId) ?: 1L)
+            advanceLoud(entry, "start", startKey, checkNotNull(entry.instance.revision(entry.jobId)))
         }
     }
 
-    /**
-     * Discard committed events nobody awaited (the rete auto-start's accept,
-     * a raced command's rejection) so the NEXT advance's awaited commit is
-     * attributed to its own command — the nexus assumes one command in
-     * flight, and the auto-starter breaks that assumption.
-     */
     private fun drainCommitted(entry: CaseEntry) {
-        while (entry.instance.nexus.committed.tryReceive().isSuccess) {
-            // drained
-        }
+        while (entry.instance.nexus.committed.tryReceive().isSuccess) { }
     }
 
-    /** Advance and THROW (with the case named) on any rejection or failure. */
-    private suspend fun advanceLoud(
-        entry: CaseEntry,
-        operation: String,
-        idempotencyKey: String,
-        expectedRevision: Long,
-        reason: String = "",
-    ) {
-        val event = try {
-            entry.instance.advance(entry.jobId, operation, idempotencyKey, expectedRevision, reason)
-        } catch (t: Throwable) {
-            throw IllegalStateException(
-                "council case '${entry.caseId}': '$operation' advance failed: ${t.message}", t,
-            )
+    private suspend fun advanceLoud(entry: CaseEntry, operation: String, key: String, revision: Long, reason: String = "") {
+        val event = try { entry.instance.advance(entry.jobId, operation, key, revision, reason) }
+        catch (failure: Throwable) {
+            throw IllegalStateException("council case '${entry.caseId}': '$operation' advance failed: ${failure.message}", failure)
         }
-        if (event is JobEvent.Rejected) throw IllegalStateException(
-            "council case '${entry.caseId}': '$operation' advance rejected: ${event.reason}",
-        )
+        check(event is JobEvent.Accepted) { "council case '${entry.caseId}': '$operation' advance rejected: $event" }
     }
 
-    /** Close-after-commit: evict oldest TERMINAL entries while live count exceeds the cap. */
-    private suspend fun evictOverCap() {
-        entriesLock.withLock {
-            while (entries.values.count { !it.evicted } > cap) {
-                val victim = entries.values
-                    .filter { it.terminal && !it.evicted }
-                    .minByOrNull { it.terminalAt }
-                    ?: break // nothing terminal to evict — live non-terminal cases stay
-                evict(victim)
+    /** Stop new operations, finish admitted callbacks/receipts, then drain every nexus and child. */
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        check(!currentCoroutineContext()[Call].contains(this@CouncilCaseRegistry)) { "Council case cannot drain its own registry" }
+        val leader = entriesLock.withLock {
+            if (drainStarted) false else { drainStarted = true; accepting = false; true }
+        }
+        if (!leader) { drained.await().getOrThrow(); return@withContext }
+        var failure: Throwable? = null
+        try {
+            operations.first { it == 0 }
+            val pending = entriesLock.withLock {
+                entries.values.filter { !it.evicted || !it.childJob.isCompleted }.onEach { entry ->
+                    check(!entry.closing)
+                    entry.closing = true
+                    entry.closed = CompletableDeferred()
+                }
+            }
+            for (entry in pending) try { closeEntry(entry) }
+            catch (caught: Throwable) {
+                if (failure == null) failure = caught else if (failure !== caught) failure!!.addSuppressed(caught)
+            }
+        } catch (caught: Throwable) { failure = caught }
+        if (failure != null) ownerJob.cancel() else ownerJob.complete()
+        ownerJob.join()
+        val result = failure?.let { Result.failure<Unit>(it) } ?: Result.success(Unit)
+        drained.complete(result)
+        result.getOrThrow()
+    }
+
+    private suspend fun closeEntry(entry: CaseEntry): Unit = withContext(NonCancellable) {
+        var failure: Throwable? = null
+        try {
+            entry.mutex.withLock {
+                coroutineScope {
+                    val output = launch {
+                        while (true) {
+                            val event = entry.instance.nexus.committed.receiveCatching()
+                            if (event.isClosed) {
+                                event.exceptionOrNull()?.let {
+                                    if (failure == null && !(it is CancellationException && (aborted || !parentJob.isActive))) failure = it
+                                }
+                                break
+                            }
+                        }
+                    }
+                    try { entry.instance.nexus.drain() }
+                    catch (caught: Throwable) { failure = caught; entry.instance.nexus.cancel(caught) }
+                    finally { output.join() }
+                }
+            }
+        } catch (caught: Throwable) { failure = caught }
+        finally {
+            if (failure != null) entry.childJob.cancel() else entry.childJob.complete()
+            entry.childJob.join()
+            entriesLock.withLock {
+                entry.evicted = true
+                entry.closing = false
+                entry.closed?.complete(Unit)
             }
         }
+        failure?.let { throw it }
     }
 
-    private fun evict(entry: CaseEntry) {
-        if (entry.evicted) return
-        entry.instance.nexus.cancel()
-        entry.childJob.cancel()
-        entry.evicted = true
+    /** Explicit abort compatibility. Normal owners use suspend drain(). */
+    fun close() {
+        aborted = true
+        accepting = false
+        ownerJob.cancel() // Includes children constructed concurrently with the abort.
     }
 }

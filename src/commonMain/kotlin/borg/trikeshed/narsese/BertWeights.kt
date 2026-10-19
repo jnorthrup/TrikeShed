@@ -80,8 +80,18 @@ class BertWeights(val config: BertConfig, tensors: Map<String, BertTensor>) {
 
     companion object {
         const val HEADER_BYTES = 1_048_576
-        const val MODEL_BYTES = 536_870_912L
+        const val MODEL_BYTES = 4_294_967_296L
         const val BLOCK_BYTES = 65_536
+
+        /** The masked-LM head; its decoder matrix is tied to `embeddings.word_embeddings.weight`. */
+        fun head(config: BertConfig): Map<String, Shape> = buildMap {
+            val h = config.hiddenSize
+            put("cls.predictions.transform.dense.weight", shapeOf(h, h))
+            put("cls.predictions.transform.dense.bias", shapeOf(h))
+            put("cls.predictions.transform.LayerNorm.weight", shapeOf(h))
+            put("cls.predictions.transform.LayerNorm.bias", shapeOf(h))
+            put("cls.predictions.bias", shapeOf(config.vocabSize))
+        }
 
         /** Only hidden-state parameters: classification heads and the unused pooler remain on disk. */
         fun required(config: BertConfig): Map<String, Shape> = buildMap {
@@ -109,7 +119,7 @@ class BertWeights(val config: BertConfig, tensors: Map<String, BertTensor>) {
         }
 
         /** Filesystem naming comes from the SPI; positioned transfers use the common NIO/uring channel. */
-        fun load(files: FileOperations, directory: String,
+        fun load(files: FileOperations, directory: String, masked: Boolean = false,
                  channels: (String) -> FileChannel = { FileChannel.open(it, StandardOpenOption.READ) }): BertWeights {
             val configPath = files.resolvePath(directory, "config.json")
             val config = withChannel(channels(configPath)) { channel ->
@@ -118,7 +128,7 @@ class BertWeights(val config: BertConfig, tensors: Map<String, BertTensor>) {
                 BertConfig.parse(read(channel, 0, ByteArray(size.toInt())).decodeToString(throwOnInvalidSequence = true))
             }
             val weightsPath = files.resolvePath(directory, "model.safetensors")
-            val selected = required(config)
+            val selected = if (masked) required(config) + head(config) else required(config)
             return withChannel(channels(weightsPath)) { channel ->
                 BertWeights(config, safetensors(channel.size(), { at, bytes -> read(channel, at, bytes) }, selected))
             }
@@ -149,11 +159,17 @@ class BertWeights(val config: BertConfig, tensors: Map<String, BertTensor>) {
                     continue
                 }
                 val name = source.removePrefix("bert.").replace(".LayerNorm.gamma", ".LayerNorm.weight")
-                    .replace(".LayerNorm.beta", ".LayerNorm.bias")
+                    .replace(".LayerNorm.beta", ".LayerNorm.bias").replace("cls.predictions.decoder.bias", "cls.predictions.bias")
                 require(name.isNotBlank() && name !in parameters) { "Duplicate BERT tensor: $name" }
                 val entry = value as? Map<*, *> ?: error("Invalid BERT tensor descriptor: $source")
                 require(entry.keys.toSet().size == entry.size) { "Duplicate BERT tensor $source descriptor field" }
-                require(entry["dtype"] == "F32") { "Unsupported BERT tensor $source dtype: ${entry["dtype"]}" }
+                val width = when (entry["dtype"]) {
+                    "F32", "I32" -> 4; "F64", "I64" -> 8; "F16", "BF16", "I16" -> 2; "I8", "U8", "BOOL" -> 1
+                    else -> error("Unsupported BERT tensor $source dtype: ${entry["dtype"]}")
+                }
+                require(entry["dtype"] == "F32" || (selected != null && name !in selected)) {
+                    "Unsupported BERT tensor $source dtype: ${entry["dtype"]}"
+                }
                 val dims = entry["shape"] as? List<*> ?: error("Missing BERT tensor $source shape")
                 require(dims.size <= 8) { "BERT tensor $source rank exceeds eight" }
                 val shape = IntArray(dims.size) { integer(dims[it], "BERT tensor $source shape", Int.MAX_VALUE.toLong()).toInt() }
@@ -166,7 +182,7 @@ class BertWeights(val config: BertConfig, tensors: Map<String, BertTensor>) {
                 require(offsets.size == 2) { "Invalid BERT tensor $source data_offsets" }
                 val from = integer(offsets[0], "BERT tensor $source offset", size - dataAt)
                 val to = integer(offsets[1], "BERT tensor $source offset", size - dataAt)
-                require(to >= from && to - from == count * 4) { "BERT tensor $source offsets disagree with its F32 shape" }
+                require(to >= from && to - from == count * width) { "BERT tensor $source offsets disagree with its shape" }
                 parameters[name] = shape.toSeries() j (from j to)
             }
             var end = 0L

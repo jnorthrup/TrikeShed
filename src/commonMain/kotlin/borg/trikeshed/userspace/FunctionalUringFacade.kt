@@ -18,8 +18,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.channels.Channel as Queue
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -45,8 +48,15 @@ public interface UserspaceChannelBackend {
     /** Descriptor compatibility with this backend's registered kernel buffers. */
     fun supportsFixedBuffer(fd: Int): Boolean = true
     fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult>
+    /** Coroutine submissions may use nonblocking host bindings while synchronous callers retain their contract. */
+    fun submitDeferredBatch(submissions: List<UringSubmission>): List<SelectionResult> = submitBatch(submissions)
     /** Consume deferred CQEs; zero polls, a positive minimum waits for completion. */
     fun reapCompletions(minComplete: Int = 0): List<SelectionResult> = emptyList()
+    /**
+     * Suspend until a deferred CQE can be reaped. This observes readiness without consuming CQEs.
+     * Readiness is level-triggered across an empty reap and this call; cancellation awaits wait-resource cleanup.
+     */
+    suspend fun awaitCompletions(): Unit = error("Backend has no completion readiness binding")
     /** Quiesce deferred effects and make their terminal cancellation CQEs reapable. */
     fun cancelPending() {}
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
@@ -151,7 +161,13 @@ public class FunctionalUringFacade(
                         }
                     }
                     if (next.isClosed && !remaining) break
-                    if (remaining && next.isFailure) delay(1) else yield()
+                    if (remaining && next.isFailure) {
+                        val admitted = if (next.isClosed) {
+                            backend.awaitCompletions()
+                            null
+                        } else awaitProgress()
+                        admitted?.let { batch -> execution.withLock { admission.withLock { dispatch(batch) } } }
+                    } else yield()
                 }
             } catch (failure: Throwable) {
                 cancelled = failure is CancellationException
@@ -166,6 +182,17 @@ public class FunctionalUringFacade(
         }
     }
 
+    /** Fan in new admissions and kernel readiness without holding the submission or admission locks while waiting. */
+    private suspend fun awaitProgress(): Batch? = coroutineScope {
+        val completion = async(start = CoroutineStart.UNDISPATCHED) { backend.awaitCompletions() }
+        try {
+            select {
+                input.onReceiveCatching { it.getOrNull() }
+                completion.onAwait { null }
+            }
+        } finally { completion.cancelAndJoin() }
+    }
+
     // Only the owning coroutine submits and reaps scoped batches. A suspended
     // native request therefore cannot prevent the next independent batch entering.
     private fun dispatch(batch: Batch) {
@@ -178,7 +205,7 @@ public class FunctionalUringFacade(
             batch.completions.addAll(rejected)
             batch.remaining -= rejected.size
             for (sqe in admitted) inFlight[sqe.userData] = sqe
-            if (admitted.isNotEmpty()) settle(backend.submitBatch(admitted.asList()))
+            if (admitted.isNotEmpty()) settle(backend.submitDeferredBatch(admitted.asList()))
             check(admitted.none {
                 it.userData in inFlight && backend.deferredCapabilities and it.opcode.mask == 0L
             }) { "Backend lost submission completions" }
@@ -227,7 +254,7 @@ public class FunctionalUringFacade(
                         try { settle(backend.reapCompletions(0)) }
                         finally { completeBatches() }
                     }
-                    if (admission.withLock { inFlight.isNotEmpty() }) delay(1)
+                    if (admission.withLock { inFlight.isNotEmpty() }) backend.awaitCompletions()
                 }
                 admission.withLock { closeBackend() }
             }
@@ -366,7 +393,15 @@ public class FunctionalUringFacade(
                 execution.withLock { admission.withLock {
                     try { reap(0) } finally { completeBatches() }
                 } }
-                if (!batch.result.isCompleted) delay(1)
+                if (!batch.result.isCompleted) coroutineScope {
+                    val completion = async(start = CoroutineStart.UNDISPATCHED) { backend.awaitCompletions() }
+                    try {
+                        select {
+                            batch.result.onAwait { }
+                            completion.onAwait { }
+                        }
+                    } finally { completion.cancelAndJoin() }
+                }
             }
             return batch.result.await().getOrThrow()
         } catch (failure: Throwable) {
@@ -380,6 +415,15 @@ public class FunctionalUringFacade(
             }
             throw failure
         }
+    }
+
+    /** Await readiness for compatibility enqueues; scoped rings have their own completion consumer. */
+    suspend fun awaitCompletions() {
+        val waiting = admission.withLock {
+            check(supervisor == null) { "A scoped uring owns its completion waiter" }
+            !closed && completions.isEmpty() && inFlight.isNotEmpty()
+        }
+        if (waiting) backend.awaitCompletions()
     }
 
     /** Submit the prepared queue and suspend until every entry has completed. */

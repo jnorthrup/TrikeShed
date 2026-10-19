@@ -78,7 +78,7 @@ data class DocumentCurationRecord(
     val quotationSubmittedReceiptCids: Series<ContentId> = emptySeriesOf(),
     val quotationDuplicateReceiptCids: Series<ContentId> = emptySeriesOf(),
     /** Capability description used for this model proposal, never executable tool state. */
-    val toolOntology: borg.trikeshed.modelmux.ToolOntologyScaffold = emptySeriesOf(),
+    val toolOntology: Series<String> = emptySeriesOf(),
     /** The EXACT per-call receipt ModelMux minted for [model] — success or failure. Null on records from before this field existed. */
     val receipt: ModelResponseReceipt? = null,
     /** One receipt per executed pipeline stage, in execution order. Empty on records from before receipts existed. */

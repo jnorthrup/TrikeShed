@@ -4,10 +4,7 @@ import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.`ColumnMeta↻`
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.isam.meta.IOMemento
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Tensor
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 import kotlin.jvm.JvmInline
 import kotlin.math.pow
 
@@ -130,7 +127,7 @@ fun hamming(a: Long, b: Long): Int = (a xor b).countOneBits()
  *
  * recall()     returns all concepts as Series<Any>, sorted by energy descending.
  * recallNear() returns concepts within hamming maxDistance of a centroid.
- * budgetTensor() returns a Tensor<Float> of shape [n, 3] (p,d,q per concept).
+ * budgetTensor() returns a MetaSeries<Tensor, Float> of shape [n, 3] (p,d,q per concept).
  */
 sealed class NarsBag {
     enum class State { MUTABLE, SEALED }
@@ -138,7 +135,7 @@ sealed class NarsBag {
     abstract val state: State
     abstract fun recall(): Series<Any>
     abstract fun recallNear(centroid: Long, maxDistance: Int): Series<Any>
-    abstract fun budgetTensor(): Tensor<Float>
+    abstract fun budgetTensor(): MetaSeries<Tensor, Float>
 
     companion object {
         fun mutable(): MutableNarsBag = MutableNarsBag()
@@ -166,7 +163,7 @@ class MutableNarsBag : NarsBag() {
                 .sortedBy { hamming(it.angular, centroid) },
         )
 
-    override fun budgetTensor(): Tensor<Float> = buildBudgetTensor(concepts)
+    override fun budgetTensor(): MetaSeries<Tensor, Float> = buildBudgetTensor(concepts)
 }
 
 class SealedNarsBag(private val concepts: List<ManifoldConcept<*>>) : NarsBag() {
@@ -178,7 +175,7 @@ class SealedNarsBag(private val concepts: List<ManifoldConcept<*>>) : NarsBag() 
                 .sortedBy { hamming(it.angular, centroid) },
         )
 
-    override fun budgetTensor(): Tensor<Float> = buildBudgetTensor(concepts)
+    override fun budgetTensor(): MetaSeries<Tensor, Float> = buildBudgetTensor(concepts)
 }
 
 // ── recall Series helpers ─────────────────────────────────────────────────────
@@ -188,7 +185,7 @@ val Series<*>.first: Int get() = a
 
 private fun sortedSeries(list: List<*>): Series<Any> = list.size j { i -> list[i] as Any }
 
-private fun buildBudgetTensor(concepts: List<ManifoldConcept<*>>): Tensor<Float> {
+private fun buildBudgetTensor(concepts: List<ManifoldConcept<*>>): MetaSeries<Tensor, Float> {
     val n = concepts.size
     val shape: Series<Int> = 2 j { i: Int -> if (i == 0) n else 3 }
     val accessor: (Series<Int>) -> Float = { s ->

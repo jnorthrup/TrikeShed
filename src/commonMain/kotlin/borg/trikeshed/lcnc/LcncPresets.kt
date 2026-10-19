@@ -1,13 +1,11 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 import borg.trikeshed.kanban.KanbanCondition
 import borg.trikeshed.kanban.KanbanEdge
 import borg.trikeshed.kanban.KanbanEdgeMode
 import borg.trikeshed.kanban.KanbanGraph
 import borg.trikeshed.kanban.KanbanLane
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
 
 /**
  * W6.2: a composition IS a stored program. These are the pre-assembled
@@ -90,6 +88,20 @@ object LcncPresets {
             needs = "A model provider key.",
             see = "Each model's turn in order, then the ruling as structured facts.",
             tweakFirst = "The system prompt on the first chat node — that sets what is being argued.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal-case", "One counsel stage",
+            does = "Retains a matter and runs its first counsel stage when the caller requests that transition.",
+            needs = "An explicit case request, a brief and a model provider key for counsel.",
+            see = "The retained matter and counsel's actual response. Further stages remain unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-tribunal-case-v2", "Bounded counsel case",
+            does = "Keeps the first argument and later counsel turns in separate scopes.",
+            needs = "An explicit case request, a brief and a model provider key.",
+            see = "Each admitted counsel turn and its retained evidence. Terminal settlement remains unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
         ),
         LcncPresetInfo(
             "preset-curator", "Belief review loop",
@@ -190,6 +202,20 @@ object LcncPresets {
             needs = "A model provider key and a document to review.",
             see = "The evidence gathered for the document, the argument, and the ruling.",
             tweakFirst = "The document text on the intake node.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal-case", "One grounded counsel stage",
+            does = "Retains a legal matter and gathers its evidence inside the explicitly requested counsel stage.",
+            needs = "An explicit case request, a brief, document curation and a model provider key.",
+            see = "The retained matter, grounded evidence and counsel's actual response. Further stages remain unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
+        ),
+        LcncPresetInfo(
+            "preset-legal-tribunal-case-v2", "Bounded grounded counsel case",
+            does = "Curates the first argument's sources and keeps later counsel turns in separate scopes.",
+            needs = "An explicit case request, a brief, the document curator, belief bank and a model provider key.",
+            see = "The original grounded argument and later counsel turns with retained evidence. Terminal settlement remains unfinished.",
+            tweakFirst = "The system prompt on the first chat node.",
         ),
         LcncPresetInfo(
             "preset-state-freeze", "Snapshot everything",
@@ -357,6 +383,8 @@ object LcncPresets {
         "preset-constellation" to constellation(),
         "preset-hermes" to hermes(),
         "preset-tribunal" to tribunal(),
+        "preset-tribunal-case" to tribunal(caseMode = true),
+        "preset-tribunal-case-v2" to tribunal(caseMode = true, repeatArgue = true),
         "preset-curator" to curator(),
         "preset-context" to context(),
         "preset-kanban" to kanban(),
@@ -371,6 +399,8 @@ object LcncPresets {
         "preset-media" to mediaDemo(),
         "preset-hermes-train" to hermesTrain(),
         "preset-legal-tribunal" to legalTribunal(),
+        "preset-legal-tribunal-case" to legalTribunal(caseMode = true),
+        "preset-legal-tribunal-case-v2" to legalTribunal(caseMode = true, repeatArgue = true),
         "preset-state-freeze" to stateFreeze(),
         "preset-council" to council(),
         "preset-bughunter" to bughunter(),
@@ -549,56 +579,43 @@ object LcncPresets {
         return LcncProgramConfix.toJson(program)
     }
 
-    // ── Step 5: the kanban board AS an LCNC composition — dogfood proof ──
-    // Every node is a generic primitive; the kanban-specific knowledge
-    // (endpoints, field names, the move command's shape) lives entirely in
-    // wiring + params. Drag a card on the dom.board: the drop only DESCRIBES
-    // the gesture — the js + http.post nodes decide what it means and fire
-    // the real /api/invoke move. The second lane is the step-5 data spine:
-    // /api/lcnc/kanban — the concentric activeSheets projection, visible raw.
-
+    // Command meanings live in the authored expression. DOM widgets only emit gestures.
     private fun kanban(): String {
         val program = LcncProgram(
             name = "preset-kanban",
             nodes = listOf(
                 LcncNode("n1", "timer", params = mapOf("seconds" to "5"), x = 30.0, y = 60.0),
-                // ONE server projection feeds everything: the concentric sheet family
-                // (kanban.activeSheets executes in the daemon via /api/lcnc/run).
-                LcncNode("n2", "kanban.activeSheets", x = 230.0, y = 60.0),
-                // The concentric treesheet view — board sheet at the center, byStatus/
-                // byPriority partitions one ring out, orchestration lanes outermost;
-                // SheetRef cells drill in, the crumb climbs back.
-                LcncNode("n3", "sheet.concentric", x = 500.0, y = 30.0),
-                // The gesture surface stays generic: boardView → items/columns →
-                // grouped draggable board.
-                LcncNode("n4", "pick", params = mapOf("path" to "items"), x = 500.0, y = 420.0),
-                LcncNode("n5", "pick", params = mapOf("path" to "columns"), x = 500.0, y = 560.0),
-                LcncNode("n6", "list.groupBy", params = mapOf("key" to "status"), x = 720.0, y = 420.0),
+                LcncNode("events", "dom.events", x = 30.0, y = 280.0),
+                LcncNode("n8", "js", params = mapOf("expr" to """
+                    [x.kind === 'create'
+                      ? {type:'submit',jobId:'panel-'+x.id,idempotencyKey:x.id,...x.fields,priority:Number(x.fields.priority)}
+                      : x.kind === 'edit'
+                        ? {type:'update',jobId:x.item.id,expectedRevision:x.item.revision,idempotencyKey:x.id,...x.fields}
+                        : {type:'move',jobId:x.itemId,expectedRevision:x.item.revision,idempotencyKey:x.id,toColumn:x.to,beforeJobId:x.beforeJobId}]
+                """.trimIndent()), x = 260.0, y = 280.0),
+                LcncNode("n9", "job.batch", x = 500.0, y = 280.0),
+                // Authored order: command verdict first, fresh projection next, display last.
+                LcncNode("n2", "kanban.activeSheets", x = 760.0, y = 60.0),
+                LcncNode("n3", "sheet.concentric", x = 1020.0, y = 30.0),
+                LcncNode("n4", "pick", params = mapOf("path" to "items"), x = 760.0, y = 420.0),
+                LcncNode("n5", "pick", params = mapOf("path" to "columns"), x = 760.0, y = 560.0),
+                LcncNode("n6", "list.groupBy", params = mapOf("key" to "status"), x = 1020.0, y = 420.0),
+                LcncNode("fields", "json.value", params = mapOf("value" to
+                    """{"title":{"ph":"Title"},"priority":{"v":"2","opts":["0","1","2"],"ph":"Priority"}}"""),
+                    x = 1020.0, y = 650.0),
                 LcncNode("n7", "dom.board",
                     params = mapOf("idField" to "id", "titleField" to "title", "subtitleField" to "id", "badgeField" to "priority"),
-                    x = 940.0, y = 450.0),
-                // The drop DESCRIBES the gesture; js shapes it into a command map and
-                // kanban.move (the daemon's own runner — the same one webhook dispatch
-                // and /api/lcnc/kanban/move resolve) lands it on the WAL.
-                LcncNode("n8", "js",
-                    params = mapOf("expr" to "{jobId:x.itemId,toColumn:x.to,expectedRevision:x.item.revision,beforeJobId:x.beforeJobId,idempotencyKey:'panel-'+x.itemId+'-'+x.item.revision+'-'+x.to+'-'+(x.beforeJobId||'end')}"),
-                    x = 1660.0, y = 420.0),
-                LcncNode("n9", "kanban.move", x = 1880.0, y = 420.0),
-                // The no-wire submit lane: type a title, click run — a real card lands.
-                // The submit lane shipped with every param blank, so "fill params,
-                // run — a real card" was an instruction, not a demonstration. It is
-                // filled now, and the idempotencyKey is STABLE: the first run lands
-                // the card, every run after is refused as a duplicate. That refusal
-                // is half the lesson. Change the key to land another.
-                LcncNode("n10", "kanban.submit",
-                    params = mapOf("jobId" to "", "title" to "preset-kanban demo card (safe to archive)",
-                        "priority" to "2", "idempotencyKey" to "preset-kanban-demo-1"),
-                    x = 230.0, y = 640.0),
-                LcncNode("n11", "note",
-                    params = mapOf("text" to "kanban as LCNC — the board is a COMPOSITION.\ncenter: kanban.activeSheets → sheet.concentric,\nthe concentric treesheets (board · byStatus ·\nbyPriority · orchestration) with SheetRef drill-in.\nbelow: the draggable gesture surface — a drop only\nDESCRIBES the gesture; js + kanban.move decide what\nit means and land it on the WAL.\nkanban.submit: fill params, run — a real card."),
-                    x = 30.0, y = 300.0),
+                    x = 1300.0, y = 450.0),
+                LcncNode("n11", "note", params = mapOf("text" to
+                    "Run reads the board. Create submits a new item; double-click edits metadata; drag moves. " +
+                    "The form schema and event expression are editable nodes. Each gesture uses one retained pulse. " +
+                    "Command verdict precedes the fresh projection; an edit uses the revision captured when its form opened."),
+                    x = 30.0, y = 560.0),
             ).toSeries(),
             wires = listOf(
+                LcncWire("events", "event", "n8", "x"),
+                LcncWire("n8", "y", "n9", "commands"),
+                LcncWire("n9", "results", "n2", "after?"),
                 LcncWire("n1", "tick", "n2", "trigger?"),
                 LcncWire("n2", "board", "n3", "board"),
                 LcncWire("n2", "byStatus", "n3", "byStatus?"),
@@ -609,10 +626,11 @@ object LcncPresets {
                 LcncWire("n4", "y", "n6", "x"),
                 LcncWire("n6", "groups", "n7", "groups"),
                 LcncWire("n5", "y", "n7", "columns?"),
-                LcncWire("n7", "move", "n8", "x"),
-                LcncWire("n8", "y", "n9", "command?"),
+                LcncWire("events", "source", "n7", "events?"),
+                LcncWire("fields", "value", "n7", "fields?"),
+                LcncWire("n9", "results", "n7", "result?"),
             ).toSeries(),
-            view = LcncView(x = 20.0, y = 20.0, zoom = 0.75),
+            view = LcncView(x = 20.0, y = 20.0, zoom = 0.65),
             seq = 12,
         )
         return LcncProgramConfix.toJson(program)
@@ -657,7 +675,7 @@ object LcncPresets {
 
     // ── W6.5 tribunal: proof the substrate is general ────────────────────
 
-    private fun tribunal(): String {
+    private fun tribunal(caseMode: Boolean = false, repeatArgue: Boolean = false): String {
         val kanban = KanbanGraph(
             boardId = "tribunal",
             lanes = listOf(
@@ -704,7 +722,7 @@ object LcncPresets {
                     "maxTokens" to "400"), x = 250.0, y = 80.0),
                 LcncNode("n3", "mux.chat", params = mapOf("job" to "rebut", "prompt" to "", "system" to "You are opposing counsel. Rebut point by point.", "maxTokens" to "400"), x = 490.0, y = 200.0),
                 LcncNode("n4", "mux.chat", params = mapOf("job" to "deliberate", "prompt" to "", "system" to "You are the judge. Weigh the record and rule.", "maxTokens" to "600"), x = 730.0, y = 120.0),
-                LcncNode("n5", "kg.ingest", x = 910.0, y = 120.0),
+                LcncNode("n5", "tribunal.record", x = 910.0, y = 120.0),
                 LcncNode("n6", "display", x = 1130.0, y = 120.0),
                 LcncNode("n7", "note", params = mapOf("text" to "tribunal preset\nbrief → argue ⇄ rebut (LOOP ≤3)\n→ deliberate (JOIN) → rule.\nABORT edge = mistrial."), x = 490.0, y = 380.0),
             ).toSeries(),
@@ -712,8 +730,7 @@ object LcncPresets {
                 // Human oversight starts the brief; no timer drives counsel.
                 LcncWire("n2", "content", "n3", "prompt?"),
                 LcncWire("n3", "content", "n4", "prompt?"),
-                // The verdict crosses kinds honestly via the ingest seam:
-                // chat text → kg.ingest(text? text → report json) → display.
+                // Prose is retained as a verdict, not interpreted as KG assertions.
                 LcncWire("n4", "content", "n5", "text?"),
                 LcncWire("n5", "report", "n6", "x"),
             ).toSeries(),
@@ -722,7 +739,75 @@ object LcncPresets {
             view = LcncView(x = 20.0, y = 10.0, zoom = 0.8),
             seq = 8,
         )
-        return LcncProgramConfix.toJson(program)
+        val authored = tribunal(program)
+        return LcncProgramConfix.toJson(if (caseMode) LcncCaseProgram.authored(authored,
+            if (repeatArgue) "preset-tribunal-case-v2" else "preset-tribunal-case", repeatArgue) else authored)
+    }
+
+    /** One actual LCNC clarification round; the separate Kanban graph does not drive this walk. */
+    private fun tribunal(program: LcncProgram): LcncProgram {
+        val seats = program.nodes.view.associateBy { it.id }
+        val judge = seats.getValue("n4").let { node -> node.copy(params = node.params + (
+            "system" to node.params["system"].orEmpty() +
+                " End with a JSON object containing disposition, needsClarification (boolean), " +
+                "clarificationQuestion (string), and mistrial (boolean). " +
+                "Set needsClarification only when the record needs a specific answer; mistrial is terminal."
+        )) }
+        val clarify = LcncNode("clarify", "scope", x = 910.0, y = 340.0, children = listOf(
+            LcncNode("cl.in.record", "scope.in", params = mapOf("name" to "record", "kind" to "text")),
+            LcncNode("cl.in.question", "scope.in", params = mapOf("name" to "question", "kind" to "text")),
+            LcncNode("cl.fold.argue", "text.fold", params = mapOf("label" to "Clarification requested by the judge")),
+            seats.getValue("n2").copy(id = "cl.argue", x = 260.0, y = 0.0),
+            LcncNode("cl.fold.rebut", "text.fold", params = mapOf("label" to "Clarification record and counsel's answer")),
+            seats.getValue("n3").copy(id = "cl.rebut", x = 520.0, y = 0.0),
+            LcncNode("cl.fold.deliberate", "text.fold", params = mapOf("label" to
+                "Final clarification round: rule from the full record, or explicitly retain the unresolved request. No further round is available.")),
+            judge.copy(id = "cl.deliberate", x = 780.0, y = 0.0),
+            LcncNode("cl.out.text", "scope.out", params = mapOf("name" to "text", "kind" to "text")),
+        ).toSeries())
+        val nodes = ArrayList<LcncNode>()
+        for (node in program.nodes.view) {
+            if (node.id == "n5") {
+                nodes.add(LcncNode("fold.record", "text.fold", params = mapOf(
+                    "label" to "Initial record: actual brief, argue, rebut, deliberate"), x = 730.0, y = 340.0))
+                nodes.add(LcncNode("parse", "ruling.parse", x = 910.0, y = 120.0))
+                nodes.add(clarify)
+                nodes.add(LcncNode("pick.text", "coalesce", x = 1130.0, y = 340.0))
+            }
+            nodes.add(when (node.id) {
+                "n4" -> judge
+                "n7" -> node.copy(params = node.params + ("text" to node.params["text"].orEmpty() +
+                    "\nLCNC runs argue -> rebut -> judge, then at most one structured clarification round.\n" +
+                    "The separate Kanban counsel LOOP <=3, JOIN2, and ABORT graph is not execution orchestration."))
+                else -> node
+            })
+        }
+        val wires = ArrayList<LcncWire>()
+        for (wire in program.wires.view) if (wire.toNode != "n5") wires.add(wire)
+        wires.addAll(listOf(
+            LcncWire("n2", "prompt", "fold.record", "brief?"),
+            LcncWire("n2", "content", "fold.record", "parts"),
+            LcncWire("n3", "content", "fold.record", "parts"),
+            LcncWire("n4", "content", "fold.record", "parts"),
+            LcncWire("n4", "content", "parse", "text"),
+            LcncWire("parse", "needsClarification", "clarify", "when?"),
+            LcncWire("parse", "clarificationQuestion", "clarify", "question"),
+            LcncWire("fold.record", "text", "clarify", "record"),
+            LcncWire("cl.in.record", "value", "cl.fold.argue", "brief?"),
+            LcncWire("cl.in.question", "value", "cl.fold.argue", "parts"),
+            LcncWire("cl.fold.argue", "text", "cl.argue", "prompt?"),
+            LcncWire("cl.fold.argue", "text", "cl.fold.rebut", "brief?"),
+            LcncWire("cl.argue", "content", "cl.fold.rebut", "parts"),
+            LcncWire("cl.fold.rebut", "text", "cl.rebut", "prompt?"),
+            LcncWire("cl.fold.rebut", "text", "cl.fold.deliberate", "brief?"),
+            LcncWire("cl.rebut", "content", "cl.fold.deliberate", "parts"),
+            LcncWire("cl.fold.deliberate", "text", "cl.deliberate", "prompt?"),
+            LcncWire("cl.deliberate", "content", "cl.out.text", "value"),
+            LcncWire("clarify", "text", "pick.text", "a?"),
+            LcncWire("n4", "content", "pick.text", "b"),
+            LcncWire("pick.text", "value", "n5", "text?"),
+        ))
+        return program.copy(nodes = nodes.toSeries(), wires = wires.toSeries())
     }
 
     // ── Step K: the context policy as an auditable program ───────────────
@@ -1447,11 +1532,11 @@ object LcncPresets {
     // ── legal-tribunal: extended preset-tribunal for legal review ─────
     // legal.ingest (canonical retained document curation) → legal.evidence
     // → sparql.query(evidence-bank) → tribunal LOOP/JOIN
-    // → kg.ingest → display.
+    // → tribunal.record → display.
     // Extends preset-tribunal with legal system prompts and
     // evidence-bank injection via SparqlKifMcpServer tools.
 
-    private fun legalTribunal(): String {
+    private fun legalTribunal(caseMode: Boolean = false, repeatArgue: Boolean = false): String {
         val kanban = KanbanGraph(
             boardId = "legal-tribunal",
             lanes = listOf(
@@ -1510,7 +1595,7 @@ object LcncPresets {
                     "system" to "You are the presiding judge. Weigh the record, apply the relevant legal standard, and rule. If the record is insufficient for a ruling, state what clarification is needed and route back to counsel.",
                     "maxTokens" to "800"),
                     x = 950.0, y = 60.0),
-                LcncNode("n5", "kg.ingest", x = 1200.0, y = 60.0),
+                LcncNode("n5", "tribunal.record", x = 1200.0, y = 60.0),
                 LcncNode("n6", "display", x = 1440.0, y = 60.0),
                 LcncNode("n7", "note", params = mapOf("text" to
                     "preset-legal-tribunal\n" +
@@ -1518,7 +1603,7 @@ object LcncPresets {
                     "-> legal.evidence (queries the shared KIF bank for\n" +
                     "   doc_<cid> facts, folds them into the brief)\n" +
                     "-> argue <-> rebut (LOOP <=3, MAD shape)\n" +
-                    "-> deliberate (JOIN 2) -> kg.ingest -> display.\n" +
+                    "-> deliberate (JOIN 2) -> tribunal.record -> display.\n" +
                     "ABORT edge = mistrial."),
                     x = 450.0, y = 380.0),
             ).toSeries(),
@@ -1537,7 +1622,9 @@ object LcncPresets {
             view = LcncView(x = 20.0, y = 10.0, zoom = 0.5),
             seq = 9,
         )
-        return LcncProgramConfix.toJson(program)
+        val authored = tribunal(program)
+        return LcncProgramConfix.toJson(if (caseMode) LcncCaseProgram.authored(authored,
+            if (repeatArgue) "preset-legal-tribunal-case-v2" else "preset-legal-tribunal-case", repeatArgue) else authored)
     }
 
 

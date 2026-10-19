@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.toSeries
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -43,7 +43,7 @@ class LcncScopeSemanticsTest {
     // ── gate: arguments bind — caller input k reaches scope.in name=k consumers ──
 
     @Test
-    fun argumentsBindThroughScopeIn() = runBlocking {
+    fun argumentsBindThroughScopeIn() = runTest {
         val runner = LcncRunner(registry).apply {
             subprogramLoader = { name -> if (name == "shout") shout() else null }
         }
@@ -66,7 +66,7 @@ class LcncScopeSemanticsTest {
     // ── gate: returns gather — ONLY scope.out names cross; locals do not ──
 
     @Test
-    fun returnsGatherOnlyScopeOutNames() = runBlocking {
+    fun returnsGatherOnlyScopeOutNames() = runTest {
         val runner = LcncRunner(registry).apply {
             subprogramLoader = { name -> if (name == "shout") shout() else null }
         }
@@ -87,7 +87,7 @@ class LcncScopeSemanticsTest {
     // ── §4: the generic args? map merges UNDER per-name wires (per-name wins) ──
 
     @Test
-    fun argsMapMergesUnderPerNameInputs() = runBlocking {
+    fun argsMapMergesUnderPerNameInputs() = runTest {
         val child = program(
             "pair",
             listOf(
@@ -126,7 +126,7 @@ class LcncScopeSemanticsTest {
     //    an unfed required parameter skips the call silently ──
 
     @Test
-    fun defaultsFeedOmittedParametersAndRequiredGatesTheCall() = runBlocking {
+    fun defaultsFeedOmittedParametersAndRequiredGatesTheCall() = runTest {
         val defaulted = program(
             "defaulted",
             listOf(
@@ -167,7 +167,7 @@ class LcncScopeSemanticsTest {
     // ── gate: depth — a self-referencing scope throws, listing the path ──
 
     @Test
-    fun selfReferencingScopeThrowsDepthExceededWithThePath() = runBlocking {
+    fun selfReferencingScopeThrowsDepthExceededWithThePath() = runTest {
         val loop = program("loop", listOf(LcncNode("n1", LcncContracts.SCOPE, subprogram = "loop")))
         val runner = LcncRunner(registry).apply {
             maxScopeDepth = 4
@@ -185,7 +185,7 @@ class LcncScopeSemanticsTest {
     // ── gate: chain determinism — executor frame chain ≡ ProgramNavigator chain ──
 
     @Test
-    fun executorFrameChainMatchesNavigatorBitForBit() = runBlocking {
+    fun executorFrameChainMatchesNavigatorBitForBit() = runTest {
         val leaf = program("leaf", listOf(LcncNode("l1", "source")))
         val mid = program("mid", listOf(LcncNode("m1", LcncContracts.SCOPE, subprogram = "leaf")))
         val outer = program("outer", listOf(LcncNode("o1", LcncContracts.SCOPE, subprogram = "mid")))

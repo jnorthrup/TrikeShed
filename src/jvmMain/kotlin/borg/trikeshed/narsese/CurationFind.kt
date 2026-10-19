@@ -20,7 +20,7 @@ import kotlin.math.*
 class CurationFind(val nodes: ConstellationNodes) {
     /** The startup question's verdict: `ready`, `reason`, the `yes` and `no` nouls, `ms` and `model`. */
     @Volatile var gate: Map<String, Any?> = mapOf("ready" to false, "reason" to "probing")
-        get() = if (Airgap.configured()) AIRGAP else field
+        get() = if (nodes.decisionProvider.remote && Airgap.configured()) AIRGAP else field
 
     /**
      * A leaf read: its kind, book, section ordinal (-1 for a book), heading, text, the ring key of its section and of its
@@ -31,21 +31,26 @@ class CurationFind(val nodes: ConstellationNodes) {
 
     /** Jev over [PROBE], one question each way, asked directly: ready when the true one holds and the false one does not. */
     suspend fun probe(key: suspend () -> String?) {
+        nodes.curation.submit { probeNow(key) }.await().getOrThrow()
+    }
+
+    internal suspend fun probeNow(key: suspend () -> String?) {
         val t0 = System.currentTimeMillis()
         val verdict: Map<String, Any?> = try {
-            Airgap.requireRemote()
+            if (nodes.decisionProvider.remote) Airgap.requireRemote()
             val k = key()
-            if (k.isNullOrBlank()) mapOf("ready" to false, "reason" to "JEV_API_KEY is not set") else {
-                val reply = Jev.ask(k, mapOf("page" to PROBE), mapOf(
+            if (nodes.decisionProvider.requiresKey && k.isNullOrBlank()) mapOf("ready" to false, "reason" to "${nodes.decisionProvider.keyName} is not set") else {
+                val reply = nodes.decisionProvider.ask(k.orEmpty(), mapOf("page" to PROBE), mapOf(
                     "yes" to Jev.noul("Does `page` say the banks are closed on March 8, 1933?"),
                     "no" to Jev.noul("Does `page` say the banks are open on March 7, 1933?")))
-                Airgap.requireRemote()
+                if (nodes.decisionProvider.remote) Airgap.requireRemote()
                 val answers = reply["answers"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
                 val yes = Jev.noulOf(answers, "yes"); val no = Jev.noulOf(answers, "no")
                 mapOf("ready" to (yes >= ConstellationNodes.HOLDS && no <= 1 - ConstellationNodes.HOLDS),
                     "reason" to "yes ${(yes * 100).toInt()}% · no ${(no * 100).toInt()}%", "yes" to yes, "no" to no, "model" to reply["model"])
             }
         } catch (_: Airgap.Rejection) { AIRGAP }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (e: Exception) { mapOf("ready" to false, "reason" to (e.message ?: e.toString())) }
         gate = verdict + ("ms" to System.currentTimeMillis() - t0)
     }
@@ -128,17 +133,17 @@ class CurationFind(val nodes: ConstellationNodes) {
      * again under the same [q] ask nothing.
      */
     suspend fun rank(key: String, q: String, rows: List<Map<*, *>>): Map<String, Any?> {
-        val verdict = if (Airgap.active()) AIRGAP else gate
+        val verdict = if (nodes.decisionProvider.remote && Airgap.active()) AIRGAP else gate
         if (verdict["ready"] != true) return verdict + mapOf("q" to q, "rows" to rows, "ranked" to false,
             "error" to verdict["reason"])
         val head = rows.take(RANK_ASKED)
         val ids = head.indices.map { "R" + it.toString().padStart(2, '0') }
         val state = mapOf("query" to q, "rows" to ids.indices.associate { ids[it] to head[it]["text"]?.toString().orEmpty().take(TEXT_CHARS) })
         val reply = try {
-            Airgap.requireRemote()
+            if (nodes.decisionProvider.remote) Airgap.requireRemote()
             nodes.asked(key, state, ids.associateWith { id ->
                 Jev.noul("Does `rows.$id` bear on `query`: state, define or apply what it asks?")
-            }).also { Airgap.requireRemote() }
+            }).also { if (nodes.decisionProvider.remote) Airgap.requireRemote() }
         } catch (_: Airgap.Rejection) {
             return AIRGAP + mapOf("q" to q, "rows" to rows, "ranked" to false)
         }
@@ -151,7 +156,7 @@ class CurationFind(val nodes: ConstellationNodes) {
 
     companion object {
         val AIRGAP: Map<String, Any?> = mapOf("ready" to false, "disabled" to true,
-            "reason" to "Jev is disabled in airgap mode", "error" to "Jev is disabled in airgap mode")
+            "reason" to "Remote curation is disabled in airgap mode", "error" to "Remote curation is disabled in airgap mode")
         /** Rows Jev orders per request. */
         const val RANK_ASKED = 24
         /** Leaves found in readings, and readings opened, at most per search. */

@@ -3,6 +3,7 @@ package modelmux
 import borg.trikeshed.parse.reify
 
 import keymux.KeyMux
+import keymux.LlmAuth
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.emptyHtxHeaders
@@ -56,6 +57,7 @@ object ModelDiscovery {
             if (id.isEmpty()) continue
             val contextWindow = (m["context_length"] as? Number)?.toInt()
                 ?: (m["context_window"] as? Number)?.toInt()
+                ?: (m["max_model_len"] as? Number)?.toInt()
                 ?: 0
             val pricing = m["pricing"] as? Map<*, *>
             val promptPrice = pricing?.get("prompt")?.toString()?.toDoubleOrNull()
@@ -81,18 +83,21 @@ object ModelDiscovery {
      * HtxElement (userspace.nio only — never a JDK client), bearer key
      * resolved from [keyMux] at `llm.<provider>.key` falling back to
      * `llm.default.key`. No key still discovers — public listings need none.
+     * NONE suppresses all credential lookup for explicitly credential-free hosts.
      */
     suspend fun discover(
         provider: String,
         baseUrl: String,
         keyMux: KeyMux? = null,
+        auth: LlmAuth = LlmAuth.REQUIRED,
     ): Result<Series<DiscoveredModel>> {
         runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val htx = currentCoroutineContext()[HtxKey]
             ?: return Result.failure(IllegalStateException("No HtxKey found in coroutine context"))
-        val key = keyMux?.get("llm.$provider.key") ?: keyMux?.get("llm.default.key")
+        val key = if (auth == LlmAuth.NONE) null
+            else keyMux?.get("llm.$provider.key") ?: keyMux?.get("llm.default.key")
         val headers = if (key != null) htxHeaders("Authorization" j "Bearer $key") else emptyHtxHeaders()
-        val req = parseHtxRequest(url = "$baseUrl/models", method = HtxMethod.GET).copy(headers = headers)
+        val req = parseHtxRequest(url = "${baseUrl.trimEnd('/')}/models", method = HtxMethod.GET).copy(headers = headers)
         return try {
             Airgap.requireRemote()
             val resp = htx.request(req)

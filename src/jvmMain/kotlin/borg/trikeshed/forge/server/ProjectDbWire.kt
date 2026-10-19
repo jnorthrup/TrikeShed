@@ -11,6 +11,7 @@ import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -152,13 +153,17 @@ class ProjectDbWire(
             // Finder names carry spaces; the client sends them percent-encoded ("My%20PDF%20Stash").
             // Decode BEFORE sanitize, or '%20' mangles into literal '-20' in the db name.
             val name = borg.trikeshed.relaxfactory.CouchHttpSurface.percentDecode(segments[1])
-            val kind = borg.trikeshed.relaxfactory.CouchHttpSurface
-                .parseQuery(path.substringAfter('?', ""))["kind"] ?: "assets"
+            val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            val kind = query["kind"] ?: "assets"
+            val provider = try { query["decisionProvider"]?.let { DecisionProvider.of(it) } }
+                catch (e: IllegalArgumentException) { return json(400, jsonOf(mapOf("error" to e.message))) }
+                catch (e: IllegalStateException) { return json(400, jsonOf(mapOf("error" to e.message))) }
             return when (segments[2]) {
-                "begin" -> runCatching { scopes.beginUpload(name, kind) }.fold(
+                "begin" -> runCatching { scopes.beginUpload(name, kind, provider) }.fold(
                     onSuccess = {
                         java.lang.System.err.println("[OROBOROS] project db upload begun: ${it.name} (${it.kind})")
-                        json(200, """{"verdict":"ok","name":"${it.name}","kind":"${it.kind}"}""")
+                        json(200, jsonOf(mapOf("verdict" to "ok", "name" to it.name, "kind" to it.kind,
+                            "decisionProvider" to it.decisionProvider?.id)))
                     },
                     onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },
                 )
@@ -190,7 +195,7 @@ class ProjectDbWire(
                         val bLen = i64().toInt()
                         if (bLen < 0 || off + bLen > body.size) { failCount++; break }
                         val bytes = body.copyOfRange(off, off + bLen); off += bLen
-                        runCatching { scopes.uploadPut(name, rel, bytes) }
+                        runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel)) }
                             .fold({ okCount++ }, { failCount++ })
                     }
                     json(200, """{"verdict":"ok","stored":$okCount,"failed":$failCount}""")
@@ -202,7 +207,7 @@ class ProjectDbWire(
                         ?: return json(400, """{"error":"path query required"}""")
                     val bytes = CouchWire.bodyOf(payload)
                     if (bytes.isEmpty()) return json(400, """{"error":"empty body"}""")
-                    runCatching { scopes.uploadPut(name, rel, bytes) }.fold(
+                    runCatching { scopes.uploadPut(name, rel, bytes, provider ?: scopes.decisionProvider(name, rel)) }.fold(
                         onSuccess = { json(200, """{"verdict":"ok","cid":"${it.value}","bytes":${bytes.size}}""") },
                         onFailure = { json(400, """{"verdict":"refused","detail":"${(it.message ?: "").replace('"', '\'')}"}""") },
                     )

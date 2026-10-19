@@ -40,7 +40,7 @@ class HermesCorpusTest {
     }
 
     @Test
-    fun reconcileSkipsTraceTraversalAndKeepsPreviouslyRetainedHistory() {
+    fun reconcileTombstonesExcludedTraceOrphansAndNeverReadsThem() {
         val root = "/hermes"
         val trace = "profiles/profile/hillclimb/asks/trial/traces/event.json"
         val curationTrace = "profiles/profile/hillclimb/curation/analyzer/r1/traces/event.json"
@@ -78,19 +78,25 @@ class HermesCorpusTest {
         val snapshot = gateway.reconcile(root, "hermes", "current", 1)
 
         assertEquals(useful.map { HermesCorpus.PREFIX + it }.sorted(), snapshot.paths)
-        assertTrue(snapshot.deletedPaths.isEmpty(), "source exclusion is not deletion")
+        // An excludedPath doc is this plane's orphan, not another plane's property: the
+        // absorbed trace leaves the plane even while its source file stays on disk.
+        // Retention lives in the FILESYSTEM (retained files); the document plane holds
+        // no trace citizens. Ghosts that outlive their exclusion are clearable garbage.
+        assertEquals(listOf(logical), snapshot.deletedPaths)
         assertTrue(snapshot.skippedDirs.isEmpty())
         assertEquals(useful.map { "$root/$it" }.sorted(), read.sorted())
         assertTrue(listed.none { it.endsWith("/traces") })
-        assertEquals(revision, couch.head.getRev(logical), "existing trace history must keep its revision")
-        assertContentEquals(historical, attachments.getAttachment(logical)?.second)
+        assertFalse(revision == couch.head.getRev(logical), "the orphan's tombstone is a new revision")
+        assertEquals(null, attachments.getAttachment(logical))
+        // retained files: the plane never touches trace bytes on disk
         assertContentEquals("source trace".encodeToByteArray(), memory.readAllBytes("$root/$trace"))
         assertContentEquals("curation trace".encodeToByteArray(), memory.readAllBytes("$root/$curationTrace"))
 
+        val tombstone = couch.head.getRev(logical)
         memory.deleteRecursively("$root/${trace.substringBeforeLast('/')}")
         val absent = gateway.reconcile(root, "hermes", "later", 2)
-        assertTrue(absent.deletedPaths.isEmpty(), "an excluded historical trace is retained even when absent on disk")
-        assertEquals(revision, couch.head.getRev(logical))
-        assertContentEquals(historical, attachments.getAttachment(logical)?.second)
+        assertTrue(absent.deletedPaths.isEmpty(), "a tombstoned orphan is not deleted twice")
+        assertEquals(null, attachments.getAttachment(logical))
+        assertEquals(tombstone, couch.head.getRev(logical))
     }
 }

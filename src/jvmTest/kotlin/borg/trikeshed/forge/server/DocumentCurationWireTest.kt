@@ -231,6 +231,15 @@ class DocumentCurationWireTest {
                 assertTrue(DocumentCurationFacts.ruleCandidates(record).size > 0)
                 assertTrue((result["tuples"] as List<*>).isNotEmpty())
                 val writes = rig.writes
+                val workspace = borg.trikeshed.kanban.module.WorkspaceService(rig.ctx)
+                for (retained in listOf(cid) + record.toolReceipts.view.map { assertNotNull(it.receiptCid) }) {
+                    val inspection = workspace.route("POST", jsonOf(mapOf("source" to mapOf(
+                        "kind" to "cas", "cid" to retained.value, "syntax" to "CBOR"))))
+                    assertEquals(200, inspection.status, inspection.body)
+                    val facet = reifyMap(inspection.body)["confix"] as Map<*, *>
+                    assertEquals(retained.value, facet["cid"])
+                    assertEquals("CBOR", facet["syntax"])
+                }
                 assertEquals(cid.value, request("GET", "/api/documents?cid=${cid.value}")["receiptCid"])
                 assertEquals(listOf(cid.value), DocumentSurface.curationList(request("GET", "/api/documents")).map { it.receiptCid })
                 request("GET", DocumentCurationLegos.sheetHref(cid))

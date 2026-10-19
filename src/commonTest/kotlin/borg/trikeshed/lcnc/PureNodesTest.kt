@@ -1,7 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.*
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -17,20 +17,36 @@ import kotlin.test.assertTrue
  */
 class PureNodesTest {
 
+    @Test fun groupingUsesTheSharedSelectionPathAndRetainsLiteralKeys() = runTest {
+        val a = mapOf("role" to mapOf("name" to "reviewer"), "steps" to listOf(mapOf("name" to "review")))
+        val b = mapOf("role" to mapOf("name" to "author"), "steps" to listOf(mapOf("name" to "draft")))
+        val literal = mapOf("role.name" to "literal", "role" to mapOf("name" to "nested"))
+        assertEquals(mapOf("reviewer" to listOf(a), "author" to listOf(b), "literal" to listOf(literal)),
+            run("list.groupBy", mapOf("key" to "role.name"), mapOf("x" to listOf(a, b, literal)))["groups"])
+        assertEquals(mapOf("review" to listOf(a), "draft" to listOf(b)),
+            run("list.groupBy", mapOf("key" to "steps.0.name"), mapOf("x" to listOf(a, b)))["groups"])
+        assertEquals("review", run("pick", mapOf("path" to "steps.0.name"), mapOf("x" to a))["y"])
+        assertEquals(mapOf("" to listOf(a)),
+            run("list.groupBy", mapOf("key" to "missing"), mapOf("x" to listOf(a)))["groups"])
+        val nullLiteral = mapOf("role.name" to null, "role" to mapOf("name" to "nested"))
+        assertEquals(mapOf("" to listOf(nullLiteral)),
+            run("list.groupBy", mapOf("key" to "role.name"), mapOf("x" to listOf(nullLiteral)))["groups"])
+        assertEquals(mapOf("" to listOf(a)),
+            run("list.groupBy", mapOf("key" to ""), mapOf("x" to listOf(a)))["groups"])
+    }
+
     private val registry = PureNodes.registry { 1234L }
 
-    private fun run(
+    private suspend fun run(
         type: String,
         params: Map<String, String> = emptyMap(),
         inputs: Map<String, Any?> = emptyMap(),
-    ): Map<String, Any?> = runBlocking {
-        registry.getValue(type).run(LcncNode("n1", type, params), inputs)
-    }
+    ): Map<String, Any?> = registry.getValue(type).run(LcncNode("n1", type, params), inputs)
 
     // ── list.format ───────────────────────────────────────────────────────
 
     @Test
-    fun listFormatSubstitutesTemplateFieldsPerItem() {
+    fun listFormatSubstitutesTemplateFieldsPerItem() = runTest {
         val cards = listOf(
             mapOf("id" to "c1", "attention" to 0.9),
             mapOf("id" to "c2", "attention" to 0.4),
@@ -42,7 +58,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun listFormatMissingFieldsRenderEmpty() {
+    fun listFormatMissingFieldsRenderEmpty() = runTest {
         val out = run("list.format",
             params = mapOf("template" to "{id}: attention={attention}"),
             inputs = mapOf("x" to listOf(mapOf("id" to "c1"))))
@@ -50,7 +66,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun listFormatLimitBoundsTheLines() {
+    fun listFormatLimitBoundsTheLines() = runTest {
         val xs = listOf(mapOf("id" to "a"), mapOf("id" to "b"), mapOf("id" to "c"))
         val bounded = run("list.format",
             params = mapOf("template" to "{id}", "limit" to "2"),
@@ -63,7 +79,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun listFormatNonMapItemsStringify() {
+    fun listFormatNonMapItemsStringify() = runTest {
         val out = run("list.format",
             params = mapOf("template" to "{id}"),
             inputs = mapOf("x" to listOf("plain", 7, null)))
@@ -71,13 +87,13 @@ class PureNodesTest {
     }
 
     @Test
-    fun listFormatScalarInputBecomesOneLine() {
+    fun listFormatScalarInputBecomesOneLine() = runTest {
         val out = run("list.format", inputs = mapOf("x" to "solo"))
         assertEquals(listOf("solo"), out["lines"])
     }
 
     @Test
-    fun listFormatComposesAttentionIntoLinesThroughTheRunner() = runBlocking {
+    fun listFormatComposesAttentionIntoLinesThroughTheRunner() = runTest {
         // The missing lane, end to end: an attention-shaped source feeds
         // list.format, whose `lines` port is what read.construct/nal.mint take.
         val reg = registry + mapOf(
@@ -98,7 +114,7 @@ class PureNodesTest {
     // ── pick / list.groupBy / timer ───────────────────────────────────────
 
     @Test
-    fun pickWalksDotPathsThroughMapsAndLists() {
+    fun pickWalksDotPathsThroughMapsAndLists() = runTest {
         val x = mapOf("items" to listOf(mapOf("id" to "c7")))
         val out = run("pick", params = mapOf("path" to "items.0.id"), inputs = mapOf("x" to x))
         assertEquals("c7", out["y"])
@@ -106,7 +122,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun groupByBucketsByKeyInEncounterOrder() {
+    fun groupByBucketsByKeyInEncounterOrder() = runTest {
         val xs = listOf(
             mapOf("id" to "a", "status" to "todo"),
             mapOf("id" to "b", "status" to "done"),
@@ -120,12 +136,12 @@ class PureNodesTest {
     }
 
     @Test
-    fun timerEmitsOneTickFromTheClock() {
+    fun timerEmitsOneTickFromTheClock() = runTest {
         assertEquals(1234L, run("timer")["tick"])
     }
 
     @Test
-    fun sheetProjectionRetainsOnlySuppliedOptionsWithoutMutation() {
+    fun sheetProjectionRetainsOnlySuppliedOptionsWithoutMutation() = runTest {
         val board = mutableMapOf<String, Any?>("id" to "board", "rows" to mutableListOf("card"))
         val inputs = mutableMapOf<String, Any?>("board" to board, "move" to true, "press" to true, "ended" to true)
         val before = inputs.toMap()
@@ -155,7 +171,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun boardProjectionRetainsOnlySuppliedColumnsWithoutMutation() {
+    fun boardProjectionRetainsOnlySuppliedColumnsWithoutMutation() = runTest {
         val card = mutableMapOf("id" to "card", "status" to "todo")
         val groups = mutableMapOf("todo" to mutableListOf(card))
         val inputs = mutableMapOf<String, Any?>("groups" to groups, "move" to true, "press" to true, "ended" to true)
@@ -184,7 +200,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun gaugeProjectionRetainsXWithoutFormattingOrGestures() {
+    fun gaugeProjectionRetainsXWithoutFormattingOrGestures() = runTest {
         val payload = mutableMapOf("count" to 12000)
         for (value in s_[0, false, "", 12000, payload, null].view) {
             val inputs = mutableMapOf("x" to value, "move" to true, "press" to true, "ended" to true)
@@ -198,7 +214,7 @@ class PureNodesTest {
     }
 
     @Test
-    fun presentationOutputsSurviveCanonicalProgramWalkingWithoutReplayingEffects() = runBlocking {
+    fun presentationOutputsSurviveCanonicalProgramWalkingWithoutReplayingEffects() = runTest {
         val card = mapOf("id" to "card", "status" to "todo")
         val board = mapOf("id" to "board", "rows" to listOf(card))
         val byStatus = listOf(mapOf("id" to "status:todo", "parent" to "board"))

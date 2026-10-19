@@ -85,7 +85,7 @@ class HermesVmConsole(
 
     sealed class Event {
         data class Manual(val signal: LcncUserSignal) : Event()
-        data class Causal(val emission: CausalMediaEmission) : Event()
+        data class Causal(val emission: CausalMediaEmission, val terminal: Map<String, Any?>) : Event()
         data class StateChanged(val state: State, val detail: String, val boot: Boot? = null) : Event()
     }
 
@@ -243,8 +243,8 @@ class HermesVmConsole(
                 cliStarted = true
             } else {
                 bootPhase(BootPhase.BOOTSTRAP, "initializing the Python diagnostic console", "hermes-xterm-bootstrap.py")
-                port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
             }
+            port.evalInVm(CONSOLE_BOOTSTRAP, "hermes-xterm-bootstrap.py")
             val ready = if (cliStarted) "HermesCLI ready" else "Python diagnostic console ready"
             synchronized(lock) {
                 boot = boot!!.copy(status = State.READY, updatedAtMs = System.currentTimeMillis(), detail = ready, revision = boot!!.revision + 1)
@@ -332,8 +332,7 @@ class HermesVmConsole(
         }
         try {
             dispatch(command.trim(), manual.signal.id, timestampMs)
-            val completed = panel.causalCompleted(manual.signal.id, timestampMs)
-            emitCausal(completed)
+            synchronized(lock) { emitCausal(panel.causalCompleted(manual.signal.id, timestampMs)) }
         } catch (t: Throwable) {
             val message = t.message ?: t.toString()
             if (worker != null && state == State.READY && !worker.isAlive) {
@@ -341,7 +340,7 @@ class HermesVmConsole(
                 transition(State.FAILED, "Hermes worker stopped: $message")
             }
             causalOutput("\u001b[31m$message\u001b[0m\r\n", manual.signal.id, timestampMs)
-            emitCausal(panel.causalFailed(manual.signal.id, timestampMs, message))
+            reject(manual, message, timestampMs)
         } finally {
             currentCause.set(null)
             turnInFlight = false
@@ -541,6 +540,7 @@ class HermesVmConsole(
         val snapshot = panel.snapshot()
         val scanned = inventory
         linkedMapOf(
+            "sequence" to panel.signalSequence,
             "state" to state.name.lowercase(),
             "detail" to detail,
             "boot" to boot?.toMap(),
@@ -572,7 +572,7 @@ class HermesVmConsole(
     }
 
     fun terminalMetaMap(): Map<String, Any?> = synchronized(lock) {
-        panel.snapshot(scrollbackRows = 0).let { snapshot -> mapOf(
+        panel.terminal.let { snapshot -> mapOf(
             "revision" to snapshot.revision,
             "columns" to snapshot.columns,
             "rows" to snapshot.rows,
@@ -645,8 +645,12 @@ class HermesVmConsole(
                 )
             }
             command.startsWith(":eval ") -> {
-                val result = port.evalInVm(command.removePrefix(":eval "), "hermes-console-eval.py")
-                causalOutput("$result\r\n", cause, timestampMs)
+                // Use Python's interactive display hook inside the existing supervised isolate.
+                // Raw non-interactive GraalPy eval returns the main module for None; projecting
+                // that value as terminal output recursively dumps the guest's entire namespace.
+                val source = pythonString(command.removePrefix(":eval "))
+                val result = port.evalInVm("__trikeshed_console_eval($source)", "hermes-console-eval.py")
+                check(result == Teleported.Bool(true)) { "console evaluation did not complete" }
             }
             command.startsWith(":import ") -> {
                 val module = command.removePrefix(":import ").trim()
@@ -748,7 +752,7 @@ class HermesVmConsole(
 
     private fun emitCausal(emission: CausalMediaEmission) {
         land(emission.signal)
-        _events.tryEmit(Event.Causal(emission))
+        _events.tryEmit(Event.Causal(emission, terminalMetaMap()))
     }
 
     private fun importPointcut(pointcut: Map<String, Any?>) = synchronized(lock) {
@@ -888,6 +892,16 @@ class HermesVmConsole(
             "Any other line is a Hermes prompt.\r\n" +
             "${ESC}[1m:env${ESC}[0m            curated guest environment (diagnostic)\r\n"
         private val CONSOLE_BOOTSTRAP = """
+            def __trikeshed_console_eval(source):
+                # Interpreter dependencies are local, not looked up in editable console globals.
+                import ast
+                import builtins
+                namespace = builtins.globals()
+                builtins.exec(builtins.compile(ast.Interactive(
+                    body=ast.parse(source, 'hermes-console-eval.py').body
+                ), 'hermes-console-eval.py', 'single'), namespace, namespace)
+                return True
+
             def __trikeshed_hermes(prompt, model=None):
                 from trikeshed_modelmux import run_oneshot
                 return run_oneshot(prompt, model)

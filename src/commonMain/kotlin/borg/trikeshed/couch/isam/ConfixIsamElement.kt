@@ -15,20 +15,29 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
-/** A bounded, owned projection lane. Couch stays authoritative, including its local checkpoints.
- * Reads never create a destination. Only an explicit import request advances the dense projection.
+/** A bounded inspection lane, borrowing primary dense storage or owning a separate projection.
+ * Projection reads never create a destination; only explicit imports advance it.
+ * Primary inspection shares the database writer and never imports or closes that borrowed owner.
  */
 class ConfixIsamElement(
     parent: CoroutineScope,
     private val source: CouchChangesProjection,
-    private val location: String,
+    location: String,
     private val files: FileOperations,
     private val cas: CasStore,
-    private val dictionaryCodec: ((ByteArray) -> IsamLeafCodec)? = null,
+    private val dictionaryCodec: ((ByteArray) -> IsamLeafCodec)? = ::DictionaryLeafCodec,
     capacity: Int = 8,
+    private val primary: CouchStorage? = null,
+    val synchronization: borg.trikeshed.context.Synchronization = primary?.synchronization ?: borg.trikeshed.context.Synchronization.MONITOR,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ConfixIsamElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    private val location = files.canonicalPath(location)
+
+    init {
+        if (primary != null) require(primary.dense != null && primary.couch.cas === cas &&
+            primary.couch.store.changes === source) { "Dense inspection must share the primary Couch and CAS" }
+    }
 
     private class Request<T>(val action: ConfixIsamElement.() -> T, val result: CompletableDeferred<T>) {
         fun execute(owner: ConfixIsamElement) {
@@ -45,8 +54,8 @@ class ConfixIsamElement(
     private val scope = CoroutineScope(parent.coroutineContext + this + job)
     // Reads resolve the identity in each file, never the next batch's write selection.
     private val operations = UringIsamOperations(scope, leafBytes = 64 * 1024,
-        leafCodec = dictionaryCodec?.let { CasLeafCodec(cas, it) } ?: ZstdLeafCodec)
-    private var store: ConfixIsamCursorBridge? = null
+        leafCodec = dictionaryCodec?.let { CasLeafCodec(cas, it) } ?: ZstdLeafCodec, synchronization = synchronization)
+    private var store: ConfixIsamCursorBridge? = primary?.dense
     private var fileTrees: ConfixIsamCursorBridge? = null
     private val completion = CompletableDeferred<Result<Unit>>()
     private val consumer = scope.launch {
@@ -60,7 +69,7 @@ class ConfixIsamElement(
                 val request = input.tryReceive().getOrNull() ?: break
                 request.result.completeExceptionally(failure ?: IllegalStateException("Confix index closed"))
             }
-            for (storage in listOf(fileTrees, store)) {
+            for (storage in listOf(fileTrees, if (primary == null) store else null)) {
                 try { storage?.close() } catch (caught: Throwable) {
                     if (failure == null) failure = caught else failure.addSuppressed(caught)
                 }
@@ -81,7 +90,7 @@ class ConfixIsamElement(
 
     private fun open(create: Boolean = false): ConfixIsamCursorBridge? {
         if (store == null && (create || files.exists(files.resolvePath("$location.store", "HEAD")))) {
-            store = ConfixIsamCursorBridge(location, files, cas, operations)
+            store = ConfixIsamCursorBridge(location, files, cas, operations, synchronization)
         }
         return store
     }
@@ -95,7 +104,7 @@ class ConfixIsamElement(
     private fun trees(create: Boolean = false): ConfixIsamCursorBridge? {
         val treeLocation = "$location.file-trees"
         if (fileTrees == null && (create || files.exists(files.resolvePath("$treeLocation.store", "HEAD")))) {
-            fileTrees = ConfixIsamCursorBridge(treeLocation, files, cas, operations)
+            fileTrees = ConfixIsamCursorBridge(treeLocation, files, cas, operations, synchronization)
         }
         return fileTrees
     }
@@ -103,7 +112,7 @@ class ConfixIsamElement(
     private fun writer(dictionary: ContentId?): IsamOperations = dictionary?.let { cid ->
         val codec = CasLeafCodec(cas, requireNotNull(dictionaryCodec) { "Zstd dictionary codec unavailable on this host" }, cid)
             .also { it.prepareWrite() }
-        UringIsamOperations(scope, leafBytes = 64 * 1024, leafCodec = codec)
+        UringIsamOperations(scope, leafBytes = 64 * 1024, leafCodec = codec, synchronization = synchronization)
     } ?: operations
 
     /** Exact published metadata only: no live mount, file reads, restoration or recursive CAS traversal. */
@@ -152,9 +161,11 @@ class ConfixIsamElement(
         val revisions = open()?.revisions ?: emptySeriesOf()
         val frames = source.afterSequence(-1)
         val end = minOf(revisions.size.toLong(), offset.toLong() + limit).toInt()
-        mapOf("available" to true, "indexedRevisions" to revisions.size, "sourceRevisions" to frames.size,
+        mapOf("available" to true, "role" to if (primary == null) "projection" else "primary",
+            "importAvailable" to (primary == null),
+            "indexedRevisions" to revisions.size, "sourceRevisions" to frames.size,
             "compression" to mapOf("format" to "zstd", "dictionaryAvailable" to (dictionaryCodec != null),
-                "selection" to "per-batch", "defaultDictionaryCid" to null),
+                "selection" to if (primary == null) "per-batch" else "storage-owner", "defaultDictionaryCid" to null),
             "offset" to offset, "next" to if (end < revisions.size) end else null,
             "revisions" to (maxOf(0, end - offset) j { i: Int ->
                 revisions[revisions.size - 1 - offset - i].descriptor()
@@ -163,6 +174,7 @@ class ConfixIsamElement(
 
     /** A point-in-time batch, not a background subscription or a database replacement. */
     suspend fun importCouch(limit: Int = 32, dictionary: ContentId? = null): Map<String, Any?> = submit {
+        require(primary == null) { "Primary Couch already publishes dense revisions; projection import is unavailable" }
         require(limit in 1..128) { "Import limit must be in 1..128" }
         val writer = writer(dictionary)
         val frames = source.afterSequence(-1)

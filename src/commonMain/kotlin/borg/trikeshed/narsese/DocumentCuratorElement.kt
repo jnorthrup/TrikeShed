@@ -11,7 +11,6 @@ import borg.trikeshed.collections.SeriesBuffer
 import borg.trikeshed.lib.*
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
-import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpReader
 import borg.trikeshed.userspace.concurrency.Channel
@@ -51,7 +50,7 @@ class DocumentCuratorElement private constructor(
     private val capacity: Int,
     private val observer: DocumentCuratorObserver,
     private val rete: CausalityReteElement?,
-    private val toolOntology: ToolOntologyScaffold,
+    private val toolOntology: Series<String>,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<DocumentCuratorElement> {
         const val MAX_INSTRUCTIONS_CHARS = 16 * 1024
@@ -61,7 +60,7 @@ class DocumentCuratorElement private constructor(
             cas: CasStore, log: DurableAppendLog, bag: BeliefBagElement,
             observer: DocumentCuratorObserver? = null, capacity: Int = 8,
             rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
-            toolOntology: ToolOntologyScaffold = emptySeriesOf(),
+            toolOntology: Series<String> = emptySeriesOf(),
         ): DocumentCuratorElement {
             require(capacity > 0) { "capacity must be positive" }
             require(modelId.isNotBlank()) { "modelId is required" }

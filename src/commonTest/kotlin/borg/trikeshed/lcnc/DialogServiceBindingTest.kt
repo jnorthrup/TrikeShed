@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.lib.view
+import borg.trikeshed.modelmux.BrainChatOptions
+import borg.trikeshed.modelmux.BrainClient
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,7 +18,37 @@ import kotlin.test.assertTrue
 
 class DialogServiceBindingTest {
     @Test
-    fun tribunalDialogAndIngestResolveCallerOverrides() = runTest {
+    fun modelMuxDialogKeepsNodeOptionsWiredInputsAndCallerContext() = runTest {
+        val caller = MuxCallContext(conversationId = 2)
+        var calls = 0
+        val brain = object : BrainClient(apiKey = "fixture") {
+            override suspend fun chat(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> {
+                calls++
+                assertSame(caller, currentCoroutineContext()[MuxCallContext])
+                assertTrue(currentCoroutineContext()[Job]!!.isActive)
+                assertEquals(73, options.maxTokens)
+                assertEquals(0.4, options.temperature)
+                assertEquals(listOf("override" to "fixture"), options.models.view.map { it.pair })
+                assertEquals(listOf("system" to "wired rules", "user" to "wired question"), messages)
+                return "answer" to "answered-model"
+            }
+        }
+        val default = Job().also { it.cancel() } + MuxCallContext(conversationId = 1)
+        val registry = TribunalNodes.registry(modelMuxDialog(brain, default))
+        val node = LcncNode("seat", "mux.chat", mapOf("prompt" to "fallback", "system" to "fallback",
+            "maxTokens" to "73", "temperature" to "0.4", "models" to """[{"key":"override","model":"fixture"}]"""))
+        withContext(caller) {
+            val out = registry.getValue("mux.chat").run(node, mapOf("prompt?" to "wired question", "system?" to "wired rules"))
+            assertEquals(mapOf("content" to "answer", "model" to "answered-model", "prompt" to "wired question"), out)
+            assertFailsWith<IllegalArgumentException> {
+                registry.getValue("mux.chat").run(node.copy(params = node.params + ("maxTokens" to "0")), emptyMap())
+            }
+        }
+        assertEquals(1, calls)
+    }
+
+    @Test
+    fun tribunalDialogAndRecordResolveCallerOverrides() = runTest {
         val registry = TribunalNodes.registry(TribunalDialog { _, _, _ -> error("default dialog") }) { error("default ingest") }
         val dialog = TribunalDialog { node, system, prompt ->
             assertEquals("seat", node.id)
@@ -24,14 +56,14 @@ class DialogServiceBindingTest {
             assertEquals("wired prompt", prompt)
             "answer" to "caller-model"
         }
-        withContext(TribunalDialogKey(dialog) + TribunalIngestKey { "recorded:$it" }) {
+        withContext(TribunalDialogKey(dialog) + TribunalRecordKey { "recorded:$it" }) {
             val seat = registry.getValue("mux.chat").run(
                 LcncNode("seat", "mux.chat", mapOf("system" to "default system", "prompt" to "default prompt")),
                 mapOf("system?" to "caller system", "prompt?" to "wired prompt"),
             )
             assertEquals("answer", seat["content"])
             assertEquals("caller-model", seat["model"])
-            val report = registry.getValue("kg.ingest").run(LcncNode("ingest", "kg.ingest"), mapOf("text?" to seat["content"]))["report"] as Map<*, *>
+            val report = registry.getValue("tribunal.record").run(LcncNode("record", "tribunal.record"), mapOf("text?" to seat["content"]))["report"] as Map<*, *>
             assertEquals("recorded:answer", report["recorded"])
             assertSame(dialog, TribunalDialogKey.require())
         }
@@ -105,7 +137,7 @@ class DialogServiceBindingTest {
         val council = CouncilNodes.registry(CouncilDialog { SeatOutcome.Ok("answer", "model") })
         val expected = mapOf(
             tribunal.getValue("mux.chat") to TribunalDialogKey,
-            tribunal.getValue("kg.ingest") to TribunalIngestKey,
+            tribunal.getValue("tribunal.record") to TribunalRecordKey,
             council.getValue("council.seat") to CouncilDialogKey,
             council.getValue("council.record") to CouncilRecordKey,
             council.getValue("council.case") to CouncilRecordKey,

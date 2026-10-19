@@ -39,7 +39,7 @@ The goal is lawyer-quality analysis of text: adaptively formed, CLIPS/Rete-level
 
 - **Causal analytical text ingest:** drag a folder onto `/graal` and it becomes a project database. The curator extracts concepts and relations through CoreNLP, runs rule candidates through a Rete production-rule engine (agenda, salience and refraction, as in CLIPS) and NARS, and each rule firing links back to the quoted source sentences behind it.
 - **Columnar core:** a lazy `Series`/`Cursor` algebra over zero-copy, memory-mapped I/O; one parser for JSON, YAML and CBOR (Confix); and an embedded content-addressed store with a write-ahead log and a copy-on-write B+tree.
-- **No-code:** a visual node-graph editor (LCNC, `/panels`) whose programs run in the daemon. Nodes can be written in Kotlin, Java, Clojure, JavaScript, Groovy, Ruby or Python and stepped at node boundaries. In-process JavaScript, Python and Ruby also support stepping into guest source; every run leaves an immutable, content-addressed receipt.
+- **No-code:** a visual node-graph editor (LCNC, `/panels`) whose programs run in the daemon. Nodes can be written in Kotlin, Java, Clojure, JavaScript, Groovy, Ruby or Python and stepped at node boundaries. In-process JavaScript, Python and Ruby also support stepping into guest source; whole-program runs leave immutable, content-addressed receipts. Live's receipt-backed root controls and remaining limitations are described below.
 - **Agent isolation harness:** AI agents, including the Python/Hermes sleeve, run as revocable guest processes with bounded, deadline-limited host calls. `council.seat` nodes put the same evidence to several models as separate parties and keep each model's identity and refusals. Model output stays a proposal and never becomes a command; `--airgap` keeps models local.
 - **Oroboros:** the daemon underneath absorbs worktree, git, agent-environment and runtime changes as content-addressed, peer-replicable history, and hot-swaps code while it runs.
 - **Durable job nexus:** jobs and a Kanban board on a write-ahead log. Kill the daemon mid-flight and restart without losing work; the board is open to any MCP client (`POST /api/mcp`).
@@ -58,9 +58,21 @@ want to hear about.
 **Quickstart (five minutes, one port):**
 
 ```bash
-git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed
+git clone --recurse-submodules git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed
 ./gradlew runOroborosDaemon --args='--watch'  # builds the live feed and launches with HotSwapAgent (JDK 25)
 ```
+
+Hermes source lives in the `utils/hermes-trikeshed-graalpy` submodule, pinned to
+the GraalPy port of upstream Hermes `v0.22.0`. For an existing checkout, install
+the missing source with:
+
+```bash
+git submodule update --init --recursive utils/hermes-trikeshed-graalpy
+```
+
+The source pin is recorded in `graalpy-sleeve/hermes.lock.json`. The daemon and
+port CLIs use this checkout by default. GraalPy and its Python dependencies still
+require the [port runtime setup](utils/hermes-trikeshed-graalpy/graalpy/README.md).
 
 Then open **http://localhost:8888** and poke it where it counts:
 
@@ -81,14 +93,61 @@ line beat a week of silence. The Gradle daemon task forwards its output to
 the terminal; the last thirty lines plus what you
 dragged, clicked, or expected is a perfect report.
 
+## Panels: assembly guides and network hosts
+
+Open **Palette → Start with a use case** for a board, debate, grounded legal
+review, nested rings, or model-driven construction. Each entry explains its
+prerequisites, expected result and first edit. Opening a construction does not
+run it. The node's robot button opens a keyboard- and touch-accessible guide:
+ports, local connection diagnostics, bounded content previews, and nearby
+compatible connections. Hover or focus a choice to trace its ports; selecting
+it rechecks the current graph and adds that cable through ordinary undo/history.
+Effect nodes remain explicit choices. Wiring never dispatches their effects.
+
+**Provider keys & models**, also available from an agent's guide, drills into
+the current KeyMux endpoint names and key-presence flags and ModelMux's exact
+endpoint/model pairs. Select a chat or council seat, including a nested legal-panel seat,
+and add routes in failover order. Apply changes only that seat's `models`
+parameter. The runtime interprets these routes as an allowlist; key values
+remain in KeyMux. Discovery does not request a model completion.
+
+**Concentric work network** joins signed IPNS discovery over the existing
+Kademlia DHT to the existing stored-program workgroup host:
+
+1. In **Local registrations & subnet declaration**, assign the construction's
+   subnet and store it with the existing toolbar action.
+2. **Publish stored constructions** announces an HTTPS origin (HTTP is accepted
+   for loopback) and the actual registered program names, content IDs and subnets.
+3. **Resolve signed host** verifies its IPNS record through the DHT. Select an
+   exact construction version, enter its requested subnet and JSON inputs, and
+   explicitly run it.
+4. Invocation resolves the host again, checks the host/program content IDs and
+   subnet, then uses the common HTX transport and the remote workgroup admission
+   path. The response retains the remote durable receipt. Changed identities are
+   refusals; interrupted requests are not retried automatically.
+
+The network directory has its own `lcnc-ipns.journal` identity, separate from
+the daemon's existing site IPNS publication. `TRIKESHED_IPNS_BOOTSTRAP` selects
+the bootstrap multiaddresses; the status view reports readiness and peer count.
+DHT records contain the host directory, not prompts, invocation inputs or keys.
+The browser calls `/api/lcnc/network/status`, `/publish`, `/resolve` and `/run`;
+bounded IPNS admission, userspace I/O and workgroup ownership remain responsible
+for completion and drain.
+
 ## Panels: retained party simulations
 
 Medical and legal tuple-review results offer **Load retained simulation for
 this receipt (no execution)**. The construction pins the curation receipt,
 loads its canonical Stanford rule candidates through `document.sheet`, and
 feeds the selected page to the existing Rete evaluator. Explicitly wired JSON
-assumptions are carried over; otherwise the list starts empty. Edit `subject`
-and `obj` (party identity), then Run. Save the construction to reopen the same
+assumptions are carried over; otherwise the list starts empty. The assumptions
+literal offers editable `subject` and `obj` (party identity) rows, including add
+and remove controls. Editing does not execute; press Run explicitly. **JSON**
+retains access to other fields and non-text values. Malformed values and numbers
+outside the browser's safe range remain in the raw editor, not silently replaced
+with an empty list. This is the existing `json.value` source with an optional
+`columns` presentation parameter, not another evaluator. Saved constructions
+without that parameter keep their raw editor. Save the construction to reopen the same
 evidence without relying on transient canvas outputs or calling NLP/a model
 again.
 
@@ -225,10 +284,28 @@ the retained lifecycle receipt. Published replays are read-only. Recorders
 sharing the same services serialize admission, and different evidence cannot
 overwrite an existing case ID. Legacy records remain readable but require a
 distinct case ID or explicit migration before recording again.
+A structured verdict still requesting clarification is not a completed ruling:
+`council.record` refuses it before persistence unless the verdict explicitly
+declares mistrial. Reaching the authored clarification bound does not turn an
+unresolved request into a decision. An explicit mistrial suppresses further
+clarification seats and cannot be replaced by their later ruling; the original
+verdict fields remain retained. Execution failure is recorded in the run receipt
+and invocation evidence, without publishing a council ruling or inferring mistrial.
 The job nexus retains, verifies and syncs snapshot bytes before exposing an
 accepted receipt, and rebuilds command receipts when opening a supplied log.
+Active jobs can compare and replace a retained `stateCid` through `JobCommand.State`,
+checking the revision and prior head. Acknowledgement requires fresh snapshot and
+state reads after sync. Missing or corrupt accepted state fails reopening;
+rejected commands' unused targets add no recovery dependency. Raw revisions are
+parsed exactly, and State WAL must match its typed canonical bytes. Existing
+headless CIDs and repository v1 reads remain compatible; v2 retains the full
+snapshot. This supplies durable heads for the tribunal FSM.
 Council's daemon wiring borrows the shared CAS and stores each case's ordered
-command references in a revision-pinned Couch job log. Reopening that log restores
+command references in a revision-pinned Couch job log. Modules share one root-owned
+case registry: callbacks pin their case until returning, and root shutdown stops
+admission, drains its nexuses and joins their children. Command acknowledgements
+carry the original request key, so a delayed same-job event cannot settle another
+request. Reopening that log restores
 the lifecycle and original terminal receipt; a retry after lifecycle commit but
 before its journal acknowledgement does not advance the case again. Ruling
 identity includes the transcript as well as the verdict; mistrial identity
@@ -272,8 +349,11 @@ The **Confix & facets** source view indexes explicit, bounded Couch revision
 batches into a separate ISAM projection. Its optional **Zstd dictionary CID**
 selects a compression dictionary for that batch only; blank uses the portable
 dictionary-free codec. This is distinct from dictionary-coded column values.
-The JVM daemon supplies the native dictionary codec; other hosts must supply a
-codec before offering this option. There is no silent fallback.
+The commonMain codec supports raw-content and trained Zstd dictionaries on every
+target. The JVM daemon may supply its native accelerator through the same leaf
+codec interface. CAS resolves each file's recorded dictionary CID; missing or
+corrupt dictionaries fail closed. An owner can explicitly disable dictionary
+support by supplying a null dictionary factory; there is no silent fallback.
 
 For embedded callers, `ConfixIsamCursorBridge.couch(name)` binds the dense
 destination to the existing Couch protocol: writes publish dense geometry and
@@ -281,10 +361,60 @@ exact canonical CBOR before becoming visible, and reopen recovers revisions,
 tombstones and destination-local replication checkpoints. The storage owner
 must remain open; close it to release its writer lease. After binding, mutate
 through the returned Couch, not the raw revision API. Heads and query indexes
-are still memory projections. This adapter does **not** switch the daemon's
-primary store or migrate an existing database. `importFrames` copies revision
+are still memory projections. This adapter does **not** migrate an existing
+database. `importFrames` copies revision
 history explicitly; a separate destination does not inherit the source's
 peer-local checkpoints.
+
+The daemon can use this as its primary store with
+`TRIKESHED_COUCH_FORMAT=confix-isam` on a new, durable forge home. The default
+`commit` retains the existing representation. Selection refuses a home with a
+Couch root in the other format; it never creates an apparently empty replacement
+for an existing database. Both modes hold a shared format-selection lease.
+Dense mode connects the same primary Couch to its attachments, document consumers,
+Council logs and workspace inspection. Separately mounted project databases keep
+their existing storage lifecycle. Panels reports **Primary dense storage** and omits the
+Couch import button; explicit file-tree metadata indexing remains available.
+The inspection lane drains before the primary owner releases its writer lease.
+Existing homes require an explicit conversion procedure, not a format toggle.
+
+For offline, same-database conversion, the commonMain API is
+`CouchStorage.convert(cas, files, source, destination, operations)`. It takes an
+existing commit-format database and a **new** destination, using the same durable
+CAS. It holds the source's format and writer leases until a fresh destination
+owner has recovered and verified every revision, canonical body, tombstone,
+sequence and `_local` checkpoint. Local put/delete history is replayed, so local
+revision numbering continues even when the most recently written checkpoint was
+deleted. This differs from `importFrames`: it is not a new peer's replication
+import. The returned receipt identifies the unchanged source HEAD and initial
+dense destination HEAD, with revision and current-local-document counts.
+
+Conversion publishes `destination/conversion.cbor` as pending before writing
+dense artifacts; only successful fresh-owner verification marks it complete,
+while that owner still holds the destination writer lease.
+`CouchStorage.open` refuses pending or malformed receipts and a completed
+destination whose dense HEAD is absent. Failure retains the destination for
+inspection, releases leases, and does not overwrite it on retry. No automatic
+rollback, source-root replacement or live daemon switch occurs. Retain the shared
+CAS and any selected dictionary blobs. This API does **not** copy a forge home,
+move attachments, convert separately mounted databases, or implement daemon
+cutover; choosing and activating the verified destination is a separate explicit
+operation. Do not run the source and converted copy as independent peers with
+inherited checkpoints.
+
+The POSIX file SPI supplies durable publication for this same commonMain storage
+path: same-directory temporary files, complete writes, file fsync, atomic rename,
+and parent-directory fsync. Newly created CAS directories are synced as well.
+Writer leases use nonblocking open-file-description record locks, compatible
+with traditional record locks without an unrelated descriptor close releasing
+the lease. A platform that cannot acquire these locks fails closed.
+macOS arm64 verification covers atomic replacement, failed publication, competing
+and aliased leases, record-lock conflicts, and commit-to-dense conversion followed
+by fresh-owner recovery and further writes with the source HEAD unchanged.
+Native checks also cover raw-content and trained Zstd dictionaries through the
+commonMain codec, including trained-dictionary conversion, fresh-owner recovery,
+and refusal when the dictionary CAS blob is missing. This is not a power-loss
+test or Linux runtime verification.
 
 Publish trained Zstd or raw-content dictionary bytes through the existing Couch
 CAS route (`POST /trikeshed/_cas`, raw binary body), then paste its returned
@@ -330,6 +460,14 @@ language lane to return a Confix route definition. Wire that value to
 `vm.camel`'s `route` input; the message goes to its separate `messages` input.
 The older payload-transform construction remains available.
 
+Source parameters on `vm.polyglot`, `vm.camel`, `vm.graalce` and `vm.eval`
+offer **Edit source…** on the canvas and in the SpaceGraph inspector. The
+focused editor keeps a draft until **Apply source**, which makes one undoable
+change to the authored parameter. Cancel and unchanged Apply do not save.
+Changed or replaced nodes refuse stale drafts without discarding the text;
+page shutdown closes the editor. Editing does not execute code or change a
+retained or paused run. Wired inputs still take precedence at execution.
+
 Language availability comes from the registered `vm.polyglot` runner's service
 bindings, using the same caller-over-mux-over-module-over-default precedence as
 execution, not the global VM host. Missing runners or undeclared host bindings
@@ -355,6 +493,29 @@ before a context starts. Execution owns and closes one Camel context; its
 receipt retains the definition, reply and headers. OWN trust is required:
 host Camel effects are not a sandbox. The example labels a reviewer, not an
 approval or a clinical/legal decision.
+
+Persistent `vm.camel.up` routes retain their declared `reach` alongside endpoints
+and module in the runtime identity and blackboard lifecycle fact. Reusing an ID
+requires the same declaration; a mismatch or missing/unknown stored reach
+refuses without restarting, stopping or changing the existing route. An omitted
+node parameter still defaults to `LOCAL`. Exact replay remains idempotent. Use
+an explicit stop and new start to change the declaration.
+
+The registered persistent-route controls use a host-owned `CamelRouteElement`
+in `commonMain`: a bounded serial command lane and a separate backpressured
+exchange-publication lane. Cancelling an invocation abandons its waiter, not
+an admitted route start. Listing, explicit stop and `all=true` are scoped to
+contexts acquired by that owner; matching an ID or declaration does not adopt
+a DocumentFeed or another owner's route. Nested callbacks refuse commands or
+drain against active ancestor owners, and publications refuse their active
+ancestor publication lanes. Lifetime changes require the current owner's admitted
+command; publications cannot borrow an ancestor's command authority.
+Shutdown joins accepted commands,
+attempts every owned consumer stop, then joins final publications before the
+host closes its observation dependencies. Failed stops retain their cleanup
+handles and publication lane for drain retry, with command admission closed.
+The existing JVM Camel adapter still supplies the actual Camel contexts;
+the common owner is lifecycle composition, not another route runtime.
 
 For **native Java or Groovy Camel DSL**, use the corresponding **Native … Camel
 DSL** action in the language facet, or the **Native … Camel review route** in
@@ -397,6 +558,236 @@ choices must enter through the route node's Confix parameter. Available
 languages and their compiler/runtime limitations are reported in the facet;
 the Kotlin source lane runs on JVM and does not prove cross-target portability.
 
+**Run** admits the authored program once and retains its receipt. **Live** starts
+with the same daemon run and arms root timer/SSE sources only after a completed
+receipt. A root gesture submits one pulse against that receipt and the unchanged
+authored definition. The commonMain runner selects its downstream work and reuses
+the retained root frame; the browser does not walk the graph or supply cached
+node outputs. Scope execution, authored order and failure behavior are the same
+as Run, not an independent best-effort browser scheduler. Busy gestures are
+refused without replay. A failed or unknown outcome stops sources; a changed
+definition requires an explicit Run or Live. Loading and undo do not execute.
+VM nodes retain trust/budget validation and refuse to reuse an existing VM ID
+implicitly. The `js` expression adapter invokes the existing owned polyglot
+function with typed input and releases its temporary guest; it has no browser DOM.
+Single-node and whole-program dispatch use caller, then mux, then module service
+bindings before runner defaults. Page gestures and DOM/media rendering remain
+presentation boundaries. Media commands expire after their receipt transport;
+media state is an observation from the element, not a headless runner's guess.
+Nested control pulses still require an invocation-path implementation and are
+refused. Forwarding through `merge`, `coalesce`, `pick`, `record.fold`, and
+`list.groupBy` preserves executed data projections through service bindings.
+Grouping keeps the executed buckets; list projections keep their original
+occurrences during the walk. Bounded retention finalizes after actual execution,
+so a later event read removes earlier aliases of that same binding. Earlier
+execution snapshots and unavailable projections cannot seed new pulses.
+Saved frames carry bounded occurrence-level root-binding origins through forwarding,
+each/carry yields, and named rings. Pure selected work can retire a root binding
+and remove its cached aliases before the next frame is saved; equal-valued ordinary
+bindings survive. A dynamically skipped pure reader does not retire a binding.
+Named-body admission and execution use the same receipt-pinned definitions.
+Legacy or malformed frames cannot seed a pulse; Run again to create a current frame.
+Selected effectful or opaque work that may newly read an unshadowed retained root
+binding as an event is still refused before effects. Post-walk retention does not
+change actual execution evidence or repair effects already performed.
+Panels uses bounded page-action lanes and shares page-local picklist reads.
+Close stops admission and awaits admitted actions and reads; late receipts
+cannot remount outputs or reopen facets. A native stored-load check holds an
+actual saved response across close and verifies unchanged graph, DOM and history;
+its link view has autosave disabled. A real browser check holds node drag
+and camera pan across close while an admitted read drains: further native
+pointer movement leaves geometry fixed, and close cancels a pending camera
+save before its deadline. A native one-second interval check observes two
+pulses, then closes with a real completed pulse response held. It verifies the
+cleared handle, awaited receipt and unchanged closed display/facets over bounded
+quiet windows. Other producer paths under held queues remain unverified.
+A native blackboard SSE check verifies an open vocabulary update rebuilds the
+Panels palette. Close then joins a held contracts read without replacing the
+closed palette or attaching new listeners; a later publication causes no reads
+or reconnect during a bounded five-second observation.
+Curator close joins an in-flight trail read and consumes its new execution data
+before resolving. A real browser check verifies that subsequent polling stops
+and native host resizing leaves the closed canvases' backing sizes fixed.
+
+`kanban.update` edits an existing card's title and/or priority through the same
+BoardIntake/CAS/WAL boundary. It requires `jobId`, `expectedRevision`, and a unique
+`idempotencyKey`; omitted metadata stays unchanged. It preserves lifecycle,
+attempt count, column, ordering, ownership, dependencies, and transition time.
+Stale revisions, malformed values, and mixed metadata/lifecycle commands are
+refused. LCNC execution-receipt cards remain managed by their execution owner.
+The Kanban preset now authors a scalar parameter schema into `dom.board.fields?`
+and binds `dom.events.source` to `events?`. Create/double-click emit create/edit
+gestures; drag emits move. An authored expression maps those gestures into the
+existing `job.batch` boundary. Submit still means create or resubmit (its lifecycle
+determines the initial column); Update edits metadata, and Move remains a separate operation.
+`job.batch.results` feeds `kanban.activeSheets.after?` before the board renders,
+so commits and refusals both project current state in the same ordered pulse.
+The form captures the opening item/revision, submits changed fields only, and
+closes only for its matching committed verdict. No-op edits do not dispatch;
+stale rejections stay open, unknown outcomes disable resubmission, and neither
+path retries or reruns unrelated nodes. Scalar fields reuse `LcncParamSpec`
+(`v`, `opts`, `ta`, `ph`, `optional`); dynamic options must be projected upstream.
+Stored boards without an authored schema/event binding do not acquire a hidden
+domain-specific form. Board forms use the page owner: close removes the modal and
+its handlers while joining admitted requests. Late receipts cannot change the
+detached form, and closed-page Create gestures cannot open another one. The
+`TRIKESHED_PANELS_FORM_CLOSE_UI=1` browser check holds a real committed edit response
+across close and verifies these boundaries without cancelling or repeating the
+update. Move-result callbacks use the same close guard. A native
+`TRIKESHED_PANELS_MOVE_CLOSE_UI=1` check holds an actual committed TODO→READY
+response and verifies unchanged closed board/status DOM after joined close.
+It verifies drag cleanup after the drop, not a pointer held across close.
+
+`mux.chat` uses the shared dialog: authored token limits and
+temperature are validated, and a nonempty `models` list restricts failover to
+those endpoint-name/model pairs in their authored order. Unknown pairs fail
+before provider dispatch; a configured destination change is refused. Empty
+lists retain ordinary roster failover. Tokens default to 512 and temperature to
+0.2; the former tribunal environment override no longer replaces authored limits.
+Its `prompt` output retains the exact resolved text sent to the dialog, alongside
+the returned content and actual model identity.
+`kg.ingest` uses the same commonMain Turtle/KIF bridge and belief-bag intake in
+Run, Live and `/api/beliefs/kg`. Return waits for processing, not just channel
+admission. Its legacy `minted` count means processed assertions, not new resident
+cells or a per-request fsync guarantee; the bag's bounded admission and WAL flush
+policy still apply. Identical source bytes do not add independent evidence on replay.
+An intake-processing failure stops the writer and fails pending acknowledgements;
+it does not roll back effects already applied before that failure.
+The existing minimal parser still skips unparseable statements; this is not full
+Turtle/KIF validation. Disabled belief intake refuses rather than recording prose.
+
+The two legacy tribunal presets use `tribunal.record`: verdict bytes are
+synced and read back from CAS before the legacy lifecycle hook completes. This
+does not verify a model verdict's truth or admit it as a belief. The legacy
+process-local tribunal instance accepts one verdict, replays that exact verdict,
+and refuses another after completion; multi-case persistence uses `council.record`.
+Saved user programs are not rewritten: replace a legacy KG-as-verdict sink with
+`tribunal.record` explicitly.
+
+The two legacy tribunal presets run argue, rebut and judge, then at most one
+structured clarification round with the same authored seats and model options. The extra
+round receives the actual initial prompt and responses, the parsed question,
+and the preceding clarification answers. The shared ruling parser keeps braces
+and escaped quotes inside JSON strings as data. An unresolved final request
+refuses before a verdict write or lifecycle completion; an explicit mistrial
+skips the extra round and preserves the original verdict. The legacy callback
+still completes `deliberate`. That legacy walk does not drive the case graph
+transitions described below.
+
+`preset-tribunal-case` and `preset-legal-tribunal-case` are separate constructions
+with their own CIDs. Their original seats/options and graph are authored inside
+false-default stage scopes. They support initialization, current readback and
+`brief` → `argue` → `rebut` → `deliberate`, with one original seat per admitted
+transition. Legal intake/evidence runs inside the argument scope. Running either
+construction without case admission executes no seats; public `__case_` bindings
+are refused. The original first-stage text in immutable `case.note` remains part
+of the frozen construction; this section describes the host's current extent.
+
+The explicit `preset-tribunal-case-v2` and `preset-legal-tribunal-case-v2`
+offerings have distinct CIDs and support the authored `rebut` → `argue` LOOP up
+to three times and `deliberate` → `argue` clarification LOOP once. Select the v2
+name when initializing a fresh case; existing cases keep their frozen program.
+The four provider scopes keep the original seat options. Legal intake/evidence
+runs only for first argue; repeated argue uses its separate authored scope and
+the full retained counsel record. Clarification preserves the actual grounded
+prompt, answers and original judge question through further counsel loops.
+
+Panels → Facets → Cases exposes these commands without request JSON. Select a
+validated named case program and case ID explicitly; initializing needs a brief
+and calls no model. Opening the facet runs no case command. **Read case** also
+calls no model and advances no stage, but does record an ordinary run receipt.
+Each new transition requires an explicit current read, a selected authored
+target, and the observed revision/state CID; the selected program CID is pinned.
+Targets are graph edges, not a client-side admission decision: the server owns
+predicates, JOIN, LOOP limits and terminal settlement. These commands do not run
+or modify the canvas. The case receipt links to immutable state, snapshot,
+stage evidence and frozen program through Confix.
+After reading an existing case, **Load frozen case program** loads its retained
+construction and verifies the bytes against the observed program CID. Select
+**Read case** again before transitioning. The retained choice remains usable
+when its former name changes or disappears; commands submit those frozen bytes
+without restoring the name or changing the canvas. If that name is already
+absent, another available case program can carry the initial read of the case ID;
+the returned case identifies its own frozen construction. Initialization requires
+a named selection; choose one again to change the case ID.
+
+An unknown response or pending settlement retains the exact submitted command
+for an explicit retry. Readback preserves that saved command; new mutations
+cannot replace it unless the operator explicitly dismisses it locally (which
+cancels nothing). A retry may return historical evidence and never authorizes a
+new transition; read the current head again. Closing the drawer does not cancel
+an admitted command. Request/retry state is page-local, not durable recovery
+storage, and nothing is automatically retried or advanced.
+A saved named retry still uses its original named lookup; loading frozen bytes
+does not rewrite that submitted command.
+
+Use the existing `POST /api/lcnc/run` queue with
+`{"program":"preset-tribunal-case","inputs":{"brief":"Motion: ..."},"case":{"intent":"initialize","caseId":"matter-42","idempotencyKey":"open-42"}}`.
+Initialization performs no model work and returns `case.snapshotCid`, `revision`
+and `stateCid`. A separate request supplies `case.intent="transition"`, the same `caseId`, a new
+`idempotencyKey`, `expectedRevision` and `priorStateCid` from that response, and
+`requestedTarget="argue"`.
+The same path accepts `{"intent":"read","caseId":"matter-42"}` in `case`.
+The brief remains the initialized one. Reusing an accepted request returns its
+original retained result without another seat, including historical retries
+after later stages and durable reopen. Current readback stays at the latest
+committed head. Changed identities and stale revision/head/target requests
+refuse before model work. An interrupted admitted
+stage is readable as interrupted and cannot replay its provider effect to repair
+settlement. Case intents cannot combine pulse or source-evidence execution.
+
+Each successful stage retains its full joined prompt, response and model,
+then commits its completed case head before the ordinary run receipt. Rebut and
+judge prompts use full authenticated accepted results. Judge's `JOIN2` requires
+the distinct successful argue and rebut receipts from the same counsel round,
+retaining their exact snapshot/state references. Missing or corrupt source
+references refuse before judge admission or model work; a failed rebut remains
+interrupted and cannot supply a second accepted source. Bounded invocation
+previews do not supply the full record.
+For v2, each new argue admission retires the preceding round's eligible rebut
+receipt. The two LOOP counters persist independently; an admitted failed loop
+consumes its traversal, and exact retries advance neither counter. Fresh accepted
+judge content supplies the clarification predicate; explicit mistrial suppresses
+it. Exhaustion refuses another traversal of that loop; an unresolved final judge
+remains active and readable.
+The finite history holds at most twelve stages and twenty-five case heads.
+
+The old case offerings keep their single counsel round. V2 also supports a
+separate terminal transition: request `rule` after a completed resolved judge,
+or explicitly request `mistrial` to abort an active nonterminal case. Rule uses the actual
+retained judge text and shared parser, including plain prose; unresolved
+clarification and explicit judge mistrial cannot become a ruling. An explicit
+abort accepts IDLE, completed or recovered interrupted evidence after acquiring
+the case mutex. It performs no provider replay or hard cancellation. A model
+mistrial retains its full original text; other abort reasons derive from the
+request, authored edge and retained source. Execution failure or exhaustion
+never infers mistrial.
+
+Terminal settlement retains and verifies outcome, transcript and source evidence,
+then commits one `terminal-prepared` head while active. The same executor runs
+the authored zero-provider record scope and accepts a real keyed `Complete` or
+`Fail`. Its report's `recorded` is that terminal snapshot CID. No State follows
+the lifecycle command. Readback distinguishes active `terminal-pending` from
+`settled` with actual `closed` or `failed` lifecycle, preserving the prepared
+`stateCid`, preparation snapshot and terminal receipt. This adds at most one
+head: twenty-six heads and twenty-nine accepted case commands.
+
+Only the exact prepared request may resume pending zero-provider delivery.
+After acceptance, exact terminal retries return the original receipt without a
+walk; reconstructed reports set `terminalWalkObserved=false` and supply no
+invented invocation or cleanup evidence. Historical model and initializer
+retries preserve their original results while current readback stays terminal.
+Ordinary run receipts remain separate: reporting, cleanup or receipt persistence
+can fail after the case settled. Reopened reads and exact retries authenticate
+the case outcome before returning results; missing or corrupt source/final bytes
+fail closed. Immutable
+`case.note` text describes the offering's original host boundary; this section
+describes current execution. The legacy preset walk keeps its separate automatic
+clarification behavior.
+Nested grouping uses the common
+selection path, with literal keys taking precedence and missing values retained
+in the empty-key bucket.
+
 The Evidence facet reads immutable run receipts and their frozen programs. Exact
 program CIDs include layout. When automatic output layout or manual positioning
 changes that CID, the facet separately compares the authored definition while
@@ -404,6 +795,16 @@ ignoring node position, size, collapse and viewport. Parameters, wires and their
 order, nested scopes, controls and Kanban remain compared. This read-only
 comparison neither executes nor saves a program, and does not establish that
 inputs, dependencies or results are still current.
+
+The SpaceGraph node inspector's **Inspect recorded node evidence** opens that
+same drawer with an exact node-ID filter. Choose a retained run there; the filter
+does not assert that the current node matches its frozen definition. Repeated
+calls remain separate by invocation ordinal, scope path, parent and iteration.
+Confix links preserve their original ledger positions, and returning to Evidence
+keeps the selected receipt. **Show all node evidence** removes the filter.
+Missing outputs or omitted invocations are not proof of non-execution. Alignment
+candidates remain separate from execution evidence and epistemic claims. None
+of these inspection actions executes or changes the construction.
 
 Expand **Node invocations** in a run receipt to inspect the guest used by a
 `vm.polyglot` node, including failed calls. Its bounded snapshot retains VM ID,
@@ -425,20 +826,26 @@ evidence** returns to the existing evidence view. Choose **Current canvas** in
 the source selector to leave retained-content inspection. Neither action loads,
 runs or changes the construction.
 
-The source view also accepts a **Retained JSON content ID** directly. Its API is
+The source view also accepts a **Retained content ID** directly, with explicit
+**Inspect retained JSON** and **Inspect retained CBOR** actions. Its API is
 `POST /api/lcnc/workspace` with
 `{"source":{"kind":"cas","cid":"sha256:…"},"path":["lcncRun","outputs","function"]}`.
-Only existing, hash-verified UTF-8 JSON is accepted, within the workspace's
-1 MiB, depth and token budgets. No missing-content fallback or CAS write occurs;
-binary/CBOR content continues through the existing typed storage projections.
+JSON remains the default; add `"syntax":"CBOR"` inside `source` for a canonical
+CBOR artifact. Curate's saved attempts and individual stage receipts link directly
+to this CBOR view. Both formats inspect existing, hash-verified bytes within the
+workspace's 1 MiB, depth and token budgets. CBOR decoding is bounded before scanning;
+trailing data and representations that cannot round-trip through canonical Confix
+are refused, not normalized or guessed. Byte strings retain a typed preview.
+No missing-content fallback, CAS write, model call or graph execution occurs.
 
 Graal's blackboard lists CID-pinned **Receipt / Program / Invocations in Confix**
 links for up to 32 LCNC run pointers. Kanban proposal-review cards also link the
 original run and frozen program into this same drawer. A **Pinned Confix link**
-in the drawer preserves the selected content ID and JSON path, not a moving
+in the drawer preserves the selected content ID, format and JSON-array path, not a moving
 program name, token page or cursor-index selection.
 `/panels?content=sha256:…&path=…` opens an inspection-only, ephemeral view: it
 does not restore scratch, hydrate a construction, arm sources or execute nodes.
+CBOR links carry `syntax=CBOR`; omitted syntax means JSON, never format detection.
 Malformed, missing and conflicting source links stay inert with no fallback.
 The ordinary **Open Panels editor (saved scratch)** link is a separate navigation.
 These links expose existing retained bytes; they neither prove current run
@@ -460,6 +867,12 @@ and resolved wired inputs, the scope path, iteration, pause ordinal, run ID and 
 program CID. A skipped/unfed node can still be inspected before the executor
 decides to skip it. Ordinary node stepping runs a polyglot guest call to completion.
 
+While paused, **Frozen program in Confix** opens that run's immutable program in
+a separate inspection-only tab; the debugger keeps observing the same pause.
+This does not load an executable canvas, advance the run or open saved scratch.
+The link is retained at completion. Invalid or changed program identities are
+refused rather than substituted.
+
 At a `vm.polyglot` pause, **Into guest source** is enabled only when the effective
 bound host supports the resolved language and trust tier. This capability check
 does not create a guest or evaluate source. The command suspends the same call
@@ -467,14 +880,21 @@ through Truffle, then offers **Into guest source**, **Step over source** and
 **Step out of source**. In-process JS, Python and Ruby expose bounded stack frames
 and copied scalar locals at statement and function-entry/exit stops. Each pause
 identifies its before/after anchor; object inspection does not invoke getters or
-evaluate expressions. Coordinates refer to generated guest source, including the language
-adapter, not directly to the authored body. JVM-language wrappers and process
+evaluate expressions. **Authored body** shows the function-body line numbers and
+**Generated guest** shows the emitted declaration, including its language adapter.
+The wrapper emitter supplies the mapping; adapter stops have no authored line.
+The source window stays bounded, and stack-frame lines remain generated.
+JVM-language wrappers and process
 guests offer node stepping only; the guest execution boundary also refuses an
 unsupported source-debug request before evaluation. **Step into next
 node** from a source pause finishes the guest and stops at the next node.
 **Run to line** resumes to a one-shot breakpoint in the current guest source,
 without replaying earlier effects. The panel numbers a bounded source window;
-enter any line within the reported source length. Truffle can resolve a
+enter any line within the selected coordinate system's reported length.
+Authored targets translate against the current held snapshot; invalid targets
+do not release the pause. The debug API's `source-line` command accepts
+`coordinates: "authored"` or `"generated"`; omitting it retains generated-line
+behavior. Other commands do not accept this selector. Truffle can resolve a
 non-executable line to a nearby executable location: the next hit shows both
 requested and stopped-at lines. A target that is never reached may complete
 without another source pause. Resolution uses statement and function boundaries;
@@ -486,7 +906,8 @@ run** uses the existing run cancellation route. Pauses count against the run's
 timeout (120 seconds by default), and ordinary completion/failure/cancellation
 retains the same receipt and invocation evidence. Module drain releases debug
 holds and finishes admitted work. The controller is transient and removed on
-exit; daemon restart marks unfinished runs interrupted, not resumed. Closing a
+exit; daemon restart marks started, unfinished runs interrupted. Original queued
+runs can resume through recovery before their first Start transition. Closing a
 browser is not a cancellation guarantee. A lost response must be checked in run
 records before another execution is requested.
 
@@ -512,8 +933,9 @@ Read `GET /api/lcnc/run/debug?token=…`, then include `&runId=…` to pin subse
 observations. Send `POST /api/lcnc/run/debug` with
 `{token, runId, ordinal, action}` for the observed pause, choosing from its `actions`
 list (`step`, `continue`, `source-into`, `source-over`, `source-out`, `source-line`).
-`source-line` also requires a positive integer `line` in the current generated
-source. Malformed/out-of-range lines return 400 without releasing the pause. Active
+`source-line` also requires a positive integer `line` in the current source's
+selected `coordinates` (`generated` by default, or `authored`). Malformed/out-of-range
+lines return 400 without releasing the pause. Active
 token collisions, run identity mismatches and stale/repeated pause commands
 return 409; commands missing a valid run ID return 400. An exited controller
 returns 404. A run-bound GET may include that exact run's compact `receipt`
@@ -523,6 +945,18 @@ commands advance the existing run, never replay
 it. The token is a correlation key, not an authentication boundary.
 
 ## Process-host callbacks
+
+The VM terminal page uses the same `PanelsPage` owner as Panels and Hermes.
+Its complete input requests use a bounded serial lane, pinning the VM ID and
+input mode before queueing; background reads use the separate page lane.
+`closeVmTerminal()` stops browser admission, removes listeners and timers,
+closes terminal SSE and joins admitted HTTP requests including response bodies.
+Late snapshots cannot repaint the closed page. Closing the page does not revoke
+the VM or establish completion of guest work already accepted by the daemon.
+`pagehide` initiates the same drain but cannot guarantee completion after the
+browser destroys the document. The opt-in `TRIKESHED_VM_TERMINAL_UI=1` check in
+`VmTerminalBrowserTest` holds a real snapshot across close, releases real GraalJS
+output, and checks unchanged DOM and request counts beyond the polling interval.
 
 The Python/Hermes sleeve's host callbacks and both JVM child workers use
 `ProcessCalls` in commonMain userspace NIO: one owning SupervisorJob, bounded
@@ -579,6 +1013,43 @@ replacing its worker and resuming the saved conversation. An observed worker
 exit or unfinished input remaining after close produces one failure receipt and
 clears the retired identity; late results cannot complete the next worker's turn.
 
+The Hermes browser sends line edits, normal Enter and restart requests through
+one commonMain `PanelsElement` worker, with at most 64 admitted actions. A restart
+cannot overtake locally queued input. A refused or unacknowledged edit stops
+subsequent input; Enter then requests a restart with the saved conversation,
+never execution of a truncated line. The “+ panel” control opens an independent
+worker; native copy/paste remains browser-owned.
+
+Hermes reuses the Panels/Curator `PanelsPage` browser owner, with separate input
+and background lanes. Close removes listeners and timers, closes SSE without
+reconnecting, and joins admitted requests and their response bodies. Late
+responses cannot repaint or navigate the closed mount. `closeHermes()` returns
+the same completion promise on repeated calls; `pagehide` initiates the same
+drain but cannot guarantee completion after the browser destroys the document.
+The opt-in `TRIKESHED_HERMES_INPUT_UI=1` lifecycle check holds a real snapshot,
+observes a live SSE stream, and verifies pending drain, actual late guest output,
+unchanged closed DOM and no further polling beyond ten seconds. Its minimal real
+GraalPy diagnostic guest does not prove the installed donor or live ModelMux.
+
+In that diagnostic console, `:eval` compiles Python statements for interactive
+display in the existing supervised guest namespace. Expressions use Python's
+`sys.displayhook`; the default hook displays `repr(value)` except for `None`.
+Statements retain their effects and bindings, and stdout and failures keep the
+current command's causal identity. Console parser/execution dependencies use
+helper-local imports: assigning `exec`, `compile`, `globals` or `__import__` in
+the editable namespace does not disable following commands, and those names
+still resolve to the user's bindings inside their code. The console does not
+print the module object
+returned by raw non-interactive GraalPy evaluation. General VM evaluation and the
+stock Hermes worker's command handling are unchanged.
+
+Hermes and VM terminal events retain their emitted cells, cursor and geometry;
+later output or resize cannot rewrite queued or replayed patches. Browser snapshots
+carry a signal-sequence watermark, so old replay and delayed snapshots cannot
+roll the screen back. Cursor-only output still advances that sequence even when
+the cell revision is unchanged. Reconnection observes the existing terminal; it
+does not replay commands or start a guest.
+
 The standalone `ProcessVmHost`/`ProcessIsolateHost` path also uses common userspace
 ownership through `ProcessVmChannel`. Its synchronous VM API waits through a
 platform SPI binding; bounded requests, independent host callbacks and close
@@ -617,6 +1088,34 @@ ingest GUI, or a Notion-like document workspace over the same machinery, is
 future consideration—not something already shipped. The core is there; the
 whole editing experience is not finished.
 
+The **Ingest model** dropdown on `/graal` selects `jeva`, `jev`, or
+`openai-decision` for the next folder drop. The choice travels with each queued
+document and is retained for restart recovery. Explicitly selected ingest awaits
+the provider's scoring before reporting completion; unavailable runtimes, missing
+credentials, and failed judgments remain visible as failures. Provider availability
+is reported by `GET /api/curation/providers`; per-provider progress is under
+`GET /api/intake`.
+
+The daemon default remains Jev. Set `TRIKESHED_CURATION_PROVIDER` (or JVM property
+`trikeshed.curation.provider`) to any of the three IDs; the existing `openai` alias
+is accepted. JEV uses `jev-latest` and `JEV_API_KEY`; OpenAI Decision uses
+`gpt-6-luna`, `POST /v1/decisions`, and `OPENAI_API_KEY`, resolved through KeyMux.
+Remote curation remains opt-in through `TRIKESHED_AIRGAP=off`. Answer caches,
+section judgments, and sense memory remain separate by provider; existing JEV
+and OpenAI cache paths are preserved. Section views follow the book's last
+successfully scored provider, including after restart.
+
+Jeva runs locally through a bounded, owned Python process. Configure
+`TRIKESHED_JEVA_PYTHON` for the environment containing Jeva and its dependencies,
+`TRIKESHED_JEVA_MODEL` for a local checkpoint or cached Hugging Face model, and
+optionally `TRIKESHED_JEVA_SOURCE`, `TRIKESHED_JEVA_DEVICE`, and
+`TRIKESHED_JEVA_REVISION`. Equivalent JVM properties use `trikeshed.jeva.` and
+the lowercase suffix. Defaults are `python3`, `LIQIIIII/Jeva-4B`, and `cpu`.
+Loading is offline only: selecting Jeva never downloads packages or weights.
+Jeva stores are separated by configuration and resolved local model identity.
+Native null outcomes retain their probability mass as the curator's `none` sense;
+missing or malformed answers cannot become evidence.
+
 For local-only model use, launch with `--airgap` (or `TRIKESHED_AIRGAP=1`). Jev
 and other remote model calls are disabled even when credentials are configured.
 BERT uses local weights and tokenizer files; missing assets or insufficient
@@ -652,8 +1151,8 @@ TrikeShed/
 **License** — AGPLv3 (effective 2017). Do not change.
 **Task ledger** — `doc/todo.md` is live flywheel intake; dated task lists elsewhere are historical unless explicitly refreshed. The current marketability/MCP board audit is `docs/marketability-kanban-mcp-audit.md`; its **MKT-001…015 market backlog remains inert until explicitly dispatched**, but its MCP implementation backlog (KMFSM-001/004/005/006/009/010) shipped 2026-08-30 — the board is projected to any MCP client at `POST /api/mcp` (`docs/guide-mcp-kanban.md`), with `scripts/demo-mcp-kanban.sh` as the runnable proof.
 **Architecture docs** — `doc/rewire.md` (user-centric Forge workspace architecture, storage unification, K8s emulation via GraalVM pointcut server), `doc/taste.md` (high-performance hierarchical-UI engine principles, 10-point gap review).
-**Compiled-out layers** — `classfile/slab/**` is excluded from `commonMain` compile in `build.gradle.kts` (~20 `TODO()` stubs: GraalJS eval, DuckDB c-interop, `FacetedCursorContract`, `MiniDuckContract`; files preserved on disk). `CircularQueue.poll/peek/iterator.remove` converted from `TODO()` to `error(...)` — loud hollow, not silent stub.
-**Static assets** — `src/commonMain/resources/web/` (index.html, styles.css, script.js, manifest.webmanifest, icons/) is the single source of truth for the Forge HTML shell; the `generateForgeAssets` Gradle task bakes these into the Kotlin-internal `ForgeAssets` object so no runtime resource lookup is needed.
+**Compile coverage** — `classfile/slab/**` is on the `commonMain` compile path. Its remaining `TODO()` implementations are runtime gaps, not excluded source. The JS/native debt lists contain comments only; do not add exclusions to obtain a green build. Compilation does not prove that the unfinished slab operations work.
+**Static assets** — `generateForgeAssets` bakes `src/commonMain/resources/web/index.html` and `styles.css` into `ForgeAssets`. Browser behavior is compiled Kotlin/JS, not a handwritten `web/script.js`; `ForgeApp` inserts the selected bundle tags through `{{BUNDLES}}`.
 **Categorical idempotency** — the kernel maxim (see PRELOAD.md): if a structure is not mutated, it stays in the category it came from. `Series` that gets copied to `List` only to be read back is a type demotion. `LinearHashMap` (KMP-native) replaces `MutableMap` where the map is not mutated post-construction; CasStore uses it as the blob backing.
  
 **Storage unification** — one CAS, five lenses (auxiliary CAS / materialized / reified Confix / btrfs content / graph trees). `doc/rewire.md` §0. Projection registry (`project(cid): Lens`) is the one new piece (T-CAS-PROJ-1).
@@ -820,7 +1319,8 @@ data class JobSnapshot(
   val lifecycle: String,              // submitted | ready | active | blocked | failed | closed | moved | acknowledged | retracted
   val dependencies: List<JobId>,
   val attemptCount: Int = 0,
-  val attemptId: String = ""
+  val attemptId: String = "",
+  val stateCid: String? = null
 )
 ```
 
@@ -1025,12 +1525,10 @@ Forge Workspace   ← block-based document editor (light theme)
   src/commonMain/resources/web/
     index.html  ← shell (sidebar + document + board + slash menu)
     styles.css  ← light theme, 16px Inter, sidebar #f7f6f3, doc #fff
-    script.js   ← block editor: h1/h2/h3/p/todo/bullet/quote/code/divider
-                  slash command menu, hover affordances (+/drag handle)
-                  localStorage persistence, seed hydration, board view
-ForgeApp.kt       ← placeholder substitution: {{STYLES}} {{SEED}} {{SCRIPT}}
-                    → ForgeAssets.indexHtml/stylesCss/scriptJs
-                    (generateForgeAssets bakes web/ into Kotlin object)
+  src/jsForge/kotlin/borg/trikeshed/forge/
+                  ← compiled Kotlin/JS editor, seed hydration and board view
+ForgeApp.kt       ← placeholder substitution: {{STYLES}} {{SEED}} {{GALLERY}} {{BUNDLES}}
+                    → ForgeAssets.indexHtml/stylesCss plus compiled bundle tags
 generateForgeAssets ← Gradle task, 5000-byte ByteArray chunks
                       → borg.trikeshed.forge.generated.ForgeAssets
 
@@ -1038,7 +1536,7 @@ ForgeDoc          ← block tree (H1/H2/H3, P, TODO, BULLET, NUMBERED, QUOTE, CO
 ForgeBoardFSM     ← board/card FSM (BoardLoaded, CardMoved, CardCreated, Drag*)
 ForgeKanbanIngest ← /tmp/hi markdown → Rete facts + causal nodes + Kanban cards
 ForgeGalleryCatalog/Renderer ← widget catalog (sections LAYOUT..CAS, preview tokens)
-ForgePersistenceScript.kt ← browser IndexedDB/localStorage/Cache persistence
+ForgePersistenceJs.kt ← Kotlin/JS browser persistence
 ```
 
 **Shell architecture** — the workspace shell is a pure client-side block
@@ -1048,7 +1546,8 @@ The seed is injected server-side by `ForgeApp.kt` via `{{SEED}}`
 placeholder; `./gradlew generateForgePages` bakes the fully-baked HTML into
 `docs/index.html` on the JVM (`ForgeBakePages`) for gh-pages deployment, and
 with `-PforgePagesStages=jvm,js` also publishes the Kotlin/JS bundle to
-`docs/js/TrikeShed.js` (`{{BUNDLES}}` slot; hydrate-only in the browser).
+`docs/kotlin/forge/forge.js` (`{{BUNDLES}}` slot). This static document export
+is not a replacement runtime for the daemon-backed `/panels` surface.
 
 **Block types and slash commands** — typing `/` at the start of a block
 opens a slash menu with: Text, Heading 1/2/3, To-do, Bulleted list,
@@ -1076,11 +1575,10 @@ surfaces in the PWA as the Host view and, when served by `./gradlew runKanbanHtt
 as `/api/vm` (`spawn`, `{id}/eval`, `{id}/revoke`, SSE `events`). Spec = `openapi/forge-host.openapi.yaml`
 (parity-tested against the route table).
 
-**Gallery on GitHub Pages** — `./gradlew generateForgePages` (stage `jvm`
-is the seed bake; `js`/`wasm` add bundles as `./gradlew forgePagesProbe`
-turns green — ratchet list in `gradle/js-target-debt.excludes`). Serve
-locally with `./gradlew serveForgePages`. `kotlinUpgradeYarnLock` may be needed if
-the yarn lock drifts.
+**Gallery on GitHub Pages** — `./gradlew generateForgePages` exports static
+documentation: stage `jvm` bakes the seed, and `js`/`wasm` add compiled bundles.
+Selecting export stages does not establish cross-target runtime coverage or
+permit compile exclusions. The live construction surface is the daemon's `/panels`.
 
 **Blackboard-as-Confix-cursor** — the target architecture. A single JSON
 file is the blackboard; `confixDoc(json)` → `Cursor` →
@@ -1101,19 +1599,130 @@ elevation (gallery above board above page).
 ```
 Nuid = Join<Capability, Join<Nonce, Subnet>>
   - Capability: sealed hierarchy (Process/Cas/Wireproto/Sctp/Model/BlackBoard/Custom + wildcard family roots)
-  - Subnet: concentric containment (core < process < local < lan.localhost < mesh.worker.* < global.relay)
+  - Subnet: dotted prefix containment (local contains local.review; core, process, local and lan are separate roots)
   - Nonce: RandomBytes + Derived (causal chaining)
 
 NuidFanoutElement
   - CCEK lifecycle (CREATED→OPEN→ACTIVE→DRAINING→CLOSED)
-  - Concentric narrowing: filter by scope⊇subnet AND TraitSpace.can(capability), sort by scope.level ascending
-  - Escalation: timeout at request level → walk outward up to escalationBudget+1 levels
-  - Claim: first WorkgroupSlot.tryTake() matching claimId wins; losers stand down
+  - Concentric narrowing: matching capabilities and containing subnet prefixes, deepest prefix first
+  - Escalation: a full or closed nearer inbox yields to an eligible ancestor within escalationBudget prefix edges
+  - Claim: one bounded dispatcher admits each claim to one workgroup; admission alone is not completed work
+  - Execution: register(workgroup, execute) owns a bounded handler inbox; DispatchResult.completion reports its result or failure
+  - Drain: stop external admission, finish accepted handlers and their required child claims, then join the owner
+  - Dependencies: retain actual parent claims and refuse live workgroup wait cycles before admission
 
 Workgroup
   - name + scope: Subnet + traits: TraitSpace
   - canHandle(request: Nuid) = traits.can(capability) && (scope contains subnet)
 ```
+
+`Claim.parent` retains the selected parent workgroup and claim;
+`NuidInvocation.lineage` projects the complete claim ancestry. Accepted handlers
+can dispatch required child work while external admission is stopped. Drain
+waits for those children, including children whose parent has already returned.
+Live dependency cycles fail with `NuidDispatchCycle`; a completed parent does
+not block later reuse of its worker. A handler cannot drain its own fanout or
+unregister its own active worker. When borrowing caller services, append the
+selected invocation's `.context` last to retain its metadata and ownership.
+Constructing or retaining invocation metadata does not grant admission after
+its handler has finished.
+
+Embedded LCNC callers can register a frozen construction with
+`CcekReactorBinding.registerLcncWorkgroup(fanout, workgroup, program, runners)`
+and call `fanout.runLcncWorkgroup(nuid, args)`. The result joins the dispatch
+identity with the frozen program CID and actual scope results. Each claim gets
+its own walker, typed `LcncWorkgroupKey` context, and drained assembly receipts
+carrying workgroup, claim, subnet and program identities. Inline rings are supported; unresolved named
+constructions are refused at registration. The program hash and in-memory
+assembly signals alone do not persist the claim or its result.
+
+Daemon callers can add `"subnet":"local.review"` to a named-program or inline
+document request at `POST /api/lcnc/run`. Admission commits a `queued` receipt
+with a stable run ID, frozen root program CID, inputs, options and declared scope
+before dispatch. Each saved version executes through its
+`lcnc/program/<name>@<CID>` workgroup; undeclared and inline constructions use
+the `local` scope. Receipts retain the actual workgroup, claim, requested subnet
+and claimed scope once execution starts. Eligible requests select a contained
+subnet within three ancestor edges; malformed paths and unmatched scopes are
+refused. Once admitted, execution belongs to the workgroup even if the HTTP
+caller stops waiting. Rebuilds use this same queue and dispatch path.
+
+On reopen, only an original queued receipt at revision one is eligible for
+execution. A committed Start transition precedes effects; a run that reached
+that transition is marked interrupted after restart and is never replayed.
+Recovery feeds the owned bounded queue without waiting for the entire backlog
+during attachment. Saved root versions and scopes survive declaration changes
+or deletion. Explicit `pinnedVersions` must resolve to matching, readable,
+type-valid CAS programs; unspecified subprograms freeze at first use. Version
+bindings remain registered until module drain.
+
+Nested daemon runs retain `parentRunId` and `executionFamily` alongside claim
+ancestry. The service executes three root families at once; other admitted roots
+wait in the owned queue. Descendants reserve their root's permit before queue
+publication, retaining the family even if the parent finishes while they wait.
+Each accepted claim owns a separate cleanup lease, and each run still has its
+own card and receipt. Board WIP
+counts each family as one unit and each ordinary card as another. Family
+membership cannot change, and service-owned run receipts are not agent claims.
+Board acknowledgments follow CAS sync and then WAL flush, so a committed
+pointer is not published before its payload reaches the CAS durability barrier.
+`queueDurability` is `DURABLE` only when both CAS and WAL provide durable
+storage; an in-memory CAS reports `VOLATILE`. The common userspace file WAL
+retains its existing framing, truncates incomplete final frames, and refuses
+complete corrupt frames. Module drain joins queued and executing work before
+closing the WAL handle.
+
+An authored `http.post` node can call `/api/lcnc/run` with a child program,
+subnet and inputs. The daemon dispatches that route in the current context,
+retaining claim ancestry and the execution family. Accepted dependencies use
+existing frozen registrations while a parent binding is replaced or the module
+drains; independent callers still pass normal admission.
+
+A stored construction can declare `"controls":{"subnet":"local.review"}`
+alongside its existing controls. Publishing or saving that Confix document
+projects a live `lcnc/program/<name>` workgroup with capability
+`lcnc/program/<name>` and a frozen program CID. Named runs select that binding
+automatically; an explicit request subnet can select a contained descendant.
+Republishing replaces the latest declaration while accepted versions retain
+their own workers. Removing the declaration or document withdraws it; inspection-only or invalid documents
+are refused. Offered presets are not installed workgroups. The existing
+attachment and program persistence restore declarations; the live projection
+adds no separate registry log. `GET /api/lcnc/workgroups` returns registrations,
+program CIDs and refusals, and `/api/lcnc/concentric` projects stored constructions.
+
+To pollinate another construction, pass `"sourceReceiptCid":"<completed receipt CID>"`
+to its whole-program run. The service verifies the immutable CAS bytes and the
+local committed work-log identity, then binds
+`inputs.evidence = {receiptCid, runId, programCid, returns}`. A caller-supplied
+`inputs.evidence` conflicts with this reserved input. The recipient retains the
+source pointer, effective inputs and consumed-receipt fingerprint in its normal
+receipt; rebuilding it preserves that provenance. Source execution is not repeated.
+
+Panels exposes these routes in **Confix & facets → Workgroups**. Apply or Clear
+changes the canvas subnet declaration locally; close the drawer and use **Save
+to store** to install that version. Reopen Workgroups to read the registry, then
+explicitly choose a stored program and CID, requested subnet and JSON inputs.
+**Run stored construction** executes that saved version. An optional **Source run
+receipt CID** transfers a completed producer's evidence to the chosen recipient.
+Refresh preserves the selected CID and shows it unavailable if replaced; it never
+selects a replacement or retries a run automatically.
+
+`agent.run` carries an optional task `jobId` and its full result receipt across
+scope boundaries, refusing mismatched task, run or agent identities. Its final
+receipt follows process completion and required scratch cleanup. A cleanup
+failure sets `ok=false` while retaining the transcript, patch and summary.
+A refusal before scratch admission does not delete the configured path.
+`JvmAgentRunner` atomically creates scratch only at an absent entry. It requires
+run IDs to consist of one path component and refuses an agents directory resolved
+inside the source repository.
+
+`panel.vote` requires explicit ballots, retains their transcript, exposes its quorum and
+membership, and supports finite nonnegative weights. Invalid membership or a
+malformed declared quorum refuses the vote. An explicit JSON `null` quorum is
+rejected before parameter normalization in program documents and single-node
+requests. A successful agent process does not cast an approval ballot. Scope outputs can carry gathered receipts, ballots and
+summaries into another registered assembly without rerunning their producers.
+Receipt transfer preserves provenance; it does not establish independent evidence.
 
 ### 8.1b Litebike Listener (clean-room Kotlin port — no FFI)
 
@@ -1196,7 +1805,6 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 # GitHub Pages deploy (docs/ is the hosted directory on master)
 ./gradlew generateForgePages -PforgePagesStages=jvm,js   # bake docs/ (jvm seed + Kotlin/JS bundle)
-./gradlew serveForgePages                                 # preview http://localhost:8765/ (-PforgePort=N)
 git add docs && git commit -m "feat: deploy Forge workspace" && git push
 
 # Verify deploy (Pages serves master:/docs directly — dump, commit, push; no CI)
@@ -1208,10 +1816,10 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 - `benchmarkJoin`, `benchmarkSequence`, `benchmarkVector`, `benchmarkMath`, `benchmarkConfix`
 - `printForgeGallery` — JVM text grid of catalog + blackboard
 - `runForgeJvm` — Compose Desktop shell
-- `generateForgePages` — Sync task (stages `jvm`[,`js`,`wasm`] → docs/); `serveForgePages` previews docs/ on the JDK http server; `forgePwa` = both
+- `generateForgePages` — static documentation Sync task (stages `jvm`[,`js`,`wasm`] → docs/), not the live Panels runtime
 - `julesArtifact`, `julesSettle`, `julesReviewPatch`, `julesReviewReport` — Jules CAS bridges (`--args="…"`)
 - `runOroborosDaemon`, `runFlywheelTui`, `runKanbanHttpServerJvm` — staged-classpath launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
-- `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css,script.js}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each) so the Forge HTML/CSS/JS shell ships as a Kotlin-internal asset, not a resource lookup. `commonMain` consumes the generated object; `ForgeApp.kt` / `ForgePersistenceScript.kt` / `index.html` template all reference it via `{{SEED}}`/`{{STYLES}}`/`{{GALLERY}}`/`{{SCRIPT}}` placeholders.
+- `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each). `ForgeApp.kt` fills the `{{SEED}}`, `{{STYLES}}`, `{{GALLERY}}` and `{{BUNDLES}}` slots; browser code is supplied by the compiled Kotlin bundles, not a generated `scriptJs` field.
 
 ---
 
@@ -1296,8 +1904,8 @@ cat src/commonMain/kotlin/borg/trikeshed/job/JobSupervisorElement.kt
 cat src/commonMain/kotlin/borg/trikeshed/job/JobReducer.kt
 cat src/commonMain/kotlin/borg/trikeshed/job/JobNexusFactory.kt
 
-# 5. Browse the gallery (local)
-./gradlew forgePwa            # bakes docs/ then serves http://localhost:8765/
+# 5. Inspect the gallery catalog without starting a server
+./gradlew printForgeGallery
 ```
 
 ---
@@ -1484,19 +2092,14 @@ git clone https://github.com/jnorthrup/TrikeShed && cd TrikeShed
 export JAVA_HOME="$HOME/.sdkman/candidates/java/25.0.4.1-graal"
 export PATH="$JAVA_HOME/bin:$PATH"
 
-# The gate. Not `./gradlew build` — build also drags in JS/WASM targets, some of
-# which sit behind a debt ratchet (gradle/js-target-debt.excludes) and are not
-# the thing that tells you the tree is sound. This is:
+# JVM compilation checkpoint only; this does not verify JS/WASM/native or runtime behavior.
 ./gradlew jvmMainClasses --console=plain
 
 # One real, fast test, to confirm the toolchain (not just the compiler) works:
 ./gradlew jvmTest --tests "borg.trikeshed.lib.JoinTest" --console=plain
 
-# Something you can look at without reading a line of Kotlin — bakes and serves
-# the static console/dashboard on http://localhost:8765/:
-./gradlew forgePwa
-
-# The actual daemon (Couch-shaped store + Graal console + VM host), foreground:
+# The daemon (Couch-shaped store + Graal console + VM host), foreground.
+# Open /panels at the address it reports for the live construction surface.
 ./gradlew runOroborosDaemon --console=plain
 ```
 
@@ -1504,13 +2107,14 @@ There is no framework here — no Spring, no DI container, no annotation
 processors, no generated code you can't read in the same file it's used. It's
 Gradle + the Kotlin/JVM compiler + hand-rolled HTTP and NIO, full stop. If
 `jvmMainClasses` is green, the JVM half of the tree compiles; that is the only
-claim "the build works" is making. `-PfocusedTransportSlice=true` is a debt
-switch, not a speed-up — it *disables* exclusions on trees that are currently
-red, so leave it off unless you're specifically chasing that debt.
+claim that checkpoint supports. Verify the affected targets and behavior separately.
+`focusedTransportSlice` no longer changes test exclusions: its conditional block
+is empty. Neither source nor test exclusions are permitted by `PRELOAD.md`.
 
 If you're here because someone handed you this repo and said "just get it
-running," the four commands above are the whole onboarding: gate, one test,
-static preview, live daemon. Everything else in this document is for when you
+running," the three checks above are the starting path: JVM compilation, one test,
+then the live daemon. They are not a cross-target completion gate. The rest of
+this document is for when you
 want to know *why* it's shaped this way — start with [§1 Kernel
 Algebra](#1-kernel-algebra-the-mental-model) and `PRELOAD.md`.
 

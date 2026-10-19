@@ -53,6 +53,7 @@ internal const val SETUP_SUBMIT_ALL: Int = 0x80
 /** Each userspace backend owns one of these rings. The legacy singleton is separate. */
 internal class LinuxLiburingFacade : LiburingFacade {
     private var ring: CPointer<io_uring>? = null
+    val completionFd: Int get() = ring?.pointed?.ring_fd ?: -1
     /** [peekCqe]'s out-parameter, allocated on first use and freed with the ring. */
     private var cqeSlot: CPointerVar<io_uring_cqe>? = null
     private var inFlight = 0

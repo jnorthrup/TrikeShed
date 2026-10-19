@@ -189,6 +189,20 @@
         },
         "hashSegmentCid": {
           "$ref": "#/$defs/ContentId"
+        },
+        "stateCid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "priorStateCid": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
         }
       },
       "required": [
@@ -227,7 +241,8 @@
                 "retry",
                 "move",
                 "acknowledge",
-                "retract"
+                "retract",
+                "state"
               ]
             }
           },
@@ -235,6 +250,34 @@
             "frameKind",
             "operation"
           ]
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "state"
+              }
+            },
+            "required": [
+              "operation"
+            ]
+          },
+          "then": {
+            "required": [
+              "expectedRevision",
+              "priorStateCid",
+              "stateCid"
+            ],
+            "properties": {
+              "expectedRevision": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "stateCid": {
+                "$ref": "#/$defs/ContentId"
+              }
+            }
+          }
         }
       ]
     },

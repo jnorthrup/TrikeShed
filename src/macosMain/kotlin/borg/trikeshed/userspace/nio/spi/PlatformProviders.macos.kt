@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.spi
 
+import borg.trikeshed.context.Synchronization
 import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
@@ -9,7 +10,7 @@ import borg.trikeshed.htx.HtxReactorElement
 import borg.trikeshed.reactor.Tls13CodecBackend
 import kotlin.coroutines.CoroutineContext
 
-actual fun platformNioProviders(): List<CoroutineContext.Element> {
+actual fun platformNioProviders(reactorSynchronization: Synchronization): List<CoroutineContext.Element> {
     val channelOperations = PosixChannelOperations()
     val fileOperations = PosixFileOperations()
     val tlsBackend = Tls13CodecBackend(fileOperations)
@@ -26,7 +27,7 @@ actual fun platformNioProviders(): List<CoroutineContext.Element> {
     channelOperations,
         tlsBackend,
         HtxReactorElement(channelOperations = channelOperations, tlsBackend = tlsBackend),
-    PosixReactorOperations(),
+    PosixReactorOperations(reactorSynchronization),
     PosixProcessOperations(),
 )
 

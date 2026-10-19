@@ -2,6 +2,7 @@ package borg.trikeshed.forge.server
 
 import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.confix.*
 
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.htx.*
@@ -13,7 +14,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.*
 import keymux.FixedKeySource
 import keymux.KeyMux
-import modelmux.ModelMux
+import modelmux.*
 import kotlin.test.*
 
 class MuxSessionServiceTest {
@@ -48,6 +49,18 @@ class MuxSessionServiceTest {
     }
     private fun answer(text: String = "answer") = HtxResponse(200, ByteSeries("""{"choices":[{"message":{"content":"$text"}}],"usage":{"prompt_tokens":10,"completion_tokens":5}}""".encodeToByteArray()))
 
+    @Test fun storedActivityKeepsSessionAndAssessmentIdentities(): Unit = runBlocking {
+        val activity = MuxActivity()
+        activity.start("fixture", "provider", MuxCallContext(conversationId = 42, turnId = 7),
+            assessmentId = "input-cause", contextId = "hermes-session")
+        val conversation = MuxConversation(42, "Test", 1, 1, calls = activity.snapshot())
+        val persisted = reifyMap(jsonOf(conversation.toWire()))
+        val call = (persisted["calls"] as List<*>).single() as Map<*, *>
+        assertEquals("hermes-session", call["contextId"])
+        assertEquals("input-cause", call["assessmentId"])
+        assertEquals(conversation, muxConversationFromWire(persisted))
+    }
+
     @Test fun conversationHistoryPersistsAndForkDoesNotDoubleCharge(): Unit = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
         val requests = mutableListOf<String>()
@@ -59,6 +72,7 @@ class MuxSessionServiceTest {
             assertEquals(202, post(service, "/run", mapOf("id" to id, "prompt" to "second", "models" to listOf("test-a"))).status)
             val result = finished(service, id)
             assertEquals(4, (result["messages"] as List<*>).size)
+            assertTrue((result["calls"] as List<*>).all { (it as Map<*, *>)["contextId"] == id.toString() })
             assertTrue(requests.last().contains("first") && requests.last().contains("answer") && requests.last().contains("second"))
             val restored = MuxSessionService(brain, gateway, scope, kotlin.coroutines.EmptyCoroutineContext)
             assertEquals(result, get(restored, id))
@@ -115,6 +129,48 @@ class MuxSessionServiceTest {
         } finally { scope.coroutineContext[Job]?.cancelAndJoin() }
     }
 
+    @Test fun fanoutTurnsReuseModelMemoryAndForksOwnSeparateContexts(): Unit = runBlocking {
+        val scope = CoroutineScope(coroutineContext + SupervisorJob())
+        val requests = mutableListOf<ConfixDoc>()
+        try {
+            val (service, _, _) = fixture(scope) {
+                requests.add(confixDoc(it.body.toArray().decodeToString()))
+                answer()
+            }
+            val id = create(service)
+            suspend fun turn(session: Long, prompt: String): Map<String, Any?> {
+                assertEquals(202, post(service, "/run", mapOf("id" to session, "prompt" to prompt,
+                    "models" to listOf("test-a", "test-b"), "mode" to "synthesize")).status)
+                return finished(service, session)
+            }
+            suspend fun contexts(result: Map<String, Any?>): Map<String, String> =
+                (result["children"] as List<*>).takeLast(2).associate { child ->
+                    val detail = get(service, (child as Number).toLong())
+                    detail["model"] as String to detail["contextId"] as String
+                }
+            fun environments(from: Int) = requests.drop(from).mapNotNull { doc ->
+                (doc.value("messages", 0, "content") as? String)?.takeIf { it.startsWith("Retained agent environment.") }
+            }
+
+            val first = turn(id, "first retained user input")
+            val firstContexts = contexts(first)
+            assertEquals(2, firstContexts.values.toSet().size)
+            val secondStart = requests.size
+            val second = turn(id, "second user input")
+            assertEquals(firstContexts, contexts(second))
+            val secondEnvironments = environments(secondStart)
+            assertEquals(2, secondEnvironments.size)
+            assertTrue(secondEnvironments.all { it.contains("first retained user input") && it.contains("input:user") })
+
+            val fork = reifyMap(post(service, "/fork", mapOf("id" to id)).body)
+            val forkId = (fork["id"] as Number).toLong()
+            val forkStart = requests.size
+            val forkTurn = turn(forkId, "fork user input")
+            assertTrue(contexts(forkTurn).values.none { it in firstContexts.values })
+            assertEquals(listOf("[]", "[]"), environments(forkStart).map { it.substringAfter('\n') })
+        } finally { scope.coroutineContext[Job]?.cancelAndJoin() }
+    }
+
     @Test fun invalidConfigurationNeverStartsCalls(): Unit = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
         try {
@@ -158,7 +214,9 @@ class MuxSessionServiceTest {
         val card = (body["models"] as List<*>).single() as Map<*, *>
         assertEquals("custom", card["name"])
         assertEquals(true, card["keyPresent"])
-        assertEquals("llm.custom.key", card["envVar"])
+        assertEquals("llm.custom.key", card["keyId"])
+        assertEquals("required", card["auth"])
+        assertEquals(null, card["envVar"])
         assertFalse(response.body.contains("private-test-key"))
         assertTrue(mux.activity.snapshot().isEmpty())
     }

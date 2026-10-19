@@ -1,5 +1,6 @@
 package borg.trikeshed.userspace.nio.spi
 
+import borg.trikeshed.context.Synchronization
 import borg.trikeshed.htx.HtxReactorElement
 import borg.trikeshed.reactor.StubTlsCodecBackend
 import borg.trikeshed.userspace.nio.channels.spi.WasiChannelOperations
@@ -18,7 +19,7 @@ actual fun currentNioCapabilityReport(): NioCapabilityReport = NioCapabilityRepo
     checkedAt = Wasi.realtimeNanos() / 1_000_000L,
 )
 
-actual fun platformNioProviders(): List<CoroutineContext.Element> {
+actual fun platformNioProviders(reactorSynchronization: Synchronization): List<CoroutineContext.Element> {
     val channelOperations = WasiChannelOperations()
     val tlsBackend = StubTlsCodecBackend()
     return listOf(

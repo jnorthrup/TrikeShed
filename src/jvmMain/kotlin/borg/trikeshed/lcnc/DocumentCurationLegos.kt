@@ -13,7 +13,6 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
-import borg.trikeshed.modelmux.ToolOntologyScaffold
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.narsese.DocumentCurationFacts
@@ -211,6 +210,7 @@ object DocumentCurationLegos {
     /**
      * Compose and register with explicit storage ownership. No filesystem or volatile volume
      * is selected here. The returned feed must drain before the caller closes its dependencies.
+     * If creation throws [DocumentFeed.StartFailure], its feed carries the same drain obligation.
      */
     suspend fun create(
         scope: CoroutineScope,
@@ -224,7 +224,7 @@ object DocumentCurationLegos {
         runners: MutableMap<String, LcncNodeRunner>,
         stagingLba: Long? = null,
         rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
-        toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+        toolOntology: Series<String> = DocumentCurationToolset.all(
             CamelCatalog.endpoints().map { "available:camel.endpoint=$it" }),
     ): DocumentFeed {
         require(CURATE !in runners) { "$CURATE is already registered" }
@@ -234,7 +234,10 @@ object DocumentCurationLegos {
             runners[CURATE] = curate(feed)
             return feed
         } catch (failure: Throwable) {
-            feed.drain()
+            try { feed.drain() } catch (cleanup: Throwable) {
+                if (cleanup !== failure) failure.addSuppressed(cleanup)
+                throw DocumentFeed.StartFailure(feed, failure)
+            }
             throw failure
         }
     }

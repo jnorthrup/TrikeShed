@@ -1,6 +1,7 @@
 package borg.trikeshed.hermes
 
 import borg.trikeshed.modelmux.BrainClient
+import borg.trikeshed.modelmux.BrainChatOptions
 import java.io.File
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -74,6 +75,11 @@ class LiveBrainClient(
     override fun providerRoster(): List<EndpointSpec> = last.providerRoster()
     override suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> = live().quotaStandings(nowMs)
     override suspend fun rosterStatus(): List<Map<String, Any>> = live().rosterStatus()
+    override suspend fun chat(
+        options: BrainChatOptions,
+        messages: List<Pair<String, String>>,
+        contextId: String?,
+    ): Pair<String, String> = live().chat(options, messages, contextId)
     override suspend fun chat(
         messages: List<Pair<String, String>>,
         maxTokens: Int,

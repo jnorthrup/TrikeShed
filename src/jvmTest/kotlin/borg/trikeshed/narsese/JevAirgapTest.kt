@@ -173,36 +173,38 @@ class JevAirgapTest {
             assumeFalse(Airgap.configured(), "The process environment already requires airgap")
             for (status in listOf(429, 200)) {
                 System.setProperty(Airgap.PROPERTY, "false")
-                val nodes = ConstellationNodes(File(directory.toFile(), status.toString()), ConfixBlackboard())
-                val books = File(nodes.root, "books")
-                File(books, "book.json").writeText("""{"name":"book","work":"Fixture","date":"1900","headings":["Page"],"statements":[],"support":[]}""")
-                val page = "The page remains legible."
-                File(books, "book.sections.jsonl").writeText(jsonOf(page))
-                nodes.readingFile("book", 0).apply { parentFile.mkdirs() }
-                    .writeText(jsonOf(listOf(mapOf("text" to page))))
-                val table = File(books, "book.jev/0.json").apply { parentFile.mkdirs() }
-                val retained = """{"section":0,"legible":[0.8],"tuples":[],"senses":[],"establishes":[]}""".encodeToByteArray()
-                table.writeBytes(retained)
-                val rows = File(nodes.root, "senses.rows")
-                var retainedRows: ByteArray? = null
-                var requests = 0
-                withHtxClientRoute({
-                    requests++
-                    retainedRows = rows.takeIf { it.isFile }?.readBytes()
-                    System.setProperty(Airgap.PROPERTY, "true")
-                    HtxResponse(status, ByteSeries("""{"answers":{"legible":{"noul":1.0},"whole":{"noul":1.0}}}"""))
-                }) {
-                    withContext(Airgap(false)) {
-                        assertFailsWith<Airgap.Rejection> {
-                            withTimeout(5_000) { nodes.score("fixture", listOf("book")) }
+                val nodes = ConstellationNodes(File(directory.toFile(), status.toString()), ConfixBlackboard(), scope = this)
+                try {
+                    val books = File(nodes.root, "books")
+                    File(books, "book.json").writeText("""{"name":"book","work":"Fixture","date":"1900","headings":["Page"],"statements":[],"support":[]}""")
+                    val page = "The page remains legible."
+                    File(books, "book.sections.jsonl").writeText(jsonOf(page))
+                    nodes.readingFile("book", 0).apply { parentFile.mkdirs() }
+                        .writeText(jsonOf(listOf(mapOf("text" to page))))
+                    val table = File(books, "book.jev/0.json").apply { parentFile.mkdirs() }
+                    val retained = """{"section":0,"legible":[0.8],"tuples":[],"senses":[],"establishes":[]}""".encodeToByteArray()
+                    table.writeBytes(retained)
+                    val rows = File(nodes.root, "senses.rows")
+                    var retainedRows: ByteArray? = null
+                    var requests = 0
+                    withHtxClientRoute({
+                        requests++
+                        retainedRows = rows.takeIf { it.isFile }?.readBytes()
+                        System.setProperty(Airgap.PROPERTY, "true")
+                        HtxResponse(status, ByteSeries("""{"answers":{"legible":{"noul":1.0},"whole":{"noul":1.0}}}"""))
+                    }) {
+                        withContext(Airgap(false)) {
+                            assertFailsWith<Airgap.Rejection> {
+                                withTimeout(5_000) { nodes.score("fixture", listOf("book")) }
+                            }
                         }
                     }
-                }
-                assertEquals(1, requests)
-                assertContentEquals(retained, table.readBytes())
-                assertContentEquals(retainedRows, rows.takeIf { it.isFile }?.readBytes())
-                assertEquals(0, nodes.scored["book"]?.get("tabled"))
-                assertFalse(File(table.parentFile, "0.json.tmp").exists())
+                    assertEquals(1, requests)
+                    assertContentEquals(retained, table.readBytes())
+                    assertContentEquals(retainedRows, rows.takeIf { it.isFile }?.readBytes())
+                    assertEquals(0, nodes.scored["book"]?.get("tabled"))
+                    assertFalse(File(table.parentFile, "0.json.tmp").exists())
+                } finally { nodes.drain() }
             }
         } finally {
             if (prior == null) System.clearProperty(Airgap.PROPERTY) else System.setProperty(Airgap.PROPERTY, prior)

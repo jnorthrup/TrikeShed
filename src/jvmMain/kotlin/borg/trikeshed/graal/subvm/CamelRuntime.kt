@@ -101,12 +101,13 @@ object CamelRuntime {
         fun process(payload: Payload): Reply
     }
 
-    /** A started route, and the handle that stops it. */
+    /** A context handle, retained through successful startup or incomplete startup cleanup. */
     class Route internal constructor(
         val id: String,
         val module: String,
         val from: String,
         val to: String,
+        val reach: CamelLinkage.Reach,
         val startedAtMs: Long,
         internal val bridge: Bridge,
         internal val camelContext: Any,
@@ -115,6 +116,13 @@ object CamelRuntime {
 
         @Volatile
         internal var lastAtMs: Long = 0
+
+        @Volatile
+        var cleanupPending: Boolean = false
+            internal set
+
+        @Volatile
+        internal var startupFailure: Throwable? = null
 
         /** How many Exchanges have crossed the tap since start. */
         fun exchanges(): Long = counter.get()
@@ -141,10 +149,14 @@ object CamelRuntime {
             "module" to module,
             "from" to from,
             "to" to to,
+            "reach" to reach.name,
             "status" to status(),
             "routes" to routeIds(),
             "startedAtMs" to startedAtMs,
-        )
+        ) + (startupFailure?.let { mapOf(
+            "cleanupPending" to cleanupPending,
+            "error" to (it.message ?: it::class.java.name),
+        ) } ?: emptyMap())
 
         /** [identity] plus the counters, true only at the instant it is read. */
         fun describe(): Map<String, Any?> = identity() + mapOf(
@@ -153,16 +165,27 @@ object CamelRuntime {
         )
     }
 
-    private val routes = ConcurrentHashMap<String, Route>()
+    /** Startup failed and its context still needs cleanup. The cause and stop failure are preserved. */
+    class StartFailure internal constructor(
+        val route: Route, startup: Throwable, cleanup: Throwable,
+    ) : IllegalStateException(
+        "route '${route.id}' failed to start: ${startup.message ?: startup::class.java.name}; " +
+            "cleanup pending: ${cleanup.message ?: cleanup::class.java.name}", startup,
+    ) {
+        init { if (cleanup !== startup) addSuppressed(cleanup) }
+    }
 
-    /** Every route running right now, in start order by id. */
+    private val routes = ConcurrentHashMap<String, Route>()
+    private val constructing = ConcurrentHashMap.newKeySet<String>()
+
+    /** Every retained context, including failed-start cleanup obligations, ordered by id. */
     fun running(): List<Route> = routes.values.sortedBy { it.id }
 
     /** The route with this id, or null. */
     fun route(id: String): Route? = routes[id]
 
     /** Whether a route with this id is up. */
-    fun isRunning(id: String): Boolean = routes.containsKey(id)
+    fun isRunning(id: String): Boolean = routes[id]?.let { !it.cleanupPending } == true
 
     /**
      * Lower a declared plan into Camel, optionally request it, and stop all owned services.
@@ -306,6 +329,23 @@ object CamelRuntime {
         payloadProcessor: PayloadProcessor?,
     ): Route {
         require(id.isNotBlank()) { "route id is blank — a running route has to be nameable to be stoppable" }
+        check(constructing.add(id)) { "route '$id' is already starting — wait for its construction to settle" }
+        try {
+            return constructRoute(id, from, to, module, reach, observer, payloadProcessor)
+        } finally {
+            constructing.remove(id)
+        }
+    }
+
+    private fun constructRoute(
+        id: String,
+        from: String,
+        to: String,
+        module: String,
+        reach: CamelLinkage.Reach,
+        observer: Observer?,
+        payloadProcessor: PayloadProcessor?,
+    ): Route {
         check(!routes.containsKey(id)) { "route '$id' is already running — stop it first, or pick another id" }
         check(GuestModules.isInstalled(module)) {
             "guest module '$module' is not installed — install it: " +
@@ -327,11 +367,13 @@ object CamelRuntime {
         val startedAtMs = System.currentTimeMillis()
 
         var camelContext: Any? = null
-        try {
+        var allocated: Route? = null
+        return try {
             withLoader(loader) {
                 val ctx = bridge.newContext()
                 camelContext = ctx
-                val route = Route(id, module, from, to, startedAtMs, bridge, ctx)
+                val route = Route(id, module, from, to, reach, startedAtMs, bridge, ctx)
+                allocated = route
                 bridge.addRoute(ctx, from, to, id, bridge.processor { exchange ->
                     val seq = route.counter.incrementAndGet()
                     route.lastAtMs = System.currentTimeMillis()
@@ -386,26 +428,62 @@ object CamelRuntime {
                 })
                 bridge.start(ctx)
                 routes[id] = route
+                route
             }
-            return routes.getValue(id)
         } catch (t: Throwable) {
-            routes.remove(id)
-            camelContext?.let { c -> runCatching { withLoader(loader) { bridge.stop(c) } } }
             val unwrapped = unwrap(t)
+            val cleanup = camelContext?.let { c ->
+                runCatching { withLoader(loader) { bridge.stop(c) } }.exceptionOrNull()?.let(::unwrap)
+            }
+            if (cleanup != null) {
+                // Publication here conveys a cleanup obligation, never a successful start.
+                // The ID reservation remains held until this exact context is reachable.
+                val route = checkNotNull(allocated)
+                route.startupFailure = unwrapped
+                route.cleanupPending = true
+                routes[id] = route
+                throw StartFailure(route, unwrapped, cleanup)
+            }
             throw if (unwrapped is IllegalStateException) unwrapped
             else IllegalStateException("route '$id' failed to start: ${unwrapped.message ?: unwrapped::class.java.name}", unwrapped)
         }
     }
 
-    /** Stop a route and forget it. Returns false when no route by that id was up. */
+    /** Forget a route only after cleanup succeeds. A failed stop retains its handle for retry. */
     fun stop(id: String): Boolean {
-        val route = routes.remove(id) ?: return false
-        runCatching { withLoader(route.bridge.loader) { route.bridge.stop(route.camelContext) } }
-        return true
+        val route = routes[id] ?: return false
+        return stop(route)
     }
 
-    /** Stop every route. Called on daemon shutdown; safe to call twice. */
-    fun stopAll(): List<String> = running().map { it.id }.onEach { stop(it) }
+    /** An owner's retained handle cannot stop a later context that reused the same name. */
+    fun stop(route: Route): Boolean {
+        val id = route.id
+        if (routes[id] !== route) return false
+        try {
+            withLoader(route.bridge.loader) { route.bridge.stop(route.camelContext) }
+        } catch (t: Throwable) {
+            val cause = unwrap(t)
+            throw IllegalStateException("route '$id' failed to stop: ${cause.message ?: cause::class.java.name}", cause)
+        }
+        route.cleanupPending = false
+        return routes.remove(id, route)
+    }
+
+    /** Attempt every stop before reporting failure; unsuccessful cleanup stays reachable. */
+    fun stopAll(): List<String> {
+        val stopped = mutableListOf<String>()
+        var failure: Throwable? = null
+        for (route in running()) {
+            try {
+                if (stop(route.id)) stopped += route.id
+            } catch (t: Throwable) {
+                val previous = failure
+                if (previous == null) failure = t else previous.addSuppressed(t)
+            }
+        }
+        failure?.let { throw it }
+        return stopped
+    }
 
     /**
      * Send [body] into a running route's `from` endpoint and return the reply body.
@@ -423,6 +501,7 @@ object CamelRuntime {
      */
     fun request(id: String, request: Request): Reply {
         val route = routes[id] ?: throw IllegalStateException("route '$id' is not running")
+        check(!route.cleanupPending) { "route '$id' startup failed; cleanup is still pending" }
         return withLoader(route.bridge.loader) { route.bridge.request(route.camelContext, route.from, request) }
     }
 

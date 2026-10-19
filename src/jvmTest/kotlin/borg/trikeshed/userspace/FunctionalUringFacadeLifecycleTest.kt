@@ -56,6 +56,8 @@ class FunctionalUringFacadeLifecycleTest {
             if (release.isCompleted) pending.map { SelectionResult(80, it.userData) }.also { pending.clear() }
             else emptyList()
 
+        override suspend fun awaitCompletions() { release.await() }
+
         override fun cancelPending() { cancellations++ }
 
         override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {

@@ -39,11 +39,10 @@ class LcncWizardInferenceTest {
         val p = program("ambiguous", LcncNode("from", "context.assemble"), LcncNode("to", LcncContracts.SCOPE))
         val result = LcncMating.autoWire(p, "from", "to")
         assertNull(result.wire, "ambiguity must never pick an arbitrary first pair")
-        // Three since dbc0d8201 gave the ring `each?`; this assertion lagged it. The COUNT is
-        // incidental — what the test defends is that a tie is refused with its evidence
-        // rather than resolved by picking whichever port the table happened to list first.
-        assertEquals(3, result.candidates.size)
-        assertEquals(setOf("args?", "when?", "each?"), result.candidates.map { it.toPort }.toSet())
+        // Feeding each? changes the ring's output types and iteration semantics;
+        // it requires an authored connection, not an inferred candidate.
+        assertEquals(2, result.candidates.size)
+        assertEquals(setOf("args?", "when?"), result.candidates.map { it.toPort }.toSet())
     }
 
     @Test

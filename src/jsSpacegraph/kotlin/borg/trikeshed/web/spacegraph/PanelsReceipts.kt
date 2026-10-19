@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 /** Immutable run evidence; explicit handoffs only load constructions, never execute them. */
 fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: String) {
     val latest = panels.lastProgramRun
+    val nodeId = evidenceNode
     text("Recent recorded runs · up to eight immutable receipts. A matching program version does not mean its inputs or dependencies are still current.")
     val section = document.createElement("section").asDynamic()
     section.setAttribute("aria-label", "Durable run inspection"); body.appendChild(section)
@@ -77,6 +78,7 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
                     run.runId == expected.runId && run.programCid == expected.programCid) {
                     "Receipt identity mismatch: receiptCid, runId or programCid differs from the selected run snapshot"
                 }
+                selectedReceipt = objOf { it.receiptCid = cid; it.runId = run.runId; it.programCid = run.programCid }
                 output.textContent = ""
                 text(str(run.program) + " · " + str(run.runId) + " · " + str(run.status), output)
                 text("Receipt: " + cid + "\nProgram: " + str(run.programCid) +
@@ -101,12 +103,13 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
                 if (run.returns != null) details("Returned values", run.returns)
                 val outputs = run.outputs
                 if (objectValue(outputs)) {
-                    val ids = keysOf(outputs)
+                    val ids = keysOf(outputs).filter { nodeId == null || it == nodeId }
                     val rows = document.createElement("section").asDynamic(); output.appendChild(rows)
                     var offset = 0
                     fun render() {
                         rows.textContent = ""
                         text("Recorded node outputs · ${ids.size} nodes. Missing outputs are not proof that a node did not run; truncation markers remain visible.", rows)
+                        if (nodeId != null && ids.isEmpty()) text("No top-level output snapshot for $nodeId. Nested calls may appear in Node invocations below.", rows)
                         for (id in ids.drop(offset).take(32)) {
                             details(id, outputs[id], rows)
                             button("Inspect output $id in Confix", {
@@ -153,18 +156,22 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
                             "Retained in entry order, with parent invocation and zero-based iteration. " +
                             "Inputs and outputs are boundary snapshots; omission markers are not empty values. " +
                             "This is execution evidence, not breakpoint control or proof of external effects.", target)
-                        val entries = arr(evidence.entries)
+                        // Filtering must not renumber the immutable ledger's Confix paths.
+                        val entries = arr(evidence.entries).withIndex().filter { nodeId == null || str(it.value.nodeId) == nodeId }
+                        text("${entries.size} matching retained invocations" + (nodeId?.let { " for $it" } ?: "") +
+                            ". No match is not proof of non-execution; the ledger may omit entries.", target)
                         val rows = document.createElement("section").asDynamic(); target.appendChild(rows)
                         var offset = 0
                         fun renderEntries() {
                             rows.textContent = ""
-                            for ((pageIndex, entry) in entries.drop(offset).take(16).withIndex()) {
-                                val entryIndex = offset + pageIndex
+                            for ((entryIndex, entry) in entries.drop(offset).take(16)) {
                                 val item = document.createElement("details").asDynamic()
                                 val summary = document.createElement("summary").asDynamic()
                                 summary.textContent = "#${str(entry.ordinal)} · ${str(entry.nodeId)} · ${str(entry.type)} · ${str(entry.status)}" +
                                     if (entry.iteration == null) "" else " · iteration ${str(entry.iteration)}"
                                 item.appendChild(summary); rows.appendChild(item)
+                                text("Scope path: " + JSON.stringify(entry.path) + " · parent: " + str(entry.parent ?: "root") +
+                                    " · iteration: " + str(entry.iteration ?: "none"), item)
                                 val runtime = entry.runtime
                                 if (objectValue(runtime)) {
                                     text("Guest observation · ${str(runtime.language)} · ${str(runtime.tier)}\nVM: ${str(runtime.vmId)}", item)
@@ -256,5 +263,7 @@ fun PanelsFacets.receipts(workspace: dynamic, serial: Int, inspectedRequest: Str
     if (truthy(workspace.runComparisonLimited)) text("Inline discovery reached its ${str(workspace.runComparisonLimit)}-snapshot comparison limit. Older matching receipts may be absent; inspect their content IDs above.", section)
     if (arr(workspace.runs).isEmpty()) text("No matching recent runs found. A receipt content ID can still be inspected above.", section)
     section.appendChild(output)
-    if (latest?.receiptCid != null) inspect(str(latest.receiptCid), latest)
+    val retained = selectedReceipt
+    if (retained?.receiptCid != null) inspect(str(retained.receiptCid), retained)
+    else if (latest?.receiptCid != null) inspect(str(latest.receiptCid), latest)
 }

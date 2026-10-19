@@ -1,9 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import borg.trikeshed.relaxfactory.RequestFactoryProxy
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -73,6 +70,20 @@ fun <E : CoroutineContext.Element> boundLcnc(defaultElement: E, delegate: LcncNo
 
         override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean =
             withBinding { delegate.sourceDebugging(node, inputs) }
+
+        override fun outputSources(node: LcncNode, inputs: Map<String, Any?>): Map<String, String> =
+            delegate.outputSources(node, inputs)
+
+        override val isPure: Boolean get() = delegate.isPure
+
+        override fun retainedOutputs(node: LcncNode, inputs: Map<String, Any?>,
+                                     retainedInputs: Map<String, Any?>, outputs: Map<String, Any?>): Map<String, Any?> =
+            delegate.retainedOutputs(node, inputs, retainedInputs, outputs)
+
+        override fun retainedOrigins(node: LcncNode, inputs: Map<String, Any?>,
+                                     inputOrigins: Map<String, LcncBindingOrigins>, outputs: Map<String, Any?>,
+                                     terms: LcncBindingTerms): Map<String, LcncBindingOrigins> =
+            delegate.retainedOrigins(node, inputs, inputOrigins, outputs, terms)
 
         override suspend fun <T> withServices(body: suspend () -> T): T = withBinding {
             val services = delegate as? LcncServiceBinding

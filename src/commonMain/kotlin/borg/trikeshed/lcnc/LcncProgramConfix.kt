@@ -67,6 +67,7 @@ object LcncProgramConfix {
             "wires" to wires,
             "controls" to linkedMapOf("humanOversight" to program.controls.humanOversight, "matingPoints" to matingPoints).apply {
                 if (program.controls.inspectionOnly) put("inspectionOnly", true)
+                program.controls.subnet?.let { put("subnet", it) }
             },
             "kanban" to program.kanban?.let { reify(borg.trikeshed.kanban.KanbanGraphConfix.toJson(it)) },
             "view" to program.view?.let { linkedMapOf("x" to it.x, "y" to it.y, "z" to it.zoom) },
@@ -74,36 +75,54 @@ object LcncProgramConfix {
         ))
     }
 
-    private fun nodeFrom(raw: Any?): LcncNode? {
-        val m = raw as? Map<*, *> ?: return null
-        val id = m["id"]?.toString() ?: return null
-        val type = m["type"]?.toString() ?: return null
-        @Suppress("UNCHECKED_CAST")
-        val params = (m["params"] as? Map<String, Any?>)?.mapValues { it.value?.toString() ?: "" } ?: emptyMap()
-        val children = childList(m["children"]).mapNotNull { nodeFrom(it) }
+    private fun nodeFrom(raw: Any?, path: String): LcncNode {
+        val m = requireNotNull(raw as? Map<*, *>) { "$path is not a node object" }
+        val id = text(m, "id", path)
+        val type = text(m, "type", path)
+        val params = m["params"]?.let { value ->
+            val entries = requireNotNull(value as? Map<*, *>) { "$path.params is not an object" }
+            require(entries.keys.all { it is String }) { "$path.params names must be strings" }
+            require(type != "panel.vote" || "quorum" !in entries || entries["quorum"] != null) {
+                "$path.params.quorum is null"
+            }
+            entries.entries.associate { (it.key as String) to (it.value?.toString() ?: "") }
+        } ?: emptyMap()
+        val children = childList(m["children"], "$path.children").mapIndexed { index, child ->
+            nodeFrom(child, "$path.children[$index]")
+        }
+        val subprogram = m["subprogram"]?.let {
+            requireNotNull(it as? String) { "$path.subprogram is not a string" }
+        }
         return LcncNode(id, type, params, num(m["x"]), num(m["y"]), optionalNum(m["width"]), optionalNum(m["height"]),
-            collapsed = m["collapsed"] as? Boolean ?: false,
-            subprogram = m["subprogram"]?.toString(),
+            collapsed = boolean(m, "collapsed", false, path),
+            subprogram = subprogram,
             children = children.toSeries())
     }
 
     /** reify backends reify arrays as List or Array — accept both. */
-    private fun childList(v: Any?): List<*> = when (v) {
+    private fun childList(v: Any?, path: String): List<*> = when (v) {
+        null -> emptyList<Any?>()
         is List<*> -> v
         is Array<*> -> v.toList()
-        else -> emptyList<Any?>()
+        else -> throw IllegalArgumentException("$path is not an array")
     }
+
+    private fun text(value: Map<*, *>, key: String, path: String): String =
+        requireNotNull((value[key] as? String)?.takeIf { it.isNotBlank() }) { "$path.$key must be a nonblank string" }
+
+    private fun boolean(value: Map<*, *>, key: String, default: Boolean, path: String): Boolean =
+        if (key !in value) default else requireNotNull(value[key] as? Boolean) { "$path.$key is not a Boolean" }
 
     /** Tolerant of the shapes JSON parsing actually produces (Double vs Int, missing optional fields). */
     fun fromJson(name: String, json: String): LcncProgram {
         val parsed = reify(json) as? Map<*, *> ?: error("not a program document: $name")
-        val nodes = ((parsed["nodes"] as? List<*>).orEmpty()).mapNotNull { raw -> nodeFrom(raw) }
+        val nodes = childList(parsed["nodes"], "$name.nodes").mapIndexed { index, raw -> nodeFrom(raw, "$name.nodes[$index]") }
         // A malformed cable is CORRUPT DATA, not an absent one. Dropping it silently
         // meant a document could execute with wires the author wrote and the engine
         // never saw — the same class of lie the type checker exists to end. (Stale
         // cables that name a missing node or port are a different thing: those parse,
         // and LcncTypeCheck names them before the run.)
-        val wires = ((parsed["wires"] as? List<*>).orEmpty()).mapIndexed { i, raw ->
+        val wires = childList(parsed["wires"], "$name.wires").mapIndexed { i, raw ->
             val m = raw as? Map<*, *>
                 ?: throw IllegalArgumentException("$name: wire[$i] is not an object")
             val from = m["from"] as? List<*>
@@ -113,21 +132,26 @@ object LcncProgramConfix {
             if (from.size != 2 || to.size != 2) {
                 throw IllegalArgumentException("$name: wire[$i] endpoints must be [node,port]")
             }
-            LcncWire(from[0].toString(), from[1].toString(), to[0].toString(), to[1].toString())
+            require((from + to).all { it is String && it.isNotBlank() }) { "$name: wire[$i] endpoints must contain nonblank strings" }
+            LcncWire(from[0] as String, from[1] as String, to[0] as String, to[1] as String)
         }
-        val controls = (parsed["controls"] as? Map<*, *>)?.let { c ->
-            val points = ((c["matingPoints"] as? List<*>).orEmpty()).mapNotNull { raw ->
-                val m = raw as? Map<*, *> ?: return@mapNotNull null
-                runCatching {
-                    LcncPatchMatingPoint(
-                        id = m["id"].toString(), fromNode = m["fromNode"].toString(), fromPort = m["fromPort"].toString(),
-                        toNode = m["toNode"].toString(), toPort = m["toPort"].toString(),
-                        cardinality = runCatching { LcncCardinality.valueOf(m["cardinality"]?.toString() ?: "ONE") }.getOrDefault(LcncCardinality.ONE),
-                        function = m["function"]?.toString() ?: "identity",
-                    ).validate()
-                }.getOrNull()
+        val controls = parsed["controls"]?.let { raw ->
+            val c = requireNotNull(raw as? Map<*, *>) { "$name.controls is not an object" }
+            val points = childList(c["matingPoints"], "$name.controls.matingPoints").mapIndexed { index, point ->
+                val path = "$name.controls.matingPoints[$index]"
+                val m = requireNotNull(point as? Map<*, *>) { "$path is not an object" }
+                LcncPatchMatingPoint(
+                    id = text(m, "id", path), fromNode = text(m, "fromNode", path), fromPort = text(m, "fromPort", path),
+                    toNode = text(m, "toNode", path), toPort = text(m, "toPort", path),
+                    cardinality = if ("cardinality" in m) LcncCardinality.valueOf(text(m, "cardinality", path)) else LcncCardinality.ONE,
+                    function = if ("function" in m) text(m, "function", path) else "identity",
+                ).validate()
             }.toSeries()
-            LcncConfixControls(c["humanOversight"] as? Boolean ?: true, points, c["inspectionOnly"] == true)
+            val subnet = if ("subnet" in c) requireNotNull(c["subnet"] as? String) {
+                "Invalid LCNC workgroup subnet"
+            } else null
+            LcncConfixControls(boolean(c, "humanOversight", true, "$name.controls"), points,
+                boolean(c, "inspectionOnly", false, "$name.controls"), subnet)
         } ?: LcncConfixControls()
         val kanban = (parsed["kanban"] as? Map<*, *>)?.let { borg.trikeshed.kanban.KanbanGraphConfix.fromJson(jsonOf(it)) }
         val view = (parsed["view"] as? Map<*, *>)?.let { v ->

@@ -53,7 +53,7 @@ class ModuleContext(
     val clock: () -> Long,
     /** Module-owned state root (forge home). NEVER a worktree, NEVER /tmp. */
     val stateDir: File,
-    /** HtxKey + mux reactor for provider calls (ModelMuxKanbanAgent and kin). */
+    /** HtxKey + mux reactor for provider calls. */
     val muxContext: CoroutineContext = EmptyCoroutineContext,
     /**
      * P1: live CCEK control-plane binding. When present, whole LCNC program runs
@@ -86,9 +86,31 @@ class ModuleContext(
     @Volatile var agentRuns: borg.trikeshed.lcnc.AgentRuns? = null,
     /** The daemon's live NARS Rete; document ingest registers parser/model terms here when present. */
     val narsRete: borg.trikeshed.narsese.CausalityReteElement? = null,
-    /** Host-owned dense Couch projection; imports are explicit and module detach does not close the host owner. */
+    /** Host-owned dense inspection; either primary revisions or an explicit projection, never a second writer. */
     val confixIsam: borg.trikeshed.couch.isam.ConfixIsamElement? = null,
-)
+) {
+    /** Host-owned persistent Camel commands and publications; never closed by an LCNC invocation. */
+    @Volatile var camelRoutes: borg.trikeshed.lcnc.CamelRouteElement? = null
+
+    private val councilCasesLock = Any()
+    private var councilCasesStopped = false
+    private val councilCasesRef = lazy { borg.trikeshed.lcnc.councilCaseRegistry(scope, casStore, couch) }
+
+    /** Shared root-owned case registry. Modules borrow it and never close it on detach. */
+    val councilCases: borg.trikeshed.lcnc.CouncilCaseRegistry get() = synchronized(councilCasesLock) {
+        check(!councilCasesStopped) { "Council case owner stopped" }
+        councilCasesRef.value
+    }
+
+    /** The root awaits admitted module work before draining this shared owner and its children. */
+    suspend fun drainCouncilCases() {
+        val owner = synchronized(councilCasesLock) {
+            councilCasesStopped = true
+            if (councilCasesRef.isInitialized()) councilCasesRef.value else null
+        }
+        owner?.drain()
+    }
+}
 
 /** The grip the supervisor holds: describe for /api/modules, drain-then-close on detach. */
 interface ModuleHandle {

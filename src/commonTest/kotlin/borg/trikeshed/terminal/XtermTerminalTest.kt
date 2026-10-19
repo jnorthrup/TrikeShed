@@ -18,6 +18,43 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class XtermTerminalTest {
+    @Test
+    fun retainedPatchesKeepTheirCellsAfterLaterOutput() {
+        val vt = XtermTerminal(6, 2)
+        vt.drainPatches()
+        val first = vt.feed("\u001b[31mfirst")
+        vt.feed("\r\u001b[32mlater")
+        assertEquals("first", first[0].cells.view.joinToString("") { it.text })
+        assertTrue(first[0].cells.view.all { it.style.foreground.index == 1 })
+    }
+
+    @Test
+    fun retainedPatchesKeepTheirGeometryAfterShrinkAndReset() {
+        val vt = XtermTerminal(6, 2)
+        vt.drainPatches()
+        val first = vt.feed("\u001b[2;1Hbottom")
+        vt.resize(2, 1)
+        vt.reset()
+        assertEquals(1, first[0].row)
+        assertEquals("bottom", first[0].cells.view.joinToString("") { it.text })
+    }
+
+    @Test
+    fun retainedSnapshotOwnsItsScreenAndGeometry() {
+        val vt = XtermTerminal(6, 2)
+        vt.feed("first\r\nsecond")
+        val first = vt.snapshot()
+        vt.feed("\u001b[Hlater\u001b[?25l")
+        assertEquals("first ", first.lines[0].view.joinToString("") { it.text })
+        vt.resize(2, 1)
+        vt.reset()
+        assertEquals(6, first.columns)
+        assertEquals(2, first.rows)
+        assertEquals(VtCursor(1, 5, true), first.cursor)
+        assertEquals(2, first.lines.size)
+        assertEquals("second", first.lines[1].view.joinToString("") { it.text })
+    }
+
     @AfterTest
     fun resetKanban() = KanbanFSM.reset()
 

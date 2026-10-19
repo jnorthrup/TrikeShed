@@ -1,8 +1,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lcnc.LcncContracts
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.modelmux.ToolOntologyScaffold
+import borg.trikeshed.lib.*
 import modelmux.acp.MemoryHarnessProfile
 import modelmux.acp.toolNames
 
@@ -18,7 +17,7 @@ import modelmux.acp.toolNames
 object DocumentCurationToolset {
     const val MODEL_BASE = "llm-model-base"
 
-    fun all(available: Iterable<String> = emptyList()): ToolOntologyScaffold {
+    fun all(available: Iterable<String> = emptyList()): Series<String> {
         val entries = LinkedHashSet<String>()
         entries += "$MODEL_BASE:ModelWorker.invoke(Prompt)->ModelResponse"
         entries += "$MODEL_BASE:ModelWorker.providers()->Series<ProviderDescriptor>"

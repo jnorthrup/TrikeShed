@@ -253,6 +253,7 @@ object DocumentSurface {
         append("<h2 class=\"ds-curate-h2\">").append(esc(result.name.ifBlank { "Untitled" })).append("</h2>")
         append("<p class=\"ds-sub\">Saved attempt · <code class=\"ds-cid\" title=\"")
             .append(esc(result.receiptCid)).append("\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
+        append(curationConfixLink(result.receiptCid, "Inspect retained attempt in Confix"))
         append(curationReceiptsHtml(result))
         append("<details class=\"ds-curate-source\"><summary>Source text</summary><pre>")
             .append(esc(result.text)).append("</pre></details>")
@@ -330,7 +331,9 @@ object DocumentSurface {
                 }).append("\">").append(esc(r.stage ?: "Unknown stage")).append(" · ")
                     .append(esc(status)).append("</strong>")
                 r.tool?.let { append(" · ").append(esc(it)) }
-                append("<div class=\"ds-cid\">").append(esc(r.receiptCid ?: "Stage receipt CID unavailable")).append("</div></li>")
+                append("<div class=\"ds-cid\">").append(esc(r.receiptCid ?: "Stage receipt CID unavailable")).append("</div>")
+                append(curationConfixLink(r.receiptCid, "Inspect stage receipt in Confix"))
+                append("</li>")
             }
             append("</ul>")
         }
@@ -358,6 +361,11 @@ object DocumentSurface {
         }
         append("</div>")
     }
+
+    /** Curator and stage receipts are canonical CBOR, never a guessed JSON or live program. */
+    fun curationConfixLink(cid: String?, label: String): String =
+        if (cid == null || !Regex("sha256:[0-9a-f]{64}").matches(cid)) ""
+        else "<a href=\"/panels?content=$cid&amp;syntax=CBOR\" target=\"_blank\" rel=\"noopener\">${esc(label)}</a>"
 
     // ── the shell ───────────────────────────────────────────────────────────
 

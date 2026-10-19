@@ -2,9 +2,11 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.narsese.ingestKg
 
 import borg.trikeshed.couch.CouchReportReactorElement
-import borg.trikeshed.couch.persistence.asLocalBacking
+import borg.trikeshed.couch.CouchStorage
+import borg.trikeshed.couch.CouchStorageFormat
 import kotlinx.coroutines.channels.Channel
 import kotlin.collections.set
 import kotlin.jvm.JvmStatic
@@ -290,11 +292,17 @@ object OroborosDaemon {
                 // Job so a child failing during shutdown cannot cancel its siblings mid-close —
                 // the same idiom AsyncContextElement already uses for its own elements.
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
-                var ipnsNode: borg.trikeshed.ipns.IpnsNode? = null
+                val ipnsNodes = mutableListOf<borg.trikeshed.ipns.IpnsNode>()
                 try {
-                    with(daemonScope) { mainImpl(args, config) { ipnsNode = it } }
+                    with(daemonScope) { mainImpl(args, config) { ipnsNodes.add(it) } }
                 } finally {
-                    try { ipnsNode?.close() }
+                    try {
+                        var failure: Throwable? = null
+                        for (node in ipnsNodes.asReversed()) try { node.close() } catch (caught: Throwable) {
+                            if (failure == null) failure = caught else failure.addSuppressed(caught)
+                        }
+                        failure?.let { throw it }
+                    }
                     finally { daemonScope.cancel() }
                 }
             }
@@ -336,11 +344,27 @@ object OroborosDaemon {
         follow: kotlinx.coroutines.Job?,
         intake: borg.trikeshed.forge.server.CurationIntake,
         modules: borg.trikeshed.module.ModuleSupervisor,
+        ctx: borg.trikeshed.module.ModuleContext,
     ) {
         follow?.join()
         intake.drain()
         runCatching { modules.drainAll() }
+        ctx.drainCouncilCases()
         intake.constellations()?.drain()
+    }
+
+    /** Keep consumer shutdown and its fact dependencies outside mainImpl's large state machine. */
+    private suspend fun drainCamel(
+        ctx: borg.trikeshed.module.ModuleContext,
+        blackboard: borg.trikeshed.graal.BlackboardChangesFactElement,
+        graal: borg.trikeshed.graal.vitals.GraalFactElement,
+        vitals: borg.trikeshed.graal.vitals.JvmVitals,
+    ) {
+        // A failed consumer stop keeps its publication dependencies live for cleanup retry.
+        checkNotNull(ctx.camelRoutes).drain()
+        blackboard.drain()
+        runCatching { graal.close() }
+        runCatching { vitals.stop() }
     }
 
     /** Belief-field runner registration, kept out of the daemon's JVM-sized boot method. */
@@ -511,9 +535,10 @@ object OroborosDaemon {
     private fun CoroutineScope.ipnsNode(
         oroborosDir: File,
         ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
+        journal: String = "ipns.journal",
     ): borg.trikeshed.ipns.IpnsNode {
         val node = borg.trikeshed.ipns.jvmIpnsNode(
-            File(Files.resolvePath(oroborosDir, "ipns.journal")).absolutePath, coroutineContext,
+            File(Files.resolvePath(oroborosDir, journal)).absolutePath, coroutineContext,
             bootstrap = HostSystem.getenv("TRIKESHED_IPNS_BOOTSTRAP")
                 ?: borg.trikeshed.ipns.IpnsDhtAddresses.PUBLIC_BOOTSTRAP,
         )
@@ -555,25 +580,9 @@ object OroborosDaemon {
     private suspend fun kotlinx.coroutines.CoroutineScope.mainImpl(
         args: Array<String>, config: DaemonConfig, ownIpns: (borg.trikeshed.ipns.IpnsNode) -> Unit,
     ) {
-        // KeyMux, env-FIRST: harness lane (conventional env names + hermes .env
-        // + codex/opencode credential files), then the legacy derived-name env
-        // lane (LLM_<X>_KEY), then the hermes CREDENTIAL POOL as the borrowing
-        // lane — providers the operator configured in hermes but not in this
-        // process env (credential_pool, priority-ordered with cooldowns,
-        // following hermes' own env:<VAR> indirection). 5-minute caches.
-        // fileOps is explicit: coroutine contexts don't reliably carry FileOperations,
-        // and without it the dotenv/auth.json/pool lanes silently degrade to env-only.
+        // One lane order for the daemon and bin/mux: keymux.operatorKeyMux (harness env, dotenv and
+        // auth files, raw env, hermes credential pool); without explicit fileOps the file lanes read nothing.
         val fileOps = JvmFileOperations()
-        // The ACTIVE hermes profile's pool is the operator's live credential
-        // store; HERMES_HOME names it (falls back to the default ~/.hermes
-        // when the env var is unset). resolvePath expands ~ to $HOME, so the
-        // explicit $HERMES_HOME value is what actually gets read.
-        val hermesHome = keymux.defaultHermesHome()
-        // The recipe itself lives in keymux.operatorKeyMux — ONE lane order,
-        // shared with `bin/mux` (borg.trikeshed.mux.MuxCli). When the daemon
-        // built this inline, the diagnostic that told the operator whether a key
-        // was visible resolved through a different chain than the daemon did,
-        // so it could only ever confirm its own wiring.
         // Bound ONCE into keyMux below so the reactor-owned KeyMux identity never
         // changes: MuxReactorElement.modelMux() requires `mux.keyMux === keyMux()`,
         // and KeyMux.withBinding() returns a NEW instance. The Hermes default-model
@@ -584,7 +593,7 @@ object OroborosDaemon {
         // reads THIS, not keyMux, so a repin never resolves through its own
         // previous pin (self-referential freeze). keyMux (reactor/catalog
         // identity) is the one wrapper, built once, on top of it.
-        val baseKeyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = hermesHome)
+        val baseKeyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = keymux.defaultHermesHome())
         val keyMux = baseKeyMux.withBinding("*", hermesPinOverlay)
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
@@ -750,6 +759,9 @@ object OroborosDaemon {
             modelMuxProvider = { operatorMux.await().invoke() },
         )
         muxReactor.open()
+        val breadcrumbContexts = modelmux.BreadcrumbElement(store = modelmux.BreadcrumbFileStore(
+            fileOps, fileOps.resolvePath(forgeHome.absolutePath, "modelmux", "breadcrumbs"),
+        ))
         // ── CCEK binding: the single control plane for assemblies ────
         // Provides choreograph(), createUserContext(), and the bounded
         // agent fan-out that LCNC nodes, model panels, and the curator
@@ -854,54 +866,26 @@ object OroborosDaemon {
                 )
             }
         }
-        // Durable heads: when the CAS backend is durable, the couch store files every
-        // committed frame into a CouchCommitStore (immutable CAS event chain + atomic
-        // HEAD root under <forgeHome>/couch) and recovers heads/revisions/deletions/
-        // checkpoints on boot. A volatile CAS keeps the old in-memory projection —
-        // blobs alone never recovered heads (funding-pack E02 boundary).
-        val (couchStore, couchCommits) = openCouchStore(casStore, fileOps, forgeHome)
+        // One selected storage owner feeds the existing primary Couch consumers. Format selection
+        // is explicit; an existing database in another format is never silently replaced.
+        val couchStorage = openCouchStorage(casStore, fileOps, forgeHome, this)
+        val couchDb = couchStorage.couch
+        val couchStore = couchDb.store
         val attachmentGateway = CouchAttachmentGateway(couchStore, casStore)
         val gitCouchGateway = GitCouchGateway(fileOps, attachmentGateway)
         val worktreeCouchGateway = WorktreeCouchGateway(fileOps, attachmentGateway)
         // The running build is an attachment set too (rxf-rsync lineage: classes and jars served
         // from the store). `build/…` is excluded from the worktree plane, so two narrow gateways
         // absorb exactly the live classpath: build/live/classes and build/staging/lib.
-        val buildClassesDir = File(Files.resolvePath(repoDir, "build/live/classes"))
-        val stagingLibDir = File(Files.resolvePath(repoDir, "build/staging/lib"))
-        val buildClassesGateway = WorktreeCouchGateway(
-            fileOps, attachmentGateway,
-            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/live/classes/",
-            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
-        )
-        val stagingLibGateway = WorktreeCouchGateway(
-            fileOps, attachmentGateway,
-            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/",
-            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
-        )
-        // Third narrow plane: jvm resources (web/*, META-INF/services) — without them a
-        // forge-booted instance serves no console page. Plus the hotswap agent jar, so the
-        // hydrated runtime is launchable end-to-end from the manifest alone.
-        val processedResourcesDir = File(Files.resolvePath(repoDir, "build/processedResources/jvm/main"))
-        val resourcesGateway = WorktreeCouchGateway(
-            fileOps, attachmentGateway,
-            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/resources/",
-            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
-        )
-        val buildPlanes = BuildPlanes(
-            attachments = attachmentGateway,
-            classesGateway = buildClassesGateway, classesDir = buildClassesDir,
-            libGateway = stagingLibGateway, libDir = stagingLibDir,
-            resourcesGateway = resourcesGateway, resourcesDir = processedResourcesDir,
-            agentJar = File(Files.resolvePath(repoDir, "build/libs/hotswap-agent.jar")),
-            manifestFile = File(Files.resolvePath(forgeHome, ".oroboros/manifests/classpath.tsv")),
-        )
+        val buildPlanes = buildPlanes(fileOps, attachmentGateway, repoDir, forgeHome)
         // ── Agent home: ~/.hermes is colocated history, not repo state — a fourth narrow gateway,
         // same shape as the build planes. Excludes are the agent's OWN install/cache material
         // (venv, tool binaries, thumbnail/image/audio caches, scratch, per-profile sandboxes) —
         // reinstallable, not "history". Everything else (sessions, skills, state.db, logs, kanban,
         // memories, cron, config) is what "teleport a clone" means: the agent's memory, not its jar.
-        // ONE-SHOT, no watcher: a home directory's caches/logs churn constantly and a live watch on
-        // 2.7GB of it would dwarf the repo's own file-event volume for no replication benefit.
+        // Boot-absorbed, no watcher: a home directory's caches/logs churn constantly and a live
+        // watch on 2.7GB of it would dwarf the repo's own file-event volume for no replication
+        // benefit. The panel sync button reconciles it on demand (see GraalWire planeSyncs).
         val hermesHomeDir = File(HostSystem.getProperty("user.home") ?: error("no user.home"), ".hermes")
         val hermesHomeGateway = WorktreeCouchGateway(
             fileOps, attachmentGateway,
@@ -911,10 +895,6 @@ object OroborosDaemon {
                 "scratch", "sandboxes", "venv", "node_modules", "__pycache__", ".git", ".curator_backups",
             ),
             excludedPath = borg.trikeshed.util.oroboros.HermesCorpus::isTrace,
-        )
-        val couchDb = borg.trikeshed.couch.Couch(
-            COUCH_DB_NAME, couchStore, casStore,
-            localBacking = couchCommits?.asLocalBacking(),
         )
         couchDb.ensureDesignDoc(vhostRoot = "docs/")
         // Declare the heading the worktree gateway has always been minting documents under. Until
@@ -999,12 +979,8 @@ object OroborosDaemon {
             vmHost, wireScope,
             worlds = borg.trikeshed.btrfs.VmWorldTeleport(couchDb, vmWorldStore),
         )
-        val hermesConsole = hermesConsole(config, home, repoDir, forgeHome, daemonBlackboard, htxElement, muxReactor, wireScope, vmWorldStore, fileOps)
-        val hermesWire = borg.trikeshed.forge.server.HermesConsoleWire(hermesConsole, wireScope) { panelId ->
-            OroborosDaemon.hermesConsole(config, home, repoDir, forgeHome, daemonBlackboard,
-                htxElement, muxReactor, wireScope, vmWorldStore, fileOps, panelId)
-        }
-        if (config.hermesConsole) check(hermesWire.open()) { "Hermes console did not admit startup" }
+        val hermesWire = hermesWire(config, home, repoDir, forgeHome, daemonBlackboard,
+            htxElement, muxReactor, wireScope, vmWorldStore, fileOps, breadcrumbContexts)
         // ── Project DBs: dropped hierarchies as their own couch databases (shared CAS) ──
         val projectDbRegistry = borg.trikeshed.forge.server.ProjectDbRegistry(COUCH_DB_NAME)
         // ── Memory store + ISAM index layer (fs-memory Prongs 1+2) ──
@@ -1012,26 +988,7 @@ object OroborosDaemon {
         // memory store M. MemoryIndexLayer subscribes to mutations and
         // maintains taxonomy/temporal/provenance ISAM routes.
         // Declared BEFORE graalWire: the density route reads its live lineIndex.
-        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
-
-
-        // R2: persist the inverted index. At boot, restore the continent from the store
-        // (no cold re-derive); after every ingest the live index snapshots to CAS+Couch,
-        // trailing the writer by at most one put.
-        borg.trikeshed.cas.LineCasIndexPersistence.restore(couchStore, casStore)?.let { restored ->
-            memoryStore.restoreIndex(restored)
-            HostSystem.err("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
-            // Durable fact, not a log line: the board carries what the boot actually did.
-            daemonBlackboard.put(
-                "daemon/linecas-index",
-                mapOf("docs" to restored.documentCount.toString(), "contentKeys" to restored.contentKeyCount.toString()),
-                "oroboros",
-            )
-        }
-        memoryStore.onIndexIngest = { idx ->
-            runCatching { borg.trikeshed.cas.LineCasIndexPersistence.write(couchStore, casStore, idx) }
-                .onFailure { t -> HostSystem.err("[OROBOROS] LineCasIndex persist failed: ${t.message}") }
-        }
+        val memoryStore = memoryStore(casStore, couchStore, daemonBlackboard, fileOps, forgeHome.absolutePath)
         val memoryIndex = borg.trikeshed.memory.MemoryIndexLayer(memoryStore)
         val couchIndexBridge = borg.trikeshed.memory.CouchIndexBridge(attachmentGateway, memoryIndex)
         HostSystem.err("[OROBOROS] MemoryStore + MemoryIndexLayer: ${memoryIndex.route(borg.trikeshed.memory.IndexKind.Taxonomy).entryCount} taxonomy entries")
@@ -1059,6 +1016,15 @@ object OroborosDaemon {
             attachmentGateway,
             projectDbs = projectDbRegistry,
             memoryStore = memoryStore,
+            // The panel sync button reconciles the hermes home plane beside the worktree:
+            // its boot absorb is the only other pass it ever gets, and filenodes missing
+            // from disk otherwise survive in the terrain until the daemon restarts.
+            planeSyncs = if (hermesHomeDir.isDirectory()) listOf {
+                hermesHomeGateway.reconcile(
+                    hermesHomeDir.absolutePath, "oroboros",
+                    gitState.headSha(), HostSystem.currentTimeMillis(),
+                )
+            } else emptyList(),
         )
 
         // ── BeliefBagElement: the daemon-owned NarseseBag (AIKR belief bound) ──
@@ -1449,7 +1415,7 @@ object OroborosDaemon {
             corpus = projectCorpus,
             snapshots = snapshotService,
             programs = programLedger,
-            muxContext = htxElement + muxReactor,
+            muxContext = htxElement + muxReactor + breadcrumbContexts,
             mountScope = wireScope,
             miner = projectMiner,
             catalogProvider = { requireNotNull(muxReactor.modelMux()) },
@@ -1462,10 +1428,12 @@ object OroborosDaemon {
         //    so a class compiled after boot attaches without a bounce).
         // (reteProductions / rete are constructed above the LcncPublisher, which needs them)
         val moduleRoutes = borg.trikeshed.module.ModuleRouteRegistry()
+        // Workgroup discovery has its own signed name; publishing it cannot replace the site's IPNS head.
+        val lcncIpnsNode = ipnsNode(oroborosDir, ownIpns, "lcnc-ipns.journal").also { it.open() }
         val moduleScope = CoroutineScope(
             ccekBinding.reactorScope.coroutineContext +
                     SupervisorJob(ccekBinding.reactorScope.coroutineContext[kotlinx.coroutines.Job]) +
-                    CoroutineName("oroboros-module")
+                    CoroutineName("oroboros-module") + lcncIpnsNode
         )
         // Spec §3.1 production wiring: ONE stored-program resolver — the offered
         // presets (the panels/ attachment namespace was rooted out 2026-08-27
@@ -1478,7 +1446,8 @@ object OroborosDaemon {
         val confixIsam = if (casStore.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             borg.trikeshed.couch.isam.ConfixIsamElement(moduleScope, couchStore.changes,
                 fileOps.resolvePath(forgeHome.toString(), "confix/couch"), fileOps, casStore,
-                dictionaryCodec = { borg.trikeshed.isam.ZstdDictionaryCodec(it) })
+                dictionaryCodec = { borg.trikeshed.isam.ZstdDictionaryCodec(it) },
+                primary = couchStorage.takeIf { it.dense != null })
         } else null
         val moduleContext = borg.trikeshed.module.ModuleContext(
             couch = couchDb,
@@ -1682,39 +1651,22 @@ object OroborosDaemon {
         moduleContext.lcncRunners["legal.evidence"] = borg.trikeshed.narsese.LegalNodes.evidenceRunner(kifBank)
         // ── Tribunal: the LCNC preset that argues, rebuts, and rules through
         //    REAL hermes-env model dialogs. The node family (mux.chat /
-        //    kg.ingest / display) is registered in-process, and each seat's
+        //    tribunal.record / display) is registered in-process, and each seat's
         //    model call routes through BrainClient — KeyMux harness lane
         //    ($HERMES_HOME/.env, auth.json credential pool) → ModelMux →
         //    HtxReactor, so the tribunal's token spend lands on the daemon's
         //    quota/lease receipts exactly like every other model traffic.
-        //    The instance opens on the first kg.ingest, not at application boot.
-        //    Its lanes come from the preset; kg.ingest advances the judge's
-        //    job (active → closed) when the verdict lands on the record.
+        //    The instance opens on the first tribunal.record, not at boot.
+        //    Prose retention and lifecycle are separate from KG belief intake.
         val tribunalHolder = borg.trikeshed.lcnc.TribunalInstanceHolder()
         val tribunalLock = kotlinx.coroutines.sync.Mutex()
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.TribunalNodes.registry(
-                dialog = borg.trikeshed.lcnc.hermesEnvDialog(
-                    chat = { system, prompt ->
-                        {
-                            // 600 starved every seat on a REASONING model: GLM 4.x flash
-                            // spends this same budget thinking, so mux.chat returned
-                            // content:"" on every non-trivial prompt while succeeding on
-                            // "say OK" (mission-002 M2 measured it four times). The floor
-                            // is the seat's authored budget; TRIKESHED_SEAT_MAXTOKENS
-                            // overrides for a model that needs more headroom.
-                            val seatBudget = (HostSystem.getenv("TRIKESHED_SEAT_MAXTOKENS")?.toIntOrNull() ?: 3000)
-                            val content = brainClient.chat(
-                                listOf("system" to system, "user" to prompt),
-                                maxTokens = seatBudget,
-                                contextId = "tribunal-seat",
-                            )
-                            content to (brainClient.lastModel() ?: "")
-                        }
-                    },
+                dialog = borg.trikeshed.lcnc.modelMuxDialog(
+                    brain = brainClient,
                     muxContext = htxElement + muxReactor,
                 ),
-                ingest = { verdict ->
+                record = borg.trikeshed.lcnc.tribunalRecord(casStore) { verdictCid ->
                     val t = tribunalLock.withLock {
                         tribunalHolder.instance ?: borg.trikeshed.lcnc.TribunalInstance.open(
                             scope = moduleScope,
@@ -1733,39 +1685,19 @@ object OroborosDaemon {
                             tribunalHolder.instance = tribunal
                         }
                     }
-                    val life = t.lifecycle("deliberate")
-                    if (life != "active" && life != "submitted") verdict
-                    else {
-                        t.advance("deliberate", "complete", "tribunal-verdict-${verdict.hashCode()}", t.revision("deliberate") ?: 1L)
-                        t.snapshotCid("deliberate") ?: verdict
-                    }
+                    t.record(verdictCid)
                 },
             ),
         )
+        moduleContext.lcncRunners.putAll(borg.trikeshed.lcnc.KgNodes.registry { text ->
+            checkNotNull(beliefBag) { "kg.ingest: belief bag is disabled" }.ingestKg(text) { angular, expression ->
+                hermesMemoryFiles?.gloss(angular, expression)
+            }
+        })
         // ── BrainClient decomposition as LCNC: credential.enter → prompt.chat →
         //    result.confirm. CouchKeyStore backs the credential persistence;
         //    the chatFn uses the daemon's HTX client (200/non-200 patchpoints).
-        val couchKeyStore = keymux.CouchKeyStore(couchDb)
-        // Seed CouchKeyStore from the daemon's KeyMux so the prefill
-        // dropdown resolves real keys from env/hermes/harness stores.
-        runCatching {
-            for (i in 0 until keymux.HarnessRegistry.providers.size) {
-                val p = keymux.HarnessRegistry.providers[i]
-                val k = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    keyMux.get("llm.${p.id}.key")
-                }
-                val u = kotlinx.coroutines.withContext(Dispatchers.IO) {
-                    keyMux.get("llm.${p.id}.base_url")
-                }
-                if (!k.isNullOrBlank()) {
-                    couchKeyStore.storeCredential(
-                        p.id, k,
-                        u ?: p.defaultBaseUrl ?: "",
-                        "openai",
-                    )
-                }
-            }
-        }
+        val couchKeyStore = couchKeyStore(couchDb, keyMux)
         // ModelMux for the mux.* LCNC nodes: built from the brain's full
         // provider ROSTER (the static table, un-gated) over the daemon's
         // shared KeyMux — so the panel reflects every provider this machine
@@ -1900,38 +1832,13 @@ object OroborosDaemon {
                 credStore = couchKeyStore,
             ),
         )
-        // ── Legal council (design/legal-council-3x5.md): the 3x5 preset's node
-        //    family. Its OWN seam — CouncilDialog → BrainClient.chatSeat — so
-        //    every seat carries its authored maxTokens/temperature/preferred
-        //    model and a council/<caseId>/<panel>/<seat> spend contextId (the
-        //    legacy tribunal closure above, with its hardcoded maxTokens=600 /
-        //    contextId="tribunal-seat", is intentionally untouched: the council
-        //    supersedes it; preset-tribunal keeps byte-identical semantics).
-        val councilDialog = borg.trikeshed.lcnc.CouncilDialog { call ->
-            runCatching {
-                kotlinx.coroutines.withContext(htxElement + muxReactor) {
-                    brainClient.chatSeat(
-                        messages = listOf("system" to call.system, "user" to call.prompt),
-                        maxTokens = call.maxTokens,
-                        temperature = call.temperature,
-                        contextId = call.contextId.takeIf { it.isNotBlank() },
-                        preferredModel = call.preferredModel,
-                    )
-                }
-            }.fold(
-                onSuccess = { (content, answeredBy) -> borg.trikeshed.lcnc.SeatOutcome.Ok(content, answeredBy) },
-                onFailure = { t ->
-                    if (t is kotlinx.coroutines.CancellationException) throw t
-                    borg.trikeshed.lcnc.SeatOutcome.Refused(
-                        t.message ?: t.toString(),
-                        (t as? borg.trikeshed.modelmux.BrainNoRoute)?.attempts ?: emptyList(),
-                    )
-                },
-            )
-        }
+        // Legal council seats carry their effective limits and spend context.
+        // Explicit endpoint/model lists bound failover; otherwise the seat's
+        // existing model preference applies.
+        val councilDialog = borg.trikeshed.lcnc.modelMuxCouncilDialog(brainClient, htxElement + muxReactor)
         // Per-case job nexus: every convened case gets its own lifecycle (the
         // boot TribunalInstance singleton above stays legacy-preset-only).
-        val councilCases = councilCaseRegistry(moduleScope, casStore, couchDb)
+        val councilCases = moduleContext.councilCases
         moduleContext.lcncRunners.putAll(
             borg.trikeshed.lcnc.CouncilNodes.registry(
                 dialog = councilDialog,
@@ -1980,7 +1887,8 @@ object OroborosDaemon {
         // Both wiki legos above call a model to do their work, so until now READING a curated
         // artifact needed an API key. VAL-CROSS-002 found the curation plane hosted, durable and
         // unreachable as itself. These two routes are the read side, and they touch nothing.
-        val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(wikiRoot = { jfile(wikiRoot()) })
+        val wikiReadWire = borg.trikeshed.forge.server.WikiReadWire(
+            curations = curationIntake.constellations, wikiRoot = { jfile(wikiRoot()) })
         HostSystem.err(
             "[OROBOROS] Wiki read routes armed: " +
                     borg.trikeshed.forge.server.WikiReadWire.ROUTES.joinToString(" ") { r -> "${r.first} ${r.second}" } +
@@ -2546,6 +2454,9 @@ object OroborosDaemon {
                 runCatching { channelOps.close(healthFd) }
                 healthJob.cancelAndJoin()
                 if (healthSock.exists()) healthSock.delete()
+                // Network requests own admitted remote invocations; settle them while HTX and
+                // the local module/store dependencies are still live. Outer close also covers startup failure.
+                lcncIpnsNode.drain()
                 // Finish accepted guest turns while their blackboard/model/store dependencies are live.
                 runCatching { hermesWire.drain() }.onFailure {
                     HostSystem.err("[OROBOROS] Hermes drain failed: ${it.message}")
@@ -2553,15 +2464,14 @@ object OroborosDaemon {
                 runCatching { couchWire.requestFactory?.drain() }.onFailure {
                     HostSystem.err("[OROBOROS] RequestFactory drain failed: ${it.message}")
                 }
-                // Plane tendons close before their supervisor is cancelled, so close() joins the drains cleanly.
-                runCatching { blackboardFacts.close() }
-                runCatching { graalFacts.close() }
-                runCatching { jvmVitals.stop() }
                 // Stop job-agent admission and await accepted writes/model work before their stores close.
                 runCatching { headhunterWire.drain() }
                 // The follow/Wiki producer stops at its admission boundary and settles its
                 // current pass before the runner registry, model clients, or stores close.
-                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor)
+                drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext)
+                // Join accepted route commands, then consumers and their final facts. A failed
+                // stop is not permission to close the observation dependencies underneath it.
+                drainCamel(moduleContext, blackboardFacts, graalFacts, jvmVitals)
                 projectScopes.drain()
                 runCatching { worktreeReconcileElement.drain() }
                 changesFacts.drain()
@@ -2586,7 +2496,7 @@ object OroborosDaemon {
                 try { htxElement.close() } catch (_: Exception) {}
                 try { torrentElement.close() } catch (_: Exception) {}
                 try { muxReactor.close() } catch (_: Exception) {}
-                runCatching { couchCommits?.close() }
+                runCatching { couchStorage.close() }
                 try { nioSupervisor.close() } catch (_: Exception) {}
             }
         }
@@ -2597,17 +2507,7 @@ object OroborosDaemon {
         scope: kotlinx.coroutines.CoroutineScope,
         cas: borg.trikeshed.job.CasStore,
         couch: borg.trikeshed.couch.Couch,
-    ): borg.trikeshed.lcnc.CouncilCaseRegistry {
-        require(couch.cas === cas) { "Council lifecycle and Couch must share CAS ownership" }
-        return borg.trikeshed.lcnc.CouncilCaseRegistry(scope, borg.trikeshed.lcnc.TribunalInstance.schemaPlan(),
-            componentFactories = { caseId -> borg.trikeshed.job.JobNexusComponentFactories(
-                casStoreFactory = borg.trikeshed.job.CasStoreFactory { cas },
-                walFactory = borg.trikeshed.job.JobLogFactory {
-                    borg.trikeshed.couch.CouchJobLog.open(couch,
-                        "council-log/${borg.trikeshed.job.ContentId.of(caseId.encodeToByteArray()).hex}")
-                },
-            ) })
-    }
+    ): borg.trikeshed.lcnc.CouncilCaseRegistry = borg.trikeshed.lcnc.councilCaseRegistry(scope, cas, couch)
 
     /** Host adapters acknowledge persistence before exposing derived Council facts. */
     internal fun councilRecordSeams(
@@ -2663,6 +2563,121 @@ object OroborosDaemon {
         return element
     }
 
+    private fun buildPlanes(
+        fileOps: JvmFileOperations,
+        attachmentGateway: CouchAttachmentGateway,
+        repoDir: File,
+        forgeHome: File,
+    ): BuildPlanes {
+        val buildClassesDir = File(Files.resolvePath(repoDir, "build/live/classes"))
+        val stagingLibDir = File(Files.resolvePath(repoDir, "build/staging/lib"))
+        val buildClassesGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/live/classes/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        val stagingLibGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/staging/lib/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        // Third narrow plane: jvm resources (web/*, META-INF/services) — without them a
+        // forge-booted instance serves no console page. Plus the hotswap agent jar, so the
+        // hydrated runtime is launchable end-to-end from the manifest alone.
+        val processedResourcesDir = File(Files.resolvePath(repoDir, "build/processedResources/jvm/main"))
+        val resourcesGateway = WorktreeCouchGateway(
+            fileOps, attachmentGateway,
+            prefix = WorktreeCouchGateway.WORKTREE_PREFIX + "build/resources/",
+            excludedSegments = emptySet(), excludedRelativePrefixes = emptySet(),
+        )
+        return BuildPlanes(
+            attachments = attachmentGateway,
+            classesGateway = buildClassesGateway, classesDir = buildClassesDir,
+            libGateway = stagingLibGateway, libDir = stagingLibDir,
+            resourcesGateway = resourcesGateway, resourcesDir = processedResourcesDir,
+            agentJar = File(Files.resolvePath(repoDir, "build/libs/hotswap-agent.jar")),
+            manifestFile = File(Files.resolvePath(forgeHome, ".oroboros/manifests/classpath.tsv")),
+        )
+    }
+
+    private suspend fun couchKeyStore(couchDb: borg.trikeshed.couch.Couch, keyMux: keymux.KeyMux): keymux.CouchKeyStore {
+        val couchKeyStore = keymux.CouchKeyStore(couchDb)
+        // Seed CouchKeyStore from the daemon's KeyMux so the prefill
+        // dropdown resolves real keys from env/hermes/harness stores.
+        runCatching {
+            for (i in 0 until keymux.HarnessRegistry.providers.size) {
+                val p = keymux.HarnessRegistry.providers[i]
+                val k = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    keyMux.get("llm.${p.id}.key")
+                }
+                val u = kotlinx.coroutines.withContext(Dispatchers.IO) {
+                    keyMux.get("llm.${p.id}.base_url")
+                }
+                if (!k.isNullOrBlank()) {
+                    couchKeyStore.storeCredential(
+                        p.id, k,
+                        u ?: p.defaultBaseUrl ?: "",
+                        "openai",
+                    )
+                }
+            }
+        }
+        return couchKeyStore
+    }
+
+    private fun memoryStore(
+        casStore: borg.trikeshed.job.CasStore,
+        couchStore: borg.trikeshed.couch.CouchStore,
+        blackboard: borg.trikeshed.graal.ConfixBlackboard,
+        files: borg.trikeshed.userspace.nio.file.spi.FileOperations,
+        forge: String,
+    ): borg.trikeshed.memory.MemoryStore {
+        val memoryStore = borg.trikeshed.memory.MemoryStore(casStore, couchStore)
+
+
+        // R2: the inverted index is an appendable ISAM cursor of its lines. At boot, restore the continent from its
+        // rows (no cold re-derive); every ingest appends only the new spine's rows.
+        val spines = borg.trikeshed.cas.LineCasSpineIsam(files.resolvePath(forge, ".oroboros", "linecas.isam"), files)
+        spines.restore()?.let { restored ->
+            memoryStore.restoreIndex(restored)
+            HostSystem.err("[OROBOROS] LineCasIndex restored from store: ${restored.documentCount} docs, ${restored.contentKeyCount} content keys")
+            // Durable fact, not a log line: the board carries what the boot actually did.
+            blackboard.put(
+                "daemon/linecas-index",
+                mapOf("docs" to restored.documentCount.toString(), "contentKeys" to restored.contentKeyCount.toString()),
+                "oroboros",
+            )
+        }
+        memoryStore.onIndexIngest = { spine ->
+            runCatching { spines.append(spine) }
+                .onFailure { t -> HostSystem.err("[OROBOROS] LineCasIndex append failed: ${t.message}") }
+        }
+        return memoryStore
+    }
+
+    private suspend fun hermesWire(
+        config: DaemonConfig,
+        home: String,
+        repoDir: File,
+        forgeHome: File,
+        blackboard: borg.trikeshed.graal.ConfixBlackboard,
+        htxElement: HtxElement,
+        muxReactor: MuxReactorElement,
+        socketScope: CoroutineScope,
+        world: borg.trikeshed.btrfs.BtrfsWorldStore,
+        fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
+        breadcrumbContexts: modelmux.BreadcrumbElement,
+    ): borg.trikeshed.forge.server.HermesConsoleWire {
+        val console = hermesConsole(config, home, repoDir, forgeHome, blackboard,
+            htxElement, muxReactor, socketScope, world, fileOps, breadcrumbContexts)
+        val wire = borg.trikeshed.forge.server.HermesConsoleWire(console, socketScope) { panelId ->
+            hermesConsole(config, home, repoDir, forgeHome, blackboard,
+                htxElement, muxReactor, socketScope, world, fileOps, breadcrumbContexts, panelId)
+        }
+        if (config.hermesConsole) check(wire.open()) { "Hermes console did not admit startup" }
+        return wire
+    }
+
     /** The console shares the daemon board and resolves the current reactor-owned model lease per call. */
     private fun hermesConsole(
         config: DaemonConfig,
@@ -2675,11 +2690,13 @@ object OroborosDaemon {
         socketScope: CoroutineScope,
         world: borg.trikeshed.btrfs.BtrfsWorldStore,
         fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
+        breadcrumbContexts: modelmux.BreadcrumbElement,
         panelId: String = "default",
     ): borg.trikeshed.hermes.HermesVmConsole {
         val runtime = File(forgeHome, "python/graalpy-25.3.4.1")
+        // The pinned Hermes fork is checked out as a submodule under utils.
         val source = config.hermesRoot ?: HostSystem.getenv("HERMES_SOURCE_ROOT")
-            ?: File(forgeHome, "python/hermes-source").absolutePath
+            ?: File(repoDir, "utils/hermes-trikeshed-graalpy").absolutePath
         val workerHome = File(forgeHome, "hermes-graal")
         fileOps.mkdirs(workerHome.absolutePath)
         return borg.trikeshed.hermes.HermesVmConsole(
@@ -2691,7 +2708,7 @@ object OroborosDaemon {
         ),
         blackboard = blackboard,
         modelMuxProvider = { muxReactor.modelMux() },
-        muxContext = htxElement + muxReactor + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
+        muxContext = htxElement + muxReactor + breadcrumbContexts + (socketScope.coroutineContext[Airgap] ?: Airgap(config.airgap)),
         socketScope = socketScope,
         world = world,
         workerConfiguration = borg.trikeshed.graal.subvm.PythonWorker(
@@ -2701,7 +2718,9 @@ object OroborosDaemon {
                 source,
                 File(repoDir, "graalpy-sleeve/bridges").absolutePath,
             ),
-            executable = File(runtime, "venv/bin/python").absolutePath,
+            // The port's README builds its interpreter at <checkout>/.venv-graalpy.
+            executable = File(runtime, "venv/bin/python").takeIf { it.isFile() }?.absolutePath
+                ?: File(source, ".venv-graalpy/bin/python").absolutePath,
             arguments = listOf("hermes"),
             environment = mapOf(
                 "HOME" to workerHome.absolutePath,
@@ -2719,25 +2738,21 @@ object OroborosDaemon {
         )
     }
 
-    /** Durable-when-possible couch store: commit-chained heads on a durable CAS, else the volatile projection. */
-    private fun openCouchStore(
+    /** Explicit primary format selection; only commit mode permits a volatile CAS projection. */
+    internal fun openCouchStorage(
         casStore: borg.trikeshed.job.CasStore,
         fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
         forgeHome: File,
-    ): borg.trikeshed.lib.Join<borg.trikeshed.couch.CouchStore, borg.trikeshed.couch.persistence.CouchCommitStore?> {
-        if (casStore.durability != borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
-            HostSystem.err("[OROBOROS] couch store: volatile head projection (CAS durability ${casStore.durability})")
-            return borg.trikeshed.couch.CouchStoreFactory.casBacked(casStore) j null
-        }
-        val commits = borg.trikeshed.couch.persistence.CouchCommitStore(
-            cas = casStore,
-            durability = borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE,
-            fileOps = fileOps,
-            directory = fileOps.resolvePath(forgeHome.absolutePath, "couch"),
+        scope: CoroutineScope,
+        format: CouchStorageFormat = CouchStorageFormat.parse(HostSystem.getenv("TRIKESHED_COUCH_FORMAT")),
+    ): CouchStorage {
+        val storage = CouchStorage.open(COUCH_DB_NAME, casStore, fileOps,
+            fileOps.resolvePath(forgeHome.absolutePath, "couch"), format,
+            borg.trikeshed.isam.UringIsamOperations(scope, leafBytes = 64 * 1024,
+                leafCodec = borg.trikeshed.isam.CasLeafCodec(casStore, { borg.trikeshed.isam.ZstdDictionaryCodec(it) })),
         )
-        val store = borg.trikeshed.couch.CouchStoreFactory.durableCasBacked(casStore, commits)
-        HostSystem.err("[OROBOROS] couch store: DURABLE heads via CouchCommitStore (${store.size} docs recovered)")
-        return store j commits
+        HostSystem.err("[OROBOROS] couch store: ${casStore.durability} ${format.id} (${storage.couch.store.size} docs recovered)")
+        return storage
     }
 
     /** The redacted mux working set, published to the board on every reactor state publication. */
@@ -2813,7 +2828,8 @@ object OroborosDaemon {
               --airgap: disable remote Jev/LLM calls; keep local BERT
               env: JULES_API_KEY (required)
                    HERMES_SOURCE_ROOT / HERMES_GRAAL_SLEEVE (optional)
-                   TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap
+                   TRIKESHED_AIRGAP (or JVM property trikeshed.airgap) also enables airgap;
+                   the curator is airgapped unless it is set off (TRIKESHED_AIRGAP=off)
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
               kanban-port default: 8888"""

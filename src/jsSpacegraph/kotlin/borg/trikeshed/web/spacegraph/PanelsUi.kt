@@ -134,23 +134,58 @@ suspend fun Panels.onDrop(e: dynamic) {
     for (p0 in paths) {
         val path = if (p0.startsWith("file://")) decodeURIComponent(p0.replace(Regex("^file://"), "")) else p0
         val n = addNode("project.mount", wx, wy, objOf { it.path = path })
-        if (n != null) { launchJs { runAll(str(n.id)) }; wx += 24; wy += 24 }
+        if (n != null) { admitPulse(str(n.id)); wx += 24; wy += 24 }
     }
 }
 
 /** the PALETTE: docked drag-source for the served vocabulary + the gallery */
 suspend fun Panels.buildPalette() {
+    if (page.closing) return
     val pal = byId("palette"); pal.innerHTML = ""
     val qIn = document.createElement("input").asDynamic(); qIn.placeholder = "filter palette…"; pal.appendChild(qIn)
     val body = document.createElement("div").asDynamic(); pal.appendChild(body)
     val progs = ArrayList<String>()
+    val recipes = ArrayList<dynamic>()
     try {
         val pr = try { fetchJson("/api/panels/presets") } catch (x: CancellationException) { throw x } catch (x: dynamic) { objOf { it.presets = jsArray() } }
         val st = try { fetchJson("/api/panels") } catch (x: CancellationException) { throw x } catch (x: dynamic) { objOf { it.panels = jsArray() } }
+        recipes.addAll(arr(pr.presets))
         progs.addAll(arr(pr.presets).map { str(it.name) }); progs.addAll(arr(st.panels).map { str(it.name) })
     } catch (x: CancellationException) { throw x } catch (x: dynamic) {}
+    if (page.closing) return
     fun render(f: String) {
         body.innerHTML = ""
+        val entryNames = setOf("preset-hermes", "preset-tribunal", "preset-legal-tribunal", "preset-scope", "preset-ccek-mux")
+        val entries = recipes.filter { str(it.name) in entryNames && (f.isEmpty() ||
+            (str(it.title) + " " + str(it.does)).lowercase().contains(f)) }
+        if (entries.isNotEmpty()) {
+            val heading = document.createElement("h5").asDynamic(); heading.textContent = "Start with a use case"; body.appendChild(heading)
+            for (recipe in entries) {
+                val card = document.createElement("details").asDynamic(); card.dataset.entryProgram = recipe.name
+                card.style.cssText = "border:1px solid var(--line);border-radius:5px;margin:5px 0;padding:7px;font:11px/1.45 var(--sans)"
+                val title = document.createElement("summary").asDynamic(); title.textContent = recipe.title; card.appendChild(title)
+                for (line in arrayOf(str(recipe.does), "Needs: " + str(recipe.needs), "You will see: " + str(recipe.see), "First edit: " + str(recipe.tweakFirst))) {
+                    val text = document.createElement("p").asDynamic(); text.textContent = line; card.appendChild(text)
+                }
+                val open = document.createElement("button").asDynamic(); open.type = "button"; open.textContent = "Open construction"
+                open.dataset.entryLoad = recipe.name; card.appendChild(open)
+                on(open, "click", {
+                    if (page.closing || programRunning || programAdmission != null || cases.busy) {
+                        status("Wait for the current operation before opening a construction.")
+                    } else if (recipe.document != null && load(fromConfix(recipe.document))) {
+                        panelName().value = str(recipe.name).removePrefix("preset-")
+                        status(str(recipe.title) + " opened. " + str(recipe.tweakFirst) + " Use a node sprite to inspect its connections, then choose Run.")
+                    }
+                })
+                body.appendChild(card)
+            }
+        }
+        val models = document.createElement("button").asDynamic(); models.type = "button"; models.textContent = "Provider keys & models"
+        models.dataset.entryModels = ""; body.appendChild(models)
+        on(models, "click", { openModelSelection() })
+        val network = document.createElement("button").asDynamic(); network.type = "button"; network.textContent = "Concentric work network"
+        network.dataset.entryNetwork = ""; body.appendChild(network)
+        on(network, "click", { openWorkNetwork() })
         val groups = LinkedHashMap<String, ArrayList<String>>()
         for (t in keysOf(contracts).sorted()) {
             if (f.isNotEmpty() && !t.contains(f) && !str(contracts[t].title).lowercase().contains(f)) continue
@@ -327,13 +362,12 @@ suspend fun Panels.openGallery() {
 }
 
 // ── RDF mapping interface: the canvas as triples, the vocabulary as triples, and the ALIGNMENT ──
-private var rdfTimer = 0
 private var rdfNote = ""
 
 fun Panels.refreshRdf() {
     if (byId("rdfPanel") == null) return
-    window.clearTimeout(rdfTimer)
-    rdfTimer = window.setTimeout({ val t = str(byId("rdfPanel")?.dataset?.tab ?: "graph").ifEmpty { "graph" }; launchJs { rdfTab(t) } }, 400)
+    page.cancelLater(rdfTimer)
+    rdfTimer = later(400) { val t = str(byId("rdfPanel")?.dataset?.tab ?: "graph").ifEmpty { "graph" }; launchJs { rdfTab(t) } }
 }
 
 private fun jsonPost(body: dynamic): dynamic = jsonInit("POST", JSON.stringify(body))

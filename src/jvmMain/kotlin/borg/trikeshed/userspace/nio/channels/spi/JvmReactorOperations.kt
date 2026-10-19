@@ -1,27 +1,31 @@
 package borg.trikeshed.userspace.nio.channels.spi
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.*
 import borg.trikeshed.userspace.FunctionalUringFacade
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /** Readiness is a one-shot POLL_ADD CQE; persistent interests rearm after delivery. */
-class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
+class JvmReactorOperations(val synchronization: Synchronization = Synchronization.MONITOR) : AsyncContextElement(), ReactorOperations {
     override val key get() = ReactorOperations.Key
+    private val lock = synchronization.lock()
 
     private val watchFacade = FunctionalUringFacade(64, openUserspaceChannelBackend(64))
     private var nextToken = 0L
     private val watches = HashMap<Int, Pair<Set<Interest>, Long>>()
     private val tokens = HashMap<Long, Int>()
     private val signals = ArrayDeque<ReactorSignal>()
+    private var changed = CompletableDeferred<Unit>()
+
+    private fun changed() { changed.complete(Unit); changed = CompletableDeferred() }
 
     private fun interestMask(interests: Set<Interest>): Int {
         var mask = 0
@@ -30,17 +34,18 @@ class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
         return mask
     }
 
-    override fun register(fd: Int, interests: Set<Interest>, userData: Long) {
+    override fun register(fd: Int, interests: Set<Interest>, userData: Long) = synchronize(lock) {
         check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
         if (interests.isEmpty()) {
             deregister(fd)
-            return
+            return@synchronize
         }
-        if (watches[fd] == (interests to userData)) return
+        if (watches[fd] == (interests to userData)) return@synchronize
         deregister(fd)
         // The remaining slot admits POLL_REMOVE while every watch is pending.
         check(watches.size < 63) { "Reactor watch capacity exceeded" }
         watches[fd] = interests.toSet() to userData
+        changed()
         try {
             submitWatch(fd)
             collect()
@@ -60,10 +65,11 @@ class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
         check(watchFacade.submit() == 1) { "POLL_ADD SQE was not submitted" }
     }
 
-    override fun deregister(fd: Int) {
+    override fun deregister(fd: Int) = synchronize(lock) {
         watches.remove(fd)
+        changed()
         signals.removeAll { it.fd == fd }
-        val token = tokens.entries.firstOrNull { it.value == fd }?.key ?: return
+        val token = tokens.entries.firstOrNull { it.value == fd }?.key ?: return@synchronize
         watchFacade.enqueue(
             UringSubmission(UringOp.POLL_REMOVE, fd, token, 0, 0, userData = ++nextToken),
         )
@@ -71,7 +77,7 @@ class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
         collect()
     }
 
-    private fun collect() {
+    private fun collect() = synchronize(lock) {
         for (cqe in watchFacade.wait(0)) {
             val fd = tokens.remove(cqe.userData) ?: continue
             val watch = watches[fd] ?: continue
@@ -95,33 +101,49 @@ class JvmReactorOperations : AsyncContextElement(), ReactorOperations {
         check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
         val started = TimeSource.Monotonic.markNow()
         while (true) {
-            collect()
-            if (signals.isNotEmpty()) return buildList {
-                while (signals.isNotEmpty()) add(signals.removeFirst())
+            val (ready, change) = synchronize(lock) {
+                check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+                collect()
+                if (signals.isEmpty()) {
+                    for (fd in watches.keys) if (fd !in tokens.values) submitWatch(fd)
+                    collect()
+                }
+                val ready = buildList { while (signals.isNotEmpty()) add(signals.removeFirst()) }
+                ready to changed.takeIf { watches.isEmpty() }
             }
-            for (fd in watches.keys) {
-                if (fd !in tokens.values) submitWatch(fd)
-            }
-            collect()
-            if (signals.isNotEmpty()) continue
+            if (ready.isNotEmpty()) return ready
             if (!timeout.isInfinite() && started.elapsedNow() >= timeout) return emptyList()
-            delay(1)
+            val wait: suspend () -> Unit = {
+                if (change != null) change.await() else watchFacade.awaitCompletions()
+            }
+            if (timeout.isInfinite()) wait()
+            else {
+                val remaining = timeout - started.elapsedNow()
+                if (remaining <= Duration.ZERO || withTimeoutOrNull(remaining.inWholeMilliseconds.coerceAtLeast(1)) {
+                    wait(); true
+                } == null) return emptyList()
+            }
         }
     }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        if (state == ElementState.CLOSED) return@withContext
-        state = ElementState.DRAINING
+        synchronize(lock) {
+            if (state == ElementState.CLOSED) return@withContext
+            state = ElementState.DRAINING
+            changed()
+        }
         try {
-            for (fd in watches.keys.toIntArray()) deregister(fd)
+            for (fd in synchronize(lock) { watches.keys.toIntArray() }) deregister(fd)
             watchFacade.closeNow()
         } finally {
-            watches.clear()
-            tokens.clear()
-            signals.clear()
+            synchronize(lock) {
+                watches.clear()
+                tokens.clear()
+                signals.clear()
+            }
             supervisor.complete()
             supervisor.join()
-            state = ElementState.CLOSED
+            synchronize(lock) { state = ElementState.CLOSED }
         }
     }
 

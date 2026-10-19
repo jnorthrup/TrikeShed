@@ -40,6 +40,16 @@ data class MuxCallRecord(
     val cacheReadTokens: Int = 0,
     val cacheWriteTokens: Int = 0,
     val error: String? = null,
+    val contextId: String? = null,
+)
+
+/** Shared HTTP and session-storage projection; credentials never enter activity records. */
+fun MuxCallRecord.toWire(): Map<String, Any?> = mapOf(
+    "id" to id, "conversationId" to conversationId, "turnId" to turnId, "assessmentId" to assessmentId, "contextId" to contextId,
+    "model" to model, "provider" to provider, "startedAt" to startedAt, "endedAt" to endedAt,
+    "status" to status, "keyId" to keyId, "httpStatus" to httpStatus, "inputTokens" to inputTokens,
+    "outputTokens" to outputTokens, "cachedHit" to cachedHit, "cacheReadTokens" to cacheReadTokens,
+    "cacheWriteTokens" to cacheWriteTokens, "error" to error,
 )
 
 /** Bounded process telemetry. Active calls survive retention of completed calls. */
@@ -48,9 +58,10 @@ class MuxActivity(private val capacity: Int = 1000) {
     private val calls = linkedMapOf<Long, MuxCallRecord>()
     private var sequence = 0L
 
-    suspend fun start(model: String, provider: String, context: MuxCallContext?, assessmentId: String?): Long = mutex.withLock {
+    suspend fun start(model: String, provider: String, context: MuxCallContext?, assessmentId: String?, contextId: String? = null): Long = mutex.withLock {
         val id = ++sequence
-        calls[id] = MuxCallRecord(id, context?.conversationId, context?.turnId, assessmentId, model, provider, Clock.System.now().toEpochMilliseconds())
+        calls[id] = MuxCallRecord(id, context?.conversationId, context?.turnId, assessmentId, model, provider,
+            Clock.System.now().toEpochMilliseconds(), contextId = contextId)
         id
     }
 

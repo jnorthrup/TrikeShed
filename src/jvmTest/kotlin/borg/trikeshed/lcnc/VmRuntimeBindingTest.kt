@@ -86,15 +86,18 @@ class VmRuntimeBindingTest {
         override fun running(): List<CamelRouteHandle> = handles.values.toList()
         override fun start(id: String, from: String, to: String, module: String, reach: CamelLinkage.Reach, observer: CamelRuntime.Observer): CamelRouteHandle {
             starts++
-            return Handle(id, from, to, module, observer).also { handles[id] = it }
+            return Handle(id, from, to, module, reach, observer).also { handles[id] = it }
         }
         override fun stop(id: String): Boolean { stops++; return handles.remove(id) != null }
         override fun close() { closed = true; handles.clear() }
 
-        class Handle(override val id: String, val from: String, val to: String, val module: String, val observer: CamelRuntime.Observer) : CamelRouteHandle {
+        class Handle(override val id: String, val from: String, val to: String, val module: String,
+                     reach: CamelLinkage.Reach, val observer: CamelRuntime.Observer) : CamelRouteHandle {
+            var declaredReach: String? = reach.name
             override fun status() = "Started"
             override fun routeIds() = listOf(id)
-            override fun identity(): Map<String, Any?> = mapOf("id" to id, "from" to from, "to" to to, "module" to module, "status" to status())
+            override fun identity(): Map<String, Any?> = mapOf("id" to id, "from" to from, "to" to to,
+                "module" to module, "status" to status()) + (declaredReach?.let { mapOf("reach" to it) } ?: emptyMap())
             override fun describe() = identity() + ("exchanges" to 1L)
         }
     }
@@ -199,5 +202,52 @@ class VmRuntimeBindingTest {
             runner.run(LcncNode("existing", CamelRouteLegos.UP, mapOf("from" to "direct:b")), emptyMap())
         }
         assertEquals(1, registry.starts)
+    }
+
+    @Test
+    fun camelReplayRequiresTheSameDeclaredReach() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val registry = Routes()
+        val runner = CamelRouteLegos.up(ctx, registry)
+        for (reach in CamelLinkage.Reach.entries) {
+            val id = "reach-" + reach.name
+            val node = LcncNode(id, CamelRouteLegos.UP, mapOf(
+                "from" to "direct:in", "to" to "mock:out", "reach" to reach.name))
+            assertEquals(true, runner.run(node, emptyMap())["ok"])
+            val handle = registry.handles.getValue(id)
+            val fact = ctx.blackboard.get(CamelRouteLegos.routeKey(id))
+            val starts = registry.starts
+            val other = CamelLinkage.Reach.entries.single { it != reach }
+            val refusal = assertFailsWith<IllegalArgumentException> {
+                runner.run(node, mapOf("reach" to other.name))
+            }
+            assertTrue(refusal.message.orEmpty().contains("reach"))
+            assertTrue(registry.handles[id] === handle)
+            assertEquals(fact, ctx.blackboard.get(CamelRouteLegos.routeKey(id)))
+            assertEquals(starts, registry.starts)
+            assertEquals(0, registry.stops)
+            assertEquals(true, runner.run(node, emptyMap())["ok"], "exact replay remains idempotent")
+            assertEquals(starts, registry.starts)
+        }
+    }
+
+    @Test
+    fun camelReplayRefusesMissingOrUnknownReachWithoutReplacingTheRoute() = runTest {
+        val ctx = vmRuntimeTestContext(this)
+        val registry = Routes()
+        val runner = CamelRouteLegos.up(ctx, registry)
+        val node = LcncNode("legacy", CamelRouteLegos.UP, mapOf("from" to "direct:in", "to" to "mock:out"))
+        assertEquals(true, runner.run(node, emptyMap())["ok"])
+        val handle = registry.handles.getValue(node.id)
+        val fact = ctx.blackboard.get(CamelRouteLegos.routeKey(node.id))
+        for (reach in listOf(null, "unrecognized")) {
+            handle.declaredReach = reach
+            val refusal = assertFailsWith<IllegalArgumentException> { runner.run(node, emptyMap()) }
+            assertTrue(refusal.message.orEmpty().contains("reach"))
+            assertTrue(registry.handles[node.id] === handle)
+            assertEquals(fact, ctx.blackboard.get(CamelRouteLegos.routeKey(node.id)))
+            assertEquals(1, registry.starts)
+            assertEquals(0, registry.stops)
+        }
     }
 }

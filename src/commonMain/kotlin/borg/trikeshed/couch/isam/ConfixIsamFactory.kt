@@ -1,6 +1,7 @@
 package borg.trikeshed.couch.isam
 
 import borg.trikeshed.couch.*
+import borg.trikeshed.context.*
 import borg.trikeshed.couch.persistence.CouchCommitStore
 import borg.trikeshed.couch.persistence.asLocalBacking
 import borg.trikeshed.collections.associative.toAny
@@ -21,11 +22,12 @@ class ConfixIsamStoreBuilder {
     var dataFileLocation: String = ""
     var fileOps: FileOperations? = null
     var cas: CasStore? = null
-    var operations: IsamOperations = UringIsamOperations(leafBytes = 64 * 1024)
+    var operations: IsamOperations? = null
+    var synchronization: Synchronization = Synchronization.MONITOR
 
     fun build(): ConfixIsamCursorBridge {
         require(dataFileLocation.isNotBlank()) { "dataFileLocation must be set" }
-        return ConfixIsamCursorBridge(dataFileLocation, requireNotNull(fileOps), requireNotNull(cas), operations)
+        return ConfixIsamCursorBridge(dataFileLocation, requireNotNull(fileOps), requireNotNull(cas), operations, synchronization)
     }
 }
 
@@ -44,16 +46,22 @@ data class ConfixIsamRevision(
  * Immutable dense parse geometry + exact CAS source, published through the existing Couch commit boundary.
  * Confix remains a tree of cursors; ISAM columns describe its tokens, not its application field schema.
  * This is an explicit conversion destination: opening it never edits another Couch store or its WAL.
+ * NONE requires owner-serialized access and close; injected writers and shared CAS retain their own ownership policy.
  */
 class ConfixIsamCursorBridge(
     dataFileLocation: String,
     private val files: FileOperations,
     private val cas: CasStore,
-    private val operations: IsamOperations = UringIsamOperations(leafBytes = 64 * 1024),
+    operations: IsamOperations? = null,
+    val synchronization: Synchronization = Synchronization.MONITOR,
 ) : AutoCloseable {
-    private val gate = Any()
-    private val directory = dataFileLocation.also { require(it.isNotBlank()) { "dataFileLocation must be set" } } + ".store"
-    private val commits = CouchCommitStore(cas, StorageDurability.DURABLE, files, directory, requireCompleteHistory = true)
+    private val gate = synchronization.lock()
+    private val operations = operations ?: UringIsamOperations(leafBytes = 64 * 1024, synchronization = synchronization)
+    private val directory = files.canonicalPath(dataFileLocation.also {
+        require(it.isNotBlank()) { "dataFileLocation must be set" }
+    }) + ".store"
+    private val commits = CouchCommitStore(cas, StorageDurability.DURABLE, files, directory,
+        requireCompleteHistory = true, synchronization = synchronization)
     private val history = linkedMapOf<Long, ConfixIsamRevision>()
     private val heads = linkedMapOf<String, ConfixIsamRevision>()
     private var lastSequence = -1L
@@ -68,21 +76,21 @@ class ConfixIsamCursorBridge(
         }
     }
 
-    val revisions: Series<ConfixIsamRevision> get() = synchronizedLock(gate) {
+    val revisions: Series<ConfixIsamRevision> get() = synchronize(gate) {
         commits.checkOpen()
         val snapshot = history.values.map { it.copy(files = it.files.toMap()) }.toTypedArray()
         snapshot.size j { snapshot[it] }
     }
 
-    fun revision(id: String, rev: String? = null): ConfixIsamRevision? = synchronizedLock(gate) {
+    fun revision(id: String, rev: String? = null): ConfixIsamRevision? = synchronize(gate) {
         commits.checkOpen()
         val entry = if (rev == null) heads[id] else history.values.firstOrNull { it.id == id && it.rev == rev }
         entry?.copy(files = entry.files.toMap())
     }
 
-    fun document(id: String, rev: String? = null): ConfixDoc? = synchronizedLock(gate) {
-        val entry = revision(id, rev) ?: return@synchronizedLock null
-        if (entry.deleted) return@synchronizedLock null
+    fun document(id: String, rev: String? = null): ConfixDoc? = synchronize(gate) {
+        val entry = revision(id, rev) ?: return@synchronize null
+        if (entry.deleted) return@synchronize null
         val bytes = readSource(requireNotNull(entry.source))
         val src: Series<Byte> = bytes.size j { bytes[it] }
         val index = if (entry.dataFile == null) {
@@ -100,12 +108,12 @@ class ConfixIsamCursorBridge(
 
     /** Idempotent replay requires every identity component to agree, not merely the sequence number. */
     fun put(sequence: Long, id: String, rev: String, source: ByteArray, syntax: Syntax,
-            writer: IsamOperations = operations): ConfixIsamRevision = synchronizedLock(gate) {
+            writer: IsamOperations = operations): ConfixIsamRevision = synchronize(gate) {
         commits.checkOpen()
         check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
         val bytes = source.copyOf()
         val cid = ContentId.of(bytes)
-        replay(sequence, id, rev, cid, syntax)?.let { return@synchronizedLock it }
+        replay(sequence, id, rev, cid, syntax)?.let { return@synchronize it }
         validate(sequence, id, rev)
         val doc = confixDoc(bytes, syntax)
         val geometry = ConfixIsamIsomorphism.geometry(doc.index)
@@ -137,10 +145,10 @@ class ConfixIsamCursorBridge(
         entry
     }
 
-    fun delete(sequence: Long, id: String, rev: String): ConfixIsamRevision = synchronizedLock(gate) {
+    fun delete(sequence: Long, id: String, rev: String): ConfixIsamRevision = synchronize(gate) {
         commits.checkOpen()
         check(couchStore == null || couchCommit) { "Couch owns mutation of this dense store" }
-        replay(sequence, id, rev, null, null)?.let { return@synchronizedLock it }
+        replay(sequence, id, rev, null, null)?.let { return@synchronize it }
         validate(sequence, id, rev)
         val entry = ConfixIsamRevision(sequence, id, rev, true, null, null, null, emptyMap())
         commits.commit(encode(entry))
@@ -161,13 +169,38 @@ class ConfixIsamCursorBridge(
         }
     }
 
+    /** Same-database offline conversion; unlike replication, this retains destination-local history. */
+    internal fun importDatabase(source: CouchCommitStore) = synchronize(gate) {
+        check(couchStore == null) { "Couch already owns this destination" }
+        source.replayInto(commits) { importFrames(s_[it]) }
+    }
+
+    /** Compare a freshly reopened destination with the exclusively owned source. */
+    internal fun verifyDatabase(source: CouchCommitStore): Int = synchronize(gate) {
+        val frames = source.recoveredFrames
+        val entries = revisions
+        check(frames.size == entries.size) { "Couch revision count changed during conversion" }
+        for (i in 0 until frames.size) {
+            val frame = frames[i]
+            val entry = entries[i]
+            check(frame.sequence == entry.sequence && frame.docId == entry.id && frame.rev == entry.rev &&
+                frame.deleted == entry.deleted) { "Couch revision identity changed during conversion" }
+            frame.doc?.let {
+                check(CouchStoreFactory.canonicalBody(it).contentEquals(requireNotNull(document(entry.id, entry.rev)).src.toArray())) {
+                    "Couch body changed during conversion"
+                }
+            }
+        }
+        source.verifyLocals(commits)
+    }
+
     /**
      * Couch protocol over this durable destination, not a migration of another database.
      * Existing entries must be canonical Couch CBOR bodies; replay uses their dense Confix geometry.
      * After binding, writes go through the shared Couch ingress, never the raw revision API.
      * Heads remain memory projections. Closing this owner releases the durable writer lease.
      */
-    fun couch(name: String): Couch = synchronizedLock(gate) {
+    fun couch(name: String): Couch = synchronize(gate) {
         commits.checkOpen()
         val capture = commits::capture
         val store = couchStore ?: CouchStoreFactory.committed(cas, revisions α { entry ->
@@ -182,7 +215,7 @@ class ConfixIsamCursorBridge(
                 body
             }
             capture(CouchCommittedFrame(entry.sequence, entry.id, entry.rev, entry.deleted, body))
-        }) { frame -> synchronizedLock(gate) {
+        }, synchronization) { frame -> synchronize(gate) {
             val captured = commits.capture(frame)
             couchCommit = true
             try { importFrames(s_[captured]) } finally { couchCommit = false }
@@ -192,7 +225,7 @@ class ConfixIsamCursorBridge(
     }
 
     /** Each row's final cell is a nested cursor, not a JSON string masquerading as packed ISAM bytes. */
-    fun toCursor(): Cursor = synchronizedLock(gate) {
+    fun toCursor(): Cursor = synchronize(gate) {
         commits.checkOpen()
         val snapshot = heads.values.filter { !it.deleted }.toTypedArray()
         val metadata = s_[ColumnMeta("id", IOMemento.IoString), ColumnMeta("rev", IOMemento.IoString),
@@ -211,7 +244,7 @@ class ConfixIsamCursorBridge(
         }
     }
 
-    override fun close() = synchronizedLock(gate) { commits.close() }
+    override fun close() = synchronize(gate) { commits.close() }
 
     private fun path(name: String) = files.resolvePath(directory, name)
     private fun artifactNames(name: String): Set<String> = setOf(name, "$name.meta") +

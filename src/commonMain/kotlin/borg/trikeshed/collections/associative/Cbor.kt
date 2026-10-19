@@ -99,9 +99,18 @@ object Cbor {
 
     fun decode(bytes: ByteArray): Item = Reader(bytes, 0).readItem()
 
-   class Reader(val data: ByteArray, var pos: Int) {
+   class Reader(val data: ByteArray, var pos: Int, val maxDepth: Int = Int.MAX_VALUE, val maxItems: Int = Int.MAX_VALUE) {
+        var depth = 0
+        var items = 0
 
         fun readItem(): Item {
+            require(depth <= maxDepth && items < maxItems) { "CBOR work limit" }
+            items++
+            depth++
+            try { return readValue() } finally { depth-- }
+        }
+
+        fun readValue(): Item {
             val head = u8()
             val major = head shr 5
             val additional = head and 0x1F
@@ -142,12 +151,14 @@ object Cbor {
         }
 
        fun readArray(count: Int): Item.Arr {
+            require(count <= maxItems - items) { "CBOR work limit" }
             val items = ArrayList<Item>(count)
             for (i in 0 until count) items.add(readItem())
             return Item.Arr(items.size j { items[it] })
         }
 
        fun readMap(count: Int): Item.Map {
+            require(count <= (maxItems - items) / 2) { "CBOR work limit" }
             val keys = ArrayList<String>(count)
             val vals = ArrayList<Item>(count)
             for (i in 0 until count) {

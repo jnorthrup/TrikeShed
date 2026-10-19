@@ -3,11 +3,14 @@ package borg.trikeshed.lcnc.ccek
 import borg.trikeshed.ccek.ArticulatedNode
 import borg.trikeshed.ccek.ForgeSignal
 import borg.trikeshed.ccek.ProjectionKind
+import borg.trikeshed.context.nuid.*
 import borg.trikeshed.forge.ForgeBlockId
 import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDoc
 import borg.trikeshed.lcnc.LcncProgram
 import borg.trikeshed.lcnc.LcncRunner
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.jsonOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -72,6 +75,17 @@ class LcncCcekAssembly(
         owner.invokeOnCompletion { reactorLink?.complete() }
 
         val doc = ForgeDoc.page(ForgeBlockId("lcnc-run-$name"), "LCNC run: $name")
+        val routing = context[LcncWorkgroupKey]?.value?.let { invocation -> mapOf(
+            "workgroup" to invocation.a.name,
+            "claimId" to invocation.b.a.claimId.toString(),
+            "subnet" to invocation.b.a.nuid.b.b.toString(),
+            "programCid" to invocation.b.b.value,
+            "claimLineage" to jsonOf((NuidInvocation(invocation.a j invocation.b.a).lineage α {
+                mapOf("workgroup" to it.a.name, "claimId" to it.b.claimId)
+            }).toList()),
+        ) + (invocation.b.a.parent?.let { mapOf(
+            "parentWorkgroup" to it.a.name, "parentClaimId" to it.b.claimId.toString(),
+        ) } ?: emptyMap()) }.orEmpty()
         lateinit var node: ArticulatedNode
         // Install the node before returning, even when the parent is already cancelled.
         val deferred = child.async(start = CoroutineStart.UNDISPATCHED) {
@@ -86,9 +100,9 @@ class LcncCcekAssembly(
             try {
                 yield()
                 withContext(node) {
-                    node.signalIn.send(receipt(name, "started"))
+                    node.signalIn.send(receipt(name, "started", routing))
                     val out = runner.runProcedure(program, args)
-                    node.signalIn.send(receipt(name, "finished", mapOf(
+                    node.signalIn.send(receipt(name, "finished", routing + mapOf(
                         "outputs" to out.nodeOutputs.size.toString(),
                         "returns" to out.returns.size.toString(),
                     )))
@@ -97,7 +111,7 @@ class LcncCcekAssembly(
             } catch (t: Throwable) {
                 failure = t
                 // A cancelled or closed receipt channel must not replace the run failure.
-                node.signalIn.trySend(receipt(name, "failed", mapOf(
+                node.signalIn.trySend(receipt(name, "failed", routing + mapOf(
                     "error" to (t.message ?: t::class.simpleName.orEmpty()),
                 )))
                 if (t is CancellationException) node.abort(t)

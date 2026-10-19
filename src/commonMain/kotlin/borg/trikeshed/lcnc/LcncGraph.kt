@@ -84,7 +84,16 @@ data class LcncConfixControls(
     val matingPoints: Series<LcncPatchMatingPoint> = emptySeriesOf(),
     /** Wiring specimens may be edited, but never dispatched as procedures. */
     val inspectionOnly: Boolean = false,
+    /** An explicit subnet manifests this stored construction as a routed workgroup. */
+    val subnet: String? = null,
 ) {
+    init {
+        if (subnet != null) require(subnet.isNotBlank() && subnet.length <= 256 &&
+            subnet.split('.').all { part -> part.isNotEmpty() && part.none { it.isWhitespace() || it.isISOControl() } }) {
+            "Invalid LCNC workgroup subnet"
+        }
+    }
+
     fun toggleOversight(enabled: Boolean): LcncConfixControls = copy(humanOversight = enabled)
 
     fun addMatingPoint(point: LcncPatchMatingPoint): LcncConfixControls {

@@ -1,0 +1,10 @@
+model:
+  decision_arch: matrix_stack
+  projection_dim: 4
+  decision_depth: 2
+  decision_num_heads: 2
+  decision_ffn_ratio: 1.5
+  normalize_state: false
+  decision_final_norm: false
+  min_temperature: 0.0001
+  pooling: last

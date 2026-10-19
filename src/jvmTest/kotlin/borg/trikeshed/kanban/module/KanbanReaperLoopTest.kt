@@ -18,13 +18,19 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -41,7 +47,29 @@ class KanbanReaperLoopTest {
     private fun tempDir(name: String): File =
         File(System.getProperty("java.io.tmpdir"), "kanban-reaper-$name-${System.nanoTime()}").apply { mkdirs() }
 
-    private class Rig(val server: JvmKanbanServer, val ctx: ModuleContext, val supervisor: ModuleSupervisor)
+    private class Brain {
+        val entered = CompletableDeferred<Unit>()
+        val lost = CompletableDeferred<Nothing>()
+    }
+
+    private class Rig(val server: JvmKanbanServer, val ctx: ModuleContext, val supervisor: ModuleSupervisor,
+                      val brain: AtomicReference<Brain>)
+
+    /** The old worker fails explicitly; graceful detach joins it without cancelling the shared host. */
+    private fun loseBrainAndDetach(rig: Rig) = runBlocking {
+        val old = rig.brain.get()
+        withTimeout(10_000) { old.entered.await() }
+        check(rig.brain.compareAndSet(old, Brain()))
+        old.lost.completeExceptionally(CancellationException("simulated brain loss"))
+        val failure = assertFailsWith<IllegalStateException> {
+            withTimeout(10_000) { rig.supervisor.detach("kanban") }
+        }
+        assertTrue(generateSequence<Throwable>(failure) { it.cause }.any {
+            it is CancellationException && it.message == "simulated brain loss"
+        }, failure.stackTraceToString())
+        assertTrue(rig.ctx.scope.coroutineContext.job.isActive)
+        assertTrue(rig.ctx.scope.coroutineContext.job.children.none(), "Detach must join the lost worker and module owners")
+    }
 
     private fun rig(name: String, clock: () -> Long): Rig {
         val cas = CasStore.inMemory()
@@ -61,13 +89,18 @@ class KanbanReaperLoopTest {
             clock = clock,
             stateDir = tempDir(name),
         )
-        // a brain that never answers: the worker is stuck between RUNNING and REVIEW forever
-        ctx.lcncRunners["prompt.chat"] = LcncNodeRunner { _, _ -> awaitCancellation() }
+        // A brain that answers only with explicit loss: RUNNING is retained for the restart/reaper.
+        val brain = AtomicReference(Brain())
+        ctx.lcncRunners["prompt.chat"] = LcncNodeRunner { _, _ ->
+            val current = brain.get()
+            current.entered.complete(Unit)
+            current.lost.await()
+        }
         ctx.lcncRunners["mux.models"] = LcncNodeRunner { _, _ -> mapOf("models" to listOf(mapOf("id" to "hung-model"))) }
         val server = JvmKanbanServer(moduleRoutes = routes)
         val supervisor = ModuleSupervisor(ctx)
         runBlocking { supervisor.attach(KanbanModule()) }
-        return Rig(server, ctx, supervisor)
+        return Rig(server, ctx, supervisor, brain)
     }
 
     private fun get(server: JvmKanbanServer, path: String): JvmKanbanServer.HttpResponse = runBlocking {
@@ -131,7 +164,7 @@ class KanbanReaperLoopTest {
             assertEquals(0, strikes(rig, "z").size, "nothing reaped inside the threshold")
 
             // restart 1, sixteen minutes later: reaped to READY (r4), claimed afresh (r5), hung again
-            runBlocking { rig.supervisor.detach("kanban") }
+            loseBrainAndDetach(rig)
             now += 16 * 60 * 1000L
             runBlocking { rig.supervisor.attach(KanbanModule()) }
             seen = await(rig, "z", "running", 5)
@@ -141,14 +174,14 @@ class KanbanReaperLoopTest {
             assertEquals("3", strikes(rig, "z")[0]["expectedRevision"], "the reaper quoted the RUNNING revision it saw")
 
             // restart 2: strike 2, the same way (r6 READY, r7 RUNNING)
-            runBlocking { rig.supervisor.detach("kanban") }
+            loseBrainAndDetach(rig)
             now += 16 * 60 * 1000L
             runBlocking { rig.supervisor.attach(KanbanModule()) }
             seen = await(rig, "z", "running", 7)
             assertEquals(listOf("1", "2"), strikes(rig, "z").map { it["strike"] })
 
             // restart 3: the third strike is BLOCKED, owner cleared, and the claim leaves it alone
-            runBlocking { rig.supervisor.detach("kanban") }
+            loseBrainAndDetach(rig)
             now += 16 * 60 * 1000L
             runBlocking { rig.supervisor.attach(KanbanModule()) }
             seen = await(rig, "z", "blocked", 8)
@@ -162,9 +195,17 @@ class KanbanReaperLoopTest {
                 .map { rig.ctx.blackboard.get(it) as Map<*, *> }.sortedBy { it["revision"].toString().toLong() }.map { it["col"] }
             assertEquals(listOf("todo", "ready", "running", "ready", "running", "ready", "running", "blocked"), trail)
             assertTrue(rig.ctx.blackboard.get("kanban/claim/z") == null, "the hung brain never wrote a claim receipt")
+            runBlocking {
+                assertTrue(withTimeout(10_000) { rig.supervisor.detach("kanban") })
+                assertTrue(rig.ctx.scope.coroutineContext.job.children.none())
+                assertTrue(rig.ctx.scope.coroutineContext.job.isActive)
+            }
         } finally {
-            runBlocking { rig.supervisor.detach("kanban") }
-            rig.ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            rig.brain.get().lost.completeExceptionally(CancellationException("fixture cleanup"))
+            runBlocking {
+                try { runCatching { rig.supervisor.detach("kanban") } }
+                finally { rig.ctx.scope.coroutineContext.job.cancelAndJoin() }
+            }
         }
     }
 }

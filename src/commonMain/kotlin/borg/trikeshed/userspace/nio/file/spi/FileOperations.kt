@@ -52,10 +52,19 @@ interface FileOperations : CoroutineContext.Element {
     fun isDir(path: String): Boolean
     fun isFile(path: String): Boolean
     fun mkdirs(path: String)
+    /** Atomically create one absent directory; parents must exist and any existing leaf, including a symlink, refuses. */
+    fun createDirectory(path: String): Unit =
+        throw UnsupportedOperationException("Exclusive directory creation is unavailable")
     /** Move an entry without replacing an existing destination. */
     fun move(source: String, destination: String): Unit = TODO("Filesystem move is not bound on this target")
     fun deleteRecursively(path: String)
     fun resolvePath(vararg parts: String): String
+    /** Resolve existing symlinks, including ancestors of a new path, before deriving storage siblings. */
+    fun canonicalPath(path: String): String {
+        if (durability == StorageDurability.DURABLE)
+            throw UnsupportedOperationException("Canonical filesystem paths are unavailable")
+        return resolvePath(path)
+    }
     fun readZip(path: String): List<Join<String, ByteArray>>
     fun createTempDir(prefix: String): String
 

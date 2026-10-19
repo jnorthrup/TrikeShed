@@ -1,6 +1,8 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.kanban.validate
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
@@ -68,10 +70,11 @@ class LegalTribunalExecutionTest {
         mapOf("brief" to brief)
     }
 
-    private fun runner(program: LcncProgram): LcncRunner {
+    private fun runner(program: LcncProgram, cas: CasStore = CasStore.inMemory()): LcncRunner {
         val registry = mutableMapOf<String, LcncNodeRunner>()
         val dialog = TribunalDialog { node, system, prompt -> (system + "::" + prompt) to (node.params["job"] ?: node.id) }
-        registry.putAll(TribunalNodes.registry(dialog) { verdict -> verdict })
+        registry.putAll(CouncilNodes.registry(CouncilDialog { error("unexpected Council seat") }))
+        registry.putAll(TribunalNodes.registry(dialog, tribunalRecord(cas) { it.value }))
         registry["legal.ingest"] = legalIngestFake()
         registry["legal.evidence"] = legalEvidenceFake()
         // The canned matter text the preset ships (the t0 literal socket):
@@ -95,10 +98,11 @@ class LegalTribunalExecutionTest {
     @Test
     fun legalTribunalRunsEndToEndThroughTheOneExecutor() = runTest {
         val program = preset()
+        val cas = CasStore.inMemory()
         // The human-oversight brief enters as the ROOT frame binding `brief`
         // — legal.ingest (n1) has no wired input, so this is the only way
         // the document text reaches it (the bug this test exists to catch).
-        val result = runner(program).runProcedure(
+        val result = runner(program, cas).runProcedure(
             program,
             args = mapOf("brief" to "42 U.S.C. sec 1983 claim: excessive force during arrest."),
         )
@@ -129,6 +133,7 @@ class LegalTribunalExecutionTest {
 
         val report = (result.nodeOutputs["n5"]!!["report"]) as Map<*, *>
         assertEquals(verdict, report["text"], "the verdict must actually be recorded, not silently dropped")
+        assertEquals(verdict, cas.get(ContentId(report["cid"] as String))!!.decodeToString())
         assertEquals(report, (result.nodeOutputs["n6"]!!["x"]) as Map<*, *>)
     }
 

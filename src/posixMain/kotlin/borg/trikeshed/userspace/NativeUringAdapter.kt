@@ -8,6 +8,8 @@ internal expect class NativeUringAdapter(entries: Int, mode: UringBackendMode?) 
     val availability: String
     /** The errno, in Linux numbering, of a kernel ring setup that failed; null when none was attempted or it succeeded. */
     val setupErrno: Int?
+    /** Pollable kernel CQ readiness descriptor, or -1 when the adapter emulates. */
+    val completionFd: Int
     fun submit(submissions: List<UringSubmission>)
     fun isPending(userData: Long): Boolean
     fun reapCompletions(): List<UringCompletion>

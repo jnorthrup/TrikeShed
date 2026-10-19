@@ -2,30 +2,33 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.graal.subvm.CamelRuntime
 import borg.trikeshed.module.ModuleContext
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.*
 
 /** Borrowed registry: persistent routes belong to the host, outside an LCNC invocation. */
 object CamelRouteRegistryKey : LcncServiceKey<CamelRouteRegistry>("CamelRouteRegistryKey")
 
-interface CamelRouteHandle {
-    val id: String
-    fun status(): String
-    fun routeIds(): List<String>
-    fun identity(): Map<String, Any?>
-    fun describe(): Map<String, Any?>
-}
+/** A newly allocated context whose startup failed without completing cleanup. */
+class CamelRouteStartFailure(val route: CamelRouteHandle, cause: Throwable) :
+    IllegalStateException(cause.message, cause)
 
 interface CamelRouteRegistry {
     fun route(id: String): CamelRouteHandle?
     fun running(): List<CamelRouteHandle>
     fun start(id: String, from: String, to: String, module: String, reach: CamelLinkage.Reach, observer: CamelRuntime.Observer): CamelRouteHandle
     fun stop(id: String): Boolean
+    fun stop(handle: CamelRouteHandle): Boolean {
+        val current = route(handle.id) ?: return false
+        check(current.token === handle.token) { "route '${handle.id}' now belongs to another context" }
+        return stop(handle.id)
+    }
 }
 
 /** Delegates to CamelRuntime's existing live registry; no second route map. */
 object HostCamelRouteRegistry : CamelRouteRegistry {
-    private class Handle(private val route: CamelRuntime.Route) : CamelRouteHandle {
+    private class Handle(val route: CamelRuntime.Route) : CamelRouteHandle {
         override val id: String get() = route.id
+        override val token: Any get() = route
+        override val cleanupPending: Boolean get() = route.cleanupPending
         override fun status() = route.status()
         override fun routeIds() = route.routeIds()
         override fun identity() = route.identity()
@@ -35,8 +38,12 @@ object HostCamelRouteRegistry : CamelRouteRegistry {
     override fun route(id: String): CamelRouteHandle? = CamelRuntime.route(id)?.let(::Handle)
     override fun running(): List<CamelRouteHandle> = CamelRuntime.running().map(::Handle)
     override fun start(id: String, from: String, to: String, module: String, reach: CamelLinkage.Reach, observer: CamelRuntime.Observer): CamelRouteHandle =
-        Handle(CamelRuntime.start(id, from, to, module, reach, observer))
+        try { Handle(CamelRuntime.start(id, from, to, module, reach, observer)) }
+        catch (failure: CamelRuntime.StartFailure) {
+            throw CamelRouteStartFailure(Handle(failure.route), failure)
+        }
     override fun stop(id: String): Boolean = CamelRuntime.stop(id)
+    override fun stop(handle: CamelRouteHandle): Boolean = CamelRuntime.stop((handle as Handle).route)
 }
 
 /**
@@ -79,42 +86,69 @@ object CamelRouteLegos {
 
     private const val LANGUAGE = "camel"
 
-    @Volatile
-    private var shutdownHookInstalled = false
-
-    /**
-     * Register the three lifetime legos. Called from the daemon beside
-     * [SubVmLegos.register]; no other site registers them.
-     */
-    fun register(ctx: ModuleContext) {
-        ctx.lcncRunners[UP] = up(ctx)
-        ctx.lcncRunners[DOWN] = down(ctx)
-        ctx.lcncRunners[ROUTES] = routes()
-        installShutdownHook()
+    /** The host owns the lanes; first use opens them, and shutdown drains before dependencies. */
+    fun register(ctx: ModuleContext): CamelRouteElement {
+        check(ctx.camelRoutes == null) { "Camel routes already registered for this host" }
+        val owner = CamelRouteElement(ctx.scope.coroutineContext.job)
+        ctx.camelRoutes = owner
+        ctx.lcncRunners[UP] = owned(ctx, owner, up(ctx))
+        ctx.lcncRunners[DOWN] = owned(ctx, owner, down(ctx))
+        ctx.lcncRunners[ROUTES] = owned(ctx, owner, routes())
+        return owner
     }
 
-    /**
-     * A started route survives the run that started it — including, without this, the JVM's own
-     * exit, where Camel's non-daemon consumer threads would hold the process up. Registered once.
-     */
-    private fun installShutdownHook() {
-        if (shutdownHookInstalled) return
-        synchronized(this) {
-            if (shutdownHookInstalled) return
-            runCatching {
-                Runtime.getRuntime().addShutdownHook(Thread({ CamelRuntime.stopAll() }, "camel-routes-stop"))
+    private fun owned(ctx: ModuleContext, owner: CamelRouteElement, runner: LcncNodeRunner): LcncNodeRunner =
+        boundLcnc(owner, boundLcnc(CamelRouteRegistryKey(HostCamelRouteRegistry)) { _, node, inputs ->
+            val selected = checkNotNull(currentCoroutineContext()[CamelRouteElement])
+            withContext(ctx.scope.coroutineContext.minusKey(Job)) { selected.open() }
+            selected.command {
+                // Blocking Camel/Java library work is the host boundary; admission and joins
+                // remain the commonMain owner's userspace channel composition.
+                withContext(Dispatchers.IO) { runner.execute(node, inputs) }
             }
-            shutdownHookInstalled = true
+        })
+
+    private fun publish(owner: CamelRouteElement?, action: () -> Unit) {
+        if (owner == null) action()
+        else runBlocking(owner.supervisor) { owner.observe { action() } }
+    }
+
+    private suspend fun stop(
+        ctx: ModuleContext, registry: CamelRouteRegistry, route: CamelRouteHandle, owner: CamelRouteElement?,
+    ): Boolean {
+        if (!registry.stop(route)) return false
+        val fact = route.describe() + mapOf("status" to "Stopped", "stoppedAtMs" to ctx.clock())
+        if (owner == null) ctx.blackboard.put(routeKey(route.id), fact, LANGUAGE)
+        else owner.observe { ctx.blackboard.put(routeKey(route.id), fact, LANGUAGE) }
+        return true
+    }
+
+    /** A failed start with incomplete cleanup has the same stop obligation as a successful one. */
+    private suspend fun retain(
+        ctx: ModuleContext, registry: CamelRouteRegistry, route: CamelRouteHandle, owner: CamelRouteElement?,
+    ) {
+        if (owner == null) return
+        var stoppedFact: Map<String, Any?>? = null
+        owner.retain(route) {
+            withContext(Dispatchers.IO) {
+                val fact = stoppedFact ?: run {
+                    check(registry.stop(route)) { "route '${route.id}' was not stopped by its owner" }
+                    (route.describe() + mapOf("status" to "Stopped", "stoppedAtMs" to ctx.clock()))
+                        .also { stoppedFact = it }
+                }
+                owner.observe { ctx.blackboard.put(routeKey(route.id), fact, LANGUAGE) }
+            }
         }
     }
 
     // ── up: start a route and leave it running ─────────────────────────────────
 
-    fun up(
+    internal fun up(
         ctx: ModuleContext,
         registry: CamelRouteRegistry = HostCamelRouteRegistry,
     ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
         val routes = service.value
+        val owner = currentCoroutineContext()[CamelRouteElement]
         val id = VmRuntimeNodes.string(node, inputs, "id", node.id).trim()
         val from = VmRuntimeNodes.string(node, inputs, "from", "timer:lcnc?period=1000")
         val to = VmRuntimeNodes.string(node, inputs, "to", "log:lcnc")
@@ -126,10 +160,17 @@ object CamelRouteLegos {
         // rebuilds re-runs its nodes, and a route that answered "already running" with a refusal
         // would make a rebuild fail for having succeeded earlier.
         routes.route(id)?.let { existing ->
+            require(owner == null || owner.owns(existing)) { "route '$id' belongs to another owner" }
             val identity = existing.identity()
-            require(identity["from"] == from && identity["to"] == to && identity["module"] == module) {
-                "route '$id' already exists with different endpoints or module"
+            require(identity["from"] == from && identity["to"] == to && identity["module"] == module &&
+                identity["reach"] == reach.name) {
+                "route '$id' already exists with different endpoints, module or reach"
             }
+            if (existing.cleanupPending) return@boundLcnc mapOf(
+                "id" to id, "status" to existing.status(), "routes" to existing.routeIds(),
+                "ok" to false, "cleanupPending" to true,
+                "error" to "route '$id' startup failed; cleanup is still pending",
+            )
             return@boundLcnc mapOf(
                 "id" to id,
                 "status" to existing.status(),
@@ -141,7 +182,7 @@ object CamelRouteLegos {
 
         val started = runCatching {
             routes.start(id, from, to, module, reach) { exchange ->
-                ctx.blackboard.put(
+                publish(owner) { ctx.blackboard.put(
                     exchangeKey(id),
                     mapOf(
                         "route" to id,
@@ -153,10 +194,21 @@ object CamelRouteLegos {
                         "atMs" to exchange.atMs,
                     ),
                     LANGUAGE,
-                )
+                ) }
             }
         }.getOrElse { t ->
             if (t is CancellationException) throw t
+            if (t is CamelRouteStartFailure) {
+                // The exception carries this construction's exact token; never adopt by ID.
+                retain(ctx, routes, t.route, owner)
+                val identity = t.route.identity()
+                if (owner == null) ctx.blackboard.put(routeKey(id), identity, LANGUAGE)
+                else owner.observe { ctx.blackboard.put(routeKey(id), identity, LANGUAGE) }
+                return@boundLcnc mapOf(
+                    "id" to id, "status" to t.route.status(), "routes" to t.route.routeIds(),
+                    "ok" to false, "cleanupPending" to true, "error" to t.message,
+                )
+            }
             // The gate's refusal IS the product here: it names the scheme and the remedy, and a
             // caller that swallowed it into a blank output would leave an operator reading source.
             return@boundLcnc mapOf(
@@ -168,9 +220,13 @@ object CamelRouteLegos {
             )
         }
 
+        retain(ctx, routes, started, owner)
+
         // identity(), not describe(): the counters belong to the exchange key, which is live.
         // A lifecycle fact carrying exchanges=0 forever would contradict the stream beside it.
-        ctx.blackboard.put(routeKey(id), started.identity(), LANGUAGE)
+        val identity = started.identity()
+        if (owner == null) ctx.blackboard.put(routeKey(id), identity, LANGUAGE)
+        else owner.observe { ctx.blackboard.put(routeKey(id), identity, LANGUAGE) }
         mapOf(
             "id" to id,
             "status" to started.status(),
@@ -182,11 +238,12 @@ object CamelRouteLegos {
 
     // ── down: stop a route ─────────────────────────────────────────────────────
 
-    fun down(
+    internal fun down(
         ctx: ModuleContext,
         registry: CamelRouteRegistry = HostCamelRouteRegistry,
     ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, node, inputs ->
         val routes = service.value
+        val owner = currentCoroutineContext()[CamelRouteElement]
         val allValue = VmRuntimeNodes.value(node, inputs, "all") ?: false
         val all = when (allValue) {
             is Boolean -> allValue
@@ -194,33 +251,35 @@ object CamelRouteLegos {
             else -> throw IllegalArgumentException("all must be true or false")
         }
         val id = VmRuntimeNodes.string(node, inputs, "id", "", allowBlank = true).trim()
-        val targets: List<String> = when {
-            all -> routes.running().map { it.id }
+        val targets: List<CamelRouteHandle> = when {
+            all -> routes.running().filter { owner == null || owner.owns(it) }
             id.isEmpty() -> emptyList()
-            routes.route(id) != null -> listOf(id)
-            else -> emptyList()
+            else -> listOfNotNull(routes.route(id)).filter { owner == null || owner.owns(it) }
         }
-        // Read the counters BEFORE stopping: stop() forgets the route, and a final tally taken
-        // afterwards would be the one number nobody can recover.
-        val finals = targets.associateWith { routes.route(it)?.describe().orEmpty() }
-        val stopped = targets.filter { routes.stop(it) }
+        val stopped = mutableListOf<String>()
+        val errors = mutableListOf<String>()
+        if (!all && id.isNotEmpty() && targets.isEmpty()) errors += "route '$id' is not running"
         // The lifecycle key is REWRITTEN, not removed: "this route ran and is now stopped" is a
         // different fact from "no such route was ever here", and a watcher that saw the start
         // deserves to see the stop rather than a key that quietly vanishes. The counters land
-        // here, where they are final and therefore true.
-        for (each in stopped) {
-            ctx.blackboard.put(
-                routeKey(each),
-                finals[each].orEmpty() +
-                    mapOf("status" to "Stopped", "stoppedAtMs" to ctx.clock()),
-                LANGUAGE,
-            )
+        // here after cleanup, read from the retained handle so the last exchange is included.
+        for (route in targets) {
+            val didStop = try {
+                (owner?.stop(route) ?: stop(ctx, routes, route, null))
+                    .also { if (!it) errors += "route '${route.id}' is not running" }
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                errors += "route '${route.id}' failed to stop: ${t.message ?: t::class.java.name}"
+                false
+            }
+            if (!didStop) continue
+            stopped += route.id
         }
         mapOf(
             "stopped" to stopped,
             "count" to stopped.size,
-            "ok" to (all || id.isEmpty() || stopped.isNotEmpty()),
-            "error" to if (!all && id.isNotEmpty() && stopped.isEmpty()) "route '$id' is not running" else "",
+            "ok" to errors.isEmpty(),
+            "error" to errors.joinToString("; "),
         )
     }
 
@@ -231,10 +290,11 @@ object CamelRouteLegos {
      * The same argument `vm.camel.catalog` makes about itself — a lego with no port through which
      * it could start, stop or reach anything is safe to call from a picklist that fills on open.
      */
-    fun routes(
+    internal fun routes(
         registry: CamelRouteRegistry = HostCamelRouteRegistry,
     ) = boundLcnc(CamelRouteRegistryKey(registry)) { service, _, _ ->
-        val running = service.value.running()
+        val owner = currentCoroutineContext()[CamelRouteElement]
+        val running = service.value.running().filter { owner == null || owner.owns(it) }
         mapOf(
             // A real List<String>, not a serialized array: the picklist resolver walks
             // outputs.ids[] in the browser, exactly as camel.catalog's endpoints[] is walked.

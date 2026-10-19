@@ -10,7 +10,9 @@ import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
 import kotlin.js.jsTypeOf
 import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.CompletableDeferred
 import org.khronos.webgl.Float64Array
 import org.khronos.webgl.Int32Array
 import org.khronos.webgl.get
@@ -18,9 +20,9 @@ import org.khronos.webgl.set
 
 private val nodeFs: dynamic get() = runCatching { fs }.getOrNull()
 
-/** executeBatch's control fields per SQE (uring_node.c BATCH_FIELDS): opcode, fd, start, length, offset. */
-private const val NODE_BATCH_FIELDS = 5
-/** SQEs per executeBatch call; the addon splits a run into enters of at most its SQ depth. */
+/** ABI2 control fields: opcode, fd, start, length, exact offset, transport id. */
+private const val NODE_BATCH_FIELDS = 6
+/** SQEs per native submission transport call. */
 private const val NODE_BATCH_LIMIT = 64
 private const val NOT_BATCHED = Int.MIN_VALUE
 
@@ -39,12 +41,14 @@ private object JsFileTable {
     fun descriptor(id: Int): JsDescriptor? = files[id]
     fun remove(id: Int): JsDescriptor? = files.remove(id)
     fun close(id: Int, userData: Long = 0): Int {
-        val descriptor = files.remove(id) ?: return -9
-        return try {
+        val descriptor = files[id] ?: return -9
+        val result = try {
             if (descriptor.module == null) { nodeFs.closeSync(descriptor.fd); 0 }
             else descriptor.module.execute(descriptor.handle, UringOp.CLOSE.code, descriptor.fd,
                 null, 0, 0, nodeUringInteger(0), nodeUringInteger(userData)) as Int
         } catch (failure: dynamic) { jsIoError(failure) }
+        if (result != -16) files.remove(id)
+        return result
     }
 }
 
@@ -227,34 +231,32 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
         } catch (failure: dynamic) { jsIoError(failure) }
     }
 
-    /** An admitted Node callback retains the buffer until the OS primitive settles. */
-    private suspend fun executeAsync(sub: UringSubmission): Int {
+    private class Request(val submission: UringSubmission)
+    private val pending = mutableListOf<Request>()
+    private val active = mutableListOf<Request>()
+    private val completed = mutableListOf<SelectionResult>()
+    private var completion = CompletableDeferred<Unit>()
+    private var dispatching = false
+    override val deferredCapabilities get() = capabilities
+
+    /** Host callbacks are the event transport; commonMain owns the coroutine and buffer admission. */
+    private fun executeAsync(sub: UringSubmission, complete: (Int) -> Unit) {
         val invalid = validation(sub)
-        if (invalid != 0) return invalid
-        if (sub.opcode == UringOp.NOP) return 0
-        return try {
+        if (invalid != 0 || sub.opcode == UringOp.NOP) { complete(invalid); return }
+        try {
             when (sub.opcode) {
-                UringOp.OPENAT -> {
-                    val path = sub.nodePath()
-                    val flags = jsOpenFlags(host, sub.offset)
-                    suspendCoroutine { continuation ->
-                        host.open(path, flags, sub.operationFlags, { error: dynamic, fd: dynamic ->
-                            continuation.resume(if (error != null) jsIoError(error)
-                                else JsFileTable.register(fd as Int).also { owned.add(it) })
-                        })
-                    }
-                }
+                UringOp.OPENAT -> host.open(sub.nodePath(), jsOpenFlags(host, sub.offset), sub.operationFlags,
+                    { error: dynamic, fd: dynamic ->
+                        complete(if (error != null) jsIoError(error)
+                            else JsFileTable.register(fd as Int).also { owned.add(it) })
+                    })
                 UringOp.CLOSE -> {
                     val descriptor = JsFileTable.descriptor(sub.fd)!!
                     owned.remove(sub.fd)
-                    if (descriptor.module != null) JsFileTable.close(sub.fd, sub.userData)
+                    if (descriptor.module != null) complete(JsFileTable.close(sub.fd, sub.userData))
                     else {
                         JsFileTable.remove(sub.fd)
-                        suspendCoroutine { continuation ->
-                            host.close(descriptor.fd, { error: dynamic ->
-                                continuation.resume(if (error == null) 0 else jsIoError(error))
-                            })
-                        }
+                        host.close(descriptor.fd, { error: dynamic -> complete(if (error == null) 0 else jsIoError(error)) })
                     }
                 }
                 UringOp.READ, UringOp.WRITE -> {
@@ -263,59 +265,92 @@ internal class JsUserspaceChannelBackend : UserspaceChannelBackend {
                     val position = buffer.position()
                     val start = buffer.arrayOffset() + position
                     val offset = if (sub.offset == -1L) null else sub.offset.toDouble()
-                    suspendCoroutine { continuation ->
-                        val completion = { error: dynamic, transferred: dynamic, _: dynamic ->
-                            if (error != null) continuation.resume(jsIoError(error))
-                            else {
-                                val count = transferred as Int
-                                buffer.position(position + count)
-                                continuation.resume(count)
-                            }
+                    val callback = { error: dynamic, transferred: dynamic, _: dynamic ->
+                        if (error != null) complete(jsIoError(error))
+                        else {
+                            val count = transferred as Int
+                            buffer.position(position + count)
+                            complete(count)
                         }
-                        if (sub.opcode == UringOp.READ) host.read(fd, buffer.array(), start, sub.len, offset, completion)
-                        else host.write(fd, buffer.array(), start, sub.len, offset, completion)
                     }
+                    if (sub.opcode == UringOp.READ) host.read(fd, buffer.array(), start, sub.len, offset, callback)
+                    else host.write(fd, buffer.array(), start, sub.len, offset, callback)
                 }
-                UringOp.STATX -> {
-                    val fd = JsFileTable.descriptor(sub.fd)!!.fd
-                    suspendCoroutine { continuation ->
-                        host.fstat(fd, { error: dynamic, metadata: dynamic ->
-                            val result = if (error != null) jsIoError(error) else try {
-                                jsStatxResult(sub, metadata)
-                            } catch (failure: dynamic) { jsIoError(failure) }
-                            continuation.resume(result)
-                        })
-                    }
-                }
-                UringOp.FSYNC, UringOp.FTRUNCATE -> {
-                    val fd = JsFileTable.descriptor(sub.fd)!!.fd
-                    suspendCoroutine { continuation ->
-                        val completion = { error: dynamic ->
-                            continuation.resume(if (error == null) 0 else jsIoError(error))
-                        }
-                        if (sub.opcode == UringOp.FSYNC) host.fsync(fd, completion)
-                        else host.ftruncate(fd, sub.offset.toDouble(), completion)
-                    }
-                }
-                else -> -95
+                UringOp.STATX -> host.fstat(JsFileTable.descriptor(sub.fd)!!.fd, { error: dynamic, metadata: dynamic ->
+                    complete(if (error != null) jsIoError(error) else try { jsStatxResult(sub, metadata) }
+                        catch (failure: dynamic) { jsIoError(failure) })
+                })
+                UringOp.FSYNC -> host.fsync(JsFileTable.descriptor(sub.fd)!!.fd,
+                    { error: dynamic -> complete(if (error == null) 0 else jsIoError(error)) })
+                UringOp.FTRUNCATE -> host.ftruncate(JsFileTable.descriptor(sub.fd)!!.fd, sub.offset.toDouble(),
+                    { error: dynamic -> complete(if (error == null) 0 else jsIoError(error)) })
+                else -> complete(-95)
             }
-        } catch (failure: dynamic) { jsIoError(failure) }
+        } catch (failure: dynamic) { complete(jsIoError(failure)) }
+    }
+
+    private fun dispatch() {
+        if (dispatching) return
+        dispatching = true
+        try {
+            var index = 0
+            while (index < pending.size) {
+                val request = pending[index]
+                if (active.any { dependsOn(request.submission, it.submission) } ||
+                    (0 until index).any { dependsOn(request.submission, pending[it].submission) }) { index++; continue }
+                pending.removeAt(index)
+                active.add(request)
+                executeAsync(request.submission) { result ->
+                    active.remove(request)
+                    completed.add(SelectionResult(result, request.submission.userData))
+                    completion.complete(Unit)
+                    dispatch()
+                }
+            }
+        } finally { dispatching = false }
     }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-        submissions.map { SelectionResult(execute(it), it.userData) }
+        submissions.map { sub ->
+            val result = if (active.any { dependsOn(sub, it.submission) } || pending.any { dependsOn(sub, it.submission) })
+                -16 else execute(sub)
+            SelectionResult(result, sub.userData)
+        }
+
+    override fun submitDeferredBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+        submissions.forEach { pending.add(Request(it)) }
+        dispatch()
+        return reapCompletions()
+    }
+
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> = completed.toMutableList().also {
+        completed.clear()
+        if (completion.isCompleted) completion = CompletableDeferred()
+    }
+
+    override suspend fun awaitCompletions() {
+        if (completed.isEmpty()) completion.await()
+    }
+
+    override fun cancelPending() {
+        pending.forEach { completed.add(SelectionResult(-125, it.submission.userData)) }
+        pending.clear()
+        if (completed.isNotEmpty()) completion.complete(Unit)
+        // Node fs callbacks cannot be revoked: their terminal callbacks retain the borrowed bytes until reap.
+    }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        val results = arrayOfNulls<UringCompletion>(submissions.size)
-        for (index in results.indices) {
-            val sub = submissions[index]
-            results[index] = UringCompletion(sub.userData, executeAsync(sub), 0)
+        val results = submitDeferredBatch(List(submissions.size) { submissions[it] }).toMutableList()
+        while (results.size < submissions.size) {
+            awaitCompletions()
+            results.addAll(reapCompletions())
         }
-        return results.size j { results[it]!! }
+        return results.size j { UringCompletion(results[it].userData, results[it].res, 0) }
     }
 
     override fun close() {
         if (closed) return
+        check(pending.isEmpty() && active.isEmpty()) { "Node file effects must drain before close" }
         closed = true
         owned.forEach { JsFileTable.close(it) }
         owned.clear()
@@ -336,9 +371,8 @@ actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): U
     }
 }
 
-/** ABI1 uses synchronous primitives, Int8Array bytes and BigInt offsets/identities.
- * execute must return the actual completion/negative errno after releasing its
- * borrow. An admitted effect may not throw or return before its memory is safe.
+/** ABI2 separates admission, terminal CQ reaping and event-loop readiness.
+ * The synchronous execute export retains ABI1's BigInt offset semantics for compatibility effects.
  * Kernel-unsupported operations are POSIX-emulated against the same OS fd.
  */
 internal fun nodeNativeChannelBackend(module: dynamic, handle: dynamic): UserspaceChannelBackend =
@@ -352,27 +386,30 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
         if (op != UringOp.STATX && capabilities and op.mask != 0L && op.code >= 0 && module.supports(handle, op.code) as Boolean)
             mask or op.mask else mask
     }
-    override val availability = "io_uring: Node ABI1 setup and operation probe succeeded; unavailable kernel ops use POSIX emulation"
+    override val availability = "io_uring: Node ABI2 submission, CQ reaping and event-loop wakeups; unavailable kernel ops use POSIX emulation"
     private val owned = mutableSetOf<Int>()
     private val emulated = JsUserspaceChannelBackend()
     private var closed = false
-    /** Whether the module carries executeBatch (uring_node.c); an older build settles every SQE through execute. */
-    private val batching = jsTypeOf(module.executeBatch) == "function"
-    /** The ops one kernel submission carries (uring_node.c `batched`), as the probe found them; by ordinal, since a
-     * Long mask test allocates on Kotlin/JS. */
-    private val batched = (UringOp.caps(UringOp.NOP, UringOp.READ, UringOp.WRITE, UringOp.FSYNC, UringOp.FTRUNCATE) and
-        nativeCapabilities).let { mask -> BooleanArray(UringOp.entries.size) { mask and UringOp.entries[it].mask != 0L } }
-    /** The run being gathered for one kernel submission, with each SQE's OS descriptor. */
-    private val run = ArrayList<UringSubmission>(NODE_BATCH_LIMIT)
+    override val deferredCapabilities get() = capabilities
+    private val batched = nativeCapabilities.let { mask ->
+        BooleanArray(UringOp.entries.size) { mask and UringOp.entries[it].mask != 0L }
+    }
+    private class Request(val submission: UringSubmission, val id: Int)
+    private var nextId = 0
+    private val pending = mutableListOf<Request>()
+    private val active = mutableMapOf<Int, Request>()
+    private val completed = mutableListOf<SelectionResult>()
+    private val run = ArrayList<Request>(NODE_BATCH_LIMIT)
     private val runFds = IntArray(NODE_BATCH_LIMIT)
     private val control = Float64Array(NODE_BATCH_LIMIT * NODE_BATCH_FIELDS)
     private val arrays = arrayOfNulls<ByteArray>(NODE_BATCH_LIMIT)
     private val results = Int32Array(NODE_BATCH_LIMIT)
+    private var dispatching = false
 
     private fun execute(sub: UringSubmission): Int {
         if (closed) return -9
         if (sub.flags != 0 || capabilities and sub.opcode.mask == 0L) return -95
-        // ABI1 fixes OPENAT's creation mode at 0666 and carries no raw address.
+        // Native OPENAT fixes creation mode at 0666 and carries no raw address.
         if (sub.addr != 0L || sub.operationFlags != (if (sub.opcode == UringOp.OPENAT) 438 else if (sub.opcode == UringOp.STATX) sub.operationFlags else 0)) return -95
         if (sub.opcode == UringOp.OPENAT && sub.fd != -100) return -95
         val descriptor = JsFileTable.descriptor(sub.fd)
@@ -407,28 +444,56 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
     }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
-        if (!batching) return submissions.map { SelectionResult(execute(it), it.userData) }
-        val out = ArrayList<SelectionResult>(submissions.size)
-        for (sub in submissions) {
-            val fd = batchFd(sub)
-            if (fd == NOT_BATCHED) {
-                flush(out)
-                out.add(SelectionResult(execute(sub), sub.userData))
-                continue
-            }
-            // A kernel submission runs its SQEs in any order: an SQE that orders after one in the run starts the next.
-            if (run.size == NODE_BATCH_LIMIT || run.any { dependsOn(sub, it) }) flush(out)
-            runFds[run.size] = fd
-            run.add(sub)
+        submissions.forEach { sub ->
+            do { nextId = if (nextId == Int.MAX_VALUE) 1 else nextId + 1 }
+            while (nextId in active || pending.any { it.id == nextId })
+            pending.add(Request(sub, nextId))
         }
-        flush(out)
-        return out
+        dispatch()
+        return reapCompletions()
     }
 
-    /** [sub]'s OS descriptor when it passes execute's checks unchanged and a kernel batch can carry it, else [NOT_BATCHED]. */
+    private fun dispatch() {
+        if (dispatching) return
+        dispatching = true
+        try {
+            var repeat: Boolean
+            do {
+                var index = 0
+                while (index < pending.size) {
+                    val request = pending[index]
+                    val sub = request.submission
+                    if (active.values.any { dependsOn(sub, it.submission) } ||
+                        (0 until index).any { dependsOn(sub, pending[it].submission) }) { index++; continue }
+                    val fd = batchFd(sub)
+                    if (fd == NOT_BATCHED) {
+                        flush()
+                        // The synchronous compatibility ABI never shares a ring with outstanding effects.
+                        if (active.isNotEmpty()) { index++; continue }
+                        pending.removeAt(index)
+                        completed.add(SelectionResult(execute(sub), sub.userData))
+                    } else {
+                        pending.removeAt(index)
+                        runFds[run.size] = fd
+                        run.add(request)
+                        active[request.id] = request
+                        if (run.size == NODE_BATCH_LIMIT) flush()
+                    }
+                }
+                repeat = flush()
+            } while (repeat && pending.isNotEmpty())
+        } finally { dispatching = false }
+    }
+
+    /** BigInt-only offsets stay on execute; no narrowing a file position into Float64. */
     private fun batchFd(sub: UringSubmission): Int {
-        if (closed || sub.flags != 0 || !batched[sub.opcode.ordinal] || sub.addr != 0L || sub.operationFlags != 0)
-            return NOT_BATCHED
+        if (closed || sub.flags != 0 || !batched[sub.opcode.ordinal] || sub.addr != 0L ||
+            sub.operationFlags != (if (sub.opcode == UringOp.OPENAT) 438 else 0) ||
+            sub.offset !in -9007199254740991L..9007199254740991L) return NOT_BATCHED
+        if (sub.opcode == UringOp.OPENAT) {
+            if (sub.fd != -100 || sub.buffer == null || sub.len <= 0 || sub.len > sub.buffer.remaining()) return NOT_BATCHED
+            return sub.fd
+        }
         val descriptor = JsFileTable.descriptor(sub.fd)
         if (descriptor != null && descriptor.module == null) return NOT_BATCHED
         if (sub.opcode == UringOp.NOP) return descriptor?.fd ?: sub.fd
@@ -441,44 +506,103 @@ private class NodeNativeChannelBackend(private val module: dynamic, private val 
         return descriptor.fd
     }
 
-    /** Runs the gathered run as one kernel submission, appending one result per SQE in order. */
-    private fun flush(out: MutableList<SelectionResult>) {
+    /** Admit many independent SQEs and retain all Kotlin buffers through their terminal CQEs. */
+    private fun flush(): Boolean {
         val count = run.size
-        if (count == 0) return
+        if (count == 0) return false
         for (index in 0 until count) {
-            val sub = run[index]
+            val request = run[index]
+            val sub = request.submission
             val field = index * NODE_BATCH_FIELDS
-            val buffer = if (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE) sub.buffer else null
+            val buffer = sub.buffer
             control[field] = sub.opcode.code.toDouble()
             control[field + 1] = runFds[index].toDouble()
             control[field + 2] = if (buffer == null) 0.0 else (buffer.arrayOffset() + buffer.position()).toDouble()
             control[field + 3] = sub.len.toDouble()
             control[field + 4] = sub.offset.toDouble()
+            control[field + 5] = request.id.toDouble()
             arrays[index] = buffer?.array()
         }
-        val refused = module.executeBatch(handle, count, control, arrays, results) as Int
+        val refused = module.submitBatch(handle, count, control, arrays, results) as Int
+        var rejected = false
         for (index in 0 until count) {
-            val sub = run[index]
+            val request = run[index]
             arrays[index] = null
             val result = if (refused < 0) refused else results[index]
-            val buffer = sub.buffer
-            if (result > 0 && buffer != null && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE))
-                buffer.position(buffer.position() + result)
-            out.add(SelectionResult(result, sub.userData))
+            if (result < 0) {
+                active.remove(request.id)
+                completed.add(SelectionResult(result, request.submission.userData))
+                rejected = true
+            }
         }
         run.clear()
+        return rejected
+    }
+
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> {
+        val cqes: dynamic = module.reapCompletions(handle, if (completed.isEmpty() && active.isNotEmpty()) minComplete else 0)
+        val length = cqes.length as Int
+        var index = 0
+        while (index < length) {
+            val id = cqes[index++] as Int
+            val result = cqes[index++] as Int
+            val request = checkNotNull(active.remove(id)) { "Unknown Node uring completion: $id" }
+            val sub = request.submission
+            val res = when {
+                result >= 0 && sub.opcode == UringOp.OPENAT ->
+                    JsFileTable.register(result, module, handle).also { owned.add(it) }
+                sub.opcode == UringOp.CLOSE -> {
+                    owned.remove(sub.fd)
+                    JsFileTable.remove(sub.fd)
+                    result
+                }
+                else -> result.also {
+                    if (it > 0 && (sub.opcode == UringOp.READ || sub.opcode == UringOp.WRITE))
+                        sub.buffer!!.position(sub.buffer.position() + it)
+                }
+            }
+            completed.add(SelectionResult(res, sub.userData))
+        }
+        dispatch()
+        return completed.toMutableList().also { completed.clear() }
+    }
+
+    override suspend fun awaitCompletions() {
+        if (completed.isNotEmpty()) return
+        suspendCancellableCoroutine<Unit> { continuation ->
+            val promise: dynamic = module.awaitCompletions(handle)
+            continuation.invokeOnCancellation { module.cancelWait(handle) }
+            promise.then({ _: dynamic ->
+                if (continuation.isActive) continuation.resume(Unit)
+                null
+            }, { failure: dynamic ->
+                if (continuation.isActive) continuation.resumeWithException(IllegalStateException(failure.toString() as String))
+                null
+            })
+        }
+    }
+
+    override fun cancelPending() {
+        pending.forEach { completed.add(SelectionResult(-125, it.submission.userData)) }
+        pending.clear()
+        module.cancelPending(handle)
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
-        val settled = submitBatch(List(submissions.size) { submissions[it] })
-        return settled.size j { UringCompletion(settled[it].userData, settled[it].res, 0) }
+        val results = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
+        while (results.size < submissions.size) {
+            awaitCompletions()
+            results.addAll(reapCompletions())
+        }
+        return results.size j { UringCompletion(results[it].userData, results[it].res, 0) }
     }
     override fun close() {
         if (closed) return
+        check(pending.isEmpty() && active.isEmpty()) { "Node uring effects must drain before close" }
         closed = true
         owned.forEach { JsFileTable.close(it) }
         owned.clear()
         emulated.close()
-        module.close(handle)
+        check((module.close(handle) as? Int ?: 0) >= 0) { "Node uring close refused" }
     }
 }

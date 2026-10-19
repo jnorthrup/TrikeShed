@@ -54,7 +54,11 @@ object CanonicalCbor {
     @Suppress("UNCHECKED_CAST")
     fun decodeJobCommand(bytes: ByteArray): JobCommand {
         val serializer = JobCommand.serializer() as kotlinx.serialization.KSerializer<JobCommand>
-        return borg.trikeshed.parse.confix.ConfixFormat.decodeFromByteArray(serializer, bytes)
+        val command = borg.trikeshed.parse.confix.ConfixFormat.decodeFromByteArray(serializer, bytes)
+        if (command is JobCommand.State) require(encode(command).contentEquals(bytes)) {
+            "State command must retain its canonical typed fields"
+        }
+        return command
     }
 
     /** Canonical encode any string. */
@@ -125,11 +129,13 @@ object CanonicalCbor {
 val JobCommand.operationName: String
     get() = when (this) {
         is JobCommand.Submit -> "submit"
+        is JobCommand.Update -> "update"
         is JobCommand.Start -> "start"
         is JobCommand.Complete -> "complete"
         is JobCommand.Fail -> "fail"
         is JobCommand.Retry -> "retry"
         is JobCommand.Progress -> "progress"
+        is JobCommand.State -> "state"
         is JobCommand.Block -> "block"
         is JobCommand.Cancel -> "cancel"
         is JobCommand.Move -> "move"

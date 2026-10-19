@@ -17,6 +17,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.RepoOccupancy
+import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.util.oroboros.element.WorktreeReconcileElement
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +43,8 @@ import java.util.concurrent.ConcurrentHashMap
  *   GET /api/graal/vitals         [JvmVitals.snapshot] + pointcut route summary
  *   GET /api/graal/pointcuts      every `pointcut/…` document as a route row
  *   GET /api/graal/map            the whole store as compact `[id, bytes]` rows — the RTS terrain
- *   POST /api/graal/sync          reconcile the worktree and await its document/index updates
+ *   POST /api/graal/sync          reconcile the worktree and the daemon's boot-absorbed planes,
+ *                                 and await their document/index updates
  *   GET /api/graal/doc?id=…       selected document detail sanitized for the Graal inspector
  *   GET /api/graal/content?id=…   selected attachment bytes through the same project-db resolver
  *   GET /api/graal/dag[?id=…]     the DAG arcs the tree cannot show: shared-blob cross-links and
@@ -87,6 +89,13 @@ class GraalWire(
      * bare-wire hosts) means the route 503s.
      */
     private val memoryStore: borg.trikeshed.memory.MemoryStore? = null,
+    /**
+     * Boot-absorbed file planes the panel sync reconciles beside the primary worktree — e.g.
+     * the hermes home corpus, whose boot reconcile otherwise never runs again while the daemon
+     * lives, so filenodes missing from disk stay in the terrain until a restart. Each lane
+     * returns its snapshot and the response sums the counts; a lane that fails fails the sync.
+     */
+    private val planeSyncs: List<suspend () -> WorktreeCouchGateway.Snapshot> = emptyList(),
 ) {
     private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
     private val classEvents = MutableSharedFlow<JvmVitals.VitalEvent>(extraBufferCapacity = 256)
@@ -142,11 +151,12 @@ class GraalWire(
                     ?: return json(503, mapOf("error" to "worktree_sync_unavailable"))
                 try {
                     val snapshot = worktree.sync()
+                    val planes = planeSyncs.map { it() }
                     json(200, mapOf(
-                        "paths" to snapshot.paths.size,
-                        "deleted" to snapshot.deletedPaths.size,
-                        "skippedDirs" to snapshot.skippedDirs,
-                        "skippedFiles" to snapshot.skippedFiles,
+                        "paths" to snapshot.paths.size + planes.sumOf { it.paths.size },
+                        "deleted" to snapshot.deletedPaths.size + planes.sumOf { it.deletedPaths.size },
+                        "skippedDirs" to snapshot.skippedDirs + planes.flatMap { it.skippedDirs },
+                        "skippedFiles" to snapshot.skippedFiles + planes.flatMap { it.skippedFiles },
                     ))
                 } catch (cancelled: CancellationException) {
                     throw cancelled

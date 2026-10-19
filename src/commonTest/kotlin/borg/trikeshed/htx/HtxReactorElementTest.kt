@@ -140,6 +140,63 @@ class HtxReactorElementTest {
     }
 
     @Test
+    fun nonzeroChunkSizeEndingInZeroDoesNotCompleteTheResponse() = runTest {
+        val body = "{\"ok\":true}     "
+        val operations = FakeChannelOperations(
+            listOf(listOf(
+                "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n10\r\n".encodeToByteArray(),
+                "$body\r\n0\r\n".encodeToByteArray(),
+                "\r\n".encodeToByteArray(),
+            )),
+            endOfStreamResult = -11,
+        )
+        val element = openHtxReactorElement(channelOperations = operations)
+        try {
+            val result = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+            assertEquals(HtxExchangeLifecycle.RESPONDED, result.state.lifecycle)
+            assertEquals(body, result.state.response?.body?.asString())
+            assertEquals(0, operations.remainingReads(0))
+        } finally { element.drain() }
+    }
+
+    @Test
+    fun terminalMarkerInsideChunkDataDoesNotCompleteTheResponse() = runTest {
+        val operations = FakeChannelOperations(
+            listOf(listOf(
+                "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n7\r\na0\r\n\r\n".encodeToByteArray(),
+                "b\r\n0\r\n\r\n".encodeToByteArray(),
+            )),
+            endOfStreamResult = -11,
+        )
+        val element = openHtxReactorElement(channelOperations = operations)
+        try {
+            val result = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+            assertEquals(HtxExchangeLifecycle.RESPONDED, result.state.lifecycle)
+            assertEquals("a0\r\n\r\nb", result.state.response?.body?.asString())
+            assertEquals(0, operations.remainingReads(0))
+        } finally { element.drain() }
+    }
+
+    @Test
+    fun chunkTrailersRequireTheirFinalEmptyLineButNotConnectionClosure() = runTest {
+        val operations = FakeChannelOperations(
+            listOf(listOf(
+                "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5;name=value\r\nhello\r\n0\r\n".encodeToByteArray(),
+                "Checksum: ok\r\n".encodeToByteArray(),
+                "\r\n".encodeToByteArray(),
+            )),
+            endOfStreamResult = -11,
+        )
+        val element = openHtxReactorElement(channelOperations = operations)
+        try {
+            val result = element.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/"))
+            assertEquals(HtxExchangeLifecycle.RESPONDED, result.state.lifecycle)
+            assertEquals("hello", result.state.response?.body?.asString())
+            assertEquals(0, operations.remainingReads(0))
+        } finally { element.drain() }
+    }
+
+    @Test
     fun connectFailureClosesSocketAndRingBeforeReturningFailure() = runTest {
         val operations = FakeChannelOperations(emptyList(), connectResult = -111)
         val element = openHtxReactorElement(channelOperations = operations)
@@ -346,6 +403,8 @@ private class FakeChannelOperations(
         }
         return ByteArray(bytes.size) { bytes[it] }.decodeToString()
     }
+
+    fun remainingReads(connectionIndex: Int): Int = readsByFd[connectionOrder[connectionIndex]].orEmpty().size
 
     private fun readChunk(fd: Int): ByteArray? {
         val chunks = readsByFd[fd] ?: return null

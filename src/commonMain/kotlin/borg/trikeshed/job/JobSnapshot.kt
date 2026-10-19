@@ -1,10 +1,13 @@
 package borg.trikeshed.job
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * JobSnapshot — committed state of a job.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class JobSnapshot(
     val jobId: JobId,
@@ -15,6 +18,8 @@ data class JobSnapshot(
     val attemptCount: Int = 0,
     val parentJobId: JobId? = null,
     val attemptId: String = "",
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val stateCid: String? = null,
 ) {
     companion object {
         /**

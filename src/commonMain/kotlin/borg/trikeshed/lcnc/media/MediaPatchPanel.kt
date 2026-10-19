@@ -86,6 +86,7 @@ class XtermMediaPatchPanel(
 ) {
     val terminal = XtermTerminal(descriptor.columns, descriptor.rows, scrollbackLimit)
     private var sequence = 0L
+    val signalSequence: Long get() = sequence
     private val history = ArrayDeque<LcncUserSignal>()
 
     init {

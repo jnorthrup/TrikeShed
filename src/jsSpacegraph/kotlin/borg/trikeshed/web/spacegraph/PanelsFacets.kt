@@ -1,11 +1,13 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.parse.confix.Syntax
 import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
 /** Views of the existing canvas and daemon. Opening a facet never executes a graph. */
 class PanelsFacets(val panels: Panels) {
+    internal fun launchJs(block: suspend () -> Unit) = panels.launchJs(block)
     var drawer: dynamic = null
     var body: dynamic = null
     var revision = 0
@@ -21,10 +23,13 @@ class PanelsFacets(val panels: Panels) {
     var storedId: String? = null
     var storedRev: String? = null
     var contentCid: String? = null
+    var contentSyntax = Syntax.JSON
     var fileTreeFacet = false
     var storageOffset = 0
     var storage: dynamic = null
     var compressionDictionary = ""
+    var evidenceNode: String? = null
+    var selectedReceipt: dynamic = null
 
     fun install() {
         val anchor = byId("rdfBtn") ?: return
@@ -43,6 +48,7 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun toggle() {
+        if (panels.page.closing) return
         if (drawer != null) { close(); return }
         val d = document.createElement("section").asDynamic(); drawer = d
         d.setAttribute("aria-label", "Workspace facets")
@@ -59,8 +65,17 @@ class PanelsFacets(val panels: Panels) {
 
     fun close() { revision++; drawer?.remove(); drawer = null; body = null }
 
+    /** Select an evidence filter, not a run, binding assertion or debugger command. */
+    fun inspectNode(id: String) {
+        if (panels.page.closing) return
+        evidenceNode = id
+        if (drawer == null) { tab = "execution"; toggle() } else show("execution")
+    }
+
     /** Switch only the inspection source, never the authored canvas or run state. */
-    fun inspectContent(cid: String, selectedPath: Array<out Any> = emptyArray()) {
+    fun inspectContent(cid: String, selectedPath: Array<out Any> = emptyArray(), syntax: Syntax = Syntax.JSON) {
+        require(syntax == Syntax.JSON || syntax == Syntax.CBOR) { "Unsupported retained syntax" }
+        contentSyntax = syntax
         contentCid = cid; storedId = null; storedRev = null; fileTreeFacet = false; storageOffset = 0
         path = JSON.stringify(selectedPath); offset = 0; cursorAxes = "[[2]]"
         changed()
@@ -68,9 +83,14 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun show(selected: String) {
+        if (panels.page.closing) return
         tab = selected
         val serial = ++revision
-        drawer.querySelector("[data-state]").textContent = "Read-only inspection · no graph execution"
+        drawer.querySelector("[data-state]").textContent = when (selected) {
+            "cases" -> "Explicit case commands · opening this view performs no case command"
+            "workgroups" -> "Construction declaration and stored execution · opening does not save or run"
+            else -> "Read-only inspection · no graph execution"
+        }
         body.textContent = "Reading workspace…"
         launchJs {
             try {
@@ -95,6 +115,8 @@ class PanelsFacets(val panels: Panels) {
                     nav.appendChild(b); on(b, "click", { offset = 0; show(str(facet.id)) })
                 }
                 when (selected) {
+                    "cases" -> panels.cases.render(catalog)
+                    "workgroups" -> panels.workgroups.show(serial)
                     "language" -> languages(catalog)
                     "curation" -> recipes(serial)
                     else -> inspect(serial, selected)
@@ -122,6 +144,7 @@ class PanelsFacets(val panels: Panels) {
             it.name = str(panels.panelName().value).ifBlank { "canvas" }
             if (contentCid != null && selected == "confix") it.source = objOf { s ->
                 s.kind = "cas"; s.cid = contentCid
+                if (contentSyntax != Syntax.JSON) s.syntax = contentSyntax.name
             } else if (storedId != null && selected == "confix") it.source = objOf { s ->
                 s.kind = "couch"; s.id = storedId; s.rev = storedRev
                 if (fileTreeFacet) s.facet = "file-tree"
@@ -137,13 +160,18 @@ class PanelsFacets(val panels: Panels) {
         if (serial != revision || drawer == null) return
         if (truthy(r.error)) error(str(r.error))
         drawer.querySelector("[data-state]").textContent = when {
-            r.source?.kind == "cas" -> "Retained JSON · " + str(r.source.cid)
+            r.source?.kind == "cas" -> "Retained " + str(r.confix.syntax) + " · " + str(r.source.cid)
             r.source != null -> "Stored Couch revision · " + str(r.source.rev)
             else -> "Inspected this canvas"
         } + " · blackboard revision " + str(r.blackboardRevision)
         body.innerHTML = ""
         if (selected == "execution") {
             text("Program identity: " + str(r.programCid))
+            evidenceNode?.let { id ->
+                text("Node ID filter: $id. IDs alone do not establish a definition match; compare the frozen program below. " +
+                    "Repeated calls remain separate by scope path, parent and iteration.")
+                button("Show all node evidence") { evidenceNode = null; show("execution") }
+            }
             nodeEvidence()
             text("Bindings identify dispatch owners, not readiness. Inputs and named scope bodies are checked when run.")
             for (binding in arr(r.bindings)) text(str(binding.id) + " · " + str(binding.type) + " · " + str(binding.binding) +
@@ -161,8 +189,9 @@ class PanelsFacets(val panels: Panels) {
         sources()
         if (r.source?.kind == "cas") {
             require(r.source.cid == contentCid && r.confix?.cid == contentCid) { "Retained inspection identity mismatch" }
-            text("Exact retained JSON bytes, not live state. Missing paths and omission markers are not empty outputs or proof of execution. Inspection leaves the canvas unchanged.")
-            try { link("Pinned Confix link (content and path)", ConfixNavigation.href(requireNotNull(contentCid), path)) }
+            require(r.confix.syntax == contentSyntax.name) { "Retained inspection syntax mismatch" }
+            text("Exact retained ${contentSyntax.name} bytes, not live state. Missing paths and omission markers are not empty outputs or proof of execution. Inspection leaves the canvas unchanged.")
+            try { link("Pinned Confix link (content and path)", ConfixNavigation.href(requireNotNull(contentCid), path, contentSyntax)) }
             catch (_: IllegalArgumentException) { text("Selected path exceeds the link budget; inspection remains available.") }
             if (truthy(panels.graph.controls?.inspectionOnly))
                 link("Open Panels editor (saved scratch)", "/panels")
@@ -255,6 +284,7 @@ class PanelsFacets(val panels: Panels) {
             select.appendChild(option)
         }
         body.appendChild(select)
+        evidenceNode?.let { id -> if (nodes.any { str(it.id) == id }) select.value = id }
         val output = document.createElement("section").asDynamic()
         output.setAttribute("aria-label", "Node execution observation"); body.appendChild(output)
         fun render() {
@@ -335,7 +365,7 @@ class PanelsFacets(val panels: Panels) {
     }
 
     fun sources() {
-        text("Source · canvas, retained JSON or indexed Couch revision")
+        text("Source · canvas, retained content or indexed Couch revision")
         val select = document.createElement("select").asDynamic()
         select.setAttribute("aria-label", "Confix source")
         select.style.cssText = "max-width:100%;font:inherit"
@@ -353,7 +383,7 @@ class PanelsFacets(val panels: Panels) {
             option("pinned", storedId + " · " + storedRev + " (another page)"); selected = "pinned"
         }
         if (contentCid != null) {
-            option("content", "Retained JSON · " + contentCid); selected = "content"
+            option("content", "Retained ${contentSyntax.name} · " + contentCid); selected = "content"
         }
         select.value = selected; body.appendChild(select)
         on(select, "change", {
@@ -368,23 +398,26 @@ class PanelsFacets(val panels: Panels) {
             }
         })
         val content = document.createElement("input").asDynamic()
-        content.setAttribute("aria-label", "Retained JSON content ID")
-        content.placeholder = "sha256:… from a run receipt or frozen program"
+        content.setAttribute("aria-label", "Retained content ID")
+        content.placeholder = "sha256:… from a receipt or frozen program"
         content.value = contentCid ?: ""
         content.style.cssText = "display:block;width:100%;box-sizing:border-box;font:inherit;margin-top:8px"
         body.appendChild(content)
-        button("Inspect retained JSON") {
+        for (syntax in listOf(Syntax.JSON, Syntax.CBOR)) button("Inspect retained ${syntax.name}") {
             val cid = str(content.value).trim()
-            if (Regex("sha256:[0-9a-f]{64}").matches(cid)) inspectContent(cid)
+            if (Regex("sha256:[0-9a-f]{64}").matches(cid)) inspectContent(cid, syntax = syntax)
             else panels.status("Use a complete sha256 content ID")
         }
         if (!truthy(storage?.available)) {
             text("Dense Couch indexing is unavailable on this host." + if (truthy(storage?.error)) "\n" + str(storage.error) else "")
             return
         }
+        val primary = str(storage.role) == "primary"
         text(str(storage.indexedRevisions) + " indexed revisions / " + str(storage.sourceRevisions) +
-            " Couch revisions. Indexing writes a separate dense projection; it does not replace Couch, run a graph, or change checkpoints.")
-        text("Zstd leaf compression · blank dictionary uses the portable codec. This choice applies only to the next batch; historical files retain their own dictionary identities.")
+            if (primary) " Couch revisions. Primary dense storage: every Couch write publishes its geometry. Inspection shares that store; no import is needed."
+            else " Couch revisions. Indexing writes a separate dense projection; it does not replace Couch, run a graph, or change checkpoints.")
+        text(if (primary) "Primary compression is configured by the storage owner. The dictionary selection below applies only to explicit file-tree metadata indexing."
+            else "Zstd leaf compression · blank dictionary uses the portable codec. This choice applies only to the next batch; historical files retain their own dictionary identities.")
         val dictionary = document.createElement("input").asDynamic()
         dictionary.setAttribute("aria-label", "Zstd dictionary CID")
         dictionary.placeholder = "Optional sha256:… dictionary already in daemon CAS"
@@ -398,6 +431,7 @@ class PanelsFacets(val panels: Panels) {
         else text("Publish trained or raw-content dictionary bytes through the existing Couch CAS route. Retain the blob for the lifetime of its indexed revisions.")
         if (storageOffset > 0) button("Newer revisions") { storageOffset = maxOf(0, storageOffset - 32); show("confix") }
         if (storage.next != null) button("Older revisions") { storageOffset = num(storage.next).toInt(); show("confix") }
+        if (primary) return
         button("Index next 32 Couch revisions") {
             val selectedDictionary = compressionDictionary.trim()
             val serial = ++revision

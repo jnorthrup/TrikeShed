@@ -120,6 +120,8 @@ class LcncWorkspaceCurationTest {
                 assertEquals(true, simulation["hypothetical"])
                 val firings = (simulation["firings"] as List<*>).map { it as Map<*, *> }
                 assertEquals(6, firings.size, "Both conflicting source claims are evaluated for each of three hypothetical parties")
+                assertEquals(6, firings.map { it["firingCid"] }.distinct().size,
+                    "Retained Stanford rule applications distinguish each source rule and hypothetical party")
                 assertTrue(firings.any { (it["supportNegative"] as Long) > 0 })
                 assertTrue(firings.any { (it["supportPositive"] as Long) > 0 })
                 assertTrue(firings.all { it["provenanceCid"] == record.source.extractedTextCid.value })
@@ -311,14 +313,14 @@ class LcncWorkspaceCurationTest {
                 else if (rulesPageUi) simulation.copy(nodes = simulation.nodes α { node ->
                     if (node.id == "sheet") node.copy(params = node.params + ("limit" to "1")) else node
                 }) else simulation
-                retainedSimulationBrowser(ctx, curator, binding, browserProgram) {
+                retainedSimulationBrowser(ctx, curator, binding, browserProgram, observations = {
                     mapOf("modelRequests" to seatCalls.size - spent, "curationRequests" to modelCalls - 4,
                         "nlpRequests" to nlpCalls - parsed, "taskChanges" to board.lastSequence - sequence,
                         "runs" to LcncRunHead.rows(ctx.blackboard.snapshot().values).map { it.runId },
                         "requests" to seatCalls.drop(spent).map {
                         mapOf("seat" to it.seat, "prompt" to it.prompt)
                     })
-                }
+                })
                 assertEquals(if (deliberationUi) 3 else 0, seatCalls.size - spent)
                 assertEquals(4, modelCalls, "Browser simulation must not re-enter curation")
                 assertEquals(parsed, nlpCalls)

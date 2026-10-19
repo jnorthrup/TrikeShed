@@ -34,6 +34,7 @@ fun Panels.loadFailure(data: dynamic): String? {
 
 /** Persistent refusal: background status messages cannot erase load evidence. */
 fun Panels.refuseLoad(reason: String, retry: (() -> Unit)? = null): Boolean {
+    if (page.closing) return false
     val message = "Panel not loaded: $reason. Current canvas and saved scratch are unchanged."
     status(message)
     byId("panelLoadRefusal")?.remove()

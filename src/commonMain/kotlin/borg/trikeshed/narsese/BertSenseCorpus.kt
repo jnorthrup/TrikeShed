@@ -5,14 +5,15 @@ import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 
 /** Read existing judgments through the filesystem SPI; inference never writes to these tables. */
-class BertSenseCorpus(private val files: FileOperations, private val books: String) {
+class BertSenseCorpus(private val files: FileOperations, private val books: String,
+                      private val judgmentSuffix: String = "jev") {
     fun labels(names: Series<String>, lemmas: Set<String>? = null): Series<BertSenseLabel> {
         val labels = LinkedHashMap<Pair<String, String>, BertSenseLabel>()
         for (name in names.view) {
             require(name.matches(Regex("[A-Za-z0-9._-]+")) && name != "." && name != "..")
-            val history = files.resolvePath(books, "$name.jev.history")
+            val history = files.resolvePath(books, "$name.$judgmentSuffix.history")
             val directories = files.listDir(history).sorted().map { files.resolvePath(history, it) } +
-                files.resolvePath(books, "$name.jev")
+                files.resolvePath(books, "$name.$judgmentSuffix")
             for (directory in directories) for (file in files.listDir(directory)
                 .filter { it.matches(Regex("[0-9]+\\.json")) }.sortedBy { it.removeSuffix(".json").toInt() }) {
                 val table = files.resolvePath(directory, file)
@@ -37,11 +38,12 @@ class BertSenseCorpus(private val files: FileOperations, private val books: Stri
     }
 
     /** Retain prior readings and judgments by rename, without copying a corpus or deleting it. */
-    fun retain(name: String, revision: String): Series<String> {
+    fun retain(name: String, revision: String, judgmentSuffixes: Series<String> = s_[judgmentSuffix]): Series<String> {
         require(name.matches(Regex("[A-Za-z0-9._-]+")) && name != "." && name != "..")
         require(revision.matches(Regex("[A-Za-z0-9-]+")))
         val retained = ArrayList<String>()
-        for (suffix in listOf("readings", "jev")) {
+        for (suffix in (s_["readings"] + judgmentSuffixes).view) {
+            require(suffix.matches(Regex("[A-Za-z0-9._-]+")) && suffix != "." && suffix != "..")
             val source = files.resolvePath(books, "$name.$suffix")
             if (!files.exists(source)) continue
             val history = files.resolvePath(books, "$name.$suffix.history")

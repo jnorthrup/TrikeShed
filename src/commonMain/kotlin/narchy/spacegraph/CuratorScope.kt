@@ -11,8 +11,9 @@ import kotlin.math.*
 
 /**
  * The curator scope as a law library in perspective. Each project is a shelf unit with its ladder, the
- * units stepping back in depth; each book stands on its shelf as a circle packed with its sections, each
- * section a circle of its statements; the shared SUMO concept pool is its own unit, a circle of class
+ * units stepping back in depth; each book stands on its shelf as a book, and close up is a circle packed with
+ * its sections (each a circle of its statements) and the documents it cites, those filed in its `<book>.<x>/`
+ * folder, so a document's references stand inside it rather than beside it; the shared SUMO concept pool is its own unit, a circle of class
  * circles holding concept stars sized by how much of the text rests on them. A book opens toward the
  * camera and fans its sections out as pages carrying what curation read; it closes back onto its shelf.
  * Relations are thin bundles routed through the hierarchy (Holten's hierarchical edge bundling): between
@@ -159,8 +160,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 else -> lastBegin[n] = at
             }
             // A reading lights the circles holding it, so a deep production shows up at every level of detail.
-            var p = parents[n]; var guard = 0
-            while (p >= 0 && guard++ < 64) { if (lastBegin[p] < at) lastBegin[p] = at; p = parents[p] }
+            var p = holder(n); var guard = 0
+            while (p >= 0 && guard++ < 64) { if (lastBegin[p] < at) lastBegin[p] = at; p = holder(p) }
         }
         cursor = (value["head"] as? Number)?.toLong() ?: cursor
         dropped += (value["dropped"] as? Number)?.toLong() ?: 0L
@@ -211,7 +212,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         panelValue = null
         trailHead = -1L
         keys.clear(); keyIndex.clear(); types.clear(); lastNote.clear(); linkLabel.clear(); conflicted.clear(); bundles.clear(); statedIn.clear()
-        names = SegmentIndex(); target = -1
+        names = SegmentIndex(); target = -1; up = IntArray(0)
         readings.clear(); asked.clear(); pageLines.clear()
         for (c in listOf(born, lastBegin, lastEnd, activeSince, spent, linkAt)) c.reset()
         for (c in listOf(parents, runs, lastKind, forces, degree, linkFrom, linkTo)) c.reset()
@@ -233,7 +234,10 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     /** The node the camera is easing onto after [goto]; -1 when none. */
     private var target = -1
 
-    private fun name(i: Int): String = if (isBook(i)) bookName(i) else keys[i].substringAfterLast('/')
+    private fun name(i: Int): String = if (isBook(i)) bookName(i).substringAfterLast('/') else keys[i].substringAfterLast('/')
+
+    /** The circle holding [i]: its ring parent, or for a book filed in another book's folder, that book. */
+    private fun holder(i: Int) = if (i < up.size) up[i] else parents[i]
 
     /** Up to [limit] named nodes whose name starts with [prefix] (case folded), in name order. */
     fun find(prefix: String, limit: Int = 60): List<Map<String, Any?>> {
@@ -249,7 +253,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
 
     /** A node as a row of the finding aids: ordinal, name, kind, where it stands, and how much rests on it. */
     private fun entry(i: Int): Map<String, Any?> = mapOf("node" to i, "name" to name(i), "type" to types[i],
-        "in" to parents[i].takeIf { it >= 0 && types[it] != "program" }?.let(::name), "count" to if (types[i] == "concept") degree[i] else kidCount(i),
+        "in" to holder(i).takeIf { it >= 0 && types[it] != "program" }?.let(::name), "count" to if (types[i] == "concept") degree[i] else kidCount(i),
         "note" to lastNote[i])
 
     /**
@@ -337,6 +341,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     // ── layout: circles packed bottom-up, then top circles stood on their units' shelves ──
     /** Per node: its container circle ([TOP] for a book or the pool, [UNPLACED] outside the library). */
     private var disc = IntArray(0)
+    /** Per node: the circle holding it ([holder]): its ring parent, or the book whose folder (`<book>.<x>/`) files it. */
+    private var up = IntArray(0)
     /** Per node: its center, relative to its container's (absolute for a top circle), and its radius. */
     private var ox = DoubleArray(0); private var oy = DoubleArray(0); private var oz = DoubleArray(0); private var rad = DoubleArray(0)
     private var kidStart = IntArray(1); private var kidList = IntArray(0)
@@ -360,11 +366,16 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     private fun layout() {
         panelValue = null
         val n = keys.size
+        // A book filed in another book's folder (`<book>.<x>/…`) is a document that book cites: it stands inside it.
+        val bookAt = HashMap<String, Int>()
+        for (i in 0 until n) if (isBook(i)) bookAt[bookName(i)] = i
+        up = IntArray(n) { parents[it] }
+        for ((name, i) in bookAt) bookAt[name.substringBeforeLast('/', "").substringBeforeLast('.')]?.let { up[i] = it }
         kidStart = IntArray(n + 1)
-        for (i in 0 until n) { val p = parents[i]; if (p >= 0) kidStart[p + 1]++ }
+        for (i in 0 until n) { val p = up[i]; if (p >= 0) kidStart[p + 1]++ }
         for (i in 0 until n) kidStart[i + 1] += kidStart[i]
         kidList = IntArray(kidStart[n]); val fill = kidStart.copyOf()
-        for (i in 0 until n) { val p = parents[i]; if (p >= 0) kidList[fill[p]++] = i }
+        for (i in 0 until n) { val p = up[i]; if (p >= 0) kidList[fill[p]++] = i }
         disc = IntArray(n) { UNPLACED }; meanKid = DoubleArray(n); ox = DoubleArray(n); oy = DoubleArray(n); oz = DoubleArray(n); rad = DoubleArray(n)
         /** Packs [members] (radii already in [rad]) inside [container], centers relative to it. */
         fun pack(container: Int, members: IntArray) {
@@ -378,24 +389,25 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         fun kids(i: Int) = IntArray(kidCount(i)) { kidList[kidStart[i] + it] }
         val tops = ArrayList<Int>()
         maxConcept = 1
-        for (i in 0 until n) {
-            if (isBook(i)) {
-                val sections = kids(i).filter { types[it] == "book.section" }.toIntArray()
-                for (s in sections) {
-                    val st = kids(s)
-                    for (k in st) rad[k] = STAR * sqrt(1.0 + degree[k])
-                    pack(s, st)
-                }
-                pack(i, sections); tops.add(i)
-            } else if (isPool(i)) {
-                val classes = kids(i).filter { types[it] == "scope" }.toIntArray()
-                for (c in classes) {
-                    val atoms = kids(c)
-                    for (a in atoms) { rad[a] = STAR * sqrt(1.0 + degree[a]); maxConcept = max(maxConcept, degree[a]) }
-                    pack(c, atoms)
-                }
-                pack(i, classes); tops.add(i)
+        // Deepest first: a cited document is packed before the book that cites it, and packs into it beside its sections.
+        for (i in (0 until n).filter(::isBook).sortedByDescending { b -> bookName(b).count { it == '/' } }) {
+            val sections = kids(i).filter { types[it] == "book.section" }.toIntArray()
+            for (s in sections) {
+                val st = kids(s)
+                for (k in st) rad[k] = STAR * sqrt(1.0 + degree[k])
+                pack(s, st)
             }
+            pack(i, sections + kids(i).filter(::isBook).toIntArray())
+            if (up[i] == parents[i]) tops.add(i)
+        }
+        for (i in 0 until n) if (isPool(i)) {
+            val classes = kids(i).filter { types[it] == "scope" }.toIntArray()
+            for (c in classes) {
+                val atoms = kids(c)
+                for (a in atoms) { rad[a] = STAR * sqrt(1.0 + degree[a]); maxConcept = max(maxConcept, degree[a]) }
+                pack(c, atoms)
+            }
+            pack(i, classes); tops.add(i)
         }
         for (t in tops) disc[t] = TOP
         tops.filter(::isBook).sortedBy { rad[it] }.let { m -> if (m.isNotEmpty()) { refR = rad[m[m.size / 2]]; refKid = meanKid[m[m.size / 2]] } }
@@ -811,7 +823,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 items.add(p.sumOf { it.z } / 4 j DrawItem.Path("shelf-$k-$si-$fi", s_[PathPart.Move(p[0]), PathPart.Line(p[1]), PathPart.Line(p[2]), PathPart.Line(p[3]), PathPart.Close],
                     fill = Rgba((wood.red * shade).roundToInt(), (wood.green * shade).roundToInt(), (wood.blue * shade).roundToInt())))
             }
-            val title = if (u.name == "concepts") "SUMO concepts · ${u.discs.sumOf { kidCount(it) }} classes" else "${u.name} · ${u.discs.size} books"
+            val title = if (u.name == "concepts") "SUMO concepts · ${u.discs.sumOf { kidCount(it) }} classes" else "${u.name} · ${u.discs.size} book" + if (u.discs.size == 1) "" else "s"
             val tl = cam.project(Vec3(u.x0 + ladder, u.h + u.board * 4, u.z + u.d), viewport); val tr = cam.project(Vec3(u.x1, u.h, u.z + u.d), viewport)
             if (tl != null && tr != null) {
                 val size = ((tr.x - tl.x) / 18).coerceIn(10.0, 22.0)
@@ -866,6 +878,46 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
             val base = when { book -> Rgba(96, 72, 44); pool -> Rgba(34, 52, 78); section -> Rgba(70, 60, 44); else -> Rgba(40, 62, 92) }
             val lit = mix(base, Rgba(240, 214, 150), heat * .7)
             val rim = when { hot -> Rgba(255, 255, 255); activeSince[i] >= 0 -> Rgba(255, 220, 120); i in conflicted -> Rgba(230, 80, 90, .8); else -> Rgba(lit.red + 30, lit.green + 30, lit.blue + 30, .55) }
+            val cited = if (book) (kidStart[i] until kidStart[i + 1]).count { isBook(kidList[it]) } else 0
+            if (book && !splits) {
+                // From a distance a book is a book: a cover standing on its board with its spine band and title plate,
+                // its corners rounding into the circle it opens into as it nears the size where its contents split out.
+                val near = if (kids > 0) (meanKid[i] * f / p.z / split).coerceIn(0.0, 1.0) else 0.0
+                val round = ((near - ROUNDING) / (1 - ROUNDING)).coerceIn(0.0, 1.0); val face = 1 - round
+                val hw = r * (COVER + (1 - COVER) * round); val hh = r * .97
+                val tone = mix(leather(i), Rgba(240, 214, 150), heat * .6)
+                items.add(key j DrawItem.Path("d-$i", cover(p, hw, hh, round), fill = tone, stroke = rim, width = if (hot) 1.6 else .8))
+                if (activeSince[i] >= 0) items.add(key - .001 j DrawItem.Path("pulse-$i", cover(p, hw * 1.06, hh * 1.04, round), stroke = Rgba(255, 240, 200, .9), width = 1.4))
+                // The cover carries the document's own title, its first heading; hovered, the shelf reads its name and contents.
+                val title = (kidStart[i] until kidStart[i + 1]).firstOrNull { types[kidList[it]] == "book.section" }?.let { keys[kidList[it]].substringAfterLast('/') }
+                    ?: name(i).substringBeforeLast('.')
+                if (face > 0 && hh >= 2) {
+                    items.add(key - .001 j DrawItem.Path("sp-$i", box(Rect(p.x - hw, p.y - hh, hw * .2, 2 * hh)),
+                        fill = Rgba(tone.red * 2 / 3, tone.green * 2 / 3, tone.blue * 2 / 3, face)))
+                    for ((k, y) in doubleArrayOf(p.y - hh * .62, p.y + hh * .58).withIndex())
+                        items.add(key - .0011 j DrawItem.Path("rb-$i-$k", box(Rect(p.x - hw, y, hw * .2, max(.6, hh * .035))), fill = Rgba(226, 204, 150, .7 * face)))
+                    val plate = Rect(p.x - hw * .66, p.y - hh * .6, hw * 1.52, hh * .62)
+                    items.add(key - .001 j DrawItem.Path("pl-$i", box(plate), fill = Rgba(232, 216, 176, .92 * face)))
+                    // The title rides its plate where it is legible there; smaller, the plate stands for it, as on a far shelf.
+                    val s = min(plate.height / 3.9, 14.0)
+                    if (s >= TITLE_PX) {
+                        val per = max(6, (plate.width * .92 / (s * .55)).toInt())
+                        val rows = ArrayList<String>(); val row = StringBuilder()
+                        for (word in title.split(' ')) {
+                            if (row.isNotEmpty() && row.length + 1 + word.length > per) { rows.add(row.toString()); row.clear() }
+                            if (row.isNotEmpty()) row.append(' ')
+                            row.append(word)
+                        }
+                        if (row.isNotEmpty()) rows.add(row.toString())
+                        claim(plate)
+                        for ((k, t) in rows.take(3).withIndex()) labels.add(DrawItem.Text("bt-$i-$k", if (k == 2 && rows.size > 3) t.take(per - 1) + "…" else t,
+                            Vec3(plate.x + plate.width * .04, plate.y + s * (1.1 + 1.2 * k)), INK, s, maxWidth = plate.width * .92, clip = plate, weight = 600))
+                    }
+                }
+                if (hot) labels.add(DrawItem.Text("bl-$i", "${name(i)} · ${kids - cited} §" + (if (cited > 0) " · $cited cited" else ""),
+                    Vec3(p.x + hw + 4, p.y - hh + 12), Rgba(240, 214, 150), 12.0, maxWidth = LABEL_W * 2, weight = 600))
+                return
+            }
             if (!bare) items.add(key j DrawItem.Path("d-$i", disc(p, r, sides), fill = Rgba(lit.red, lit.green, lit.blue, if (splits) .28 else .8), stroke = rim, width = if (hot) 1.6 else .8))
             if (!bare && activeSince[i] >= 0) items.add(key - .001 j DrawItem.Path("pulse-$i", disc(p, r * (1.1 + .08 * sin((now - activeSince[i]) / 90.0)), sides), stroke = Rgba(255, 240, 200, .9), width = 1.4))
             if (!splits && section && kids > 0 && r >= 3) {
@@ -879,17 +931,18 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                     x0 += r * 1.4 * share
                 }
             }
-            val name = when { book -> bookName(i).removeSuffix(".pdf"); pool -> "concepts"; else -> keys[i].substringAfterLast('/') }
-            val count = when { book -> "$kids §"; pool -> "$kids classes"; section -> "$kids st"; else -> "$kids" }
-            val text = if (splits || r < 30) name else "$name · $count"
+            val caption = when { book -> name(i).substringBeforeLast('.'); pool -> "concepts"; else -> keys[i].substringAfterLast('/') }
+            val count = when { book -> "${kids - cited} §" + (if (cited > 0) " · $cited cited" else ""); pool -> "$kids classes"; section -> "$kids st"; else -> "$kids" }
+            val text = if (splits || r < 30) caption else "$caption · $count"
             val size = (if (book || pool) r / 7 else r / 5).coerceIn(if (book || pool) 11.0 else 9.0, if (book || pool) 20.0 else 14.0)
-            // A book's or the pool's title always shows: inside when it fits, else on the rim above it.
             val inside = text.length * size * .56 <= 2 * r
             val y = if (splits || !inside) p.y - r - 4 else p.y + size * .35
             val at = Vec3(p.x - min(r, text.length * size * .28), y); val w = max(2 * r, if (book || pool) 240.0 else LABEL_W)
-            // Inside titles and a book's or the pool's title always print; a section's rim title prints where it lands free.
-            if (!bare && (inside || hot || book || pool || (r >= LABEL_R && claim(Rect(at.x, y - size, min(w, text.length * size * .56), size * 1.3))))) {
-                if (inside || hot || book || pool) claim(Rect(at.x, y - size, min(w, text.length * size * .56), size * 1.3))
+            // A title inside its circle, the pool's and a hovered circle's always print; a rim title prints where it lands free.
+            val forced = inside && !splits || hot || pool
+            val spot = Rect(at.x, y - size, min(w, text.length * size * .56), size * 1.3)
+            if (!bare && (forced || (r >= LABEL_R && claim(spot)))) {
+                if (forced) claim(spot)
                 labels.add(DrawItem.Text("dl-$i", text, at, if (book || pool) Rgba(240, 214, 150) else Rgba(226, 230, 236, .9),
                     size, maxWidth = w, weight = if (book || pool) 600 else 400))
             }
@@ -1167,6 +1220,20 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         if (k == n) PathPart.Close else Vec3(c.x + cos(k * 2 * PI / n) * r, c.y + sin(k * 2 * PI / n) * r).let { if (k == 0) PathPart.Move(it) else PathPart.Line(it) }
     }
 
+    /** A book's outline about [c], half-width [hw] by half-height [hh]: [round] 0 is a cover with eased corners, 1 the ellipse it opens into. */
+    private fun cover(c: Vec3, hw: Double, hh: Double, round: Double): Series<PathPart> {
+        val e = 2 / (2 + 18 * (1 - round) * (1 - round))
+        return (COVER_POINTS + 1) j { k: Int ->
+            if (k == COVER_POINTS) PathPart.Close else {
+                val t = k * 2 * PI / COVER_POINTS; val ct = cos(t); val st = sin(t)
+                Vec3(c.x + hw * sign(ct) * abs(ct).pow(e), c.y + hh * sign(st) * abs(st).pow(e)).let { if (k == 0) PathPart.Move(it) else PathPart.Line(it) }
+            }
+        }
+    }
+
+    /** A book's binding, chosen by its name: a shelf of books reads as a shelf of books. */
+    private fun leather(i: Int): Rgba = LEATHER[(bookName(i).hashCode() and 0x7fffffff) % LEATHER.size]
+
     /** Node [i]'s outline as the scope draws it, centered on ([c]) at radius [r]. */
     private fun outline(i: Int, c: Vec3, r: Double): Series<PathPart> =
         if (types[i] == "concept") shape(CuratorMetaphors.Shape.STAR, c, r) else disc(c, r, (r * .8).toInt().coerceIn(8, 40))
@@ -1251,6 +1318,10 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         const val LABEL_R = 2.0; const val CELL = 6.0; const val LABEL_W = 220.0
         /** A statement or concept circle this large on screen holds its text inside. */
         const val INSIDE_R = 60.0
+        /** A far book: its cover's half-width as a share of its circle's radius; past this share of its split size it rounds into
+         *  that circle; a title on its plate under this size is drawn as the plate alone; points around its outline. */
+        const val COVER = .72; const val ROUNDING = .5; const val TITLE_PX = 7.0; const val COVER_POINTS = 32
+        val LEATHER = listOf(Rgba(112, 42, 36), Rgba(44, 58, 98), Rgba(46, 84, 58), Rgba(142, 102, 58), Rgba(92, 36, 54), Rgba(68, 74, 84), Rgba(106, 74, 42))
         /** However low the snap depth, children under this mean screen radius stay aggregated in their container. */
         const val MIN_SPLIT_PX = 2.0
         /** An open book rises toward the camera by this share of its radius. */

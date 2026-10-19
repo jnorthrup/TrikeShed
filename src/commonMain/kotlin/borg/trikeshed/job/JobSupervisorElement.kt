@@ -100,9 +100,12 @@ class JobSupervisorElement private constructor(
                 logSequence = frame.sequence
                 committedSequence = frame.sequence
                 if (result.accepted) {
+                    if (command is JobCommand.State) casStore.verifyState(command.stateCid)
                     result.snapshot?.let { snapshot ->
-                        snapshotCids[snapshot.jobId] = retain(CanonicalCbor.encode(snapshot))
-                        receipts[command.idempotencyKey] = snapshotCids.getValue(snapshot.jobId)
+                        val snapshotCid = retain(CanonicalCbor.encode(snapshot))
+                        snapshot.stateCid?.let { casStore.verifyState(it) }
+                        snapshotCids[snapshot.jobId] = snapshotCid
+                        receipts[command.idempotencyKey] = snapshotCid
                         snapshots[snapshot.jobId] = snapshot
                     }
                 }
@@ -151,6 +154,10 @@ class JobSupervisorElement private constructor(
         check(casStore.put(bytes) == expected) { "CAS acknowledgement digest mismatch for $expected" }
         check(casStore.get(expected)?.contentEquals(bytes) == true) { "CAS read-back verification failed for $expected" }
         casStore.sync()
+        val retained = casStore.get(expected)
+        check(retained != null && ContentId.of(retained) == expected && retained.contentEquals(bytes)) {
+            "CAS post-sync read-back verification failed for $expected"
+        }
         return expected
     }
 
@@ -158,6 +165,10 @@ class JobSupervisorElement private constructor(
         // Step 1: schema validation
         instrumentationRef.schemaValidationCount++
         instrumentationRef.schemaValidationSequence = ++instrumentationRef.globalSequence
+
+        // Only a candidate accepted head owns its referenced bytes. Rejected commands remain replayable.
+        if (cmd is JobCommand.State && reducer.stateRejection(cmd) == null)
+            casStore.verifyState(cmd.stateCid, synchronize = true)
 
         // Step 2: canonical encoding
         val canonicalBytes = CanonicalCbor.encode(cmd)
@@ -189,6 +200,7 @@ class JobSupervisorElement private constructor(
         if (result.accepted) {
             result.snapshot?.let {
                 val snapshotCid = retain(CanonicalCbor.encode(it))
+                it.stateCid?.let { stateCid -> casStore.verifyState(stateCid) }
                 snapshots[it.jobId] = it
                 snapshotCids[it.jobId] = snapshotCid
                 receipts[cmd.idempotencyKey] = snapshotCid
@@ -214,6 +226,10 @@ class JobSupervisorElement private constructor(
     suspend fun submitRaw(jsonBytes: ByteArray) {
         val doc = confixDoc(jsonBytes, Syntax.JSON)
         val operation = doc.value("operation")?.toString() ?: ""
+        if (operation == "state") {
+            submit(JobFrame(doc).stateCommand())
+            return
+        }
         val jobId = JobId.of(doc.value("jobId")?.toString() ?: "")
         val idemKey = doc.value("idempotencyKey")?.toString() ?: ""
         val expectedRev = doc.value("expectedRevision")?.toString()?.toLong() ?: 0L

@@ -16,6 +16,8 @@ internal class TerminalGrid(private val hermes: Boolean) {
     var lines: dynamic = js("[]")
     var lastCursorRow: dynamic = -1
     var selecting = false
+    private var panelId = ""
+    private var sequence = -1.0
 
     private val ansi16 = if (hermes) TerminalPalette.HERMES_ANSI16 else TerminalPalette.VM_ANSI16
 
@@ -95,12 +97,29 @@ internal class TerminalGrid(private val hermes: Boolean) {
     fun renderAll() = render((0 until rows).map { it.asDynamic() })
 
     /** Adopt a panel snapshot's geometry, cursor and lines. */
-    fun adopt(p: dynamic) {
+    fun adopt(p: dynamic, signalSequence: dynamic): Boolean {
+        val next = (signalSequence as? Number)?.toDouble() ?: return false
+        val id = strOrEmpty(p.id)
+        if (id == panelId && next < sequence) return false
+        panelId = id
+        sequence = next
         if (truthy(p.rows)) rows = (p.rows as Number).toInt()
         if (truthy(p.columns)) columns = (p.columns as Number).toInt()
         revision = if (truthy(p.revision)) p.revision else 0
         if (truthy(p.cursor)) cursor = p.cursor
         lines = if (truthy(p.lines)) p.lines else js("[]")
+        return true
+    }
+
+    /** Signal order includes cursor/title-only output, which need not change the cell revision. */
+    fun causal(event: dynamic): Boolean {
+        val next = (event.signal?.sequence as? Number)?.toDouble() ?: return false
+        if (strOrEmpty(event.signal?.panelId) != panelId || next <= sequence) return false
+        if (!truthy(event.terminal)) return false
+        adoptHeader(event.terminal)
+        patches(event.patches)
+        sequence = next
+        return true
     }
 
     /** Adopt the terminal header an event carries alongside its patches. */

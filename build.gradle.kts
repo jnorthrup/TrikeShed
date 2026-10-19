@@ -279,6 +279,7 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
+                api("org.jetbrains.kotlinx:atomicfu:0.28.0")
                 // Core supplies annotations, descriptors and generated serializer contracts.
                 // Confix owns formats on every target; no kotlinx JSON/CBOR frontend.
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
@@ -793,6 +794,17 @@ tasks.register<JavaExec>("corenlpRete") {
     mainClass.set("borg.trikeshed.narsese.CorenlpReteCli")
     classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
     workingDir = rootDir
+}
+
+// Masked-LM substitutes → SUMO class induced per noun
+tasks.register<JavaExec>("fillSubsume") {
+    group = "narsese"
+    description = "Masked-LM substitutes of a noun → the SUMO class their sense closures share."
+    dependsOn("jvmJar", freezeSumo)
+    mainClass.set("borg.trikeshed.narsese.FillSubsumer")
+    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
+    workingDir = rootDir
+    maxHeapSize = "4g"
 }
 
 // TrajectoryReduction CLI — fold SessionCause chains into freeze verdicts
@@ -1965,7 +1977,7 @@ tasks.register<Exec>("buildJvmUring") {
     inputs.file(liburingBuild.map { it.file("src/liburing.a") })
     outputs.file(layout.buildDirectory.file("native/jvm/libtrikeshed_uring.so"))
     val jdk = System.getProperty("java.home")
-    commandLine("cc", "-O3", "-shared", "-fPIC",
+    commandLine("cc", "-O3", "-shared", "-fPIC", "-pthread",
         "-I$jdk/include", "-I$jdk/include/linux",
         "-I${liburingBuild.get().dir("src/include").asFile.absolutePath}",
         "-I${liburingSource.dir("src/include").asFile.absolutePath}",

@@ -1,18 +1,13 @@
 package borg.trikeshed.splat
 
-import borg.trikeshed.lib.Shape
-import borg.trikeshed.lib.Tensor
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.shapeOf
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** Recovered from `accd8861c`; finds a compact eigen signature among probabilistic splat dimensions. */
 interface EigenFinder<T> {
     /** Rank-1 tensor: principal eigenvalue followed by its normalized eigenvector. */
-    fun extractSignature(splat: Splat<T>): Tensor<Double>
+    fun extractSignature(splat: Splat<T>): MetaSeries<Tensor, Double>
 }
 
 /** Pure Kotlin power iteration over the splat's diagonal probability covariance. */
@@ -25,7 +20,7 @@ class PowerIterationEigenFinder<T>(
         require(tolerance > 0.0)
     }
 
-    override fun extractSignature(splat: Splat<T>): Tensor<Double> {
+    override fun extractSignature(splat: Splat<T>): MetaSeries<Tensor, Double> {
         val dimensions = splat.size
         if (dimensions == 0) return shapeOf(1) j { _: Shape -> 0.0 }
         val vector = DoubleArray(dimensions) { 1.0 / sqrt(dimensions.toDouble()) }

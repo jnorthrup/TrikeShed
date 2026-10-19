@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.kif.KifExpr
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeriesOf
@@ -116,8 +117,33 @@ data class ReteFiring(
     val consequentAngular: Long
         get() = KgTriplet(rule.antecedent, "entails", rule.consequent).angularIdentity()
 
-    /** Stable identity of this rule application against this live assertion. */
+    /**
+     * Stable identity of this rule application, not merely its angular routing address.
+     * Angular identity omits the object, so retain the matched terms and relation as well.
+     * Evidence and offered support are absent: this names the application, not its offer.
+     * Live bag refraction uses [refractionCid], preserving the angular admission contract.
+     * Existing receipts retain their recorded IDs; new applications use framed v2 content.
+     */
     val firingCid: ContentId
+        get() = ContentId.of(
+            CanonicalCbor.encodeMap(mapOf(
+                "kind" to "rete-firing-v2",
+                "sourceRuleCid" to sourceRuleCid.value,
+                "matchedSubject" to matched.subject,
+                "matchedObject" to matched.obj,
+                "matchedAngular" to matched.angular,
+                "matchedRelation" to matched.relation.name,
+                "consequentSubject" to rule.antecedent,
+                "consequentObject" to rule.consequent,
+                "consequentAngular" to consequentAngular,
+            )),
+        )
+
+    /**
+     * Live bag refraction is angular, not per-party provenance. Keep its existing key
+     * byte-for-byte so richer firing receipts cannot reopen already-seen support.
+     */
+    val refractionCid: ContentId
         get() = ContentId.of(
             "${sourceRuleCid.value}|${matched.angular}|$consequentAngular".encodeToByteArray(),
         )

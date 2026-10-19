@@ -26,7 +26,7 @@ class BertModel(
             try {
                 val assets = withContext(parent.coroutineContext.minusKey(Job) + fileIoContext) {
                     val files = requireNotNull(parent.coroutineContext[FileOperations]) { "BERT requires FileOperations" }
-                    val parameters = BertWeights.load(files, directory, channels).also { retained = it }
+                    val parameters = BertWeights.load(files, directory, channels = channels).also { retained = it }
                     parameters j BertTokenizerConfig.load(files, directory, parameters.config, channels)
                 }
                 currentCoroutineContext().ensureActive()
@@ -117,12 +117,18 @@ class BertModel(
         return tokens.size j { i: Int -> checkNotNull(result[i]) }
     }
 
-    /** Unpadded sentences omit masked padding work; each layer retains only its current activations. */
-    private suspend fun hidden(ids: Series<Int>): FloatArray {
-        val weights = checkNotNull(parameters)
+    private suspend fun hidden(ids: Series<Int>): FloatArray = checkNotNull(parameters).states(ids, 4)
+}
+
+/**
+ * Encoder states of [ids], averaged over the final [last] layers (the embedding output counts as a layer when
+ * the stack is shallower). Unpadded sentences omit masked padding work; each layer retains only its current activations.
+ */
+internal suspend fun BertWeights.states(ids: Series<Int>, last: Int): FloatArray {
+        val weights = this
         val config = weights.config
         val rows = ids.size
-        val h = dimensions
+        val h = config.hiddenSize
         require(rows in 2..minOf(512, config.maxPositionEmbeddings))
         fun parameter(name: String) = weights[name].b
         suspend fun linear(input: FloatArray, prefix: String, from: Int = h, to: Int = h): FloatArray {
@@ -165,8 +171,8 @@ class BertModel(
         }
         state = norm(state, "embeddings.LayerNorm")
         val sum = FloatArray(state.size)
-        val count = minOf(4, config.numHiddenLayers + 1)
-        if (config.numHiddenLayers < 4) state.copyInto(sum)
+        val count = minOf(last, config.numHiddenLayers + 1)
+        if (config.numHiddenLayers < count) state.copyInto(sum)
         for (layer in 0 until config.numHiddenLayers) {
             currentCoroutineContext().ensureActive()
             val prefix = "encoder.layer.$layer"
@@ -182,5 +188,4 @@ class BertModel(
         }
         for (i in sum.indices) sum[i] /= count
         return sum
-    }
 }

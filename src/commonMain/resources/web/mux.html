@@ -31,8 +31,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       <div id="errors" role="alert" hidden></div>
       <section id="metrics" class="metrics" aria-label="Current totals"></section>
       <section id="keysView" hidden>
-        <div class="section-heading"><h2>Credential pool</h2><div class="toolbar"><input id="keySearch" type="search" placeholder="Filter provider, model, or key" aria-label="Filter credentials"><select id="keyStatus" aria-label="Credential status"><option value="all">All credentials</option><option value="ready">Key present</option><option value="missing">Key missing</option></select></div></div>
+        <div class="section-heading"><h2>Credential pool</h2><div class="toolbar"><input id="keySearch" type="search" placeholder="Filter provider, model, or key" aria-label="Filter credentials"><select id="keyStatus" aria-label="Credential status"><option value="all">All credentials</option><option value="ready">Key present</option><option value="missing">Key missing</option><option value="none">No credential required</option></select></div></div>
         <div class="table-wrap"><table><thead><tr><th>Provider / model</th><th>Credential</th><th>Routing</th><th>Window usage</th><th>Resets in</th><th>Calls</th></tr></thead><tbody id="keyRows"></tbody></table></div>
+        <div class="section-heading"><h2>Keyed models</h2><button data-action="refresh-discovery" title="Ask providers again" aria-label="Ask providers again"><i data-lucide="refresh-cw"></i>Ask providers</button></div>
+        <div id="discoveryRows"><div class="empty">Asking providers for their models</div></div>
         <div class="section-heading"><h2>Endpoint registry</h2><button data-action="add-endpoint" class="primary"><i data-lucide="plus"></i>Add endpoint</button></div>
         <div class="table-wrap"><table><thead><tr><th>Name / address</th><th>Model</th><th>Environment variable</th><th>Registry flags</th><th>Binding</th><th></th></tr></thead><tbody id="endpointRows"></tbody></table></div>
       </section>
@@ -58,6 +60,20 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
           <section id="sessionDetail" class="session-detail"><div class="empty">Select a session</div></section>
         </div>
       </section>
+      <section id="breadcrumbsView" aria-labelledby="breadcrumbsTitle" hidden>
+        <div class="section-heading"><h2 id="breadcrumbsTitle">Session routing &amp; model breadcrumbs</h2><label id="breadcrumbSelection">Session / context<select id="breadcrumbContext" aria-label="Model session or breadcrumb context"><option value="">Select a context</option></select></label></div>
+        <div id="breadcrumbMeta" class="detail-meta"></div>
+        <p id="breadcrumbRunTarget" class="muted" hidden></p>
+        <div class="section-heading"><h3>Routing attempts</h3></div>
+        <div id="breadcrumbRouting"><div class="empty">Select a model session or context</div></div>
+        <div class="section-heading"><h3>Context cleaner &amp; breadcrumb trail</h3></div>
+        <p class="muted">A rolling window of 50 turns records whether each outgoing prompt overflowed 100,000 estimated tokens. Under 2% overflow the cleaner scales records up and recalls dropped ones; over 5% it drops records older than a minute under 0.3 presence and scales the rest back by 10%. Dropped records keep their reference and stay retrievable.</p>
+        <p class="muted">The trail lists records in the order they were laid; a turn carries its tool results inside it. As presence decays each record holds fewer of its most distinct words. Recall moves a breadcrumb from 0, its reference, to 1, its original, and refreshes its recency.</p>
+        <div id="breadcrumbCleaner"><div class="empty">Select a model session or context</div></div>
+        <div class="section-heading"><h3>Model-visible breadcrumbs</h3></div>
+        <p class="muted">Tool messages from the latest submitted model request. Breadcrumb content is shown exactly as submitted; viewing it does not refresh retention.</p>
+        <div id="breadcrumbMessages"><div class="empty">Loading model contexts</div></div>
+      </section>
       <section id="statsView" hidden>
         <div class="section-heading"><h2>Request activity</h2><div class="toolbar"><select id="statsWindow" aria-label="Statistics time window"><option value="15">Last 15 minutes</option><option value="60">Last hour</option><option value="1440">Last 24 hours</option></select><button data-action="export-activity" title="Export activity" aria-label="Export activity"><i data-lucide="download"></i></button></div></div>
         <div class="chart-legend"><span><b class="swatch green"></b>Completed</span><span><b class="swatch red"></b>Failed</span><span><b class="swatch blue"></b>Cached</span><span id="retention" class="muted">Most recent 1,000 attempts in this process</span></div>
@@ -71,6 +87,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     <label>Name<input name="name" pattern="[a-z0-9][a-z0-9._-]*" maxlength="100" required placeholder="my-provider" aria-label="Name"></label>
     <label>API address<input name="base" type="url" required placeholder="https://api.provider.com/v1" aria-label="API address"></label>
     <label>Model<input name="model" required maxlength="200" placeholder="vendor/model" aria-label="Model"></label>
+    <label>Authentication<select name="auth" aria-label="Authentication"><option value="required">Credential required</option><option value="none">No credential</option></select></label>
     <label>Credential environment variable<input name="envVar" pattern="[A-Z_][A-Z0-9_]*" required placeholder="PROVIDER_API_KEY" autocomplete="off" aria-label="Credential environment variable"></label>
     <div class="toolbar flags"><label><input type="checkbox" name="enabled" checked aria-label="Registry enabled">Registry enabled</label><label><input type="checkbox" name="preferred" aria-label="Preferred">Preferred</label></div>
     <p id="endpointError" role="alert"></p><div class="dialog-actions"><button type="button" data-action="close-dialog">Cancel</button><button type="submit" class="primary"><i data-lucide="check"></i>Save endpoint</button></div>

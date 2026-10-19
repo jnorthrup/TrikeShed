@@ -1,5 +1,7 @@
 package borg.trikeshed.userspace
 
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.get
 import borg.trikeshed.lib.processObj
 import borg.trikeshed.lib.fs
 import borg.trikeshed.lib.os
@@ -12,6 +14,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.assertContentEquals
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
+import kotlinx.coroutines.cancelAndJoin
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
@@ -87,7 +93,7 @@ class NodeUringDiscoveryTest {
         assertEquals(UringProbeState.ARCH_MISMATCH, discover(architecture).report.state)
         assertEquals(0, architecture.opened as Int)
         val abi = module()
-        abi.abiVersion = js("function(){return 2}")
+        abi.abiVersion = js("function(){return 1}")
         assertEquals(UringProbeState.ABI_MISMATCH, discover(abi).report.state)
         assertEquals(0, abi.opened as Int)
         val napi = module()
@@ -152,7 +158,7 @@ class NodeUringDiscoveryTest {
         assertEquals(UringProbePhase.EXECUTION, discovery.report.phase)
         assertEquals(1, module.opened as Int)
         assertEquals(1, module.executed as Int)
-        assertEquals(0x7472696b65L.toString(), module.lastUserData.toString() as String)
+        assertEquals(1, module.lastTransportId as Int)
         val backend = assertNotNull(discovery.backend)
         assertEquals(0L, backend.nativeCapabilities and UringOp.STATX.mask)
         val fd = backend.submitBatch(listOf(Submissions.openat("fixture", userData = 12))).single().res
@@ -162,6 +168,45 @@ class NodeUringDiscoveryTest {
         assertEquals(0, Statx.of(stat).stx_mode, "size-only adapter does not establish a file kind")
         backend.close()
         assertEquals(1, module.closed as Int)
+    }
+
+    @Test
+    fun fixtureNativeBatchOrdersDescriptorBarriers() = runTest {
+        val module = module()
+        val backend = nodeNativeChannelBackend(module, js("BigInt(7)"))
+        val fd = backend.submitBatch(listOf(Submissions.openat("fixture", userData = 1))).single().res
+        module.batches = js("[]")
+        val first = Submissions.write(fd, 0, 2, 0, 2).copy(buffer = ByteBuffer(byteArrayOf(1, 2)))
+        val second = Submissions.write(fd, 0, 2, 2, 3).copy(buffer = ByteBuffer(byteArrayOf(3, 4)))
+        val submissions = arrayOf(first, second, Submissions.fsync(fd, 4))
+        val cqes = backend.batchEnqueue(submissions.size j { submissions[it] })
+        assertEquals(3, cqes.a)
+        assertEquals(2, module.batches.length as Int)
+        assertEquals(2, module.batches[0] as Int)
+        assertEquals(1, module.batches[1] as Int)
+        assertEquals(2, first.buffer!!.position())
+        assertEquals(2, second.buffer!!.position())
+        backend.close()
+    }
+
+    @Test
+    fun fixtureNativeWakeupCancellationRetainsAdmission() = runTest {
+        val module = module()
+        module.reapCompletions = js("function(){if(!this.released)return [];var q=this.cq;this.cq=[];return q}")
+        module.awaitCompletions = js("function(){var self=this;this.waits=(this.waits||0)+1;return new Promise(function(resolve){self.wake=resolve})}")
+        module.cancelWait = js("function(){this.cancelled=(this.cancelled||0)+1;if(this.wake)this.wake()}")
+        val backend = nodeNativeChannelBackend(module, js("BigInt(7)"))
+        assertTrue(backend.submitBatch(listOf(Submissions.nop(99))).isEmpty())
+        val waiter = launch { backend.awaitCompletions() }
+        yield()
+        waiter.cancelAndJoin()
+        assertEquals(1, module.cancelled as Int)
+        assertTrue(backend.reapCompletions().isEmpty(), "Cancelling readiness does not cancel admitted effects")
+        module.released = true
+        val cqes = backend.reapCompletions()
+        assertEquals(99L, cqes.single().userData)
+        assertEquals(0, cqes.single().res)
+        backend.close()
     }
 
     @Test
@@ -208,17 +253,60 @@ class NodeUringDiscoveryTest {
     }
 
     @Test
-    fun actualSelectedBackendFileOperations() {
+    fun actualEmulatedSynchronousExecuteKeepsCompatibilityCompletion() {
         if (loadPlatformHost().descriptor.runtime != HostRuntime.NODE_JS) return
         val filesystem: dynamic = fs ?: return
+        val directory = filesystem.mkdtempSync((os.tmpdir() as String) + "/trikeshed-uring-sync-") as String
+        val facade = FunctionalUringFacade(4, JsUserspaceChannelBackend())
+        try {
+            val fd = facade.execute(Submissions.openat("$directory/probe", 2 or 64 or 128, 1))
+            assertTrue(fd >= 0)
+            val bytes = ByteBuffer(byteArrayOf(9, 8))
+            assertEquals(2, facade.execute(Submissions.write(fd, 0, 2, 0, 2).copy(buffer = bytes)))
+            assertEquals(2, bytes.position())
+            assertEquals(0, facade.execute(Submissions.close(fd, 3)))
+        } finally {
+            try { facade.closeNow() }
+            finally { filesystem.rmSync(directory, js("({recursive:true,force:true})")) }
+        }
+    }
+
+    @Test
+    fun actualEmulatedRawCloseCannotReleaseAnActiveCallbackDescriptor() = runTest {
+        if (loadPlatformHost().descriptor.runtime != HostRuntime.NODE_JS) return@runTest
+        val filesystem: dynamic = fs ?: return@runTest
+        val directory = filesystem.mkdtempSync((os.tmpdir() as String) + "/trikeshed-uring-borrow-") as String
+        val backend = JsUserspaceChannelBackend()
+        var deferred = false
+        try {
+            val fd = backend.submitBatch(listOf(Submissions.openat("$directory/probe", 2 or 64 or 128, 1))).single().res
+            assertTrue(fd >= 0)
+            val write = Submissions.write(fd, 0, 2, 0, 2).copy(buffer = ByteBuffer(byteArrayOf(9, 8)))
+            assertTrue(backend.submitDeferredBatch(listOf(write)).isEmpty())
+            deferred = true
+            assertEquals(-16, backend.submitBatch(listOf(Submissions.close(fd, 3))).single().res)
+            assertTrue(FileImpl(fd).isOpen())
+            backend.awaitCompletions()
+            assertEquals(2, backend.reapCompletions().single().res)
+            deferred = false
+            assertEquals(0, backend.submitBatch(listOf(Submissions.close(fd, 4))).single().res)
+        } finally {
+            if (deferred) { backend.awaitCompletions(); backend.reapCompletions() }
+            try { backend.close() }
+            finally { filesystem.rmSync(directory, js("({recursive:true,force:true})")) }
+        }
+    }
+
+    @Test
+    fun actualSelectedBackendFileOperations() = runTest {
+        if (loadPlatformHost().descriptor.runtime != HostRuntime.NODE_JS) return@runTest
+        val filesystem: dynamic = fs ?: return@runTest
         val directory = filesystem.mkdtempSync((os.tmpdir() as String) + "/trikeshed-uring-node-") as String
         val path = "$directory/probe.bin"
         val backend = openUserspaceChannelBackend(8)
         val facade = FunctionalUringFacade(8, backend)
-        fun complete(submission: UringOp.Companion.UringSubmission): Int {
-            facade.enqueue(submission)
-            facade.submit()
-            val completion = facade.wait().single()
+        suspend fun complete(submission: UringOp.Companion.UringSubmission): Int {
+            val completion = facade.batchEnqueue(1 j { submission })[0]
             assertEquals(submission.userData, completion.userData)
             return completion.res
         }
@@ -261,13 +349,23 @@ class NodeUringDiscoveryTest {
         js("(function(candidate){var r=function(){return candidate};r.resolve=function(){return '/fixture/uring.node'};return r})")(value)
 
     private fun module(): dynamic = js("""({
-        opened:0, closed:0, executed:0,
-        abiVersion:function(){return 1}, platform:function(){return 'linux'},
+        opened:0, closed:0, executed:0, cq:[], batches:[],
+        abiVersion:function(){return 2}, platform:function(){return 'linux'},
         architecture:function(){return 'x86_64'}, napiVersion:function(){return 8},
         open:function(){this.opened++;return BigInt(7)}, supports:function(){return true},
         execute:function(handle,opcode,fd,bytes,start,length,offset,userData){
             this.executed++;this.lastOpcode=opcode;this.lastUserData=userData;return 0
         },
-        close:function(){this.closed++}
+        submitBatch:function(handle,count,control,arrays,results){
+            this.batches.push(count);
+            for(var i=0;i<count;i++){
+                this.executed++;this.lastOpcode=control[i*6];this.lastTransportId=control[i*6+5];
+                results[i]=0;this.cq.push(control[i*6+5],control[i*6]===22||control[i*6]===23?control[i*6+3]:0)
+            }
+            return 0
+        },
+        reapCompletions:function(){var cq=this.cq;this.cq=[];return cq},
+        awaitCompletions:function(){return Promise.resolve()},cancelWait:function(){},cancelPending:function(){},
+        close:function(){this.closed++;return 0}
     })""")
 }

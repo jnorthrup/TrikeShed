@@ -40,6 +40,7 @@ internal actual class NativeUringAdapter actual constructor(entries: Int, mode: 
     }
     actual val capabilities: Long get() = discoveredCapabilities
     actual val setupErrno: Int? get() = ring.setupErrno
+    actual val completionFd: Int get() = if (opened.isSuccess) ring.completionFd else -1
     actual val availability: String get() = transportFailure?.let { "native: io_uring transport failed: $it" }
         ?: if (opened.isSuccess) "native: io_uring setup, register and NOP execution probes succeeded; features=${ring.features}"
         else "emulated: ${opened.exceptionOrNull()?.message}"

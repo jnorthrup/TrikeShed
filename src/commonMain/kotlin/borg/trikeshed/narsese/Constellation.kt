@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.collections.bits.IntAccumulator
 import borg.trikeshed.collections.bits.RoaringSeries
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.packInts
 
 /** Deontic force of a norm: obligation, permission, prohibition, or a presumption stated in the present tense. */
@@ -107,6 +108,12 @@ class Book(
     val nouls: FloatArray = FloatArray(0),
     /** Premises Jev found the book's pages state as fact: the open questions its pages answer, joined as facts. */
     val established: Set<String> = emptySet(),
+    /** Each section's `urn:sha256:` over its text, in section order: the named graph its statements are stated in. */
+    val sections: List<String> = emptyList(),
+    /** Each section's path through the headings its text declares (`Part › 1. Title › 1.1. Head`); empty where none are declared. */
+    val paths: List<String> = emptyList(),
+    /** What the source document is, as its curation notes state it: where it was read from, when, and its digest. */
+    val provenance: Map<String, String> = emptyMap(),
 ) {
     init { require(statements.size == support.size && judged.size == nouls.size) }
 
@@ -132,8 +139,12 @@ class Book(
 
         const val HEADING = 120
 
+        /** The section's content address: identical text in any book or run names the same graph. */
+        fun urn(section: String): String = "urn:" + ContentId.of(section.encodeToByteArray()).value
+
         fun of(name: String, work: String, date: String, sections: List<String>, clauses: List<List<NormClause>>,
-               classOf: (NormClause) -> Int = { -1 }, facts: Set<String> = emptySet(), cites: List<Pair<Int, Int>> = emptyList()): Book {
+               classOf: (NormClause) -> Int = { -1 }, facts: Set<String> = emptySet(), cites: List<Pair<Int, Int>> = emptyList(),
+               headings: List<String>? = null, paths: List<String> = emptyList(), provenance: Map<String, String> = emptyMap()): Book {
             val index = LinkedHashMap<String, Int>()
             val statements = ArrayList<NormStatement>()
             val sectionsOf = ArrayList<IntAccumulator>()
@@ -142,7 +153,8 @@ class Book(
                 val at = index.getOrPut(s.key) { statements.add(s); sectionsOf.add(IntAccumulator(4)); statements.size - 1 }
                 sectionsOf[at].add(ordinal)
             }
-            return Book(name, work, date, sections.map(::heading), statements, sectionsOf.map { it.toRoaring().toIntArray() }, facts, cites)
+            return Book(name, work, date, headings ?: sections.map(::heading), statements, sectionsOf.map { it.toRoaring().toIntArray() }, facts, cites,
+                sections = sections.map(::urn), paths = paths, provenance = provenance)
         }
     }
 }
@@ -183,9 +195,9 @@ class Constellation(val name: String) {
         private set
 
     /**
-     * NAL evidence per proposition: every section stating it is one source, affirmative force
+     * NAL evidence per proposition: every section address stating it is one source, affirmative force
      * positive and MUST_NOT negative, so opposing statements revise one belief and a section never
-     * counts twice. Key: packInts(proposition ordinal, 0).
+     * counts twice, not even when two books carry its identical text. Key: packInts(proposition ordinal, 0).
      */
     val propositions = EvidenceLedger()
     private val propositionIds = HashMap<String, Int>()
@@ -202,6 +214,17 @@ class Constellation(val name: String) {
     private fun predicationId(p: String): Int = predicationIds.getOrPut(p) { predicationNames.size.also { predicationNames.add(p) } }
 
     fun bookOrdinal(name: String): Int = books.indexOfFirst { it.name == name }
+
+    /** Evidence source per section address: a section of identical text counts once, whichever books carry it. */
+    private val sources = HashMap<String, Int>()
+
+    /**
+     * The named graph of global section [g]: its `urn:sha256:`, or, for a book frozen before section addresses,
+     * null.
+     */
+    fun graph(g: Int): String? = books[g ushr 20].sections.getOrNull(g and 0xFFFFF)
+
+    private fun source(g: Int): Int = sources.getOrPut(graph(g) ?: "${books[g ushr 20].name}#${g and 0xFFFFF}") { sources.size }
 
     /**
      * Statements that hold for a bearer of the class whose self+ancestor ids are [mask]: those typed
@@ -267,8 +290,9 @@ class Constellation(val name: String) {
             for (k in book.support[i]) {
                 val w = book.weight(i, k)
                 val sign = if (s.modality == Modality.MUST_NOT) EvidenceCoord(0, w) else EvidenceCoord(w, 0)
-                propositions.observe(packInts(p, 0), (b shl 20) or k, sign)
-                if (typed) predications.observe(key, (b shl 20) or k, sign)
+                val from = source((b shl 20) or k)
+                propositions.observe(packInts(p, 0), from, sign)
+                if (typed) predications.observe(key, from, sign)
             }
             if (typed) predicationStatements.getOrPut(key) { IntAccumulator(2) }.add(id)
         }
@@ -362,12 +386,13 @@ class Constellation(val name: String) {
     }
 
     /**
-     * Rules the constellation admits: statements two or more books state. An opposed statement is
-     * admitted only when every opponent's latest supporting book is older than its own.
+     * Rules the constellation admits: statements two or more books state. An opposed statement is admitted only
+     * when every book stating an opponent is an older edition of a work that states it: a later date supersedes
+     * among one work's editions, never across works, so no later document is honored over another work's text.
      */
     fun admissible(): List<Int> = restated().filter { id ->
-        val latest = booksStating(id).maxOf { books[it].date }
-        opponents(id).all { o -> booksStating(o).maxOf { books[it].date } < latest }
+        val mine = booksStating(id)
+        opponents(id).all { o -> booksStating(o).all { ob -> mine.any { b -> books[b].work == books[ob].work && books[ob].date < books[b].date } } }
     }
 
     // ── edition alignment ────────────────────────────────────────────────────

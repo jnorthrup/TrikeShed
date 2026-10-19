@@ -32,6 +32,9 @@ import org.w3c.dom.HTMLElement
  * Decisions (layout, camera, follow, trail, spikes, metaphors) are CuratorScope's.
  */
 object CuratorPage {
+    private val page = PanelsPage { status("Page action failed: " + failureText(it)) }
+    private fun launchJs(block: suspend () -> Unit) { page.submit(block) }
+    fun close() = page.close()
     private const val POLL_MS = 250
     private val scope = CuratorScope()
     private lateinit var host: HTMLElement
@@ -46,8 +49,20 @@ object CuratorPage {
     private var panelKey = ""
     private var airgap = false
     private var airgapPending = false
+    private var animation = 0
+    private var pollTimer = 0
+    private var gateTimer = 0
+    private var resizeObserver: dynamic = null
 
     fun mount() {
+        page.mount { install() }
+    }
+
+    private fun install() {
+        page.own {
+            window.cancelAnimationFrame(animation); window.clearTimeout(pollTimer); window.clearTimeout(gateTimer)
+            resizeObserver?.disconnect()
+        }
         host = document.getElementById("curator") as HTMLElement
         glCanvas = layer(); text = layer()
         val attrs = obj(); attrs.antialias = true
@@ -59,11 +74,12 @@ object CuratorPage {
         finder()
         ask()
         shelve()
-        jsNew(js("ResizeObserver"), { _: dynamic -> resize() }).observe(host)
+        resizeObserver = jsNew(js("ResizeObserver"), { _: dynamic -> if (!page.closing) resize() })
+        resizeObserver.observe(host)
         resize()
         poll()
-        fun loop(t: Double) { draw(t); window.requestAnimationFrame(::loop) }
-        window.requestAnimationFrame(::loop)
+        fun loop(t: Double) { if (!page.closing) { draw(t); animation = window.requestAnimationFrame(::loop) } }
+        animation = window.requestAnimationFrame(::loop)
     }
 
     private fun layer(): HTMLCanvasElement = (document.createElement("canvas") as HTMLCanvasElement).also {
@@ -87,19 +103,19 @@ object CuratorPage {
         fun at(e: dynamic): DoubleArray { val r = host.getBoundingClientRect(); return doubleArrayOf(num(e.clientX) - r.left, num(e.clientY) - r.top) }
         val opts = obj(); opts.passive = false
         fun t() = window.performance.now()
-        host.addEventListener("wheel", { e: dynamic -> e.preventDefault(); val p = at(e)
+        page.on(host, "wheel", { e: dynamic -> e.preventDefault(); val p = at(e)
             scope.wheel(num(e.deltaY), num(e.deltaMode).toInt(), p[0], p[1], t()) }, opts)
-        host.addEventListener("pointerdown", { e: dynamic -> if (num(e.button) == 0.0) { val p = at(e); drag = p; down = p
+        page.on(host, "pointerdown", { e: dynamic -> if (num(e.button) == 0.0) { val p = at(e); drag = p; down = p
             scope.press(p[0], p[1], t()); host.asDynamic().setPointerCapture(e.pointerId) } })
-        host.addEventListener("pointermove", { e: dynamic ->
+        page.on(host, "pointermove", { e: dynamic ->
             val p = at(e); val d = drag
             if (d != null) { scope.drag(p[0] - d[0], p[1] - d[1], p[0], p[1], t()); drag = p } else scope.hovered = scope.pick(p[0], p[1])
         })
-        host.addEventListener("pointerup", { e: dynamic -> val p = at(e); val d = down; drag = null; down = null
+        page.on(host, "pointerup", { e: dynamic -> val p = at(e); val d = down; drag = null; down = null
             if (d != null) { scope.release(t()); if (kotlin.math.hypot(p[0] - d[0], p[1] - d[1]) < 3 && !scope.toggle(p[0], p[1])) scope.select(scope.pick(p[0], p[1])) } })
-        host.addEventListener("pointerleave", { _: dynamic -> scope.hovered = -1 })
-        document.addEventListener("keydown", { e: dynamic ->
-            if (str(e.target?.tagName) == "INPUT") return@addEventListener
+        page.on(host, "pointerleave", { _: dynamic -> scope.hovered = -1 })
+        page.on(document, "keydown", { e: dynamic ->
+            if (str(e.target?.tagName) == "INPUT") return@on
             when (str(e.key)) {
                 "f", "F" -> { scope.selected = -1; scope.follow() }
                 "ArrowRight", "PageDown" -> scope.turn(1)
@@ -116,7 +132,7 @@ object CuratorPage {
     private fun detail() {
         val slider = document.getElementById("curator-detail").asDynamic() ?: return
         slider.value = scope.snapPercent.toString()
-        slider.addEventListener("input", { _: dynamic -> scope.snapPercent = num(slider.value) })
+        page.on(slider, "input", { _: dynamic -> scope.snapPercent = num(slider.value) })
     }
 
     /** Each die panel folds away to give the view the whole width; the button it was pressed on holds the state. */
@@ -125,7 +141,7 @@ object CuratorPage {
         for (i in 0 until buttons.length) {
             val button = buttons.item(i) as? HTMLElement ?: continue
             val side = document.getElementById(button.getAttribute("data-fold") ?: continue) as? HTMLElement ?: continue
-            button.addEventListener("click", { _: dynamic ->
+            page.on(button, "click", { _: dynamic ->
                 val min = side.classList.toggle("min")
                 button.setAttribute("aria-pressed", min.toString())
                 resize()
@@ -172,13 +188,13 @@ object CuratorPage {
                 } catch (e: dynamic) { if (shownAt == at) { show(title, rows, -1); toc.insertAdjacentHTML("afterbegin", dim("Jev failed: " + failureText(e))) } }
             }
         }
-        search.addEventListener("input", { _: dynamic ->
+        page.on(search, "input", { _: dynamic ->
             val q = str(search.value); tocAt = -3; shownAt++
             if (q.isBlank()) contents(-1) else show("find “$q”", scope.find(q), -1)
         })
-        search.addEventListener("keydown", { e: dynamic ->
+        page.on(search, "keydown", { e: dynamic ->
             val q = str(search.value).trim()
-            if (str(e.key) != "Enter" || q.isEmpty()) return@addEventListener
+            if (str(e.key) != "Enter" || q.isEmpty()) return@on
             val at = ++shownAt; tocAt = -3
             toc.innerHTML = dim("finding “$q”…")
             val body = jsonOf(mapOf("q" to q, "depth" to (str(depth.value).toIntOrNull() ?: 3).coerceIn(1, 4)))
@@ -190,20 +206,20 @@ object CuratorPage {
                 } catch (e: dynamic) { if (shownAt == at) toc.innerHTML = dim("find failed: " + failureText(e)) }
             }
         })
-        query.addEventListener("keydown", { e: dynamic ->
+        page.on(query, "keydown", { e: dynamic ->
             if (str(e.key) == "Enter") { val q = str(query.value); found("statements", q, scope.query(q).map { it + ("text" to it["note"]) }) }
         })
-        toc.addEventListener("click", { e: dynamic ->
+        page.on(toc, "click", { e: dynamic ->
             val open = e.target.closest("[data-open]")
-            if (open != null) { contents(str(open.getAttribute("data-open")).toInt()); return@addEventListener }
+            if (open != null) { contents(str(open.getAttribute("data-open")).toInt()); return@on }
             // A row the daemon found names its ring key: the node it stands for once the ring holds it.
             val hit = e.target.closest("[data-ring]")
             if (hit != null) {
                 val i = scope.nodeOf(str(hit.getAttribute("data-ring")))
                 if (i >= 0) scope.goto(i) else hit.title = "not in the ring yet"
-                return@addEventListener
+                return@on
             }
-            val row = e.target.closest("[data-node]") ?: return@addEventListener
+            val row = e.target.closest("[data-node]") ?: return@on
             scope.goto(str(row.getAttribute("data-node")).toInt())
         })
         // Intake can arrive in several batches. Refresh contents, not an operator's search results.
@@ -216,8 +232,8 @@ object CuratorPage {
             nodes = scope.nodes; epoch = scope.epoch
         }
         val button = document.getElementById("curator-airgap").asDynamic()
-        button.addEventListener("click", { _: dynamic ->
-            if (airgap || airgapPending) return@addEventListener
+        page.on(button, "click", { _: dynamic ->
+            if (airgap || airgapPending) return@on
             val rankDisabled = truthy(rank.disabled)
             airgapPending = true; button.disabled = true
             rank.disabled = true; rank.checked = false
@@ -268,7 +284,7 @@ object CuratorPage {
                 val r = fetchJs("/api/curation/rank")
                 val v = reify(str(awaitJs(r.text()))) as Map<*, *>
                 gate(rank, v)
-                if (!airgap && v["reason"] == "probing") window.setTimeout({ gate(rank) }, 3_000)
+                if (!page.closing && !airgap && v["reason"] == "probing") gateTimer = window.setTimeout({ gate(rank) }, 3_000)
             } catch (e: dynamic) {
                 rank.title = "Jev unavailable: " + failureText(e)
                 document.getElementById("curator-airgap").asDynamic().disabled = airgap || airgapPending
@@ -324,14 +340,14 @@ object CuratorPage {
                 } catch (e: dynamic) { show("<p class='dim'>Jev failed: ${failureText(e)}</p>") }
             }
         }
-        el.addEventListener("submit", { e: dynamic ->
+        page.on(el, "submit", { e: dynamic ->
             e.preventDefault()
             val q = str(e.target.q.value).trim()
             if (q.isNotEmpty()) put(e.target, q)
         })
-        el.addEventListener("click", { e: dynamic ->
-            val chip = e.target.closest("[data-ask]") ?: return@addEventListener
-            val form = el.querySelector("form.ask") ?: return@addEventListener
+        page.on(el, "click", { e: dynamic ->
+            val chip = e.target.closest("[data-ask]") ?: return@on
+            val form = el.querySelector("form.ask") ?: return@on
             val q = str(chip.getAttribute("data-ask"))
             form.asDynamic().q.value = q
             put(form, q)
@@ -365,7 +381,7 @@ object CuratorPage {
                 contentsUpdate()
                 status("live · ${scope.nodes} nodes")
             } catch (e: dynamic) { status("ring unreachable: " + failureText(e)) }
-            window.setTimeout({ poll() }, POLL_MS)
+            if (!page.closing) pollTimer = window.setTimeout({ poll() }, POLL_MS)
         }
     }
 

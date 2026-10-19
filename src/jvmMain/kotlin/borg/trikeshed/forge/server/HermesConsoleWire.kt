@@ -215,7 +215,7 @@ class HermesConsoleWire(
                         "kind" to "causal",
                         "signal" to event.emission.signal.toMap(),
                         "patches" to event.emission.patches.view.map { it.toMap() },
-                        "terminal" to console.terminalMetaMap(),
+                        "terminal" to event.terminal,
                     )
                     is HermesVmConsole.Event.StateChanged -> mapOf(
                         "kind" to "state",

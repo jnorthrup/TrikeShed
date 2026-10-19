@@ -11,6 +11,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
+import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.joinAll
@@ -192,6 +193,37 @@ class ProjectDbMountTest {
         assertTrue(h2.scopes.remountLedger() >= 1)
         // 2 direct puts + 1 wire put + 2 batched = 5
         assertEquals(5, h2.registry.get("my-drop")?.docCount, "manifest replay must rebuild every uploaded doc")
+    }
+
+    @Test
+    fun uploadProviderAndDocumentOverrideSurviveRestartAndInvalidProviderWritesNothing(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-provider-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = CasStore.inMemory()
+        val first = harness(ledger, cas)
+        val wire = ProjectDbWire(first.registry, first.scopes)
+        val admissions = mutableListOf<Pair<String, DecisionProvider?>>()
+        first.scopes.onDocument = { _, id, provider -> admissions.add(id to provider) }
+        val request = "POST /x HTTP/1.1\r\n\r\n".encodeToByteArray()
+        assertEquals(400, wire.route("POST", "/_project/invalid/begin?decisionProvider=unknown", request, null)?.status)
+        assertNull(first.registry.get("invalid"))
+        assertEquals(200, wire.route("POST", "/_project/legal/begin?decisionProvider=jev", request, null)?.status)
+        assertEquals(200, wire.route("POST", "/_project/legal/put?path=a.txt", request + "alpha".encodeToByteArray(), null)?.status)
+        assertEquals(200, wire.route("POST", "/_project/legal/put?path=b.txt&decisionProvider=${DecisionProvider.OPENAI.id}", request + "beta".encodeToByteArray(), null)?.status)
+        assertEquals(400, wire.route("POST", "/_project/legal/put?path=bad.txt&decisionProvider=unknown", request + "bad".encodeToByteArray(), null)?.status)
+        assertNull(first.registry.get("legal")?.gateway?.getAttachmentRef("bad.txt"))
+        assertEquals(listOf<Pair<String, DecisionProvider?>>("a.txt" to DecisionProvider.JEV, "b.txt" to DecisionProvider.OPENAI), admissions)
+        first.scopes.drain()
+
+        val second = harness(ledger, cas)
+        val resumed = mutableListOf<Pair<String, DecisionProvider?>>()
+        second.scopes.onDocument = { _, id, provider -> resumed.add(id to provider) }
+        assertEquals(1, second.scopes.remountLedger())
+        assertEquals(DecisionProvider.JEV, second.scopes.list().single().decisionProvider)
+        assertEquals(DecisionProvider.JEV, second.scopes.decisionProvider("legal", "a.txt"))
+        assertEquals(DecisionProvider.OPENAI, second.scopes.decisionProvider("legal", "b.txt"))
+        assertEquals(admissions, resumed)
+        second.scopes.drain()
     }
 
     @Test

@@ -6,11 +6,100 @@ import borg.trikeshed.lib.j
 
 import borg.trikeshed.common.createTempDirectory
 import borg.trikeshed.userspace.nio.posix.trikeshed_last_modified
+import borg.trikeshed.userspace.nio.posix.trikeshed_file_lease
 import borg.trikeshed.lib.*
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
 import platform.posix.*
 
 class PosixFileOperations : FileOperations {
+
+    override val durability: StorageDurability get() = StorageDurability.DURABLE
+
+    override fun acquireExclusiveLease(path: String): FileLease {
+        require('\u0000' !in path) { "Filesystem lease path contains NUL" }
+        val fd = trikeshed_file_lease(path)
+        check(fd >= 0) { posixFailure("acquire exclusive lease: $path") }
+        return object : FileLease {
+            val gate = SynchronizedObject()
+            var closed = false
+            override fun close() = synchronized(gate) {
+                if (!closed) {
+                    closed = true
+                    check(platform.posix.close(fd) == 0) { posixFailure("close lease: $path") }
+                }
+            }
+        }
+    }
+
+    /** Same-directory publication; no acknowledgement before file and directory fsync. */
+    override fun writeAtomically(filename: String, bytes: ByteArray): Unit = memScoped {
+        val name = filename.substringAfterLast('/')
+        require('\u0000' !in filename && name.isNotEmpty() && name != "." && name != "..") {
+            "Invalid atomic write target: $filename"
+        }
+        val target = if (filename.startsWith('/')) filename else "${cwd()}/$filename"
+        val parent = target.substringBeforeLast('/').ifEmpty { "/" }
+        mkdirs(parent)
+        val template = "$parent/.trikeshed-XXXXXX".cstr.placeTo(this)
+        val fd = mkstemp(template)
+        check(fd >= 0) { posixFailure("mkstemp: $parent") }
+        val temporary = template.toKString()
+        var failure: Throwable? = null
+        try {
+            withDescriptor(fd, temporary) {
+                check(fcntl(it, F_SETFD, FD_CLOEXEC) == 0) { posixFailure("FD_CLOEXEC: $temporary") }
+                if (bytes.isNotEmpty()) bytes.usePinned { pinned ->
+                    var offset = 0
+                    while (offset < bytes.size) {
+                        val written = platform.posix.write(it, pinned.addressOf(offset), (bytes.size - offset).convert())
+                        if (written < 0 && errno == EINTR) continue
+                        check(written > 0) { posixFailure("write: $temporary") }
+                        offset += written.toInt()
+                    }
+                }
+                syncDescriptor(it, temporary)
+            }
+            check(rename(temporary, target) == 0) { posixFailure("rename: $temporary -> $target") }
+            syncDirectory(parent)
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally {
+            if (unlink(temporary) != 0 && errno != ENOENT) {
+                val cleanup = IllegalStateException(posixFailure("unlink: $temporary"))
+                if (failure != null) failure.addSuppressed(cleanup) else throw cleanup
+            }
+        }
+    }
+
+    fun posixFailure(operation: String): String = "$operation failed (errno=$errno): ${strerror(errno)?.toKString()}"
+
+    inline fun <T> withDescriptor(fd: Int, path: String, body: (Int) -> T): T {
+        check(fd >= 0) { posixFailure("open: $path") }
+        var failure: Throwable? = null
+        try {
+            return body(fd)
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
+        } finally {
+            if (platform.posix.close(fd) != 0) {
+                val cleanup = IllegalStateException(posixFailure("close: $path"))
+                if (failure != null) failure.addSuppressed(cleanup) else throw cleanup
+            }
+        }
+    }
+
+    fun syncDescriptor(fd: Int, path: String) {
+        var result: Int
+        do { result = fsync(fd) } while (result != 0 && errno == EINTR)
+        check(result == 0) { posixFailure("fsync: $path") }
+    }
+
+    fun syncDirectory(path: String) =
+        withDescriptor(platform.posix.open(path, O_RDONLY or O_DIRECTORY or O_CLOEXEC), path) { syncDescriptor(it, path) }
 
     override fun readAllLines(filename: String): List<String> =
         readString(filename).replace("\r\n", "\n").split('\n').let { if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it }
@@ -91,7 +180,18 @@ class PosixFileOperations : FileOperations {
         val st = alloc<stat>(); stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.convert()) }
+    override fun mkdirs(path: String) {
+        require(path.isNotEmpty() && '\u0000' !in path) { "Invalid directory path" }
+        if (isDir(path)) return
+        val directory = path.trimEnd('/')
+        val parent = directory.substringBeforeLast('/', ".").ifEmpty { "/" }
+        mkdirs(parent)
+        check(mkdir(directory, 0x1FFu.convert()) == 0 || (errno == EEXIST && isDir(directory))) {
+            posixFailure("mkdir: $directory")
+        }
+        syncDirectory(directory)
+        syncDirectory(parent)
+    }
     override fun deleteRecursively(path: String): Unit = memScoped {
         val st = alloc<stat>()
         if (stat(path, st.ptr) != 0) return // Does not exist
@@ -116,7 +216,41 @@ class PosixFileOperations : FileOperations {
             remove(path)
         }
     }
-    override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
+    override fun resolvePath(vararg parts: String): String {
+        val joined = parts.asSequence().filter { it.isNotEmpty() }.joinToString("/")
+        require('\u0000' !in joined) { "Filesystem path contains NUL" }
+        val absolute = if (joined.startsWith('/')) joined else "${cwd()}/$joined"
+        val names = mutableListOf<String>()
+        for (name in absolute.splitToSequence('/')) when (name) {
+            "", "." -> Unit
+            ".." -> if (names.isNotEmpty()) names.removeAt(names.lastIndex)
+            else -> names.add(name)
+        }
+        return "/" + names.joinToString("/")
+    }
+
+    override fun canonicalPath(path: String): String {
+        require(path.isNotEmpty() && '\u0000' !in path) { "Invalid filesystem path" }
+        var candidate = (if (path.startsWith('/')) path else "${cwd()}/$path").trimEnd('/').ifEmpty { "/" }
+        val missing = mutableListOf<String>()
+        while (true) {
+            val resolved = realpath(candidate, null)
+            if (resolved != null) {
+                try { return resolvePath(resolved.toKString(), *missing.asReversed().toTypedArray()) }
+                finally { free(resolved) }
+            }
+            check(errno == ENOENT) { posixFailure("realpath: $candidate") }
+            // A dangling symlink is an existing, unresolved alias, not a new directory name.
+            val absent = memScoped { lstat(candidate, alloc<stat>().ptr) }
+            check(absent != 0) { "Unresolvable filesystem path: $candidate" }
+            check(errno == ENOENT && candidate != "/") { posixFailure("lstat: $candidate") }
+            val name = candidate.substringAfterLast('/')
+            require(name != "..") { "Unresolvable filesystem path: $candidate" }
+            if (name != ".") missing.add(name)
+            candidate = candidate.substringBeforeLast('/').trimEnd('/').ifEmpty { "/" }
+        }
+    }
+
     override fun readZip(path: String): List<Join<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun open(path: String, readOnly: Boolean): Int {
         val flags = if (readOnly) O_RDONLY else (O_RDWR or O_CREAT)

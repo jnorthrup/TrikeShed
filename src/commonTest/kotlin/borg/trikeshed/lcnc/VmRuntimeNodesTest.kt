@@ -20,6 +20,32 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class VmRuntimeNodesTest {
+    @Test fun expressionDelegatesTypedInputAndServicesWithoutAnotherInvocation() = runTest {
+        var calls = 0
+        val host = Host()
+        val delegate = boundLcnc(VmHostKey(host)) { service, node, inputs ->
+            assertTrue(service.value === host)
+            assertEquals("vm.polyglot", node.type)
+            assertEquals("js", node.params["language"])
+            assertEquals("const x = input;\nreturn (\nx.value\n);", node.params["source"])
+            assertEquals("0", node.params["calls"])
+            assertEquals(mapOf("input" to mapOf("value" to "synthetic")), inputs)
+            calls++
+            mapOf("value" to "synthetic")
+        }
+        val expression = VmRuntimeNodes.expression(delegate)
+        val bindings = expression as LcncServiceBinding
+        assertTrue(bindings.requiredKeys.view.any { it === VmHostKey })
+        var observations = 0
+        val absent: String? = bindings.withServices { observations++; null }
+        assertEquals(null, absent)
+        assertEquals(1, observations, "a null observation is not a reason to run twice")
+        assertEquals(mapOf("y" to "synthetic"), expression.run(LcncNode("shape", "js", mapOf("expr" to "x.value")),
+            mapOf("x" to mapOf("value" to "synthetic"), "language" to "python", "world" to "/not-forwarded")))
+        assertEquals(1, calls)
+        assertFalse(currentCoroutineContext().job.children.any())
+    }
+
     private class Host : VmHost {
         val specs = mutableListOf<VmSpec>()
         val handles = linkedMapOf<String, Handle>()

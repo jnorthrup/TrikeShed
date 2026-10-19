@@ -16,23 +16,33 @@ fun main() {
 }
 
 private fun boot() {
-    if (document.getElementById("curator") != null) { CuratorPage.mount(); return }
+    if (document.getElementById("curator") != null) {
+        CuratorPage.mount(); window.asDynamic().closePanels = { CuratorPage.close() }; return
+    }
     if (document.getElementById("world") == null) return
     val p = Panels()
-    p.blip.install()
-    p.camera.install()
-    wire(p)
-    val ws = SpaceGraphWorkspace(p); p.workspace = ws; ws.install()
-    p.facets.install()
-    exposeWindow(p)
-    // The BLACKBOARD: a delta on the vocabulary entry re-hydrates the palette from what is on the board.
-    try {
-        val es = jsNew(js("EventSource"), "/blackboard/facts")
-        es.onmessage = { e: dynamic ->
-            try { val d = JSON.parse<dynamic>(str(e.data)); if (truthy(d) && d.key == "lcnc/vocabulary") launchJs { p.syncContracts(announce = false); p.buildPalette() } } catch (x: dynamic) {}
-        }
-    } catch (x: dynamic) {}
-    launchJs { start(p) }
+    p.page.mount {
+        p.page.own { p.stopSources() }
+        p.page.own { p.blip.leave(null) }
+        p.page.own { p.camera.close() }
+        p.page.own { p.debugger.stopObserving() }
+        p.page.own { p.facets.close() }
+        p.blip.install()
+        p.camera.install()
+        wire(p)
+        val ws = SpaceGraphWorkspace(p); p.workspace = ws; ws.install()
+        p.facets.install()
+        exposeWindow(p)
+        // The BLACKBOARD: a delta on the vocabulary entry re-hydrates the palette from what is on the board.
+        try {
+            val es = jsNew(js("EventSource"), "/blackboard/facts")
+            p.page.own { es.onmessage = null; es.close() }
+            es.onmessage = { e: dynamic ->
+                try { val d = JSON.parse<dynamic>(str(e.data)); if (truthy(d) && d.key == "lcnc/vocabulary") p.launchJs { p.syncContracts(announce = false); p.buildPalette() } } catch (x: dynamic) {}
+            }
+        } catch (x: dynamic) {}
+        p.launchJs { start(p) }
+    }
 }
 
 /** boot: restore, or seed the starter panel. Boot waits for contract hydration. */
@@ -44,7 +54,7 @@ private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
         p.graph.controls = objOf { it.humanOversight = true; it.inspectionOnly = true }
         byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
         byId("palette").classList.remove("open")
-        p.applyView(); window.requestAnimationFrame { p.redraw() }
+        p.applyView(); p.page.frame { p.redraw() }
         try {
             val (token, run) = DebugNavigation.source(search)
             p.status("Observing an existing run — no construction loaded or executed; saved scratch is unchanged")
@@ -61,12 +71,12 @@ private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
         byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
         byId("palette").classList.remove("open")
         try {
-            val (cid, path) = ConfixNavigation.source(search)
-            p.facets.inspectContent(cid, path)
+            val (cid, path, syntax) = ConfixNavigation.source(search)
+            p.facets.inspectContent(cid, path, syntax)
             p.status("Retained content inspection — no construction loaded or executed; saved scratch is unchanged")
         } catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (e: dynamic) { p.refuseLoad("Invalid retained-content link: " + failureText(e)) }
-        p.applyView(); window.requestAnimationFrame { p.redraw() }
+        p.applyView(); p.page.frame { p.redraw() }
         return
     }
     val documentTask = search.get("documentTask")
@@ -77,24 +87,24 @@ private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
         byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
     }
     if (!p.syncContracts()) {
-        p.refuseLoad("Contract vocabulary is unavailable; startup is paused") { launchJs { start(p, revision) } }
+        p.refuseLoad("Contract vocabulary is unavailable; startup is paused") { p.launchJs { start(p, revision) } }
         return
     }
     p.syncLanes()
-    launchJs { p.buildPalette() }
+    p.launchJs { p.buildPalette() }
     if (p.documentRevision != revision) {
         byId("panelLoadRefusal")?.remove()
         p.status("Contracts ready; canvas changed during startup, so automatic restore was skipped")
         return
     }
     if (!truthy(document.body!!.classList.contains("sg-spatial"))) byId("palette").classList.add("open")
-    if (search.get("dlg") == "keys") launchJs { p.openKeyMuxDlg() }
+    if (search.get("dlg") == "keys") p.launchJs { p.openKeyMuxDlg() }
     if (documentTask != null) {
         // A failed task link must never fall through to a live default or restored local canvas.
         try { if (p.loadDocumentTask(documentTask)) p.fit() }
         catch (e: kotlinx.coroutines.CancellationException) { throw e }
         catch (e: dynamic) { p.status("Document task not loaded: " + failureText(e)) }
-        p.applyView(); window.requestAnimationFrame { p.redraw() }
+        p.applyView(); p.page.frame { p.redraw() }
         return
     }
     // /panels?load=<name> IS a link to a document: presets first, then the store. Link views are ephemeral.
@@ -127,7 +137,7 @@ private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
     val bookmark = PatchNavigation.decode(window.location.hash)
     if (bookmark != null) p.camera.restoreCameraView(bookmark)
     else if (!qload.isNullOrEmpty()) p.fit()
-    p.applyView(); window.requestAnimationFrame { p.redraw() }
+    p.applyView(); p.page.frame { p.redraw() }
     // The ops board remains live; constructions requiring oversight wait for Run.
     p.armSources(automatic = true)
     p.runAll(null, automatic = true)
@@ -194,22 +204,22 @@ private fun seedOpsBoard(p: Panels): Boolean {
 /** every control on the bar, the canvas gestures, keys */
 private fun wire(p: Panels) {
     val vp = p.viewport
-    on(p.world, "pointerdown", { e ->
+    p.page.on(p.world, "pointerdown", { e ->
         val hitEl = if (e.target.closest != null) e.target.closest(".node") else undefined
         val picked = p.nodes().firstOrNull { it.el === hitEl }
         val target = if (picked != null && truthy(picked._childHost)) picked else picked?._parentScope ?: p.scopeAtTarget(e.target)
         p.layoutOwner.parentId = if (truthy(target)) target.id else null
     })
-    on(vp, "dblclick", { e ->
+    p.page.on(vp, "dblclick", { e ->
         val sc = p.scopeAtTarget(e.target)
         if (sc != null) p.showMenu(num(e.clientX), num(e.clientY), sc)
         else if (e.target === vp || e.target.id == "world" || e.target.id == "wires") p.showMenu(num(e.clientX), num(e.clientY))
     })
-    on(vp, "contextmenu", { e -> e.preventDefault(); p.showMenu(num(e.clientX), num(e.clientY), p.scopeAtTarget(e.target)) })
-    on(byId("qsBtn"), "click", { p.openQuickstart() })
-    on(byId("fbBtn"), "click", { p.openFeedback() })
+    p.page.on(vp, "contextmenu", { e -> e.preventDefault(); p.showMenu(num(e.clientX), num(e.clientY), p.scopeAtTarget(e.target)) })
+    p.page.on(byId("qsBtn"), "click", { p.openQuickstart() })
+    p.page.on(byId("fbBtn"), "click", { p.openFeedback() })
     var dragHint: dynamic = null
-    on(vp, "dragover", { e ->
+    p.page.on(vp, "dragover", { e ->
         e.preventDefault(); e.dataTransfer.dropEffect = "copy"
         val types = arr(js("Array.from(e.dataTransfer.types||[])")).map { str(it) }
         val isPalette = "text/x-lcnc-type" in types || "text/x-lcnc-program" in types
@@ -220,29 +230,27 @@ private fun wire(p: Panels) {
         }
         dragHint.textContent = if (isPalette) "⊕ drop to place (a ring's square places INSIDE it)" else "⊕ drop to mount project"
     })
-    on(vp, "dragleave", { e -> if (!vp.contains(e.relatedTarget)) { dragHint?.remove(); dragHint = null } })
-    on(vp, "drop", { e -> e.preventDefault(); dragHint?.remove(); dragHint = null; launchJs { p.onDrop(e) } })
-    on(window, "pointerdown", { e -> if (!p.menu.contains(e.target)) p.menu.style.display = "none" })
-    on(byId("addBtn"), "click", { p.showMenu(60.0, 60.0) })
-    on(byId("fitBtn"), "click", { p.fit() })
-    on(byId("shakeBtn"), "click", { e -> launchJs { p.shake.request(p.shakeOwner, objOf { it.optional = truthy(e.shiftKey) }) } })
-    on(byId("fdBtn"), "click", { launchJs { p.layout.settle(p.layoutOwner) } })
+    p.page.on(vp, "dragleave", { e -> if (!vp.contains(e.relatedTarget)) { dragHint?.remove(); dragHint = null } })
+    p.page.on(vp, "drop", { e -> e.preventDefault(); dragHint?.remove(); dragHint = null; p.launchJs { p.onDrop(e) } })
+    p.page.on(window, "pointerdown", { e -> if (!p.menu.contains(e.target)) p.menu.style.display = "none" })
+    p.page.on(byId("addBtn"), "click", { p.showMenu(60.0, 60.0) })
+    p.page.on(byId("fitBtn"), "click", { p.fit() })
+    p.page.on(byId("shakeBtn"), "click", { e -> p.launchJs { p.shake.request(p.shakeOwner, objOf { it.optional = truthy(e.shiftKey) }) } })
+    p.page.on(byId("fdBtn"), "click", { p.launchJs { p.layout.settle(p.layoutOwner) } })
     byId("runBtn").title = "Run this authored program once in the daemon and inspect its durable receipt"
-    on(byId("runBtn"), "click", { launchJs { p.runProgram() } })
+    p.page.on(byId("runBtn"), "click", { p.admitProgram() })
     val debug = document.createElement("button").asDynamic()
     debug.id = "debugBtn"; debug.textContent = "Debug nodes"
     debug.title = "Run once in the daemon; step nodes and rings, or enter in-process JS/Python/Ruby source. Pauses count toward timeouts."
     byId("runBtn").parentNode.insertBefore(debug, byId("stopBtn"))
-    on(debug, "click", { launchJs { p.runProgram(debug = true) } })
+    p.page.on(debug, "click", { p.admitProgram(debug = true) })
     val live = document.createElement("button").asDynamic()
     live.id = "liveBtn"; live.textContent = "Live"; live.setAttribute("aria-label", "Run live panel")
-    live.title = "Page-owned interactive sweep and sources; not a durable whole-program run"
+    live.title = "Run once in the daemon, then admit root gestures against its retained receipt"
     byId("runBtn").parentNode.insertBefore(live, byId("stopBtn"))
-    on(live, "click", {
-        if (!p.programRunning) { p.armSources(); launchJs { p.runAll(null) } }
-    })
-    on(byId("stopBtn"), "click", { p.stopSources() })
-    on(p.mm, "click", { e ->
+    p.page.on(live, "click", { p.admitProgram(live = true) })
+    p.page.on(byId("stopBtn"), "click", { p.stopSources() })
+    p.page.on(p.mm, "click", { e ->
         if (truthy(p.mm._s)) {
             val r = p.mm.getBoundingClientRect()
             val wx = ((num(e.clientX) - num(r.left)) - num(p.mm._ox)) / num(p.mm._s); val wy = ((num(e.clientY) - num(r.top)) - num(p.mm._oy)) / num(p.mm._s)
@@ -250,8 +258,9 @@ private fun wire(p: Panels) {
             p.applyView(); p.save(); p.drawMinimap()
         }
     })
-    window.setInterval({ p.drawMinimap() }, 1500)
-    on(window, "keydown", { e ->
+    val minimap = window.setInterval({ p.drawMinimap() }, 1500)
+    p.page.own { window.clearInterval(minimap) }
+    p.page.on(window, "keydown", { e ->
         val t = e.target; val tag = str(t?.tagName ?: "").lowercase()
         if (tag == "input" || tag == "textarea" || tag == "select" || truthy(t?.isContentEditable)) return@on
         // Bare F frames the board — checked before the modifier gate
@@ -260,8 +269,8 @@ private fun wire(p: Panels) {
         if (e.key == "z" || e.key == "Z") { e.preventDefault(); if (truthy(e.shiftKey)) p.history.redo() else p.history.undo() }
         else if (e.key == "y" || e.key == "Y") { e.preventDefault(); p.history.redo() }
     })
-    on(byId("storeSaveBtn"), "click", {
-        launchJs {
+    p.page.on(byId("storeSaveBtn"), "click", {
+        p.launchJs {
             val name = str(p.panelName().value ?: "").trim()
             if (!Regex("^[a-z0-9][a-z0-9._-]*$").matches(name)) { p.status("name: lowercase kebab"); return@launchJs }
             val resp = fetchJs("/api/panels/$name", jsonInit("POST", JSON.stringify(p.serialize())))
@@ -273,8 +282,8 @@ private fun wire(p: Panels) {
             if (r.verdict == "ok") p.syncBoard(name)
         }
     })
-    on(byId("storeLoadBtn"), "click", {
-        launchJs {
+    p.page.on(byId("storeLoadBtn"), "click", {
+        p.launchJs {
             var name = str(p.panelName().value ?: "").trim()
             if (name.isEmpty()) {
                 val r = fetchJson("/api/panels")
@@ -287,21 +296,21 @@ private fun wire(p: Panels) {
             if (!truthy(resp.ok)) { p.status("load failed: " + str(resp.status)); return@launchJs }
             if (!p.load(awaitJs(resp.json()))) return@launchJs
             p.panelName().value = name
-            p.armSources(automatic = true); launchJs { p.runAll(null, automatic = true) }
+            p.armSources(automatic = true); p.runAll(null, automatic = true)
             p.status("loaded panels/$name")
             p.syncBoard(name)
         }
     })
-    on(byId("exportBtn"), "click", {
+    p.page.on(byId("exportBtn"), "click", {
         val doc = p.serialize()
         val parts = arrayOf(js("JSON.stringify(doc,null,1)")); val blobType = objOf { it.type = "application/json" }
         val blob = js("new Blob(parts, blobType)")
         val a = document.createElement("a").asDynamic(); a.href = js("URL").createObjectURL(blob); a.download = "panel-graph.json"; a.click()
     })
-    on(byId("importBtn"), "click", { byId("fileIn").click() })
-    on(byId("fileIn"), "change", { e ->
+    p.page.on(byId("importBtn"), "click", { byId("fileIn").click() })
+    p.page.on(byId("fileIn"), "change", { e ->
         val f = e.target.files[0]
-        if (f != null) launchJs {
+        if (f != null) p.launchJs {
             try {
                 if (p.load(JSON.parse(str(awaitJs(f.text()))))) {
                     p.armSources(automatic = true); p.runAll(null, automatic = true)
@@ -311,14 +320,14 @@ private fun wire(p: Panels) {
             finally { e.target.value = "" }
         }
     })
-    on(byId("clearBtn"), "click", { if (window.confirm("clear the panel?")) p.load(objOf { it.nodes = jsArray(); it.wires = jsArray() }) })
-    on(byId("paletteBtn"), "click", { byId("palette").classList.toggle("open") })
-    on(byId("keysBtn"), "click", { launchJs { p.openKeyMuxDlg() } })
-    on(byId("assetsBtn"), "click", { borg.trikeshed.web.AssetTreeDialog.toggle() })
-    on(byId("presetsBtn"), "click", { launchJs { p.openGallery() } })
-    on(byId("rdfBtn"), "click", { p.openRdf() })
-    on(byId("undoBtn"), "click", { p.history.undo() })
-    on(byId("redoBtn"), "click", { p.history.redo() })
+    p.page.on(byId("clearBtn"), "click", { if (window.confirm("clear the panel?")) p.load(objOf { it.nodes = jsArray(); it.wires = jsArray() }) })
+    p.page.on(byId("paletteBtn"), "click", { byId("palette").classList.toggle("open") })
+    p.page.on(byId("keysBtn"), "click", { p.launchJs { p.openKeyMuxDlg() } })
+    p.page.on(byId("assetsBtn"), "click", { borg.trikeshed.web.AssetTreeDialog.toggle() })
+    p.page.on(byId("presetsBtn"), "click", { p.launchJs { p.openGallery() } })
+    p.page.on(byId("rdfBtn"), "click", { p.openRdf() })
+    p.page.on(byId("undoBtn"), "click", { p.history.undo() })
+    p.page.on(byId("redoBtn"), "click", { p.history.redo() })
 }
 
 /** the page's shared state and operations, as the markup, the blip and cross-surface scripts address them */
@@ -336,6 +345,7 @@ private fun exposeWindow(p: Panels) {
     w.ringScaleOf = { n: dynamic -> p.ringScaleOf(n) }
     w.applyView = { p.applyView() }
     w.blipLeave = { p.blipLeave() }
+    w.closePanels = { p.close() }
     val cGet = obj(); cGet.get = { p.contracts }; cGet.configurable = true
     js("Object.defineProperty")(w, "CONTRACTS", cGet)
 }

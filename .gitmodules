@@ -1,0 +1,5 @@
+[submodule "utils/hermes-trikeshed-graalpy"]
+	path = utils/hermes-trikeshed-graalpy
+	url = https://github.com/jnorthrup/hermes-trikeshed-graalpy.git
+	branch = codex/graalpy
+	shallow = true

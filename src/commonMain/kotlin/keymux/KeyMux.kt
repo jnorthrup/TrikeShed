@@ -36,7 +36,10 @@ typealias KeyResult = Join<String?, String>   // value j sourceName
 typealias KeyBinding = Join<KeyPath, KeySource>
 
 /** One consistent key/base_url answer from [KeyMux.resolveLlm] — never a mix of two different snapshots. */
-internal class LlmResolution(val keyId: String, val authKey: String, val baseUrl: String)
+internal class LlmResolution(val keyId: String?, val authKey: String?, val baseUrl: String)
+
+/** NONE is an explicit endpoint policy: no credential source or default key is consulted. */
+enum class LlmAuth { REQUIRED, NONE }
 
 /** The mux itself: ordered bindings + resolver strategy */
 typealias KeyMuxCore = Join<Series<KeyBinding>, KeyResolver>
@@ -540,9 +543,16 @@ class KeyMux constructor(
      * can pair an old secret with a new destination. [resolveLlm] takes the
      * overlay's binding once via [PinOverlaySource.snapshotPin] and reuses it
      * for both fields; everything else falls through the ordinary
-     * first-wins precedence [get] uses. Returns null when no auth key resolves.
+     * first-wins precedence [get] uses. REQUIRED returns null when no key resolves;
+     * NONE uses only the explicit destination and never touches credential sources.
      */
-    internal suspend fun resolveLlm(modelId: String, providerTag: String?, fallbackBaseUrl: String): LlmResolution? {
+    internal suspend fun resolveLlm(
+        modelId: String,
+        providerTag: String?,
+        fallbackBaseUrl: String,
+        auth: LlmAuth = LlmAuth.REQUIRED,
+    ): LlmResolution? {
+        if (auth == LlmAuth.NONE) return LlmResolution(null, null, fallbackBaseUrl)
         val pins = mutableMapOf<PinOverlaySource, PinBinding?>()
         val snapshot = bindings.view.map { binding ->
             val source = binding.b

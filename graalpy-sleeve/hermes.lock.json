@@ -1,6 +1,6 @@
 {
-  "repository": "https://github.com/jnorthrup/hermes-trikeshed-graal.git",
-  "revision": "9b91afb72d44481e91c4022cce2af18d672c28a7",
+  "repository": "https://github.com/jnorthrup/hermes-trikeshed-graalpy.git",
+  "revision": "2486f52ebd7ecebe432d6de1062125933e706788",
   "branch": "codex/graalpy",
   "upstream": {
     "repository": "https://github.com/NousResearch/hermes-agent.git",

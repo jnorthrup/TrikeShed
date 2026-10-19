@@ -27,6 +27,11 @@ body{background:var(--bg);color:var(--ink);font:13px/1.45 "SF Mono","JetBrains M
 .chip span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
 button.chip{font:inherit;color:var(--ink);text-align:left;cursor:pointer}
 button.chip:disabled{opacity:.6;cursor:wait}
+#ingest{min-width:190px;max-width:240px}
+#ingest label{display:block;font-size:10px;color:var(--dim)}
+#ingestProvider{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:3px;color:var(--ink);font:inherit;padding:2px 4px}
+#ingestStatus{display:block;font-size:10px;line-height:1.2;letter-spacing:0;text-transform:none}
+#ingestStatus[data-error="true"]{color:var(--deopt)}
 .chip.flash-compile{box-shadow:0 0 0 1px var(--compile),0 0 14px rgba(61,220,132,.45)}
 .chip.flash-deopt{box-shadow:0 0 0 1px var(--deopt),0 0 14px rgba(255,79,88,.5)}
 .chip.flash-gc{box-shadow:0 0 0 1px var(--gc),0 0 14px rgba(255,176,46,.45)}
@@ -203,6 +208,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <canvas id="map"></canvas>
 <div id="hud">
   <div id="ident"><b>GraalVM</b><span id="identSub">connecting…</span></div>
+  <div class="chip" id="ingest"><label for="ingestProvider">Ingest model</label><select id="ingestProvider" aria-describedby="ingestStatus" disabled><option value="jeva">Jeva</option><option value="jev">Jev</option><option value="openai-decision">OpenAI decision</option></select><span id="ingestStatus" role="status" aria-live="polite">Loading providers…</span></div>
   <button class="chip" id="cSync" type="button" aria-label="Sync primary worktree and refresh blackboard snapshot" title="Reconcile the primary worktree and refresh the blackboard snapshot"><b>Sync</b><span>worktree</span></button>
   <div class="chip" id="cComp"><b>0</b><span>jit compiles</span><canvas class="spark" width="86" height="14"></canvas></div>
   <div class="chip" id="cDeopt"><b>0</b><span>deopts</span></div>

@@ -10,6 +10,10 @@ import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -64,5 +68,50 @@ class ProjectCorpusJvmTest {
         val docs = ProjectNodes.registry(corpus).getValue(ProjectNodes.DOCS)
         val out = docs.run(borg.trikeshed.lcnc.LcncNode("d", ProjectNodes.DOCS, params = mapOf("project" to scope.name, "glob" to "*.md")), emptyMap())
         assertEquals(2, out["count"])
+    }
+
+    @Test
+    fun pdfExtractReusesItsFootnotesMarkerRegardlessOfMimeType(): Unit = runBlocking {
+        val (scopes, registry) = rig()
+        val scope = scopes.beginUpload("pdf-marker")
+        scopes.uploadPut(scope.name, "book.pdf", "%PDF-fixture".encodeToByteArray())
+        scopes.uploadPut(scope.name, "book.pdf.extract.md", "retained extraction".encodeToByteArray())
+        scopes.uploadPut(scope.name, "book.pdf.footnotes.tsv", "page\ttext\n1\tnote".encodeToByteArray())
+        val corpus = JvmProjectCorpus(registry, scopes, ingest = { _, _ -> error("completed PDF must not be extracted again") })
+        try {
+            assertEquals("application/octet-stream", registry.get(scope.name)!!.gateway
+                .getAttachmentRef("book.pdf.footnotes.tsv")!!.contentType)
+            assertEquals("retained extraction", corpus.extract(scope.name, "book.pdf", 1_000)?.text)
+        } finally { scopes.drain() }
+    }
+
+    @Test
+    fun concurrentPdfExtractsShareOneCompletedExtraction(): Unit = runBlocking {
+        val (scopes, registry) = rig()
+        val scope = scopes.beginUpload("pdf-concurrent")
+        scopes.uploadPut(scope.name, "book.pdf", "%PDF-fixture".encodeToByteArray())
+        scopes.uploadPut(scope.name, "book.pdf.extract.md", "legacy extraction without notes".encodeToByteArray())
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var calls = 0
+        val corpus = JvmProjectCorpus(registry, scopes, ingest = { project, id ->
+            calls++
+            entered.complete(Unit)
+            release.await()
+            scopes.uploadPut(project, id + ProjectMiner.FOOTNOTES_SUFFIX, "page\ttext\n1\tnote".encodeToByteArray())
+            scopes.uploadPut(project, id + ProjectNodes.EXTRACT_SUFFIX, "completed extraction".encodeToByteArray())
+        })
+        try {
+            withTimeout(5_000) {
+                val first = async { corpus.extract(scope.name, "book.pdf", 1_000) }
+                entered.await()
+                val second = async(start = CoroutineStart.UNDISPATCHED) { corpus.extract(scope.name, "book.pdf", 1_000) }
+                assertEquals(1, calls)
+                release.complete(Unit)
+                assertEquals("completed extraction", first.await()?.text)
+                assertEquals("completed extraction", second.await()?.text)
+                assertEquals(1, calls, "the waiter must recheck the twins after the first extraction completes")
+            }
+        } finally { release.complete(Unit); scopes.drain() }
     }
 }

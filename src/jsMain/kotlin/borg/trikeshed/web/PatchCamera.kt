@@ -17,6 +17,22 @@ import kotlin.math.sign
  * [harness] is the blackboard's Harness object on /blackboard, null on /panels.
  */
 class PatchCamera(private val s: PatchSurface, private val harness: () -> dynamic = { null }) {
+    private class Binding(val target: dynamic, val type: String, val handler: (dynamic) -> Unit,
+                          val admitted: (dynamic) -> Unit, val options: dynamic)
+    private val bindings = mutableListOf<Binding>()
+    private var closed = false
+    private fun on(target: dynamic, type: String, handler: (dynamic) -> Unit, options: dynamic = undefined) {
+        check(!closed) { "Camera is closed" }
+        val admitted: (dynamic) -> Unit = { if (!closed) handler(it) }
+        bindings.add(Binding(target, type, handler, admitted, options))
+        borg.trikeshed.web.on(target, type, admitted, options)
+    }
+    private fun off(target: dynamic, type: String, handler: (dynamic) -> Unit) {
+        val index = bindings.indexOfFirst { it.target === target && it.type == type && it.handler === handler }
+        if (index < 0) return
+        val binding = bindings.removeAt(index)
+        borg.trikeshed.web.off(binding.target, binding.type, binding.admitted, binding.options)
+    }
     private val view get() = s.view
     private val viewport get() = s.viewport
 
@@ -167,6 +183,7 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
     private var camSaveT = 0
     /** Blackboard navigation saves only its bookmark; /panels saves and rewrites the hash. */
     fun saveCameraSoon() {
+        if (closed) return
         window.clearTimeout(camSaveT)
         val h = harness()
         if (h != null) { h.rememberView(); return }
@@ -183,6 +200,7 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
         LandscapeMomentum.wheelPixels(num(e.deltaY), num(e.deltaMode).toInt(), rectHeight)
 
     fun install() {
+        check(!closed) { "Camera is closed" }
         on(viewport, "pointerdown", { e ->
             if (e.button != 0) return@on
             val hb = harness(); if (hb != null) hb.terrainBookmark = null
@@ -216,6 +234,27 @@ class PatchCamera(private val s: PatchSurface, private val harness: () -> dynami
             applyView(); saveCameraSoon()
             if (momentum.wheel(px, py, f, before, num(view.z), ceiling, now())) glide()
         }, passive)
+    }
+
+    /** Release the mounted camera's callbacks without scheduling another save or momentum frame. */
+    fun close() {
+        if (closed) return
+        closed = true
+        var failure: Throwable? = null
+        fun release(action: () -> Unit) {
+            try { action() } catch (caught: Throwable) {
+                if (failure == null) failure = caught else if (failure !== caught) failure?.addSuppressed(caught)
+            }
+        }
+        release { killMomentum() }
+        release { window.cancelAnimationFrame(momFrame) }
+        release { window.clearTimeout(camSaveT) }
+        momFrame = 0; camSaveT = 0
+        release { viewport.classList.remove("panning") }
+        release { restoreCameraDetail() }
+        for (binding in bindings) release { borg.trikeshed.web.off(binding.target, binding.type, binding.admitted, binding.options) }
+        bindings.clear()
+        failure?.let { throw it }
     }
 
     companion object {

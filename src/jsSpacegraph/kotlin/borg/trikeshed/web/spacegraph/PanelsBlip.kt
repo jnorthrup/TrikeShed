@@ -10,6 +10,9 @@ import kotlinx.coroutines.CancellationException
  * (/api/lcnc/blip) — asserted, inferred, graal. Nothing here is authored by the page.
  */
 class PanelsBlip(private val p: Panels) {
+    private fun launchJs(block: suspend () -> Unit) = p.launchJs(block)
+    private fun on(target: dynamic, type: String, handler: (dynamic) -> Unit, options: dynamic = undefined) =
+        p.page.on(target, type, handler, options)
     private var timer = 0
     private var node: dynamic = null
     private var seq = 0
@@ -22,6 +25,7 @@ class PanelsBlip(private val p: Panels) {
     private fun el(): dynamic = document.getElementById("blip").asDynamic()
 
     fun move(e: dynamic) {
+        if (p.page.closing) return
         if (node == null || e.currentTarget !== node.el) return
         if (truthy(e.buttons)) { leave(null); return }
         x = num(e.clientX); y = num(e.clientY)
@@ -66,6 +70,7 @@ class PanelsBlip(private val p: Panels) {
     }
 
     fun enter(n: dynamic, e: dynamic) {
+        if (p.page.closing) return
         if (e.pointerType == "touch" || truthy(e.buttons)) return
         leave(null); x = num(e.clientX); y = num(e.clientY); node = n
         val mySeq = seq
@@ -80,8 +85,8 @@ class PanelsBlip(private val p: Panels) {
     }
 
     fun install() {
-        window.addEventListener("resize", { leave(null) })
-        window.addEventListener("blur", { leave(null) })
+        on(window, "resize", { leave(null) })
+        on(window, "blur", { leave(null) })
         on(window, "keydown", { e -> if (e.key == "Escape") leave(null) })
         on(p.viewport, "pointerdown", { leave(null) }, true)
         on(p.viewport, "wheel", { leave(null) }, objOf { it.passive = true })

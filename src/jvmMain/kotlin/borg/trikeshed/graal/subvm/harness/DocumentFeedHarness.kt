@@ -88,6 +88,7 @@ object DocumentFeedHarness {
         val receipts = ArrayList<DocumentFeed.Receipt>()
         bag.open()
         var feed: DocumentFeed? = null
+        var failure: Throwable? = null
         try {
             feed = DocumentFeed.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture")
             val supported = feed.submit(pdf).also(receipts::add)
@@ -136,8 +137,20 @@ object DocumentFeedHarness {
                 check(!CamelRuntime.isRunning(feed.routeId) && feed.job.isCompleted)
                 feed = null
             }
+        } catch (caught: Throwable) {
+            failure = caught
+            if (caught is DocumentFeed.StartFailure) feed = caught.feed
+            throw caught
         } finally {
-            try { feed?.drain() } finally { try { bag.drain() } finally { fixture.close() } }
+            // A retained consumer must stop before the fixture closes its dependencies.
+            try { feed?.drain() } catch (cleanup: Throwable) {
+                failure?.let { primary ->
+                    if (primary !== cleanup) primary.addSuppressed(cleanup)
+                    throw primary
+                }
+                throw cleanup
+            }
+            try { bag.drain() } finally { fixture.close() }
         }
         val expectedAttributions = if (ocr) 4 else 3
         check(bag.size == expectedAttributions) { "Expected $expectedAttributions source attributions, found ${bag.size}" }

@@ -336,11 +336,15 @@ class WorkspaceStorageTest {
                 val base = "http://127.0.0.1:${server.address.port}"
                 val client = java.net.http.HttpClient.newBuilder()
                     .connectTimeout(java.time.Duration.ofSeconds(5)).build()
-                fun http(method: String, body: String = "", path: String = "/api/lcnc/workspace") = client.send(java.net.http.HttpRequest.newBuilder(
-                    java.net.URI("$base$path")).timeout(java.time.Duration.ofSeconds(20))
-                    .header("Content-Type", "application/json")
-                    .method(method, java.net.http.HttpRequest.BodyPublishers.ofString(body)).build(),
-                    java.net.http.HttpResponse.BodyHandlers.ofString())
+                // The module's queued-run and observation lanes share this runBlocking event loop.
+                // Blocking client I/O must yield it so queued runs and projections can settle.
+                suspend fun http(method: String, body: String = "", path: String = "/api/lcnc/workspace") = withContext(Dispatchers.IO) {
+                    client.send(java.net.http.HttpRequest.newBuilder(
+                        java.net.URI("$base$path")).timeout(java.time.Duration.ofSeconds(20))
+                        .header("Content-Type", "application/json")
+                        .method(method, java.net.http.HttpRequest.BodyPublishers.ofString(body)).build(),
+                        java.net.http.HttpResponse.BodyHandlers.ofString())
+                }
                 val catalogResponse = http("GET")
                 assertEquals(200, catalogResponse.statusCode())
                 val observations = http("GET", path = "/api/graal/pointcuts")
@@ -407,7 +411,8 @@ class WorkspaceStorageTest {
                     val priorRuns = LcncRunHead.rows(service.context.blackboard.snapshot().values).map { it.runId }.toSet()
                     println("LCNC_STORAGE_DICTIONARY=${dictionaryCid.value}")
                     println("LCNC_STORAGE_UI=$base/panels?load=language-check")
-                    assertTrue(finished.await(10, java.util.concurrent.TimeUnit.MINUTES), "Browser check did not close")
+                    assertTrue(withContext(Dispatchers.IO) { finished.await(10, java.util.concurrent.TimeUnit.MINUTES) },
+                        "Browser check did not close")
                     if (fileTreeUi) assertEquals(priorRuns,
                         LcncRunHead.rows(service.context.blackboard.snapshot().values).map { it.runId }.toSet(),
                         "File-tree inspection and indexing must not execute a panel graph")
@@ -457,7 +462,7 @@ class WorkspaceStorageTest {
                 assertContentEquals(sourceHead, Files.readAllBytes(f.root.resolve("couch/HEAD")))
             } finally {
                 server.stop(0); executor.shutdownNow()
-                assertTrue(executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS))
+                assertTrue(withContext(NonCancellable + Dispatchers.IO) { executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS) })
             }
             } finally {
                 try { module?.drain() } finally {

@@ -12,12 +12,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
+import kotlinx.coroutines.withTimeout
 import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
+import kotlin.test.assertFalse
 
 /** Minimal proxy-ctor module for the gate: claims one exact path, answers a marker. */
 class EchoModule : ForgeModule {
@@ -52,6 +59,103 @@ class BoardShadowModule : ForgeModule {
 }
 
 class ModuleSupervisorTest {
+    private fun ownedModule(moduleId: String, draining: suspend () -> Unit = {}, closing: suspend () -> Unit = {}): ForgeModule =
+        object : ForgeModule {
+            override val id = moduleId
+            override suspend fun open(ctx: ModuleContext): ModuleHandle {
+                ctx.routes.claim(id, "/api/$id") { _, _, _, _ -> JvmKanbanServer.HttpResponse(200, id) }
+                return object : ModuleHandle {
+                    override val id = moduleId
+                    override fun describe(): Map<String, Any?> = emptyMap()
+                    override suspend fun drain() = draining()
+                    override suspend fun close() = closing()
+                }
+            }
+        }
+
+    @Test fun failedDrainStillClosesReleasesAndReportsFailureBeforeNameReuse() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val context = newContext(routes)
+        val events = mutableListOf<String>()
+        val supervisor = ModuleSupervisor(context, receipt = { event, _, _ -> events += event })
+        try {
+            supervisor.attach(ownedModule("failed", draining = { throw IllegalArgumentException("drain failure") },
+                closing = { throw IllegalStateException("close failure") }))
+            val failure = assertFailsWith<IllegalStateException> { supervisor.detach("failed") }
+            assertTrue(generateSequence<Throwable>(failure) { it.cause }.any {
+                it is IllegalArgumentException && it.message == "drain failure"
+            })
+            assertTrue(generateSequence<Throwable>(failure) { it.cause }.any {
+                it.suppressedExceptions.any { other -> other.message == "close failure" }
+            })
+            assertTrue(routes.paths().isEmpty())
+            assertEquals("module/detach-failed", events.last())
+            assertFalse(events.contains("module/detached"))
+            supervisor.attach(ownedModule("failed"))
+            assertTrue(supervisor.detach("failed"))
+        } finally { context.scope.coroutineContext.job.cancelAndJoin() }
+    }
+
+    @Test fun retirementReservesTheNameAndDrainAllJoinsItDespiteWaiterCancellation() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val context = newContext(routes)
+        val supervisor = ModuleSupervisor(context)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var closed = false
+        supervisor.attach(ownedModule("held", draining = { entered.complete(Unit); release.await() }, closing = { closed = true }))
+        val first = async(start = CoroutineStart.UNDISPATCHED) { supervisor.detach("held") }
+        entered.await()
+        val all = async(start = CoroutineStart.UNDISPATCHED) { supervisor.drainAll() }
+        try {
+            assertFalse(all.isCompleted)
+            first.cancel()
+            assertFailsWith<IllegalArgumentException> { supervisor.attach(ownedModule("held")) }
+            assertEquals(mapOf("/api/held" to "held"), routes.paths())
+            release.complete(Unit)
+            withTimeout(1_000) { all.await(); first.join() }
+            assertTrue(closed)
+            assertTrue(routes.paths().isEmpty())
+            supervisor.attach(ownedModule("held"))
+            assertEquals(mapOf("/api/held" to "held"), routes.paths())
+            assertTrue(supervisor.detach("held"))
+        } finally { release.complete(Unit); first.cancelAndJoin(); all.cancelAndJoin(); context.scope.coroutineContext.job.cancelAndJoin() }
+    }
+
+    @Test fun drainAllContinuesEveryModuleAndRetainsEachFailure() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val context = newContext(routes)
+        val supervisor = ModuleSupervisor(context)
+        val closed = mutableListOf<String>()
+        try {
+            for (id in listOf("one", "two", "three")) supervisor.attach(ownedModule(id,
+                draining = { if (id != "three") error("$id drain") }, closing = { closed += id }))
+            val failure = assertFailsWith<IllegalStateException> { supervisor.drainAll() }
+            assertEquals(listOf("one", "two", "three"), closed)
+            assertTrue(routes.paths().isEmpty())
+            assertTrue(supervisor.describeAll().isEmpty())
+            val messages = generateSequence<Throwable>(failure) { it.cause }.flatMap { cause ->
+                sequenceOf(cause.message) + cause.suppressedExceptions.asSequence().flatMap { suppressed ->
+                    generateSequence<Throwable>(suppressed) { it.cause }.map { it.message }
+                }
+            }.toList()
+            assertTrue("one drain" in messages)
+            assertTrue("two drain" in messages)
+        } finally { context.scope.coroutineContext.job.cancelAndJoin() }
+    }
+
+    @Test fun retirementCannotWaitOnItsOwnCompletion() = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val context = newContext(routes)
+        val supervisor = ModuleSupervisor(context)
+        try {
+            supervisor.attach(ownedModule("recursive", draining = {
+                assertFailsWith<IllegalStateException> { supervisor.detach("recursive") }
+            }))
+            assertTrue(withTimeout(1_000) { supervisor.detach("recursive") })
+            assertTrue(routes.paths().isEmpty())
+        } finally { context.scope.coroutineContext.job.cancelAndJoin() }
+    }
 
     private fun newContext(routes: ModuleRouteRegistry): ModuleContext {
         val cas = CasStore.inMemory()

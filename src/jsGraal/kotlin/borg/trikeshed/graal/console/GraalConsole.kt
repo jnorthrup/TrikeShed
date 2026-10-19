@@ -32,6 +32,8 @@ import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLOptionElement
+import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.Node
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
@@ -124,6 +126,7 @@ object GraalConsole {
         window.addEventListener("resize", { resize() })
         exportWindow()
         bindInput()
+        bindIngestProvider()
         bindDrop()
         bindChrome()
         window.setInterval({ recentCommits = 0 }, 1000)
@@ -453,6 +456,60 @@ object GraalConsole {
 
     fun errText(e: Throwable): String { val d: dynamic = e; return str(d) }
 
+    const val INGEST_PROVIDER = "graal.ingestProvider"
+    var ingestProviders: Array<dynamic>? = null
+
+    fun ingestStatus(message: String, error: Boolean) {
+        q("ingestStatus").textContent = message
+        q("ingestStatus").setAttribute("data-error", error.toString())
+        q("ingestProvider").title = message
+    }
+
+    fun ingestProvider(): String? {
+        val selected = (q("ingestProvider") as HTMLSelectElement).value
+        val provider = ingestProviders?.firstOrNull { str(it.id) == selected }
+        if (provider == null) {
+            ingestStatus("Ingest providers unavailable; reload to retry.", true)
+            return null
+        }
+        if (!truthy(provider.available)) {
+            ingestStatus(str(orr(provider.error, "$selected is unavailable")), true)
+            return null
+        }
+        ingestStatus("Applies to the next folder drop", false)
+        return selected
+    }
+
+    fun bindIngestProvider() {
+        val select = q("ingestProvider") as HTMLSelectElement
+        select.addEventListener("keydown", { it.stopPropagation() })
+        select.addEventListener("change", {
+            try { localStorage.setItem(INGEST_PROVIDER, select.value) } catch (_: Throwable) {}
+            ingestProvider()
+        })
+        scope.launch {
+            try {
+                val catalog: dynamic = fetchJson("/api/curation/providers")
+                val providers = catalog.providers.unsafeCast<Array<dynamic>>()
+                require(providers.isNotEmpty()) { "No ingest providers returned" }
+                ingestProviders = providers
+                select.textContent = ""
+                for (provider in providers) {
+                    val option = document.createElement("option") as HTMLOptionElement
+                    option.value = str(provider.id)
+                    option.textContent = str(orr(provider.label, provider.id)) + if (truthy(provider.available)) "" else " (unavailable)"
+                    select.appendChild(option)
+                }
+                val saved = try { localStorage.getItem(INGEST_PROVIDER) } catch (_: Throwable) { null }
+                select.value = saved?.takeIf { id -> providers.any { str(it.id) == id } } ?: str(catalog.default)
+                select.disabled = false
+                ingestProvider()
+            } catch (error: Throwable) {
+                ingestStatus("Could not load ingest providers: ${errText(error)}", true)
+            }
+        }
+    }
+
     // ── drop a directory hierarchy → it becomes a NEW PROJECT DB and a top-level territory ──
     private fun bindDrop() {
         window.addEventListener("dragover", { e -> e.preventDefault() })
@@ -462,15 +519,30 @@ object GraalConsole {
             // Lane 1: sources that expose real host paths (uri-list) → server-side mount.
             val raw: String = str(orr(orr(dt.getData("text/uri-list"), dt.getData("text/plain")), ""))
             val paths = Ingest.hostPaths(raw, { u -> try { str(js("new URL(u)").pathname) } catch (_: Throwable) { null } }, ::decUri)
+            // Lane 0: a dragged link is a document out on the web; it roots a group of its own.
+            val links = raw.split('\n').map { it.trim() }.filter { it.startsWith("http://") || it.startsWith("https://") }
             // Lane 2 reads the entries synchronously: the DataTransfer is emptied after the event.
             val items: Array<dynamic> = js("Array.from(dt.items||[])")
             val entries = items.mapNotNull { it -> if (truthy(it.webkitGetAsEntry)) it.webkitGetAsEntry() else null }.filter { truthy(it) }
+            val decisionProvider = ingestProvider() ?: return@addEventListener
             scope.launch {
+                if (links.isNotEmpty() && entries.isEmpty()) {
+                    for (u in links) {
+                        river("commit", "grabbing $u with $decisionProvider …")
+                        try {
+                            val body: dynamic = newObject(); body.url = u; body.decisionProvider = decisionProvider
+                            val r: dynamic = fetchJson("/api/projects/link", jsonPost(JSON.stringify(body)))
+                            if (r.verdict == "ok") { river("commit", "project db /" + str(r.name) + " — root " + str(r.id)); landTerritory(str(r.name)) }
+                            else river("deopt", "link refused: " + str(orr(orr(r.detail, r.error), "?")))
+                        } catch (err: Throwable) { river("deopt", "link failed: " + errText(err)) }
+                    }
+                    return@launch
+                }
                 if (paths.isNotEmpty()) {
                     for (p in paths) {
-                        river("commit", "mounting $p …")
+                        river("commit", "mounting $p with $decisionProvider …")
                         try {
-                            val body: dynamic = newObject(); body.path = p
+                            val body: dynamic = newObject(); body.path = p; body.decisionProvider = decisionProvider
                             val r: dynamic = fetchJson("/api/projects", jsonPost(JSON.stringify(body)))
                             if (r.verdict == "ok") { river("commit", "project db /" + str(r.name) + " — " + str(r.docs) + " docs (" + str(r.kind) + ")"); landTerritory(str(r.name)) }
                             else if (r.verdict == "mounting") {
@@ -486,9 +558,9 @@ object GraalConsole {
                 // Lane 2: Chrome hides host paths — WALK the dropped hierarchy via the entry API and UPLOAD the bytes.
                 if (entries.isEmpty()) { crumb("nothing mountable in that drop"); return@launch }
                 for (entry in entries) {
-                    if (!truthy(entry.isDirectory)) { river("deopt", "drop a FOLDER — single files go to the ingest lane"); continue }
-                    river("commit", "uploading " + str(entry.name) + "/ …")
-                    try { uploadFolder(entry) } catch (err: Throwable) { river("deopt", "upload failed: " + errText(err)) }
+                    // A folder is a group of its files; a single file roots a group of its own.
+                    river("commit", "uploading " + str(entry.name) + (if (truthy(entry.isDirectory)) "/" else "") + " with $decisionProvider …")
+                    try { uploadFolder(entry, decisionProvider) } catch (err: Throwable) { river("deopt", "upload failed: " + errText(err)) }
                 }
             }
         })
@@ -515,12 +587,16 @@ object GraalConsole {
         return out
     }
 
-    private suspend fun uploadFolder(entry: dynamic) {
-        val files = walkEntries(entry, "")
+    private suspend fun uploadFolder(entry: dynamic, decisionProvider: String) {
+        val folder = truthy(entry.isDirectory)
+        val files = if (folder) walkEntries(entry, "") else
+            listOf(Walked(str(entry.name), Promise<dynamic> { res, rej -> entry.file({ f: dynamic -> res(f) }, { e: dynamic -> rej(e) }) }.await()))
+        val group = if (folder) str(entry.name) else str(entry.name).substringBeforeLast('.').ifEmpty { str(entry.name) }
         // Chrome hides .git from the walker — classify by build-system markers instead
         val kind = Ingest.kind(files.map { it.rel })
-        val b: dynamic = fetchJson("/_project/" + encUri(str(entry.name).lowercase()) + "/begin?kind=" + kind, methodInit("POST"))
-        if (b.verdict != "ok") { river("deopt", "upload refused: " + str(orr(b.detail, "?"))); return }
+        val providerQuery = "decisionProvider=" + encUri(decisionProvider)
+        val b: dynamic = fetchJson("/_project/" + encUri(group.lowercase()) + "/begin?kind=" + kind + "&" + providerQuery, methodInit("POST"))
+        if (b.verdict != "ok") { river("deopt", "upload refused: " + str(orr(orr(b.detail, b.error), "?"))); return }
         val db = str(b.name)
         river("commit", db + " classified " + (if (kind == "project") "PROJECT (build markers)" else "assets pile"))
         var sent = 0; var skipped = 0; var failed = 0
@@ -532,12 +608,16 @@ object GraalConsole {
             val blob: dynamic = js("new Blob(parts)")
             val init: dynamic = newObject(); init.method = "POST"
             val headers: dynamic = newObject(); headers["Content-Type"] = "application/octet-stream"; init.headers = headers; init.body = blob
-            val r = window.fetch("/_project/" + encUri(db) + "/putBatch", init).await()
+            val r = window.fetch("/_project/" + encUri(db) + "/putBatch?" + providerQuery, init).await()
             if (r.ok) {
                 val j: dynamic = r.json().await()
                 sent += num(orr(j.stored, 0)).toInt(); failed += num(orr(j.failed, 0)).toInt()
                 river("commit", db + ": " + sent + "/" + files.size)
-            } else failed++
+            } else {
+                failed++
+                val error: dynamic = r.json().await()
+                river("deopt", "upload refused: " + str(orr(orr(error.detail, error.error), r.status)))
+            }
         }
         fun frame(rel: String, buf: ArrayBuffer) {
             val pb = rel.encodeToByteArray()

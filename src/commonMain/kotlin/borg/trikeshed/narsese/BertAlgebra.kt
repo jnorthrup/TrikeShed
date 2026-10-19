@@ -38,7 +38,7 @@ val BertToken.offsets: Twin<Int>? get() {
 val BertVector.coordinates: Series<Float>? get() = values?.toSeries()
 
 /** A rank-one tensor over the same coordinate storage, indexed by a rank-one multi-index. */
-val BertVector.tensor: Tensor<Float>? get() {
+val BertVector.tensor: MetaSeries<Tensor, Float>? get() {
     val coordinates = coordinates ?: return null
     return shapeOf(coordinates.size) j { index: Shape ->
         require(index.size == 1) { "BERT tensor indices must have rank one" }

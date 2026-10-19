@@ -186,6 +186,18 @@ private fun decodeCborFloat(src: Series<Byte>, open: Int): Double? {
     val initial = src[open].toInt() and 0xFF
     if (initial ushr 5 != 7) return null
     return when (initial and 0x1F) {
+        25 -> {
+            // Half precision (RFC 8949 §3.3): the shortest exact width a canonical writer picks for 0, 1, ±inf and the like.
+            val half = ((src[open + 1].toInt() and 0xFF) shl 8) or (src[open + 2].toInt() and 0xFF)
+            val exponent = (half shr 10) and 0x1F
+            val fraction = half and 0x3FF
+            val magnitude = when (exponent) {
+                0 -> fraction * 5.9604644775390625E-8
+                31 -> if (fraction == 0) Double.POSITIVE_INFINITY else Double.NaN
+                else -> (1024 + fraction) * Double.fromBits(((exponent - 25 + 1023).toLong()) shl 52)
+            }
+            if (half and 0x8000 != 0) -magnitude else magnitude
+        }
         26 -> {
             var bits = 0
             repeat(4) { offset -> bits = (bits shl 8) or (src[open + 1 + offset].toInt() and 0xFF) }

@@ -118,7 +118,7 @@ class JobRepositoryRecoveryTest {
     }
 
     @Test
-    fun testMissingPageRejection() = runBlocking {
+    fun testMissingPageRejection() = runBlocking<Unit> {
         val log = MockLog()
         val casStore = CasStore.inMemory()
         val repo = JobRepository(log, casStore)
@@ -146,7 +146,7 @@ class JobRepositoryRecoveryTest {
     }
 
     @Test
-    fun testCorruptPageRejection() = runBlocking {
+    fun testCorruptPageRejection() = runBlocking<Unit> {
         val log = MockLog()
         val casStore = CasStore.inMemory()
         val repo = JobRepository(log, casStore)
@@ -192,7 +192,7 @@ class JobRepositoryRecoveryTest {
     }
 
     @Test
-    fun testCorruptValuePageRejection() = runBlocking {
+    fun testCorruptValuePageRejection() = runBlocking<Unit> {
         val log = MockLog()
         val casStore = CasStore.inMemory()
         val repo = JobRepository(log, casStore)

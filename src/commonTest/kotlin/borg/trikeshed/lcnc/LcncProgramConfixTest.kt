@@ -8,6 +8,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -18,6 +19,39 @@ import kotlin.test.assertTrue
  * [ProgramNavigator] — the whole chain in Kotlin.
  */
 class LcncProgramConfixTest {
+
+    @Test
+    fun malformedAuthoredNodesAndControlsCannotDisappearDuringParsing() {
+        val documents = listOf(
+            """{"nodes":[{"id":"effect","type":"timer"},17],"wires":[]}""",
+            """{"nodes":[{"type":"timer"}]}""",
+            """{"nodes":[{"id":"effect"}]}""",
+            """{"nodes":[{"id":17,"type":"timer"}]}""",
+            """{"nodes":[{"id":"effect","type":"timer","params":[]}]}""",
+            """{"nodes":[{"id":"ring","type":"scope","children":[null]}]}""",
+            """{"nodes":[{"id":"ring","type":"scope","children":17}]}""",
+            """{"nodes":17,"controls":{"subnet":"local.review"}}""",
+            """{"nodes":[],"wires":17}""",
+            """{"nodes":[],"controls":[]}""",
+            """{"nodes":[],"controls":{"inspectionOnly":"true"}}""",
+            """{"nodes":[],"controls":{"humanOversight":null}}""",
+        )
+        for (document in documents) assertFailsWith<IllegalArgumentException>(document) {
+            LcncProgramConfix.fromJson("invalid", document)
+        }
+    }
+
+    @Test
+    fun malformedMatingPointsCannotBeRemovedOrDefaulted() {
+        val points = listOf("17", "{}", """{"id":"p","fromNode":"a","fromPort":"out","toNode":"b","toPort":"in","cardinality":"unknown"}""")
+        for (point in points) assertFailsWith<IllegalArgumentException> {
+            LcncProgramConfix.fromJson("invalid", """{"nodes":[],"controls":{"matingPoints":[$point]}}""")
+        }
+        val program = LcncProgramConfix.fromJson("valid", """{"nodes":[{"id":"timer","type":"timer","params":{"seconds":5}}]}""")
+        assertEquals(5.0, program.nodes[0].params["seconds"]?.toDouble())
+        assertTrue(program.controls.humanOversight)
+        assertEquals(0, program.wires.size)
+    }
 
     /** A representative stored-program document (Confix shape). */
     private val realKanbanJson = """

@@ -27,13 +27,15 @@ class PresetAssemblyTest {
             setOf(
                 LcncShakeDemo.NAME,
                 "preset-hermes", "preset-tribunal", "preset-curator",
+                "preset-tribunal-case", "preset-legal-tribunal-case",
+                "preset-tribunal-case-v2", "preset-legal-tribunal-case-v2",
                 "preset-context", "preset-kanban", "preset-ccek", "preset-scope", "preset-scope-inner",
                 "preset-pairs", "preset-brain-mux", "preset-prompt", "preset-corpus", "preset-ccek-mux", "preset-media",
                 "preset-hermes-train", "preset-legal-tribunal", "preset-state-freeze",
                 "preset-council", "preset-bughunter", "preset-subvm-audit",
                 "preset-turbohaul",
                 "preset-describe", "preset-norms", "preset-constellation",
-            ),
+            ) + LcncWorkspacePresets.catalog.map { it.name },
             all.keys,
         )
         for ((name, doc) in all) {

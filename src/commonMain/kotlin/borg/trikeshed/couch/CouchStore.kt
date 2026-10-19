@@ -1,6 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.context.*
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.collections.MutableSeries
@@ -198,8 +199,9 @@ class CouchStore(
     }
 
     companion object {
-        fun create(parentScope: kotlinx.coroutines.CoroutineScope, capacity: Int = 64): CouchStore {
-            return CouchStoreFactory.inMemory()
+        fun create(parentScope: kotlinx.coroutines.CoroutineScope, capacity: Int = 64,
+                   synchronization: Synchronization = Synchronization.MONITOR): CouchStore {
+            return CouchStoreFactory.inMemory(synchronization)
         }
     }
 }
@@ -280,10 +282,11 @@ object CouchStoreFactory {
         }
     }
 
-    fun inMemory(): CouchStore {
+    /** NONE requires caller-serialized mutations; independently shared CAS/projection owners retain their contracts. */
+    fun inMemory(synchronization: Synchronization = Synchronization.MONITOR): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
-        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
+        val ingress = ProductionCouchIngress(head, { frame -> head.applyCommit(frame); changes.applyCommit(frame); }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) }, synchronization = synchronization)
         return CouchStore(ingress, head, changes)
     }
 
@@ -293,13 +296,14 @@ object CouchStoreFactory {
      * then a block fetch; nothing about a document exists outside the CAS. JSON is only the wire
      * commutation ([Couch] renders it in and out).
      */
-    fun casBacked(cas: borg.trikeshed.job.CasStore): CouchStore {
+    fun casBacked(cas: borg.trikeshed.job.CasStore, synchronization: Synchronization = Synchronization.MONITOR): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection(cas)
         val ingress = ProductionCouchIngress(
             head,
             { frame -> head.applyCommit(frame); changes.applyCommit(frame) },
             { doc -> cas.put(canonicalBody(doc)) },
+            synchronization = synchronization,
         )
         return CouchStore(ingress, head, changes)
     }
@@ -316,11 +320,12 @@ object CouchStoreFactory {
      * CAS and durable filesystem) — a VOLATILE commit store here would be the
      * memory projection this factory exists to replace.
      */
-    fun durableCasBacked(cas: borg.trikeshed.job.CasStore, commits: borg.trikeshed.couch.persistence.CouchCommitStore): CouchStore {
+    fun durableCasBacked(cas: borg.trikeshed.job.CasStore, commits: borg.trikeshed.couch.persistence.CouchCommitStore,
+                         synchronization: Synchronization = commits.synchronization): CouchStore {
         require(commits.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
             "durableCasBacked requires a DURABLE commit store"
         }
-        return committed(cas, commits.recoveredFrames) { frame ->
+        return committed(cas, commits.recoveredFrames, synchronization) { frame ->
             commits.commit(frame)
             frame
         }
@@ -328,6 +333,7 @@ object CouchStoreFactory {
 
     /** One ingress/projection contract for durable representations; publication precedes visibility. */
     internal fun committed(cas: borg.trikeshed.job.CasStore, recovered: Series<CouchCommittedFrame>,
+                           synchronization: Synchronization = Synchronization.MONITOR,
                            publish: (CouchCommittedFrame) -> CouchCommittedFrame): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection(cas)
@@ -346,6 +352,7 @@ object CouchStoreFactory {
             },
             { doc -> cas.put(canonicalBody(doc)) },
             initialSequence = maxSequence + 1,
+            synchronization = synchronization,
         )
         return CouchStore(ingress, head, changes)
     }
@@ -367,7 +374,7 @@ object CouchStoreFactory {
         return Document(id, m.entries.filter { it.key != "_id" && it.value != null }.map { Field(it.key, it.value!!) })
     }
 
-    fun withPersistence(persistence: CouchPersistence): CouchStore {
+    fun withPersistence(persistence: CouchPersistence, synchronization: Synchronization = Synchronization.MONITOR): CouchStore {
         val head = CouchHeadProjection()
         val changes = CouchChangesProjection()
         val ingress = ProductionCouchIngress(head, { frame -> 
@@ -377,7 +384,7 @@ object CouchStoreFactory {
                 val docToPersist = frame.doc ?: Document(frame.docId, emptyList())
                 persistence.persist(docToPersist.id, jsonOf(docToPersist).encodeToByteArray())
             }
-        }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) })
+        }, { doc -> borg.trikeshed.job.ContentId.of(doc.fields.joinToString { it.value.toString() }.encodeToByteArray()) }, synchronization = synchronization)
         return CouchStore(ingress, head, changes)
     }
 }

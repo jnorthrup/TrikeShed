@@ -62,6 +62,7 @@ object DocumentCurationStorageHarness {
         val modules = ModuleSupervisor(context)
         val server = JvmKanbanServer(moduleRoutes = routes, stateDir = File(root))
         var feed: DocumentFeed? = null
+        var failure: Throwable? = null
         var modelCalls = 0
         bag.open()
         val fixture = DocumentModelFixture.open { prompt ->
@@ -137,14 +138,24 @@ object DocumentCurationStorageHarness {
                 "io" to io.map { mapOf("operation" to it.opcode.name, "offset" to it.byteOffset,
                     "length" to it.byteLength, "userData" to it.userData, "submitted" to it.submitted, "result" to it.res) },
                 "outputs" to outputs, "drained" to true)))
+        } catch (caught: Throwable) {
+            failure = caught
+            if (caught is DocumentFeed.StartFailure) feed = caught.feed
+            throw caught
         } finally {
-            try { feed?.drain() } finally {
-                try { modules.drainAll() } finally {
-                  try { bag.drain() } finally {
+            // A retained consumer must stop before the fixture closes its dependencies.
+            try { feed?.drain() } catch (cleanup: Throwable) {
+                failure?.let { primary ->
+                    if (primary !== cleanup) primary.addSuppressed(cleanup)
+                    throw primary
+                }
+                throw cleanup
+            }
+            try { modules.drainAll() } finally {
+                try { bag.drain() } finally {
                     try { bagLog.close() } finally {
-                      try { storage.drain() } finally { fixture.close() }
+                        try { storage.drain() } finally { fixture.close() }
                     }
-                  }
                 }
             }
         }

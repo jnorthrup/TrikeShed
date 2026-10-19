@@ -11,13 +11,13 @@
 body{display:grid;grid-template-rows:auto auto auto minmax(0,1fr);overflow:hidden}
 header{display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
 header b{color:var(--amber)} .badge{border:1px solid var(--line);border-radius:3px;padding:2px 6px;color:var(--dim)}
-button{font:inherit;color:var(--ink);background:#171d28;border:1px solid var(--line);border-radius:3px;padding:4px 8px;cursor:pointer} button:hover{border-color:var(--amber);color:var(--amber)}
 main{min-height:0;display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--line)}
 body.diagnostics main{grid-template-columns:minmax(500px,1fr) 310px}
 body:not(.diagnostics) #rails{display:none}
 #panels{display:flex;gap:4px;padding:4px 10px;background:var(--panel);overflow-x:auto;border-bottom:1px solid var(--line)}
 #panels a{color:var(--dim);padding:4px 9px;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent}
 #panels a[aria-current=page]{color:var(--ink);border-color:var(--amber)}
+#panels a:hover{color:var(--amber)}
 body:not(.diagnostics) #boot.ok #bootDetail,body:not(.diagnostics) #geometry,body:not(.diagnostics) #revision{display:none}
 #terminalPanel{min-width:0;background:#050607;display:flex;flex-direction:column}
 #screenWrap{flex:1;min-height:0;overflow:auto;padding:10px;display:flex;align-items:flex-start;justify-content:center}
@@ -36,8 +36,7 @@ body:not(.diagnostics) #boot.ok #bootDetail,body:not(.diagnostics) #geometry,bod
 .rail{overflow:auto;border-bottom:1px solid var(--line);padding:5px}.sig{padding:5px 7px;margin:3px 0;border-left:3px solid var(--dim);background:#161b25;font-size:10px;word-break:break-word}.sig.manual{border-color:var(--amber)}.sig.causal{border-color:var(--cyan)}.sig.failed{border-color:var(--red)}.sig .id{color:var(--dim)}.sig .cause{color:var(--cyan)}
 .ok{color:var(--green)}.bad{color:var(--red)}
 #hint{margin-left:auto;color:var(--dim);font-size:11px}
-#clipboardMenu{position:fixed;z-index:10;padding:4px;background:var(--panel);border:1px solid var(--line);box-shadow:0 3px 12px #0008}#clipboardMenu button{display:block;width:100%;text-align:left}
-#clipboardStatus{color:var(--dim);font-size:11px}#pasteBox{position:fixed;z-index:11;inset:20% 15% auto;padding:12px;background:var(--panel);border:1px solid var(--line)}#pasteText{display:block;width:100%;height:10em;margin:8px 0;background:#000;color:var(--ink);font:inherit}
+#clipboardStatus{color:var(--dim);font-size:11px}
 #boot{padding:7px 10px;border-bottom:1px solid var(--line);background:var(--panel);max-height:35vh;overflow:auto}
 #bootState{font-weight:600}#bootElapsed{color:var(--dim)}#bootDetail,#bootFailure{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 #bootFailure{color:var(--red)}#bootTrace{margin-top:4px;color:var(--ink)}#bootTrace summary{cursor:pointer;color:var(--red)}#bootTraceback{margin:5px 0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
@@ -49,15 +48,13 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 </style>
 </head>
 <body data-app-page="hermes">
-<header><b>Hermes</b><span id="state" class="badge">closed</span><button id="open">Start</button><button id="newSession" title="Start a fresh Hermes conversation in this panel">New session</button><button id="newPanel" title="Open an independent Hermes worker">New panel</button><button id="reset" title="Restart Hermes and resume this conversation">Reset</button><button id="copy" title="Copy selected terminal text">Copy</button><button id="paste" title="Paste into the terminal without submitting">Paste</button><button id="diagnostics" aria-pressed="false">Diagnostics</button><span id="geometry" class="badge">–</span><span id="revision" class="badge">rev 0</span><span id="clipboardStatus" role="status" aria-live="polite"></span><span id="hint">click to type · right-click to copy/paste · Ctrl-C cancel</span></header>
+<header><b>Hermes</b><span id="state" class="badge">closed</span><span id="geometry" class="badge">–</span><span id="revision" class="badge">rev 0</span><span id="clipboardStatus" role="status" aria-live="polite"></span><span id="hint">click to type · ⌘C/⌘V copy/paste · Ctrl-C cancel · Enter restarts a failed sleeve · /new fresh session</span></header>
 <nav id="panels" aria-label="Hermes panels"></nav>
 <section id="boot" aria-label="Graal sleeve startup"><div><strong id="bootState" role="status" aria-live="polite">GraalPy sleeve · closed</strong><span id="bootElapsed"></span></div><div id="bootDetail"></div><div id="bootFailure" role="status" aria-live="polite"></div><details id="bootTrace" hidden><summary>Failure traceback</summary><pre id="bootTraceback"></pre></details></section>
 <main>
   <section id="terminalPanel"><div id="screenWrap"><div id="screen" role="application" aria-label="Hermes terminal"></div><textarea id="kbd" aria-label="terminal input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea></div></section>
   <aside id="rails"><h2>manual ↔ causal LCNC patch panel</h2><div id="manualRail" class="rail"></div><div id="causalRail" class="rail"></div></aside>
 </main>
-<div id="clipboardMenu" role="menu" aria-label="Terminal clipboard" hidden><button id="menuCopy" role="menuitem">Copy selection</button><button id="menuPaste" role="menuitem">Paste</button></div>
-<section id="pasteBox" role="dialog" aria-label="Paste into terminal" hidden><label for="pasteText">Paste text here, then insert it into the terminal.</label><textarea id="pasteText"></textarea><button id="pasteInsert">Insert</button> <button id="pasteCancel">Cancel</button></section>
 <script src="/kotlin/pages/pages.js" defer></script>
 </body>
 </html>

@@ -12,6 +12,6 @@ object ModelMuxProviderKey : LcncServiceKey<suspend () -> ModelMux?>("ModelMuxPr
 object KeyMuxProviderKey : LcncServiceKey<suspend () -> KeyMux?>("KeyMuxProviderKey")
 object CredentialStoreKey : LcncServiceKey<CouchKeyStore?>("CredentialStoreKey")
 object TribunalDialogKey : LcncServiceKey<TribunalDialog>("TribunalDialogKey")
-object TribunalIngestKey : LcncServiceKey<suspend (String) -> String>("TribunalIngestKey")
+object TribunalRecordKey : LcncServiceKey<suspend (String) -> String>("TribunalRecordKey")
 object CouncilDialogKey : LcncServiceKey<CouncilDialog>("CouncilDialogKey")
 object CouncilRecordKey : LcncServiceKey<RecordSeams>("CouncilRecordKey")

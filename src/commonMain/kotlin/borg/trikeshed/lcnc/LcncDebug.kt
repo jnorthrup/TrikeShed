@@ -4,6 +4,7 @@ import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reify
 import borg.trikeshed.vm.VmDebugAction
+import borg.trikeshed.vm.VmSourceCoordinates
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -85,12 +86,34 @@ class LcncDebug : AbstractCoroutineContextElement(Key) {
     }
 
     /** An ordinal admits exactly one command; delayed/double clicks cannot advance another pause. */
-    suspend fun command(expected: Int, command: Command, line: Int? = null): Boolean = gate.withLock {
+    suspend fun command(expected: Int, command: Command, line: Int? = null,
+                        coordinates: VmSourceCoordinates = VmSourceCoordinates.GENERATED): Boolean = gate.withLock {
         if (state != "paused" || ordinal != expected || detached || command !in actions) false
         else {
-            if (command == Command.SOURCE_LINE) require(line != null &&
-                line in 1..((site?.get("lineCount") as? Number)?.toInt() ?: 0)) { "Line is outside the current guest source" }
-            check(commands.trySend(Resume(command, line)).isSuccess)
+            val generated = if (command != Command.SOURCE_LINE) line else when (coordinates) {
+                VmSourceCoordinates.GENERATED -> {
+                    require(line != null && line in 1..((site?.get("lineCount") as? Number)?.toInt() ?: 0)) {
+                        "Line is outside the current guest source"
+                    }
+                    line
+                }
+                VmSourceCoordinates.AUTHORED -> {
+                    fun positiveInt(value: Any?): Int? = (value as? Number)?.toDouble()?.takeIf {
+                        it.isFinite() && it >= 1 && it <= Int.MAX_VALUE && it % 1 == 0.0
+                    }?.toInt()
+                    val authored = site?.get("authored") as? Map<*, *>
+                    val start = positiveInt(authored?.get("generatedStartLine"))
+                    val count = positiveInt(authored?.get("lineCount"))
+                    val total = positiveInt(site?.get("lineCount"))
+                    // Validate the whole mapping without overflowing an Int endpoint.
+                    require(start != null && count != null && total != null && start <= total &&
+                        count <= total - start + 1 && line != null && line in 1..count) {
+                        "Line is outside the current authored source"
+                    }
+                    start + (line - 1)
+                }
+            }
+            check(commands.trySend(Resume(command, generated)).isSuccess)
             stepping = command != Command.CONTINUE
             state = "running"
             site = null

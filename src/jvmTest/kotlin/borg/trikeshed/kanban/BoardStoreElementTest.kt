@@ -1,6 +1,11 @@
 package borg.trikeshed.kanban
 
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.couch.isam.WalFrame
+import borg.trikeshed.userspace.nio.channels.FileChannel as UserspaceFileChannel
+import borg.trikeshed.userspace.nio.file.StandardOpenOption as UserspaceOpenOption
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import java.io.File
@@ -10,6 +15,8 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlin.test.assertNull
 import kotlin.test.assertFailsWith
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFalse
 
 class InvokeLoweringTest {
 
@@ -52,6 +59,34 @@ class InvokeLoweringTest {
         val badCol = InvokeLowering.lower(mapOf("type" to "move", "jobId" to "x", "idempotencyKey" to "k", "expectedRevision" to 1, "toColumn" to "nowhere"))
         assertTrue("unknown column" in (badCol as InvokeLowering.Outcome.Rejected).reason)
     }
+
+    @Test
+    fun malformedRevisionCannotBecomeAnUnguardedCommand() {
+        val invalid = arrayOf<Any>("", "invalid", "1.0", 1.5, 1.5f, Double.NaN,
+            Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Long.MAX_VALUE.toDouble(),
+            Long.MIN_VALUE.toDouble() * 2, false)
+        for (type in arrayOf("submit", "move")) for (field in arrayOf("expectedRevision", "revision")) {
+            for (value in invalid) {
+                val raw = mapOf("type" to type, "jobId" to "card", "idempotencyKey" to "revision", field to value) +
+                    if (type == "move") mapOf("toColumn" to "ready") else emptyMap()
+                val rejected = assertIs<InvokeLowering.Outcome.Rejected>(InvokeLowering.lower(raw), "$type $field=$value")
+                assertEquals("invalid expectedRevision", rejected.reason)
+            }
+        }
+    }
+
+    @Test
+    fun integralRevisionPreservesItsExactValueAndOmission() {
+        val raw = mapOf("type" to "submit", "jobId" to "card", "idempotencyKey" to "revision")
+        val values = arrayOf<Pair<Any, Long>>(1 to 1L, 1L to 1L, 1.0 to 1L, 1.0f to 1L,
+            "1" to 1L, Long.MAX_VALUE to Long.MAX_VALUE, Long.MAX_VALUE.toString() to Long.MAX_VALUE)
+        for ((value, expected) in values) {
+            val lowered = assertIs<InvokeLowering.Outcome.Lowered>(InvokeLowering.lower(raw + ("expectedRevision" to value)))
+            assertEquals(expected, assertIs<borg.trikeshed.job.JobCommand.Submit>(lowered.command).expectedRevision)
+        }
+        val omitted = assertIs<InvokeLowering.Outcome.Lowered>(InvokeLowering.lower(raw))
+        assertNull(assertIs<borg.trikeshed.job.JobCommand.Submit>(omitted.command).expectedRevision)
+    }
 }
 
 class BoardStoreElementTest {
@@ -67,6 +102,212 @@ class BoardStoreElementTest {
 
     private suspend fun submit(el: BoardStoreElement, job: String, key: String, deps: List<String> = emptyList()): BoardApply =
         send(el, "type" to "submit", "jobId" to job, "idempotencyKey" to key, "title" to "Card $job", "dependencies" to deps)
+
+    @Test
+    fun lcncSubmitRefusesStaleWiredRevision() = runBlocking {
+        for (port in listOf("command", "command?")) {
+            val store = BoardStoreElement(null, CasStore.inMemory(), clock = { 7L })
+            try {
+                store.open()
+                assertIs<BoardApply.Committed>(submit(store, "card", "create"))
+                val runner = borg.trikeshed.lcnc.LcncKanbanExperience(store).registry().getValue("kanban.submit")
+                suspend fun edit(key: String, title: String, revision: Double, fallback: String): Map<String, Any?> =
+                    runner.run(borg.trikeshed.lcnc.LcncNode("edit", "kanban.submit",
+                        mapOf("expectedRevision" to fallback)), mapOf(port to mapOf(
+                        "jobId" to "card", "title" to title, "expectedRevision" to revision,
+                        "idempotencyKey" to key,
+                    )))
+
+                val accepted = edit("fresh", "Current title", 1.0, "99")
+                assertEquals(true, accepted["accepted"], "wired revision must override the parameter")
+                assertEquals(2L, accepted["revision"])
+                val rejected = edit("stale", "Stale overwrite", 1.0, "2")
+                assertEquals(false, rejected["accepted"], "$port must preserve the store's revision precondition")
+                assertTrue(rejected["reason"].toString().contains("stale expectedRevision"))
+                assertEquals("Current title", store.card("card")?.title)
+                assertEquals(2L, store.card("card")?.revision)
+                val sheets = assertIs<Map<*, *>>(rejected["sheets"])
+                val board = assertIs<Map<*, *>>(sheets["boardView"])
+                val card = assertIs<Map<*, *>>(assertIs<List<*>>(board["items"]).single())
+                assertEquals("Current title", card["title"], "refusal projects current state, not the rejected edit")
+                assertEquals(2L, card["revision"])
+            } finally { store.close() }
+        }
+    }
+
+    @Test
+    fun lcncSubmitRefusesStaleParameterRevision() = runBlocking {
+        val store = BoardStoreElement(null, CasStore.inMemory(), clock = { 7L })
+        try {
+            store.open()
+            assertIs<BoardApply.Committed>(submit(store, "card", "create"))
+            val runner = borg.trikeshed.lcnc.LcncKanbanExperience(store).registry().getValue("kanban.submit")
+            suspend fun edit(key: String, title: String) = runner.run(
+                borg.trikeshed.lcnc.LcncNode("edit", "kanban.submit", mapOf(
+                    "jobId" to "card", "title" to title, "expectedRevision" to "1", "idempotencyKey" to key,
+                )), emptyMap())
+            assertEquals(true, edit("fresh", "Current title")["accepted"])
+            val rejected = edit("stale", "Stale overwrite")
+            assertEquals(false, rejected["accepted"], "parameter edits have the same store precondition")
+            assertTrue(rejected["reason"].toString().contains("stale expectedRevision"))
+            assertEquals("Current title", store.card("card")?.title)
+            assertEquals(2L, store.card("card")?.revision)
+        } finally { store.close() }
+    }
+
+    @Test
+    fun lcncSubmitWithoutRevisionKeepsStoreSemantics() = runBlocking {
+        val store = BoardStoreElement(null, CasStore.inMemory(), clock = { 7L })
+        try {
+            store.open()
+            val runner = borg.trikeshed.lcnc.LcncKanbanExperience(store).registry().getValue("kanban.submit")
+            suspend fun edit(key: String, fields: Map<String, Any?>) = runner.run(
+                borg.trikeshed.lcnc.LcncNode("edit", "kanban.submit"),
+                mapOf("command" to (fields + mapOf("jobId" to "card", "idempotencyKey" to key))))
+            assertEquals(true, edit("create", mapOf("title" to "Current title", "priority" to 0))["accepted"])
+            assertEquals(true, edit("metadata", mapOf("tags" to listOf("reviewed")))["accepted"])
+            assertEquals("Current title", store.card("card")?.title)
+            assertEquals(0, store.card("card")?.priority)
+            assertEquals(2L, store.card("card")?.revision)
+            assertEquals(listOf("reviewed"), store.card("card")?.tags)
+        } finally { store.close() }
+    }
+
+    @Test
+    fun lcncSubmitRejectsMalformedExplicitRevisionWithoutChangingTheCard() = runBlocking {
+        val store = BoardStoreElement(null, CasStore.inMemory(), clock = { 7L })
+        try {
+            store.open()
+            assertIs<BoardApply.Committed>(submit(store, "card", "create"))
+            val runner = borg.trikeshed.lcnc.LcncKanbanExperience(store).registry().getValue("kanban.submit")
+            for (wired in arrayOf(false, true)) for (revision in arrayOf("", "invalid", "1.5")) {
+                val fields = mapOf("jobId" to "card", "title" to "Invalid overwrite",
+                    "idempotencyKey" to "invalid-$wired-$revision", "expectedRevision" to revision)
+                val result = if (wired) runner.run(borg.trikeshed.lcnc.LcncNode("edit", "kanban.submit",
+                    mapOf("expectedRevision" to "1")), mapOf("command" to fields))
+                else runner.run(borg.trikeshed.lcnc.LcncNode("edit", "kanban.submit", fields), emptyMap())
+                assertEquals(false, result["accepted"], "wired=$wired, revision='$revision'")
+                assertEquals("invalid expectedRevision", result["reason"])
+                assertEquals("Card card", store.card("card")?.title)
+                assertEquals(1L, store.card("card")?.revision)
+            }
+        } finally { store.close() }
+    }
+
+    @Test
+    fun lcncSubmitContractMakesRevisionExplicitlyOptional() {
+        val contract = requireNotNull(borg.trikeshed.lcnc.LcncContracts.find("kanban.submit"))
+        val revision = requireNotNull(contract.params["expectedRevision"])
+        assertTrue(revision.optional, "opening the parameter editor must not add a precondition")
+        assertEquals("", revision.v, "the editor must not invent a card revision")
+    }
+
+    @Test
+    fun legacyWalFramesReopenWithIdenticalBytesAndMonotonicSequences() = runBlocking {
+        val dir = tempDir("legacy-frames")
+        val file = File(dir, "board.wal")
+        val legacy = WalFrame.encode(4, "first".encodeToByteArray()) + WalFrame.encode(9, "second".encodeToByteArray())
+        file.writeBytes(legacy)
+        val wal = JvmBoardWal(dir)
+        try {
+            assertEquals(10L, wal.append("third".encodeToByteArray()), "Append initializes its sequence even before replay")
+            wal.flush()
+            assertContentEquals(legacy + WalFrame.encode(10, "third".encodeToByteArray()), file.readBytes())
+            val records = mutableListOf<Pair<Long, String>>()
+            wal.replay { sequence, payload -> records += sequence to payload.decodeToString() }
+            assertEquals(listOf(4L to "first", 9L to "second", 10L to "third"), records)
+        } finally { wal.close() }
+        wal.close()
+        assertFailsWith<IllegalStateException> { wal.append(byteArrayOf()) }
+        val reopened = JvmBoardWal(dir)
+        try {
+            assertEquals(11L, reopened.append("fourth".encodeToByteArray()))
+            reopened.flush()
+            val sequences = mutableListOf<Long>()
+            reopened.replay { sequence, _ -> sequences += sequence }
+            assertEquals(listOf(4L, 9L, 10L, 11L), sequences)
+        } finally { reopened.close() }
+    }
+
+    @Test
+    fun onlyIncompleteFinalWalHeadersOrPayloadsAreTruncated() = runBlocking {
+        val prefix = WalFrame.encode(1, "first".encodeToByteArray()) + WalFrame.encode(2, "second".encodeToByteArray())
+        val next = WalFrame.encode(3, "third".encodeToByteArray())
+        for (cut in listOf(1, WalFrame.HEADER_SIZE - 1, WalFrame.HEADER_SIZE, WalFrame.HEADER_SIZE + 2, next.size - 1)) {
+            val dir = tempDir("short-frame-$cut")
+            val file = File(dir, "board.wal")
+            file.writeBytes(prefix + next.copyOf(cut))
+            val wal = JvmBoardWal(dir)
+            try {
+                assertContentEquals(prefix, file.readBytes())
+                val sequences = mutableListOf<Long>()
+                wal.replay { sequence, _ -> sequences += sequence }
+                assertEquals(listOf(1L, 2L), sequences)
+                assertEquals(3L, wal.append("third".encodeToByteArray()))
+                wal.flush()
+                assertContentEquals(prefix + next, file.readBytes())
+            } finally { wal.close() }
+        }
+    }
+
+    @Test
+    fun completeWalCorruptionRefusesWithoutTruncatingCommittedBytes() {
+        val prefix = WalFrame.encode(1, "first".encodeToByteArray())
+        val frame = WalFrame.encode(2, "second".encodeToByteArray())
+        val corruptions = listOf(
+            "magic" to frame.copyOf().also { it[0] = 0 },
+            "version" to frame.copyOf().also { it[5] = 2 },
+            "checksum" to frame.copyOf().also { it[it.lastIndex] = (it.last().toInt() xor 1).toByte() },
+            "sequence" to WalFrame.encode(1, "duplicate".encodeToByteArray()),
+            "length" to frame.copyOf().also { java.nio.ByteBuffer.wrap(it).putInt(14, 10 * 1024 * 1024 + 1) },
+        )
+        for ((kind, invalid) in corruptions) {
+            val dir = tempDir("bad-frame-$kind")
+            val file = File(dir, "board.wal")
+            val bytes = prefix + invalid
+            file.writeBytes(bytes)
+            assertFailsWith<IllegalStateException>(kind) { JvmBoardWal(dir) }
+            assertContentEquals(bytes, file.readBytes(), "A complete corrupt $kind frame must remain available for diagnosis")
+        }
+    }
+
+    @Test
+    fun walDirectorySyncFailurePropagatesAndHandlesCloseAfterFailure() {
+        val dir = tempDir("sync-failure")
+        val channel = UserspaceFileChannel.open(File(dir, "board.wal").path,
+            UserspaceOpenOption.READ, UserspaceOpenOption.WRITE, UserspaceOpenOption.CREATE)
+        var fail = false
+        var directorySyncs = 0
+        val wal = BoardFileWal(channel, StorageDurability.DURABLE) {
+            if (fail) throw java.io.IOException("injected directory sync failure")
+            UserspaceFileChannel.open(dir.path, UserspaceOpenOption.READ).use { it.force(true) }
+            directorySyncs++
+        }
+        try {
+            assertEquals(1, directorySyncs)
+            wal.append("one".encodeToByteArray())
+            wal.append("two".encodeToByteArray())
+            wal.flush()
+            assertEquals(2, directorySyncs, "One group flush syncs the directory once")
+            fail = true
+            assertEquals("injected directory sync failure", assertFailsWith<java.io.IOException> { wal.flush() }.message)
+            assertFailsWith<IllegalStateException> { wal.append("uncertain".encodeToByteArray()) }
+        } finally { wal.close() }
+        wal.close()
+        assertFalse(channel.isOpen())
+
+        val opening = UserspaceFileChannel.open(File(dir, "opening.wal").path,
+            UserspaceOpenOption.READ, UserspaceOpenOption.WRITE, UserspaceOpenOption.CREATE)
+        assertFailsWith<java.io.IOException> {
+            BoardFileWal(opening, StorageDurability.DURABLE) { throw java.io.IOException("opening sync failed") }
+        }
+        assertFalse(opening.isOpen(), "Failed initialization releases its userspace descriptor")
+        val nested = File(dir, "new/child")
+        assertEquals(StorageDurability.DURABLE, BoardFileWal(JvmFileOperations(), nested.path).let {
+            try { it.append("nested".encodeToByteArray()); it.flush(); it.durability } finally { it.close() }
+        })
+        assertContentEquals(WalFrame.encode(1, "nested".encodeToByteArray()), File(nested, "board.wal").readBytes())
+    }
 
     @Test
     fun commitMoveRevisionAndGuards() = runBlocking {
@@ -191,13 +432,14 @@ class BoardStoreElementTest {
     }
 
     @Test
-    fun groupCommitFlushesOncePerBatch() = runBlocking {
+    fun groupCommitFlushesOncePerBatch(): Unit = runBlocking {
         val dir = tempDir("group")
         var flushes = 0
         val counting = object : BoardWalPort {
             val inner = JvmBoardWal(dir)
             override fun append(record: ByteArray): Long = inner.append(record)
             override fun flush() { flushes++; inner.flush() }
+            override fun close() = inner.close()
             override suspend fun replay(onRecord: suspend (Long, ByteArray) -> Unit) = inner.replay(onRecord)
         }
         val el = BoardStoreElement(counting, CasStore.inMemory())
@@ -211,6 +453,7 @@ class BoardStoreElementTest {
         replies.forEach { assertIs<BoardApply.Committed>(it.await()) }
         assertEquals(1, flushes, "group commit must flush once for the drained batch")
         el.drain()
+        assertFailsWith<IllegalStateException> { counting.inner.append(byteArrayOf()) }
     }
 
     @Test

@@ -91,6 +91,8 @@ class BtrfsUringLifecycleTest {
         override fun reapCompletions(minComplete: Int): List<SelectionResult> =
             if (release.isCompleted) pending.toList().also { pending.clear() } else emptyList()
 
+        override suspend fun awaitCompletions() { release.await() }
+
         override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
             val completions = submitBatch(List(submissions.size) { submissions[it] }).toMutableList()
             while (completions.size < submissions.size) {

@@ -12,7 +12,7 @@ import kotlin.js.jsTypeOf
  * Compile-time native-depth gate for the JS actual.
  *
  * 0 = emulation only (host primitives servicing SQEs)
- * 1 = ABI-probed @trikeshed/uring Node module (probe validates exports/NAPI/setup)
+ * 1 = @trikeshed/uring ABI2 Node module (probe validates exports/NAPI/setup)
  *
  * The facade surface is byte-identical above either level; going more native
  * means raising this const, never adding a second API. The runtime probe
@@ -67,11 +67,12 @@ internal fun discoverNodeUringBackend(
         moduleName = path
         phase = UringProbePhase.LOAD
         val module: dynamic = loader(path)
-        val exports = arrayOf("abiVersion", "platform", "architecture", "napiVersion", "open", "supports", "execute", "close")
+        val exports = arrayOf("abiVersion", "platform", "architecture", "napiVersion", "open", "supports", "execute", "close",
+            "submitBatch", "reapCompletions", "awaitCompletions", "cancelWait", "cancelPending")
         if (module == null || exports.any { jsTypeOf(module[it]) != "function" })
-            return unavailable(UringProbeState.ABI_MISMATCH, "Node uring module does not export the ABI 1 functions", moduleName, phase)
-        if (nodeUringVersion(module.abiVersion()) != 1)
-            return unavailable(UringProbeState.ABI_MISMATCH, "Node uring bridge protocol must be version 1", moduleName, phase)
+            return unavailable(UringProbeState.ABI_MISMATCH, "Node uring module does not export the ABI 2 functions", moduleName, phase)
+        if (nodeUringVersion(module.abiVersion()) != 2)
+            return unavailable(UringProbeState.ABI_MISMATCH, "Node uring bridge protocol must be version 2", moduleName, phase)
         if (normalizeHostOs(module.platform() as? String) != "linux")
             return unavailable(UringProbeState.ABI_MISMATCH, "Node uring module platform must be Linux", moduleName, phase)
         val architecture = normalizeHostArchitecture(module.architecture() as? String)

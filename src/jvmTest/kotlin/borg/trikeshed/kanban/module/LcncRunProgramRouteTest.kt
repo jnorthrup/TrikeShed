@@ -8,10 +8,11 @@ import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.dag.ReteProductionRegistry
 import borg.trikeshed.graal.ConfixBlackboard
-import borg.trikeshed.job.CasStore
-import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.*
+import borg.trikeshed.kanban.*
 import borg.trikeshed.lcnc.*
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
+import java.lang.System
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.module.ModuleRouteRegistry
@@ -35,6 +36,8 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertNotNull
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 
 /**
  * Spec §7 route gate: `POST /api/lcnc/run {program}` executes a stored
@@ -44,6 +47,39 @@ import kotlin.test.assertTrue
  * (presets-only) program loader with zero registered runners.
  */
 class LcncRunProgramRouteTest {
+    @Test fun nodeDispatchUsesTheSameServicePrecedenceAsProgramExecution(): Unit = runBlocking {
+        for ((moduleClock, muxClock, callerClock, expected) in listOf(
+            listOf(null, null, null, 1L), listOf(2L, null, null, 2L),
+            listOf(2L, 3L, null, 3L), listOf(2L, 3L, 4L, 4L),
+        )) {
+            fun clock(value: Long?): kotlin.coroutines.CoroutineContext =
+                value?.let { LcncClockKey { it } } ?: kotlin.coroutines.EmptyCoroutineContext
+            val routes = ModuleRouteRegistry()
+            val ctx = newContext(routes, tempDir("node-context"), CasStore.inMemory(),
+                moduleContext = clock(moduleClock), muxContext = clock(muxClock))
+            ctx.lcncRunners.putAll(PureNodes.registry { 1L })
+            val server = JvmKanbanServer(moduleRoutes = routes)
+            val supervisor = ModuleSupervisor(ctx)
+            supervisor.attach(KanbanModule())
+            try {
+                kotlinx.coroutines.withContext(clock(callerClock)) {
+                    val single = post(server, "/api/lcnc/run", """{"type":"timer","params":{},"inputs":{}}""")
+                    assertEquals(200, single.status, single.body)
+                    val program = post(server, "/api/lcnc/run",
+                        """{"document":{"nodes":[{"id":"clock","type":"timer"}],"wires":[]}}""")
+                    assertEquals(200, program.status, program.body)
+                    val nodeTick = ((json(single)["outputs"] as Map<*, *>)["tick"] as Number).toLong()
+                    val programTick = (((json(program)["outputs"] as Map<*, *>)["clock"] as Map<*, *>)["tick"] as Number).toLong()
+                    assertEquals(expected, programTick, "Program context contract")
+                    assertEquals(programTick, nodeTick, "Single-node dispatch must use caller > mux > module > default")
+                }
+            } finally {
+                supervisor.detach("kanban")
+                ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            }
+        }
+    }
+
     @Test fun unsupportedSourceCommandLeavesTheNodeHeldAndContinueExecutesTheGuestOnce(): Unit = runBlocking {
         for ((language, trust) in listOf(borg.trikeshed.vm.VmLanguage.JAVA to "OWN",
             borg.trikeshed.vm.VmLanguage.JAVASCRIPT to "UNTRUSTED")) {
@@ -110,20 +146,45 @@ class LcncRunProgramRouteTest {
             }
             error("unreachable")
         }
-        suspend fun command(at: Map<String, Any?>, action: String, line: Int? = null) = post(server, "/api/lcnc/run/debug",
-            jsonOf(mapOf("token" to token, "runId" to at["runId"], "ordinal" to at["ordinal"], "action" to action, "line" to line)))
+        suspend fun command(at: Map<String, Any?>, action: String, line: Int? = null, coordinates: String? = null) =
+            post(server, "/api/lcnc/run/debug", jsonOf(mapOf("token" to token, "runId" to at["runId"],
+                "ordinal" to at["ordinal"], "action" to action, "line" to line) +
+                (if (coordinates == null) emptyMap() else mapOf("coordinates" to coordinates))))
         try {
             val node = paused()
             assertEquals(202, command(node, "source-into").status)
             var stop = paused((node["ordinal"] as Number).toInt())
+            for (selector in listOf(null, "", "AUTHORED", "unknown", 1, true)) {
+                val refused = post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
+                    "token" to token, "runId" to stop["runId"], "ordinal" to stop["ordinal"],
+                    "action" to "source-line", "line" to 1, "coordinates" to selector)))
+                assertEquals(400, refused.status, refused.body)
+                assertEquals("invalid_debug_coordinates", json(refused)["error"])
+                assertEquals(stop, paused(), "Invalid coordinates must not consume the source hold")
+            }
+            for (action in listOf("step", "continue", "source-into", "source-over", "source-out")) {
+                for (selector in listOf("generated", "authored")) {
+                    val refused = command(stop, action, coordinates = selector)
+                    assertEquals(400, refused.status, refused.body)
+                    assertEquals("invalid_debug_coordinates", json(refused)["error"])
+                    assertEquals(stop, paused(), "Coordinates apply only to source-line")
+                }
+            }
             for (invalid in listOf(null, 0, -1, 1.5, "4", 2147483648L)) {
                 assertEquals(400, post(server, "/api/lcnc/run/debug", jsonOf(mapOf(
                     "token" to token, "runId" to stop["runId"], "ordinal" to stop["ordinal"], "action" to "source-line", "line" to invalid))).status)
                 assertEquals(stop["ordinal"], paused()["ordinal"])
             }
-            assertEquals(202, command(stop, "source-line", 4).status)
+            val authored = (stop["site"] as Map<*, *>)["authored"] as Map<*, *>
+            val authoredLine = 4 - (authored["generatedStartLine"] as Number).toInt() + 1
+            assertTrue(authoredLine in 1..(authored["lineCount"] as Number).toInt())
+            val refused = command(stop, "source-line", (authored["lineCount"] as Number).toInt() + 1, "authored")
+            assertEquals(400, refused.status, refused.body)
+            assertEquals("invalid_debug_line", json(refused)["error"])
+            assertEquals(stop, paused(), "Authored bounds must not consume the source hold")
+            assertEquals(202, command(stop, "source-line", authoredLine, "authored").status)
             stop = paused((stop["ordinal"] as Number).toInt())
-            for (expected in 0..1) {
+            for (expected in 0..2) {
                 val site = stop["site"] as Map<*, *>
                 assertEquals(4, (site["line"] as Number).toInt())
                 val breakpoint = site["breakpoint"] as Map<*, *>
@@ -134,11 +195,12 @@ class LcncRunProgramRouteTest {
                 assertTrue(locals.any { val row = it as Map<*, *>; row["name"] == "count" && (row["value"] as? Number)?.toInt() == expected })
                 assertEquals(400, command(stop, "source-line", 10000).status)
                 assertEquals(stop["ordinal"], paused()["ordinal"], "Invalid input must not release the hold")
-                if (expected == 0) {
+                if (expected < 2) {
                     val old = stop
-                    assertEquals(202, command(stop, "source-line", 4).status)
+                    assertEquals(202, command(stop, "source-line", 4, if (expected == 0) "generated" else null).status)
                     stop = paused((stop["ordinal"] as Number).toInt())
-                    assertEquals(409, command(old, "source-line", 4).status)
+                    assertEquals(409, command(old, "source-line", authoredLine, "authored").status)
+                    assertEquals(stop, paused(), "A stale authored command must leave the newer pause held")
                 }
             }
             assertEquals(202, command(stop, "continue").status)
@@ -608,6 +670,8 @@ class LcncRunProgramRouteTest {
         stateDir: File,
         cas: CasStore,
         programs: Map<String, LcncProgram> = emptyMap(),
+        moduleContext: kotlin.coroutines.CoroutineContext = kotlin.coroutines.EmptyCoroutineContext,
+        muxContext: kotlin.coroutines.CoroutineContext = kotlin.coroutines.EmptyCoroutineContext,
     ): ModuleContext {
         val couchStore = CouchStoreFactory.casBacked(cas)
         return ModuleContext(
@@ -620,7 +684,8 @@ class LcncRunProgramRouteTest {
             casStore = cas,
             attachments = CouchAttachmentGateway(couchStore, cas),
             routes = routes,
-            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + moduleContext),
+            muxContext = muxContext,
             clock = { 1234L },
             stateDir = stateDir,
             // Mirrors production composition: explicit fixtures first, offered presets behind.
@@ -835,7 +900,7 @@ class LcncRunProgramRouteTest {
         } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
     }
 
-    @Test fun inspectionOnlyInlineDocumentRecordsFailureWithoutInvokingEffects() = runBlocking {
+    @Test fun inspectionOnlyInlineDocumentRecordsRefusalBeforeClaimsOrEffects() = runBlocking {
         val routes = ModuleRouteRegistry()
         val ctx = newContext(routes, tempDir("inspection-only"), CasStore.inMemory())
         var effects = 0
@@ -850,16 +915,17 @@ class LcncRunProgramRouteTest {
             assertEquals(400, response.status, response.body)
             val run = json(response)
             assertEquals(false, run["ok"])
-            assertEquals("failed", run["status"])
-            assertEquals("execution", run["phase"])
+            assertEquals("refused", run["status"])
+            assertEquals("admission", run["phase"])
             assertTrue(run["error"].toString().contains("Inspection-only"))
             val receipt = content(server, run["receiptCid"])["lcncRun"] as Map<*, *>
             assertEquals(run["runId"], receipt["runId"])
-            assertEquals("failed", receipt["status"])
+            assertEquals("refused", receipt["status"])
             assertEquals(null, receipt["programKey"])
-            val evidence = content(server, receipt["invocationsCid"])
-            assertTrue((evidence["entries"] as List<*>).isEmpty())
-            assertEquals(0, (evidence["attempted"] as Number).toInt())
+            for (key in listOf("claimId", "workgroup", "startedAtMs", "invocationsCid")) assertFalse(receipt.containsKey(key))
+            val queued = content(server, receipt["previousReceiptCid"])["lcncRun"] as Map<*, *>
+            assertEquals("queued", queued["status"])
+            assertEquals(receipt["programCid"], queued["programCid"])
             assertEquals(0, effects)
         } finally { supervisor.detach("kanban"); ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel() }
     }
@@ -1080,7 +1146,7 @@ class LcncRunProgramRouteTest {
             assertEquals(200, sheets.status, sheets.body)
             val family = reify(sheets.body) as List<*>
             assertEquals(cid, (family.first() as Map<*, *>)["id"])
-            assertEquals("root-at-admission,subprogram-at-first-use", receipt["versionPolicy"])
+            assertEquals("root-at-queue,subprogram-at-first-use", receipt["versionPolicy"])
             val stored = json(get("cid=${receipt["receiptCid"]}"))["lcncRun"] as Map<*, *>
             assertTrue("receiptCid" !in stored && "sequence" !in stored && "timelineRevision" !in stored)
             val previous = json(get("cid=${stored["previousReceiptCid"]}"))["lcncRun"] as Map<*, *>
@@ -1125,4 +1191,202 @@ class LcncRunProgramRouteTest {
             } finally { next.drain() }
         }
     }
+
+    @Test fun durableQueuedBacklogExecutesItsFrozenVersionAfterFreshCasReopen(): Unit = runBlocking {
+        val dir = tempDir("queued-backlog")
+        val files = JvmFileOperations()
+        val packPath = File(dir, "cas").path
+        fun version(value: String, subnet: String) = program("queued-version", listOf(
+            LcncNode("work", "test.version", mapOf("value" to value)),
+            LcncNode("output", "scope.out", mapOf("name" to "value", "kind" to "text")),
+        ), listOf(LcncWire("work", "value", "output", "value"))).copy(
+            controls = LcncConfixControls(subnet = subnet))
+        val original = version("v1", "local.queued")
+        val replacement = version("v2", "local.replacement")
+        val queuedRefs = mutableListOf<BoardApply.Committed>()
+        val count = 70
+        val firstCas = PackCasStore(files, packPath)
+        val firstCtx = newContext(ModuleRouteRegistry(), dir, firstCas)
+        val firstStore = BoardStoreElement(JvmBoardWal(File(dir, ".kanban")), firstCas)
+        firstStore.open()
+        val firstRuns = LcncRunService(firstCtx, firstStore) { emptyMap() }
+        try {
+            repeat(count) {
+                val prepared = firstRuns.enqueue(original.name, original, true, emptyMap(), emptyMap<String, Any?>())
+                assertNull(prepared.a)
+                val entry = assertNotNull(prepared.b)
+                queuedRefs.add(entry.a)
+                val receipt = firstRuns.queuedReceipt(entry)
+                assertEquals("queued", receipt["status"])
+                assertEquals("DURABLE", receipt["queueDurability"])
+                assertFalse(receipt.containsKey("workgroup"))
+                assertFalse(receipt.containsKey("startedAtMs"))
+            }
+        } finally {
+            firstRuns.drain()
+            firstStore.drain()
+            firstCtx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            firstCas.close()
+        }
+        val refs = queuedRefs.toSeries()
+        var executions = 0
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val nextCas = PackCasStore(files, packPath)
+        val nextCtx = newContext(ModuleRouteRegistry(), dir, nextCas, mapOf(original.name to replacement))
+        nextCtx.blackboard.put(LcncBlackboard.programKey(replacement.name),
+            LcncBlackboard.programEntry(replacement.name, replacement, LcncContracts.all().associateBy { it.type }), "test")
+        nextCtx.lcncRunners["test.version"] = LcncNodeRunner { node, _ ->
+            entered.complete(Unit)
+            release.await()
+            executions++
+            mapOf("value" to node.params.getValue("value"))
+        }
+        val supervisor = ModuleSupervisor(nextCtx)
+        var detached = false
+        var completed = false
+        val receipts = mutableMapOf<String, Any?>()
+        try {
+            withTimeout(5_000) { supervisor.attach(KanbanModule()) }
+            withTimeout(5_000) { entered.await() }
+            assertEquals(0, executions, "Attachment must return before a held recovery backlog completes")
+            val draining = async(start = CoroutineStart.UNDISPATCHED) { supervisor.detach("kanban") }
+            assertFalse(draining.isCompleted)
+            release.complete(Unit)
+            assertTrue(withTimeout(30_000) { draining.await() })
+            detached = true
+            assertEquals(count, executions)
+            for (ref in refs.view) {
+                val receipt = nextCtx.blackboard.get(ref.jobId) as Map<*, *>
+                assertEquals("completed", receipt["status"])
+                assertEquals(LcncBlackboard.cidOf(original), receipt["programCid"])
+                assertEquals(mapOf("value" to "v1"), receipt["returns"])
+                assertEquals("local.queued", receipt["claimedAtSubnet"])
+                assertEquals("lcnc/program/${original.name}@${LcncBlackboard.cidOf(original)}", receipt["workgroup"])
+                receipts[ref.jobId] = receipt["receiptCid"]
+            }
+            completed = true
+        } finally {
+            release.complete(Unit)
+            if (!completed) nextCtx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+            if (!detached) supervisor.detach("kanban")
+            nextCtx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            nextCas.close()
+        }
+        val terminalCas = PackCasStore(files, packPath)
+        val terminalCtx = newContext(ModuleRouteRegistry(), dir, terminalCas, mapOf(original.name to replacement))
+        terminalCtx.lcncRunners["test.version"] = LcncNodeRunner { _, _ -> error("Terminal receipts must not replay effects") }
+        val terminalSupervisor = ModuleSupervisor(terminalCtx)
+        try {
+            withTimeout(5_000) { terminalSupervisor.attach(KanbanModule()) }
+            for (ref in refs.view) {
+                val receipt = terminalCtx.blackboard.get(ref.jobId) as Map<*, *>
+                assertEquals("completed", receipt["status"])
+                assertEquals(receipts[ref.jobId], receipt["receiptCid"])
+            }
+        } finally {
+            terminalSupervisor.detach("kanban")
+            terminalCtx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+            terminalCas.close()
+        }
+    }
+
+
+    @Test fun inlineVoteRefusesAnExplicitNullQuorumBeforeDownstreamEffects(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("inline-null-quorum"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(ctx)
+        var downstream = 0
+        ctx.lcncRunners["test.afterVote"] = LcncNodeRunner { _, inputs ->
+            downstream++
+            mapOf("accepted" to inputs.getValue("accepted"))
+        }
+        suspend fun vote(params: Map<String, Any?>): JvmKanbanServer.HttpResponse {
+            val document = mapOf("nodes" to listOf(
+                mapOf("id" to "ballots", "type" to "scope.in", "params" to mapOf("name" to "ballots", "kind" to "json")),
+                mapOf("id" to "vote", "type" to "panel.vote", "params" to params),
+                mapOf("id" to "after", "type" to "test.afterVote"),
+                mapOf("id" to "result", "type" to "scope.out", "params" to mapOf("name" to "accepted", "kind" to "json")),
+            ), "wires" to listOf(
+                mapOf("from" to listOf("ballots", "value"), "to" to listOf("vote", "ballots")),
+                mapOf("from" to listOf("vote", "accepted"), "to" to listOf("after", "accepted")),
+                mapOf("from" to listOf("after", "accepted"), "to" to listOf("result", "value")),
+            ))
+            return post(server, "/api/lcnc/run", jsonOf(mapOf("name" to "quorum-document", "document" to document,
+                "inputs" to mapOf("ballots" to quorumBallots()))))
+        }
+        try {
+            supervisor.attach(KanbanModule())
+            for ((params, accepted) in quorumControls().view) {
+                val before = downstream
+                val response = vote(params)
+                assertEquals(200, response.status, response.body)
+                val run = json(response)
+                assertEquals(true, run["ok"])
+                assertEquals("completed", run["status"])
+                assertEquals(accepted, (run["returns"] as Map<*, *>)["accepted"])
+                assertEquals(expectedQuorumVote(accepted), (run["outputs"] as Map<*, *>)["vote"])
+                assertEquals(before + 1, downstream, "Each valid vote reaches its downstream effect once")
+            }
+            assertEquals(4, downstream)
+            val refused = vote(mapOf("quorum" to null))
+            assertEquals(400, refused.status, "An explicitly null declared quorum must refuse: ${refused.body}")
+            assertEquals(4, downstream, "A malformed quorum cannot run a downstream effect: ${refused.body}")
+        } finally {
+            try { supervisor.detach("kanban") }
+            finally { ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() }
+        }
+    }
+
+    @Test fun singleNodeVoteRefusesAnExplicitNullQuorum(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val ctx = newContext(routes, tempDir("node-null-quorum"), CasStore.inMemory())
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(ctx)
+        suspend fun vote(params: Map<String, Any?>) = post(server, "/api/lcnc/run", jsonOf(mapOf(
+            "type" to "panel.vote", "params" to params, "inputs" to mapOf("ballots" to quorumBallots()))))
+        try {
+            supervisor.attach(KanbanModule())
+            for ((params, accepted) in quorumControls().view) {
+                val response = vote(params)
+                assertEquals(200, response.status, response.body)
+                val result = json(response)
+                assertEquals(true, result["ok"])
+                assertEquals("panel.vote", result["type"])
+                assertEquals(expectedQuorumVote(accepted), result["outputs"])
+            }
+            val refused = vote(mapOf("quorum" to null))
+            assertEquals(400, refused.status, "An explicitly null declared quorum must refuse: ${refused.body}")
+        } finally {
+            try { supervisor.detach("kanban") }
+            finally { ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin() }
+        }
+    }
+
+    private fun quorumControls(): Series<Join<Map<String, Any?>, Boolean>> = s_[
+        emptyMap<String, Any?>() j true,
+        mapOf<String, Any?>("quorum" to " \t ") j true,
+        mapOf<String, Any?>("quorum" to 3) j false,
+        mapOf<String, Any?>("quorum" to "3") j false,
+    ]
+
+    private fun quorumBallots(): List<Map<String, Any?>> = listOf(
+        mapOf("seat" to "review-a", "role" to "reviewer", "model" to null, "ok" to true,
+            "content" to "explicit approval a", "approve" to true, "error" to null, "weight" to 1.0),
+        mapOf("seat" to "review-b", "role" to "reviewer", "model" to null, "ok" to true,
+            "content" to "explicit approval b", "approve" to true, "error" to null, "weight" to 1.0),
+        mapOf("seat" to "review-c", "role" to "reviewer", "model" to null, "ok" to true,
+            "content" to "explicit dissent", "approve" to false, "error" to null, "weight" to 1.0),
+    )
+
+    private fun expectedQuorumVote(accepted: Boolean): Map<String, Any?> = mapOf(
+        "verdict" to if (accepted) "ACCEPTED" else "REJECTED", "accepted" to accepted,
+        "tie" to false, "triage" to if (accepted) "advance" else "abort",
+        "tally" to mapOf("approve" to 2.0, "reject" to 1.0, "abstain" to 0.0),
+        "dissent" to if (accepted) listOf("explicit dissent") else listOf("explicit approval a", "explicit approval b"),
+        "transcript" to quorumBallots(), "seats" to 3.0,
+        "quorum" to if (accepted) 1.5000000000000002 else 3.0, "quorumMet" to accepted,
+    )
+
 }

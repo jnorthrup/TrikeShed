@@ -3,7 +3,6 @@ package borg.trikeshed.graal.subvm
 import borg.trikeshed.vm.Teleported
 import borg.trikeshed.vm.field
 import borg.trikeshed.vm.str
-import java.io.File
 
 /** One stock GraalPy context in its own process, with an explicit application environment. */
 data class PythonWorker(
@@ -17,9 +16,6 @@ data class PythonWorker(
 ) {
     init {
         require(timeoutMillis > 0)
-        require(workingDirectory == null || File(workingDirectory).isDirectory) { "Python worker directory is missing" }
-        require(pythonPath.all { File(it).exists() }) { "Python worker import path is missing" }
-        require(executable == null || File(executable).isFile) { "Python worker executable is missing" }
     }
 
     internal fun encode(): String = SubVmProtocol.encode(Teleported.obj(

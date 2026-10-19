@@ -43,6 +43,8 @@ class BtrfsRaidImageTest {
         val pending = mutableListOf<UringSubmission>()
         val opening = mutableSetOf<Long>()
 
+        override fun submitDeferredBatch(submissions: List<UringSubmission>): List<SelectionResult> = submitBatch(submissions)
+
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
             val admitted = mutableListOf<UringSubmission>()
             val rejected = mutableListOf<SelectionResult>()
@@ -76,6 +78,10 @@ class BtrfsRaidImageTest {
 
         private fun observe(completions: List<SelectionResult>): List<SelectionResult> = completions.also {
             for (completion in it) if (opening.remove(completion.userData) && completion.res >= 0) opened += completion.res
+        }
+
+        override suspend fun awaitCompletions() {
+            if (pending.isNotEmpty()) release?.await() else delegate.awaitCompletions()
         }
 
         override fun close() { closes++; delegate.close() }

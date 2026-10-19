@@ -9,6 +9,7 @@ import org.w3c.dom.HTMLElement
 
 /** SpatialWorkspace.mjs: the LCNC document owns all effects; this workspace owns only presentation. */
 class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
+    private fun launchJs(block: suspend () -> Unit) = p.launchJs(block)
     private var open = false
     var backend = "svg"; private set
     private var response: dynamic = null
@@ -29,6 +30,7 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
     private lateinit var tools: HTMLElement
     private var query: dynamic = null
     private var observer: dynamic = null
+    private var resizeObserver: dynamic = null
     private var resetCamera = true
     private var dirtyAlignment = true
     private var heldParams: Pair<dynamic, dynamic>? = null
@@ -148,6 +150,10 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
         actions.append(command("Open editor", "pencil", true) { editNode(str(n.id)) }, command("Frame node", "search") { renderer!!.focus(str(n.id)) },
             command("Delete node", "trash-2") { releaseParams(); p.removeNode(n.id); select(null, null) })
         meta.append(actions)
+        val evidence = section("Execution evidence")
+        evidence.append(el("p", "sg-muted", "Inspect retained outputs and invocation occurrences for this node ID. " +
+            "Version differences remain explicit; alignment candidates are not execution or epistemic proof."),
+            command("Inspect recorded node evidence", "search", true) { p.facets.inspectNode(str(n.id)) })
         val params = n.el.querySelector(":scope > .params")
         if (params != null && num(params.children.length) > 0) {
             val s = section("Parameters"); val r = params.getBoundingClientRect(); val scale = num(n.el.getBoundingClientRect().width) / num(n.el.offsetWidth)
@@ -177,7 +183,7 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
         val alignment = arr(response?.alignment?.nodes).firstOrNull { it.id == n.id }; val s = section("Alignment candidates")
         for ((label, values) in listOf("Rete" to alignment?.watchedBy, "Causal rules" to alignment?.causalRules, "KIF" to alignment?.facts))
             s.append(el("h4", "", label), el("pre", "", arr(values).joinToString("\n") { str(it) }.ifEmpty { "None" }))
-        section("Epistemic bindings").append(el("p", "sg-muted", "Not supplied")); icons()
+        icons()
     }
 
     override fun moveNode(id: String, dx: Double, dy: Double, commit: Boolean) {
@@ -246,13 +252,17 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
 
     fun schedule(alignment: Boolean = false) {
         dirtyAlignment = dirtyAlignment || alignment
-        if (!open || timer != 0) return
+        if (p.page.closing || !open || timer != 0) return
         timer = window.setTimeout({ timer = 0; refresh() }, 20)
     }
 
     fun install() {
-        window.addEventListener("lcnc:shadow-update", { schedule(true) })
-        window.addEventListener("pagehide", { releaseParams(); request?.abort(); window.clearTimeout(timer); observer?.disconnect(); renderer?.destroy() })
+        p.page.on(window, "lcnc:shadow-update", { schedule(true) })
+        p.page.own { serial++; releaseParams() }
+        p.page.own { window.clearTimeout(timer) }
+        p.page.own { observer?.disconnect() }
+        p.page.own { resizeObserver?.disconnect() }
+        p.page.own { renderer?.destroy() }
         if (byId("spacegraphBtn") == null) return
         tools = el("div", "sg-tools"); tools.id = "sg-tools"; tools.hidden = true; document.body!!.append(tools)
         val modes = el("div", "sg-modes"); modes.setAttribute("role", "group"); modes.setAttribute("aria-label", "Workspace view")
@@ -285,7 +295,8 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
             try { val value = localStorage.getItem("spacegraph.renderer"); if (value in listOf("gl", "canvas", "svg")) preferred = value!! } catch (e: dynamic) {}
             useProvider(preferred, false)
         } catch (error: Throwable) { report(error); activate(false); return }
-        jsNew(js("ResizeObserver"), { _: dynamic -> schedule() }).observe(surface)
+        resizeObserver = jsNew(js("ResizeObserver"), { _: dynamic -> schedule() })
+        resizeObserver.observe(surface)
         val world = byId("world")
         observer = jsNew(js("MutationObserver"), { records: dynamic ->
             if (arr(records).any { r ->
@@ -296,7 +307,7 @@ class SpaceGraphWorkspace(private val p: Panels) : SpatialCallbacks {
         })
         val oo = obj(); oo.attributes = true; oo.attributeFilter = arrayOf("class", "style"); oo.childList = true; oo.subtree = true; oo.characterData = true
         observer.observe(world, oo)
-        on(byId("fitBtn"), "click", { if (open) { resetCamera = true; schedule() } })
+        p.page.on(byId("fitBtn"), "click", { if (open) { resetCamera = true; schedule() } })
         val api = obj()
         api.select = { id: String?, port: dynamic -> select(id, port) }
         api.activate = { v: Boolean -> activate(v) }

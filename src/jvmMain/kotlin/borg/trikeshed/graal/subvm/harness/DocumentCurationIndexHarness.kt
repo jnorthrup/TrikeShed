@@ -97,6 +97,7 @@ object DocumentCurationIndexHarness {
         val fixture = DocumentModelFixture.open(responder = model::invoke)
         val docScope = CoroutineScope(scope.coroutineContext + fixture.htx + fixture.reactor)
         var feed: DocumentFeed? = null
+        var failure: Throwable? = null
         try {
             feed = DocumentCurationLegos.create(docScope, volume, cas, log, bag, points, fixture.model, "fixture", runners)
             val (real, realOutput) = submit("PRELOAD.md:identified-passage", passage)
@@ -188,8 +189,20 @@ object DocumentCurationIndexHarness {
                     "reasons" to unavailable.first.reasons.view.toList(), "sheets" to unavailable.second["sheets"]),
                 "recovery" to true, "modelCalls" to model.calls, "drained" to true,
             )
+        } catch (caught: Throwable) {
+            failure = caught
+            if (caught is DocumentFeed.StartFailure) feed = caught.feed
+            throw caught
         } finally {
-            try { feed?.drain() } finally { try { bag.drain() } finally { fixture.close() } }
+            // A retained consumer must stop before the fixture closes its dependencies.
+            try { feed?.drain() } catch (cleanup: Throwable) {
+                failure?.let { primary ->
+                    if (primary !== cleanup) primary.addSuppressed(cleanup)
+                    throw primary
+                }
+                throw cleanup
+            }
+            try { bag.drain() } finally { fixture.close() }
         }
     }
 

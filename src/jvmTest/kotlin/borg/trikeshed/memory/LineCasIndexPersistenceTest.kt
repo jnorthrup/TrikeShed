@@ -2,14 +2,13 @@ package borg.trikeshed.memory
 
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.cas.LineCasIndex
-import borg.trikeshed.cas.LineCasIndexPersistence
+import borg.trikeshed.cas.LineCasSpineIsam
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -20,12 +19,11 @@ import kotlin.test.assertTrue
  *
  * 1. `LineCasIndex.snapshot` → `restore` round-trips EXACTLY (doc count, content
  *    keys, and graded link matches are identical; per-line codes survive).
- * 2. The persistence seam lands a content-addressed snapshot document in the store,
- *    and a FRESH store + `restore` reproduces the live index — boot without
- *    cold derivation.
- * 3. `MemoryStore.onIndexIngest` trails the live index: every `put` lands the
- *    snapshot, and `restoreIndex` adopts the restored continent so `linkSearch`
- *    answers across the boot boundary.
+ * 2. The index persists as an appendable ISAM cursor of its lines ([LineCasSpineIsam]): each ingest appends only
+ *    the new spine's rows, and a FRESH cursor over the same rows reproduces the live index — boot without cold
+ *    derivation and without rewriting the index per ingest.
+ * 3. `MemoryStore.onIndexIngest` hands each absorbed spine to the cursor, and `restoreIndex` adopts the restored
+ *    continent so `linkSearch` answers across the boot boundary.
  */
 class LineCasIndexPersistenceTest {
 
@@ -78,47 +76,40 @@ class LineCasIndexPersistenceTest {
     }
 
     @Test
-    fun persistenceLandsADocAndRestoresAcrossABoot() {
+    fun spineRowsLandInTheCursorAndRestoreAcrossABoot() {
+        val files = borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()
+        val dir = files.createTempDir("linecas-isam")
         val cas = CasStore.inMemory()
-        val couch = CouchStoreFactory.casBacked(cas)
         val live = LineCasIndex()
-        val spA = LineCas.spineInto(cas, textA)
-        val spB = LineCas.spineInto(cas, textB)
-        live.ingestSpine(spA)
-        live.ingestSpine(spB)
+        val cursor = LineCasSpineIsam(files.resolvePath(dir, "linecas.isam"), files)
+        for (text in listOf(textA, textB)) LineCas.spineInto(cas, text).also { live.ingestSpine(it); cursor.append(it) }
 
-        val cid = LineCasIndexPersistence.write(couch, cas, live)
-        assertTrue(LineCasIndexPersistence.exists(couch), "snapshot doc is present")
-        val bytes = assertNotNull(LineCasIndexPersistence.read(couch, cas))
-        assertEquals(cid.value, borg.trikeshed.job.ContentId.of(bytes).value, "the doc references the exact blob")
+        // a fresh cursor over the same rows (a new boot) restores the continent — no re-derivation
+        val restored = assertNotNull(LineCasSpineIsam(files.resolvePath(dir, "linecas.isam"), files).restore())
+        assertEquals(live.snapshot(), restored.snapshot(), "the rows restore every spine exactly")
 
-        // a FRESH store (a new boot) restores the continent — no re-derivation
-        val restored = assertNotNull(LineCasIndexPersistence.restore(couch, cas))
-        assertEquals(2, restored.documentCount, "both spines restored")
-        assertEquals(live.contentKeyCount, restored.contentKeyCount)
-
-        // no snapshot yet → no restore (the honest empty case)
-        val emptyCas = CasStore.inMemory()
-        val emptyCouch = CouchStoreFactory.casBacked(emptyCas)
-        assertFalse(LineCasIndexPersistence.exists(emptyCouch))
-        assertNull(LineCasIndexPersistence.restore(emptyCouch, emptyCas))
+        // no rows yet → no restore (the honest empty case)
+        assertNull(LineCasSpineIsam(files.resolvePath(dir, "absent.isam"), files).restore())
+        files.deleteRecursively(dir)
     }
 
     @Test
-    fun memoryStoreTrailsTheIndexAndRestoresAcrossABoot() {
+    fun memoryStoreAppendsEachSpineAndRestoresAcrossABoot() {
+        val files = borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()
+        val dir = files.createTempDir("linecas-isam")
         val cas = CasStore.inMemory()
         val couch = CouchStoreFactory.casBacked(cas)
         val store = MemoryStore(cas, couch)
-        store.onIndexIngest = { idx -> LineCasIndexPersistence.write(couch, cas, idx) }
+        val cursor = LineCasSpineIsam(files.resolvePath(dir, "linecas.isam"), files)
+        store.onIndexIngest = cursor::append
 
         store.put(memoryFile("/memories/a.md", "alpha", textA), kind = "note")
         store.put(memoryFile("/memories/b.md", "beta", textB), kind = "note")
-        assertTrue(LineCasIndexPersistence.exists(couch), "the snapshot trailed the ingest")
         assertEquals(2, store.lineIndex.documentCount)
 
-        // boot two: a fresh store adopts the persisted continent
+        // boot two: a fresh store adopts the appended continent
         val store2 = MemoryStore(CasStore.inMemory(), CouchStoreFactory.casBacked(cas))
-        val restored = LineCasIndexPersistence.restore(couch, cas)
+        val restored = LineCasSpineIsam(files.resolvePath(dir, "linecas.isam"), files).restore()
         assertNotNull(restored)
         store2.restoreIndex(restored)
 
@@ -127,5 +118,6 @@ class LineCasIndexPersistenceTest {
         val bootHits = store2.linkSearch(textB, minGrade = borg.trikeshed.cas.MatchGrade.CONTENT_ONLY)
         assertEquals(liveHits.size, bootHits.size, "linkSearch answers identically across the boot boundary")
         assertTrue(bootHits.size > 0, "the restored continent actually matches")
+        files.deleteRecursively(dir)
     }
 }

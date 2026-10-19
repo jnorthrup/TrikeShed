@@ -1,7 +1,7 @@
 package borg.trikeshed.tilting.zran
 
 /** RFC 8878 frame decoder. Reusable: one instance keeps its literal buffer and tables. */
-class ZstdDecoder {
+class ZstdDecoder(val dictionary: ZstdDictionary? = null) {
     var out: ByteArray = ByteArray(0)
     var op = 0
     var growable = true
@@ -17,6 +17,7 @@ class ZstdDecoder {
     var ml: FseTable? = null
     val rep = IntArray(3)
     val br = ReverseBits()
+    var window = 0L
 
     /** Decodes every frame in src[off, end), skipping skippable frames. */
     fun decompress(src: ByteArray, off: Int = 0, end: Int = src.size): ByteArray {
@@ -66,7 +67,7 @@ class ZstdDecoder {
         val dictBytes = when (fhd and 3) { 0 -> 0; 1 -> 1; 2 -> 2; else -> 4 }
         val fcsBytes = when (fcsFlag) { 0 -> if (single) 1 else 0; 1 -> 2; 2 -> 4; else -> 8 }
         check(end - p >= (if (single) 0 else 1) + dictBytes + fcsBytes) { "zstd: truncated frame header" }
-        var window = 0L
+        window = 0L
         if (!single) {
             val wd = src.u8(p++)
             val base = 1L shl (10 + (wd ushr 3))
@@ -74,7 +75,7 @@ class ZstdDecoder {
         }
         var dict = 0L
         for (k in 0 until dictBytes) dict = dict or (src.u8(p + k).toLong() shl (8 * k))
-        check(dict == 0L) { "zstd: dictionary frames are unsupported" }
+        check(dict == 0L || dictionary?.id == dict) { "zstd: dictionary $dict required" }
         p += dictBytes
         var fcs = -1L
         if (fcsBytes > 0) {
@@ -88,6 +89,7 @@ class ZstdDecoder {
         rep[0] = 1; rep[1] = 4; rep[2] = 8
         hufReady = false
         ll = null; of = null; ml = null
+        dictionary?.initialize(this)
         val frameStart = op
         if (fcs in 0..Int.MAX_VALUE.toLong()) {
             check(op + fcs <= limit) { "zstd: frame content exceeds its destination" }
@@ -264,14 +266,28 @@ class ZstdDecoder {
                 } else lit.copyInto(out, op, lp, lp + llen)
                 op += llen
                 lp += llen
-                check(off <= op - frameStart) { "zstd: match offset $off beyond the window" }
+                val produced = op - frameStart
+                val history = dictionary?.content
+                check(off > 0 && if (off > produced) {
+                    history != null && produced.toLong() <= window && off.toLong() <= produced.toLong() + history.size
+                } else off.toLong() <= window) { "zstd: match offset $off beyond the window" }
                 var from = op - off
-                if (mlen <= 16 && off >= 8 && op <= wideEnd) {
+                var remaining = mlen
+                if (from < frameStart) {
+                    val count = minOf(remaining, frameStart - from)
+                    val index = history!!.size - (frameStart - from)
+                    history.copyInto(out, op, index, index + count)
+                    op += count
+                    from += count
+                    remaining -= count
+                }
+                if (remaining == 0) continue
+                if (remaining <= 16 && off >= 8 && op <= wideEnd) {
                     out.put64(op, out.le64(from))
                     out.put64(op + 8, out.le64(from + 8))
-                    op += mlen
-                } else if (off >= mlen) { out.copyInto(out, op, from, from + mlen); op += mlen }
-                else repeat(mlen) { out[op++] = out[from++] }
+                    op += remaining
+                } else if (off >= remaining) { out.copyInto(out, op, from, from + remaining); op += remaining }
+                else repeat(remaining) { out[op++] = out[from++] }
             }
             check(br.finished) { "zstd: sequence bitstream not fully consumed" }
         }

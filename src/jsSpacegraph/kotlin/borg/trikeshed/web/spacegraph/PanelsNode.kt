@@ -1,12 +1,12 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.landscape.LandscapeNavigation
+import borg.trikeshed.lcnc.LcncPortContract
 import borg.trikeshed.web.*
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
 
 private fun types(e: dynamic): List<String> = arr(js("Array.from(e.dataTransfer.types)")).map { str(it) }
 
@@ -55,6 +55,7 @@ fun Panels.buildNode(n: dynamic) {
     val hd = document.createElement("div").asDynamic(); hd.className = "hd"
     hd.innerHTML = "<i></i><b>${t.title}</b><s role=\"button\" tabindex=\"0\" aria-label=\"Collapse node\" title=\"collapse\">▤</s><s role=\"button\" tabindex=\"0\" aria-label=\"Delete node\" title=\"delete\">✕</s>"
     el.appendChild(hd)
+    sprites.attach(n, hd)
     // the hover blip: asserted / inferred / graal for THIS node, from the daemon
     on(el, "pointerenter", { e -> blip.enter(n, e) })
     on(el, "pointerleave", { e -> blip.leave(e) })
@@ -120,11 +121,23 @@ fun Panels.buildNode(n: dynamic) {
     el.appendChild(body)
     renderPorts(n)
     val ps = document.createElement("div").asDynamic(); ps.className = "params"
+    // SpaceGraph may relocate these controls; the node retains their presentation owner.
+    n._paramsHost = ps
+    val rowViews = mutableMapOf<String, () -> Unit>()
+    fun refreshColumns(parameter: String) {
+        for ((field, refresh) in rowViews) if (str(t.params[field].colsParam ?: "") == parameter) refresh()
+    }
+    // Capture picklist identity only after the complete parameter frame has its defaults.
     for (k in keysOf(t.params)) {
         val def = t.params[k]
         if (n.params[k] === undefined && !truthy(def.optional)) n.params[k] = def.v ?: ""
+    }
+    for (k in keysOf(t.params)) {
+        val def = t.params[k]
         val lab = document.createElement("label").asDynamic(); lab.textContent = k; ps.appendChild(lab)
-        if (truthy(def.cols) && num(def.cols.length) > 0) { ps.appendChild(listWidget(n, k, def)); continue }
+        if ((truthy(def.cols) && num(def.cols.length) > 0) || truthy(def.colsParam)) {
+            ps.appendChild(listWidget(n, k, def) { rowViews[k] = it }); continue
+        }
         val inp: dynamic
         if (truthy(def.opts) || truthy(def.optsFrom)) {
             inp = document.createElement("select").asDynamic()
@@ -146,7 +159,15 @@ fun Panels.buildNode(n: dynamic) {
             // LIVE PICKLIST: optsFrom names a running source; the current value survives, marked stale.
             if (truthy(def.optsFrom)) {
                 inp.classList.add("live")
-                launchJs { try { val list = livePicklist(str(def.optsFrom), n); if (list.isNotEmpty()) fill(list.toTypedArray()) } catch (e: CancellationException) { throw e } catch (e: dynamic) {} }
+                val canvas = graph
+                val requestedParams = JSON.stringify(n.params)
+                launchJs {
+                    try {
+                        val list = livePicklist(str(def.optsFrom), n)
+                        if (graph === canvas && node(str(n.id)) === n && n.el === el && truthy(inp.isConnected) &&
+                            JSON.stringify(n.params) == requestedParams && list.isNotEmpty()) fill(list.toTypedArray())
+                    } catch (e: CancellationException) { throw e } catch (e: dynamic) {}
+                }
             }
             inp.value = n.params[k] ?: ""
         } else if (truthy(def.ta)) {
@@ -165,6 +186,7 @@ fun Panels.buildNode(n: dynamic) {
                 redraw()
             }
             save()
+            refreshColumns(k)
         }
         on(inp, "input", { paramChanged() })
         on(inp, "pointerdown", { e -> e.stopPropagation() })
@@ -180,7 +202,7 @@ fun Panels.buildNode(n: dynamic) {
             on(present, "change", {
                 inp.disabled = !truthy(present.checked)
                 if (truthy(present.checked)) paramChanged()
-                else { js("Reflect.deleteProperty")(n.params, k); save() }
+                else { js("Reflect.deleteProperty")(n.params, k); save(); refreshColumns(k) }
             })
         }
         // any dragged value drops into a plain param too
@@ -194,6 +216,19 @@ fun Panels.buildNode(n: dynamic) {
             }
         })
         ps.appendChild(inp)
+        if (truthy(def.code)) {
+            inp.spellcheck = false
+            val edit = document.createElement("button").asDynamic()
+            edit.type = "button"; edit.textContent = "Edit source…"
+            edit.setAttribute("aria-label", "Edit $k for " + str(n.id))
+            ps.appendChild(edit)
+            // These handlers belong to the node DOM, not the page's retained binding registry.
+            on(edit, "pointerdown", { e -> e.stopPropagation() })
+            on(edit, "click", { e ->
+                e.stopPropagation()
+                if (!page.closing && !truthy(inp.disabled)) sourceEditor.open(n, k, inp, str(def.ph ?: ""))
+            })
+        }
     }
     el.appendChild(ps)
     if (n.type == "gauge") {
@@ -229,74 +264,135 @@ fun Panels.buildNode(n: dynamic) {
             if (truthy(n._parentScope)) { n.x = maxOf(0.0, num(n.x)); n.y = maxOf(0.0, num(n.y)); growRingWorldFor(n) }
             el.style.left = "${n.x}px"; el.style.top = "${n.y}px"; redraw()
         }
-        up = { off(window, "pointermove", mv); off(window, "pointerup", up); save() }
-        on(window, "pointermove", mv); on(window, "pointerup", up)
+        up = { page.off(window, "pointermove", mv); page.off(window, "pointerup", up); save() }
+        page.on(window, "pointermove", mv); page.on(window, "pointerup", up)
     })
 }
 
 /** LIST widget: rows of {col:value}; the param VALUE is the JSON array text; a drop target for dragged values. */
-private fun Panels.listWidget(n: dynamic, k: String, def: dynamic): dynamic {
-    val cols = arr(def.cols).map { str(it) }
+private fun Panels.listWidget(n: dynamic, k: String, def: dynamic, refresh: (() -> Unit) -> Unit): dynamic {
+    val spec = LcncPortContract.LcncParamSpec(
+        cols = arr(def.cols).map { str(it) }, colsParam = str(def.colsParam ?: ""))
     val wrap = document.createElement("div").asDynamic(); wrap.className = "plist"
-    fun rowsOf(): dynamic = try { val a = JSON.parse<dynamic>(if (truthy(n.params[k])) str(n.params[k]) else "[]"); if (isArray(a)) a else jsArray() } catch (e: dynamic) { jsArray() }
-    fun commit(rows: dynamic) { n.params[k] = JSON.stringify(rows); save() }
+    val table = document.createElement("div").asDynamic(); wrap.appendChild(table)
+    val details = document.createElement("details").asDynamic()
+    val summary = document.createElement("summary").asDynamic(); summary.textContent = "JSON"
+    details.appendChild(summary)
+    val raw = document.createElement("textarea").asDynamic()
+    raw.setAttribute("aria-label", "$k JSON"); raw.rows = 4
+    raw.value = n.params[k] ?: ""; details.appendChild(raw); wrap.appendChild(details)
+    on(wrap, "pointerdown", { e -> e.stopPropagation() })
+    fun numericRows(value: dynamic): Boolean = when (typeOf(value)) {
+        "number" -> truthy(js("Number.isFinite")(value)) &&
+            (!truthy(js("Number.isInteger")(value)) || truthy(js("Number.isSafeInteger")(value)))
+        "object" -> value == null || if (isArray(value)) arr(value).all { numericRows(it) }
+            else keysOf(value).all { numericRows(value[it]) }
+        else -> true
+    }
+    fun rowsOf(): dynamic {
+        val rows = JSON.parse<dynamic>(str(n.params[k] ?: "").ifBlank { "[]" })
+        require(isArray(rows) && arr(rows).all { it != null && typeOf(it) == "object" && !isArray(it) }) {
+            "Row editing requires an array of objects. The original value is unchanged; edit JSON to repair it."
+        }
+        require(numericRows(rows)) { "Numbers outside the browser's safe range require the JSON editor" }
+        return rows
+    }
+    fun columns(): List<String> = spec.columns(keysOf(n.params).associateWith { str(n.params[it]) })
+    fun commit(rows: dynamic) {
+        require(numericRows(rows)) { "Numbers outside the browser's safe range require the JSON editor" }
+        n.params[k] = JSON.stringify(rows); raw.value = n.params[k]; save()
+    }
+    fun notice(message: String) {
+        val text = document.createElement("div").asDynamic()
+        text.textContent = message; text.style.cssText = "font-size:10px;color:var(--dim);padding:4px"
+        table.appendChild(text)
+    }
     lateinit var paint: () -> Unit
-    paint = {
-        val rows = rowsOf(); wrap.innerHTML = ""
+    paint = paint@{
+        table.textContent = ""; raw.value = n.params[k] ?: ""
+        val cols = try { columns() } catch (e: dynamic) {
+            notice(str(e.message ?: e)); details.open = true; return@paint
+        }
+        if (cols.isEmpty()) { details.open = true; return@paint }
+        val rows = try { rowsOf() } catch (e: dynamic) {
+            notice("Rows unavailable: " + str(e.message ?: e) + ". Original value preserved.")
+            details.open = true; return@paint
+        }
         val head = document.createElement("div").asDynamic(); head.className = "plr plh"
-        for (c2 in cols) { val sp = document.createElement("span").asDynamic(); sp.textContent = c2; head.appendChild(sp) }
-        head.appendChild(document.createElement("span"))
-        wrap.appendChild(head)
+        for (c in cols) { val label = document.createElement("span").asDynamic(); label.textContent = c; head.appendChild(label) }
+        head.appendChild(document.createElement("span")); table.appendChild(head)
         arr(rows).forEachIndexed { ri, row ->
             val r = document.createElement("div").asDynamic(); r.className = "plr"
-            for (c2 in cols) {
-                val inp2 = document.createElement("input").asDynamic(); inp2.value = row[c2] ?: ""
-                on(inp2, "input", { val rs = rowsOf(); if (!truthy(rs[ri])) rs[ri] = obj(); rs[ri][c2] = inp2.value; commit(rs) })
-                on(inp2, "pointerdown", { e -> e.stopPropagation() })
-                r.appendChild(inp2)
+            for (c in cols) {
+                val input = document.createElement("input").asDynamic()
+                val own = c in keysOf(row)
+                val textual = !own || typeOf(row[c]) == "string"
+                input.value = if (!own) "" else if (textual) row[c] else JSON.stringify(row[c])
+                input.disabled = !textual
+                input.setAttribute("aria-label", "$k row ${ri + 1} $c")
+                if (!textual) input.title = "Non-text value preserved; edit JSON to change its type"
+                on(input, "input", {
+                    val current = rowsOf()
+                    val descriptor = obj(); descriptor.value = input.value
+                    descriptor.enumerable = true; descriptor.writable = true; descriptor.configurable = true
+                    js("Object.defineProperty")(current[ri], c, descriptor)
+                    commit(current)
+                })
+                r.appendChild(input)
             }
-            val del = document.createElement("s").asDynamic(); del.textContent = "✕"
-            on(del, "pointerdown", { e -> e.stopPropagation() })
-            on(del, "click", { val rs = rowsOf(); rs.splice(ri, 1); commit(rs); paint() })
-            r.appendChild(del)
-            wrap.appendChild(r)
+            val del = document.createElement("button").asDynamic()
+            del.type = "button"; del.textContent = "✕"; del.setAttribute("aria-label", "Remove $k row ${ri + 1}")
+            on(del, "click", { val current = rowsOf(); current.splice(ri, 1); commit(current); paint() })
+            r.appendChild(del); table.appendChild(r)
         }
-        val add = document.createElement("div").asDynamic(); add.className = "pladd"; add.textContent = "＋ row"
-        on(add, "pointerdown", { e -> e.stopPropagation() })
-        on(add, "click", { val rs = rowsOf(); rs.push(obj()); commit(rs); paint() })
-        wrap.appendChild(add)
+        val extra = arr(rows).flatMap { keysOf(it).filter { key -> key !in cols } }.distinct()
+        if (extra.isNotEmpty()) notice("Other fields retained in JSON: " + extra.joinToString(", "))
+        if (arr(rows).any { row -> cols.any { c -> row[c] !== undefined && typeOf(row[c]) != "string" } })
+            notice("Non-text cells are read-only here. Their types and values are preserved in JSON.")
+        val add = document.createElement("button").asDynamic()
+        add.type = "button"; add.className = "pladd"; add.textContent = "＋ row"
+        add.setAttribute("aria-label", "Add $k row")
+        on(add, "click", { val current = rowsOf(); current.push(js("Object.create(null)")); commit(current); paint() })
+        table.appendChild(add)
     }
+    on(raw, "input", { n.params[k] = raw.value; save(); paint() })
     on(wrap, "dragover", { e -> if ("text/x-lcnc-value" in types(e)) { e.preventDefault(); e.stopPropagation(); wrap.classList.add("dropready") } })
     on(wrap, "dragleave", { wrap.classList.remove("dropready") })
     on(wrap, "drop", { e ->
         val txt = str(e.dataTransfer.getData("text/x-lcnc-value"))
         if (txt.isNotEmpty()) {
             e.preventDefault(); e.stopPropagation(); wrap.classList.remove("dropready")
-            val v: dynamic = try { JSON.parse(txt) } catch (x: dynamic) { txt }
-            val rs = rowsOf()
-            fun toRow(o: dynamic): dynamic {
-                val row = obj()
-                if (truthy(o) && typeOf(o) == "object" && !isArray(o)) {
-                    for (c2 in cols) if (o[c2] !== undefined) row[c2] = str(o[c2])
-                    if (keysOf(row).isEmpty()) { val vals = arr(js("Object.entries(o)")); cols.forEachIndexed { i, c2 -> if (i < vals.size) row[c2] = str(vals[i][1]) } }
-                } else cols.forEachIndexed { i, c2 -> if (i == 0) row[c2] = str(o) }
-                return row
-            }
-            if (isArray(v)) for (o in arr(v)) rs.push(toRow(o)) else rs.push(toRow(v))
-            commit(rs); paint()
-            status("dropped " + (if (isArray(v)) "${v.length} rows" else "a row") + " into " + str(n.type) + "." + k)
+            try {
+                val cols = columns()
+                require(cols.isNotEmpty()) { "Declare row columns before appending rows; edit JSON for other values" }
+                val current = rowsOf()
+                val value: dynamic = try { JSON.parse(txt) } catch (x: dynamic) { txt }
+                fun toRow(value: dynamic): dynamic {
+                    // Existing object rows keep every field and value type, including fields outside the view.
+                    if (value != null && typeOf(value) == "object" && !isArray(value)) return value
+                    val row = js("Object.create(null)")
+                    row[cols.first()] = str(value)
+                    return row
+                }
+                if (isArray(value)) for (item in arr(value)) current.push(toRow(item)) else current.push(toRow(value))
+                commit(current); paint()
+                status("dropped rows into " + str(n.type) + "." + k)
+            } catch (failure: dynamic) { status("Rows unchanged: " + str(failure.message ?: failure)) }
         }
     })
+    refresh(paint)
     paint()
     return wrap
 }
 
 /** Drag a wire from a port: kind-equal ports light, candidate splines fan out, release lands or offers mates. */
 fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSED_PARAMETER") e: dynamic) {
+    val resolve = try { portKindResolver() }
+        catch (failure: dynamic) { status("Cannot inspect connections: " + failureText(failure)); return }
     val path = svg("path")
     path.classList.add("drag"); wiresSvg.appendChild(path)
     document.body!!.classList.add("wiring")
-    val srcKind = nodeKindOf(n, dir, name)
+    val srcKind = resolve(n, dir, name)
     val srcScope = scopePath(n)
     class Cand(val nd: dynamic, val pe: dynamic, val port: String, val pdir: String, var g: dynamic = null, var b: dynamic = null, val blocked: Boolean = false)
     val cands = ArrayList<Cand>()
@@ -307,7 +403,9 @@ fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSE
         for (pe in arr(nd.el.querySelectorAll(".port"))) {
             if (pe.closest(".node") !== nd.el) continue
             val pdir = str(pe.dataset.dir); val pport = str(pe.dataset.port)
-            val kindOk = nd.id != n.id && pdir != dir && kindsCompatible(srcKind, nodeKindOf(nd, pdir, pport))
+            val otherKind = resolve(nd, pdir, pport)
+            val kindOk = nd.id != n.id && pdir != dir &&
+                if (dir == "out") kindsCompatible(srcKind, otherKind) else kindsCompatible(otherKind, srcKind)
             // Containment is a SEPARATE question from kind — the scope impedance is shown REFUSED, not hidden.
             var scopeOk = true
             if (kindOk) {
@@ -330,7 +428,8 @@ fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSE
         val g = svg("path")
         g.classList.add("cand")
         PatchNavigation.wireCurve(g, if (dir == "out") anchor else b, if (dir == "out") b else anchor, viewport, view)
-        val kc = PatchKinds.kindColor[portClass(c.nd.type, c.pdir, c.port)] ?: PatchKinds.kindColor[portClass(n.type, dir, name)]
+        val kc = PatchKinds.kindColor[PatchKinds.portClass(resolve(c.nd, c.pdir, c.port), kindAcceptance)] ?:
+            PatchKinds.kindColor[PatchKinds.portClass(srcKind, kindAcceptance)]
         if (kc != null) g.style.stroke = kc
         wiresSvg.insertBefore(g, wiresSvg.firstChild) // behind the live cable
         c.g = g; c.b = b; ghosts.add(c)
@@ -355,6 +454,17 @@ fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSE
     }
     lateinit var mv: (dynamic) -> Unit
     lateinit var up: (dynamic) -> Unit
+    var released: () -> Unit = {}
+    fun clear() {
+        page.off(window, "pointermove", mv); page.off(window, "pointerup", up)
+        path.remove()
+        document.body!!.classList.remove("wiring")
+        for (x in arr(document.querySelectorAll(".port.mateable"))) x.classList.remove("mateable")
+        for (x in arr(document.querySelectorAll(".port.scopeblock"))) x.classList.remove("scopeblock")
+        for (x in arr(document.querySelectorAll(".port.mate-only"))) x.classList.remove("mate-only")
+        for (x in arr(document.querySelectorAll(".node.nomate"))) x.classList.remove("nomate")
+        for (gh in ghosts) gh.g.remove()
+    }
     mv = { ev ->
         val w = world.getBoundingClientRect()
         val m = obj(); m.x = (num(ev.clientX) - w.left) / num(view.z); m.y = (num(ev.clientY) - w.top) / num(view.z)
@@ -370,14 +480,7 @@ fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSE
         for (gh in ghosts) gh.g.classList.toggle("near", gh === best && bd < 220 * 220)
     }
     up = { ev ->
-        off(window, "pointermove", mv); off(window, "pointerup", up)
-        path.remove()
-        document.body!!.classList.remove("wiring")
-        for (x in arr(document.querySelectorAll(".port.mateable"))) x.classList.remove("mateable")
-        for (x in arr(document.querySelectorAll(".port.scopeblock"))) x.classList.remove("scopeblock")
-        for (x in arr(document.querySelectorAll(".port.mate-only"))) x.classList.remove("mate-only")
-        for (x in arr(document.querySelectorAll(".node.nomate"))) x.classList.remove("nomate")
-        for (gh in ghosts) gh.g.remove()
+        released(); clear()
         val tgt = document.elementFromPoint(num(ev.clientX), num(ev.clientY)).asDynamic()
         // Highlighting HIGHLIGHTS: a lone legal mate is pointed at, never auto-landed.
         if (tgt != null && truthy(tgt.classList.contains("port")) && tgt.dataset.dir != dir) {
@@ -398,25 +501,33 @@ fun Panels.startWireDrag(n: dynamic, dir: String, name: String, @Suppress("UNUSE
         }
         redraw()
     }
-    on(window, "pointermove", mv); on(window, "pointerup", up)
+    page.on(window, "pointermove", mv); page.on(window, "pointerup", up)
+    released = page.own { clear() }
 }
 
 /** the mate popup: release a wire on empty canvas and the daemon offers the kind-compatible continuations */
 suspend fun Panels.showMateMenu(cx: Double, cy: Double, srcNode: dynamic, srcPort: String, wx: Double, wy: Double, scope: dynamic, dir: String) {
+    val canvas = graph
+    fun current() = !page.closing && graph === canvas && node(srcNode.id) === srcNode &&
+        (scope == null || node(scope.id) === scope)
+    if (!current()) return
+    val resolve = try { portKindResolver() }
+        catch (failure: dynamic) { status("Cannot inspect connections: " + failureText(failure)); return }
     val all = ArrayList<dynamic>()
     if (dir != "in") {
         // A ring port's kind lives in the NODE (its scope.out child), not in the `scope` contract.
-        val srcKind = nodeKindOf(srcNode, "out", srcPort) ?: ""
+        val srcKind = resolve(srcNode, "out", srcPort) ?: ""
         val mq = "/api/lcnc/mating-options?sourceType=" + encodeURIComponent(str(srcNode.type)) + "&sourcePort=" + encodeURIComponent(PatchKinds.bare(srcPort)) +
             "&kind=" + encodeURIComponent(srcKind) + "&q="
         var generic = false
         try { val r = api("GET", mq); all.addAll(arr(r.options)); generic = truthy(r.generic) }
         catch (e: CancellationException) { throw e }
-        catch (e: dynamic) { status("mate options failed: " + str(e)); return }
+        catch (e: dynamic) { if (current()) status("mate options failed: " + str(e)); return }
+        if (!current()) return
         if (generic) status(str(srcNode.type) + "." + srcPort + " is a generic ring parameter — every kind mates; declare a kind on its scope.out to narrow")
     } else {
         // BACKCHAIN: from an input, offer every type whose output kind equals it
-        val want = nodeKindOf(srcNode, "in", srcPort)
+        val want = resolve(srcNode, "in", srcPort)
         if (want == null) { status(str(srcNode.type) + "." + srcPort + " is untyped — it mates with nothing"); return }
         if (want == "*") status(str(srcNode.type) + "." + srcPort + " is a generic ring parameter — every kind mates; declare a kind on its scope.in to narrow")
         for (t in keysOf(contracts).sorted()) {
@@ -426,26 +537,24 @@ suspend fun Panels.showMateMenu(cx: Double, cy: Double, srcNode: dynamic, srcPor
             }
         }
     }
+    if (!current()) return
     if (all.isEmpty()) { status("no kind-compatible mate for " + str(srcNode.type) + "." + srcPort); return }
     menu.innerHTML = "<h5>" + (if (dir == "in") "backchain " else "mate ") + str(srcNode.type) + "." + srcPort + (if (scope != null) " → into ring " + str(scope.id) else "") + "</h5>"
     val qIn = document.createElement("input").asDynamic(); qIn.placeholder = "filter mates…"
     val box = document.createElement("div").asDynamic(); box.className = "items"
     suspend fun pick(opt: dynamic) {
         menu.style.display = "none"
-        val nn = if (scope != null) addChildNode(scope, str(opt.type)) else addNode(str(opt.type), wx - 8, wy - 8)
+        if (!current()) return
+        val nn: dynamic = if (scope != null) addChildNode(scope, str(opt.type)) else addNode(str(opt.type), wx - 8, wy - 8)
         if (nn == null) return
-        if (dir == "in") {
-            graph.wires = arr(graph.wires).filter { x -> !(x.to[0] == srcNode.id && x.to[1] == srcPort) }.toTypedArray()
-            graph.wires.push(wire(nn.id, opt.outputPort, srcNode.id, srcPort))
-        } else {
-            graph.wires = arr(graph.wires).filter { x -> !(x.to[0] == nn.id && x.to[1] == opt.inputPort) }.toTypedArray()
-            graph.wires.push(wire(srcNode.id, srcPort, nn.id, opt.inputPort))
-        }
+        val addedId = str(nn.id)
+        val parameters = JSON.stringify(nn.params)
         try {
             val f = api("GET", "/api/lcnc/fills?type=" + encodeURIComponent(str(opt.type)))
+            if (!current() || node(addedId) !== nn) return
             val best = obj()
             for (fl in arr(f.fills)) if (!js("fl.param in best").unsafeCast<Boolean>()) best[fl.param] = fl.value
-            for (lab in arr(nn.el.querySelectorAll(".params label"))) {
+            if (JSON.stringify(nn.params) == parameters) for (lab in arr(nn.el.querySelectorAll(".params label"))) {
                 val k = str(lab.textContent)
                 if (best[k] !== undefined) {
                     nn.params[k] = best[k]
@@ -453,7 +562,10 @@ suspend fun Panels.showMateMenu(cx: Double, cy: Double, srcNode: dynamic, srcPor
                 }
             }
         } catch (e: CancellationException) { throw e } catch (e: dynamic) {}
-        redraw(); save()
+        if (!current() || node(addedId) !== nn) return
+        val connected = if (dir == "in") connectPanelPorts(arrayOf(addedId, opt.outputPort), arrayOf(srcNode.id, srcPort))
+            else connectPanelPorts(arrayOf(srcNode.id, srcPort), arrayOf(addedId, opt.inputPort))
+        if (!connected) { redraw(); save(); return }
         status("mated " + str(srcNode.type) + "." + srcPort + " ↔ " + str(opt.type) + "." + str(if (truthy(opt.inputPort)) opt.inputPort else opt.outputPort))
     }
     fun render(f: String) {
@@ -508,9 +620,7 @@ fun Panels.showMenu(cx: Double, cy: Double, intoScope: dynamic = null) {
  * SCOPED live picklist. `spec` is "<type>#<path>" or "<type>?k=v&k2=$other#<path>": the query is sent as
  * the runner's params, and a `$name` value is read from THIS node's params. Cached per resolved source.
  */
-private val picklistCache = HashMap<String, kotlinx.coroutines.Deferred<List<String>>>()
-
-suspend fun livePicklist(spec: String, node: dynamic): List<String> {
+suspend fun Panels.livePicklist(spec: String, node: dynamic): List<String> {
     val hash = spec.indexOf('#')
     if (hash < 0) return emptyList()
     val head = spec.substring(0, hash); val path = spec.substring(hash + 1)
@@ -527,19 +637,17 @@ suspend fun livePicklist(spec: String, node: dynamic): List<String> {
     }
     if (type.isEmpty() || path.isEmpty()) return emptyList()
     val key = type + "?" + JSON.stringify(params) + "#" + path
-    val cached = picklistCache[key]
-    if (cached != null) return cached.await()
-    val deferred = kotlinx.coroutines.MainScope().async {
+    return page.element.picklist(key) {
         val body = obj(); body.type = type; body.params = params; body.inputs = obj()
         val res = api("POST", "/api/lcnc/run", body)
-        if (!truthy(res) || !truthy(res.outputs)) return@async emptyList<String>()
+        require(truthy(res) && truthy(res.outputs)) { str(res?.error ?: "Picklist source did not return outputs") }
         var cur: dynamic = res.outputs
         for (seg in path.split(".")) {
-            if (cur == null) return@async emptyList<String>()
+            if (cur == null) return@picklist emptyList<String>()
             if (seg.endsWith("[]")) {
                 val k = seg.dropLast(2)
                 cur = if (k.isNotEmpty()) cur[k] else cur
-                if (!isArray(cur)) return@async emptyList<String>()
+                if (!isArray(cur)) return@picklist emptyList<String>()
                 val wrapped = obj(); wrapped.__list = cur; cur = wrapped
             } else if (truthy(cur) && truthy(cur.__list)) {
                 val wrapped = obj(); wrapped.__list = arr(cur.__list).map { x -> if (truthy(x)) x[seg] else x }.filter { it != null }.toTypedArray(); cur = wrapped
@@ -549,6 +657,4 @@ suspend fun livePicklist(spec: String, node: dynamic): List<String> {
         val out = if (truthy(fin) && truthy(fin.__list)) arr(fin.__list) else if (isArray(fin)) arr(fin) else emptyArray()
         out.map { str(it) }.filter { it.isNotEmpty() }
     }
-    picklistCache[key] = deferred
-    return deferred.await()
 }

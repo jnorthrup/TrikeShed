@@ -1,0 +1,61 @@
+{
+  "transformers_version": "5.17.0",
+  "architectures": null,
+  "output_hidden_states": false,
+  "return_dict": true,
+  "dtype": null,
+  "chunk_size_feed_forward": 0,
+  "is_encoder_decoder": false,
+  "id2label": {
+    "0": "LABEL_0",
+    "1": "LABEL_1"
+  },
+  "label2id": {
+    "LABEL_0": 0,
+    "LABEL_1": 1
+  },
+  "problem_type": null,
+  "vocab_size": 256,
+  "hidden_size": 8,
+  "intermediate_size": 13,
+  "num_hidden_layers": 4,
+  "num_attention_heads": 2,
+  "num_key_value_heads": 1,
+  "hidden_act": "silu",
+  "max_position_embeddings": 128,
+  "initializer_range": 0.02,
+  "rms_norm_eps": 1e-06,
+  "use_cache": false,
+  "tie_word_embeddings": false,
+  "rope_parameters": {
+    "rope_type": "default",
+    "rope_theta": 10000.0,
+    "partial_rotary_factor": 0.5,
+    "mrope_section": [
+      1,
+      1,
+      0
+    ]
+  },
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "head_dim": 4,
+  "linear_conv_kernel_dim": 3,
+  "linear_key_head_dim": 3,
+  "linear_value_head_dim": 4,
+  "linear_num_key_heads": 1,
+  "linear_num_value_heads": 2,
+  "layer_types": [
+    "linear_attention",
+    "full_attention",
+    "linear_attention",
+    "full_attention"
+  ],
+  "pad_token_id": null,
+  "bos_token_id": null,
+  "eos_token_id": null,
+  "_name_or_path": "",
+  "partial_rotary_factor": 0.25,
+  "model_type": "qwen3_5_text",
+  "output_attentions": false
+}

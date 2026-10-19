@@ -43,9 +43,8 @@ object PlaneJudge {
 
     data class Decision(val outcome: Outcome, val reason: String, val reply: Reply?)
 
-    private val VERDICT = Regex("(?im)^\\s*VERDICT\\s*:\\s*(MET|NOT-MET|NOT MET|NEEDS-HUMAN|NEEDS HUMAN)\\b")
-    private val LINE = Regex("(?im)^\\s*((?:MUST|SHOULD|MAY)-\\d+)\\s*:\\s*(MET|NOT-MET|NOT MET)\\b[^\\n]*?(?:evidence\\s*[:=]\\s*([^\\s,;]+))?\\s*$")
-    private val ACTION = Regex("(?is)^\\s*ACTION\\s*:\\s*(.+)$", RegexOption.MULTILINE)
+    private val VERDICT = Regex("^\\s*VERDICT\\s*:\\s*(MET|NOT-MET|NOT MET|NEEDS-HUMAN|NEEDS HUMAN)\\b", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
+    private val LINE = Regex("^\\s*((?:MUST|SHOULD|MAY)-\\d+)\\s*:\\s*(MET|NOT-MET|NOT MET)\\b[^\\n]*?(?:evidence\\s*[:=]\\s*([^\\s,;]+))?\\s*$", setOf(RegexOption.IGNORE_CASE, RegexOption.MULTILINE))
 
     /** Parse the reply shape; null when there is no VERDICT line at all. */
     fun parse(text: String): Reply? {

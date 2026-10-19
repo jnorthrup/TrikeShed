@@ -8,12 +8,23 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <time.h>
+#include <limits.h>
+#include <poll.h>
+#include <pthread.h>
+#include <sys/eventfd.h>
 #include <unistd.h>
 
 #if IO_URING_VERSION_MAJOR < 2 || (IO_URING_VERSION_MAJOR == 2 && IO_URING_VERSION_MINOR < 15)
 #error "The JNI adapter requires liburing 2.15 or later"
 #endif
+
+struct jvm_request {
+    struct jvm_request *next;
+    uint64_t token, identity;
+    int op, start, len;
+    jbyteArray array;
+    void *bytes;
+};
 
 /* One ring per UserspaceChannelBackend. No JVM process-wide ring or worker. */
 struct jvm_uring {
@@ -21,14 +32,16 @@ struct jvm_uring {
     struct io_uring_probe *probe;
     int failed;
     int exited;
-    /* IORING_SETUP_SUBMIT_ALL: one enter submits every queued SQE, so it may wait for all of their CQEs. */
-    int submit_all;
+
     struct iovec *buffers;
     unsigned buffer_count;
-    /* executeBatch's heap-window staging: reused across batches and never cleared. A WRITE fills its slice before
-     * submission; a READ copies out only the bytes its CQE reports. */
-    unsigned char *staging;
-    size_t staging_size;
+    struct jvm_request *requests;
+    uint64_t next_identity;
+    int wake_fd, submit_error;
+    pthread_mutex_t wait_lock;
+    pthread_cond_t wait_closed;
+    unsigned waiters;
+    int closing;
 };
 
 /* io_uring retries a READ or WRITE of an O_NONBLOCK file that supports NOWAIT (a socket, a pipe, a terminal) by
@@ -53,7 +66,7 @@ static struct jvm_uring *ring_of(jlong handle) {
 
 static int implemented(int op) {
     switch (op) {
-        case IORING_OP_NOP: case IORING_OP_FSYNC:
+        case IORING_OP_NOP: case IORING_OP_FSYNC: case IORING_OP_ASYNC_CANCEL:
         case IORING_OP_READ_FIXED: case IORING_OP_WRITE_FIXED:
         case IORING_OP_OPENAT: case IORING_OP_CLOSE:
         case IORING_OP_READ: case IORING_OP_WRITE: case IORING_OP_STATX:
@@ -65,7 +78,7 @@ static int implemented(int op) {
 
 JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_abiVersion(JNIEnv *env, jobject self) {
     (void)env; (void)self;
-    return 5;
+    return 6;
 }
 
 /* The facade's Linux asm-generic O_* values in this host's numbering (arm64 moves two bits). */
@@ -81,19 +94,30 @@ JNIEXPORT jlong JNICALL Java_borg_trikeshed_userspace_JvmUring_open(JNIEnv *env,
     if (entries <= 0) return -EINVAL;
     struct jvm_uring *state = calloc(1, sizeof(*state));
     if (!state) return -ENOMEM;
-    /* SUBMIT_ALL (5.18) keeps one failed SQE from stranding the rest of a batch; COOP_TASKRUN (5.19) completes
-     * io-wq work at the waiter's next kernel entry instead of interrupting it. Older kernels refuse them: plain ring. */
+    /* SUBMIT_ALL (5.18) keeps an issue error from stranding the rest of a batch. Coroutine submissions and OS
+     * readiness waits may run on different JVM threads, so no issuer-affinity/taskrun or polling setup flags. */
     struct io_uring_params params;
     memset(&params, 0, sizeof(params));
-    params.flags = IORING_SETUP_SUBMIT_ALL | IORING_SETUP_COOP_TASKRUN;
+    params.flags = IORING_SETUP_SUBMIT_ALL;
     int result = io_uring_queue_init_params((unsigned)entries, &state->ring, &params);
-    if (result == 0) state->submit_all = 1;
-    else if (result == -EINVAL) result = io_uring_queue_init((unsigned)entries, &state->ring, 0);
+    if (result == -EINVAL) result = io_uring_queue_init((unsigned)entries, &state->ring, 0);
     if (result < 0) { free(state); return result; }
+    state->wake_fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK | EFD_SEMAPHORE);
+    if (state->wake_fd < 0) {
+        result = -errno;
+        io_uring_queue_exit(&state->ring);
+        free(state);
+        return result;
+    }
+    pthread_mutex_init(&state->wait_lock, NULL);
+    pthread_cond_init(&state->wait_closed, NULL);
     state->probe = io_uring_get_probe_ring(&state->ring);
     if (!state->probe) {
         result = errno ? -errno : -EOPNOTSUPP;
         io_uring_queue_exit(&state->ring);
+        close(state->wake_fd);
+        pthread_cond_destroy(&state->wait_closed);
+        pthread_mutex_destroy(&state->wait_lock);
         free(state);
         return result;
     }
@@ -180,10 +204,10 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
     JNIEnv *env, jobject self, jlong handle, jint op, jint fd, jbyteArray array,
     jint start, jint len, jlong offset, jlong user_data, jlong address,
     jint operation_flags, jint buffer_index) {
-    (void)self;
+    (void)self; (void)user_data;
     struct jvm_uring *state = ring_of(handle);
     if (!state || state->failed || state->exited) return -EBADF;
-    if (!implemented(op)) return -EOPNOTSUPP;
+    if (!implemented(op) || op == IORING_OP_ASYNC_CANCEL) return -EOPNOTSUPP;
     if (len < 0) return -EINVAL;
     if (op == IORING_OP_FSYNC) {
         if ((unsigned)operation_flags & ~IORING_FSYNC_DATASYNC) return -EOPNOTSUPP;
@@ -228,73 +252,10 @@ JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_execute(
         bytes = path;
     }
     if (op == IORING_OP_STATX && (memchr(bytes, 0, len) || ((char *)bytes)[len] != 0)) { result = -EINVAL; goto finish; }
-    if (!io_uring_opcode_supported(state->probe, op)) {
-        result = op == IORING_OP_STATX
-            ? (statx(fd, bytes, (int)operation_flags, (unsigned)offset, metadata) == 0 ? 0 : -errno)
-            : posix_execute(op, fd, bytes, (unsigned)len, offset, (unsigned)operation_flags);
-        goto finish;
-    }
-    struct io_uring_sqe *sqe = io_uring_get_sqe(&state->ring);
-    if (!sqe) { result = -EBUSY; goto finish; }
-    switch (op) {
-        case 0: io_uring_prep_nop(sqe); break;
-        case 3: io_uring_prep_fsync(sqe, fd, (unsigned)operation_flags); break;
-        case 17: io_uring_prep_fallocate(sqe, fd, operation_flags, offset, (uint64_t)len); break;
-        case 4: io_uring_prep_read_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
-        case 5: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, buffer_index); break;
-        case 18: io_uring_prep_openat(sqe, fd, bytes, open_flags(offset), (mode_t)operation_flags); break;
-        case 19: io_uring_prep_close(sqe, fd); break;
-        case 21: io_uring_prep_statx(sqe, fd, bytes, (int)operation_flags, (unsigned)offset, metadata); break;
-        case 22: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-        case 23: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-        case 24: io_uring_prep_fadvise(sqe, fd, (uint64_t)offset, len, operation_flags); break;
-        case 25: io_uring_prep_madvise(sqe, bytes, (unsigned)len, operation_flags); break;
-        case 55: io_uring_prep_ftruncate(sqe, fd, offset); break;
-    }
-    io_uring_sqe_set_data64(sqe, (uint64_t)user_data);
-    for (;;) {
-        result = io_uring_submit(&state->ring);
-        if (result >= 0) break;
-        if (result == -EINTR) continue;
-        if (op == 0) {
-            /* The discovery NOP borrows no memory and owns no descriptor.
-             * A denied enter can therefore reject the candidate safely. */
-            io_uring_queue_exit(&state->ring);
-            state->failed = state->exited = 1;
-            goto finish;
-        }
-        /* Do not prepare/replay an SQE after an uncertain enter failure.
-         * liburing resubmits only the original still-pending SQ tail. */
-        state->failed = 1;
-        struct timespec delay = { .tv_sec = 0, .tv_nsec = 100000000 };
-        nanosleep(&delay, NULL);
-    }
-    struct io_uring_cqe *cqe;
-    for (;;) {
-        result = io_uring_wait_cqe(&state->ring, &cqe);
-        if (result == -EINTR) continue;
-        if (result < 0) {
-            /* queue_exit only initiates cancellation. Keep the Java borrow until
-             * the terminal CQE proves the kernel no longer uses its memory.
-             * A permanently broken CQ intentionally cannot return ownership. */
-            state->failed = 1;
-            struct timespec delay = { .tv_sec = 0, .tv_nsec = 100000000 };
-            nanosleep(&delay, NULL);
-            continue;
-        }
-        if (io_uring_cqe_get_data64(cqe) != (uint64_t)user_data) {
-            state->failed = 1;
-            io_uring_cqe_seen(&state->ring, cqe);
-            continue;
-        }
-        result = cqe->res;
-        io_uring_cqe_seen(&state->ring, cqe);
-        break;
-    }
-    if (state->failed) {
-        io_uring_queue_exit(&state->ring);
-        state->exited = 1;
-    }
+    /* This entry point is the POSIX fallback only; native SQEs always use submitBatch/reapBatch. */
+    result = op == IORING_OP_STATX
+        ? (statx(fd, bytes, (int)operation_flags, (unsigned)offset, metadata) == 0 ? 0 : -errno)
+        : posix_execute(op, fd, bytes, (unsigned)len, offset, (unsigned)operation_flags);
 finish:
     free(path);
     if (elements) (*env)->ReleaseByteArrayElements(env, array, elements, op == 22 || op == 21 ? 0 : JNI_ABORT);
@@ -303,196 +264,286 @@ finish:
 
 #define BATCH_FIELDS 8
 #define BATCH_CHUNK 64
+#define DEFERRED_RESULT INT_MIN
 
-/* The operations executeBatch carries: data-path ops whose memory is a heap window, a registered buffer or an
- * address. Path, descriptor-lifecycle and metadata ops keep the one-SQE execute. */
-static int batched(int op) {
-    switch (op) {
-        case IORING_OP_NOP: case IORING_OP_FSYNC: case IORING_OP_READ_FIXED: case IORING_OP_WRITE_FIXED:
-        case IORING_OP_FALLOCATE: case IORING_OP_READ: case IORING_OP_WRITE: case IORING_OP_FADVISE:
-        case IORING_OP_MADVISE: case IORING_OP_FTRUNCATE: return 1;
-        default: return 0;
-    }
+static void request_free(JNIEnv *env, struct jvm_request *request) {
+    if (request->array) (*env)->DeleteGlobalRef(env, request->array);
+    free(request->bytes);
+    free(request);
 }
 
-/* execute's argument checks for the batched operations: 0, or the CQE result the op completes with unsubmitted. */
-static int batch_invalid(struct jvm_uring *state, int op, jint len, jlong offset, jint flags, jint index, jlong address) {
-    if (!batched(op) || !io_uring_opcode_supported(state->probe, op)) return -EOPNOTSUPP;
-    if (len < 0) return -EINVAL;
-    if (op == IORING_OP_FSYNC) {
-        if ((unsigned)flags & ~IORING_FSYNC_DATASYNC) return -EOPNOTSUPP;
-    } else if (op != IORING_OP_MADVISE && op != IORING_OP_FADVISE && op != IORING_OP_FALLOCATE && flags != 0) {
-        return -EOPNOTSUPP;
-    }
-    int fixed = op == IORING_OP_READ_FIXED || op == IORING_OP_WRITE_FIXED;
-    if ((fixed || op == IORING_OP_READ || op == IORING_OP_WRITE) && offset < -1) return -EINVAL;
-    if (fixed) {
-        if (!state->buffers || index < 0 || (unsigned)index >= state->buffer_count) return -EFAULT;
-        const struct iovec *registered = &state->buffers[index];
-        uintptr_t base = (uintptr_t)registered->iov_base;
-        uintptr_t submitted = (uintptr_t)address;
-        if (submitted < base || submitted - base > registered->iov_len ||
-            (size_t)len > registered->iov_len - (submitted - base)) return -EFAULT;
-    }
-    if (op == IORING_OP_FTRUNCATE && offset < 0) return -EINVAL;
-    return 0;
-}
-
-/* Grows the staging to [need] bytes: a fresh block, since nothing staged outlives a batch. */
-static int stage(struct jvm_uring *state, size_t need) {
-    if (need <= state->staging_size) return 0;
-    size_t size = state->staging_size ? state->staging_size : 65536;
-    while (size < need) size *= 2;
-    unsigned char *grown = malloc(size);
-    if (!grown) return -ENOMEM;
-    free(state->staging);
-    state->staging = grown;
-    state->staging_size = size;
-    return 0;
-}
-
-/* Up to BATCH_CHUNK SQEs (and no more than the SQ holds) go to the kernel in one enter, which also waits for their
- * CQEs. A heap window travels through the ring's staging: only [start, start + len) is copied in for a WRITE, and
- * only the res bytes a READ completed are copied back, so the caller's bytes past res stay its own. */
-JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_executeBatch(
+/* A nonblocking kernel submission. Every admitted SQE owns a request until its original terminal CQE, including
+ * after ASYNC_CANCEL; cancellation CQEs use data=0 and never release the original request's memory. */
+JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_submitBatch(
     JNIEnv *env, jobject self, jlong handle, jint count, jlongArray control, jobjectArray arrays, jintArray results) {
     (void)self;
     struct jvm_uring *state = ring_of(handle);
     if (!state || state->failed || state->exited) return -EBADF;
-    if (count < 0 || !control || !arrays || !results ||
+    if (count < 0 || count > BATCH_CHUNK || !control || !arrays || !results ||
         (*env)->GetArrayLength(env, control) / BATCH_FIELDS < count ||
         (*env)->GetArrayLength(env, arrays) < count || (*env)->GetArrayLength(env, results) < count) return -EINVAL;
-    jint limit = (jint)state->ring.sq.ring_entries < BATCH_CHUNK ? (jint)state->ring.sq.ring_entries : BATCH_CHUNK;
-    for (jint base = 0; base < count; ) {
-        jint n = count - base < limit ? count - base : limit;
-        jlong fields[BATCH_CHUNK * BATCH_FIELDS];
-        jint res[BATCH_CHUNK];
-        size_t slice[BATCH_CHUNK];
-        unsigned char done[BATCH_CHUNK];
-        if (state->failed || state->exited) {
-            for (jint i = 0; i < n; i++) res[i] = -EBADF;
-            (*env)->SetIntArrayRegion(env, results, base, n, res);
-            base += n;
+    jlong fields[BATCH_CHUNK * BATCH_FIELDS];
+    jint res[BATCH_CHUNK];
+    (*env)->GetLongArrayRegion(env, control, 0, count * BATCH_FIELDS, fields);
+    for (jint i = 0; i < count; i++) {
+        const jlong *f = fields + i * BATCH_FIELDS;
+        int op = (int)f[0], fd = (int)f[1], start = (int)f[2], len = (int)f[3];
+        jlong offset = f[4];
+        int flags = (int)f[6], index = (int)(f[6] >> 32);
+        res[i] = -EINVAL;
+        if (!implemented(op) || !io_uring_opcode_supported(state->probe, op)) { res[i] = -EOPNOTSUPP; continue; }
+        if (len < 0) continue;
+        if (op == IORING_OP_FSYNC) {
+            if ((unsigned)flags & ~IORING_FSYNC_DATASYNC) { res[i] = -EOPNOTSUPP; continue; }
+        } else if (op == IORING_OP_STATX) {
+            if ((unsigned)flags & ~(unsigned)(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH | AT_NO_AUTOMOUNT)) continue;
+        } else if (op != IORING_OP_MADVISE && op != IORING_OP_FADVISE && op != IORING_OP_OPENAT &&
+                   op != IORING_OP_FALLOCATE && flags != 0) { res[i] = -EOPNOTSUPP; continue; }
+        struct jvm_request *target = NULL;
+        if (op == IORING_OP_ASYNC_CANCEL) {
+            if (len != 0 || offset != 0) continue;
+            for (target = state->requests; target && target->token != (uint64_t)f[5]; target = target->next) {}
+            if (!target) { res[i] = -ENOENT; continue; }
+        }
+        int fixed = op == IORING_OP_READ_FIXED || op == IORING_OP_WRITE_FIXED;
+        if ((fixed || op == IORING_OP_READ || op == IORING_OP_WRITE) && offset < -1) continue;
+        if (fixed) {
+            res[i] = -EFAULT;
+            if (!state->buffers || index < 0 || (unsigned)index >= state->buffer_count) continue;
+            const struct iovec *registered = &state->buffers[index];
+            uintptr_t base = (uintptr_t)registered->iov_base, submitted = (uintptr_t)f[5];
+            if (submitted < base || submitted - base > registered->iov_len ||
+                (size_t)len > registered->iov_len - (submitted - base)) continue;
+        }
+        res[i] = -EINVAL;
+        if (op == IORING_OP_FTRUNCATE && offset < 0) continue;
+        if (op == IORING_OP_OPENAT && (len == 0 || offset < 0 || (offset & ~FACADE_OPEN_FLAGS) || (offset & 3) == 3)) continue;
+        if (op == IORING_OP_STATX && (offset < 0 || offset > 0xffffffffL || f[5] != 0)) continue;
+        if (!io_uring_sq_space_left(&state->ring)) { res[i] = -EAGAIN; continue; }
+        jbyteArray array = (jbyteArray)(*env)->GetObjectArrayElement(env, arrays, i);
+        size_t window = op == IORING_OP_STATX ? (size_t)len + 1 + sizeof(struct statx) : (size_t)len;
+        int heap = op == IORING_OP_OPENAT || op == IORING_OP_STATX ||
+            ((op == IORING_OP_READ || op == IORING_OP_WRITE) && array);
+        if (heap && (!array || start < 0 || (uint64_t)start + window > (uint64_t)(*env)->GetArrayLength(env, array))) {
+            if (array) (*env)->DeleteLocalRef(env, array);
             continue;
         }
-        (*env)->GetLongArrayRegion(env, control, base * BATCH_FIELDS, n * BATCH_FIELDS, fields);
-        size_t need = 0;
-        int borrows = 0;
-        for (jint i = 0; i < n; i++) {
-            const jlong *f = fields + i * BATCH_FIELDS;
-            int op = (int)f[0];
-            jint start = (jint)f[2], len = (jint)f[3];
-            slice[i] = SIZE_MAX;
-            done[i] = 1;
-            res[i] = batch_invalid(state, op, len, f[4], (jint)f[6], (jint)(f[6] >> 32), f[5]);
-            if (res[i]) continue;
-            if (op == IORING_OP_READ || op == IORING_OP_WRITE) {
-                jbyteArray array = (jbyteArray)(*env)->GetObjectArrayElement(env, arrays, base + i);
-                if (array) {
-                    jsize size = (*env)->GetArrayLength(env, array);
-                    (*env)->DeleteLocalRef(env, array);
-                    if (start < 0 || (jlong)start + len > size) { res[i] = -EINVAL; continue; }
-                    slice[i] = need;
-                    need += ((size_t)len + 63) & ~(size_t)63;
-                }
+        struct jvm_request *request = calloc(1, sizeof(*request));
+        if (!request) { if (array) (*env)->DeleteLocalRef(env, array); res[i] = -ENOMEM; continue; }
+        request->token = (uint64_t)f[7]; request->op = op; request->start = start; request->len = len;
+        void *bytes = (void *)(uintptr_t)f[5];
+        if (heap) {
+            request->array = (*env)->NewGlobalRef(env, array);
+            request->bytes = malloc(window + (op == IORING_OP_OPENAT ? 1 : 0) + 1);
+            if (!request->array || !request->bytes) {
+                request_free(env, request); (*env)->DeleteLocalRef(env, array);
+                if ((*env)->ExceptionCheck(env)) (*env)->ExceptionClear(env);
+                res[i] = -ENOMEM; continue;
             }
-            if (op != IORING_OP_NOP) borrows = 1;
-            done[i] = 0;
-        }
-        if (need && stage(state, need)) {
-            for (jint i = 0; i < n; i++) if (!done[i]) { res[i] = -ENOMEM; done[i] = 1; }
-        }
-        int prepared = 0;
-        for (jint i = 0; i < n; i++) {
-            if (done[i]) continue;
-            const jlong *f = fields + i * BATCH_FIELDS;
-            int op = (int)f[0], fd = (int)f[1];
-            jint start = (jint)f[2], len = (jint)f[3];
-            jlong offset = f[4];
-            int flags = (int)f[6], index = (int)(f[6] >> 32);
-            void *bytes = (void *)(uintptr_t)f[5];
-            if (slice[i] != SIZE_MAX) {
-                bytes = state->staging + slice[i];
-                if (op == IORING_OP_WRITE) {
-                    jbyteArray array = (jbyteArray)(*env)->GetObjectArrayElement(env, arrays, base + i);
-                    (*env)->GetByteArrayRegion(env, array, start, len, (jbyte *)bytes);
-                    (*env)->DeleteLocalRef(env, array);
-                }
-            }
-            /* The SQ is empty between calls and n <= its entries. */
-            struct io_uring_sqe *sqe = io_uring_get_sqe(&state->ring);
-            if (!sqe) { res[i] = -EBUSY; done[i] = 1; continue; }
-            switch (op) {
-                case IORING_OP_NOP: io_uring_prep_nop(sqe); break;
-                case IORING_OP_FSYNC: io_uring_prep_fsync(sqe, fd, (unsigned)flags); break;
-                case IORING_OP_FALLOCATE: io_uring_prep_fallocate(sqe, fd, flags, offset, (uint64_t)len); break;
-                case IORING_OP_READ_FIXED: io_uring_prep_read_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, index); break;
-                case IORING_OP_WRITE_FIXED: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, index); break;
-                case IORING_OP_READ: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-                case IORING_OP_WRITE: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
-                case IORING_OP_FADVISE: io_uring_prep_fadvise(sqe, fd, (uint64_t)offset, len, flags); break;
-                case IORING_OP_MADVISE: io_uring_prep_madvise(sqe, bytes, (unsigned)len, flags); break;
-                case IORING_OP_FTRUNCATE: io_uring_prep_ftruncate(sqe, fd, offset); break;
-            }
-            io_uring_sqe_set_data64(sqe, (uint64_t)i);
-            prepared++;
-        }
-        int reaped = 0;
-        while (reaped < prepared) {
-            /* Without SUBMIT_ALL an SQE that fails to issue leaves its successors queued for the next enter, so
-             * that ring waits for one CQE at a time. */
-            int rc = io_uring_submit_and_wait(&state->ring, state->submit_all ? (unsigned)(prepared - reaped) : 1);
-            if (rc < 0 && rc != -EINTR) {
-                if (!borrows) {
-                    /* NOPs borrow no memory and own no descriptor: a refused enter can fail them safely. */
-                    io_uring_queue_exit(&state->ring);
-                    state->failed = state->exited = 1;
-                    for (jint i = 0; i < n; i++) if (!done[i]) { res[i] = rc; done[i] = 1; }
-                    break;
-                }
-                /* Never return a borrow after an uncertain enter failure: liburing resubmits only the still-pending
-                 * SQ tail, and the CQ is drained until every prepared SQE reports. */
-                state->failed = 1;
-                struct timespec delay = { .tv_sec = 0, .tv_nsec = 100000000 };
-                nanosleep(&delay, NULL);
-            }
-            unsigned head, seen = 0;
-            struct io_uring_cqe *cqe;
-            io_uring_for_each_cqe(&state->ring, head, cqe) {
-                uint64_t i = io_uring_cqe_get_data64(cqe);
-                if (i < (uint64_t)n && !done[i]) { res[i] = cqe->res; done[i] = 1; reaped++; }
-                else state->failed = 1;
-                seen++;
-            }
-            io_uring_cq_advance(&state->ring, seen);
-        }
-        for (jint i = 0; i < n; i++) {
-            const jlong *f = fields + i * BATCH_FIELDS;
-            if ((int)f[0] == IORING_OP_READ && slice[i] != SIZE_MAX && res[i] > 0 && res[i] <= (jint)f[3]) {
-                jbyteArray array = (jbyteArray)(*env)->GetObjectArrayElement(env, arrays, base + i);
-                (*env)->SetByteArrayRegion(env, array, (jint)f[2], res[i], (const jbyte *)(state->staging + slice[i]));
-                (*env)->DeleteLocalRef(env, array);
+            bytes = request->bytes;
+            if (op != IORING_OP_READ) (*env)->GetByteArrayRegion(env, array, start,
+                op == IORING_OP_STATX ? len + 1 : len, bytes);
+            if (op == IORING_OP_OPENAT) ((char *)bytes)[len] = 0;
+            if ((op == IORING_OP_OPENAT || op == IORING_OP_STATX) &&
+                (memchr(bytes, 0, len) || ((char *)bytes)[len] != 0)) {
+                request_free(env, request); (*env)->DeleteLocalRef(env, array); continue;
             }
         }
-        (*env)->SetIntArrayRegion(env, results, base, n, res);
-        if (state->failed && !state->exited) {
-            io_uring_queue_exit(&state->ring);
-            state->exited = 1;
+        if (array) (*env)->DeleteLocalRef(env, array);
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&state->ring);
+        if (!sqe) { request_free(env, request); res[i] = -EAGAIN; continue; }
+        switch (op) {
+            case IORING_OP_NOP: io_uring_prep_nop(sqe); break;
+            case IORING_OP_FSYNC: io_uring_prep_fsync(sqe, fd, (unsigned)flags); break;
+            case IORING_OP_ASYNC_CANCEL: io_uring_prep_cancel64(sqe, target->identity, 0); break;
+            case IORING_OP_FALLOCATE: io_uring_prep_fallocate(sqe, fd, flags, offset, (uint64_t)len); break;
+            case IORING_OP_READ_FIXED: io_uring_prep_read_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, index); break;
+            case IORING_OP_WRITE_FIXED: io_uring_prep_write_fixed(sqe, fd, bytes, (unsigned)len, (uint64_t)offset, index); break;
+            case IORING_OP_OPENAT: io_uring_prep_openat(sqe, fd, bytes, open_flags(offset), (mode_t)flags); break;
+            case IORING_OP_CLOSE: io_uring_prep_close(sqe, fd); break;
+            case IORING_OP_STATX: io_uring_prep_statx(sqe, fd, bytes, flags, (unsigned)offset,
+                (struct statx *)((char *)bytes + len + 1)); break;
+            case IORING_OP_READ: io_uring_prep_read(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
+            case IORING_OP_WRITE: io_uring_prep_write(sqe, fd, bytes, (unsigned)len, (uint64_t)offset); nowait_if_nonblocking(sqe, fd, offset); break;
+            case IORING_OP_FADVISE: io_uring_prep_fadvise(sqe, fd, (uint64_t)offset, len, flags); break;
+            case IORING_OP_MADVISE: io_uring_prep_madvise(sqe, bytes, (unsigned)len, flags); break;
+            case IORING_OP_FTRUNCATE: io_uring_prep_ftruncate(sqe, fd, offset); break;
         }
-        base += n;
+        request->identity = ++state->next_identity;
+        if (!request->identity) request->identity = ++state->next_identity;
+        io_uring_sqe_set_data64(sqe, request->identity);
+        request->next = state->requests; state->requests = request;
+        res[i] = DEFERRED_RESULT;
     }
+    int rc;
+    do { rc = io_uring_submit(&state->ring); } while (rc == -EINTR);
+    state->submit_error = rc < 0 ? rc : 0;
+    if (rc < 0) {
+        /* A discovery NOP owns no descriptor or external memory. A denied enter can reject that ring safely.
+         * Other requests remain retained: an uncertain enter error is not their terminal completion. */
+        int nops = 1;
+        for (struct jvm_request *r = state->requests; r; r = r->next) if (r->op != IORING_OP_NOP) nops = 0;
+        if (nops) { io_uring_queue_exit(&state->ring); state->failed = state->exited = 1; }
+    }
+    (*env)->SetIntArrayRegion(env, results, 0, count, res);
     return 0;
 }
 
-JNIEXPORT void JNICALL Java_borg_trikeshed_userspace_JvmUring_close(JNIEnv *env, jobject self, jlong handle) {
+/* Reap many without waiting. A monotonic kernel identity prevents allocator reuse from retargeting an outstanding
+ * cancellation; original user_data crosses back to commonMain, including zero and all-ones. */
+JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_reapBatch(
+    JNIEnv *env, jobject self, jlong handle, jlongArray tokens, jintArray results) {
+    (void)self;
+    struct jvm_uring *state = ring_of(handle);
+    if (!state || !tokens || !results) return -EINVAL;
+    jsize limit = (*env)->GetArrayLength(env, tokens);
+    if ((*env)->GetArrayLength(env, results) < limit) limit = (*env)->GetArrayLength(env, results);
+    if (limit > BATCH_CHUNK) limit = BATCH_CHUNK;
+    jlong out_tokens[BATCH_CHUNK]; jint out_results[BATCH_CHUNK]; jint n = 0;
+    if (state->exited) {
+        while (state->requests && n < limit) {
+            struct jvm_request *r = state->requests; state->requests = r->next;
+            out_tokens[n] = (jlong)r->token; out_results[n++] = state->submit_error ? state->submit_error : -EBADF;
+            request_free(env, r);
+        }
+    } else {
+        if (io_uring_sq_ready(&state->ring)) {
+            int rc; do { rc = io_uring_submit(&state->ring); } while (rc == -EINTR);
+            state->submit_error = rc < 0 ? rc : 0;
+        }
+        /* peek_batch also enters the kernel when CQ overflow needs flushing. */
+        struct io_uring_cqe *cqes[BATCH_CHUNK];
+        unsigned ready = io_uring_peek_batch_cqe(&state->ring, cqes, (unsigned)limit);
+        unsigned consumed = 0;
+        for (unsigned i = 0; i < ready && n < limit; i++) {
+            struct io_uring_cqe *cqe = cqes[i]; consumed++;
+            uint64_t identity = io_uring_cqe_get_data64(cqe);
+            if (!identity) continue; /* Internal cancellation requests have their own CQEs. */
+            struct jvm_request **link = &state->requests;
+            while (*link && (*link)->identity != identity) link = &(*link)->next;
+            if (!*link) { state->failed = 1; continue; }
+            struct jvm_request *r = *link;
+            if (cqe->flags & IORING_CQE_F_MORE) continue;
+            int result = cqe->res;
+            if (r->array && result > 0 && r->op == IORING_OP_READ && result <= r->len)
+                (*env)->SetByteArrayRegion(env, r->array, r->start, result, r->bytes);
+            if (r->array && result == 0 && r->op == IORING_OP_STATX)
+                (*env)->SetByteArrayRegion(env, r->array, r->start + r->len + 1, sizeof(struct statx),
+                    (jbyte *)r->bytes + r->len + 1);
+            out_tokens[n] = (jlong)r->token; out_results[n++] = result;
+            *link = r->next; request_free(env, r);
+        }
+        io_uring_cq_advance(&state->ring, consumed);
+    }
+    (*env)->SetLongArrayRegion(env, tokens, 0, n, out_tokens);
+    (*env)->SetIntArrayRegion(env, results, 0, n, out_results);
+    /* Surface a failed enter without fabricating terminal CQEs or releasing the outstanding borrows. A later
+     * reap may retry the original SQ tail; commonMain retains admission ownership across cleanup failure. */
+    if (n == 0 && state->requests && state->failed && !state->exited) return -EIO;
+    return n == 0 && state->requests && state->submit_error ? state->submit_error : n;
+}
+
+JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_cancel(
+    JNIEnv *env, jobject self, jlong handle, jlong token, jboolean all) {
+    (void)env; (void)self;
+    struct jvm_uring *state = ring_of(handle);
+    if (!state || state->exited) return -EBADF;
+    if (!io_uring_opcode_supported(state->probe, IORING_OP_ASYNC_CANCEL)) return -EOPNOTSUPP;
+    int prepared = 0;
+    for (struct jvm_request *target = state->requests; target; target = target->next) {
+        if (target->op == IORING_OP_ASYNC_CANCEL || (!all && target->token != (uint64_t)token)) continue;
+        struct io_uring_sqe *sqe = io_uring_get_sqe(&state->ring);
+        if (!sqe) break;
+        io_uring_prep_cancel64(sqe, target->identity, 0);
+        io_uring_sqe_set_data64(sqe, 0);
+        prepared++;
+        if (!all) break;
+    }
+    if (!prepared) return all ? -EAGAIN : -ENOENT;
+    int rc; do { rc = io_uring_submit(&state->ring); } while (rc == -EINTR);
+    return rc < 0 ? rc : 0;
+}
+
+static void wake_waiters(struct jvm_uring *state) {
+    uint64_t count = state->waiters ? state->waiters : 1;
+    ssize_t written;
+    do { written = write(state->wake_fd, &count, sizeof(count)); } while (written < 0 && errno == EINTR);
+}
+
+JNIEXPORT void JNICALL Java_borg_trikeshed_userspace_JvmUring_wake(JNIEnv *env, jobject self, jlong handle) {
     (void)env; (void)self;
     struct jvm_uring *state = ring_of(handle);
     if (!state) return;
+    pthread_mutex_lock(&state->wait_lock);
+    wake_waiters(state);
+    pthread_mutex_unlock(&state->wait_lock);
+}
+
+/* Readiness only: CQEs and their memory remain owned by reapBatch. The eventfd interrupts a blocked wait on
+ * coroutine cancellation; close joins OS waiters before freeing the handle. Extra fds are emulated POLL/CONNECT. */
+JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_await(
+    JNIEnv *env, jobject self, jlong handle, jintArray descriptors, jintArray masks) {
+    (void)self;
+    struct jvm_uring *state = ring_of(handle);
+    if (!state || !descriptors || !masks) return -EINVAL;
+    jsize count = (*env)->GetArrayLength(env, descriptors);
+    if ((*env)->GetArrayLength(env, masks) != count) return -EINVAL;
+    struct pollfd *fds = calloc((size_t)count + 2, sizeof(*fds));
+    jint *extra = count ? (*env)->GetIntArrayElements(env, descriptors, NULL) : NULL;
+    jint *events = count ? (*env)->GetIntArrayElements(env, masks, NULL) : NULL;
+    if (!fds || (count && (!extra || !events))) {
+        if (extra) (*env)->ReleaseIntArrayElements(env, descriptors, extra, JNI_ABORT);
+        if (events) (*env)->ReleaseIntArrayElements(env, masks, events, JNI_ABORT);
+        free(fds); return -ENOMEM;
+    }
+    pthread_mutex_lock(&state->wait_lock);
+    if (state->closing) {
+        pthread_mutex_unlock(&state->wait_lock);
+        if (extra) (*env)->ReleaseIntArrayElements(env, descriptors, extra, JNI_ABORT);
+        if (events) (*env)->ReleaseIntArrayElements(env, masks, events, JNI_ABORT);
+        free(fds); return -EBADF;
+    }
+    state->waiters++;
+    fds[0].fd = state->exited ? -1 : state->ring.ring_fd; fds[0].events = POLLIN;
+    fds[1].fd = state->wake_fd; fds[1].events = POLLIN;
+    int immediate = state->exited;
+    pthread_mutex_unlock(&state->wait_lock);
+    for (jsize i = 0; i < count; i++) { fds[i + 2].fd = extra[i]; fds[i + 2].events = (short)events[i]; }
+    if (extra) (*env)->ReleaseIntArrayElements(env, descriptors, extra, JNI_ABORT);
+    if (events) (*env)->ReleaseIntArrayElements(env, masks, events, JNI_ABORT);
+    int rc = immediate ? 0 : poll(fds, (nfds_t)count + 2, -1);
+    int result = rc < 0 ? -errno : 0;
+    if (fds[1].revents & POLLIN) {
+        uint64_t value; ssize_t received;
+        do { received = read(fds[1].fd, &value, sizeof(value)); } while (received < 0 && errno == EINTR);
+    }
+    free(fds);
+    pthread_mutex_lock(&state->wait_lock);
+    state->waiters--;
+    pthread_cond_broadcast(&state->wait_closed);
+    pthread_mutex_unlock(&state->wait_lock);
+    return result;
+}
+
+JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_close(JNIEnv *env, jobject self, jlong handle) {
+    (void)env; (void)self;
+    struct jvm_uring *state = ring_of(handle);
+    if (!state) return 0;
+    /* Backend close first reaps every original request. Refuse to destroy retained native memory otherwise. */
+    if (state->requests) return -EBUSY;
+    pthread_mutex_lock(&state->wait_lock);
+    state->closing = 1;
+    wake_waiters(state);
+    while (state->waiters) pthread_cond_wait(&state->wait_closed, &state->wait_lock);
+    pthread_mutex_unlock(&state->wait_lock);
     io_uring_free_probe(state->probe);
     if (!state->exited) io_uring_queue_exit(&state->ring);
+    close(state->wake_fd);
+    pthread_cond_destroy(&state->wait_closed);
+    pthread_mutex_destroy(&state->wait_lock);
     free(state->buffers);
-    free(state->staging);
     free(state);
+    return 0;
 }
 
 JNIEXPORT jint JNICALL Java_borg_trikeshed_userspace_JvmUring_closeFd(JNIEnv *env, jobject self, jint fd) {

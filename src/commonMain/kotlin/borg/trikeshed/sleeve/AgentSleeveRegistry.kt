@@ -23,7 +23,7 @@ object AgentSleeveRegistry {
         facet = VmFacet.GRAAL_PYTHON,
         entryModule = "hermes_cli.main",
         sleeveRoot = "graalpy-sleeve/hermes",
-        donorRoot = "~/.hermes/hermes-agent",
+        donorRoot = "utils/hermes-trikeshed-graalpy",
         traps = listOf(
             PolyglotTrap(
                 id = "hermes/thread-spawn",

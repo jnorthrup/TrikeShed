@@ -3,6 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.couch.isam.ConfixIsamElement
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.*
+import borg.trikeshed.parse.confix.*
 import kotlinx.coroutines.test.runTest
 import java.nio.file.Files
 import java.nio.file.Path
@@ -10,6 +11,25 @@ import kotlin.test.*
 
 class WorkspaceDictionaryTest {
     val storageTests = WorkspaceStorageTest()
+
+    @Test fun commonLaneWritesAndReopensDictionariesWithoutAPlatformFactory() = runTest {
+        storageTests.fixture(this) { f ->
+            val cid = f.couch.blockPut("synthetic clinical evidence; human review required".encodeToByteArray())
+            f.couch.put("case", mapOf("review" to "pending", "terms" to listOf("evidence", "医")), null)
+            val sourceHead = Files.readAllBytes(f.root.resolve("couch/HEAD"))
+            f.storage.drain()
+            val lane = ConfixIsamElement(this, f.couch.store.changes, f.location, f.files, f.cas)
+            try {
+                assertEquals(true, (lane.catalog()["compression"] as Map<*, *>)["dictionaryAvailable"])
+                assertEquals(1, lane.importCouch(dictionary = cid)["imported"])
+            } finally { lane.drain() }
+            val reopened = ConfixIsamElement(this, f.couch.store.changes, f.location, f.files, f.cas)
+            try {
+                assertNotNull(reopened.document("case")?.b?.docAt("terms"))
+                assertContentEquals(sourceHead, Files.readAllBytes(f.root.resolve("couch/HEAD")))
+            } finally { reopened.drain() }
+        }
+    }
 
     @Test fun batchesResolveTheirOwnDictionariesAfterReopenWithoutChangingCouch() = runTest {
         storageTests.fixture(this, dictionaries = true) { f ->
@@ -49,7 +69,7 @@ class WorkspaceDictionaryTest {
             assertEquals(0, executions)
 
             f.storage.drain()
-            val plain = ConfixIsamElement(this, f.couch.store.changes, f.location, f.files, f.cas)
+            val plain = ConfixIsamElement(this, f.couch.store.changes, f.location, f.files, f.cas, dictionaryCodec = null)
             try {
                 assertFailsWith<IllegalArgumentException> { plain.document("case-0") }
                 assertNotNull(plain.document("case-2"), "Dictionary-free history remains independently readable")

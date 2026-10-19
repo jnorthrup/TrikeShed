@@ -12,12 +12,12 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
 import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.posix.trikeshed_open
+import borg.trikeshed.userspace.nio.channels.spi.PosixCompletionWait
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
 import kotlinx.cinterop.*
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import platform.posix.*
 
@@ -28,6 +28,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     private val pending = mutableMapOf<Long, UringSubmission>()
     private val completed = ArrayDeque<UringCompletion>()
     private val results = mutableMapOf<Long, CompletableDeferred<UringCompletion>>()
+    private val waiters = mutableSetOf<PosixCompletionWait>()
     private var accepting = true
     private var closed = false
     override val capabilities: Long = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.READ,
@@ -40,8 +41,6 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     private val directories = mutableMapOf<Int, CPointer<DIR>>()
     /** CONNECTs whose connect(2) is in progress: writable or failed, SO_ERROR settles them. */
     private val connecting = mutableSetOf<Long>()
-    /** [kernelBatch]'s CQE results by SQE index. */
-    private val batchResults = IntArray(INLINE_LIMIT)
     override val nativeCapabilities: Long get() = native.capabilities
     override val deferredCapabilities: Long get() = capabilities
     override val availability: String get() = native.availability
@@ -57,7 +56,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     override fun unregisterBuffers(): Result<Unit> = synchronized(lock) { native.unregisterBuffers() }
 
     override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = synchronized(lock) {
-        settleInline(submissions) ?: kernelBatch(submissions) ?: run {
+        settleInline(submissions) ?: run {
             admit(submissions)
             // A kernel ring completes NOPs and cached transfers inside the submitting enter: hand those back now.
             if (pending.isNotEmpty()) poll()
@@ -95,41 +94,6 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         return out
     }
 
-    /**
-     * One kernel enter for a batch the kernel ring settles without a peer: with nothing outstanding, SQEs of
-     * [kernelBatchOps] the ring carries (READ and WRITE at an offset), each valid, distinct in userData and independent
-     * of the others, go to the kernel together and are reaped before this returns, in submission order. Null when the
-     * batch needs the queue.
-     */
-    private fun kernelBatch(submissions: List<UringSubmission>): List<SelectionResult>? {
-        val count = submissions.size
-        val kernel = native.capabilities and kernelBatchOps
-        if (kernel == 0L || count == 0 || count > entries || count > INLINE_LIMIT || queued.isNotEmpty() ||
-            pending.isNotEmpty() || completed.isNotEmpty() || results.isNotEmpty()) return null
-        for (index in 0 until count) {
-            val sub = submissions[index]
-            if (!(sub.opcode of kernel) || (sub.opcode of positioned && sub.offset < 0) || validate(sub) != null) return null
-            val buffer = sub.buffer
-            if (buffer != null && sub.len > buffer.remaining()) return null
-            for (prior in 0 until index) {
-                val other = submissions[prior]
-                if (other.userData == sub.userData || dependsOn(sub, other)) return null
-            }
-        }
-        if (!native.executeBatch(submissions, batchResults)) return null
-        val out = ArrayList<SelectionResult>(count)
-        for (index in 0 until count) {
-            val sub = submissions[index]
-            val res = batchResults[index]
-            if (res > 0 && sub.opcode of transferOps) {
-                check(res <= sub.len) { "completion exceeds submitted buffer window" }
-                sub.buffer!!.position(sub.buffer.position() + res)
-            }
-            out.add(SelectionResult(res, sub.userData))
-        }
-        return out
-    }
-
     private fun admit(
         submissions: List<UringSubmission>,
         receivers: Map<Long, CompletableDeferred<UringCompletion>> = emptyMap(),
@@ -150,22 +114,61 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             else queued.add(submission)
         }
         dispatch()
+        wakeWaiters()
+    }
+
+    private fun wakeWaiters() { for (waiter in waiters) waiter.wake() }
+
+    /** Snapshot only runnable emulated waits: dependency-blocked successors must not cause ready-fd spins. */
+    private fun completionWait(): PosixCompletionWait {
+        val interests = mutableMapOf<Int, Int>()
+        if (pending.isNotEmpty() && native.completionFd >= 0) interests[native.completionFd] = POLLIN
+        val blocked = mutableListOf<UringSubmission>()
+        for (submission in queued) {
+            val dependency = pending.values.any { dependsOn(submission, it) } || blocked.any { dependsOn(submission, it) }
+            blocked.add(submission)
+            if (dependency || submission.opcode of native.capabilities) continue
+            val mask = when (submission.opcode) {
+                UringOp.RECV, UringOp.ACCEPT -> POLLIN
+                UringOp.SEND, UringOp.CONNECT -> POLLOUT
+                UringOp.POLL_ADD -> submission.operationFlags
+                else -> null
+            }
+            if (mask != null) interests[submission.fd] = (interests[submission.fd] ?: 0) or mask
+        }
+        return PosixCompletionWait(interests.entries.map { it.key j it.value }).also { waiters.add(it) }
+    }
+
+    override suspend fun awaitCompletions() {
+        val wait = synchronized(lock) {
+            if (closed || completed.isNotEmpty() || queued.isEmpty() && pending.isEmpty()) null else completionWait()
+        } ?: return
+        try { wait.await() }
+        finally {
+            synchronized(lock) { waiters.remove(wait) }
+            wait.close()
+        }
+    }
+
+    private fun awaitBlocking(wait: PosixCompletionWait) {
+        try { wait.poll() }
+        finally {
+            synchronized(lock) { waiters.remove(wait) }
+            wait.close()
+        }
     }
 
     override fun reapCompletions(minComplete: Int): List<SelectionResult> {
         require(minComplete >= 0)
         val results = mutableListOf<SelectionResult>()
         do {
-            var kernel = false
-            val outstanding = synchronized(lock) {
+            val wait = synchronized(lock) {
                 poll()
                 results.addAll(takeCompletions())
-                kernel = pending.isNotEmpty()
-                queued.isNotEmpty() || pending.isNotEmpty()
+                if (results.size >= minComplete || queued.isEmpty() && pending.isEmpty()) null else completionWait()
             }
-            if (results.size >= minComplete || !outstanding) break
-            // SQEs in the kernel: wait there for the next CQE (bounded, so emulated waits still re-poll each ms).
-            if (kernel) synchronized(lock) { native.awaitCompletion(1000) } else usleep(1000u)
+            if (wait == null) break
+            awaitBlocking(wait)
         } while (true)
         return results
     }
@@ -188,6 +191,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             }
         }
         native.cancelPending(tokens)
+        wakeWaiters()
     }
 
     override suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion> {
@@ -198,7 +202,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         suspend fun settle() {
             while (receivers.values.any { !it.isCompleted }) {
                 synchronized(lock) { poll() }
-                if (receivers.values.any { !it.isCompleted }) delay(1)
+                if (receivers.values.any { !it.isCompleted }) awaitCompletions()
             }
         }
         try {
@@ -213,7 +217,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                     }
                 }
                 if (admitted) break
-                delay(1)
+                awaitCompletions()
             }
             settle()
             val completions = Array(ordered.size) { receivers.getValue(ordered[it].userData).await() }
@@ -332,6 +336,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     private fun publish(completion: UringCompletion) {
         val receiver = results.remove(completion.userData)
         if (receiver == null) completed.add(completion) else receiver.complete(completion)
+        wakeWaiters()
     }
 
     private fun takeCompletions(): List<SelectionResult> = buildList {
@@ -626,16 +631,20 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     }
 
     override fun close() {
-        synchronized(lock) { accepting = false }
-        while (synchronized(lock) {
-            poll()
-            queued.isNotEmpty() || pending.isNotEmpty()
-        }) usleep(1000u)
+        synchronized(lock) { accepting = false; wakeWaiters() }
+        while (true) {
+            val wait = synchronized(lock) {
+                poll()
+                if (queued.isEmpty() && pending.isEmpty()) null else completionWait()
+            } ?: break
+            awaitBlocking(wait)
+        }
         synchronized(lock) {
             if (closed) return
             native.close()
             // Descriptors returned to callers are closed by their owners, independently of this ring.
             closed = true
+            wakeWaiters()
         }
     }
 
@@ -648,11 +657,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             UringOp.GETDENTS, UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD)
         /** Operations the kernel ring completes only when ready: their emulation leaves them queued while it reports -EAGAIN. */
         val waits = UringOp.caps(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD)
-        /** Batch size up to which [settleInline] and [kernelBatch] check userData pairwise. */
+        /** Batch size up to which [settleInline] checks userData pairwise. */
         const val INLINE_LIMIT = 64
-        /** Ops a kernel ring completes without waiting on a peer: [kernelBatch] settles them in one enter. */
-        val kernelBatchOps = UringOp.caps(UringOp.NOP, UringOp.READ, UringOp.WRITE, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
-            UringOp.FSYNC, UringOp.FTRUNCATE, UringOp.FADVISE, UringOp.MADVISE)
         /** Linux SOCK_NONBLOCK | SOCK_CLOEXEC. */
         const val SOCKET_FLAGS = 0x800 or 0x80000
         val linux = Platform.osFamily == OsFamily.LINUX

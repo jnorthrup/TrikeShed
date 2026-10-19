@@ -1,32 +1,34 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.kanban.KanbanCardState
 import borg.trikeshed.kanban.KanbanPredicate
 import borg.trikeshed.kanban.KanbanPredicateRegistry
+import borg.trikeshed.modelmux.BrainChatOptions
+import borg.trikeshed.modelmux.BrainClient
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
 /**
- * The tribunal's kanban predicates — named once so the shipped preset's
- * `KanbanCondition` and every predicate registry that validates or drives
- * it (tests, and any future daemon-side FSM gate) resolve the SAME name to
- * the SAME check. `NEEDS_CLARIFICATION` gates the `deliberate → argue`
- * loop-back: the judge's `kg.ingest` verdict is expected to land a
- * `"clarification": true` flag in the card's `io` map when the record is
- * insufficient to rule on (nothing writes that flag automatically today —
- * the kanban FSM and the LCNC mux.chat/kg.ingest execution graph are two
- * separate systems; wiring a verdict's content into the FSM's card io is
- * daemon orchestration that doesn't exist yet). Absent the flag, the
- * predicate refuses and `deliberate` stays terminal, exactly as before.
+ * The separate Kanban graph consumes an explicit card flag. The shipped LCNC
+ * programs use the shared structured ruling parser and one guarded clarification
+ * scope; they do not drive these card transitions, counsel LOOP/JOIN, or ABORT.
  */
 object TribunalPredicates {
     const val NEEDS_CLARIFICATION = "needsClarification"
+    const val RESOLVED_RULING = "resolvedRuling"
 
     fun registry(base: KanbanPredicateRegistry = KanbanPredicateRegistry()): KanbanPredicateRegistry =
         base.plus(NEEDS_CLARIFICATION, KanbanPredicate { card: KanbanCardState, _ -> card.io["clarification"] == true })
+            .plus(RESOLVED_RULING, KanbanPredicate { card: KanbanCardState, _ ->
+                val ruling = card.io["lcnc.case.ruling"] as? Map<*, *>
+                val evidence = ruling?.get("evidenceCid") as? String
+                card.io["clarification"] == false && ruling != null && ruling["needsClarification"] == false &&
+                    ruling["mistrial"] == false && evidence != null && runCatching { ContentId(evidence) }.isSuccess
+            })
 }
 
 /**
@@ -68,22 +70,32 @@ fun hermesEnvDialog(
     withContext(muxContext.minusKey(Job) + currentCoroutineContext()) { chat(system, prompt)() }
 }
 
-/**
- * The tribunal's node family — the runners the preset's `mux.chat` /
- * `kg.ingest` / `display` nodes have been missing. Without these the preset
- * is a document that throws `LcncUnknownNodeType` on first sweep; with them
- * the trial actually runs through the daemon's single executor.
- *
- * [dialog] is the model seam (see [TribunalDialog]); [ingest] is the
- * tracked-lifecycle seam — the daemon wires it to the live
- * [TribunalInstance] so each verdict commits on the versioned record
- * (judge job active → closed) and the report carries the recorded cid.
- */
+/** The same authored options and route restrictions used by the HTTP chat surface. */
+fun modelMuxDialog(brain: BrainClient, muxContext: CoroutineContext): TribunalDialog =
+    TribunalDialog { node, system, prompt ->
+        val options = BrainChatOptions.parse(node.params)
+        withContext(muxContext.minusKey(Job) + currentCoroutineContext()) {
+            brain.chat(options, listOf("system" to system, "user" to prompt), "tribunal-seat")
+        }
+    }
+
+/** Retain the verdict bytes before asking the host to commit its lifecycle. */
+fun tribunalRecord(cas: CasStore, complete: suspend (ContentId) -> String): suspend (String) -> String = { text ->
+    require(text.isNotBlank()) { "tribunal.record: empty verdict" }
+    val bytes = text.encodeToByteArray()
+    val cid = ContentId.of(bytes)
+    check(cas.put(bytes) == cid) { "tribunal.record: CAS acknowledgement digest mismatch" }
+    cas.sync()
+    check(cas.get(cid)?.contentEquals(bytes) == true) { "tribunal.record: verdict bytes not retained" }
+    complete(cid)
+}
+
+/** Model dialog and prose verdict recording. KG assertions belong to [KgNodes]. */
 object TribunalNodes {
 
     fun registry(
         dialog: TribunalDialog,
-        ingest: suspend (String) -> String = { it },
+        record: suspend (String) -> String = { error("tribunal.record: no record service bound") },
     ): Map<String, LcncNodeRunner> = mapOf(
         // The model seat: params carry the role (`system`) and the fallback
         // prompt; a wired `prompt` input (the prior seat's content) wins —
@@ -108,21 +120,23 @@ object TribunalNodes {
             )?.takeIf { it.isNotBlank() }
             require(prompt != null) { "mux.chat: no prompt wired, bound as '${node.params["brief"] ?: "<brief>"}', or in params" }
             val (content, model) = service.value.seat(node, system, prompt!!)
-            mapOf("content" to content, "model" to model)
+            // The already selected prompt is evidence, not another resolution of the brief.
+            mapOf("content" to content, "model" to model, "prompt" to prompt)
         },
-        // The verdict seam: chat text → content-addressed report, tracked
-        // on the instance. [ingest] is the daemon's lifecycle hook — it
-        // commits the verdict (the judge's job active → closed) and returns
-        // the recorded cid; the report carries both cids, so the displayed
-        // verdict is the VERIFIED one, not just the model's last words.
-        "kg.ingest" to boundLcnc(TribunalIngestKey(ingest)) { service, node, inputs ->
+        // The host binds tribunalRecord: retained prose plus a lifecycle receipt.
+        // This is not KG parsing, belief admission, or verification of the verdict's truth.
+        "tribunal.record" to boundLcnc(TribunalRecordKey(record)) { service, node, inputs ->
             // Inputs are keyed by the wire's literal toPort (gather() in
             // LcncRunner does not strip the `?`), so an optional `text?`
             // wire lands under that exact key — check both spellings, the
             // same defensive dance `mux.chat`'s prompt resolution does.
             val text = (inputs["text"] as? String)
                 ?: (inputs["text?"] as? String)
-                ?: node.params["kg"].orEmpty()
+                ?: node.params["text"].orEmpty()
+            require(text.isNotBlank()) { "tribunal.record: empty verdict" }
+            require(CouncilNodes.ruling(text)["needsClarification"] != true) {
+                "tribunal.record: unresolved clarification; no terminal ruling to record"
+            }
             val recorded = service.value.invoke(text)
             val cid = ContentId.of(text.encodeToByteArray())
             mapOf("report" to linkedMapOf(
@@ -141,7 +155,7 @@ object TribunalNodes {
     )
 
     /** The full contract: which node types the tribunal registry serves. */
-    fun servedTypes(): Set<String> = setOf("mux.chat", "kg.ingest", "display")
+    fun servedTypes(): Set<String> = setOf("mux.chat", "tribunal.record", "display")
 }
 
 /**

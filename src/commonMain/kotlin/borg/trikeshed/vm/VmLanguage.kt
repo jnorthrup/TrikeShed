@@ -183,18 +183,24 @@ data class VmLanguageProgram(
     val inputKind: VmValueKind = VmValueKind.JSON,
     val outputKind: VmValueKind = VmValueKind.JSON,
 ) {
-    fun declaration(budget: VmBudget = VmBudget(), name: String = "lcnc"): String {
+    fun declaration(budget: VmBudget = VmBudget(), name: String = "lcnc"): String = declaration(budget, name, null)
+
+    private fun declaration(budget: VmBudget, name: String, mapping: ((VmSourceMap) -> Unit)?): String {
         require(source.isNotBlank()) { "VM function body is blank" }
         require(source.encodeToByteArray().size <= 65_536) { "VM source exceeds 65536 bytes" }
+        fun body(prefix: String, suffix: String, indentation: Int = 0): String {
+            mapping?.invoke(VmSourceMap(prefix.lineSequence().count(), source.lineSequence().count(), indentation))
+            return prefix + (if (indentation == 0) source else
+                source.lineSequence().joinToString("\n") { " ".repeat(indentation) + it }) + suffix
+        }
         return when (language) {
-            VmLanguage.JAVASCRIPT -> "function $ROOT(input) {\n$source\n}\n"
+            VmLanguage.JAVASCRIPT -> body("function $ROOT(input) {\n", "\n}\n")
             // ProxyObject exposes members, not Python's mapping protocol. Decode the
             // data argument inside the guest so nested values are native dict/list.
-            VmLanguage.PYTHON -> "def $ROOT(input):\n    import json\n    input = json.loads(input)\n" +
-                source.lineSequence().joinToString("\n") { "    $it" } + "\n"
+            VmLanguage.PYTHON -> body("def $ROOT(input):\n    import json\n    input = json.loads(input)\n", "\n", 4)
             // Ruby's JSON library requires native facilities denied by this facet.
             // Copy the typed proxy argument into native containers without requiring a library.
-            VmLanguage.RUBY -> """
+            VmLanguage.RUBY -> body("""
                 def $ROOT(input)
                   convert = ->(value) do
                     if value.nil?
@@ -210,7 +216,7 @@ data class VmLanguageProgram(
                     end
                   end
                   input = convert.call(input)
-            """.trimIndent() + "\n" + source.lineSequence().joinToString("\n") { "  $it" } + "\nend\n"
+            """.trimIndent() + "\n", "\nend\n", 2)
             VmLanguage.KOTLIN_COMMON -> {
                 language.validate(VmTrust.OWN, budget)
                 """
@@ -274,10 +280,14 @@ data class VmLanguageProgram(
         }
         inputKind.validate(input)
         debug?.context?.ensureActive()
-        handle.eval(declaration(budget, name), name)
+        var mapping: VmSourceMap? = null
+        val declaration = declaration(budget, name, if (debug == null) null else { value -> mapping = value })
+        handle.eval(declaration, name)
         debug?.context?.ensureActive()
         val argument = if (language == VmLanguage.PYTHON) Teleported.Str(input.canonical()) else input
-        val session = debug?.let { handle.debug(name, it) }
+        val session = debug?.let { request -> handle.debug(name, VmDebugRequest(request.context) { snapshot ->
+            request.suspendAt(if (snapshot["sourceName"] == name) mapping?.observation(snapshot) ?: snapshot else snapshot)
+        }) }
         try {
             val result = outputKind.validate(handle.call(ROOT, argument))
             debug?.context?.ensureActive()

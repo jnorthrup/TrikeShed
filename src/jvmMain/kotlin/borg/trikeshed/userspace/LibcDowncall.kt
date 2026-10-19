@@ -71,6 +71,8 @@ internal object LibcDowncall {
     @JvmField val RECV: MethodHandle = errno(FunctionDescriptor.of(JAVA_LONG, JAVA_INT, ADDRESS, JAVA_LONG, JAVA_INT))
     /** int poll(struct pollfd*, nfds_t, int timeout): nfds_t is unsigned long on Linux, unsigned int on Darwin. */
     @JvmField val POLL: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, ADDRESS, if (linux) JAVA_LONG else JAVA_INT, JAVA_INT))
+    /** int pipe(int descriptors[2]). */
+    @JvmField val PIPE: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, ADDRESS))
     /** int getsockopt(int, int level, int name, void*, socklen_t*). */
     @JvmField val GETSOCKOPT: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS, ADDRESS))
     /** int setsockopt(int, int level, int name, const void*, socklen_t). */

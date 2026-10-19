@@ -2,6 +2,8 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.lib.*
+import kotlin.coroutines.CoroutineContext
 
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.vm.Teleported
@@ -19,6 +21,25 @@ object VmHostKey : LcncServiceKey<VmHost>("VmHostKey")
 object VmProviderReportsKey : LcncServiceKey<() -> List<VmCapabilityReport>>("VmProviderReportsKey")
 
 object VmRuntimeNodes {
+    /** The existing panel expression syntax lowers into the host's owned typed function. */
+    fun expression(function: LcncNodeRunner): LcncNodeRunner = object : LcncNodeRunner, LcncServiceBinding {
+        private val binding = function as? LcncServiceBinding
+        override val requiredKeys get() = binding?.requiredKeys ?: emptySeriesOf<CoroutineContext.Key<*>>()
+        override val providedKeys get() = binding?.providedKeys ?: emptySeriesOf<CoroutineContext.Key<*>>()
+        override suspend fun <T> withServices(body: suspend () -> T): T =
+            if (binding == null) body() else binding.withServices(body)
+
+        private fun definition(node: LcncNode) = node.copy(type = "vm.polyglot", params = mapOf(
+            "language" to "js", "source" to "const x = input;\nreturn (\n${node.params["expr"] ?: "x"}\n);",
+            "inputKind" to "JSON", "outputKind" to "JSON", "trust" to "OWN",
+            "statements" to "100000", "wallMillis" to "5000", "calls" to "0",
+        ))
+        override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean =
+            function.sourceDebugging(definition(node), mapOf("input" to inputs["x"]))
+        override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> =
+            mapOf("y" to function.execute(definition(node), mapOf("input" to inputs["x"]))["value"])
+    }
+
     const val SPAWN = "vm.spawn"
     const val EVAL = "vm.eval"
     const val REVOKE = "vm.revoke"

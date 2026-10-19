@@ -21,4 +21,5 @@ data class MuxConversation(
     val calls: List<MuxCallRecord> = emptyList(),
     val children: List<Long> = emptyList(),
     val error: String? = null,
+    val contextId: String? = null,
 )

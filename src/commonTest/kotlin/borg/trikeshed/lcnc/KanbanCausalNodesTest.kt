@@ -42,6 +42,8 @@ class KanbanCausalNodesTest {
         assertEquals(listOf(positive.ruleCid.value, negative.ruleCid.value, equivalence.ruleCid.value), output["ruleCids"])
         val firings = (output["firings"] as List<*>).map { it as Map<*, *> }
         assertEquals(5, firings.size)
+        assertEquals(5, firings.map { it["firingCid"] }.distinct().size,
+            "Each source rule and party application has its own retained firing identity")
         for (party in listOf("party-a", "party-b")) {
             val pair = firings.filter { it["matchedObject"] == party }
             assertEquals(listOf(450L, 0L), pair.map { it["supportPositive"] })

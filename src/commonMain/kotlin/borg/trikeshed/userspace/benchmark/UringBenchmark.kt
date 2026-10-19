@@ -12,6 +12,8 @@ import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.UringProbeReport
+import borg.trikeshed.userspace.UserspaceChannelBackend
+import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.nio.ByteBuffer
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.Serializable
@@ -44,6 +46,9 @@ data class UringBenchmarkMeasurement(
     val batchMedianNanos: Long,
     val batchP95Nanos: Long,
     val operationsPerSecond: Double,
+    val batchP99Nanos: Long = batchP95Nanos,
+    val wallElapsedNanos: Long = elapsedNanos,
+    val wallOperationsPerSecond: Double = operationsPerSecond,
 )
 
 @Serializable
@@ -61,8 +66,19 @@ data class UringBenchmarkResult(
 
 /** Identical warmed, cached-file and NOP workloads through the owning common ring. */
 object UringBenchmark {
-    suspend fun run(config: UringBenchmarkConfig): UringBenchmarkResult = coroutineScope {
-        val facade = FunctionalUringFacade.create(this, config.entries)
+    suspend fun run(config: UringBenchmarkConfig): UringBenchmarkResult =
+        run(config, openUserspaceChannelBackend(config.entries))
+
+    /** Batch latency covers facade admission through terminal return; wall throughput also includes buffer checks.
+     * Kernel enter sizes require a separate syscall trace; backend submission list sizes do not establish them.
+     */
+    suspend fun run(
+        config: UringBenchmarkConfig,
+        backend: UserspaceChannelBackend,
+        nativeRequired: Boolean = false,
+        phaseBoundary: ((String, Boolean) -> Unit)? = null,
+    ): UringBenchmarkResult = coroutineScope {
+        val facade = FunctionalUringFacade.create(this, config.entries, backend)
         var descriptor: Int? = null
         var nextToken = 1L
         suspend fun one(submission: UringSubmission): UringCompletion {
@@ -71,6 +87,12 @@ object UringBenchmark {
             return result[0]
         }
         try {
+            if (nativeRequired) {
+                val required = UringOp.caps(UringOp.NOP, UringOp.OPENAT, UringOp.WRITE, UringOp.READ, UringOp.FSYNC, UringOp.CLOSE)
+                check(facade.nativeCapabilities and required == required) {
+                    "Native benchmark opcodes unavailable: ${facade.availability}; native=${facade.nativeCapabilities}"
+                }
+            }
             // O_RDWR | O_CREAT | O_EXCL: the fixture must be a new disposable file.
             val opened = one(Submissions.openat(config.path, flags = 2 or 64 or 128, userData = nextToken++))
             check(opened.res >= 0) { "OPENAT failed: ${opened.res}; use a new fixture path" }
@@ -81,7 +103,12 @@ object UringBenchmark {
             for (opcode in arrayOf(UringOp.NOP, UringOp.WRITE, UringOp.READ)) {
                 val durations = LongArray(config.iterations)
                 var settled = 0L
+                var wallStarted = TimeSource.Monotonic.markNow()
                 for (iteration in 0 until config.warmup + config.iterations) {
+                    if (iteration == config.warmup) {
+                        phaseBoundary?.invoke(opcode.name, true)
+                        wallStarted = TimeSource.Monotonic.markNow()
+                    }
                     for (index in buffers.indices) {
                         buffers[index].clear()
                         buffers[index].array().fill(if (opcode == UringOp.READ) 0 else (index + 1).toByte())
@@ -117,6 +144,8 @@ object UringBenchmark {
                         settled += results.size
                     }
                 }
+                val wallElapsed = wallStarted.elapsedNow().inWholeNanoseconds
+                phaseBoundary?.invoke(opcode.name, false)
                 val elapsed = durations.sum()
                 check(elapsed > 0) { "Monotonic clock did not advance" }
                 durations.sort()
@@ -125,7 +154,8 @@ object UringBenchmark {
                 measurements += UringBenchmarkMeasurement(opcode, admitted, settled,
                     if (opcode == UringOp.NOP) 0 else settled * config.bytes,
                     elapsed, durations[durations.size / 2], durations[(durations.size - 1) * 95 / 100],
-                    settled * 1_000_000_000.0 / elapsed)
+                    settled * 1_000_000_000.0 / elapsed, durations[(durations.size - 1) * 99 / 100],
+                    wallElapsed, settled * 1_000_000_000.0 / wallElapsed)
                 if (opcode == UringOp.WRITE)
                     check(one(Submissions.fsync(fd, nextToken++)).res == 0) { "FSYNC failed" }
             }

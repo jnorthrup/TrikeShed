@@ -353,7 +353,7 @@ class HtxReactorElement(
         private var size = 0
         private var boundary = -1        // index of CRLFCRLF once seen
         private var contentLength = -2   // -2 unknown, -1 none declared
-        private var chunked = false
+        private var chunks: HtxChunkFraming? = null
 
         fun append(chunk: ByteSeries) {
             val n = chunk.rem
@@ -377,8 +377,9 @@ class HtxReactorElement(
                     contentLength = headerText.lineSequence()
                         .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
                         ?.substringAfter(":")?.trim()?.toIntOrNull() ?: -1
-                    chunked = headerText.lineSequence()
+                    if (headerText.lineSequence()
                         .any { it.startsWith("Transfer-Encoding:", ignoreCase = true) && it.contains("chunked", ignoreCase = true) }
+                    ) chunks = HtxChunkFraming(boundary + 4)
                     return
                 }
                 i++
@@ -390,13 +391,8 @@ class HtxReactorElement(
 
         fun isComplete(): Boolean {
             if (boundary < 0) return false
+            chunks?.let { return it.advance(buf, size) }
             if (contentLength >= 0) return size >= boundary + 4 + contentLength
-            if (chunked) {
-                // terminal chunk marker in the tail
-                val from = maxOf(boundary + 4, size - 7)
-                val text = buf.decodeToString(from, size)
-                return text.contains("0\r\n\r\n") || text.endsWith("0\r\n")
-            }
             return false
         }
 
@@ -423,9 +419,7 @@ class HtxReactorElement(
         val isChunked = headerText.lineSequence()
             .any { it.startsWith("Transfer-Encoding:", ignoreCase = true) && it.contains("chunked", ignoreCase = true) }
         if (isChunked) {
-            val body = bytes.copyOfRange(boundary + 4, bytes.size)
-            val text = body.decodeToString()
-            return text.contains("0\r\n\r\n") || text.endsWith("0\r\n")
+            return HtxChunkFraming(boundary + 4).advance(bytes)
         }
         return false
     }

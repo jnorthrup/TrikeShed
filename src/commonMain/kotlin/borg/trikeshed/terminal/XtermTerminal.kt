@@ -7,6 +7,7 @@ import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
+import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 
 /** Indexed/default/RGB terminal color. -1 means the terminal default. */
@@ -78,6 +79,7 @@ class XtermTerminal(
     var originMode: Boolean = false; private set
     var autoWrap: Boolean = true; private set
     var cursorVisible: Boolean = true; private set
+    val cursor: VtCursor get() = VtCursor(row, column, cursorVisible)
     var alternateScreen: Boolean = false; private set
     var revision: Long = 0L; private set
 
@@ -211,11 +213,13 @@ class XtermTerminal(
         revision = revision,
         columns = columns,
         rows = rows,
-        cursor = VtCursor(row, column, cursorVisible),
+        cursor = cursor,
         title = title,
         alternateScreen = alternateScreen,
         applicationCursorKeys = applicationCursorKeys,
-        lines = rows j { r: Int -> columns j { c: Int -> cells[r][c] } },
+        // A snapshot crosses the mutable terminal's ownership boundary. Keep Series projections,
+        // but capture their backing cells now, before subsequent output/resize changes this screen.
+        lines = Array(rows) { r -> cells[r].copyOf().toSeries() }.toSeries(),
         scrollback = scrollbackRows.coerceAtLeast(0).let { count ->
             val start = (this.scrollbackRows.size - count).coerceAtLeast(0)
             val selected = this.scrollbackRows.drop(start)
@@ -237,7 +241,7 @@ class XtermTerminal(
                 val start = c
                 while (c < columns && dirty[r][c]) { dirty[r][c] = false; c++ }
                 val end = c
-                patches += VtPatch(revision, r, start, (end - start) j { i: Int -> cells[r][start + i] }, causeSignalId)
+                patches += VtPatch(revision, r, start, cells[r].copyOfRange(start, end).toSeries(), causeSignalId)
             }
         }
         return patches.size j { i: Int -> patches[i] }

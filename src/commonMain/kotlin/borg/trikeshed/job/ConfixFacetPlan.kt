@@ -72,12 +72,15 @@ data class ConfixFacetPlan(
             }
         }
 
+        if (operation == "state") runCatching { JobFrame(doc).stateCommand() }
+            .exceptionOrNull()?.let { errors.add(it.message ?: "invalid state command") }
         return ValidationResult(errors.isEmpty(), errors)
     }
 
 
     fun projectToSnapshot(doc: ConfixDoc): JobSnapshot {
         val operation = doc.value("operation")?.toString() ?: "unknown"
+        require(operation != "state") { "State projection requires the prior committed snapshot; use JobReducer" }
         val lifecycle = when (operation) {
             "submit"      -> "submitted"
             "start"       -> "active"

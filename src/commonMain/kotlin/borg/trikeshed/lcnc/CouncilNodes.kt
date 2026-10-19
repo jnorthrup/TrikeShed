@@ -5,9 +5,7 @@ import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.job.*
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.cancellation.CancellationException
@@ -139,6 +137,36 @@ class InMemoryRecordStore {
  */
 object CouncilNodes {
 
+    /** Shared structured ruling semantics; control guards never rewrite the retained text. */
+    fun ruling(text: String): Map<String, Any?> {
+        val parsed = if (text.startsWith("[SEAT FAILED")) null else lastBalancedObject(text)
+        val mistrial = strictBool(parsed?.get("mistrial"))
+        return if (parsed == null) mapOf(
+            "verdict" to mapOf("disposition" to text),
+            "needsClarification" to false,
+            "clarificationQuestion" to "",
+            "mistrial" to false,
+            "text" to text,
+        ) else mapOf(
+            "verdict" to parsed,
+            "needsClarification" to (!mistrial && strictBool(parsed["needsClarification"])),
+            "clarificationQuestion" to (parsed["clarificationQuestion"]?.toString() ?: ""),
+            "mistrial" to mistrial,
+            "text" to text,
+        )
+    }
+
+    fun fold(label: String, brief: Any?, parts: Any?, separator: String = "\n\n---\n\n", numbered: Boolean = true): String {
+        val values = ArrayList<String>()
+        flattenText(brief, values)
+        flattenText(parts, values)
+        val body = values.filter { it.isNotBlank() }.mapIndexed { i, p ->
+            if (!numbered || p.startsWith("[")) p else "(${i + 1}) $p"
+        }
+        val lines = (if (label.isBlank()) emptyList() else listOf("== $label ==")) + body
+        return lines.joinToString(separator)
+    }
+
     fun registry(
         dialog: CouncilDialog,
         seams: RecordSeams = RecordSeams.inMemory(),
@@ -225,27 +253,59 @@ object CouncilNodes {
         // graft's wire), folded FIRST. A part that already carries a bracket
         // header (a seat's `labeled`) keeps it; otherwise `numbered`
         // prefixes its ordinal.
-        "text.fold" to LcncNodeRunner { node, inputs ->
-            val label = node.params["label"].orEmpty()
-            val separator = node.params["separator"] ?: "\n\n---\n\n"
-            val numbered = node.params["numbered"] != "false"
-            val parts = ArrayList<String>()
-            flattenText(inputs["brief"] ?: inputs["brief?"], parts)
-            flattenText(inputs["parts"] ?: inputs["parts?"], parts)
-            val body = parts.filter { it.isNotBlank() }.mapIndexed { i, p ->
-                if (!numbered || p.startsWith("[")) p else "(${i + 1}) $p"
-            }
-            val lines = (if (label.isBlank()) emptyList() else listOf("== $label ==")) + body
-            mapOf("text" to lines.joinToString(separator))
+        "text.fold" to LcncPureRunner { node, inputs ->
+            mapOf("text" to fold(node.params["label"].orEmpty(),
+                inputs["brief"] ?: inputs["brief?"], inputs["parts"] ?: inputs["parts?"],
+                node.params["separator"] ?: "\n\n---\n\n", node.params["numbered"] != "false"))
         },
 
         // Provenance gatherer: MANY `parts` of turn-record maps (or lists of
         // them) flattened to one list in wire order — gathered INSIDE each
         // ring so no inner→outer wire ever exists.
-        "record.fold" to LcncNodeRunner { _, inputs ->
-            val turns = ArrayList<Map<String, Any?>>()
-            flattenTurns(inputs["parts"] ?: inputs["parts?"], turns)
-            mapOf("turns" to turns)
+        "record.fold" to object : LcncPureRunner {
+            override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+                val turns = ArrayList<Map<String, Any?>>()
+                flattenTurns(inputs["parts"] ?: inputs["parts?"], turns)
+                return mapOf("turns" to turns)
+            }
+            override fun retainedOutputs(node: LcncNode, inputs: Map<String, Any?>,
+                                         retainedInputs: Map<String, Any?>, outputs: Map<String, Any?>): Map<String, Any?> {
+                val selected = if (inputs["parts"] != null) "parts" else "parts?"
+                if (selected !in retainedInputs || retainedInputs[selected] === LcncProjection.Absent)
+                    return outputs - "turns"
+                if ((outputs["turns"] as? List<*>)?.isEmpty() == true) return outputs
+                val turns = ArrayList<Any?>()
+                flattenTurns(inputs[selected], retainedInputs[selected], turns)
+                return outputs + ("turns" to turns)
+            }
+
+            override fun retainedOrigins(node: LcncNode, inputs: Map<String, Any?>,
+                                         inputOrigins: Map<String, LcncBindingOrigins>, outputs: Map<String, Any?>,
+                                         terms: LcncBindingTerms): Map<String, LcncBindingOrigins> {
+                if ("turns" !in outputs) return emptyMap()
+                val selected = if (inputs["parts"] != null) "parts" else "parts?"
+                val source = inputOrigins[selected] ?: emptySeriesOf()
+                val parts = ArrayList<LcncBindingOrigins>()
+                val rows = ArrayList<Int>()
+                var ordinal = 0
+                fun visit(value: Any?, path: List<Either<String, Int>>) {
+                    terms.account()
+                    if (path.size > 30) throw LcncBindingTerms.Limit("depth_limit")
+                    when (value) {
+                        is Map<*, *> -> {
+                            val origins = terms.select(source, path.toSeries())
+                            rows.add(terms.presence(origins))
+                            parts.add(terms.prefix(origins,
+                                s_[Either.right<String, Int>(ordinal++)]))
+                        }
+                        is List<*> -> for ((index, child) in value.withIndex())
+                            visit(child, path + Either.right<String, Int>(index))
+                    }
+                }
+                visit(inputs[selected], emptyList())
+                parts.add(terms.guard(if (rows.isEmpty()) terms.presence(source) else terms.any(rows.toSeries())))
+                return mapOf("turns" to terms.join(parts.toSeries()))
+            }
         },
 
         // The verdict extractor. Locates the LAST balanced {...} object in
@@ -253,30 +313,24 @@ object CouncilNodes {
         // JSON true or the string "true" — on ANY failure path (no JSON,
         // malformed JSON, a seat-failure banner) both come back false, so
         // the clarify/mistrial ring guards can never see truthy garbage.
+        // Mistrial is terminal: suppress clarification without rewriting the verdict.
         "ruling.parse" to LcncNodeRunner { _, inputs ->
-            val text = ((inputs["text"] as? String) ?: (inputs["text?"] as? String)).orEmpty()
-            val parsed = if (text.startsWith("[SEAT FAILED")) null else lastBalancedObject(text)
-            if (parsed == null) mapOf(
-                "verdict" to mapOf("disposition" to text),
-                "needsClarification" to false,
-                "clarificationQuestion" to "",
-                "mistrial" to false,
-                "text" to text,
-            ) else mapOf(
-                "verdict" to parsed,
-                "needsClarification" to strictBool(parsed["needsClarification"]),
-                "clarificationQuestion" to (parsed["clarificationQuestion"]?.toString() ?: ""),
-                "mistrial" to strictBool(parsed["mistrial"]),
-                "text" to text,
-            )
+            ruling(((inputs["text"] as? String) ?: (inputs["text?"] as? String)).orEmpty())
         },
 
         // Clarified-over-original: `a?` wins when present and non-blank; a
         // skipped ring's yield stays absent, so `b` (the original) stands.
-        "coalesce" to LcncNodeRunner { _, inputs ->
-            val a = inputs["a"] ?: inputs["a?"]
-            val b = inputs["b"] ?: inputs["b?"]
-            mapOf("value" to if (a != null && (a !is String || a.isNotBlank())) a else b)
+        "coalesce" to object : LcncPureRunner {
+            fun input(inputs: Map<String, Any?>): String? {
+                val a = listOf("a", "a?").firstOrNull { inputs[it] != null }
+                val value = a?.let { inputs[it] }
+                return if (value != null && (value !is String || value.isNotBlank())) a
+                    else listOf("b", "b?").firstOrNull { inputs[it] != null }
+            }
+            override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> =
+                mapOf("value" to input(inputs)?.let { inputs[it] })
+            override fun outputSources(node: LcncNode, inputs: Map<String, Any?>): Map<String, String> =
+                input(inputs)?.let { mapOf("value" to it) } ?: emptyMap()
         },
 
         // Re-geometry: a convening config (wired map or JSON string, merged
@@ -319,11 +373,17 @@ object CouncilNodes {
         // doc, the (ruling …) KIF assertion, and the per-case lifecycle
         // advance. All seats refused, a banner verdict, an explicit mistrial,
         // or unverified turn bytes prevent a ruling fact from entering the bank.
+        // An unresolved clarification is not a decision and is refused before persistence.
         "council.record" to boundLcnc(CouncilRecordKey(seams)) { service, node, inputs ->
             val seams = service.value
             seams.recordMutex.withLock {
             val verdict = inputs["verdict"] ?: inputs["verdict?"]
             require(verdict != null) { "council.record: no verdict wired" }
+            val decision = verdict as? Map<*, *>
+            val verdictMistrial = strictBool(decision?.get("mistrial"))
+            require(verdictMistrial || !strictBool(decision?.get("needsClarification"))) {
+                "council.record: unresolved clarification; no terminal ruling to record"
+            }
             val caseId = ((inputs["caseId"] ?: inputs["caseId?"]) as? String)?.takeIf { it.isNotBlank() }
                 ?: node.params["caseId"]?.takeIf { it.isNotBlank() }
                 ?: "default"
@@ -352,7 +412,6 @@ object CouncilNodes {
             val verdictBytes = verdictText.encodeToByteArray()
             val verdictCid = ContentId.of(verdictBytes).value
 
-            val verdictMistrial = (verdict as? Map<*, *>)?.get("mistrial").let { it == true || it == "true" }
             val status = when {
                 cidMismatches > 0 -> "mistrial"
                 seatCount > 0 && seatFailures == seatCount -> "mistrial"
@@ -557,14 +616,38 @@ object CouncilNodes {
         }
     }
 
+    /** Project the actual fold's row slots; ignored scalars never acquire a retained row. */
+    private fun flattenTurns(actual: Any?, retained: Any?, out: MutableList<Any?>) {
+        when (actual) {
+            is Map<*, *> -> out.add(if (retained is Map<*, *>)
+                retained.entries.associate { (key, value) -> key.toString() to value }
+            else LcncProjection.Absent)
+            is List<*> -> {
+                val projected = retained as? List<*>
+                for (index in actual.indices) flattenTurns(actual[index],
+                    if (projected != null && index < projected.size) projected[index] else LcncProjection.Absent, out)
+            }
+            else -> {}
+        }
+    }
+
     /** The LAST balanced `{…}` object in [text] that parses as a JSON map. */
     private fun lastBalancedObject(text: String): Map<String, Any?>? {
         var end = text.lastIndexOf('}')
         while (end >= 0) {
-            // Walk backward from this close brace to its matching open.
+            // A candidate closes outside its strings. Walking backward keeps
+            // quoted braces as data; prose before its opening is never visited.
             var depth = 0
             var start = -1
+            var quoted = false
             for (j in end downTo 0) {
+                if (text[j] == '"') {
+                    var prior = j - 1
+                    while (prior >= 0 && text[prior] == '\\') prior--
+                    if ((j - prior - 1) % 2 == 0) quoted = !quoted
+                    continue
+                }
+                if (quoted) continue
                 when (text[j]) {
                     '}' -> depth++
                     '{' -> depth--

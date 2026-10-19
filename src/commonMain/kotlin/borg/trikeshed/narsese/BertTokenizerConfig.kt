@@ -39,7 +39,7 @@ object BertTokenizerConfig {
             }
         }
         val metadata = text("tokenizer_config.json")
-        val serialized = text("tokenizer.json")
+        val serialized = if (files.isFile(files.resolvePath(directory, "tokenizer.json"))) text("tokenizer.json") else null
         val specialTokens = if (files.isFile(files.resolvePath(directory, "special_tokens_map.json")))
             text("special_tokens_map.json") else null
         if (files.isFile(files.resolvePath(directory, "added_tokens.json")))
@@ -49,11 +49,12 @@ object BertTokenizerConfig {
         return tokenizer
     }
 
-    fun validate(metadata: String, serialized: String, tokenizer: BertWordPiece, config: BertConfig,
+    /** [serialized] null: a vocab.txt-only checkpoint, admitted on tokenizer_config.json and the vocabulary alone. */
+    fun validate(metadata: String, serialized: String?, tokenizer: BertWordPiece, config: BertConfig,
                  specialTokens: String? = null) {
         val options = objectMap(reifyStrict(metadata), "tokenizer_config.json")
         expect(options["do_lower_case"] == true, "do_lower_case=true")
-        expect(number(options["model_max_length"], 512), "model_max_length=512")
+        expect(options["model_max_length"] == null || number(options["model_max_length"], 512), "model_max_length=512")
         expect((options["tokenizer_class"] ?: "BertTokenizerFast") in listOf("BertTokenizer", "BertTokenizerFast"),
             "BertTokenizer class")
         expect((options["padding_side"] ?: "right") == "right", "right padding")
@@ -84,6 +85,12 @@ object BertTokenizerConfig {
             }
         }
 
+        if (serialized == null) {
+            expect(tokenizer.rows == config.vocabSize, "vocabulary matches the model's embedding rows")
+            expect(tokenizer.vocabulary["[PAD]"] == config.padTokenId, "pad_token_id matches [PAD]")
+            for (content in names.values) requireNotNull(tokenizer.vocabulary[content]) { "Missing BERT special token $content" }
+            return
+        }
         val json = objectMap(reifyStrict(serialized), "tokenizer.json")
         expect(json["version"] == "1.0", "tokenizer.json version=1.0")
         expect(json["truncation"] == null && json["padding"] == null, "runtime-owned truncation and padding")

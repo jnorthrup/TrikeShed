@@ -57,7 +57,11 @@ class ConfixIsamCouchTest {
             assertEquals("7-foreign", couch.docJson("peer")!!["_rev"])
             assertEquals(changes, couch.changes(0, includeDocs = true))
             assertEquals(checkpoint, couch.localGet("pull-peer"))
-            assertEquals(listOf("医", "review"), storage.document("case", firstRevision)!!.value("nested", "患者"))
+            val historical = assertNotNull(storage.document("case", firstRevision))
+            val values = assertNotNull(historical.docAt("nested", "患者")).cellKids
+            assertEquals(2, values.size)
+            assertEquals("医", values[0].reify())
+            assertEquals("review", values[1].reify())
             assertEquals(true, couch.put("next", mapOf("value" to 2L), null)["ok"])
             assertEquals(6L, couch.updateSeq)
             couch.localDelete("pull-peer")
@@ -144,6 +148,29 @@ class ConfixIsamCouchTest {
             assertFails { storage.couch("dense") }
             assertNotNull(storage.document("a"))
         }
+    }
+
+    @Test fun normalizedBridgeLocationRecoversTheExistingDenseRoot() = runBlocking<Unit> {
+        val location = directory.resolve("dense").toString()
+        lateinit var source: CouchChangesProjection
+        ConfixIsamCursorBridge("$location/./", files, cas()).use {
+            val couch = it.couch("dense")
+            couch.put("retained", mapOf("v" to "dense"), null)
+            source = couch.store.changes
+        }
+        open().use { assertEquals("dense", it.couch("dense").docJson("retained")!!["v"]) }
+        assertFalse(files.exists("$location/.store"))
+        files.mkdirs(location)
+        java.nio.file.Files.createSymbolicLink(directory.resolve("alias"), directory.resolve("dense"))
+        val alias = directory.resolve("alias").toString()
+        ConfixIsamCursorBridge(alias, files, cas()).use {
+            assertEquals("dense", it.couch("dense").docJson("retained")!!["v"])
+        }
+        val inspection = ConfixIsamElement(this, source, "$alias/./", files, cas())
+        try {
+            assertEquals(1, inspection.catalog()["indexedRevisions"])
+            assertNotNull(inspection.document("retained"))
+        } finally { inspection.drain() }
     }
 
     @Test fun existingWireRouterServesDenseDocumentsAttachmentsAndChangesAfterReopen() = runBlocking {

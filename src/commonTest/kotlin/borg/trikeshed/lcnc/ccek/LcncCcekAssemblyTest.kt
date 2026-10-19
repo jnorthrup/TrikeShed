@@ -83,13 +83,20 @@ class LcncCcekAssemblyTest {
             val caller = currentCoroutineContext().job
             val children = caller.children.toList()
             var calls = 0
-            val runner = LcncRunner(mapOf("vm.polyglot" to LcncNodeRunner { _, _ ->
-                val request = assertNotNull(currentCoroutineContext()[borg.trikeshed.vm.VmDebugRequest])
-                assertSame(binding.reactor, request.context[MuxReactorElement])
-                assertEquals(borg.trikeshed.vm.VmDebugAction.CONTINUE,
-                    request.suspendAt(mapOf("sourceName" to "p", "line" to 1)))
-                calls++
-                mapOf("value" to 42)
+            val runner = LcncRunner(mapOf("vm.polyglot" to object : LcncNodeRunner {
+                override suspend fun sourceDebugging(node: LcncNode, inputs: Map<String, Any?>): Boolean {
+                    assertSame(binding.reactor, currentCoroutineContext()[MuxReactorElement])
+                    return true
+                }
+
+                override suspend fun execute(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> {
+                    val request = assertNotNull(currentCoroutineContext()[borg.trikeshed.vm.VmDebugRequest])
+                    assertSame(binding.reactor, request.context[MuxReactorElement])
+                    assertEquals(borg.trikeshed.vm.VmDebugAction.CONTINUE,
+                        request.suspendAt(mapOf("sourceName" to "p", "line" to 1)))
+                    calls++
+                    return mapOf("value" to 42)
+                }
             }))
             val run = LcncCcekAssembly(binding, runner).launch("source-assembly",
                 program("source-assembly", LcncNode("p", "vm.polyglot")), context = currentCoroutineContext() + debug)

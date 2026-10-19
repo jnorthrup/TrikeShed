@@ -10,7 +10,7 @@ import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
-import borg.trikeshed.modelmux.ToolOntologyScaffold
+import borg.trikeshed.lib.Series
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.CausalityReteElement
 import borg.trikeshed.narsese.DocumentCurationRecord
@@ -54,7 +54,12 @@ class DocumentFeed private constructor(
     val routeId: String,
     val job: kotlinx.coroutines.CompletableJob,
 ) : CoroutineContext.Element {
+    /** Startup failed with a retained cleanup obligation. Drain [feed] before its dependencies. */
+    class StartFailure(val feed: DocumentFeed, cause: Throwable) :
+        IllegalStateException("document feed '${feed.routeId}' startup failed; cleanup pending: ${cause.message}", cause)
+
     companion object Key : CoroutineContext.Key<DocumentFeed> {
+        /** A [StartFailure] retains its feed for drain retry; callers must not close its dependencies first. */
         suspend fun create(
             scope: CoroutineScope,
             volume: Volume,
@@ -68,7 +73,7 @@ class DocumentFeed private constructor(
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
             stagingLba: Long? = null,
             rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
-            toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+            toolOntology: Series<String> = DocumentCurationToolset.all(
                 CamelCatalog.endpoints().map { "available:camel.endpoint=$it" }),
         ): DocumentFeed {
             require(stagingLba == null || stagingLba in 0..volume.capacity) { "Invalid document staging region" }
@@ -77,6 +82,7 @@ class DocumentFeed private constructor(
             val nlp = CoreNlpRuntime()
             val input = DocumentInputElement.create(owner, volume)
             var curator: DocumentCuratorElement? = null
+            var feed: DocumentFeed? = null
             try {
                 curator = DocumentCuratorElement.create(owner, nlp, model, modelId, cas, log, bag,
                     rete = rete,
@@ -84,8 +90,23 @@ class DocumentFeed private constructor(
                     observer = DocumentCuratorObserver { name, correlation, refs ->
                         land(points, name, correlation, mapOf("receipts" to List(refs.size) { refs[it].value }))
                     })
-                return DocumentFeed(input, curator, nlp, cas, points, tikaOptions, stagingLba, routeId, job).also { it.start() }
+                val created = DocumentFeed(input, curator, nlp, cas, points, tikaOptions, stagingLba, routeId, job)
+                feed = created
+                created.start()
+                return created
             } catch (failure: Throwable) {
+                val retained = feed
+                if (retained?.route != null) {
+                    retained.closed.set(true)
+                    // Camel already attempted cleanup. Its failure must not close dependencies
+                    // beneath a live consumer or hide the feed handle from the caller.
+                    if (failure is CamelRuntime.StartFailure) throw StartFailure(retained, failure)
+                    try { retained.drain() } catch (cleanup: Throwable) {
+                        if (cleanup !== failure) failure.addSuppressed(cleanup)
+                        throw StartFailure(retained, failure)
+                    }
+                    throw failure
+                }
                 withContext(NonCancellable) {
                     try { curator?.drain() } finally {
                         try { input.drain() } finally {
@@ -112,7 +133,7 @@ class DocumentFeed private constructor(
             tikaOptions: TikaRuntime.TikaOptions = TikaRuntime.TikaOptions(),
             stagingLba: Long? = null,
             rete: CausalityReteElement? = scope.coroutineContext[CausalityReteElement.Key],
-            toolOntology: ToolOntologyScaffold = DocumentCurationToolset.all(
+            toolOntology: Series<String> = DocumentCurationToolset.all(
                 buildList {
                     addAll(CamelCatalog.endpoints().map { "available:camel.endpoint=$it" })
                     addAll(brain.modelMux().listModels("chat").view.map {
@@ -139,6 +160,7 @@ class DocumentFeed private constructor(
     override val key: CoroutineContext.Key<*> get() = Key
     private val gate = Mutex()
     private val closed = AtomicBoolean(false)
+    private var route: CamelRuntime.Route? = null
     private val observationFailures = AtomicInteger()
     private val observationFailure = AtomicReference<String?>()
 
@@ -157,7 +179,7 @@ class DocumentFeed private constructor(
     }
 
     private fun start() {
-        CamelRuntime.start(routeId, "direct:$routeId", "log:$routeId?showBody=false",
+        route = try { CamelRuntime.start(routeId, "direct:$routeId", "log:$routeId?showBody=false",
             processor = CamelRuntime.PayloadProcessor { payload ->
                 // This is a synchronous Java Processor callback, not a GraalJS entry.
                 runBlocking(job) {
@@ -185,7 +207,10 @@ class DocumentFeed private constructor(
             observer = CamelRuntime.Observer { exchange ->
                 observe("tap", "$routeId:${exchange.seq}", mapOf(
                     "preview" to exchange.body, "truncated" to exchange.truncated))
-            })
+            }) } catch (failure: CamelRuntime.StartFailure) {
+            route = failure.route
+            throw failure
+        }
         observe("routeStart", routeId)
     }
 
@@ -229,8 +254,10 @@ class DocumentFeed private constructor(
     suspend fun drain() = withContext(NonCancellable) {
         closed.set(true)
         gate.withLock {
+            // A failed route stop retains callbacks and their cleanup handle. Keep their
+            // dependencies alive as well; a later drain retries the stop with admission shut.
+            withContext(Dispatchers.IO) { route?.let { CamelRuntime.stop(it) } }
             try {
-                withContext(Dispatchers.IO) { CamelRuntime.stop(routeId) }
                 observe("routeStop", routeId)
             } finally {
                 try { curator.drain() } finally {

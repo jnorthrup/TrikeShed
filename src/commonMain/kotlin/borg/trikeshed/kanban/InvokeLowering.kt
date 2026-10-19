@@ -37,7 +37,10 @@ object InvokeLowering {
         if (jobIdStr.isNullOrBlank()) return Outcome.Rejected(key, type, "missing jobId")
 
         val jobId = JobId(jobIdStr)
-        val revision = longOf(raw["expectedRevision"] ?: raw["revision"])
+        val suppliedRevision = raw["expectedRevision"] ?: raw["revision"]
+        val revision = longOf(suppliedRevision)
+        if (suppliedRevision != null && revision == null)
+            return Outcome.Rejected(key, type, "invalid expectedRevision")
 
         fun needRevision(): Long? {
             return revision
@@ -52,6 +55,24 @@ object InvokeLowering {
                     val deps = listishOf(raw["dependencies"])?.mapNotNull { it?.toString() }?.map(::JobId) ?: emptyList()
                     Outcome.Lowered(JobCommand.Submit(jobId, key, deps, revision))
                 }
+            }
+
+            "update" -> {
+                val rev = needRevision() ?: return Outcome.Rejected(key, type, "update without expectedRevision")
+                // Metadata is not a back door into Move, ownership, execution receipts or dependencies.
+                val allowed = setOf("type", "kind", "jobId", "id", "idempotencyKey", "expectedRevision",
+                    "revision", "title", "priority", "atMs", "actor")
+                for (field in raw.keys) if (field !in allowed)
+                    return Outcome.Rejected(key, type, "update cannot change '$field'")
+                val title = raw["title"] as? String
+                if (raw.containsKey("title") && title.isNullOrBlank())
+                    return Outcome.Rejected(key, type, "invalid update title")
+                val priority = longOf(raw["priority"])
+                if (raw.containsKey("priority") && (priority == null || priority !in 0L..2L))
+                    return Outcome.Rejected(key, type, "invalid update priority")
+                if (title == null && priority == null)
+                    return Outcome.Rejected(key, type, "update without title or priority")
+                Outcome.Lowered(JobCommand.Update(jobId, key, rev, title, priority?.toInt()))
             }
 
             "move" -> {
@@ -106,9 +127,13 @@ object InvokeLowering {
 
     private fun longOf(v: Any?): Long? = when (v) {
         is Long -> v
-        is Int -> v.toLong()
-        is Double -> if (v % 1.0 == 0.0) v.toLong() else null
-        is Number -> v.toLong()
+        // Kotlin/JS represents Int and Double as Number: validate before conversion.
+        // Long.MAX_VALUE rounds to 2^63 as a Double: keep the upper bound strict,
+        // otherwise conversion saturates and changes the supplied precondition.
+        is Number -> v.toDouble().takeIf {
+            it.isFinite() && it % 1.0 == 0.0 &&
+                it >= Long.MIN_VALUE.toDouble() && it < Long.MAX_VALUE.toDouble()
+        }?.toLong()
         is String -> v.toLongOrNull()
         else -> null
     }

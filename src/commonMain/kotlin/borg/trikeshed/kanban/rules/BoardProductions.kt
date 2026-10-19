@@ -8,6 +8,7 @@ import borg.trikeshed.dag.ReteStoredFact
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.BoardCol
 import borg.trikeshed.kanban.BoardStoreElement
+import borg.trikeshed.kanban.boardWipUnit
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -93,6 +94,11 @@ object BoardRules {
 
     /** The card fact's `AGENT:` id (the coding-agent lane); blank = the chat brain claims it. */
     internal fun agent(fact: ReteStoredFact): String = (fact.fields["agent"] as? String).orEmpty()
+
+    internal fun wipUnit(fact: ReteStoredFact): String = boardWipUnit(
+        fact.fields["jobId"] as? String ?: fact.factId.b,
+        (fact.fields["executionFamily"] as? String).orEmpty(),
+    )
 
     /**
      * Is [jobId] a child the fan-out worker minted for [parent]? The worker's naming is
@@ -267,16 +273,17 @@ class WipBreachProduction : ReteProduction {
         for (col in BoardCol.entries) {
             val limit = col.wipLimit ?: continue
             val inCol = byCol[col.wire] ?: continue
-            if (inCol.size > limit) {
+            val count = inCol.mapTo(mutableSetOf()) { BoardRules.wipUnit(it) }.size
+            if (count > limit) {
                 fire(
                     Activation(
-                        activationId = "wip-breach-${col.wire}-${inCol.size}",
+                        activationId = "wip-breach-${col.wire}-$count",
                         ruleId = ruleId,
-                        ruleVersionCid = BoardRules.cid("rule-wip-breach-v1"),
+                        ruleVersionCid = BoardRules.cid("rule-wip-breach-v2"),
                         salience = salience,
-                        sequence = inCol.size.toLong(),
+                        sequence = count.toLong(),
                         supportCids = inCol.map { it.versionCid },
-                        bindings = mapOf("column" to col.wire, "count" to "${inCol.size}", "limit" to "$limit"),
+                        bindings = mapOf("column" to col.wire, "count" to "$count", "limit" to "$limit"),
                     ),
                 )
             }
@@ -324,7 +331,7 @@ class DependencyReadyProduction : ReteProduction {
 
 /**
  * The board claims its own work: for each READY card, oldest-first by
- * lastMoveMs, while RUNNING (counted from the facts) + claims fired this pass
+ * lastMoveMs, while RUNNING execution families + new units claimed this pass
  * stays under RUNNING's WIP limit, propose Move(RUNNING, owner=claim:brain).
  * The sink lowers the activation to the store and runs the brain (the module's
  * claim worker); the card comes back through REVIEW, never DONE, by itself.
@@ -343,6 +350,7 @@ class DependencyReadyProduction : ReteProduction {
  * skipped — a `MODELS:` card dragged straight to READY is split by
  * [FanOutProduction] (salience 95, decided first), never claimed whole. Once its
  * join has landed the predicate is false and the parent is claimed like any card.
+ * LCNC execution-family receipts retain their service owner and are never agent claims.
  */
 class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : ReteProduction {
     override val ruleId: String = BoardRules.CLAIM
@@ -353,21 +361,24 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
         val limit = BoardCol.RUNNING.wipLimit ?: return
         val cards = BoardRules.cards(net, partitionId)
         val running = cards.filter { it.fields["column"] == BoardCol.RUNNING.wire }
-        if (running.size >= limit) return
+        val units = running.view.mapTo(mutableSetOf()) { BoardRules.wipUnit(it) }
         val ready = cards
             .filter { it.fields["column"] == BoardCol.READY.wire }
             .sortedWith(compareBy({ (it.fields["lastMoveMs"] as? Long) ?: 0L }, { it.fields["jobId"] as? String ?: "" }))
-        var fired = 0
         for (card in ready) {
-            if (running.size + fired >= limit) break
+            if (card.fields["owner"] == "lcnc-runner" &&
+                (card.fields["executionFamily"] as? String)?.isNotBlank() == true) continue
             if (BoardRules.fanOutPending(card, cards)) continue
             val jobId = card.fields["jobId"] as? String ?: continue
+            val unit = BoardRules.wipUnit(card)
+            if (unit !in units && units.size >= limit) continue
+            units.add(unit)
             val revision = (card.fields["revision"] as? Long) ?: 0L
             fire(
                 Activation(
                     activationId = "claim-$jobId-r$revision",
                     ruleId = ruleId,
-                    ruleVersionCid = BoardRules.cid("rule-claim-v1"),
+                    ruleVersionCid = BoardRules.cid("rule-claim-v2"),
                     salience = salience,
                     sequence = revision,
                     supportCids = (s_[card.versionCid] + running.α { it.versionCid }).toList(),
@@ -380,7 +391,6 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
                     ),
                 ),
             )
-            fired++
         }
     }
 }

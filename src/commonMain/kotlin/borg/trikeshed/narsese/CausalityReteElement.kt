@@ -197,7 +197,8 @@ class CausalityReteElement(
         val landed = ArrayList<Join<Long, String>>()
         for (i in 0 until firings.size) {
             val firing = firings[i]
-            if (firing.firingCid in seenFirings) continue
+            val refraction = firing.refractionCid
+            if (refraction in seenFirings) continue
             val consequentAngular = firing.consequentAngular
             val receipt = DerivationReceipt.observation(
                 subject = TermIdentity(firing.matched.angular),
@@ -224,7 +225,7 @@ class CausalityReteElement(
                     gloss = gloss,
                 ),
             )
-            seenFirings.add(firing.firingCid)
+            seenFirings.add(refraction)
             offeredCount++
             if (traceCapacity > 0) {
                 if (firingTrace.size == traceCapacity) firingTrace.removeFirst()

@@ -31,6 +31,7 @@ internal object JvmSocketSyscalls {
     private object Recv { @JvmField val at = symbol("recv") }
     private object Send { @JvmField val at = symbol("send") }
     private object Poll { @JvmField val at = symbol("poll") }
+    private object Pipe { @JvmField val at = symbol("pipe") }
     private object GetOption { @JvmField val at = symbol("getsockopt") }
     private object SetOption { @JvmField val at = symbol("setsockopt") }
     private object SocketName { @JvmField val at = symbol("getsockname") }
@@ -199,5 +200,63 @@ internal object JvmSocketSyscalls {
         val result = status(state, if (linux) LibcDowncall.POLL.invokeExact(Poll.at, state, records, fds.size.toLong(), timeout) as Int
             else LibcDowncall.POLL.invokeExact(Poll.at, state, records, fds.size, timeout) as Int)
         return result to IntArray(fds.size) { records.get(ValueLayout.JAVA_SHORT, it * 8L + 6).toInt() and 0xffff }
+    }
+
+    /** A cancellable poll effect. The owning common coroutine waits for the worker's cleanup on cancellation. */
+    suspend fun await(fds: IntArray, masks: IntArray, register: ((() -> Unit) -> AutoCloseable)? = null) {
+        require(fds.size == masks.size)
+        val pipe = Arena.ofConfined().use { arena ->
+            val descriptors = arena.allocate(8)
+            val state = errnoState.get()
+            check(status(state, LibcDowncall.PIPE.invokeExact(Pipe.at, state, descriptors) as Int) == 0) { "completion wake pipe failed" }
+            IntArray(2) { descriptors.get(int, it * 4L) }
+        }
+        val guard = Any()
+        var open = true
+        val done = kotlinx.coroutines.CompletableDeferred<Unit>()
+        try {
+            for (fd in pipe) {
+                val state = errnoState.get()
+                val flags = status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 3, 0) as Int)
+                check(flags >= 0 && status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 4,
+                    flags or if (linux) 0x800 else 4) as Int) == 0) { "completion wake pipe flags failed" }
+                check(status(state, LibcDowncall.FCNTL.invokeExact(Fcntl.at, state, fd, 2, 1) as Int) == 0)
+            }
+            val wake = {
+                synchronized(guard) {
+                    if (open) JvmFileSyscalls.transfer(pipe[1], byteArrayOf(1), 0, 1, -1, false)
+                    Unit
+                }
+            }
+            val registration = register?.invoke(wake)
+            try {
+                kotlinx.coroutines.suspendCancellableCoroutine<Unit> { continuation ->
+                    continuation.invokeOnCancellation { wake() }
+                    try { kotlinx.coroutines.Dispatchers.IO.dispatch(continuation.context, Runnable {
+                        val outcome = runCatching {
+                            var status: Int
+                            do { status = poll(fds + pipe[0], masks + 1, -1).first } while (status == -4)
+                            check(status >= 0) { "completion poll failed: $status" }
+                        }
+                        synchronized(guard) {
+                            open = false
+                            pipe.forEach(JvmFileSyscalls::close)
+                        }
+                        done.complete(Unit)
+                        continuation.resumeWith(outcome)
+                    }) } catch (failure: Throwable) {
+                        done.complete(Unit)
+                        continuation.resumeWith(Result.failure(failure))
+                    }
+                }
+            } finally {
+                try { kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { done.await() } }
+                finally { registration?.close() }
+            }
+        } finally {
+            synchronized(guard) {
+                if (open) { open = false; pipe.forEach(JvmFileSyscalls::close) }
+            }
+        }
     }
 }

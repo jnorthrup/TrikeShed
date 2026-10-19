@@ -47,7 +47,9 @@ internal fun probeUringBackend(host: HostDescriptor, module: String, backend: Us
             phase = UringProbePhase.EXECUTION
             val token = 0x7472696b65L
             val completed = backend.submitBatch(listOf(UringOp.Companion.UringSubmission(
-                UringOp.NOP, -1, 0, 0, 0, userData = token)))
+                UringOp.NOP, -1, 0, 0, 0, userData = token))).toMutableList()
+            if (completed.isEmpty() && backend.deferredCapabilities and UringOp.NOP.mask != 0L)
+                completed.addAll(backend.reapCompletions(1))
             if (completed.size != 1 || completed[0].userData != token)
                 return UringBackendDiscovery(UringProbeReport(host, UringProbeState.PROBE_FAILED, phase,
                     module, "NOP completion count or token mismatch", nativeCapabilities = native))

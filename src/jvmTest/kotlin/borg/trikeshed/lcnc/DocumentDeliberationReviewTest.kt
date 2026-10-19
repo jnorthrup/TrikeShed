@@ -206,10 +206,10 @@ class DocumentDeliberationReviewTest {
                     val frozen = LcncProgramConfix.fromJson("document-deliberation-review",
                         assertNotNull(cas.get(ContentId(run["programCid"] as String))).decodeToString())
                     retainedSimulationBrowser(browserContext, null, ccekReactorBinding(scope.coroutineContext),
-                        frozen, stateDirectory = root) {
+                        frozen, stateDirectory = root, observations = {
                         mapOf("runReceiptCid" to run["receiptCid"], "runId" to run["runId"],
                             "modelRequests" to requests.get(), "nlpRequests" to parses.get())
-                    }
+                    })
                     val inspectedBoard = BoardStoreElement(JvmBoardWal(File(root, ".kanban")), cas, parentJob = owner)
                     try {
                         inspectedBoard.open()

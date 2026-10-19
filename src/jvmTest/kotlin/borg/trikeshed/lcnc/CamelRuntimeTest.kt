@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -518,5 +519,38 @@ class CamelRuntimeTest {
         val ids = out["ids"] as List<String>
         assertTrue(id in ids, "the running route should be listed for the picklist: $ids")
         assertEquals(ids.size, out["count"])
+    }
+
+    @Test
+    fun persistentRouteRetainsReachAndRejectsPolicyDrift() = runBlocking {
+        requireModule()
+        val ctx = vmRuntimeTestContext(this)
+        val runner = CamelRouteLegos.up(ctx)
+        for (reach in CamelLinkage.Reach.entries) {
+            val id = "probe-reach-" + reach.name
+            val node = LcncNode(id, CamelRouteLegos.UP, mapOf(
+                "from" to "direct:$id", "to" to "mock:$id", "reach" to reach.name))
+            try {
+                assertEquals(true, runner.run(node, emptyMap())["ok"])
+                val route = requireNotNull(CamelRuntime.route(id))
+                val identity = route.identity()
+                assertEquals(reach.name, identity["reach"])
+                assertEquals(reach.name, route.describe()["reach"])
+                val fact = ctx.blackboard.get(CamelRouteLegos.routeKey(id))
+                assertEquals(identity, fact)
+                val other = CamelLinkage.Reach.entries.single { it != reach }
+                val refusal = assertFailsWith<IllegalArgumentException> {
+                    runner.run(node, mapOf("reach" to other.name))
+                }
+                assertTrue(refusal.message.orEmpty().contains("reach"))
+                assertTrue(CamelRuntime.route(id) === route)
+                assertEquals(fact, ctx.blackboard.get(CamelRouteLegos.routeKey(id)))
+                assertEquals("still-running", CamelRuntime.send(id, "still-running"))
+                assertEquals(true, runner.run(node, emptyMap())["ok"])
+                assertTrue(CamelRuntime.route(id) === route)
+            } finally {
+                CamelRuntime.stop(id)
+            }
+        }
     }
 }

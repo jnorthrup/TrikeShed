@@ -10,6 +10,11 @@ import borg.trikeshed.userspace.reactor.Interest
  * [java.nio.channels.FileChannel] cannot register with [java.nio.channels.Selector].
  * [ReactorOperations] bridges this: kqueue (macOS), io_uring (Linux), libuv (Node.js),
  * poll(2) (POSIX fallback).
+ *
+ * Implementations with a synchronization option default to monitored state access.
+ * NONE requires serialized registration, deregistration, polling and lifecycle access
+ * by the owning coroutine context, including on multicore hosts. It does not remove
+ * OS waiter/cancellation resource locks or select behavior from the CPU count.
  */
 interface ReactorOperations : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ReactorOperations>

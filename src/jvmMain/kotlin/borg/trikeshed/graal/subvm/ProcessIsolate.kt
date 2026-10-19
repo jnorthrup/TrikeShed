@@ -81,6 +81,12 @@ class ProcessIsolate(
         require(pythonWorker == null || facet == VmFacet.GRAAL_PYTHON && nodeLauncher == null) {
             "PythonWorker requires the Python facet and its own child JVM"
         }
+        // Filesystem preconditions hold at launch, not configuration: a daemon configures an unprovisioned worker at boot.
+        pythonWorker?.run {
+            require(workingDirectory == null || File(workingDirectory).isDirectory) { "Python worker directory is missing" }
+            require(pythonPath.all { File(it).exists() }) { "Python worker import path is missing" }
+            require(executable == null || File(executable).isFile) { "Python worker executable is missing" }
+        }
         deliberateHostEnvironmentOnce()
         val pipes = runBlocking { JvmProcessProtocolPipes.open(command = { port, token ->
             if (nodeLauncher != null) {

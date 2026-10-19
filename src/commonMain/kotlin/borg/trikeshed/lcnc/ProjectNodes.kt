@@ -185,11 +185,13 @@ object ProjectNodes {
     const val NOTES_SUFFIX = ".notes.md"
     /** The footnote-stream twin the miner leaves beside a paged document (PageStreams). */
     const val FOOTNOTES_SUFFIX = ".footnotes.tsv"
+    /** The links-stream twin the miner leaves beside a markup document (MarkupStreams): its anchors, never its text. */
+    const val LINKS_SUFFIX = ".links.tsv"
     /** A twin names what was derived from or written about another document; it is never a document itself. */
     fun twin(id: String): Boolean = twinOf(id) != null
 
     /** The document [id] is a twin of, or null when [id] is a document. */
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
+    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
     const val NOTES = "project.notes"
 
     /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */

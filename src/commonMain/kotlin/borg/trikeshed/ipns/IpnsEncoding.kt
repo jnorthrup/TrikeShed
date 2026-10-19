@@ -88,8 +88,8 @@ object IpnsEncoding {
     }
     fun sha256(bytes: ByteArray): ByteArray = Sha256Pure.digest(bytes)
     fun multihash(code: ULong, digest: ByteArray): ByteArray = varint(code) + varint(digest.size.toULong()) + digest
-    fun multihashParts(bytes: ByteArray): Pair<ULong, ByteArray> {
-        require(bytes.size <= 512) { "Multihash size limit" }
+    fun multihashParts(bytes: ByteArray, maxBytes: Int = 512): Pair<ULong, ByteArray> {
+        require(maxBytes in 512..10_240 && bytes.size <= maxBytes) { "Multihash size limit" }
         val reader = IpnsVarint(bytes)
         val code = reader.read()
         val size = reader.read()
@@ -114,8 +114,8 @@ object IpnsEncoding {
         return text.toString()
     }
     fun unbase58(text: String): ByteArray = radixDecode(text, BASE58)
-    fun unbase(text: String): ByteArray {
-        require(text.length in 2..2048) { "Multibase size limit" }
+    fun unbase(text: String, maxChars: Int = 2048): ByteArray {
+        require(maxChars in 2..16_384 && text.length in 2..maxChars) { "Multibase size limit" }
         return when (text[0]) {
             'k', 'K' -> radixDecode(text.drop(1).lowercase(), BASE36)
             'z' -> radixDecode(text.drop(1), BASE58)
@@ -174,7 +174,7 @@ object IpnsEncoding {
 /** CIDv1, independent of the existing sha256:hex ContentId vocabulary. */
 class IpnsCid(val codec: ULong, multihash: ByteArray) {
     private val hash = multihash.copyOf()
-    init { require(codec > 0u); IpnsEncoding.multihashParts(hash) }
+    init { require(codec > 0u); IpnsEncoding.multihashParts(hash, IpnsRecord.MAX_BYTES) }
     val multihash: ByteArray get() = hash.copyOf()
     val bytes: ByteArray get() = IpnsEncoding.varint(1u) + IpnsEncoding.varint(codec) + hash
     override fun toString(): String = IpnsEncoding.base32(bytes)

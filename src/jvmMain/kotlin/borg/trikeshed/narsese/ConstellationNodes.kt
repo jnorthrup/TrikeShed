@@ -12,10 +12,6 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.lib.*
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.sync.withPermit
 import borg.trikeshed.rdf.RdfGraph
 import borg.trikeshed.rdf.RdfQuad
 import borg.trikeshed.rdf.RdfTerm
@@ -31,19 +27,133 @@ import modelmux.Airgap
  * `constellation/<name>/…`. Books freeze to `<stateDir>/constellations/books/<book>.json`; a
  * constellation is its member list, `<stateDir>/constellations/<name>.members`.
  */
-class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboard, private val bank: KifKnowledgeBase? = null,
+class ConstellationNodes(private val stateDir: File, private val blackboard: ConfixBlackboard, private val bank: KifKnowledgeBase? = null,
                          /** The daemon's live rete: sense rules minted before the rows replaced them are retracted from it. */
                          private val liveRete: CausalityReteElement? = null,
                          private val bert: BertSenseElement? = null,
                          private val files: borg.trikeshed.userspace.nio.file.spi.FileOperations =
-                             borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()) {
+                             borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(),
+                         val decisionProvider: DecisionProvider = DecisionProvider.JEV,
+                         private val scope: kotlinx.coroutines.CoroutineScope = kotlinx.coroutines.CoroutineScope(
+                             borg.trikeshed.userspace.nio.file.spi.fileIoContext),
+                         private val owner: ConstellationNodes? = null,
+                         private val modelIdentity: String? = null,
+                         namespace: String? = null) {
     private val wiki = File(stateDir, "wiki")
     val root = File(stateDir, "constellations").apply { mkdirs() }
     private val books = File(root, "books").apply { mkdirs() }
     private val live = HashMap<String, Constellation>()
-    private val bertCorpus = BertSenseCorpus(files, books.absolutePath)
+    val decisionNamespace = namespace ?: namespaceOf(decisionProvider)
+    private val tableSuffix = if (decisionProvider == DecisionProvider.JEV) "jev" else decisionNamespace
+    private val bertCorpus = BertSenseCorpus(files, books.absolutePath, tableSuffix)
+    private val sensePrefix = if (decisionProvider == DecisionProvider.JEV) "senses" else "senses.$decisionNamespace"
+    private val decisionModel = modelIdentity ?: modelOf(decisionProvider)
 
-    suspend fun drain() { bert?.drain() }
+    private fun modelOf(provider: DecisionProvider): String = if (provider == DecisionProvider.JEVA)
+        scope.coroutineContext[JevaElement]?.metadata?.get("model_identity")?.toString() ?: provider.model
+        else provider.model
+
+    private fun namespaceOf(provider: DecisionProvider): String = provider.namespace +
+        (scope.coroutineContext[JevaElement]?.takeIf { provider == DecisionProvider.JEVA }
+            ?.let { "-${cid(it.config.identity + "\u0000" + modelOf(provider))}" } ?: "")
+
+    val curation = CurationElement(scope)
+    init { scope.coroutineContext[JevaElement]?.retain(curation) }
+
+    private val providers = HashMap<String, ConstellationNodes>()
+    private var draining = false
+    private var drained = false
+
+    private fun admitting(): Boolean {
+        val family = owner ?: this
+        return synchronized(family.providers) { !family.draining && !family.drained }
+    }
+
+    /** A queued ingest retains this immutable provider and its own judgment stores. */
+    fun forProvider(provider: DecisionProvider): ConstellationNodes =
+        providerNodes(provider, namespaceOf(provider), modelOf(provider))
+
+    private fun providerNodes(provider: DecisionProvider, namespace: String, model: String, reading: Boolean = false): ConstellationNodes {
+        owner?.let { return it.providerNodes(provider, namespace, model, reading) }
+        return synchronized(providers) {
+            check(!drained && (!draining || reading)) { "Curation is draining" }
+            if (namespace == decisionNamespace) this else providers.getOrPut(namespace) {
+                ConstellationNodes(stateDir, blackboard, bank, liveRete, bert, files, provider, scope, this, model, namespace)
+            }
+        }
+    }
+
+    /** Reading an ingested book uses its committed judgments, even when the provider is now offline. */
+    fun forBook(name: String): ConstellationNodes {
+        val selection = File(books, "${safe(name)}.decision.json").takeIf { it.isFile }
+            ?.let { reifyMap(it.readText()) } ?: return this
+        val provider = DecisionProvider.of(selection["provider"] as? String)
+        val namespace = requireNotNull(selection["namespace"] as? String)
+        require(namespace == provider.namespace || namespace.startsWith(provider.namespace + "-"))
+        require(namespace.all { it.isLetterOrDigit() || it in "-_." })
+        return providerNodes(provider, namespace, selection["model"]?.toString() ?: provider.model, reading = true)
+    }
+
+    private fun forBook(name: String, provider: String?): ConstellationNodes {
+        val saved = forBook(name)
+        val selected = provider?.let(DecisionProvider::of) ?: return saved
+        return if (saved.decisionProvider == selected) saved else forProvider(selected)
+    }
+
+    fun scoring(): List<Map<String, Any?>> {
+        owner?.let { return it.scoring() }
+        return synchronized(providers) { listOf(this) + providers.values }.flatMap { it.scored.values.toList() }
+    }
+
+    suspend fun drain() {
+        owner?.let { return it.drain() }
+        synchronized(providers) { draining = true }
+        val joined = HashSet<ConstellationNodes>()
+        while (true) {
+            val children = synchronized(providers) {
+                (listOf(this) + providers.values).filter { it !in joined }.also { if (it.isEmpty()) drained = true }
+            }
+            if (children.isEmpty()) break
+            for (child in children) child.curation.stopAdmission()
+            for (child in children) { child.curation.drain(); joined.add(child) }
+        }
+        scope.coroutineContext[JevaElement]?.drain()
+        bert?.drain()
+    }
+
+    private suspend fun requireDecisionAccess() { if (decisionProvider.remote) Airgap.requireRemote() }
+
+    private suspend fun decisionKey(): String {
+        requireDecisionAccess()
+        if (!decisionProvider.requiresKey) return ""
+        return kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]
+            ?.keyMux()?.get(decisionProvider.keyName)?.takeIf { it.isNotBlank() }
+            ?: error("${decisionProvider.keyName} is not set")
+    }
+
+    /** Validate the selected provider before an explicitly selected ingest starts extracting. */
+    suspend fun ingestAccess(provider: DecisionProvider = decisionProvider): ConstellationNodes =
+        kotlinx.coroutines.withContext(scope.coroutineContext.minusKey(kotlinx.coroutines.Job)) {
+        if (provider == DecisionProvider.JEVA) {
+            val local = requireNotNull(kotlinx.coroutines.currentCoroutineContext()[JevaElement]) { "Jeva runtime is unavailable" }
+            val status = local.availability()
+            check(status["available"] == true) { status["error"]?.toString() ?: "Jeva runtime is unavailable" }
+        }
+        // Work admitted before drain may still ask within its already resolved provider lane.
+        (if (provider == decisionProvider && namespaceOf(provider) == decisionNamespace) this@ConstellationNodes else forProvider(provider))
+            .also { it.decisionKey() }
+    }
+
+    /** Explicit provider selection admits and awaits that book's judgments as part of ingest. */
+    suspend fun ingestScore(name: String) = kotlinx.coroutines.withContext(scope.coroutineContext.minusKey(kotlinx.coroutines.Job)) {
+        val selected = ingestAccess()
+        selected.score(selected.decisionKey(), listOf(name))
+    }
+
+    /** Release inference storage after intake settles; curation lanes and committed readings stay available. */
+    suspend fun releaseDecision() {
+        scope.coroutineContext[JevaElement]?.release()
+    }
 
     /** BERT annotates the existing reading; it neither creates Jev tables nor mints NARS observations. */
     suspend fun bertReading(name: String, reading: List<Map<String, Any?>>, evidenceBooks: List<String>,
@@ -97,7 +207,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * What words denote where: the sense rows Jev's judgments of CoreNLP's nouns fill, kept beside the books. The
      * per-class memory they replace (`senses.bag`) is not read; the rows are primed from the Jev tables themselves.
      */
-    private val senseFile = File(root, "senses.rows")
+    private val senseFile = File(root, "$sensePrefix.rows")
     @Volatile private var mem: SenseMemory? = null
     private val memLock = Any()
     /** Bumped whenever the sense memory changes, so a section read before it is read again. */
@@ -116,9 +226,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     private val forge = borg.trikeshed.common.Path(stateDir.absolutePath)
     /** The caps the rows stood in at the last trace, condition → class, as [capsFile] holds them across restarts. */
     private val caps = HashMap<String, String>()
-    private val capsFile = File(root, "senses.caps")
+    private val capsFile = File(root, "$sensePrefix.caps")
     /** Every cap a row entered, rolled to or left, in trace order. */
-    private val traceFile = File(root, "senses.trace")
+    private val traceFile = File(root, "$sensePrefix.trace")
     /** The local tree over SUMO's: where the sense rows come to focus, rebuilt whenever the rows change. */
     @Volatile private var tree = ConceptTree(null)
 
@@ -286,16 +396,81 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         }
         for (f in listOf(bookFile(book), sourceFile(book), File(books, "${safe(book)}.sections.jsonl"))) f.delete()
         File(books, "${safe(book)}.readings").deleteRecursively()
-        File(books, "${safe(book)}.jev").deleteRecursively()
-        synchronized(loaded) { loaded.remove(book) }
-        live.remove(constellation)
+        for (suffix in judgmentSuffixes(book).view) File(books, "${safe(book)}.$suffix").deleteRecursively()
+        invalidateSource(book)
     }
 
     /** The content id of the text a book was curated from, beside the book. */
     private fun sourceFile(name: String) = File(books, safe(name) + ".source")
 
-    private fun safe(name: String) = name.replace(Regex("[^A-Za-z0-9._-]+"), "-")
+    /** A book's file stem: its name in file-safe characters. A file name holds 255 bytes, its suffixes and staging copies
+     *  included, so past [STEM] characters (a document filed deep in its citers' folders) the stem keeps the name's tail
+     *  beside a digest of the whole name. */
+    private fun safe(name: String): String {
+        val s = name.replace(Regex("[^A-Za-z0-9._-]+"), "-")
+        return if (s.length <= STEM) s else cid(name).take(16) + "-" + s.takeLast(STEM - 17)
+    }
     private fun bookFile(name: String) = File(books, safe(name) + ".json")
+
+    /** Every provider/configuration's active tables must leave with an obsolete source revision. */
+    private fun judgmentSuffixes(name: String): Series<String> {
+        val prefix = "${safe(name)}."
+        val base = DecisionProvider.entries.map { it.tableSuffix }
+        val held = books.listFiles { f -> f.isDirectory && f.name.startsWith(prefix) && !f.name.endsWith(".history") }
+            .orEmpty().map { it.name.removePrefix(prefix) }.filter { suffix ->
+                base.any { suffix == it || suffix.startsWith("$it-") }
+            }
+        return (base + held + tableSuffix).distinct().toSeries()
+    }
+
+    /** A shared source revision invalidates every provider's derived book and sense state. */
+    private fun invalidateSource(book: String) {
+        val familyOwner = owner ?: this
+        synchronized(familyOwner.providers) {
+            val family = listOf(familyOwner) + familyOwner.providers.values
+            for (member in family) synchronized(member.memLock) {
+                val current = member.mem
+                val memory = current ?: member.senseFile.takeIf { it.isFile }?.bufferedReader()
+                    ?.useLines { SenseMemory.read(it) }
+                if (memory != null) synchronized(memory) {
+                    val before = memory.judgments
+                    memory.replace(book)
+                    if (memory.judgments != before) {
+                        if (current != null) { member.trace(memory); member.save(memory) }
+                        else member.files.writeAtomically(member.senseFile.absolutePath, memory.write().encodeToByteArray())
+                    }
+                }
+                member.invalidateViews()
+            }
+            // Configurations not instantiated this boot still have persisted rows. Their next memory()
+            // traces the corrected rows against the retained caps before exposing their classifications.
+            val active = family.map { it.senseFile.name }.toSet()
+            for (saved in root.listFiles { f -> f.isFile && (f.name == "senses.rows" ||
+                f.name.startsWith("senses.") && f.name.endsWith(".rows")) && f.name !in active }.orEmpty()) {
+                val memory = saved.bufferedReader().useLines { SenseMemory.read(it) }
+                val before = memory.judgments
+                memory.replace(book)
+                if (memory.judgments != before)
+                    files.writeAtomically(saved.absolutePath, memory.write().encodeToByteArray())
+            }
+            File(books, "${safe(book)}.decision.json").delete()
+        }
+    }
+
+    private fun invalidateViews() {
+        senseEpoch++
+        synchronized(loaded) { loaded.clear() }
+        synchronized(reified) { reified.clear() }
+        live.clear()
+    }
+
+    private fun invalidateFamilyViews() {
+        val familyOwner = owner ?: this
+        synchronized(familyOwner.providers) {
+            familyOwner.invalidateViews()
+            for (member in familyOwner.providers.values) member.invalidateViews()
+        }
+    }
 
     /** The section texts beside a book, one JSON string per line in section order: what a section reading shows. */
     private fun saveSections(name: String, sections: List<String>) =
@@ -307,6 +482,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         "support" to b.support.map { it.toList() },
         "facts" to b.facts.toList(),
         "cites" to b.cites.map { listOf(it.first, it.second) },
+        "sections" to b.sections,
+        "paths" to b.paths,
+        "provenance" to b.provenance,
     )))
 
     /** Books as last read, keyed by name; a book re-reads only when its file changes (length and mtime). */
@@ -340,6 +518,10 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             (m["facts"] as? List<*>)?.map { it.toString() }?.toSet() ?: emptySet(),
             (m["cites"] as? List<*>)?.map { p -> (p as List<*>).let { (it[0] as Number).toInt() to (it[1] as Number).toInt() } } ?: emptyList(),
             judged, nouls, established(m["name"].toString()),
+            // A book frozen before section addresses takes them from the section texts saved beside it.
+            (m["sections"] as? List<*>)?.map { it.toString() } ?: texts(m["name"].toString()).map(Book::urn),
+            (m["paths"] as? List<*>)?.map { it.toString() }.orEmpty(),
+            (m["provenance"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v.toString() }.orEmpty(),
         )
     }
 
@@ -349,7 +531,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     }.toSet()
 
     /** Jev's table for section [k] of a book, beside its readings. */
-    private fun tableFile(name: String, k: Int) = File(books, "${safe(name)}.jev/$k.json")
+    private fun tableDirectory(name: String) = File(books, "${safe(name)}.${tableSuffix}")
+    private fun tableFile(name: String, k: Int) = File(tableDirectory(name), "$k.json")
 
     /**
      * Section [k]'s Jev table, reified once per version of its file: fidelity, establishes, locating a book, priming
@@ -368,8 +551,14 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
 
     /** Every Jev table of a book, by section ordinal. */
     private fun tablesOf(name: String): List<Pair<Int, Map<*, *>>> =
-        File(books, "${safe(name)}.jev").listFiles { x -> x.name.endsWith(".json") }.orEmpty()
+        tableDirectory(name).listFiles { x -> x.name.endsWith(".json") }.orEmpty()
             .mapNotNull { f -> f.name.removeSuffix(".json").toIntOrNull()?.let { k -> tableOf(f)?.let { k to it } } }
+
+    /** The links out of a book its tables hold referenced, each address once at its highest noul, in section order. */
+    fun referenced(name: String): List<Map<*, *>> = tablesOf(name).sortedBy { it.first }
+        .flatMap { (k, t) -> (t["links"] as? List<*>).orEmpty().mapNotNull { (it as? Map<*, *>)?.let { l -> l + ("section" to k) } } }
+        .filter { it["referenced"] == true }
+        .groupBy { it["href"].toString() }.map { (_, ls) -> ls.maxBy { (it["noul"] as? Number)?.toDouble() ?: 0.0 } }
 
     /** Reified Jev tables by path, each with the stamp of the file version it was read from; at most [PARSED] kept. */
     private val reified = object : LinkedHashMap<String, Pair<Long, Map<*, *>>>(64, .75f, true) {
@@ -380,29 +569,58 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     private fun cid(s: String) = borg.trikeshed.job.ContentId.of(s.encodeToByteArray()).hex
 
     /**
-     * Jev over [state], each question asked once: an answer stands under the content ids of its state and its question,
+     * The selected provider over [state]: answers stand under provider/model, state and question content ids,
      * one file per state, and only questions with no standing answer go out, together in one request. A state that
      * changes (a truth revised, a premise consumed into the facts) is a new state, so its questions are asked anew.
      * The reply holds every answer, standing or new; `usage` is what went out, `asked` how many questions did.
      */
     suspend fun asked(key: String, state: Map<String, Any?>, questions: Map<String, Map<String, Any?>>): Map<String, Any?> {
-        val f = File(root, "jev/${cid(jsonOf(state))}.json")
+        if (decisionProvider == DecisionProvider.JEVA) {
+            val selected = ingestAccess()
+            if (selected !== this) return selected.asked(key, state, questions)
+        }
+        val stateId = "${decisionNamespace}/${cid(jsonOf(state))}"
+        val requestId = "$stateId/${cid(jsonOf(questions.toSortedMap()))}"
+        return curation.answer(requestId, stateId, ::admitting) { askedNow(key, state, questions) }
+    }
+
+    private suspend fun askedNow(key: String, state: Map<String, Any?>, questions: Map<String, Map<String, Any?>>): Map<String, Any?> {
+        val f = File(root, "decisions/${decisionNamespace}/${cid(jsonOf(state))}.json")
         val ids = questions.mapValues { (_, q) -> cid(jsonOf(q)) }
-        fun standing(): Map<String, Any?> = synchronized(answering) { f.takeIf { it.isFile }?.let { reifyMap(it.readText()) } ?: emptyMap() }
-        val had = standing()
-        val missing = questions.filterKeys { ids.getValue(it) !in had }
-        val reply = if (missing.isEmpty()) emptyMap() else Jev.ask(key, state, missing)
+        fun standing(): Map<String, Any?> = synchronized(answering) {
+            f.takeIf { it.isFile }?.let { reifyMap(it.readText()) }
+                // The old store was exclusively jev-latest. Validate each reused answer below.
+                ?: if (decisionProvider == DecisionProvider.JEV) File(root, "jev/${f.name}").takeIf { it.isFile }?.let {
+                    mapOf("provider" to decisionProvider.id, "model" to decisionModel, "answers" to reifyMap(it.readText()))
+                } ?: emptyMap() else emptyMap()
+        }
+        val had = standing()["answers"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        val missing = questions.filter { (id, q) ->
+            runCatching { Jev.answerOf(mapOf(id to had[ids.getValue(id)]), id, q) }.isFailure
+        }
+        val reply = if (missing.isEmpty()) emptyMap() else if (decisionProvider == DecisionProvider.JEVA)
+            kotlinx.coroutines.withContext(scope.coroutineContext.minusKey(kotlinx.coroutines.Job)) {
+                decisionProvider.ask(key, state, missing)
+            } else decisionProvider.ask(key, state, missing)
         if (missing.isNotEmpty()) {
+            if (decisionProvider == DecisionProvider.JEVA)
+                check(reply["model"] == decisionModel) { "Jeva model identity changed while answering" }
             val got = reply["answers"] as? Map<*, *> ?: return reply
             synchronized(answering) {
-                val all = LinkedHashMap<String, Any?>(standing())
-                for (id in missing.keys) got[id]?.let { all[ids.getValue(id)] = it }
-                f.parentFile.mkdirs(); f.writeText(jsonOf(all))
+                val all = LinkedHashMap<String, Any?>()
+                (standing()["answers"] as? Map<*, *>)?.forEach { (id, answer) -> all[id.toString()] = answer }
+                for ((id, q) in missing) got[id]?.let { all[ids.getValue(id)] = Jev.answerOf(got, id, q) }
+                f.parentFile.mkdirs()
+                val tmp = File(f.parentFile, "${f.name}.tmp").apply { writeText(jsonOf(mapOf(
+                    "provider" to decisionProvider.id, "model" to (reply["model"] ?: decisionModel), "answers" to all))) }
+                java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
             }
         }
         val now = standing()
-        return mapOf("model" to reply["model"], "usage" to (reply["usage"] ?: mapOf("input_tokens" to 0, "output_tokens" to 0)),
-            "answers" to questions.mapValues { (q, _) -> now[ids.getValue(q)] }, "asked" to missing.size)
+        val answers = now["answers"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        return mapOf("provider" to decisionProvider.id, "model" to (now["model"] ?: decisionModel),
+            "usage" to (reply["usage"] ?: mapOf("input_tokens" to 0, "output_tokens" to 0)),
+            "answers" to questions.mapValues { (q, _) -> answers[ids.getValue(q)] }, "asked" to missing.size)
     }
 
     /**
@@ -435,8 +653,10 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     /** A section's reading: as curation saved it, else parsed once now and saved beside the book. */
     private fun reading(name: String, k: Int, body: String): List<Map<*, *>> {
         val f = readingFile(name, k)
-        return f.takeIf { it.isFile }?.let { (reify(it.readText()) as? List<*>)?.map { s -> s as Map<*, *> } }
-            ?: sentences(body, CoreNlpRuntime().use { it.analyze(body) }).also { f.parentFile.mkdirs(); f.writeText(jsonOf(it)) }
+        return f.takeIf { files.isFile(it.absolutePath) }?.let { (reify(files.readString(it.absolutePath)) as? List<*>)?.map { s -> s as Map<*, *> } }
+            ?: sentences(body, CoreNlpRuntime().use { it.analyze(body) }).also {
+                files.mkdirs(f.parentFile.absolutePath); files.writeAtomically(f.absolutePath, jsonOf(it).encodeToByteArray())
+            }
     }
 
     /**
@@ -448,32 +668,50 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the parse's failure, measured. Each window also carries the rete's [open] premises, speculatively: those the
      * page states as fact are the table's `establishes`, and join the facts. A noun the lexicon gives two or more SUMO
      * senses is asked once per section, in the window it first appears in: which sense its sentence uses, each sense
-     * described by its WordNet gloss. The lexicon's preferred sense is one option; Jev's choice discounts it.
+     * described by its WordNet gloss. The lexicon's preferred sense is one option; Jev's choice discounts it. Each link
+     * out of the section (a markup page's anchors, [links]) is asked in the window carrying its words: whether the page
+     * relies on the linked document for what it states (`referenced`), or the link is navigation or advertising.
      */
     private suspend fun table(key: String, b: Book, k: Int, body: String, read: List<Map<*, *>>, open: List<Pair<String, NormStatement>>,
-                              prior: List<Pair<String, Double>>, gate: kotlinx.coroutines.sync.Semaphore,
-                              at: Locality, posited: Map<String, List<String>>, byKey: Map<String, Int>): Map<String, Any?> {
+                              prior: List<Pair<String, Double>>,
+                              at: Locality, posited: Map<String, List<String>>, byKey: Map<String, Int>,
+                              links: List<MarkupStreams.Link> = emptyList()): Map<String, Any?> {
         val era = Regex("\\b(1[5-9]|20)\\d\\d\\b").find(b.date)?.value?.toInt()
         val windows = ArrayList<List<Map<*, *>>>()
         var w = ArrayList<Map<*, *>>(); var chars = 0; var tuples = 0
+        // A sentence the parser could not end (a table read as one run of words) goes to Jev cut: the page holds at most a
+        // window of it, and a question that quotes it quotes its opening, so no request outgrows what Jev reads.
+        fun said(s: Map<*, *>, cut: Int) = s["text"].toString().take(cut)
         for (s in read) {
-            val n = (s["text"] as? String).orEmpty().length; val t = (s["statements"] as? List<*>).orEmpty().size
+            val n = minOf((s["text"] as? String).orEmpty().length, WINDOW_CHARS); val t = (s["statements"] as? List<*>).orEmpty().size
             if (w.isNotEmpty() && (chars + n > WINDOW_CHARS || tuples + t > TUPLES_ASKED)) { windows.add(w); w = ArrayList(); chars = 0; tuples = 0 }
             w.add(s); chars += n; tuples += t
         }
         if (w.isNotEmpty()) windows.add(w)
         fun id(c: Char, i: Int) = c + i.toString().padStart(2, '0')
-        val rows = ArrayList<Map<String, Any?>>(); val dated = ArrayList<Map<String, Any?>>(); val senses = ArrayList<Map<String, Any?>>()
+        // The links out of this section (its blocks' anchors), each address once, asked in the window carrying its words.
+        fun plain(s: String) = LINK_SPACES.replace(s.replace("**", "").lowercase(), " ").trim()
+        val flat = plain(body)
+        val linksAt = (links.filter { l -> plain(l.line).removePrefix("- ").trimStart('#', ' ').take(LINK_CONTEXT).let { it.isNotEmpty() && it in flat } } +
+            CitationLinks.of(body))
+            .distinctBy { it.href }.take(LINKS_ASKED).let { mine ->
+                val pages = windows.map { win -> plain(win.joinToString(" ") { said(it, WINDOW_CHARS) }) }
+                mine.groupBy { l -> pages.indexOfFirst { plain(l.anchor) in it }.coerceAtLeast(0) }
+            }
+        val cited = ArrayList<Map<String, Any?>>()
+        val rows = ArrayList<Map<String, Any?>>()
+        val dated = ArrayList<Pair<Int, Map<String, Any?>>>()
+        val senses = ArrayList<Pair<Int, Map<String, Any?>>>()
         val legible = ArrayList<Double>(); val errors = ArrayList<String>(); val establishes = LinkedHashMap<String, Double>(prior.toMap())
         var whole: Double? = null; var tokens = 0L; var fresh = 0; var requests = 0
         class Sense(val lemma: String, val read: String?, val sentence: String, val options: List<String>, val posited: List<String>, val audit: Boolean)
         class Asked(val tuples: List<Pair<String, Map<*, *>>>, val dates: List<Pair<String, String>>, val premises: List<Pair<String, NormStatement>>,
-                    val senses: List<Sense>, val reply: Map<String, Any?>)
+                    val senses: List<Sense>, val links: List<MarkupStreams.Link>, val reply: Map<String, Any?>)
         // A word is asked once per window: each window is its own source of evidence for NARS, as one sense per
         // section capped a word at a few dozen judgments where a production needs one in fifty against it.
-        val sensesOf = windows.mapIndexed { x, win ->
+        fun sensesOf(x: Int, win: List<Map<*, *>>): List<Sense> {
             val out = ArrayList<Sense>()
-            if (!SENSES_ENABLED) return@mapIndexed out
+            if (!SENSES_ENABLED) return out
             val sensed = HashSet<String>()
             for (s in win) for (c in (s["concepts"] as? List<*>).orEmpty()) {
                 val m = c as? Map<*, *> ?: continue
@@ -488,21 +726,25 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 // A sense a cap holds where this book was crafted is not asked again, but for an occasional audit.
                 val audit = capped(lemma, at) != null
                 if (audit && cid("$lemma\u0000${b.name}\u0000$k\u0000$x").take(4).toInt(16) % AUDIT != 0) continue
-                sensed.add(lemma); out.add(Sense(lemma, read, s["text"].toString(), options, more, audit))
+                sensed.add(lemma); out.add(Sense(lemma, read, said(s, SENTENCE_CHARS), options, more, audit))
             }
-            out
+            return out
         }
-        val replies = kotlinx.coroutines.coroutineScope { windows.withIndex().map { (x, win) -> async {
-            val page = win.joinToString(" ") { it["text"].toString() }
-            val tuplesOf = win.flatMap { s -> (s["statements"] as? List<*>).orEmpty().map { s["text"].toString() to (it as Map<*, *>) } }
+        curation.windows(windows.size, ask = { x ->
+            val win = windows[x]
+            val sensesOf = sensesOf(x, win)
+            val page = win.joinToString(" ") { said(it, WINDOW_CHARS) }
+            val tuplesOf = win.flatMap { s -> (s["statements"] as? List<*>).orEmpty().map { said(s, SENTENCE_CHARS) to (it as Map<*, *>) } }
                 .filter { (_, st) -> keyOf(st) in byKey }.distinctBy { keyOf(it.second) }.take(TUPLES_ASKED)
             val datesOf = win.mapNotNull { s -> ((s["entities"] as? Map<*, *>)?.get("DATE") as? List<*>)?.takeIf { it.isNotEmpty() }
-                ?.let { s["text"].toString() to it.joinToString(" ") } }.take(DATES_ASKED)
+                ?.let { said(s, SENTENCE_CHARS) to it.joinToString(" ") } }.take(DATES_ASKED)
             val state = linkedMapOf<String, Any?>("work" to b.work, "page" to page)
             if (x == 0 && windows.size > 1) state["section_end"] = body.takeLast(END_CHARS)
             state["tuples"] = tuplesOf.withIndex().associate { (i, p) -> id('T', i) to mapOf("bearer" to p.second["bearer"], "force" to p.second["force"],
                 "action" to p.second["action"].toString().replace('_', ' '), "object" to p.second["object"], "condition" to p.second["condition"], "sentence" to p.first) }
             state["dates"] = datesOf.withIndex().associate { (i, d) -> id('D', i) to mapOf("sentence" to d.first, "tagged" to d.second) }
+            val linksOf = linksAt[x].orEmpty()
+            if (linksOf.isNotEmpty()) state["links"] = linksOf.withIndex().associate { (i, l) -> id('L', i) to mapOf("anchor" to l.anchor, "address" to l.href) }
             val q = LinkedHashMap<String, Map<String, Any?>>()
             q["legible"] = Jev.noul("Is `page` legible printed language, rather than OCR garble: words broken or run together, stray symbols, columns interleaved?")
             if (x == 0) q["whole"] = Jev.noul(if (windows.size > 1) "Does this section of `work`, which opens with `page` and closes with `section_end`, begin and end at natural boundaries (a heading, entry, paragraph or sentence) rather than mid-sentence?"
@@ -524,52 +766,64 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 "The page states that the premise holds", "The page does not state it, or only names it as a condition")
             // Each sense in its own question, the word and its sentence beside it: the standing answer outlives the window.
             // Jev may refuse every sense offered, so the options never confine it to what CoreNLP and NARS expect.
-            for ((i, s) in sensesOf[x].withIndex()) q["s$i"] = Jev.choice(mapOf("word" to s.lemma, "sentence" to s.sentence,
+            for ((i, s) in sensesOf.withIndex()) q["s$i"] = Jev.choice(mapOf("word" to s.lemma, "sentence" to s.sentence,
                 "question" to "In which sense does `sentence` use the word `word`?"),
                 s.options.associateWith { SumoCorpus.nounGloss(s.lemma, it) ?: SumoCorpus.nounGloss(s.lemma.removeSuffix("s"), it) ?: SumoCorpus.classGloss(it) } +
                     (NONE to "none of the other senses: the word is used here in a sense not listed"))
-            Asked(tuplesOf, datesOf, premisesOf, sensesOf[x], gate.withPermit {
+            // Each link is judged against the page that carries it: a document the page's terms rely on is referenced, the rest is waste.
+            for (i in linksOf.indices) q["k$i"] = Jev.noul("Does `page` rely on the document it links to as `links.${id('L', i)}` for what it states: terms it incorporates or is governed by, terms defined there, or fees, rights or remedies it sends the reader to?",
+                "The linked document is part of what the page states", "The link only navigates the site, opens the reader's account, or advertises")
+            Asked(tuplesOf, datesOf, premisesOf, sensesOf, linksOf,
                 runCatching { asked(key, state, q) }.getOrElse { e ->
-                    if (e is Airgap.Rejection) throw e
+                    if (e is Airgap.Rejection || e is kotlinx.coroutines.CancellationException || e is JevaDeadline.Expired) throw e
                     mapOf("error" to (e.message ?: e.toString()))
                 }
-            })
-        } }.awaitAll() }
-        for ((x, a) in replies.withIndex()) {
+            )
+        }, collect = { x, a ->
             val tuplesOf = a.tuples; val datesOf = a.dates; val reply = a.reply
             val answers = reply["answers"] as? Map<*, *>
-            if (answers == null) { errors.add(reply["error"]?.toString() ?: "no answers"); continue }
+            if (answers == null) { errors.add(reply["error"]?.toString() ?: "no answers"); return@windows }
+            if (decisionProvider == DecisionProvider.JEVA)
+                check(reply["model"] == decisionModel) { "Jeva model identity changed while scoring" }
             tokens += ((reply["usage"] as? Map<*, *>)?.get("input_tokens") as? Number)?.toLong() ?: 0L
             fresh += (reply["asked"] as? Number)?.toInt() ?: 0
             if (((reply["asked"] as? Number)?.toInt() ?: 0) > 0) requests++
-            legible.add(Jev.noulOf(answers, "legible"))
+            while (legible.size <= x) legible.add(0.0)
+            legible[x] = Jev.noulOf(answers, "legible")
             if (x == 0) whole = Jev.noulOf(answers, "whole")
             for ((i, p) in tuplesOf.withIndex()) rows.add(linkedMapOf("key" to keyOf(p.second), "sentence" to b.statements[byKey.getValue(keyOf(p.second))].sentence,
                 "window" to x, "noul" to Jev.noulOf(answers, "t$i")))
             for ((i, d) in datesOf.withIndex()) {
                 val years = Regex("\\b\\d{4}\\b").findAll(d.second).map { it.value.toInt() }.toList()
-                dated.add(linkedMapOf("tagged" to d.second, "sentence" to d.first, "date" to Jev.noulOf(answers, "d$i"),
+                dated.add(x to linkedMapOf("tagged" to d.second, "sentence" to d.first, "date" to Jev.noulOf(answers, "d$i"),
                     "late" to Jev.noulOf(answers, "l$i"), "after" to era?.let { e -> years.any { it > e } }))
             }
             for ((i, p) in a.premises.withIndex()) Jev.noulOf(answers, "p$i").takeIf { it >= HOLDS }?.let { n -> establishes[p.first] = maxOf(establishes[p.first] ?: 0.0, n) }
+            for ((i, l) in a.links.withIndex()) Jev.noulOf(answers, "k$i").let { n ->
+                cited.add(linkedMapOf("href" to l.href, "anchor" to l.anchor, "window" to x, "noul" to n, "referenced" to (n >= HOLDS)))
+            }
             for ((i, s) in a.senses.withIndex()) {
-                val p = ((answers["s$i"] as? Map<*, *>)?.get("probabilities") as? Map<*, *>).orEmpty()
+                val answer = requireNotNull(answers["s$i"] as? Map<*, *>) { "No choice for question 's$i'" }
+                val p = (answer["probabilities"] as? Map<*, *>).orEmpty()
                     .mapNotNull { (o, n) -> (n as? Number)?.let { o.toString() to it.toDouble() } }.toMap()
-                val chosen = p.maxByOrNull { it.value }?.key ?: continue
+                val chosen = requireNotNull(answer["choice"] as? String) { "No selected sense for question 's$i'" }
+                require(chosen in p) { "Selected sense is absent from probabilities" }
                 val readP = s.read?.let { p[it] } ?: 0.0
                 // The lexicon's sense is discounted where Jev holds it false, as a premise joins the facts where Jev holds it true.
                 // The whole distribution goes to NARS: each sense offered is evidence for or against, from this sentence once.
-                senses.add(linkedMapOf("lemma" to s.lemma, "sentence" to s.sentence, "read" to s.read, "sense" to chosen,
+                senses.add(x to linkedMapOf("lemma" to s.lemma, "sentence" to s.sentence, "read" to s.read, "sense" to chosen,
                     "p" to p.getValue(chosen), "readP" to readP, "discounts" to (chosen != s.read && chosen != NONE && readP <= 1 - HOLDS),
                     "refused" to (chosen == NONE), "posited" to s.posited, "audit" to s.audit, "probabilities" to p,
                     "source" to cid("${b.name}\u0000$k\u0000$x\u0000${s.sentence}")))
             }
-        }
+        })
         val mine = b.support.indices.count { k in b.support[it] }
-        return linkedMapOf("section" to k, "windows" to windows.size, "legible" to legible, "whole" to whole, "tuples" to rows,
-            "unasked" to mine - rows.map { it["key"] }.distinct().size, "dates" to dated,
-            "senses" to (if (SENSES_ENABLED) senses else tableOf(b.name, k)?.get("senses") ?: emptyList<Any?>()),
-            "establishes" to establishes.map { (p, n) -> mapOf("premise" to p, "question" to question(p), "noul" to n) },
+        return linkedMapOf("provider" to decisionProvider.id, "model" to decisionModel,
+            "section" to k, "windows" to windows.size, "legible" to legible, "whole" to whole, "tuples" to rows.sortedBy { it["window"] as Int },
+            "unasked" to mine - rows.map { it["key"] }.distinct().size, "dates" to dated.sortedBy { it.first }.map { it.second },
+            "senses" to (if (SENSES_ENABLED) senses.sortedBy { it.first }.map { it.second } else tableOf(b.name, k)?.get("senses") ?: emptyList<Any?>()),
+            "establishes" to establishes.toSortedMap().map { (p, n) -> mapOf("premise" to p, "question" to question(p), "noul" to n) },
+            "links" to cited.sortedBy { it["window"] as Int },
             "tokens" to tokens, "asked" to fresh, "requests" to requests, "errors" to errors)
     }
 
@@ -583,13 +837,28 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the premises its pages established, so the next book is asked only what is still open.
      */
     suspend fun score(key: String, names: List<String>) {
-        Airgap.requireRemote()
-        val gate = kotlinx.coroutines.sync.Semaphore(JEV_AT_ONCE)
+        check(admitting()) { "Curation is draining" }
+        if (decisionProvider == DecisionProvider.JEVA) {
+            val selected = ingestAccess()
+            if (selected !== this) return selected.score(key, names)
+        }
+        curation.submit(admissible = ::admitting) { scoreNow(key, names) }.await().getOrThrow()
+    }
+
+    suspend fun admitScore(key: String, names: List<String>, context: kotlin.coroutines.CoroutineContext): kotlinx.coroutines.Deferred<Result<Unit>> {
+        check(admitting()) { "Curation is draining" }
+        val selected = if (decisionProvider == DecisionProvider.JEVA) ingestAccess() else this
+        return selected.curation.submit(context, { System.err.println("[JEV] scoring failed: $it") }, selected::admitting) { selected.scoreNow(key, names) }
+    }
+
+    private suspend fun scoreNow(key: String, names: List<String>) {
+        requireDecisionAccess()
         val m = memory()
         synchronized(m) { m.tick() }
         for (name in names.sortedBy { File(books, "${safe(it)}.sections.jsonl").length() }) {
             val b = load(name) ?: continue
-            val ts = texts(name)
+            val sectionFile = File(books, "${safe(name)}.sections.jsonl")
+            val count = b.headings.size
             val c = constellationOf(name)?.let(::constellation)
             val open = c?.open()?.entries?.sortedByDescending { it.value.cardinality }?.map { (p, ids) -> p to c.statements[ids.toIntArray().first()] }.orEmpty()
             // Where the book was crafted, and the classes NARS posits for the words its lexicon cannot type.
@@ -598,29 +867,59 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             val tokens = java.util.concurrent.atomic.AtomicLong(); val done = java.util.concurrent.atomic.AtomicInteger()
             val requests = java.util.concurrent.atomic.AtomicInteger(); val questions = java.util.concurrent.atomic.AtomicInteger()
             val began = System.currentTimeMillis()
-            fun progress(tabled: Int) = mapOf("book" to name, "tabled" to tabled, "of" to ts.size, "requests" to requests.get(),
+            fun progress(tabled: Int) = mapOf("provider" to decisionProvider.id, "model" to decisionModel,
+                "book" to name, "tabled" to tabled, "of" to count, "requests" to requests.get(),
                 "questions" to questions.get(), "tokens" to tokens.get(), "open" to open.size)
             scored[name] = progress(0)
-            // Readings first, one parse at a time: a book curated before readings were kept is parsed here once.
-            val read = ts.indices.map { k -> reading(name, k, ts[k]) }
             // One statement index per book: built per section, every section of a dictionary held its own copy at once.
             val byKey = b.statements.withIndex().associate { it.value.key to it.index }
-            kotlinx.coroutines.coroutineScope { ts.indices.map { k -> async {
-                // A premise this page established joined the facts and left the open set: the rewritten table keeps it.
-                val prior = (tableOf(name, k)?.get("establishes") as? List<*>).orEmpty()
-                    .mapNotNull { e -> (e as? Map<*, *>)?.let { it["premise"].toString() to ((it["noul"] as? Number)?.toDouble() ?: 0.0) } }
-                    .filter { askable(it.first) }
-                val t = table(key, b, k, ts[k], read[k], open, prior, gate, at, posited, byKey)
-                Airgap.requireRemote()
-                tokens.addAndGet(t["tokens"] as Long); requests.addAndGet(t["requests"] as Int); questions.addAndGet(t["asked"] as Int)
-                // Whole or not at all: a page read while its table is rewritten sees the old table or the new one, never a torn file.
-                val f = tableFile(name, k).apply { parentFile.mkdirs() }
-                val tmp = File(f.parentFile, "${f.name}.tmp").apply { writeText(jsonOf(t)) }
-                java.nio.file.Files.move(tmp.toPath(), f.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
-                // Jev's judgments of the page's words revise NARS, each sentence's judgment once.
-                synchronized(m) { observe(m, name, k, at, t) }
-                scored[name] = progress(done.incrementAndGet())
-            } }.awaitAll() }
+            // The document's links stream, read once per book: a markup page's anchors, filed by the miner beside its extract.
+            val links = constellationOf(name)?.let { File(root.parentFile, "files/$it/$name${borg.trikeshed.lcnc.ProjectNodes.LINKS_SUFFIX}") }
+                ?.takeIf { it.isFile }?.let { MarkupStreams.linksOf(it.readText()) }.orEmpty()
+            // Stage on disk: bounded parsing/model queues never retain a whole book's texts, readings or replies.
+            // Nothing replaces standing tables until every section of the book has succeeded.
+            val stage = File(root, ".${safe(name)}.${decisionNamespace}.${java.util.UUID.randomUUID()}")
+            files.mkdirs(stage.absolutePath)
+            data class Section(val ordinal: Int, val body: String)
+            data class Reading(val section: Section, val read: List<Map<*, *>>)
+            try {
+                curation.sections<Section, Reading, Pair<Int, Map<String, Any?>>>(
+                    source = { send ->
+                        if (files.isFile(sectionFile.absolutePath)) {
+                            var k = 0
+                            for (line in files.streamLines(sectionFile.absolutePath)) {
+                                send(Section(k++, (reify(line.b.decodeToString()) as? String).orEmpty()))
+                            }
+                        }
+                    },
+                    parse = { section -> Reading(section, reading(name, section.ordinal, section.body)) },
+                    table = { parsed ->
+                        val k = parsed.section.ordinal
+                        val prior = (tableOf(name, k)?.get("establishes") as? List<*>).orEmpty()
+                            .mapNotNull { e -> (e as? Map<*, *>)?.let { it["premise"].toString() to ((it["noul"] as? Number)?.toDouble() ?: 0.0) } }
+                            .filter { askable(it.first) }
+                        val t = table(key, b, k, parsed.section.body, parsed.read, open, prior, at, posited, byKey, links)
+                        requireDecisionAccess()
+                        check((t["errors"] as? List<*>).isNullOrEmpty()) { "Curation questions failed: ${t["errors"]}" }
+                        k to t
+                    },
+                    collect = { (k, t) ->
+                        files.writeAtomically(File(stage, "$k.json").absolutePath, jsonOf(t).encodeToByteArray())
+                        tokens.addAndGet(t["tokens"] as Long); requests.addAndGet(t["requests"] as Int); questions.addAndGet(t["asked"] as Int)
+                    },
+                )
+                check(files.listDir(stage.absolutePath).size == count) { "Book section count changed while scoring" }
+                requireDecisionAccess()
+                for (k in 0 until count) {
+                    val f = tableFile(name, k)
+                    files.mkdirs(f.parentFile.absolutePath)
+                    files.writeAtomically(f.absolutePath, files.readAllBytes(File(stage, "$k.json").absolutePath))
+                    scored[name] = progress(done.incrementAndGet())
+                }
+            } catch (failure: Exception) {
+                scored[name] = progress(0) + ("error" to (failure.message ?: failure.toString()))
+                throw failure
+            } finally { files.deleteRecursively(stage.absolutePath) }
             // The book's tables as they stand are its judgments: its rows are read again from them, so a section judged
             // again replaces its earlier judgment rather than counting the same text twice.
             val tabled = tablesOf(name)
@@ -630,19 +929,25 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 trace(m).also { save(m) }
             }
             senseEpoch++
-            System.err.println("[JEV] $name: ${ts.size} sections, ${requests.get()} requests, ${questions.get()} questions, ${tokens.get()} tokens, " +
+            System.err.println("[JEV] $name: $count sections, ${requests.get()} requests, ${questions.get()} questions, ${tokens.get()} tokens, " +
                 "${System.currentTimeMillis() - began}ms; senses at $at: ${m.rows} rows, ${m.judgments} judgments, ${traced.caps} caps: " +
                 "${traced.entered} entered, ${traced.rolled} rolled, ${traced.left} left")
-            scored[name] = progress(ts.size) + ("ms" to System.currentTimeMillis() - began)
-            synchronized(loaded) { loaded.remove(name) }
-            constellationOf(name)?.let { live.remove(it) }
+            scored[name] = progress(count) + ("ms" to System.currentTimeMillis() - began)
+            files.writeAtomically(File(books, "${safe(name)}.decision.json").absolutePath,
+                jsonOf(mapOf("provider" to decisionProvider.id, "namespace" to decisionNamespace,
+                    "model" to decisionModel)).encodeToByteArray())
+            invalidateFamilyViews()
         }
     }
 
     private fun constellation(name: String): Constellation = live.getOrPut(name) {
         Constellation(name).also { c ->
             File(root, "$name.members").takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() }?.distinct()
-                ?.forEach { b -> load(b)?.let(c::join) }
+                ?.forEach { b ->
+                    val selected = forBook(b)
+                    if (SENSES_ENABLED) selected.memory()
+                    selected.load(b)?.let(c::join)
+                }
         }
     }
 
@@ -683,9 +988,11 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         val run = trail.lastRun()
         val bookNode = listOf("book.curate", name)
         val secNodes = IntArray(sections.size) { -1 }
-        val secKeys = sectionKeys(sections.map(Book::heading))
+        val secKeys = sectionKeys(cut.headings ?: sections.map(Book::heading))
         // Old judgments remain available as labelled evidence, but never as this revision's table.
-        val retained = bertCorpus.retain(safe(name), "${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}")
+        val retained = bertCorpus.retain(safe(name), "${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}",
+            judgmentSuffixes(name))
+        invalidateSource(name)
         files.mkdirs(File(books, "${safe(name)}.readings").absolutePath)
         val evidenceBooks = (convention("constellation")?.let(::members).orEmpty() + name).distinct()
         // Read labels once per book, not once per section of a large document.
@@ -733,11 +1040,13 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         // Bridges between sections: what the book's own prose cites.
         for ((from, to) in cites) if (secNodes.getOrElse(from) { -1 } >= 0 && secNodes.getOrElse(to) { -1 } >= 0)
             trail.link(run, secNodes[from], secNodes[to], "cites")
-        val book = Book.of(name, convention("work") ?: name, convention("date") ?: convention("edition") ?: doc?.get("seq")?.toString() ?: "", sections, clauses, { typed[it] ?: bearerClass(it) }, facts, cites)
+        val book = Book.of(name, convention("work") ?: name, convention("date") ?: convention("edition") ?: doc?.get("seq")?.toString() ?: "", sections, clauses, { typed[it] ?: bearerClass(it) }, facts, cites,
+            cut.headings, cut.paths.orEmpty(), notes)
         val senses = book.statements.filter { it.bearerClass >= 0 }.associate { it.bearer to SumoCorpus.classifier.className(SumoClassId(it.bearerClass)) }
         save(book)
         saveSections(name, sections)
         sourceFile(name).writeText(borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)
+        invalidateFamilyViews()
         // Conformance: each noted statement is held (the text states it), contradicted (the text states the
         // opposing force on its proposition), or unstated.
         val byProposition = book.statements.withIndex().groupBy({ it.value.proposition }, { it.index })
@@ -815,7 +1124,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             .groupingBy { it.toString() }.eachCount().entries.sortedByDescending { it.value }.map { mapOf("class" to it.key, "n" to it.value) }
         return linkedMapOf(
             "book" to b.name, "work" to b.work, "date" to b.date, "ordinal" to k, "of" to b.headings.size,
-            "heading" to b.headings[k], "text" to text, "sentences" to sentences, "classes" to classes,
+            "heading" to b.headings[k], "path" to b.paths.getOrNull(k), "urn" to b.sections.getOrNull(k), "provenance" to b.provenance,
+            "text" to text, "sentences" to sentences, "classes" to classes,
             "shape" to mapOf("kinds" to sig.structuralKey, "lines" to metrics.lines, "chars" to metrics.characters,
                 "tokens" to metrics.tokens, "uniqueTokens" to metrics.uniqueTokens, "shannonBitsPerByte" to metrics.shannonBitsPerByte,
                 "lzPhrases" to sig.lzPhraseCount, "descriptionBits" to sig.descriptionBits, "k" to sig.normalizedComplexity),
@@ -914,7 +1224,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the premises it establishes join the facts and the rete fires again.
      */
     suspend fun oracle(key: String, bookName: String, k: Int, ask: String): Map<String, Any?> {
-        Airgap.requireRemote()
+        requireDecisionAccess()
         val name = constellationOf(bookName) ?: return mapOf("error" to "book '$bookName' is in no constellation")
         val c = constellation(name)
         val sumo = SumoCorpus.classifier
@@ -970,7 +1280,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         val state = mapOf("question" to ask, "passages" to passages, "norms" to normState)
         val reply = asked(key, state, questions)
         val answers = reply["answers"] as? Map<*, *> ?: return mapOf("error" to "Jev returned no answers", "reply" to reply)
-        val where = answers["where"] as? Map<*, *>
+        val where = Jev.answerOf(answers, "where", questions.getValue("where"))
         val p = (where?.get("probabilities") as? Map<*, *>).orEmpty()
         val ranked = passages.entries.sortedByDescending { (p[it.key] as? Number)?.toDouble() ?: 0.0 }
             .map { (id, v) -> v + mapOf("id" to id, "p" to ((p[id] as? Number)?.toDouble() ?: 0.0)) }
@@ -1023,7 +1333,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      */
     private fun stand(c: Constellation, runId: Int) {
         val trail = borg.trikeshed.lcnc.LcncTrail.live
-        for (bk in c.books) if (bk.headings.isNotEmpty() && !trail.known("$CURATE/${bk.name}/${sectionKeys(bk.headings)[0]}")) replay(trail, runId, bk)
+        for (bk in c.books) if (bk.headings.isNotEmpty() && !trail.known("$CURATE/${bk.name}/${sectionKeys(bk.headings)[0]}"))
+            forBook(bk.name).replay(trail, runId, bk)
         val keysOf = c.books.map { sectionKeys(it.headings) }
         fun sectionNode(g: Int): Int? = keysOf.getOrNull(g ushr 20)?.let { ks ->
             ks.getOrNull(g and 0xFFFFF)?.let { h -> trail.node(CURATE, listOf(c.books[g ushr 20].name), h, "book.section") } }
@@ -1052,7 +1363,9 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     private val join = LcncNodeRunner { node, inputs ->
         val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.join: name the constellation")
         val bookName = (inputs["book"] ?: inputs["book?"])?.toString() ?: node.params["book"] ?: error("constellation.join: no book")
-        val book = load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
+        val selected = forBook(bookName)
+        if (SENSES_ENABLED) selected.memory()
+        val book = selected.load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
         // A member curated again is read again: the constellation is cleared and rebuilt from its
         // members' saved books, so the new reading replaces the old one in statements, truth,
         // conflicts, alignment and tells — never kept stale, never counted twice.
@@ -1240,7 +1553,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
      * the commonest year its opening states. Its register: the share of its lowercase nouns the lexicon does not map.
      */
     fun located(name: String): Located {
-        val tables = File(books, "${safe(name)}.jev")
+        val tables = tableDirectory(name)
         val stamp = bookFile(name).lastModified() * 31 + tables.lastModified()
         synchronized(located) { located[name]?.takeIf { it.first == stamp }?.let { return it.second } }
         // The book's own record, read here rather than loaded: loading a book types its bearers where it is located.
@@ -1311,7 +1624,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
     /** [m] to [senseFile], whole or not at all. */
     private fun save(m: SenseMemory) {
         if (!SENSES_ENABLED) return
-        val tmp = File(root, "senses.bag.tmp").apply { writeText(m.write()) }
+        val tmp = File(root, "${senseFile.name}.tmp").apply { writeText(m.write()) }
         java.nio.file.Files.move(tmp.toPath(), senseFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
     }
 
@@ -1369,7 +1682,7 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         for ((k, cls) in before.entries.sortedBy { it.key }) if (k !in now) { left++; log.append(stamp).append("\t-\t").append(k).append('\t').append(cls).append('\n') }
         if (log.isNotEmpty()) traceFile.appendText(log.toString())
         if (first || entered + rolled + left > 0) {
-            val tmp = File(root, "senses.caps.tmp").apply { writeText(now.entries.sortedBy { it.key }.joinToString("") { "${it.key}\t${it.value}\n" }) }
+            val tmp = File(root, "${capsFile.name}.tmp").apply { writeText(now.entries.sortedBy { it.key }.joinToString("") { "${it.key}\t${it.value}\n" }) }
             java.nio.file.Files.move(tmp.toPath(), capsFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE)
         }
         synchronized(caps) { caps.clear(); caps.putAll(now) }
@@ -1511,8 +1824,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             add(p("confidence"), RdfTerm.Literal(t.confidence.toString(), RdfVocab.XSD + "float"))
             c.opponents(id).forEach { o -> add(p("opposedBy"), RdfTerm.Iri(ns + "norm/" + c.statements[o].id)) }
             c.support[id].toIntArray().take(SECTIONS_PER_NORM).forEach { g ->
-                add(p("statedIn"), RdfTerm.literal(c.books[g ushr 20].name),
-                    RdfTerm.Iri(ns + "section/" + c.books[g ushr 20].name.replace(' ', '_') + "/" + (g and 0xFFFFF)))
+                add(p("statedIn"), RdfTerm.literal(c.books[g ushr 20].name), RdfTerm.Iri(c.graph(g)
+                    ?: (ns + "section/" + c.books[g ushr 20].name.replace(' ', '_') + "/" + (g and 0xFFFFF))))
             }
         }
         return TurtleRdf.emit(RdfGraph(emptyList(), quads))
@@ -1622,6 +1935,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         /** The language lane's LCNC nodes, registered in one call so the daemon's boot method stays under the JVM method limit. */
         fun registerLanguageNodes(ctx: borg.trikeshed.module.ModuleContext, bank: borg.trikeshed.kif.KifKnowledgeBase,
                                   liveRete: CausalityReteElement? = null): ConstellationNodes {
+            val provider = DecisionProvider.of(System.getProperty(DecisionProvider.PROPERTY)
+                ?: System.getenv(DecisionProvider.ENVIRONMENT))
             SkillCurateNode.register(ctx.lcncRunners, bank)
             NlRulesNode.register(ctx.lcncRunners, bank)
             SkillOverlapNode.register(ctx.lcncRunners, bank)
@@ -1629,33 +1944,65 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             val bertScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext +
                 borg.trikeshed.userspace.nio.file.spi.fileIoContext)
             val bert = BertSenseElement(bertScope, BertPythonSleeve::local)
+            val decisionContext = ctx.muxContext.minusKey(kotlinx.coroutines.Job).minusKey(Airgap).let {
+                if (System.getProperty(Airgap.PROPERTY) == null && System.getenv(Airgap.ENVIRONMENT) == null ||
+                    ctx.scope.coroutineContext[Airgap]?.enabled == true || ctx.muxContext[Airgap]?.enabled == true) it + Airgap() else it
+            }
+            val modelScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext + decisionContext)
+            val jeva = JevaElement(modelScope, JevaConfig.configured(System::getProperty, System::getenv))
+            val jev = decisionContext + jeva
+            val decisionScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext + jev)
             val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank, liveRete, bert,
                 ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations]
-                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations()).also { it.register(ctx.lcncRunners) }
+                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), provider, decisionScope).also { it.register(ctx.lcncRunners) }
+            ctx.routes.claim("language", "/api/curation/providers") { method, _, _, _ ->
+                if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
+                val catalog = kotlinx.coroutines.withContext(jev) {
+                    DecisionProvider.entries.map { candidate ->
+                        val status = if (candidate == DecisionProvider.JEVA)
+                            jeva.metadata.takeIf { it["model_identity"] != null } ?: jeva.availability() else {
+                            val error = when {
+                                Airgap.active() -> "Remote curation is disabled in airgap mode"
+                                kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]
+                                    ?.keyMux()?.get(candidate.keyName).isNullOrBlank() -> "${candidate.keyName} is not set"
+                                else -> null
+                            }
+                            mapOf("available" to (error == null), "error" to error)
+                        }
+                        status + mapOf("id" to candidate.id, "label" to candidate.id,
+                            "model" to (status["model"] ?: candidate.model))
+                    }
+                }
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200,
+                    jsonOf(mapOf("default" to provider.id, "providers" to catalog)))
+            }
             // The ring is in memory: saved constellations stand in it again without waiting for a join.
-            Thread({ runCatching { nodes.restore() }.onFailure { System.err.println("[OROBOROS] constellation restore failed: $it") } },
-                "constellation-restore").apply { isDaemon = true }.start()
+            nodes.curation.offer(failed = { System.err.println("[OROBOROS] constellation restore failed: $it") }) { nodes.restore() }
             // The sense memory: `?lemma=<noun>&book=<name>` reads a word's rows per locality and how it is typed where
             // the book was crafted; bare, the memory's size, the rows nearest a cap and the caps standing.
             ctx.routes.claim("language", "/api/curation/senses") { method, path, _, _ ->
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
-                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(nodes.senses(q["lemma"], q["book"])))
+                val selected = nodes.forBook(q["book"].orEmpty(), q["decisionProvider"])
+                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(selected.senses(q["lemma"], q["book"]) +
+                    mapOf("provider" to selected.decisionProvider.id, "model" to selected.decisionModel)))
             }
             // One curated section read whole: `?book=<name>&section=<ordinal or heading>`.
             ctx.routes.claim("language", "/api/curation/section") { method, path, _, _ ->
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
-                val out = nodes.section(q["book"].orEmpty(), q["section"].orEmpty())
+                val selected = nodes.forBook(q["book"].orEmpty(), q["decisionProvider"])
+                val out = selected.section(q["book"].orEmpty(), q["section"].orEmpty()) +
+                    mapOf("provider" to selected.decisionProvider.id, "model" to selected.decisionModel)
                 borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 404 else 200, jsonOf(out))
             }
             // Jev rides the HTX reactor in the module's context; its key resolves through the operator KeyMux.
-            val jev = ctx.muxContext.minusKey(kotlinx.coroutines.Job).minusKey(Airgap).let {
-                if (ctx.scope.coroutineContext[Airgap]?.enabled == true || ctx.muxContext[Airgap]?.enabled == true) it + Airgap() else it
-            }
+            // The curator is airgapped unless a switch is set off explicitly (TRIKESHED_AIRGAP=off): Jev is opt-in.
             val airgap = Airgap.configured() || jev[Airgap]?.enabled == true
-            if (!airgap) borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(Jev.BASE)
-            suspend fun jevDisabled() = kotlinx.coroutines.withContext(jev) { Airgap.active() }
+            if (!airgap) for (candidate in DecisionProvider.entries.filter { it.remote })
+                borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(candidate.base)
+            suspend fun remoteDisabled(selected: DecisionProvider) = selected.remote && kotlinx.coroutines.withContext(jev) { Airgap.active() }
+            suspend fun jevDisabled() = remoteDisabled(provider)
             fun disabled() = borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503, jsonOf(CurationFind.AIRGAP))
             ctx.routes.claim("language", "/api/curation/airgap") { method, _, _, _ ->
                 if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
@@ -1663,19 +2010,27 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                 borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(CurationFind.AIRGAP))
             }
             suspend fun jevKey(): String? = kotlinx.coroutines.withContext(jev) {
-                kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]?.keyMux()?.get("JEV_API_KEY")
+                if (!provider.requiresKey) "" else kotlinx.coroutines.currentCoroutineContext()[borg.trikeshed.userspace.reactor.MuxReactorElement]?.keyMux()?.get(provider.keyName)
                     ?.takeIf { it.isNotBlank() }
             }
             // Jev over the corpus the open page's constellation reaches: `{book, section, question}` in, the oracle's reading out.
             ctx.routes.claim("language", "/api/curation/jev") { method, _, text, _ ->
                 if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
-                if (jevDisabled()) return@claim disabled()
                 val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
+                if (remoteDisabled(q["decisionProvider"]?.toString()?.let(DecisionProvider::of) ?: provider)) return@claim disabled()
                 val out = kotlinx.coroutines.withContext(jev) {
-                    if (Airgap.active()) return@withContext CurationFind.AIRGAP
-                    val key = jevKey() ?: return@withContext mapOf("error" to "JEV_API_KEY is not set")
-                    runCatching { nodes.oracle(key, q["book"].toString(), (q["section"] as? Number)?.toInt() ?: 0, q["question"].toString()) }
-                        .getOrElse { if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString())) }
+                    runCatching {
+                        val book = q["book"].toString()
+                        val choice = q["decisionProvider"]?.toString()?.let(DecisionProvider::of)
+                            ?: nodes.forBook(book).decisionProvider
+                        val selected = nodes.ingestAccess(choice)
+                        selected.oracle(selected.decisionKey(), book, (q["section"] as? Number)?.toInt() ?: 0, q["question"].toString()) +
+                            mapOf("provider" to choice.id, "model" to selected.decisionModel)
+                    }
+                        .getOrElse {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString()))
+                        }
                 }
                 borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out["disabled"] == true) 503 else if (out.containsKey("error")) 502 else 200, jsonOf(out))
             }
@@ -1683,23 +2038,30 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             // the run in the background; GET reads each book's progress (sections tabled, of how many, tokens).
             ctx.routes.claim("language", "/api/curation/jev/score") { method, _, text, _ ->
                 when (method) {
-                    "GET" -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(nodes.scored.values.toList()))
+                    "GET" -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200, jsonOf(nodes.scoring()))
                     "POST" -> {
-                        if (jevDisabled()) return@claim disabled()
                         val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
+                        if (remoteDisabled(q["decisionProvider"]?.toString()?.let(DecisionProvider::of) ?: provider)) return@claim disabled()
                         val names = (q["books"] as? List<*>)?.map { it.toString() } ?: nodes.members(q["constellation"].toString())
-                        val key = jevKey()
-                        when {
-                            jevDisabled() -> disabled()
-                            names.isEmpty() -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(404, jsonOf(mapOf("error" to "no books to score")))
-                            key == null -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(502, jsonOf(mapOf("error" to "JEV_API_KEY is not set")))
-                            else -> {
-                                ctx.scope.launch(jev + kotlinx.coroutines.Dispatchers.IO) {
-                                    runCatching { nodes.score(key, names) }.onFailure { System.err.println("[JEV] scoring failed: $it") }
+                        if (names.isEmpty()) return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(404,
+                            jsonOf(mapOf("error" to "no books to score")))
+                        try {
+                            kotlinx.coroutines.withContext(jev) {
+                                val choice = q["decisionProvider"]?.toString()?.let(DecisionProvider::of)
+                                val groups = names.groupBy { choice ?: nodes.forBook(it).decisionProvider }
+                                val admitted = groups.map { (candidate, books) ->
+                                    val selected = nodes.ingestAccess(candidate)
+                                    Triple(selected, books, selected.decisionKey())
                                 }
-                                borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(202, jsonOf(mapOf("books" to names)))
+                                for ((selected, books, key) in admitted) selected.admitScore(key, books, jev)
                             }
+                        } catch (failure: Exception) {
+                            if (failure is kotlinx.coroutines.CancellationException) throw failure
+                            return@claim if (failure is Airgap.Rejection) disabled()
+                            else borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503,
+                                jsonOf(mapOf("error" to (failure.message ?: "curation admission closed"))))
                         }
+                        borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(202, jsonOf(mapOf("books" to names)))
                     }
                     else -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 }
@@ -1707,8 +2069,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
             // The curator's search: `{q, constellation?, book?, depth, limit}` over the curated leaves, n deep. Jev orders
             // what it found once the startup question came back as known: GET the verdict, POST `{q, rows}` to rank.
             val find = CurationFind(nodes)
-            if (airgap) find.gate = CurationFind.AIRGAP
-            else ctx.scope.launch(jev + kotlinx.coroutines.Dispatchers.IO) { find.probe { jevKey() } }
+            if (airgap && provider.remote) find.gate = CurationFind.AIRGAP
+            else nodes.curation.offer(jev) { find.probeNow { jevKey() } }
             ctx.routes.claim("language", "/api/curation/find") { method, _, text, _ ->
                 if (method != "POST") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
@@ -1728,10 +2090,13 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
                         if (gate["ready"] != true) return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(503, jsonOf(gate))
                         val q = borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text))
                         val out = kotlinx.coroutines.withContext(jev) {
-                            if (Airgap.active()) return@withContext CurationFind.AIRGAP
-                            val key = jevKey() ?: return@withContext mapOf("error" to "JEV_API_KEY is not set")
+                            if (provider.remote && Airgap.active()) return@withContext CurationFind.AIRGAP
+                            val key = jevKey() ?: return@withContext mapOf("error" to "${provider.keyName} is not set")
                             runCatching { find.rank(key, q["q"]?.toString().orEmpty(), (q["rows"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }) }
-                                .getOrElse { if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString())) }
+                                .getOrElse {
+                                    if (it is kotlinx.coroutines.CancellationException) throw it
+                                    if (it is Airgap.Rejection) CurationFind.AIRGAP else mapOf("error" to (it.message ?: it.toString()))
+                                }
                         }
                         borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out["disabled"] == true) 503 else if (out.containsKey("error")) 502 else 200, jsonOf(out))
                     }
@@ -1759,7 +2124,13 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         const val HOLDS = 0.7
         /** A Jev table's window: whole sentences up to this many characters, at most this many tuples and dates asked. */
         const val WINDOW_CHARS = 6_000
+        /** The most of one sentence a question quotes beside the page. */
+        const val SENTENCE_CHARS = 400
         const val TUPLES_ASKED = 40
+        /** Links out asked per section, each address once; and the words of a link's block that place it in a section. */
+        const val LINKS_ASKED = 24
+        const val LINK_CONTEXT = 60
+        private val LINK_SPACES = Regex("\\s+")
         const val DATES_ASKED = 12
         /** Ambiguous nouns a Jev table window asks the sense of. */
         const val SENSES_ASKED = 96
@@ -1792,6 +2163,8 @@ class ConstellationNodes(stateDir: File, private val blackboard: ConfixBlackboar
         const val LANGUAGE = "constellation"
         /** The activity ring's root for the concept pool every curated book reads into. */
         const val POOL = "concepts"
+        /** The longest book file stem [safe] writes whole. */
+        const val STEM = 160
         const val NORMS = 200
         const val BEARERS = 50
         const val SAMPLE = 25

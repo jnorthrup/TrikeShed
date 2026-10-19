@@ -24,6 +24,66 @@ class WorkspaceContentTest {
 
     fun source(cid: String) = mapOf("kind" to "cas", "cid" to cid)
 
+    @Test fun canonicalCborReceiptsUseTheSamePinnedPathsAndCursorWithoutTranscoding() = runTest {
+        var writes = 0
+        val cas = object : CasStore() {
+            override fun put(bytes: ByteArray): ContentId { writes++; return super.put(bytes) }
+        }
+        val ctx = context(this, cas)
+        val service = WorkspaceService(ctx)
+        val bytes = CanonicalCbor.encodeMap(mapOf("source" to mapOf("name" to "患者"),
+            "receipt" to mapOf("httpStatus" to 0, "errorClass" to "TimeoutCancellationException"),
+            "binary" to byteArrayOf(0, -1), "values" to listOf(null, false, 7)))
+        val cid = cas.put(bytes).value
+        val before = writes
+        val board = ctx.blackboard.snapshot()
+        val sequence = ctx.couch.store.changes.lastCommittedSequence
+        val source = source(cid) + ("syntax" to "CBOR")
+        suspend fun inspect(path: List<Any>): Map<*, *> {
+            val response = service.route("POST", jsonOf(mapOf("source" to source, "path" to path,
+                "limit" to 2, "cursor" to mapOf("path" to listOf(0), "sourceCid" to cid))))
+            assertEquals(200, response.status, response.body)
+            val result = reifyMap(response.body)
+            assertEquals(source, result["source"])
+            return assertIs<Map<*, *>>(result["confix"]).also {
+                assertEquals(cid, it["cid"])
+                assertEquals("CBOR", it["syntax"])
+                assertEquals(bytes.size, (it["bytes"] as Number).toInt())
+                assertEquals(2, (it["rows"] as List<*>).size)
+            }
+        }
+        repeat(2) {
+            assertEquals("患者", inspect(listOf("source", "name"))["value"])
+            assertEquals("TimeoutCancellationException", inspect(listOf("receipt", "errorClass"))["value"])
+            assertEquals(reifyMap("""{"type":"bytes","value":[0,255]}"""), inspect(listOf("binary"))["value"])
+            assertEquals(false, inspect(listOf("missing"))["found"])
+            assertNull(inspect(listOf("values", 0))["value"])
+        }
+        assertContentEquals(bytes, cas.get(ContentId(cid)))
+        assertEquals(before, writes)
+        assertEquals(board, ctx.blackboard.snapshot())
+        assertEquals(sequence, ctx.couch.store.changes.lastCommittedSequence)
+    }
+
+    @Test fun cborInspectionRefusesMalformedUnsupportedAndUnboundedFramesWithoutFormatGuessing() = runTest {
+        val cas = object : CasStore() {}
+        val service = WorkspaceService(context(this, cas))
+        suspend fun inspect(bytes: ByteArray, syntax: Any? = "CBOR", expected: Int = 422) {
+            val cid = cas.put(bytes).value
+            val response = service.route("POST", jsonOf(mapOf("source" to (source(cid) + ("syntax" to syntax)))))
+            assertEquals(expected, response.status, response.body)
+        }
+        val valid = CanonicalCbor.encodeMap(mapOf("value" to 1))
+        inspect(valid, expected = 200)
+        inspect(valid, "JSON")
+        inspect(valid, "YAML", 400)
+        inspect(valid, null, 400)
+        inspect("{}".encodeToByteArray())
+        for (bytes in listOf(byteArrayOf(), valid + byteArrayOf(0), byteArrayOf(0x61, 0xff.toByte()),
+            byteArrayOf(0x5a, 0x7f, -1, -1, -1), ByteArray(80) { 0x81.toByte() } + byteArrayOf(0),
+            CanonicalCbor.encodeMap(mapOf("many" to List(WorkspaceFacets.MAX_TOKENS + 1) { 0 })))) inspect(bytes)
+    }
+
     @Test fun completedPolyglotCamelRunAndItsInvocationsShareTheReadOnlyFacetSurface(): Unit = runBlocking {
         var writes = 0
         val cas = object : CasStore() {

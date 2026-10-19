@@ -10,6 +10,7 @@ import borg.trikeshed.narsese.AttentionEconomy
 import borg.trikeshed.narsese.GroupCoherenceEnactment
 import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.BeliefIntake
+import borg.trikeshed.narsese.ingestKg
 import borg.trikeshed.narsese.CuratorImpulseElement
 import borg.trikeshed.narsese.CuratorImpulseKind
 import borg.trikeshed.narsese.Nal
@@ -267,27 +268,7 @@ class BeliefWire(
             method == "POST" && p == "/api/beliefs/kg" -> {
                 val kgText = rawBody(text)
                 if (kgText.isBlank()) return json(mapOf("error" to "empty body"), 400)
-                val sourceCid = borg.trikeshed.job.ContentId.of(kgText.encodeToByteArray())
-                val mapped = borg.trikeshed.narsese.KgNalBridge.bridge(kgText)
-                var minted = 0
-                for (m in mapped) {
-                    val signal = m.signal(sourceCid.value)
-                    bag.intake.send(
-                        BeliefIntake.Mint(
-                            signal,
-                            borg.trikeshed.cursor.BudgetCoord(0.6f, 0.4f, 0.6f),
-                            gloss = m.gloss(),
-                        ),
-                    )
-                    memoryFiles?.gloss(signal.angular, m.gloss())
-                    minted++
-                }
-                json(mapOf(
-                    "format" to borg.trikeshed.narsese.KgNalBridge.sniff(kgText)?.name,
-                    "statements" to mapped.size,
-                    "minted" to minted,
-                    "copulas" to mapped.groupingBy { it.copula.name }.eachCount(),
-                ))
+                json(bag.ingestKg(kgText) { angular, expression -> memoryFiles?.gloss(angular, expression) })
             }
 
             else -> null

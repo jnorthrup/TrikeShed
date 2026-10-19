@@ -5,6 +5,13 @@ import borg.trikeshed.parse.reify
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.modelmux.BrainClient
+import borg.trikeshed.modelmux.BrainChatOptions
+import borg.trikeshed.modelmux.BrainChatOptionsTest
+import borg.trikeshed.modelmux.Frame
+import borg.trikeshed.hermes.HermesWatch
+import borg.trikeshed.hermes.LiveBrainClient
+import borg.trikeshed.htx.openHtxElement
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.memory.CouchIndexBridge
@@ -13,11 +20,19 @@ import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import keymux.KeyMux
+import keymux.FixedKeySource
 import modelmux.ModelMux
+import modelmux.MuxCallContext
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import java.io.File
+import java.nio.file.Files
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -27,14 +42,14 @@ import kotlin.test.assertTrue
  */
 class PatchWireTest {
 
-    private fun harness(ledger: File): Pair<PatchWire, CouchAttachmentGateway> {
+    private fun harness(ledger: File, brain: BrainClient = deterministicBrainClient(), muxContext: CoroutineContext = EmptyCoroutineContext): Pair<PatchWire, CouchAttachmentGateway> {
         val cas = CasStore.inMemory()
         val couchStore = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(couchStore, cas)
         val indexLayer = MemoryIndexLayer(MemoryStore(cas, couchStore))
         val bridge = CouchIndexBridge(gateway, indexLayer)
         val scopes = ProjectScopes(JvmFileOperations(), gateway, bridge, cas, null)
-        return PatchWire(deterministicBrainClient(), scopes) to gateway
+        return PatchWire(brain, scopes, muxContext = muxContext) to gateway
     }
 
     /**
@@ -61,6 +76,93 @@ class PatchWireTest {
         wire.route("POST", path, "POST $path HTTP/1.1\r\nContent-Type: application/json\r\n\r\n$body", null)
 
     // ── mux surfaces ─────────────────────────────────────────────────────
+
+    @Test
+    fun muxChatUsesInvocationProvenanceAndCallerContext(): Unit = runBlocking {
+        val parent = ContentId.of("fixture-parent".encodeToByteArray())
+        val caller = MuxCallContext(conversationId = 2)
+        val brain = object : BrainClient(apiKey = "fixture") {
+            override fun lastModel(): String = "unrelated-concurrent-answer"
+            override suspend fun chat(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> {
+                assertEquals(73, options.maxTokens)
+                assertEquals(0.4, options.temperature)
+                assertEquals(parent.value, contextId)
+                assertEquals(listOf("system" to parent.value, "user" to "rules\n\nquestion"), messages)
+                assertSame(caller, currentCoroutineContext()[MuxCallContext])
+                assertTrue(currentCoroutineContext()[Job]!!.isActive)
+                return "fixture answer" to "invocation-model"
+            }
+        }
+        val default = Job().also { it.cancel() } + MuxCallContext(conversationId = 1)
+        val (wire, _) = harness(tmpLedger(), brain, default)
+        withContext(caller) {
+            val reply = post(wire, "/api/mux/chat", """{"prompt":"question","system":"rules","maxTokens":73,"temperature":0.4,"contextId":"${parent.value}"}""")!!
+            assertEquals(200, reply.status)
+            val body = reify(reply.body) as Map<*, *>
+            assertEquals("invocation-model", body["model"])
+            assertEquals("fixture answer", body["content"])
+            assertEquals(Frame.append(Frame(parent, null, ByteArray(0)), "fixture answer".encodeToByteArray()).cid.value, body["contextId"])
+        }
+    }
+
+    @Test
+    fun muxChatCancellationIsNotConvertedIntoProviderFailure(): Unit = runBlocking {
+        val entered = CompletableDeferred<Unit>()
+        val brain = object : BrainClient(apiKey = "fixture") {
+            override suspend fun chat(options: BrainChatOptions, messages: List<Pair<String, String>>, contextId: String?): Pair<String, String> {
+                entered.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val (wire, _) = harness(tmpLedger(), brain)
+        val call = async { post(wire, "/api/mux/chat", """{"prompt":"cancel fixture"}""") }
+        entered.await()
+        call.cancel()
+        assertFailsWith<CancellationException> { call.await() }
+        call.join()
+    }
+
+    @Test
+    fun muxChatRebuildsHermesBindingBeforeValidatingSelectedModel(): Unit = runBlocking {
+        val watchFile = Files.createTempFile("hermes-mux-options-", ".stamp").toFile()
+        val transport = BrainChatOptionsTest.Transport()
+        val htx = openHtxElement(routeService = transport)
+        val keys = KeyMux { bind("llm.default.key", FixedKeySource("fixture-key")) }
+        fun client(model: String) = BrainClient(apiKey = "fixture-key", base = "https://fixture.invalid/v1", model = model, keyMux = keys)
+        val old = client("old-fixture")
+        val next = client("new-fixture")
+        var rebuilds = 0
+        val live = LiveBrainClient(HermesWatch(listOf(watchFile)), { rebuilds++; next to mapOf("model" to "new-fixture") }, old to emptyMap())
+        val (wire, _) = harness(tmpLedger(), live, htx)
+        try {
+            val stamp = watchFile.lastModified()
+            assertTrue(watchFile.setLastModified(stamp + 10_000))
+            val reply = post(wire, "/api/mux/chat", """{"prompt":"fixture","maxTokens":73,"temperature":0.4,"models":[{"key":"override","model":"new-fixture"}]}""")!!
+            assertEquals(200, reply.status, reply.body)
+            assertEquals("new-fixture", (reify(reply.body) as Map<*, *>)["model"])
+            assertEquals(1, rebuilds)
+            assertEquals("new-fixture", transport.bodies.single()["model"])
+            val refused = post(wire, "/api/mux/chat", """{"prompt":"fixture","models":[{"key":"override","model":"old-fixture"}]}""")!!
+            assertEquals(400, refused.status)
+            assertEquals(1, transport.bodies.size, "The old pin must not dispatch")
+        } finally {
+            try { htx.close() } finally { assertTrue(watchFile.delete()) }
+        }
+    }
+
+    @Test
+    fun muxChatRejectsInvalidOptionsAndUnknownEndpointPairsBeforeRouting(): Unit = runBlocking {
+        val (wire, _) = harness(tmpLedger())
+        for (options in listOf(
+            "\"maxTokens\":0", "\"maxTokens\":1.5", "\"maxTokens\":2147483648",
+            "\"temperature\":-0.1", "\"temperature\":2.1",
+            "\"models\":{}", "\"models\":[{}]",
+            "\"models\":[{\"key\":\"unknown\",\"model\":\"unknown\"}]",
+        )) {
+            val reply = post(wire, "/api/mux/chat", """{"prompt":"hello",$options}""")!!
+            assertEquals(400, reply.status, "$options: ${reply.body}")
+        }
+    }
 
     @Test
     fun muxModelsRespondsEvenWithNoProvidersConfigured(): Unit = runBlocking {

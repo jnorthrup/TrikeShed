@@ -12,6 +12,8 @@ import borg.trikeshed.parse.reify
 /** The workspace selects projections of existing data; a facet never owns an executor. */
 enum class WorkspaceFacet(val id: String, val title: String, val description: String) {
     CURATION("curation", "Use cases", "Document and tuple curation, shared evidence, and role-based simulations."),
+    WORKGROUPS("workgroups", "Workgroups", "Author a stored subnet declaration and explicitly run a registered construction."),
+    CASES("cases", "Cases", "Explicit initialization, current readback and revision-pinned case transitions through the run queue."),
     CONFIX("confix", "Confix & facets", "Inspect constructions, retained data, cursor rows, and content identity."),
     LANGUAGE("language", "Low code", "Place language and Camel nodes backed by the host's installed runtimes."),
     EXECUTION("execution", "Evidence", "Follow node bindings, causal evidence, pointcuts, and run receipts."),

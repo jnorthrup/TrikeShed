@@ -26,10 +26,13 @@ class BoardFactElement(
     val partitionId: String = "board",
 ) {
     private val known = mutableSetOf<String>()
+    private val sequences = mutableMapOf<String, Long>()
     private val board = BlackboardContext(partitionId)
 
     suspend fun onCommitted(ev: BoardCommitted) {
         val jobId = ev.jobId
+        if ((sequences[jobId] ?: Long.MIN_VALUE) > ev.sequence) return
+        sequences[jobId] = ev.sequence
         val factId = FactId(partitionId, jobId)
         if (ev.command is JobCommand.Retract || ev.command is JobCommand.Cancel || ev.col == BoardCol.ARCHIVED) {
             if (known.remove(jobId)) rete.retract(factId)
@@ -63,7 +66,9 @@ class BoardFactElement(
             "fanout" to (spec.fanout ?: 0),
             // The coding-agent lane: ClaimProduction binds the owner from this.
             "agent" to spec.agent,
-        )
+        ).let { fields ->
+            if (ev.executionFamily.isNotBlank()) fields + ("executionFamily" to ev.executionFamily) else fields
+        }
         if (known.add(jobId)) rete.assert(factId, fields, ev.cid, board)
         else rete.modify(factId, fields, ev.cid)
     }
@@ -81,5 +86,6 @@ class BoardFactElement(
     suspend fun retractAll() {
         for (id in known.toList()) rete.retract(FactId(partitionId, id))
         known.clear()
+        sequences.clear()
     }
 }

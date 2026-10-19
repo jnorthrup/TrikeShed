@@ -5,7 +5,7 @@ import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchCommittedFrame
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.Document
-import borg.trikeshed.isam.synchronizedLock
+import borg.trikeshed.context.*
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -20,6 +20,7 @@ import borg.trikeshed.userspace.nio.file.spi.StorageDurability
  * the filesystem lease excludes another writer until this owner closes.
  * A failed root publication has an uncertain outcome and poisons this owner.
  * Conversion consumers can require complete history instead of the legacy truncated-history recovery policy.
+ * NONE requires the owner to serialize every access and close. CAS/file resource ownership and writer leases remain.
  */
 class CouchCommitStore(
     private val cas: CasStore,
@@ -27,8 +28,9 @@ class CouchCommitStore(
     private val fileOps: FileOperations? = null,
     directory: String? = null,
     private val requireCompleteHistory: Boolean = false,
+    val synchronization: Synchronization = Synchronization.MONITOR,
 ) : AutoCloseable {
-    private val gate = Any()
+    private val gate = synchronization.lock()
     private val rootPath: String?
     private var lease: FileLease? = null
     private var closed = false
@@ -64,7 +66,7 @@ class CouchCommitStore(
 
     /** Frames present when this owner opened, ordered for projection replay. */
     val recoveredFrames: Series<CouchCommittedFrame>
-        get() = synchronizedLock(gate) {
+        get() = synchronize(gate) {
             operational()
             recovered.size j { index ->
                 val retained = recovered[index]
@@ -75,9 +77,9 @@ class CouchCommitStore(
             }
         }
 
-    fun checkOpen(): Unit = synchronizedLock(gate) { operational() }
+    fun checkOpen(): Unit = synchronize(gate) { operational() }
 
-    fun commit(frame: CouchCommittedFrame): Unit = synchronizedLock(gate) {
+    fun commit(frame: CouchCommittedFrame): Unit = synchronize(gate) {
         operational()
         require(frame.sequence >= 0 && frame.sequence > frameSequence) { "Couch commit sequence must increase" }
         val captured = capture(frame)
@@ -92,12 +94,12 @@ class CouchCommitStore(
         frameSequence = captured.sequence
     }
 
-    fun localGet(id: String): Map<String, Any?>? = synchronizedLock(gate) {
+    fun localGet(id: String): Map<String, Any?>? = synchronize(gate) {
         operational()
         locals[id]?.let(::decode)
     }
 
-    fun localPut(id: String, body: Map<String, Any?>): Map<String, Any?> = synchronizedLock(gate) {
+    fun localPut(id: String, body: Map<String, Any?>): Map<String, Any?> = synchronize(gate) {
         operational()
         require(id.isNotEmpty()) { "Local document id is empty" }
         check(localSequence < Long.MAX_VALUE) { "Local revision sequence exhausted" }
@@ -115,15 +117,70 @@ class CouchCommitStore(
         decode(bytes)
     }
 
-    fun localDelete(id: String): Boolean = synchronizedLock(gate) {
+    fun localDelete(id: String): Boolean = synchronize(gate) {
         operational()
-        if (id !in locals) return@synchronizedLock false
+        if (id !in locals) return@synchronize false
         if (durability == StorageDurability.DURABLE) append(mapOf("kind" to "local-delete", "id" to id))
         locals.remove(id)
         true
     }
 
-    override fun close(): Unit = synchronizedLock(gate) {
+    /** Offline representation conversion, not replication: preserve local revision/deletion history too. */
+    internal fun replayInto(destination: CouchCommitStore, frame: (CouchCommittedFrame) -> Unit) = synchronize(gate) {
+        operational()
+        require(destination !== this && durability == StorageDurability.DURABLE)
+        synchronize(destination.gate) {
+            destination.operational()
+            require(destination.count == 0L) { "Conversion destination is not empty" }
+            val events = mutableListOf<ContentId>()
+            var cursor = head
+            var remaining = count
+            while (remaining > 0) {
+                val cid = requireNotNull(cursor) { "Incomplete Couch history" }
+                val event = decode(readVerified(cid))
+                require(event["format"] == EVENT_FORMAT && integer(event, "index") == remaining)
+                events.add(cid)
+                cursor = nullableCid(event, "previous")
+                remaining--
+            }
+            require(cursor == null) { "Couch history exceeds its root" }
+            for (cid in events.asReversed()) {
+                val event = decode(readVerified(cid))
+                when (event["kind"]) {
+                    "frame" -> {
+                        val doc = nullableCid(event, "body")?.let {
+                            requireNotNull(CouchStoreFactory.documentFromBody(decode(readVerified(it))))
+                        }
+                        frame(capture(CouchCommittedFrame(integer(event, "sequence"), string(event, "id"),
+                            string(event, "rev"), event["deleted"] as Boolean, doc)))
+                    }
+                    "local-put" -> {
+                        val bytes = readVerified(requireNotNull(nullableCid(event, "body")))
+                        val copied = destination.localPut(string(event, "id"), decode(bytes))
+                        check(CanonicalCbor.encodeMap(copied).contentEquals(bytes)) { "Local revision changed during conversion" }
+                    }
+                    "local-delete" -> check(destination.localDelete(string(event, "id"))) { "Local deletion changed during conversion" }
+                    else -> error("Unsupported Couch event")
+                }
+            }
+            check(destination.count == count) { "Couch event count changed during conversion" }
+            verifyLocals(destination)
+        }
+    }
+
+    internal fun verifyLocals(destination: CouchCommitStore): Int = synchronize(gate) {
+        operational()
+        synchronize(destination.gate) {
+            destination.operational()
+            check(localSequence == destination.localSequence && locals.keys == destination.locals.keys &&
+                locals.all { (id, bytes) -> bytes.contentEquals(destination.locals.getValue(id)) }) {
+                "Couch local state changed during conversion"
+            }
+            locals.size
+        }
+    }
+
+    override fun close(): Unit = synchronize(gate) {
         if (!closed) {
             closed = true
             val owned = lease
@@ -261,7 +318,7 @@ class CouchCommitStore(
     }
 
     /** Own and validate the body before another durable representation publishes it. */
-    internal fun capture(frame: CouchCommittedFrame): CouchCommittedFrame = synchronizedLock(gate) {
+    internal fun capture(frame: CouchCommittedFrame): CouchCommittedFrame = synchronize(gate) {
         operational()
         validateFrame(frame)
         val doc = frame.doc?.let {

@@ -80,9 +80,11 @@ class ModelMuxTransport(httpx.BaseTransport):
         timeout = TIMEOUT_SECONDS if timeout is None else min(float(timeout), TIMEOUT_SECONDS)
         if not 0 < timeout <= TIMEOUT_SECONDS:
             raise ValueError("ModelMux timeout must be positive seconds")
+        from gateway.session_context import get_session_env
+        session = get_session_env("HERMES_SESSION_ID")
         completion = _call("mux_completion", model,
                            json.dumps(body, ensure_ascii=False, allow_nan=False),
-                           max(1, int(timeout * 1000)))["completion"]
+                           max(1, int(timeout * 1000)), session)["completion"]
         if stream:
             return httpx.Response(200, headers={"content-type": "text/event-stream", "x-trikeshed-buffered": "true"},
                                   content=_sse(completion))

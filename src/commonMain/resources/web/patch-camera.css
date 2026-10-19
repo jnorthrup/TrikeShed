@@ -22,3 +22,29 @@
 #wires path.cand.near{stroke-width:calc(2.4px * var(--wire-scale,1))}
 #wires path.cand.only{stroke-width:calc(2.8px * var(--wire-scale,1));filter:none}
 #wires text.wiretype,#channels text{font-size:calc(12px * var(--wire-label-scale,1));stroke-width:calc(4px * var(--wire-label-scale,1))}
+
+/* Context sprites stay attached to the node they describe. */
+.node .hd .node-sprite{display:inline-flex;align-items:center;justify-content:center;width:32px;height:30px;padding:2px;margin-left:5px;background:transparent;border:1px solid transparent;color:var(--wire);flex-shrink:0}
+.node .hd .node-sprite svg{width:26px;height:24px;overflow:visible;fill:var(--panel);stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.node .hd .node-sprite circle{fill:currentColor;stroke:none}
+.node .hd .node-sprite:hover,.node .hd .node-sprite[aria-expanded="true"]{border-color:currentColor;background:var(--panel2)}
+.node.sprite-selected{outline:2px solid var(--wire);outline-offset:3px}
+.node.sprite-mate{outline:3px solid var(--ok);outline-offset:4px}
+.port.sprite-port{outline:4px solid var(--ok);outline-offset:3px;background:var(--ok)!important}
+.sprite-panel{position:fixed;z-index:54;width:410px;max-width:calc(100vw - 16px);max-height:calc(100vh - 80px);box-sizing:border-box;overflow:auto;padding:14px;background:var(--panel,#101620);color:var(--ink,#dce6f3);border:1px solid var(--wire,#57d3ff);border-radius:12px;box-shadow:0 12px 40px #0008;font:12px/1.45 var(--sans,sans-serif);overflow-wrap:anywhere}
+.sprite-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px}
+.sprite-panel>header button{font-size:20px;padding:0 8px}
+.sprite-panel section{border-top:1px solid var(--line,#263348);margin-top:12px;padding-top:8px}
+.sprite-panel h3{font-size:12px;margin:2px 0 7px;color:var(--wire)}
+.sprite-panel h4{font-size:11px;margin:8px 0 3px}
+.sprite-panel p{margin:4px 0}
+.sprite-panel .sprite-identity,.sprite-panel .sprite-port-label{font:11px/1.5 var(--mono,monospace)}
+.sprite-panel .sprite-muted,.sprite-panel .sprite-identity{color:var(--dim,#9aa9bc)}
+.sprite-panel .sprite-violation{color:var(--err,#ff757e)}
+.sprite-panel .sprite-status{margin:8px 0}
+.sprite-panel .sprite-actions{display:flex;flex-wrap:wrap;gap:6px}
+.sprite-panel pre{max-height:160px;overflow:auto;white-space:pre-wrap;font:11px/1.5 var(--mono,monospace);background:var(--bg,#090e16);border-radius:5px;padding:8px}
+.sprite-panel .sprite-choice{display:block;width:100%;text-align:left;white-space:normal;margin:6px 0;padding:7px 9px;font:11px/1.45 var(--mono,monospace)}
+.sprite-panel .sprite-choice:hover,.sprite-panel .sprite-choice:focus-visible{border-color:var(--ok);color:var(--ok)}
+.sprite-arrow{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;overflow:visible;z-index:53}
+.sprite-arrow path{fill:none;stroke:var(--ok,#3ddc84);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:7 4}

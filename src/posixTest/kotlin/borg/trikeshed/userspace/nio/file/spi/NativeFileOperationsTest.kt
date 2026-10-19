@@ -4,19 +4,153 @@ package borg.trikeshed.userspace.nio.file.spi
 
 import borg.trikeshed.common.mktemp
 import borg.trikeshed.userspace.nio.spi.platformNioProviders
-import kotlinx.cinterop.allocArray
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.get
-import kotlinx.cinterop.memScoped
-import platform.posix.timeval
-import platform.posix.utimes
+import kotlinx.cinterop.*
+import platform.posix.*
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertFails
 
 class NativeFileOperationsTest {
+
+    @Test
+    fun pathResolutionNormalizesDirectoryAliasesBeforeSiblingDerivation() {
+        val files = platformFiles()
+        assertEquals(files.cwd(), files.resolvePath())
+        assertEquals(files.cwd(), files.resolvePath("", "."))
+        assertEquals("/var/dense", files.resolvePath("/var//dense/"))
+        assertEquals("/var/dense", files.resolvePath("/var/dense/."))
+        assertEquals("/var/dense", files.resolvePath("/var/old", "..", "/dense/"))
+        assertEquals("/dense", files.resolvePath("/../../dense"))
+        assertEquals("/", files.resolvePath("/a/../.."))
+        assertEquals("${files.cwd()}/dense", files.resolvePath("", "dense/./"))
+        assertFails { files.resolvePath("/var/dense\u0000hidden") }
+    }
+
+    @Test
+    fun canonicalPathsResolveExistingAncestorsAndRejectUnresolvableAliases() {
+        val files = platformFiles()
+        val directory = files.canonicalPath(files.createTempDir("trikeshed-canonical-path"))
+        val alias = "$directory/alias"
+        val dangling = "$directory/dangling"
+        val loop = "$directory/loop"
+        try {
+            files.mkdirs("$directory/physical/nested")
+            assertEquals(0, symlink("$directory/physical/nested", alias))
+            assertEquals("$directory/physical/nested", files.canonicalPath(alias))
+            assertEquals("$directory/physical/nested/new/child", files.canonicalPath("$alias/new/child"))
+            assertEquals("$directory/physical/nested/new", files.canonicalPath("$alias/new/./"))
+            assertEquals("$directory/physical", files.canonicalPath("$alias/.."))
+            assertFails { files.canonicalPath("$alias/missing/..") }
+            assertEquals(0, symlink("$directory/missing", dangling))
+            assertFails { files.canonicalPath("$dangling/child") }
+            assertEquals(0, symlink(loop, loop))
+            assertFails { files.canonicalPath("$loop/child") }
+            files.write("$directory/file", "retained")
+            assertFails { files.canonicalPath("$directory/file/child") }
+        } finally {
+            unlink(alias)
+            unlink(dangling)
+            unlink(loop)
+            files.deleteRecursively(directory)
+        }
+    }
+
+    @Test
+    fun atomicPublicationReplacesTheInodeAndCreatesCasParents() {
+        val files = platformFiles()
+        val directory = files.createTempDir("trikeshed-publication")
+        try {
+            val path = "$directory/nested/sha256/blob"
+            val before = byteArrayOf(1, 2, 3)
+            val after = ByteArray(128 * 1024) { (it % 251).toByte() }
+            files.writeAtomically(path, before)
+            val retained = files.open(path)
+            assertTrue(retained >= 0)
+            try {
+                files.writeAtomically(path, after)
+                assertEquals(before.size.toLong(), files.size(retained), "publication must not truncate an existing reader's inode")
+                assertContentEquals(after, files.readAllBytes(path))
+                files.writeAtomically(path, byteArrayOf())
+                assertContentEquals(byteArrayOf(), files.readAllBytes(path))
+            } finally { assertEquals(0, files.close(retained)) }
+            assertEquals(listOf("blob"), files.listDir("$directory/nested/sha256"))
+            assertEquals(StorageDurability.DURABLE, files.durability)
+        } finally { files.deleteRecursively(directory) }
+    }
+
+    @Test
+    fun failedAtomicPublicationPreservesTheDestinationAndRemovesItsTemporary() {
+        val files = platformFiles()
+        val directory = files.createTempDir("trikeshed-publication-failure")
+        try {
+            files.mkdirs("$directory/target")
+            files.write("$directory/target/retained", "original")
+            assertFails { files.writeAtomically("$directory/target", byteArrayOf(1)) }
+            assertEquals("original", files.readString("$directory/target/retained"))
+            assertEquals(listOf("target"), files.listDir(directory))
+            files.write("$directory/file", "original")
+            assertFails { files.mkdirs("$directory/file/child") }
+            assertEquals("original", files.readString("$directory/file"))
+        } finally { files.deleteRecursively(directory) }
+    }
+
+    @Test
+    fun leasesExcludeOtherOwnersAndAliasesUntilAnIdempotentClose() {
+        val files = platformFiles()
+        val other = PosixFileOperations()
+        val directory = files.createTempDir("trikeshed-lease")
+        try {
+            val path = "$directory/lease"
+            val first = files.acquireExclusiveLease(path)
+            try {
+                assertEquals(0, platform.posix.link(path, "$directory/alias"))
+                repeat(2) {
+                    assertFails { files.acquireExclusiveLease(path).close() }
+                    assertFails { other.acquireExclusiveLease("$directory/alias").close() }
+                }
+            } finally { first.close() }
+            other.acquireExclusiveLease(path).use {
+                first.close() // must not close a descriptor since reused by the new owner
+                assertFails { files.acquireExclusiveLease(path).close() }
+            }
+            files.acquireExclusiveLease("$directory/alias").close()
+        } finally { files.deleteRecursively(directory) }
+    }
+
+    @Test
+    fun leasesConflictWithTraditionalRecordLocksWithoutAnUnrelatedCloseReleasingThem() = memScoped {
+        val files = platformFiles()
+        val directory = files.createTempDir("trikeshed-record-lock")
+        val path = "$directory/lease"
+        val record = alloc<flock>().apply {
+            l_type = F_WRLCK.convert()
+            l_whence = SEEK_SET.convert()
+            l_start = 0
+            l_len = 0
+            l_pid = 0
+        }
+        try {
+            files.acquireExclusiveLease(path).use {
+                val other = files.open(path, readOnly = false)
+                assertTrue(other >= 0)
+                try {
+                    assertEquals(-1, fcntl(other, F_SETLK, record.ptr))
+                    assertTrue(errno == EAGAIN || errno == EACCES)
+                } finally { assertEquals(0, files.close(other)) }
+                assertFails { files.acquireExclusiveLease(path).close() }
+            }
+            val other = files.open(path, readOnly = false)
+            assertTrue(other >= 0)
+            try {
+                assertEquals(0, fcntl(other, F_SETLK, record.ptr))
+                assertFails { files.acquireExclusiveLease(path).close() }
+            } finally { assertEquals(0, files.close(other)) }
+            files.acquireExclusiveLease(path).close()
+        } finally { files.deleteRecursively(directory) }
+    }
 
     @Test
     fun lastModifiedPreservesMilliseconds() = memScoped {

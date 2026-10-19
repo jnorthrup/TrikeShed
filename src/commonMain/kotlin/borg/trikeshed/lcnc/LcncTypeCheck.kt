@@ -229,10 +229,11 @@ object LcncTypeCheck {
     private class Resolver(
         private val byId: Map<String, LcncNode>,
         private val pathOf: Map<String, List<String>>,
-        private val wires: List<LcncWire>,
+        wires: List<LcncWire>,
         private val contracts: Map<String, LcncPortContract>,
         private val facts: LcncFacts,
     ) {
+        private val wiresTo = wires.groupBy { it.toNode }
         private val memo = HashMap<String, PortKind>()
         private val visiting = HashSet<String>()
         private val unresolved = PortKind(null, generic = true)
@@ -254,8 +255,8 @@ object LcncTypeCheck {
          */
         private fun feederOf(nodeId: String, port: String): PortKind? {
             var found: PortKind? = null
-            for (w in wires) {
-                if (w.toNode != nodeId || w.toPort.removeSuffix("?") != port) continue
+            for (w in wiresTo[nodeId].orEmpty()) {
+                if (w.toPort.removeSuffix("?") != port) continue
                 val src = byId[w.fromNode] ?: continue
                 val k = kind(src, "out", w.fromPort.removeSuffix("?"))
                 if (found == null || !k.generic) found = k
@@ -345,7 +346,7 @@ object LcncTypeCheck {
         }
 
         private fun eachFed(n: LcncNode): Boolean =
-            wires.any { it.toNode == n.id && it.toPort.removeSuffix("?") == "each" }
+            wiresTo[n.id].orEmpty().any { it.toPort.removeSuffix("?") == "each" }
     }
 
     private fun isRing(n: LcncNode): Boolean =

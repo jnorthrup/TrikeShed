@@ -3,6 +3,7 @@ package borg.trikeshed.userspace.nio.spi
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Synchronization
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -15,9 +16,12 @@ import kotlinx.coroutines.withContext
  *
  * Owns the registered providers and their shared cleanup outcome.
  * Platform providers are registered at [open] time and resolved via [service].
+ * [reactorSynchronization] chooses reactor state ownership explicitly; NONE
+ * requires serialized access by its owner, independently of the host's CPU count.
  */
 open class NioSupervisor(
     private val maxConcurrentIo: Int = 10000,
+    val reactorSynchronization: Synchronization = Synchronization.MONITOR,
 ) : CoroutineContext.Element {
     private val lifecycle = Mutex()
     private val completion = CompletableDeferred<Result<Unit>>()
@@ -55,7 +59,7 @@ open class NioSupervisor(
         check(state < ElementState.DRAINING) { "NIO providers are draining or closed" }
         if (state != ElementState.CREATED) return@withLock
         try {
-            val providers = platformNioProviders()
+            val providers = platformNioProviders(reactorSynchronization)
             (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
             providers.forEach { if (it !is NioCapabilityReport) register(it) }
             for (provider in services) if (provider is AsyncContextElement) provider.open()
@@ -108,4 +112,4 @@ open class NioSupervisor(
  * Returns the list of platform NIO providers to register in [NioSupervisor.open].
  * Each platform provides an [actual] implementation returning its concrete SPI instances.
  */
-expect fun platformNioProviders(): List<CoroutineContext.Element>
+expect fun platformNioProviders(reactorSynchronization: Synchronization = Synchronization.MONITOR): List<CoroutineContext.Element>

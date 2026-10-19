@@ -19,6 +19,7 @@ data class VoteBallot(
     val content: String? = null,
     val approve: Boolean = false,
     val error: String? = null,
+    val weight: Double = 1.0,
 )
 
 data class PanelVoteResult(
@@ -28,6 +29,8 @@ data class PanelVoteResult(
     val dissent: List<String>,
     val transcript: List<VoteBallot>,
 ) {
+    val quorumMet: Boolean get() = tally.approveWeight >= quorumRequired
+
     fun triage(): String = when {
         verdict == VoteVerdict.ACCEPTED -> "advance"
         tally.approveWeight == 0.0 && tally.rejectWeight == 0.0 && tally.abstainWeight > 0.0 -> "retry"
@@ -40,25 +43,28 @@ object PanelVote {
     fun reduce(
         ballots: List<VoteBallot>,
         quorum: Double,
-        weightOf: (VoteBallot) -> Double = { 1.0 },
+        weightOf: (VoteBallot) -> Double = { it.weight },
     ): PanelVoteResult {
-        require(quorum >= 0.0) { "quorum must be non-negative" }
+        require(quorum.isFinite() && quorum >= 0.0) { "quorum must be finite and non-negative" }
         val seats = HashSet<String>()
         var approve = 0.0
         var reject = 0.0
         var abstain = 0.0
-        ballots.forEach { ballot ->
+        val transcript = ballots.map { ballot ->
+            require(ballot.seat.isNotBlank()) { "panel seat is blank" }
             require(seats.add(ballot.seat)) { "duplicate panel seat: ${ballot.seat}" }
             val weight = weightOf(ballot)
-            require(weight >= 0.0) { "vote weight must be non-negative" }
+            require(weight.isFinite() && weight >= 0.0) { "vote weight must be finite and non-negative" }
             when {
                 !ballot.ok -> abstain += weight
                 ballot.approve -> approve += weight
                 else -> reject += weight
             }
+            require((approve + reject + abstain).isFinite()) { "panel weight exceeds finite capacity" }
+            if (ballot.weight == weight) ballot else ballot.copy(weight = weight)
         }
         val verdict = if (approve >= quorum && approve > reject) VoteVerdict.ACCEPTED else VoteVerdict.REJECTED
-        val dissent = ballots.mapNotNull { ballot ->
+        val dissent = transcript.mapNotNull { ballot ->
             val disagrees = ballot.ok && when (verdict) {
                 VoteVerdict.ACCEPTED -> !ballot.approve
                 VoteVerdict.REJECTED -> ballot.approve
@@ -70,7 +76,7 @@ object PanelVote {
             tally = PanelVoteTally(approve, reject, abstain),
             quorumRequired = quorum,
             dissent = dissent,
-            transcript = ballots.toList(),
+            transcript = transcript,
         )
     }
 }

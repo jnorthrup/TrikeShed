@@ -171,6 +171,8 @@ internal class JvmUserspaceChannelBackend(
     private data class Watch(val descriptor: JvmDescriptor, val mask: Int, val opcode: UringOp)
     private val watches = LinkedHashMap<Long, Watch>()
     private val completions = ArrayDeque<SelectionResult>()
+    private val completionWaiters = mutableSetOf<() -> Unit>()
+    private var completionEpoch = 0L
     private var closed = false
     private var draining = false
 
@@ -190,7 +192,7 @@ internal class JvmUserspaceChannelBackend(
                 else -> execute(sub)
             }
             result?.let { SelectionResult(it, sub.userData) }
-        }
+        }.also { completionEpoch++; completionWaiters.forEach { it() } }
 
     /** io deferred behind an unsettled CONNECT on the same fd. */
     private val heldBehindConnect = LinkedHashMap<Long, UringSubmission>()
@@ -302,6 +304,40 @@ internal class JvmUserspaceChannelBackend(
         return results
     }
 
+    internal fun completionReady(): Boolean = synchronized(this) {
+        completions.isNotEmpty() || watches.isEmpty() || watches.values.any {
+            !it.descriptor.isOpen() || it.descriptor is JvmChannelDescriptor
+        }
+    }
+
+    internal fun completionPollSet(): Pair<IntArray, IntArray> = synchronized(this) {
+        val snapshot = watches.values.map { watch ->
+                val fd = when (val descriptor = watch.descriptor) {
+                    is JvmSocketDescriptor -> descriptor.fd
+                    is JvmNativeDescriptor -> descriptor.fd
+                    else -> -1
+                }
+                fd to watch.mask
+        }
+        IntArray(snapshot.size) { snapshot[it].first } to IntArray(snapshot.size) { snapshot[it].second }
+    }
+
+    override suspend fun awaitCompletions() {
+        val (pollSet, epoch) = synchronized(this) {
+            if (completionReady()) return
+            completionPollSet() to completionEpoch
+        }
+        val (fds, masks) = pollSet
+        JvmSocketSyscalls.await(fds, masks) { wake ->
+            synchronized(this) {
+                completionWaiters.add(wake)
+                // Recheck after installing the wakeup: readiness cannot disappear between reap and subscription.
+                if (completionReady() || completionEpoch != epoch) wake()
+            }
+            AutoCloseable { synchronized(this) { completionWaiters.remove(wake) } }
+        }
+    }
+
     @Synchronized
     override fun cancelPending() {
         draining = true
@@ -312,6 +348,8 @@ internal class JvmUserspaceChannelBackend(
         // io deferred behind a CONNECT cannot proceed once the ring is cancelling.
         for ((token, sub) in heldBehindConnect) completions.addLast(SelectionResult(-125, token))
         heldBehindConnect.clear()
+        completionEpoch++
+        completionWaiters.forEach { it() }
     }
 
     internal fun execute(sub: UringSubmission): Int {
@@ -612,7 +650,7 @@ internal class JvmUserspaceChannelBackend(
         submitBatch(List(submissions.size) { submissions[it] }).forEach(::take)
         while (outstanding.isNotEmpty()) {
             reapCompletions(0).forEach(::take)
-            if (outstanding.isNotEmpty()) kotlinx.coroutines.delay(1)
+            if (outstanding.isNotEmpty()) awaitCompletions()
         }
         return order.size j { index -> UringCompletion(order[index], byToken.getValue(order[index]), 0) }
     }

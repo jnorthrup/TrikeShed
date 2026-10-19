@@ -4,8 +4,8 @@ package borg.trikeshed.job
  * JobEvent — committed events.
  */
 sealed class JobEvent {
-    data class Accepted(val jobId: JobId, val sequence: Long) : JobEvent()
-    data class Rejected(val jobId: JobId, val sequence: Long, val reason: String) : JobEvent()
+    data class Accepted(val jobId: JobId, val sequence: Long, val idempotencyKey: String? = null) : JobEvent()
+    data class Rejected(val jobId: JobId, val sequence: Long, val reason: String, val idempotencyKey: String? = null) : JobEvent()
 }
 
 /** Wire-level operation name: "accepted" for Accepted, "rejected" for Rejected. */
@@ -26,3 +26,10 @@ val JobEvent.reason: String?
  * JobFact — facts emitted by reducer.
  */
 data class JobFact(val jobId: JobId, val cid: ContentId)
+
+/** Request identity emitted by the reducer; null only for manually constructed legacy events. */
+val JobEvent.idempotencyKey: String?
+    get() = when (this) {
+        is JobEvent.Accepted -> idempotencyKey
+        is JobEvent.Rejected -> idempotencyKey
+    }

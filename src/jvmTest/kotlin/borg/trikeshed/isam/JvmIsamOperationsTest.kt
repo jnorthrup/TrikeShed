@@ -1,5 +1,6 @@
 package borg.trikeshed.isam
 
+import borg.trikeshed.context.Synchronization
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.RowVec
@@ -23,6 +24,9 @@ import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.OpenOption
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -46,6 +50,8 @@ class JvmIsamOperationsTest {
         val operations = mutableListOf<UringOp>()
         val completions = mutableListOf<SelectionResult>()
         val files = mutableListOf<File>()
+
+        override fun submitDeferredBatch(submissions: List<UringSubmission>): List<SelectionResult> = submitBatch(submissions)
 
         override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> = submissions.map { submission ->
             operations += submission.opcode
@@ -128,6 +134,55 @@ class JvmIsamOperationsTest {
 
     private fun reader(operations: JvmIsamOperations, path: String) =
         operations.createReader(path, "$path.meta", IsamMetaFileReader("$path.meta"))
+
+    @Test
+    fun appendSupportsSharedWritersAndAnUnsynchronizedSerialOwner() {
+        for (mode in Synchronization.entries) inDirectory { directory ->
+            val path = directory.resolve("rows.bin").toString()
+            val operations = UringIsamOperations(synchronization = mode)
+            operations.write(cursor(0 to 0), path, emptyMap(), false)
+            val writers = if (mode == Synchronization.NONE) Executors.newSingleThreadExecutor()
+                else Executors.newFixedThreadPool(4)
+            val start = CountDownLatch(1)
+            try {
+                val appends = (1..32).map { row -> writers.submit {
+                    start.await()
+                    operations.append(cursor(row to row.toByte()).view, path, emptyMap(), null, false)
+                } }
+                start.countDown()
+                appends.forEach { it.get(20, TimeUnit.SECONDS) }
+            } finally {
+                start.countDown()
+                writers.shutdownNow()
+                assertTrue(writers.awaitTermination(20, TimeUnit.SECONDS))
+            }
+            val source = reader(operations, path)
+            source.open()
+            try {
+                assertEquals(33, source.recordCount)
+                assertEquals((0..32).toSet(), (0 until source.recordCount).map { source.readRow(it)[0].a }.toSet())
+            } finally { source.close() }
+        }
+    }
+
+    @Test
+    fun recursiveWriteFromAppendTransformCannotTruncateTheActiveFile() {
+        for (mode in Synchronization.entries) inDirectory { directory ->
+            val path = directory.resolve("rows.bin").toString()
+            val operations = UringIsamOperations(synchronization = mode)
+            operations.write(cursor(1 to 2), path, emptyMap(), false)
+            val original = Files.readAllBytes(Path.of(path))
+            val metadata = Files.readAllBytes(Path.of("$path.meta"))
+            assertFailsWith<IllegalStateException> {
+                operations.append(cursor(3 to 4).view, path, emptyMap(), {
+                    operations.write(cursor(9 to 10), path, emptyMap(), false)
+                    it
+                }, false)
+            }
+            assertContentEquals(original, Files.readAllBytes(Path.of(path)))
+            assertContentEquals(metadata, Files.readAllBytes(Path.of("$path.meta")))
+        }
+    }
 
     @Test
     fun grouped_rows_round_trip_through_partial_facade_io_as_direct_files() = inDirectory { directory ->

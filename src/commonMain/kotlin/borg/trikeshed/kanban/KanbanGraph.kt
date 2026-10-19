@@ -32,7 +32,7 @@ data class KanbanCondition(val predicate: String, val parameters: Map<String, St
  *    per-card iteration count lives in `KanbanCardState.io` and the engine
  *    refuses transitions past the bound, so a runaway simulation terminates
  *    by construction.
- *  - [ABORT] is an unguarded escape to a terminal lane from any state.
+ *  - [ABORT] is an unguarded escape to a terminal lane from any nonterminal state.
  */
 enum class KanbanEdgeMode { DIRECT, FANOUT, JOIN, LOOP, ABORT }
 
@@ -153,6 +153,7 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
         // with no outgoing edges (a terminal), so abort can never be a waypoint.
         if (edge.mode == KanbanEdgeMode.LOOP && edge.maxIterations < 1) errors += KanbanGraphError.IncompatibleIo(edge.id, "LOOP requires maxIterations >= 1")
         if (edge.mode == KanbanEdgeMode.ABORT && edge.condition != null) errors += KanbanGraphError.IncompatibleIo(edge.id, "ABORT is unguarded by design")
+        if (edge.mode == KanbanEdgeMode.ABORT && !outgoing(edge.to).isEmpty()) errors += KanbanGraphError.IncompatibleIo(edge.id, "ABORT requires a terminal destination")
         val source = lane(edge.from)
         val target = lane(edge.to)
         if (source != null && target != null && source.outputs.isNotEmpty() && target.inputs.isNotEmpty() &&
@@ -233,8 +234,10 @@ object KanbanGraphEngine {
         if (!validation.valid) return KanbanTransitionResult.Rejected(validation.errors.joinToString { it.toString() })
         val card = graph.cards.view.firstOrNull { it.id == request.cardId } ?: return KanbanTransitionResult.Rejected("missing card ${request.cardId}")
         if (card.revision != request.expectedRevision) return KanbanTransitionResult.Rejected("revision mismatch")
-        val candidates = graph.outgoing(card.lane).filter { edge ->
-            (request.requestedTarget == null || edge.to == request.requestedTarget) &&
+        val nonterminal = !graph.outgoing(card.lane).isEmpty()
+        val candidates = graph.edges.filter { edge ->
+            (edge.from == card.lane || (edge.mode == KanbanEdgeMode.ABORT && nonterminal)) &&
+                (request.requestedTarget == null || edge.to == request.requestedTarget) &&
                 // ABORT is an unguarded escape — it bypasses predicates by design.
                 (edge.mode == KanbanEdgeMode.ABORT ||
                     (edge.condition == null || predicates.resolve(edge.condition.predicate)!!.test(card, edge)))

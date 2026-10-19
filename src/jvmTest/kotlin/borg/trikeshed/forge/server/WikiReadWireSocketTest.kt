@@ -73,6 +73,12 @@ class WikiReadWireSocketTest {
             assertEquals(200, listStatus)
             assertTrue(String(listBody).contains("\"path\":\"skills/retrieval.md\""), String(listBody))
 
+            val (wikiStatus, wikiBody, _) = get(port, "/wiki")
+            assertEquals(200, wikiStatus)
+            assertTrue("/wiki?page=skills%2Fretrieval.md" in String(wikiBody))
+            assertEquals(200, get(port, "/wiki?page=skills%2Fretrieval.md").first)
+            assertEquals(200, get(port, "/wiki.css").first)
+
             val expected = artifact.toByteArray()
             val (status, body, headers) = get(port, "/api/wiki/read?path=skills/retrieval.md")
             assertEquals(200, status)

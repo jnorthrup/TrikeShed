@@ -1,5 +1,6 @@
 package borg.trikeshed.lcnc
 
+import borg.trikeshed.lib.*
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -31,8 +32,31 @@ class LcncScopeFrame(
     /** The enclosing ring; null at the root. Nearest ring shadows on lookup. */
     val parent: LcncScopeFrame? = null,
     val bindingSources: Map<String, String> = emptyMap(),
+    /** Bound keys permit retention until an actual typed read removes them. Entry projection fills safe values. */
+    val retainedBindings: MutableMap<String, Any?> = LinkedHashMap(bindings),
+    /** Finalized after the actual walk, in dependency order. */
+    val retainedOutputs: MutableMap<String, Map<String, Any?>> = LinkedHashMap(),
+    val retainedReturns: MutableMap<String, Any?> = LinkedHashMap(),
+    val retainedBindingOrigins: MutableMap<String, LcncBindingOrigins> = LinkedHashMap(),
+    val retainedOutputOrigins: MutableMap<String, Map<String, LcncBindingOrigins>> = LinkedHashMap(),
+    val retainedReturnOrigins: MutableMap<String, LcncBindingOrigins> = LinkedHashMap(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LcncScopeFrame>
+
+    /** The exact output owner observed by a fed wire; later walks never re-resolve its identity. */
+    internal fun outputOwner(nodeId: String): LcncScopeFrame? =
+        if (outputs.containsKey(nodeId)) this else parent?.outputOwner(nodeId)
+
+    /** Entry projection preserves typed-read removals already made on this actual binding owner. */
+    internal fun retainBindings(projected: Map<String, Any?>, origins: Map<String, LcncBindingOrigins> = emptyMap()) {
+        val permitted = retainedBindings.keys.toSet()
+        retainedBindings.clear()
+        retainedBindingOrigins.clear()
+        for ((name, value) in projected) if (name in permitted && value !== LcncProjection.Absent) {
+            retainedBindings[name] = value
+            retainedBindingOrigins[name] = origins[name] ?: emptySeriesOf()
+        }
+    }
 
     /** Whether [name] is bound anywhere on the chain — distinguishes bound-null from unbound. */
     fun hasBinding(name: String): Boolean =
@@ -48,6 +72,9 @@ class LcncScopeFrame(
     /** Warm base: a node's outputs, resolved outward through the enclosing rings. */
     fun outputsOf(nodeId: String): Map<String, Any?>? =
         outputs[nodeId] ?: parent?.outputsOf(nodeId)
+
+    fun retainedOutputsOf(nodeId: String): Map<String, Any?>? =
+        if (outputs.containsKey(nodeId)) retainedOutputs[nodeId] else parent?.retainedOutputsOf(nodeId)
 
     /** Ring depth — 0 at the root. */
     val depth: Int get() = (parent?.depth ?: -1) + 1

@@ -133,6 +133,42 @@ class LcncRunHeadTest {
     }
 
     @Test
+    fun aQueuedRequestIsUnfinishedAndDoesNotSpendItsExecutionBudget() {
+        val head = headOf(
+            receipt("good", "completed", startedAtMs = 1000L),
+            receipt("waiting", "queued", startedAtMs = 0L, sequence = 9,
+                extra = mapOf("queuedAtMs" to 2000L)),
+        )
+        assertEquals("waiting", head.latest?.runId)
+        assertEquals("good", head.artifact?.runId)
+        assertEquals(listOf("waiting"), head.active.map { it.runId })
+        val verdict = LcncRunHead.decide(head, null, 99_000_000)
+        assertEquals(LcncRunHead.Lamp.RUNNING, verdict.lamp)
+        assertTrue(verdict.reason.contains("queued"))
+        assertTrue(verdict.reason.contains("execution has not started"))
+        assertTrue(!verdict.reason.contains("against"), "Queue waiting is not overdue execution")
+        val body = LcncRunHead.headBody("corpus", programKey, programCid, inputs, head, verdict, null, null)
+        assertNull(body["startedAtMs"])
+        assertEquals(2000L, body["queuedAtMs"])
+        assertEquals("queued", body["status"])
+    }
+
+    @Test
+    fun queueAdmissionOrderSurvivesExecutionAndNumericReplay() {
+        val entries = listOf(
+            receipt("first", "running", startedAtMs = 9000L, sequence = 20,
+                extra = mapOf("queuedAtMs" to 1000.0)),
+            receipt("second", "queued", startedAtMs = 0L, sequence = 10,
+                extra = mapOf("queuedAtMs" to "2000")),
+            receipt("third", "queued", startedAtMs = 0L, sequence = 11,
+                extra = mapOf("queuedAtMs" to 2000.0)),
+        )
+        val head = headOf(*entries.toTypedArray())
+        assertEquals(listOf("third", "second", "first"), head.matching.map { it.runId })
+        assertEquals(2000L, head.latest?.queuedAtMs)
+    }
+
+    @Test
     fun differentInputsAndDifferentProgramVersionsAreDifferentTargets() {
         val mine = receipt("r1", "completed")
         // Same program, other inputs: no cross-talk.

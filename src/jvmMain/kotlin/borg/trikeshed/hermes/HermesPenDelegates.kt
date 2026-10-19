@@ -2,7 +2,7 @@ package borg.trikeshed.hermes
 
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap
-import borg.trikeshed.parse.confix.confixDoc
+import borg.trikeshed.parse.confix.*
 
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.graal.ConfixBlackboard
@@ -26,7 +26,7 @@ import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import modelmux.ModelMux
+import modelmux.*
 import modelmux.acp.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
@@ -198,15 +198,25 @@ class HermesPen(
         val modelId = str(args, 0) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
         val json = str(args, 1) ?: return refusal("bad-args", "mux_completion(modelId, requestJson)")
         val timeout = if (args.size == 2) MODEL_WALL_MILLIS
-            else (args.getOrNull(2) as? Teleported.Num)?.v?.takeIf { args.size == 3 && it > 0 }
+            else (args.getOrNull(2) as? Teleported.Num)?.v?.takeIf { args.size in 3..4 && it > 0 }
                 ?.coerceAtMost(MODEL_WALL_MILLIS)
                 ?: return refusal("bad-args", "mux_completion timeout must be positive milliseconds")
+        val session = if (args.size == 4) {
+            val value = str(args, 3) ?: return refusal("bad-args", "mux_completion session must be a string")
+            if (value.length > 128) return refusal("bad-args", "mux_completion session exceeds 128 characters")
+            value.takeIf { it.isNotBlank() }
+        } else null
         val admittedTimeout = timeout.coerceAtMost(MODEL_WALL_MILLIS - 5_000L)
         val started = TimeSource.Monotonic.markNow()
         return withTimeout(admittedTimeout) {
             val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
             val remaining = (admittedTimeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
-            val result = mux.completion(modelId, confixDoc(json), contextId = cause, timeoutMs = remaining)
+            val request = confixDoc(json)
+            val breadcrumbs = muxContext[BreadcrumbElement]
+            val result = if (breadcrumbs != null && (session != null || request.getAt("breadcrumb_context") != null))
+                BreadcrumbModelHost(mux, breadcrumbs).completion(modelId, request,
+                    contextId = session, timeoutMs = remaining, assessmentId = cause)
+            else mux.completion(modelId, request, assessmentId = cause, contextId = session, timeoutMs = remaining)
             result.fold(
                 onSuccess = { true j mapOf("verdict" to "ok", "completion" to reifyMap(it.b.toArray().decodeToString())) },
                 onFailure = { refusal(if ("lease" in (it.message ?: "")) "lease-exhausted" else "mux-error", it.message ?: "") },

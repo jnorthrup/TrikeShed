@@ -45,8 +45,8 @@ object LcncRunHead {
 
     const val STATUS_COMPLETED = "completed"
 
-    /** The two non-terminal statuses `LcncRunService` writes before a run ends. */
-    val ACTIVE = setOf("validating", "running")
+    /** A queued request is unfinished; its execution budget starts only when it begins running. */
+    val ACTIVE = setOf("queued", "validating", "running")
 
     /**
      * A frame never carries more than this many rows of any list: the consumed documents, the
@@ -125,6 +125,7 @@ object LcncRunHead {
         val error: String?,
         val timeoutMs: Long?,
         val raw: Map<String, Any?>,
+        val queuedAtMs: Long? = null,
     )
 
     /** Numbers survive a WAL replay as Doubles and a KIF round trip as text; both read back as Long. */
@@ -154,6 +155,7 @@ object LcncRunHead {
             error = text(m["error"]),
             timeoutMs = num((m["budgets"] as? Map<*, *>)?.get("timeoutMs")),
             raw = m.entries.associate { (k, v) -> k.toString() to v },
+            queuedAtMs = num(m["queuedAtMs"]),
         )
     }
 
@@ -172,15 +174,14 @@ object LcncRunHead {
     data class Head(val artifact: RunRow?, val latest: RunRow?, val active: List<RunRow>, val matching: List<RunRow>)
 
     /**
-     * The runs of exactly this target, newest first. The sort is `web/landscape.js`'s — started
-     * descending, then the board sequence descending — and the sequence tiebreak is load-bearing:
-     * two runs under one frozen clock share `startedAtMs`, and only the board's commit sequence
-     * says which is newer.
+     * The runs of exactly this target, newest admission first. Queued runs retain their admission
+     * clock after execution starts; legacy runs use their start clock. The board sequence breaks
+     * ties when several admissions share one frozen clock.
      */
     fun head(rows: List<RunRow>, programKey: String, programCid: String, wantedInputs: String): Head {
         val matching = rows.filter {
             it.programKey == programKey && it.programCid == programCid && canonicalInputs(it.inputs) == wantedInputs
-        }.sortedWith(compareByDescending<RunRow> { it.startedAtMs }.thenByDescending { it.sequence })
+        }.sortedWith(compareByDescending<RunRow> { it.queuedAtMs ?: it.startedAtMs }.thenByDescending { it.sequence })
         return Head(
             artifact = matching.firstOrNull { it.status == STATUS_COMPLETED },
             latest = matching.firstOrNull(),
@@ -223,6 +224,8 @@ object LcncRunHead {
         val active = head.active.firstOrNull()
         if (active != null) {
             val concurrent = if (head.active.size > 1) "; ${head.active.size} concurrent runs" else ""
+            if (active.status == "queued") return Verdict(Lamp.RUNNING,
+                "The run is queued; execution has not started$concurrent", emptyList())
             val budget = active.timeoutMs
             val elapsed = nowMs - active.startedAtMs
             val overdue = budget != null && active.startedAtMs > 0L && elapsed > budget + OVERDUE_GRACE_MS
@@ -355,7 +358,8 @@ object LcncRunHead {
             "latestReceiptCid" to latest?.receiptCid,
             "rebuildOf" to artifact?.rebuildOf,
             "rebuildOfRunId" to artifact?.rebuildOfRunId,
-            "startedAtMs" to latest?.startedAtMs,
+            "startedAtMs" to if (latest?.status == "queued") null else latest?.startedAtMs,
+            "queuedAtMs" to latest?.queuedAtMs,
             "finishedAtMs" to artifact?.finishedAtMs,
             "sequence" to latest?.sequence,
             "activeRuns" to head.active.size,

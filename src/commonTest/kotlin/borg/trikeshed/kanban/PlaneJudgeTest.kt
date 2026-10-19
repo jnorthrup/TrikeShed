@@ -14,7 +14,7 @@ class PlaneJudgeTest {
 
     @Test
     fun parsesTheReplyShapeLoosely() {
-        val r = PlaneJudge.parse("VERDICT: MET\nMUST-1: MET — evidence: trikeshed/src/A.kt\nMUST-2: MET evidence=graal/vitals/memory.\nSHOULD-1: NOT MET — evidence: none\nACTION: Change A.kt so the tick lands first.\nSecond line.")!!
+        val r = PlaneJudge.parse("Reply follows.\n  verdict: meT\n  must-1: Met — Evidence: trikeshed/src/A.kt\n  MuSt-2: MET evidence=graal/vitals/memory.\n  should-1: not met — evidence: none\n  aCtIoN: Change A.kt so the tick lands first.\nSecond line.")!!
         assertEquals("MET", r.verdict)
         assertEquals(listOf("MUST-1" to "trikeshed/src/A.kt", "MUST-2" to "graal/vitals/memory", "SHOULD-1" to ""), r.lines.map { it.label to it.evidence })
         assertEquals(listOf(true, true, false), r.lines.map { it.met })

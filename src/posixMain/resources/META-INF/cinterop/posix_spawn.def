@@ -1,6 +1,7 @@
 package = borg.trikeshed.userspace.nio.posix
-headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h dirent.h stdlib.h
+headers = spawn.h unistd.h fcntl.h sys/types.h sys/stat.h signal.h errno.h string.h dirent.h stdlib.h stdio.h
 headers.osx = sys/random.h
+compilerOpts.linux = -D_GNU_SOURCE
 
 ---
 
@@ -23,6 +24,29 @@ static inline char **trikeshed_args(int *argc) {
 // UTF-8 (one from args_os) cannot be.
 static inline int trikeshed_open(char *path, int flags, int mode) {
     return open(path, flags, mode);
+}
+
+// OFD record locks conflict with ordinary fcntl locks (including JVM FileLock),
+// but belong to this descriptor, not every descriptor opened by this process.
+// Closing a rejected contender therefore cannot release the active writer.
+static inline int trikeshed_file_lease(const char *path) {
+#ifdef F_OFD_SETLK
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+    if (fd < 0) return -1;
+    struct flock lock;
+    memset(&lock, 0, sizeof lock);
+    lock.l_type = F_WRLCK;
+    lock.l_whence = SEEK_SET;
+    int status;
+    do { status = fcntl(fd, F_OFD_SETLK, &lock); } while (status < 0 && errno == EINTR);
+    if (status == 0) return fd;
+    int failure = errno;
+    close(fd);
+    errno = failure;
+#else
+    errno = ENOTSUP;
+#endif
+    return -1;
 }
 
 // Keep the platform's opaque pointer/struct ABI inside the C boundary.

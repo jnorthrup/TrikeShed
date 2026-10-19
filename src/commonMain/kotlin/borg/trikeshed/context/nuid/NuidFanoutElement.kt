@@ -1,314 +1,456 @@
-@file:Suppress("UNCHECKED_CAST", "ObjectPropertyName")
-
 package borg.trikeshed.context.nuid
 
 import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.context.ElementState
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.channels.Channel
+import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.concurrency.Channel
+import kotlin.concurrent.Volatile
+import kotlin.coroutines.AbstractCoroutineContextElement
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.selects.onTimeout
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.yield
-import kotlin.time.TimeSource
 
-/**
- * NuidFanoutElement — the CCEK owner of the concentric-narrowing dispatcher.
- *
- * Attraction model
- * ----------------
- * Workers advertise themselves as [Workgroup]s with a [Subnet] [Workgroup.scope]
- * and a [TraitSpace]. This element holds the *registry* — the list of
- * workgroups willing to receive work — and the *dispatcher* — the algorithm
- * that walks the registry for each incoming Nuid and decides who claims it.
- *
- * The concentric narrowing rule:
- *   1. Sort eligible workgroups by `scope.level` ascending (innermost first).
- *      A worker on `local` outranks a worker on `lan.localhost` outranks
- *      a worker on `mesh.worker.<id>` — the request should land as locally
- *      as possible.
- *   2. For each eligible workgroup (scope ⊇ request.subnet AND traits include
- *      request.capability), offer the action via the workgroup's claim inbox.
- *   3. The first workgroup whose `claim(claimId)` returns true wins the action.
- *      Losers observe false and stand down — the next eligible workgroup is
- *      then offered. This is the CCEK analogue of Hermes's `BEGIN IMMEDIATE`
- *      + `claim_lock` CAS.
- *   4. If no workgroup at the request's scope claims, [dispatch] walks one
- *      level outward (escalation). Concentric authority for *visibility*
- *      flows inward (outer workers see inner requests), but escalation for
- *      *unclaimed* work flows outward.
- *
- * Lifecycle
- * ---------
- *   CREATED   ⇒ registry exists; [register] allowed; [dispatch] rejected.
- *   OPEN      ⇒ accepting [register] and [dispatch].
- *   ACTIVE    ⇒ same as OPEN plus escalation.
- *   DRAINING  ⇒ registry frozen; no new dispatches; in-flight claims finish.
- *   CLOSED    ⇒ registry empty; supervisor cancelled.
- */
-class NuidFanoutElement(
-    parentJob: Job? = null,
-    val escalationBudget: Int = 3,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+typealias NuidLineage = Series<Join<Workgroup, NuidFanoutElement.Claim>>
 
-    companion object Key : AsyncContextKey<NuidFanoutElement>()
-    override val key: AsyncContextKey<NuidFanoutElement> = Key
+private class NuidAuthority(val invocation: NuidInvocation) : AbstractCoroutineContextElement(Key) {
+    companion object Key : CoroutineContext.Key<NuidAuthority>
+}
 
-    /** Per-workgroup claim slot. Claim intake belongs to the dispatcher;
-     *  production workers receive accepted claims through [consume]. */
-    class WorkgroupSlot(val workgroup: Workgroup) {
-        // Buffered so a brief latency from one worker doesn't block concurrent
-        // offers to its peers. Capacity scales with claim pressure.
-        private val inbox: Channel<Claim> = Channel(Channel.BUFFERED)
-        private val accepted: Channel<Claim> = Channel(Channel.BUFFERED)
+/** The selected workgroup and claim belong to the executing slot, independently of caller bindings. */
+class NuidInvocation private constructor(val value: Join<Workgroup, NuidFanoutElement.Claim>, owned: Boolean) : AbstractCoroutineContextElement(Key) {
+    constructor(value: Join<Workgroup, NuidFanoutElement.Claim>) : this(value, false)
 
-        /** Consume one pending claim, suspending if empty. */
-        suspend fun consume(): Claim = inbox.receive()
+    /** Append last when borrowing caller services. Publicly constructed metadata carries no authority. */
+    val context: CoroutineContext = if (owned) this + NuidAuthority(this) else this
 
-        /** Try to consume one pending claim (non-blocking). Returns null if empty. */
-        fun tryTake(): Claim? = inbox.tryReceive().getOrNull()
-
-        /** Consume one claim accepted for this workgroup. */
-        suspend fun consumeAccepted(): Claim = accepted.receive()
-
-        /** Publish a claim after dispatcher admission succeeds. */
-        internal suspend fun publishAccepted(claim: Claim) { accepted.send(claim) }
-
-        /** Enqueue a claim offer to this workgroup. */
-        suspend fun offer(claim: Claim) { inbox.send(claim) }
-
-        /** Close the slot — no more offers. Existing claims remain drainable. */
-        fun close() {
-            inbox.close()
-            accepted.close()
+    /** Actual selected parents, followed by this invocation; caller payloads do not supply ancestry. */
+    val lineage: NuidLineage get() {
+        var size = 1
+        var parent = value.b.parent
+        while (parent != null) { size++; parent = parent.b.parent }
+        return size j { index ->
+            var selected = value
+            repeat(size - index - 1) { selected = checkNotNull(selected.b.parent) }
+            selected
         }
     }
 
-    /** A claim is the unit of dispatch: identity + payload + the originating Nuid. */
+    companion object Key : CoroutineContext.Key<NuidInvocation> {
+        internal fun owned(value: Join<Workgroup, NuidFanoutElement.Claim>): NuidInvocation = NuidInvocation(value, true)
+        suspend fun current(): Join<Workgroup, NuidFanoutElement.Claim>? = currentCoroutineContext()[this]?.value
+        suspend fun require(): Join<Workgroup, NuidFanoutElement.Claim> =
+            checkNotNull(current()) { "No NUID workgroup invocation" }
+    }
+}
+
+/** A sequential slot cannot wait on itself or a current dependency back to itself. */
+class NuidDispatchCycle(val lineage: NuidLineage, val target: Workgroup, val path: Series<String>) :
+    IllegalStateException("NUID workgroup dependency cycle: ${path.view.joinToString(" -> ")}")
+
+/** Capability × prefix-subnet admission, followed by optional owned workgroup execution. */
+class NuidFanoutElement(
+    parentJob: Job? = null,
+    val escalationBudget: Int = 3,
+    private val capacity: Int = 64,
+) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    companion object Key : AsyncContextKey<NuidFanoutElement>()
+    override val key: AsyncContextKey<NuidFanoutElement> = Key
+
+    class WorkgroupSlot(val workgroup: Workgroup, capacity: Int = 64) {
+        private data class Admission(val claim: Claim, val completion: CompletableDeferred<Any?>?)
+        private val inbox = Channel.buffered<Claim>(capacity)
+        private val accepted = Channel.buffered<Admission>(capacity)
+        private var worker: Job? = null
+        internal val executes: Boolean get() = worker != null
+
+        /** Explicit offers are separate from the dispatcher's accepted work. */
+        suspend fun consume(): Claim = inbox.kChannel.receive()
+        fun tryTake(): Claim? = inbox.kChannel.tryReceive().getOrNull()
+        suspend fun offer(claim: Claim) { inbox.kChannel.send(claim) }
+
+        /** Admission notifications only; a registered handler owns its own accepted channel. */
+        suspend fun consumeAccepted(): Claim {
+            check(!executes) { "${workgroup.name}: a registered handler owns accepted claims" }
+            return accepted.kChannel.receive().claim
+        }
+
+        internal fun execute(
+            scope: CoroutineScope,
+            handler: suspend (Claim) -> Any?,
+            cleanup: suspend (Claim) -> Unit,
+            started: suspend (NuidInvocation) -> Unit,
+            finished: suspend (Claim) -> Unit,
+        ) {
+            check(worker == null)
+            suspend fun settle(admission: Admission, outcome: Result<Any?>, invocation: NuidInvocation? = null) {
+                var failure = outcome.exceptionOrNull()
+                withContext(NonCancellable + (invocation?.context ?: EmptyCoroutineContext)) {
+                    try {
+                        cleanup(admission.claim)
+                    } catch (caught: Throwable) {
+                        val original = failure
+                        if (original == null) failure = caught
+                        else if (original !== caught) original.addSuppressed(caught)
+                    } finally {
+                        finished(admission.claim)
+                    }
+                }
+                val finalFailure = failure
+                if (finalFailure == null) admission.completion?.complete(outcome.getOrThrow())
+                else admission.completion?.completeExceptionally(finalFailure)
+            }
+            worker = scope.launch(CoroutineName("nuid-workgroup:${workgroup.name}"), start = CoroutineStart.UNDISPATCHED) {
+                var failure: Throwable = CancellationException("NUID workgroup stopped")
+                try {
+                    for (admission in accepted.kChannel) {
+                        val invocation = NuidInvocation.owned(workgroup j admission.claim)
+                        val outcome = try {
+                            started(invocation)
+                            // Carry handler failure as a value across our context boundary. Stack
+                            // recovery may otherwise copy it and later discard cleanup suppression.
+                            withContext(invocation.context) {
+                                try { Result.success(handler(admission.claim)) }
+                                catch (error: Throwable) { Result.failure(error) }
+                            }
+                        } catch (error: Throwable) {
+                            Result.failure(error)
+                        }
+                        settle(admission, outcome, invocation)
+                        currentCoroutineContext().ensureActive()
+                    }
+                } catch (error: Throwable) {
+                    failure = error
+                    throw error
+                } finally {
+                    accepted.close()
+                    withContext(NonCancellable) {
+                        while (true) {
+                            val pending = accepted.kChannel.tryReceive().getOrNull() ?: break
+                            settle(pending, Result.failure(CancellationException(
+                                "${workgroup.name}: claim ${pending.claim.claimId} did not execute", failure)))
+                        }
+                    }
+                }
+            }
+        }
+
+        /** Select commits a send or timeout; a timed-out offer cannot execute at two scopes. */
+        @OptIn(ExperimentalCoroutinesApi::class)
+        internal suspend fun admit(claim: Claim, timeoutMillis: Long): DispatchResult? {
+            val completion = if (executes) CompletableDeferred<Any?>() else null
+            val admission = Admission(claim, completion)
+            val admitted = try {
+                select {
+                    accepted.kChannel.onSend(admission) { true }
+                    onTimeout(timeoutMillis) { false }
+                }
+            } catch (_: ClosedSendChannelException) { false }
+            if (!admitted) return null
+            return DispatchResult(claim.claimId, workgroup.name, workgroup.scope,
+                claim.nuid.subnet.level - workgroup.scope.level, completion)
+        }
+
+        /** Buffered accepted work remains drainable after admission closes. */
+        fun close() { inbox.close(); accepted.close() }
+        internal suspend fun join() { worker?.join() }
+    }
+
     data class Claim(
         val claimId: Long,
         val nuid: Nuid,
         val payload: Any?,
+        val parent: Join<Workgroup, Claim>? = null,
     )
 
-    /** Result of a dispatch attempt — winner is decided by the workgroup, not the
-     *  dispatcher. [winner] is null on timeout. */
+    /** A winner denotes admission. Only [completion] reports a registered handler's result or failure. */
     data class DispatchResult(
         val claimId: Long,
         val winner: String?,
         val claimedAtSubnet: Subnet?,
         val escalatedLevels: Int,
+        val completion: Deferred<Any?>? = null,
     )
 
-    // ── registry ────────────────────────────────────────────────
+    private data class Dispatch(
+        val claim: Claim,
+        val candidates: List<WorkgroupSlot>,
+        val timeoutMillis: Long,
+        val result: CompletableDeferred<DispatchResult>,
+    )
 
-    private val registryMutex: Mutex = Mutex()
+    private val registryMutex = Mutex()
+    private val workgroups = mutableListOf<WorkgroupSlot>()
+    private val retiring = mutableMapOf<String, WorkgroupSlot>()
+    private val ownedClaims = mutableMapOf<Long, Claim>()
+    private val invocations = mutableMapOf<Long, NuidInvocation>()
+    private val dependencies = mutableMapOf<Long, Join<Claim, Twin<String>>>()
+    @Volatile private var registry: Series<WorkgroupSlot> = emptySeriesOf()
+    private val mutableSubscribers = mutableListOf<AsyncContextElement>()
+    private val dispatches = Channel.buffered<Dispatch>(capacity)
+    private var executionScope: CoroutineScope? = null
+    private var dispatcher: Job? = null
+    private var claimCounter = 0L
 
-    /** Backing list — append-only on register, mutated on unregister/close. */
-    private val workgroups: MutableList<WorkgroupSlot> = mutableListOf()
+    init { require(escalationBudget >= 0); require(capacity > 0) }
 
-    /** Snapshot for read-side iteration; cached and invalidated on mutate. */
-    @Suppress("private val can be var") private var cachedSnapshot: List<WorkgroupSlot>? = null
+    override val fanoutSubscribers: List<AsyncContextElement> get() = mutableSubscribers.toList()
+    fun subscribe(observer: AsyncContextElement) { mutableSubscribers.add(observer) }
+    fun unsubscribe(observer: AsyncContextElement) { mutableSubscribers.remove(observer) }
 
-    /** Mutable list of CCEK subscribers; mirrored through [fanoutSubscribers]. */
-    private val mutableSubscribers: MutableList<AsyncContextElement> = mutableListOf()
+    /** Admission registrations are idempotent by name. Handler registration never replaces a binding. */
+    suspend fun register(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)? = null) =
+        registerSlot(workgroup, execute) {}
 
-    private fun snapshot(): List<WorkgroupSlot> {
-        cachedSnapshot?.let { return it }
-        val s = workgroups.toList()
-        cachedSnapshot = s
-        return s
-    }
+    /** Cleanup belongs to each accepted claim, including claims stopped before handler execution. */
+    suspend fun register(workgroup: Workgroup, cleanup: suspend (Claim) -> Unit, execute: suspend (Claim) -> Any?) =
+        registerSlot(workgroup, execute, cleanup)
 
-    private fun invalidate() { cachedSnapshot = null }
-
-    // ── CCEK surface ─────────────────────────────────────────────
-
-    override val fanoutSubscribers: List<AsyncContextElement>
-        get() = mutableSubscribers.toList()
-
-    fun subscribe(observer: AsyncContextElement) {
-        mutableSubscribers.add(observer)
-    }
-
-    fun unsubscribe(observer: AsyncContextElement) {
-        mutableSubscribers.remove(observer)
-    }
-
-    // ── registry operations ─────────────────────────────────────
-
-    /** Register a workgroup. Idempotent on `name`. Allowed in OPEN/ACTIVE. */
-    suspend fun register(workgroup: Workgroup) {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "NuidFanoutElement must be OPEN before register() (was $state)"
-        }
+    private suspend fun registerSlot(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)?, cleanup: suspend (Claim) -> Unit) {
+        val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
         registryMutex.withLock {
-            if (workgroups.none { it.workgroup.name == workgroup.name }) {
-                workgroups.add(WorkgroupSlot(workgroup))
-                invalidate()
+            if (state == ElementState.DRAINING && invocation != null && invocations[invocation.value.b.claimId] === invocation)
+                check(supervisor.isActive && !dispatches.isClosed()) { "NUID workgroup owner is closed" }
+            else checkAccepting()
+            check(workgroup.name !in retiring) { "${workgroup.name}: workgroup is draining" }
+            val existing = workgroups.firstOrNull { it.workgroup.name == workgroup.name }
+            if (existing != null) {
+                check(execute == null) { "${workgroup.name}: already registered" }
+                return
+            }
+            val slot = WorkgroupSlot(workgroup, capacity)
+            if (execute != null) slot.execute(checkNotNull(executionScope), execute,
+                cleanup = cleanup,
+                started = { invocation ->
+                    registryMutex.withLock { invocations[invocation.value.b.claimId] = invocation }
+                },
+                finished = ::finishClaim)
+            workgroups.add(slot)
+            registry = workgroups.toTypedArray().toSeries()
+        }
+    }
+
+    /** Reserve the name until the removed handler finishes every accepted invocation. */
+    suspend fun unregister(name: String) {
+        val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
+        val slot = registryMutex.withLock {
+            checkLifecycleCaller(invocation, name)
+            retiring[name] ?: workgroups.firstOrNull { it.workgroup.name == name }?.also {
+                workgroups.remove(it)
+                registry = workgroups.toTypedArray().toSeries()
+                retiring[name] = it
+                it.close()
             }
         }
-    }
-
-    /** Remove a workgroup by name. Drains its claim slot. */
-    suspend fun unregister(name: String) {
-        val slot: WorkgroupSlot? = registryMutex.withLock {
-            val idx = workgroups.indexOfFirst { it.workgroup.name == name }
-            if (idx < 0) null
-            else workgroups.removeAt(idx).also { invalidate() }
+        if (slot != null) withContext(NonCancellable) {
+            slot.join()
+            registryMutex.withLock { if (retiring[name] === slot) retiring.remove(name) }
         }
-        slot?.close()
     }
 
-    /** Look up a workgroup's slot, or null. */
-    fun slotOf(name: String): WorkgroupSlot? =
-        snapshot().firstOrNull { it.workgroup.name == name }
+    fun slotOf(name: String): WorkgroupSlot? = registry.view.firstOrNull { it.workgroup.name == name }
+    fun workgroups(): Series<Workgroup> = registry α { it.workgroup }
 
-    // ── lifecycle overrides ───────────────────────────────────────
+    /** The executing owner's live identity, independent of public caller metadata. */
+    suspend fun currentInvocation(): Join<Workgroup, Claim>? {
+        val invocation = currentCoroutineContext()[NuidAuthority]?.invocation ?: return null
+        return registryMutex.withLock {
+            invocation.takeIf { invocations[it.value.b.claimId] === it }?.value
+        }
+    }
 
     override suspend fun open() {
-        if (state == ElementState.CREATED) state = ElementState.OPEN
+        registryMutex.withLock {
+            if (state != ElementState.CREATED) return
+            supervisor.ensureActive()
+            state = ElementState.OPEN
+            val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
+            executionScope = scope
+            dispatcher = scope.launch(CoroutineName("nuid-dispatch"), start = CoroutineStart.UNDISPATCHED) {
+                var failure: Throwable = CancellationException("NUID dispatcher stopped")
+                try {
+                    for (dispatch in dispatches.kChannel) {
+                        var executing = false
+                        try {
+                            var admitted: DispatchResult? = null
+                            var escalated = 0
+                            for (slot in dispatch.candidates) {
+                                escalated = dispatch.claim.nuid.subnet.level - slot.workgroup.scope.level
+                                reserveDependency(dispatch.claim, slot.workgroup)
+                                admitted = slot.admit(dispatch.claim, dispatch.timeoutMillis)
+                                if (admitted != null) {
+                                    executing = admitted.completion != null
+                                    break
+                                }
+                                registryMutex.withLock { dependencies.remove(dispatch.claim.claimId) }
+                            }
+                            dispatch.result.complete(admitted ?: DispatchResult(dispatch.claim.claimId, null, null, escalated))
+                        } catch (error: Throwable) {
+                            dispatch.result.completeExceptionally(error)
+                            currentCoroutineContext().ensureActive()
+                        } finally {
+                            if (!executing) withContext(NonCancellable) { finishClaim(dispatch.claim) }
+                        }
+                    }
+                } catch (error: Throwable) {
+                    failure = error
+                    throw error
+                } finally {
+                    dispatches.close()
+                    withContext(NonCancellable) {
+                        while (true) {
+                            val pending = dispatches.kChannel.tryReceive().getOrNull() ?: break
+                            pending.result.completeExceptionally(failure)
+                            finishClaim(pending.claim)
+                        }
+                        registryMutex.withLock {
+                            workgroups.forEach { it.close() }
+                            retiring.values.forEach { it.close() }
+                        }
+                    }
+                }
+            }.also { it.invokeOnCompletion { supervisor.complete() } }
+        }
     }
 
-    /** Promote to ACTIVE — equivalent for dispatch purposes; here as the open() alias. */
-    suspend fun activate() {
+    suspend fun activate() = registryMutex.withLock {
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
     }
 
-    override suspend fun close() {
-        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
+    /** Stop external ingress; accepted handlers retain dependency admission until they finish. */
+    suspend fun stopAdmission(): Unit = withContext(NonCancellable) {
+        registryMutex.withLock {
             if (state < ElementState.DRAINING) state = ElementState.DRAINING
-            supervisor.cancel()
-            registryMutex.withLock {
-                workgroups.forEach { it.close() }
-                workgroups.clear()
-                mutableSubscribers.clear()
-                invalidate()
-            }
+            if (ownedClaims.isEmpty()) dispatches.close()
+            if (dispatcher == null) supervisor.complete()
+        }
+    }
+
+    /** Stop admission, finish queued dispatch and accepted handlers, then release the registry. */
+    override suspend fun drain(): Unit = withContext(NonCancellable) {
+        val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
+        registryMutex.withLock { checkLifecycleCaller(invocation) }
+        stopAdmission()
+        dispatcher?.join()
+        supervisor.join()
+        registryMutex.withLock {
+            workgroups.forEach { it.close() }
+            retiring.values.forEach { it.close() }
+            workgroups.clear()
+            retiring.clear()
+            registry = emptySeriesOf()
+            ownedClaims.clear()
+            invocations.clear()
+            dependencies.clear()
+            mutableSubscribers.clear()
             state = ElementState.CLOSED
         }
     }
 
-    // ── dispatcher ────────────────────────────────────────────────
-
-    /** Monotonic claim id; rolls over at [Long.MAX_VALUE]. */
-    private val claimMutex: Mutex = Mutex()
-    private var claimCounter: Long = 0L
-
-    private suspend fun nextClaimId(): Long = claimMutex.withLock {
-        claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L
-        claimCounter
-    }
+    override suspend fun close() = drain()
 
     /**
-     * Offer a [Claim] to the most-local eligible workgroup. Returns the
-     * [DispatchResult] with the winner name (or null if no workgroup claimed
-     * within [timeoutMillis]).
-     *
-     * Concentric narrowing: filter registry to those whose scope contains the
-     * request's subnet AND whose traits include the capability; sort ascending
-     * by scope.level; offer the claim at each level; first acceptor wins.
-     * No acceptor ⇒ escalate one outward level, up to [escalationBudget]+1.
+     * Prefix containment determines eligibility. The deepest eligible prefix is nearest;
+     * [escalationBudget] bounds the actual number of ancestor edges crossed.
+     * The bounded dispatcher owns admitted requests even if a caller stops awaiting them.
      */
-    suspend fun dispatch(
-        nuid: Nuid,
-        payload: Any? = null,
-        timeoutMillis: Long = 50L,
-    ): DispatchResult {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "NuidFanoutElement must be OPEN/ACTIVE before dispatch() (was $state)"
+    suspend fun dispatch(nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): DispatchResult {
+        require(timeoutMillis >= 0)
+        val result = CompletableDeferred<DispatchResult>()
+        val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
+        val dispatch = registryMutex.withLock {
+            val parent = invocation?.takeIf { invocations[it.value.b.claimId] === it }
+            if (parent == null) checkAccepting()
+            else check(state < ElementState.CLOSED && supervisor.isActive) { "NUID workgroup owner is closed" }
+            do { claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L }
+            while (claimCounter in ownedClaims)
+            val candidates = workgroups.filter {
+                it.workgroup.canHandle(nuid) && nuid.subnet.level - it.workgroup.scope.level <= escalationBudget
+            }.sortedByDescending { it.workgroup.scope.level }
+            val claim = Claim(claimCounter, nuid, payload, parent?.value)
+            ownedClaims[claim.claimId] = claim
+            Dispatch(claim, candidates, timeoutMillis, result)
         }
-        val claimId = nextClaimId()
-        val claim = Claim(claimId, nuid, payload)
-        val eligible: List<WorkgroupSlot> = snapshot()
-            .filter { it.workgroup.canHandle(nuid) }
-            .sortedBy { it.workgroup.scope.level }
-
-        if (eligible.isEmpty()) {
-            return DispatchResult(claimId, winner = null, claimedAtSubnet = null, escalatedLevels = 0)
+        try {
+            // Reserving ownership precedes the bounded send. Cancellation relinquishes the caller's
+            // wait, not work already admitted by the owner; no mutex is held while the queue is full.
+            withContext(NonCancellable) { dispatches.kChannel.send(dispatch) }
+        } catch (failure: Throwable) {
+            withContext(NonCancellable) { finishClaim(dispatch.claim) }
+            throw failure
         }
+        return result.await()
+    }
 
-        val levels: Map<Int, List<WorkgroupSlot>> = eligible.groupBy { it.workgroup.scope.level }
-        val startLevel = nuid.subnet.level
-        val levelsToTry: List<Int> = levels.keys
-            .filter { key -> key >= startLevel }
-            .sorted()
-            .take(escalationBudget + 1)
-        var escalatedLevels = 0
+    private suspend fun finishClaim(claim: Claim) = registryMutex.withLock {
+        if (ownedClaims[claim.claimId] === claim) {
+            ownedClaims.remove(claim.claimId)
+            invocations.remove(claim.claimId)
+            dependencies.remove(claim.claimId)
+            dependencies.entries.removeAll { it.value.a === claim }
+            if (state == ElementState.DRAINING && ownedClaims.isEmpty()) dispatches.close()
+        }
+    }
 
-        for ((idx, level) in levelsToTry.withIndex()) {
-            if (idx > 0) escalatedLevels = idx
-            val candidates = levels[level] ?: continue
-            for (slot in candidates) slot.offer(claim)
-            val winner = pollForWinner(candidates, claimId, timeoutMillis)
-            if (winner != null) {
-                return DispatchResult(
-                    claimId = claimId,
-                    winner = winner.workgroup.name,
-                    claimedAtSubnet = winner.workgroup.scope,
-                    escalatedLevels = escalatedLevels,
-                )
+    /** An active parent may wait on its child; historical parent identity alone cannot block reuse. */
+    private suspend fun reserveDependency(claim: Claim, target: Workgroup) = registryMutex.withLock {
+        val parent = claim.parent ?: return@withLock
+        if (invocations[parent.b.claimId]?.value?.b !== parent.b) return@withLock
+        val lineage = NuidInvocation(parent).lineage
+        val back = dependencyPath(target.name, parent.a.name)
+        if (back != null) throw NuidDispatchCycle(lineage, target,
+            (listOf(parent.a.name) + back).toTypedArray().toSeries())
+        dependencies[claim.claimId] = parent.b j (parent.a.name j target.name)
+    }
+
+    /** Read under registryMutex, including reservations waiting at a bounded slot channel. */
+    private fun dependencyPath(from: String, to: String): List<String>? {
+        val visited = mutableSetOf<String>()
+        val path = mutableListOf<String>()
+        fun visit(name: String): Boolean {
+            if (!visited.add(name)) return false
+            path.add(name)
+            if (name == to) return true
+            for (dependency in dependencies.values) {
+                val edge = dependency.b
+                if (edge.a == name && visit(edge.b)) return true
             }
-            if (idx >= levelsToTry.lastIndex) break
+            path.removeAt(path.lastIndex)
+            return false
         }
-
-        return DispatchResult(
-            claimId = claimId,
-            winner = null,
-            claimedAtSubnet = null,
-            escalatedLevels = escalatedLevels,
-        )
+        return if (visit(from)) path else null
     }
 
-    /**
-     * Attempts to dispatch [nuid] and returns the [Capability] that won the claim,
-     * or null if no workgroup claimed it.
-     */
     suspend fun claimWinnerCapability(nuid: Nuid, payload: Any? = null, timeoutMillis: Long = 50L): Capability? {
         val result = dispatch(nuid, payload, timeoutMillis)
-        if (result.winner != null) {
-            // Finding the exact matching capability in the winner's trait space
-            val winnerSlot = slotOf(result.winner)
-            if (winnerSlot != null) {
-                val caps = winnerSlot.workgroup.traits.capabilities()
-                for (i in 0 until caps.a) { // Series.a is size
-                    val cap = caps.b(i) // Series.b is the index accessor
-                    if (cap matches nuid.capability) return cap
-                }
-            }
-            return nuid.capability
-        }
-        return null
+        val winner = result.winner ?: return null
+        val slot = slotOf(winner) ?: return nuid.capability
+        val caps = slot.workgroup.traits.capabilities()
+        for (i in 0 until caps.a) if (caps.b(i) matches nuid.capability) return caps.b(i)
+        return nuid.capability
     }
 
-    /** Watch candidate slots for any one of them to take [claimId]. */
-    private suspend fun pollForWinner(
-        candidates: List<WorkgroupSlot>,
-        claimId: Long,
-        timeoutMillis: Long,
-    ): WorkgroupSlot? {
-        val mark = TimeSource.Monotonic.markNow()
-        val deadlineNanos = timeoutMillis * 1_000_000L
-        while (mark.elapsedNow().inWholeNanoseconds < deadlineNanos) {
-            for (slot in candidates) {
-                val taken = slot.tryTake() ?: continue
-                if (taken.claimId == claimId && acceptClaim(slot.workgroup, taken)) {
-                    slot.publishAccepted(taken)
-                    return slot
-                }
-            }
-            yield()
-        }
-        return null
-    }
-
-    /** Default admission policy — accepts any claim whose workgroup can handle it. */
-    private fun acceptClaim(workgroup: Workgroup, claim: Claim): Boolean =
-        workgroup.canHandle(claim.nuid)
-
-    /** Lift an offer directly to a named workgroup (bypass narrowing). */
+    /** Explicit offer only; this bypass does not report dispatch admission or handler completion. */
     suspend fun offer(name: String, claim: Claim) {
-        slotOf(name)?.offer(claim)
+        registryMutex.withLock { checkAccepting(); slotOf(name) }?.offer(claim)
+    }
+
+    private fun checkAccepting() {
+        check((state == ElementState.OPEN || state == ElementState.ACTIVE) && supervisor.isActive) {
+            "NuidFanoutElement must be OPEN/ACTIVE (was $state)"
+        }
+    }
+
+    /** Lifecycle waits cannot join the currently executing slot or its owning supervisor. */
+    private fun checkLifecycleCaller(invocation: NuidInvocation?, name: String? = null) {
+        val active = invocation?.takeIf { invocations[it.value.b.claimId] === it } ?: return
+        check(name != null && name != active.value.a.name) {
+            "${active.value.a.name}: an active workgroup cannot join its own lifecycle"
+        }
     }
 }

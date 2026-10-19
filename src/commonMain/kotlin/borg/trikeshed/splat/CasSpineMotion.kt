@@ -6,13 +6,7 @@ import borg.trikeshed.cas.LineSpine
 import borg.trikeshed.cas.MatchGrade
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.Tensor
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
 import kotlin.math.abs
 
 /** One observed content-addressed line displacement between adjacent spine generations. */
@@ -30,7 +24,7 @@ data class CasSpineIteration(
     val currentCid: ContentId,
     val nextCid: ContentId,
     val motion: Splat<SpineMotion>,
-    val eigenSignature: Tensor<Double>,
+    val eigenSignature: MetaSeries<Tensor, Double>,
     val next: LineSpine,
 )
 

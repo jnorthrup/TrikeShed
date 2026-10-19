@@ -1,7 +1,12 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.litebike.JvmKanbanServer
+import borg.trikeshed.lib.*
+import borg.trikeshed.parse.reify
+import borg.trikeshed.wiki.*
 import java.io.File
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
 /**
@@ -14,17 +19,19 @@ import java.security.MessageDigest
  * durable but had no way to be read as itself; `GET /api/cas/get?cid=…` could return the
  * bytes only because the caller already knew the content id.
  *
- * Two routes, both GET, both side-effect free:
+ * Read-only routes:
  *
  *  - `GET /api/wiki/list[?prefix=…]` — the plane's files as JSON: relative path, byte length,
  *    and sha256 content id, so a caller can verify what it is about to fetch.
  *  - `GET /api/wiki/read?path=…`     — one file's bytes verbatim, with its cid in the
  *    `X-Content-Id` header for verification against a freeze record.
+ *  - `GET /wiki[?page=…]` — linked retained library sections and wiki articles, with contents and backlinks.
  *
  * Paths are resolved against the plane root and REJECTED if they escape it; symlinks are
  * resolved before that check, so a link pointing out of the plane cannot serve the filesystem.
  */
 class WikiReadWire(
+    private val curations: (() -> borg.trikeshed.narsese.ConstellationNodes?)? = null,
     /** Resolved lazily: the daemon builds the wire before the plane is guaranteed to exist. */
     private val wikiRoot: () -> File,
 ) {
@@ -33,7 +40,7 @@ class WikiReadWire(
         const val READ_ROUTE: String = "/api/wiki/read"
         const val PREFIX: String = "/api/wiki/"
 
-        val ROUTES: List<Pair<String, String>> = listOf("GET" to LIST_ROUTE, "GET" to READ_ROUTE)
+        val ROUTES: List<Pair<String, String>> = listOf("GET" to LIST_ROUTE, "GET" to READ_ROUTE, "GET" to "/wiki")
 
         /** Guard against a `list` on a huge plane answering an unbounded document. */
         private const val MAX_LIST_ENTRIES = 5000
@@ -52,22 +59,9 @@ class WikiReadWire(
             append('"')
         }
 
-        private fun decode(raw: String): String {
-            val out = StringBuilder()
-            var i = 0
-            while (i < raw.length) {
-                val c = raw[i]
-                when {
-                    c == '+' -> { out.append(' '); i++ }
-                    c == '%' && i + 2 < raw.length -> {
-                        val hex = raw.substring(i + 1, i + 3).toIntOrNull(16)
-                        if (hex == null) { out.append(c); i++ } else { out.append(hex.toChar()); i += 3 }
-                    }
-                    else -> { out.append(c); i++ }
-                }
-            }
-            return out.toString()
-        }
+        private fun decode(raw: String): String =
+            try { URLDecoder.decode(raw, StandardCharsets.UTF_8) }
+            catch (_: IllegalArgumentException) { raw }
 
         internal fun query(path: String, name: String): String? =
             path.substringAfter('?', "").split('&')
@@ -98,6 +92,40 @@ class WikiReadWire(
         else -> "application/octet-stream"
     }
 
+    /** Project retained curation identities into the bounded, containment-checked wiki plane. */
+    private suspend fun page(path: String): JvmKanbanServer.HttpResponse {
+        val selected = query(path, "page")?.takeIf { it.isNotBlank() }
+        val source = query(path, "source") == "1"
+        fun html(status: Int, articles: Series<WikiArticle>, unavailable: String? = null, truncated: Boolean = false) =
+            JvmKanbanServer.HttpResponse(status,
+                WikiSurface.render(articles, selected, source, unavailable, truncated), "text/html; charset=utf-8")
+        val files = mutableListOf<WikiArticle>()
+        val listing = checkNotNull(route("GET", LIST_ROUTE, ByteArray(0)))
+        val index = if (listing.status == 200) reify(listing.body) as Map<*, *> else emptyMap<Any?, Any?>()
+        var truncated = index["truncated"] == true
+        var selectedStatus = if (selected == null) 200 else 404
+        for (entry in (index["files"] as? List<*>).orEmpty()) {
+            val name = (entry as? Map<*, *>)?.get("path") as? String ?: continue
+            if (!name.endsWith(".md", ignoreCase = true)) continue
+            val response = checkNotNull(route("GET", "$READ_ROUTE?path=${WikiSurface.encode(name)}", ByteArray(0)))
+            if (selected == name) selectedStatus = response.status
+            if (response.status != 200) { truncated = true; continue }
+            files.add(WikiArticle(name, response.payloadBytes.decodeToString(), response.headers["X-Content-Id"].orEmpty()))
+        }
+        val articles = try {
+            val source = files.toSeries()
+            curations?.invoke()?.let { CurationWiki(it).pages(selected, source) } ?: source
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            return html(500, emptySeriesOf(), "The retained library could not be read: ${error.message}")
+        }
+        if (listing.status != 200 && articles.size == 0)
+            return html(listing.status, articles, "The curation wiki is unavailable.")
+        if (articles.view.any { it.path == selected }) selectedStatus = 200
+        return html(selectedStatus, articles,
+            if (selectedStatus >= 500) "This curation could not be read." else null, truncated)
+    }
+
     @Suppress("UNUSED_PARAMETER")
     suspend fun route(
         method: String,
@@ -106,6 +134,10 @@ class WikiReadWire(
         respond: (suspend (ByteArray) -> Unit)? = null,
     ): JvmKanbanServer.HttpResponse? {
         val bare = path.substringBefore('?')
+        if (bare == "/wiki" || bare == "/wiki/" || bare == "/wiki.html") {
+            return if (method == "GET") page(path)
+            else json(405, """{"error":"method_not_allowed"}""")
+        }
         if (!bare.startsWith(PREFIX)) return null
         if (method != "GET") {
             return json(405, """{"error":"method_not_allowed","method":${jsonString(method)},"path":${jsonString(bare)}}""")

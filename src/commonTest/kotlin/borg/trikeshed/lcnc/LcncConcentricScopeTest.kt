@@ -3,7 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.toList
 import kotlinx.coroutines.currentCoroutineContext
-import borg.trikeshed.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,7 +29,7 @@ class LcncConcentricScopeTest {
         LcncProgram(name, nodes.toSeries(), wires.toSeries())
 
     @Test
-    fun absentDefaultRequiresABindingButAnExplicitEmptyDefaultDoesNot() = runBlocking {
+    fun absentDefaultRequiresABindingButAnExplicitEmptyDefaultDoesNot() = runTest {
         fun ring(params: Map<String, String>) = program("default-presence", listOf(
             LcncNode("r", LcncContracts.SCOPE, children = listOf(
                 LcncNode("i", LcncContracts.SCOPE_IN, params),
@@ -46,7 +46,7 @@ class LcncConcentricScopeTest {
     //    zero re-plumbing; yields climb out explicitly ──────────────────────
 
     @Test
-    fun innerConsumesOuterTwoRingsDeepWithZeroPlumbing() = runBlocking {
+    fun innerConsumesOuterTwoRingsDeepWithZeroPlumbing() = runTest {
         val p = program(
             "deep",
             listOf(
@@ -71,7 +71,7 @@ class LcncConcentricScopeTest {
     // ── line 1: scope.in resolves the chain outward; nearest ring shadows ──
 
     @Test
-    fun scopeInResolvesOutwardAndNearestRingShadows() = runBlocking {
+    fun scopeInResolvesOutwardAndNearestRingShadows() = runTest {
         val p = program(
             "shadow",
             listOf(
@@ -101,7 +101,7 @@ class LcncConcentricScopeTest {
     // ── line 1: only scope.out crosses — an outward wire is a loud violation ──
 
     @Test
-    fun outwardWireIsALoudScopeViolation(): Unit = runBlocking {
+    fun outwardWireIsALoudScopeViolation() = runTest {
         val p = program(
             "leak",
             listOf(
@@ -118,7 +118,7 @@ class LcncConcentricScopeTest {
     }
 
     @Test
-    fun cousinWireIsALoudScopeViolation(): Unit = runBlocking {
+    fun cousinWireIsALoudScopeViolation() = runTest {
         val p = program(
             "cousins",
             listOf(
@@ -139,7 +139,7 @@ class LcncConcentricScopeTest {
     // ── line 4: authored order is program order — use-before-def is loud ──
 
     @Test
-    fun useBeforeDefIsLoud(): Unit = runBlocking {
+    fun useBeforeDefIsLoud() = runTest {
         val p = program(
             "ubd",
             listOf(
@@ -156,7 +156,7 @@ class LcncConcentricScopeTest {
     // ── line 4: if (cond) { ring } — a falsy guard skips, yields stay absent ──
 
     @Test
-    fun guardedRingSkipsOnFalseAndRunsOnTrue() = runBlocking {
+    fun guardedRingSkipsOnFalseAndRunsOnTrue() = runTest {
         fun guarded(cond: String) = program(
             "iff",
             listOf(
@@ -181,7 +181,7 @@ class LcncConcentricScopeTest {
     // ── if (cond) { ring } else { ring }: one guard, two rings, one typed merge ──
 
     @Test
-    fun elseRingRunsOnlyOnFalseAndMergeTakesTheRingThatRan() = runBlocking {
+    fun elseRingRunsOnlyOnFalseAndMergeTakesTheRingThatRan() = runTest {
         fun branched(cond: String) = program(
             "ifelse",
             listOf(
@@ -217,7 +217,7 @@ class LcncConcentricScopeTest {
     //    sees the enclosing environment (the anti-vacuum gate) ──────────────
 
     @Test
-    fun namedRingSeesTheEnclosingEnvironmentAndMatchesInline() = runBlocking {
+    fun namedRingSeesTheEnclosingEnvironmentAndMatchesInline() = runTest {
         val bodyNodes = listOf(
             LcncNode("bi", LcncContracts.SCOPE_IN, params = mapOf("name" to "text")),
             LcncNode("bo", LcncContracts.SCOPE_OUT, params = mapOf("name" to "seen")),
@@ -243,7 +243,7 @@ class LcncConcentricScopeTest {
     //    plumbing — block compatibility through the machinery, not the grammar ──
 
     @Test
-    fun runnersSeeTheFrameThroughCoroutineContext() = runBlocking {
+    fun runnersSeeTheFrameThroughCoroutineContext() = runTest {
         val reg = registry + ("ctx.probe" to LcncNodeRunner { _, _ ->
             val frame = currentCoroutineContext()[LcncScopeFrame]
             mapOf(
@@ -269,7 +269,7 @@ class LcncConcentricScopeTest {
     // ── identity: the executor's chain is deterministic and ring-named ──
 
     @Test
-    fun frameChainIsDeterministicOverTheRingPath() = runBlocking {
+    fun frameChainIsDeterministicOverTheRingPath() = runTest {
         val entered = ArrayList<Pair<List<String>, FrameIdChain>>()
         val p = program(
             "chain",
@@ -294,7 +294,7 @@ class LcncConcentricScopeTest {
     // ── the offered preset is the machine's own demo: three rings, one document ──
 
     @Test
-    fun presetScopeRunsAsAThreeRingDocument() = runBlocking {
+    fun presetScopeRunsAsAThreeRingDocument() = runTest {
         val doc = LcncPresets.all().getValue("preset-scope")
         val p = LcncProgramConfix.fromJson("preset-scope", doc)
         val res = LcncRunner(emptyMap()).runProcedure(p)

@@ -3,13 +3,15 @@ package borg.trikeshed.kanban.module
 import borg.trikeshed.graal.subvm.VmLanguages
 import borg.trikeshed.graal.subvm.CamelSource
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.CanonicalCbor
+import borg.trikeshed.collections.associative.Cbor
 import borg.trikeshed.couch.isam.descriptor
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
-import borg.trikeshed.parse.confix.Syntax
+import borg.trikeshed.parse.confix.*
 import borg.trikeshed.vm.VmHost
 import borg.trikeshed.vm.VmLanguageCapability
 import borg.trikeshed.vm.VmLanguage
@@ -25,11 +27,35 @@ class WorkspaceService(
 ) {
     suspend fun catalog(): Map<String, Any?> = mapOf(
         "facets" to WorkspaceFacets.catalog().view.toList(),
+        "cases" to casePrograms(),
         "languages" to capabilities().view.map(::language),
         "runners" to context.lcncRunners.keys.sorted(),
         "blackboardRevision" to context.blackboard.snapshot().revision,
         "storage" to storageCatalog(),
     )
+
+    /** Offered examples plus current board definitions; discovery never installs either. CID pinning
+     * at the run seam still checks the loader's selected version, not this presentation snapshot. */
+    fun casePrograms(): List<Map<String, Any?>> {
+        val programs = LcncPublisher(context.blackboard, { context.lcncRunners }, context.attachments)
+            .storedCorpus().toMutableMap()
+        for ((key, entry) in context.blackboard.snapshot().values) {
+            if (!key.startsWith(LcncBlackboard.PROGRAM_PREFIX)) continue
+            val name = key.removePrefix(LcncBlackboard.PROGRAM_PREFIX)
+            // Even an invalid current board entry shadows the offered definition, rather than
+            // presenting a valid example in its place and implying the edit was accepted.
+            programs.remove(name)
+            LcncBlackboard.programOf(entry)?.takeIf { it.name == name }?.let { programs[name] = it }
+        }
+        return programs.toSortedMap().values.mapNotNull { program ->
+            if (runCatching { LcncCaseProgram.validate(program) }.isFailure) return@mapNotNull null
+            mapOf("name" to program.name, "programCid" to LcncBlackboard.cidOf(program),
+                "title" to (LcncPresets.info(program.name)?.title ?: program.name),
+                "edges" to program.kanban!!.edges.view.map { edge ->
+                    mapOf("from" to edge.from, "to" to edge.to, "mode" to edge.mode.name)
+                })
+        }
+    }
 
     suspend fun capabilities(): Series<VmLanguageCapability> {
         val runner = context.lcncRunners[SubVmLegos.POLYGLOT]
@@ -209,9 +235,14 @@ class WorkspaceService(
         return HttpResponse(200, jsonOf(body))
     }
 
-    /** Facets over the exact retained JSON bytes; no named-head fallback or execution. */
+    /** Facets over exact retained bytes. The caller selects the format; no sniffing or fallback. */
     fun content(request: Map<*, *>, source: Map<*, *>): HttpResponse {
-        require(source.keys == setOf("kind", "cid")) { "CAS inspection requires only kind and cid" }
+        require(source.keys - "syntax" == setOf("kind", "cid")) { "CAS inspection requires kind, cid and optional syntax" }
+        val syntax = when {
+            !source.containsKey("syntax") || source["syntax"] == "JSON" -> Syntax.JSON
+            source["syntax"] == "CBOR" -> Syntax.CBOR
+            else -> throw IllegalArgumentException("Retained syntax must be JSON or CBOR")
+        }
         val cid = ContentId(requireNotNull(source["cid"] as? String) { "A retained content ID is required" })
         val bytes = context.casStore.get(cid)
             ?: return HttpResponse(404, jsonOf(mapOf("error" to "Retained content unavailable")))
@@ -219,22 +250,34 @@ class WorkspaceService(
             return HttpResponse(413, jsonOf(mapOf("error" to "Retained content exceeds workspace byte limit")))
         if (ContentId.of(bytes) != cid)
             return HttpResponse(409, jsonOf(mapOf("error" to "Retained content identity mismatch")))
-        val text: String
-        val value: Any?
-        try {
-            text = bytes.decodeToString(throwOnInvalidSequence = true)
-            value = reifyStrict(text)
-        } catch (e: CharacterCodingException) {
-            return HttpResponse(422, jsonOf(mapOf("error" to "Retained content is not UTF-8 JSON")))
-        } catch (e: IllegalArgumentException) {
-            return HttpResponse(422, jsonOf(mapOf("error" to "Retained content is not UTF-8 JSON")))
-        } catch (e: IllegalStateException) {
-            return HttpResponse(422, jsonOf(mapOf("error" to "Retained content is not UTF-8 JSON")))
+        val doc: ConfixDoc
+        if (syntax == Syntax.CBOR) {
+            try {
+                // Bound recursive decoding before scanning or reifying. Curator/Couch receipts use
+                // this canonical form; reject representations the Confix projection cannot retain.
+                val reader = Cbor.Reader(bytes, 0, maxDepth = 64, maxItems = WorkspaceFacets.MAX_TOKENS)
+                reader.readItem()
+                require(reader.pos == bytes.size) { "Trailing CBOR" }
+                doc = confixDoc(bytes, syntax)
+                require(CanonicalCbor.encode(doc).contentEquals(bytes)) { "Unsupported CBOR representation" }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                return HttpResponse(422, jsonOf(mapOf("error" to "Retained content is not bounded canonical Confix CBOR")))
+            }
+        } else {
+            val value: Any?
+            try {
+                value = reifyStrict(bytes.decodeToString(throwOnInvalidSequence = true))
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                return HttpResponse(422, jsonOf(mapOf("error" to "Retained content is not UTF-8 JSON")))
+            }
+            WorkspaceFacets.valueBudget().violation(value)?.let { throw IllegalArgumentException(it) }
+            doc = confixDoc(bytes, syntax)
         }
-        WorkspaceFacets.valueBudget().violation(value)?.let { throw IllegalArgumentException(it) }
-        return HttpResponse(200, jsonOf(mapOf("source" to mapOf("kind" to "cas", "cid" to cid.value),
+        return HttpResponse(200, jsonOf(mapOf("source" to source,
             "blackboardRevision" to context.blackboard.snapshot().revision,
-            "confix" to WorkspaceFacets.inspect(text, path(request),
+            "confix" to WorkspaceFacets.inspect(doc, syntax, path(request),
                 request["offset"]?.let { integer(it, "offset") } ?: 0,
                 request["limit"]?.let { integer(it, "limit") } ?: 32, cursorQuery(request["cursor"])))))
     }

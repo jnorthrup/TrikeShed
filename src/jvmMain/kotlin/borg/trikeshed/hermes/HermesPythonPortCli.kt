@@ -16,7 +16,7 @@ object HermesPythonPortCli {
     @JvmStatic
     fun main(args: Array<String>) {
         val options = args.asList()
-        val root = Path.of(value(options, "--root") ?: "${System.getProperty("user.home")}/.hermes/hermes-agent").toAbsolutePath().normalize()
+        val root = Path.of(value(options, "--root") ?: "utils/hermes-trikeshed-graalpy").toAbsolutePath().normalize()
         val report = Path.of(value(options, "--report") ?: "build/reports/hermes-python-port.json").toAbsolutePath().normalize()
         val queue = Path.of(value(options, "--queue") ?: "build/reports/hermes-graalpy-sleeve-queue.json").toAbsolutePath().normalize()
         val sleeve = Path.of(value(options, "--sleeve") ?: "graalpy-sleeve/hermes").toAbsolutePath().normalize()

@@ -1,6 +1,7 @@
 package borg.trikeshed.couch
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.context.*
 
 /**
  * Production Ingress that generates CAS-based revisions and submits to an injected
@@ -19,19 +20,15 @@ class ProductionCouchIngress(
     private val commitBoundary: (CouchCommittedFrame) -> Unit,
     private val contentIdFn: (Document) -> ContentId,
     initialSequence: Long = 0,
+    val synchronization: Synchronization = Synchronization.MONITOR,
 ) : CouchIngress {
     private var sequence: Long = initialSequence
 
-    // The ingress IS the single-writer boundary — but the daemon has many writing
-    // coroutines (boot reconcile, worktree-quake reconcile, panels, replication),
-    // and an unsynchronized rev-read → sequence++ → commit interleaving mints
-    // equal/reordered sequences that trip the head projection's monotonicity
-    // guard ("_changes resumes after the sequence without going backwards"),
-    // ABORTING whichever reconcile loses the race. Every mutating entry runs
-    // inside one lock so the discipline holds regardless of caller topology.
-    private val commitLock = Any()
+    // Shared writers serialize revision selection, sequence allocation and publication together.
+    // NONE requires the caller to own that same boundary, including all replicated mutations.
+    private val commitLock = synchronization.lock()
 
-    override fun putIntent(doc: Document, expectedRev: String?): Boolean = borg.trikeshed.isam.synchronizedLock(commitLock) {
+    override fun putIntent(doc: Document, expectedRev: String?): Boolean = synchronize(commitLock) {
         val existingRev = head.getRev(doc.id)
         val isDeleted = head.isDeleted(doc.id)
 
@@ -60,7 +57,7 @@ class ProductionCouchIngress(
         return true // Success for both inserts and updates
     }
 
-    override fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean = borg.trikeshed.isam.synchronizedLock(commitLock) {
+    override fun putReplicated(doc: Document?, docId: String, rev: String, deleted: Boolean): Boolean = synchronize(commitLock) {
         val existingRev = head.getRev(docId)
         if (existingRev == rev) return true // already the head: idempotent
         if (existingRev != null && !revWins(rev, existingRev)) return false
@@ -70,7 +67,7 @@ class ProductionCouchIngress(
         return true
     }
 
-    override fun deleteIntent(docId: String, expectedRev: String?): Boolean = borg.trikeshed.isam.synchronizedLock(commitLock) {
+    override fun deleteIntent(docId: String, expectedRev: String?): Boolean = synchronize(commitLock) {
         val existingRev = head.getRev(docId) ?: return false
         val isDeleted = head.isDeleted(docId)
         if (isDeleted) return false

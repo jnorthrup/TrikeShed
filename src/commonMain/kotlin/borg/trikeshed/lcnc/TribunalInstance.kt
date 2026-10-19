@@ -3,6 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.parse.jsonOf
 
 import borg.trikeshed.job.ConfixFacetPlan
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobEvent
 import borg.trikeshed.job.JobId
@@ -17,6 +18,8 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.Syntax
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * The tribunal's mutable + versionable instance.
@@ -45,6 +48,21 @@ class TribunalInstance internal constructor(
     val plan: ConfixFacetPlan,
     var laneIds: List<String>,
 ) {
+    private val recordLock = Mutex()
+    private var verdictCid: ContentId? = null
+
+    /** One verdict per legacy instance; never attach another verdict to an old completion. */
+    suspend fun record(cid: ContentId): String = recordLock.withLock {
+        if (verdictCid == cid) return@withLock checkNotNull(snapshotCid("deliberate"))
+        check(verdictCid == null && lifecycle("deliberate") in setOf("active", "submitted")) {
+            "tribunal.record: this instance has already completed; use a new case for another verdict"
+        }
+        val event = advance("deliberate", "complete", "tribunal-verdict-${cid.value}",
+            checkNotNull(revision("deliberate")))
+        check(event is JobEvent.Accepted) { "tribunal.record: lifecycle rejected: $event" }
+        verdictCid = cid
+        checkNotNull(snapshotCid("deliberate")) { "tribunal.record: missing committed snapshot" }
+    }
 
     /** Revision of a committed job, or null if it has not committed yet. */
     fun revision(jobId: String): Long? = nexus.snapshot(jobId)?.revision
@@ -107,36 +125,36 @@ class TribunalInstance internal constructor(
         }
 
         nexus.submit(cmd)
-        return awaitCommit(id)
+        return awaitCommit(id, idempotencyKey)
     }
 
-    /** Suspend until the nexus commits a command for [id]; return that event. */
-    private suspend fun awaitCommit(id: JobId): JobEvent {
-        // Sequential trial: one command in flight at a time, so the next
-        // committed event is ours. Bounded so a missing commit is loud, not
-        // an infinite loop.
+    /** Suspend for this request's event; unrelated seed/auto-start events are wakeups only. */
+    private suspend fun awaitCommit(id: JobId, idempotencyKey: String): JobEvent {
+        // A delayed auto-start event can name the same job. Its request key
+        // cannot acknowledge this command. Keep the existing bounded wait.
         repeat(16) {
             val e = nexus.committed.receive()
             val eid = when (e) {
                 is JobEvent.Accepted -> e.jobId
                 is JobEvent.Rejected -> e.jobId
             }
-            if (eid == id) return e
+            val key = when (e) {
+                is JobEvent.Accepted -> e.idempotencyKey
+                is JobEvent.Rejected -> e.idempotencyKey
+            }
+            if (eid == id && key == idempotencyKey) return e
         }
         throw IllegalStateException("tribunal: no committed event observed for ${id.value}")
     }
 
     /**
      * Suspend until every root seed commit has landed (each lane at
-     * revision 1). Consumes exactly one committed event per lane IN ORDER —
-     * the reactor emits in commit order and the seeds were submitted in
-     * lane order, so this drains the seed events from the committed channel
-     * with nothing left behind (a leftover seed event for a lane would be
-     * mistaken for that lane's next advance).
+     * revision 1). Seed requests are awaited in lane order. Interleaved
+     * auto-start events cannot acknowledge another seed or later advance.
      */
     suspend fun awaitRootSeeds() {
         for (lane in laneIds) {
-            awaitCommit(JobId.of(lane))
+            awaitCommit(JobId.of(lane), "tribunal-seed-$lane")
         }
     }
 
