@@ -589,8 +589,18 @@ class Registry(
     }
 
     /** Defaults actually served: (repository j origin) j (tag j digest), in repository then tag order. */
-    fun defaults(): Series<Join<Twin<String>, Twin<String>>> =
-        repositories.entries.flatMap { (r, repo) -> repo.tags.entries.map { (t, d) -> (r j repo.origin.serialization) j (t j d) } }.toSeries()
+    fun defaults(): Series<Join<Twin<String>, Twin<String>>> {
+        /* ⚡ Bolt: Eliminate intermediate List allocations from flatMap and map by building list directly and wrapping with j constructor */
+        val list = buildList {
+            for ((r, repo) in repositories) {
+                val origin = repo.origin.serialization
+                for ((t, d) in repo.tags) {
+                    add((r j origin) j (t j d))
+                }
+            }
+        }
+        return list.size j { i: Int -> list[i] }
+    }
 
     /** registry.rs route: the OCI distribution read routes over the defaults. */
     fun route(method: String, path: String): HtxResponse {
