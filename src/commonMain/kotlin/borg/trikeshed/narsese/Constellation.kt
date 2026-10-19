@@ -114,11 +114,26 @@ class Book(
     val paths: List<String> = emptyList(),
     /** What the source document is, as its curation notes state it: where it was read from, when, and its digest. */
     val provenance: Map<String, String> = emptyMap(),
+    /** Per statement, the share of its clause the parse reified ([NormClause.reified]), the best of its clauses; empty for a book read before it. */
+    val reified: FloatArray = FloatArray(0),
 ) {
-    init { require(statements.size == support.size && judged.size == nouls.size) }
+    init { require(statements.size == support.size && judged.size == nouls.size && (reified.isEmpty() || reified.size == statements.size)) }
 
-    /** Evidence section [k] gives statement [i]: one unit scaled by Jev's noul, a whole unit where Jev has not judged. */
+    /**
+     * Evidence section [k] gives statement [i]. A clause the parse reified enters as an input judgment does: confidence
+     * [INPUT] scaled by the share of the clause it keeps, so w = c/(1-c) units and one statement of a clause reads
+     * c = [INPUT] whole. Jev's noul gates it: judged below [GATE] the section is one machine observation scaled by the noul.
+     * A book read before reification gives one unit, scaled by the noul where Jev judged it.
+     */
     fun weight(i: Int, k: Int): Long {
+        val noul = noul(i, k)
+        if (reified.isEmpty() || noul != null && noul < GATE) return noul?.let { maxOf(1L, (it * Nal.UNIT).toLong()) } ?: Nal.UNIT
+        val c = INPUT * reified[i]
+        return maxOf(1L, (c / (1f - c) * Nal.UNIT).toLong())
+    }
+
+    /** Jev's noul that section [k] states statement [i], or null where Jev has not judged the pair. */
+    fun noul(i: Int, k: Int): Float? {
         val key = packInts(i, k)
         var lo = 0; var hi = judged.size - 1
         while (lo <= hi) {
@@ -127,10 +142,10 @@ class Book(
             when {
                 x < key -> lo = mid + 1
                 x > key -> hi = mid - 1
-                else -> return maxOf(1L, (nouls[mid] * Nal.UNIT).toLong())
+                else -> return nouls[mid]
             }
         }
-        return Nal.UNIT
+        return null
     }
 
     companion object {
@@ -138,6 +153,12 @@ class Book(
         fun heading(section: String): String = section.take(HEADING).substringBefore(". ", section.take(HEADING)).trim()
 
         const val HEADING = 120
+
+        /** An input judgment's confidence: what a clause stated once carries when the parse keeps all of it. */
+        const val INPUT = 0.9f
+
+        /** Jev's noul below which a section is not taken to state the statement as the parse read it. */
+        const val GATE = 0.5f
 
         /** The section's content address: identical text in any book or run names the same graph. */
         fun urn(section: String): String = "urn:" + ContentId.of(section.encodeToByteArray()).value
@@ -148,13 +169,15 @@ class Book(
             val index = LinkedHashMap<String, Int>()
             val statements = ArrayList<NormStatement>()
             val sectionsOf = ArrayList<IntAccumulator>()
+            val reified = ArrayList<Float>()
             for ((ordinal, found) in clauses.withIndex()) for (c in found) {
                 val s = NormStatement.of(c, classOf)
-                val at = index.getOrPut(s.key) { statements.add(s); sectionsOf.add(IntAccumulator(4)); statements.size - 1 }
+                val at = index.getOrPut(s.key) { statements.add(s); sectionsOf.add(IntAccumulator(4)); reified.add(0f); statements.size - 1 }
                 sectionsOf[at].add(ordinal)
+                reified[at] = maxOf(reified[at], c.reified)
             }
             return Book(name, work, date, headings ?: sections.map(::heading), statements, sectionsOf.map { it.toRoaring().toIntArray() }, facts, cites,
-                sections = sections.map(::urn), paths = paths, provenance = provenance)
+                sections = sections.map(::urn), paths = paths, provenance = provenance, reified = reified.toFloatArray())
         }
     }
 }

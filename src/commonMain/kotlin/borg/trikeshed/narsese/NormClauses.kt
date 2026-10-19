@@ -26,6 +26,8 @@ data class NormClause(
     /** The subject's head lemma and its named-entity tag (`O` when none): what types the bearer. */
     val head: String = subject.substringAfterLast(' '),
     val ner: String = "O",
+    /** The share of the clause's content words (its verb's span in the parse) this reading keeps: 1 when nothing was clipped. */
+    val reified: Float = 1f,
 ) {
     /** The predicate as one term: verb and object. Restatements that differ only in qualification share it. */
     val predicate: String get() = listOfNotNull(verb, obj).joinToString("_") { it.replace(' ', '_') }
@@ -37,31 +39,61 @@ object NormClauses {
     private val modifiers = arrayOf("compound", "amod", "nmod:poss")
     private val conditionMarks = setOf("if", "when", "unless", "until", "where", "whenever", "before", "after", "upon")
 
-    /** Clauses of [doc]; a modal-less present-tense clause counts only when its subject lemma is in [genericSubjects]. */
-    fun extract(doc: NlpDocument, genericSubjects: Set<String> = emptySet()): List<NormClause> {
+    /**
+     * Clauses of [doc]; a modal-less present-tense clause counts only when its subject lemma is in [genericSubjects].
+     * A word the text's [parties] define ([PartyAliases]) reads as that party's noun: a pronoun as subject, object,
+     * possessor or the subject of a condition, and a bare noun alias ("customer"). "You may cancel" is the user's norm.
+     * Each subject the parse gives a verb (enhanced dependencies spread a verb over "the Seller or Coinbase") is a clause.
+     */
+    fun extract(doc: NlpDocument, genericSubjects: Set<String> = emptySet(), parties: Map<String, String> = emptyMap()): List<NormClause> {
         val out = ArrayList<NormClause>()
         for (s in doc.sentences.values()) {
             val tokens = s.tokens.values().associateBy { it.index }
             val deps = s.dependencies.values()
             fun kids(head: Int, vararg rel: String) = deps.filter { d -> d.governor == head && rel.any { d.relation.lowercase().startsWith(it) } }
-            fun phrase(t: NlpToken): String {
-                val mods = kids(t.index, *modifiers).mapNotNull { tokens[it.dependent] }.filter { it.index < t.index }.sortedBy { it.index }
-                // A possessive pronoun keeps its own form: CoreNLP lemmatises "his" to "he".
-                // A possessive pronoun or a demonstrative/quantifying determiner does not name the bearer.
-                return (mods.filter { !it.tag.startsWith("PRP") && it.lemma.lowercase() !in setOf("such", "said", "same") } + t)
-                    .joinToString(" ") { it.lemma.lowercase() }
+            fun party(t: NlpToken): String? = parties[t.lemma.lowercase()]?.takeIf {
+                t.tag.startsWith("PRP") || t.tag.startsWith("NN") && kids(t.index, "compound", "amod").isEmpty()
             }
+            fun phrase(t: NlpToken): String {
+                party(t)?.let { return it }
+                val mods = kids(t.index, *modifiers).mapNotNull { tokens[it.dependent] }.filter { it.index < t.index }.sortedBy { it.index }
+                // A possessive pronoun keeps its own form: CoreNLP lemmatises "his" to "he"; a party's possessive is the party.
+                // Any other possessive pronoun or a demonstrative/quantifying determiner does not name the bearer.
+                return (mods.mapNotNull { m -> if (m.tag.startsWith("PRP")) party(m) else m.lemma.lowercase().takeIf { it !in setOf("such", "said", "same") } } +
+                    t.lemma.lowercase()).joinToString(" ")
+            }
+            fun modalOf(verb: NlpToken) = kids(verb.index, "aux").mapNotNull { tokens[it.dependent] }
+                .firstOrNull { it.lemma.lowercase() in modals || it.word.lowercase() in modals }
+            fun clauseVerb(i: Int) = tokens[i]?.let { it.tag.startsWith("VB") && kids(i, "nsubj").isNotEmpty() && modalOf(it) != null } == true
+            // The clause's own words: the verb's dependents, transitively, short of a coordinate clause, another modal clause
+            // and the auxiliaries; the share of its content words the clause keeps is how whole the parse reified it.
+            fun span(verb: NlpToken): List<NlpToken> {
+                val seen = HashSet<Int>(); val at = ArrayList<NlpToken>(); val stack = ArrayList<Int>().apply { add(verb.index) }
+                while (stack.isNotEmpty()) {
+                    val h = stack.removeAt(stack.size - 1)
+                    if (!seen.add(h)) continue
+                    tokens[h]?.let(at::add)
+                    for (d in deps) if (d.governor == h) {
+                        val r = d.relation.lowercase()
+                        if (r.startsWith("conj") || r.startsWith("parataxis") || r.startsWith("aux") || r.startsWith("cop") || r == "punct") continue
+                        if (d.dependent != verb.index && clauseVerb(d.dependent)) continue
+                        stack.add(d.dependent)
+                    }
+                }
+                return at
+            }
+            fun content(t: NlpToken) = t.tag.startsWith("NN") || t.tag.startsWith("VB") || t.tag.startsWith("JJ") || t.tag == "CD" || party(t) != null
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
             for (verb in tokens.values.filter { it.tag.startsWith("VB") }) {
-                val subjDep = kids(verb.index, "nsubj").firstOrNull() ?: continue
-                val subj = tokens[subjDep.dependent] ?: continue
-                if (!subj.tag.startsWith("NN")) continue
-                // "the bill will be dismissed": the subject is the patient, so the predicate is passive.
-                val passive = subjDep.relation.lowercase().endsWith(":pass")
                 // A bare copula ("the case is") carries no clause.
                 if (verb.lemma.lowercase() == "be" && kids(verb.index, "obj", "dobj", "xcomp", "obl").isEmpty()) continue
-                val modal = kids(verb.index, "aux").mapNotNull { tokens[it.dependent] }
-                    .firstOrNull { it.lemma.lowercase() in modals || it.word.lowercase() in modals }
+                val subjects = kids(verb.index, "nsubj")
+                for (subjDep in subjects) {
+                val subj = tokens[subjDep.dependent] ?: continue
+                if (!subj.tag.startsWith("NN") && party(subj) == null) continue
+                // "the bill will be dismissed": the subject is the patient, so the predicate is passive.
+                val passive = subjDep.relation.lowercase().endsWith(":pass")
+                val modal = modalOf(verb)
                 val generic = modal == null && verb.tag in setOf("VBZ", "VBP") && subj.lemma.lowercase() in genericSubjects
                 if (modal == null && !generic) continue
                 // Negation on the verb ("will not"), in the modal ("cannot"), or on the subject ("no one").
@@ -69,22 +101,27 @@ object NormClauses {
                     kids(subj.index, "det", "advmod").mapNotNull { tokens[it.dependent] }.any { it.lemma.lowercase() in negators } ||
                     modal?.word?.lowercase() == "cannot"
                 val obj = kids(verb.index, "obj", "dobj", "xcomp").mapNotNull { tokens[it.dependent] }.firstOrNull()
-                    // A wh-word or pronoun object names no term: the clause it opens is not this norm's object.
-                    ?.takeIf { !it.tag.startsWith("W") && !it.tag.startsWith("PRP") }
+                    // A wh-word or pronoun object names no term: the clause it opens is not this norm's object. A party's pronoun names the party.
+                    ?.takeIf { !it.tag.startsWith("W") && (!it.tag.startsWith("PRP") || party(it) != null) }
                 val obl = kids(verb.index, "obl").mapNotNull { tokens[it.dependent] }.firstOrNull()?.let { o ->
                     val case = kids(o.index, "case").mapNotNull { tokens[it.dependent] }.firstOrNull()
                     listOfNotNull(case?.lemma?.lowercase(), phrase(o)).joinToString(" ")
                 }
                 // The condition is mark + premise; the premise reads as a fact does (subject, copula, head), and
-                // a pronoun subject ("when it is due") is the clause's object, else its subject.
+                // a pronoun subject ("when it is due") is the clause's object, else its subject; a party's pronoun is the party.
                 val condition = kids(verb.index, "advcl").mapNotNull { tokens[it.dependent] }.firstNotNullOfOrNull { v ->
                     kids(v.index, "mark", "advmod").mapNotNull { tokens[it.dependent] }.firstOrNull { it.lemma.lowercase() in conditionMarks }?.let { mark ->
                         val s = kids(v.index, "nsubj").mapNotNull { tokens[it.dependent] }.firstOrNull()
-                            ?.let { if (it.tag.startsWith("PRP")) obj ?: subj else it }
+                            ?.let { if (it.tag.startsWith("PRP") && party(it) == null) obj ?: subj else it }
                         listOfNotNull(mark.lemma.lowercase(), s?.let(::phrase), "be".takeIf { kids(v.index, "cop").isNotEmpty() },
                             v.lemma.lowercase()).joinToString(" ")
                     }
                 }
+                // The other subjects of the verb are their own clauses' words, not words this one dropped. The oblique is
+                // not part of the statement's identity, so its words count as dropped.
+                val kept = (subjects.mapNotNull { tokens[it.dependent]?.let(::phrase) } + listOfNotNull(verb.lemma.lowercase(), obj?.let(::phrase), condition))
+                    .flatMap { it.split(' ', '_') }.toSet()
+                val words = span(verb).filter(::content)
                 out.add(NormClause(
                     subject = phrase(subj),
                     modal = modal?.lemma?.lowercase()?.let { if (it == "can" && negated) "cannot" else it } ?: "generic",
@@ -94,9 +131,11 @@ object NormClauses {
                     oblique = obl,
                     sentence = text,
                     condition = condition,
-                    head = subj.lemma.lowercase(),
+                    head = party(subj) ?: subj.lemma.lowercase(),
                     ner = subj.ner,
+                    reified = if (words.isEmpty()) 1f else words.count { (party(it) ?: it.lemma.lowercase()) in kept }.toFloat() / words.size,
                 ))
+                }
             }
         }
         // Every other asserted clause, as OpenIE reads it: (subject; relation; object) with the relation's

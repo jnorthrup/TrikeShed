@@ -485,6 +485,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         "sections" to b.sections,
         "paths" to b.paths,
         "provenance" to b.provenance,
+        "reified" to b.reified.toList(),
     )))
 
     /** Books as last read, keyed by name; a book re-reads only when its file changes (length and mtime). */
@@ -522,6 +523,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             (m["sections"] as? List<*>)?.map { it.toString() } ?: texts(m["name"].toString()).map(Book::urn),
             (m["paths"] as? List<*>)?.map { it.toString() }.orEmpty(),
             (m["provenance"] as? Map<*, *>)?.entries?.associate { (k, v) -> k.toString() to v.toString() }.orEmpty(),
+            (m["reified"] as? List<*>)?.map { (it as Number).toFloat() }?.toFloatArray() ?: FloatArray(0),
         )
     }
 
@@ -964,6 +966,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val generic = (convention("generic") ?: "").split(',', ' ').map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
         val cut = SectionShapes.sections(text)
         val shape = cut.shape; val sections = cut.texts
+        // The parties the work defines for itself, as each section's parse finds them (a preamble's come first): its
+        // pronouns read as those nouns, so "you may …" is a party's norm.
+        val parties = LinkedHashMap<String, String>()
         val cites = SectionShapes.cites(cut)
         // The notes' prose, read by the same parser: what the curator holds the work to. Its statements are
         // conventions for the reading (their bearers' classes steer senses) and the measure of conformance.
@@ -1004,9 +1009,10 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.BEGIN, at)
             val t0 = System.currentTimeMillis()
             val doc = nlp.analyze(sec)
-            val read = bertReading(name, sentences(sec, doc), evidenceBooks, evidence)
+            for ((alias, party) in PartyAliases.of(doc)) parties.putIfAbsent(alias, party)
+            val read = bertReading(name, sentences(sec, doc, parties), evidenceBooks, evidence)
             files.writeAtomically(readingFile(name, k).absolutePath, jsonOf(read).encodeToByteArray())
-            val found = NormClauses.extract(doc, generic)
+            val found = NormClauses.extract(doc, generic, parties)
             trail.emit(run, borg.trikeshed.lcnc.LcncTrail.Kind.END, at,
                 "${found.size} statements, ${doc.sentences.a} sentences, ${sec.length} chars, ${System.currentTimeMillis() - t0}ms · ${k + 1}/${sections.size}")
             // The section's other nouns are the context a bearer's sense is read in.
@@ -1303,9 +1309,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
      * Per sentence, everything the parse [doc] of [body] registered: each noun a concept typed by SUMO (with its
      * nearest ancestors), each named entity, each predicate, and the statements read from it.
      */
-    private fun sentences(body: String, doc: borg.trikeshed.nlp.NlpDocument): List<Map<String, Any?>> {
+    private fun sentences(body: String, doc: borg.trikeshed.nlp.NlpDocument, parties: Map<String, String> = emptyMap()): List<Map<String, Any?>> {
         val sumo = SumoCorpus.classifier
-        val bySentence = NormClauses.extract(doc).groupBy { it.sentence }
+        val bySentence = NormClauses.extract(doc, parties = parties).groupBy { it.sentence }
         return doc.sentences.values().map { s ->
                 val said = body.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
                 val toks = s.tokens.values()
