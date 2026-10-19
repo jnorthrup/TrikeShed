@@ -27,7 +27,7 @@ object AgentEnvironment {
         out["NO_COLOR"] = "1"
         out["CI"] = "1"
         out["PATH"] = (cliDirs + SYSTEM_PATH).map { File(it).path }.distinct().joinToString(File.pathSeparator)
-        // Security: Filter out secret-shaped keys from extra caller-supplied environment variables
+        // Security (Sentinel): Enforce strict defense-in-depth isolation by filtering out secret-shaped keys (e.g., tokens, API keys) from extra caller-supplied environment variables to prevent environment leaks.
         for ((k, v) in extra) {
             if (GuestEnvironment.deliberate(k) != GuestEnvironment.Disposition.BLOCKED) {
                 out[k] = v

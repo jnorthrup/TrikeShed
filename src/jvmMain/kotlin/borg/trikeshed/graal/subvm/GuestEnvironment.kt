@@ -40,6 +40,7 @@ object GuestEnvironment {
     private val TOXIC_FRAGMENTS = listOf(
         "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH",
         "PRIVATE", "APIKEY", "ACCESS", "SESSION", "COOKIE", "CERT",
+        "LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_", "PYTHONPATH", "NODE_OPTIONS",
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
