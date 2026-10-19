@@ -80,6 +80,34 @@ class AlgebraEdgesTest {
     }
 
     @Test
+    fun splitProjectionsReadTheSelectedSideLive() {
+        var fn: (Int) -> String = { "old" }
+        val side = object : Series<String> {
+            override val a: Int = 1
+            override val b: (Int) -> String get() = fn
+        }
+        var opposite = 0
+        val other = object : Series<Int> {
+            override val a: Int = 1
+            override val b: (Int) -> Int get() = { opposite++; 0 }
+        }
+        val projected = ReifiedSplitSeries2(side, other).left
+        fn = { "new" }
+        assertEquals("new", projected[0], "a replaced oracle shows through the projection, as this[it].a showed it")
+        assertEquals(1, projected.size)
+        assertEquals(0, opposite, "the equal-size left projection never evaluates the right side")
+        var rfn: (Int) -> Int = { 1 }
+        val live = object : Series<Int> {
+            override val a: Int = 1
+            override val b: (Int) -> Int get() = rfn
+        }
+        val rightProjected = ReifiedSplitSeries2(side, live).right
+        rfn = { 2 }
+        assertEquals(2, rightProjected[0])
+        assertEquals(2, rightProjected.reversed()[0])
+    }
+
+    @Test
     fun twinSplitKeepsItsReversal() {
         val twins: Series<Twin<Int>> = 3 j { i: Int -> Twin(i, -i) }
         val split = ReifiedSplitSeries2.invoke<Int>(twins)

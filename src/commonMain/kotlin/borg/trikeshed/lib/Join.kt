@@ -80,14 +80,19 @@ typealias Series2<A, B> = Series<Join<A, B>>
 
 /**
  * Project the A-side of a Series2: [size] elements (taken now), read lazily. A [ReifiedSplitSeries2] whose two sides
- * both have exactly that size is read through its left side's oracle with no Join per element; any other shape,
- * unequal sides included, reads `this[it].a` as always, so the length and the failures of a mismatch are unchanged.
+ * both have exactly that size is read through its left side, whose oracle is fetched at every element read (a side
+ * whose `b` changes shows the change, as `this[it].a` did), with no Join per element and without evaluating the right
+ * side. Any other shape, unequal sides included, reads `this[it].a` as always, so the length and the failures of a
+ * mismatch are unchanged.
  */
 val <A, B> Series2<A, B>.left: Series<A>
     get() {
         val n = size
         val split = this as? ReifiedSplitSeries2<*, *>
-        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) return n j (split.leftSeries as Series<A>).b
+        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) {
+            val side = split.leftSeries as Series<A>
+            return n j { i: Int -> side.b(i) }
+        }
         return n j { this[it].a }
     }
 
@@ -96,7 +101,10 @@ val <A, B> Series2<A, B>.right: Series<B>
     get() {
         val n = size
         val split = this as? ReifiedSplitSeries2<*, *>
-        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) return n j (split.rightSeries as Series<B>).b
+        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) {
+            val side = split.rightSeries as Series<B>
+            return n j { i: Int -> side.b(i) }
+        }
         return n j { this[it].b }
     }
 
