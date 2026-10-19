@@ -15,14 +15,21 @@ interface Join<out A, out B> {
     companion object
 }
 
-/** Primitive pairs up to 64 bits pack even when constructed through erased types. */
+/**
+ * Primitive pairs up to 64 bits pack even when constructed through erased types. A function never packs, so a Series
+ * (`size j { ... }`) skips the primitive probe; every pair that does not pack is one class, [Joined], rather than one
+ * anonymous class per inlined call site, so the code that reads Joins and Series sees one receiver shape.
+ */
 inline infix fun <A, B> A.j(b: B): Join<A, B> {
-    packedPrimitiveJoin(this, b)?.let { return it as Join<A, B> }
-    return object : Join<A, B> {
-        override val a: A get() = this@j
-        override val b: B get() = b
-    }
+    if (b !is Function<*>) packedPrimitiveJoin(this, b)?.let { return it as Join<A, B> }
+    return Joined(this, b)
 }
+
+/**
+ * The Join [j] builds when its pair does not pack. Its fields are generic, so a primitive is boxed once, at
+ * construction, and every read returns that box. Open for array-backed edges such as [ByteArraySeries].
+ */
+open class Joined<out A, out B>(override val a: A, override val b: B) : Join<A, B>
 
 /** Join factory and literal syntax, retaining the representations selected by [j]. */
 object `⋈` {
@@ -71,11 +78,35 @@ typealias Series<T> = MetaSeries<Int, T>
 /** Integer-indexed Series of binary products. */
 typealias Series2<A, B> = Series<Join<A, B>>
 
-/** Project the A-side of a Series2. */
-val <A, B> Series2<A, B>.left: Series<A> get() = size j { this[it].a }
+/**
+ * Project the A-side of a Series2: [size] elements (taken now), read lazily. A [ReifiedSplitSeries2] whose two sides
+ * both have exactly that size is read through its left side, whose oracle is fetched at every element read (a side
+ * whose `b` changes shows the change, as `this[it].a` did), with no Join per element and without evaluating the right
+ * side. Any other shape, unequal sides included, reads `this[it].a` as always, so the length and the failures of a
+ * mismatch are unchanged.
+ */
+val <A, B> Series2<A, B>.left: Series<A>
+    get() {
+        val n = size
+        val split = this as? ReifiedSplitSeries2<*, *>
+        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) {
+            val side = split.leftSeries as Series<A>
+            return n j { i: Int -> side.b(i) }
+        }
+        return n j { this[it].a }
+    }
 
-/** Project the B-side of a Series2. */
-val <A, B> Series2<A, B>.right: Series<B> get() = size j { this[it].b }
+/** Project the B-side of a Series2, as [left] projects the A-side. */
+val <A, B> Series2<A, B>.right: Series<B>
+    get() {
+        val n = size
+        val split = this as? ReifiedSplitSeries2<*, *>
+        if (split != null && split.leftSeries.a == n && split.rightSeries.a == n) {
+            val side = split.rightSeries as Series<B>
+            return n j { i: Int -> side.b(i) }
+        }
+        return n j { this[it].b }
+    }
 
 val <T>  Series<T>.size: Int get() = a
 

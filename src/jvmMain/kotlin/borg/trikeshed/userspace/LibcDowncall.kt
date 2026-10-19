@@ -80,6 +80,21 @@ internal object LibcDowncall {
     /** int fcntl(int, int command, ...int). */
     @JvmField val FCNTL: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT),
         Linker.Option.firstVariadicArg(2))
+    /** int epoll_ctl(int epfd, int op, int fd, struct epoll_event*). */
+    @JvmField val EPOLL_CTL: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, JAVA_INT, JAVA_INT, JAVA_INT, ADDRESS))
+    /** int epoll_wait(int epfd, struct epoll_event*, int maxevents, int timeout). */
+    @JvmField val EPOLL_WAIT: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS, JAVA_INT, JAVA_INT))
+    /** int kqueue(void). */
+    @JvmField val KQUEUE: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT))
+    /** int kevent(int kq, const struct kevent*, int, struct kevent*, int, const struct timespec*). */
+    @JvmField val KEVENT: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS, JAVA_INT, ADDRESS))
+    /** long syscall(long number, ...): io_uring_setup, io_uring_enter and io_uring_register take up to six words. */
+    @JvmField val SYSCALL6: MethodHandle = errno(FunctionDescriptor.of(JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG,
+        JAVA_LONG, JAVA_LONG, JAVA_LONG), Linker.Option.firstVariadicArg(1))
+    /** void* mmap(void*, size_t, int prot, int flags, int fd, off_t). */
+    @JvmField val MMAP: MethodHandle = errno(FunctionDescriptor.of(ADDRESS, ADDRESS, JAVA_LONG, JAVA_INT, JAVA_INT, JAVA_INT, JAVA_LONG))
+    /** int munmap(void*, size_t). */
+    @JvmField val MUNMAP: MethodHandle = errno(FunctionDescriptor.of(JAVA_INT, ADDRESS, JAVA_LONG))
 }
 
 /** The address of libc function [name] in this process, for [LibcDowncall]'s handles. */

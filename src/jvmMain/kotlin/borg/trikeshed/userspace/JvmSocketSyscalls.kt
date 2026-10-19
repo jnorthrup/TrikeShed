@@ -37,6 +37,11 @@ internal object JvmSocketSyscalls {
     private object SocketName { @JvmField val at = symbol("getsockname") }
     private object PeerName { @JvmField val at = symbol("getpeername") }
     private object Fcntl { @JvmField val at = symbol("fcntl") }
+    private object EpollCreate { @JvmField val at = symbol("epoll_create1") }
+    private object EpollCtl { @JvmField val at = symbol("epoll_ctl") }
+    private object EpollWait { @JvmField val at = symbol("epoll_wait") }
+    private object Kqueue { @JvmField val at = symbol("kqueue") }
+    private object Kevent { @JvmField val at = symbol("kevent") }
 
     private fun errno(value: Int): Int = if (linux) value else when (value) {
         35 -> 11; 36 -> 115; 37 -> 114; 38 -> 88; 39 -> 89; 40 -> 90
@@ -80,9 +85,14 @@ internal object JvmSocketSyscalls {
         return fd
     }
 
-    private inline fun address(buffer: ByteBuffer?, length: Int, action: (MemorySegment, Int) -> Int): Int {
-        if (buffer == null || length < 2 || length > buffer.remaining()) return -22
-        val bytes = ByteArray(length).also { buffer.duplicate().get(it) }
+    /** A Linux-framed sockaddr from [buffer], or else from native memory at [addr], as the kernel reads an SQE's. */
+    private inline fun address(buffer: ByteBuffer?, length: Int, addr: Long, action: (MemorySegment, Int) -> Int): Int {
+        if (length < 2) return -22
+        val bytes = when {
+            buffer != null -> if (length > buffer.remaining()) return -22 else ByteArray(length).also { buffer.duplicate().get(it) }
+            addr != 0L -> MemorySegment.ofAddress(addr).reinterpret(length.toLong()).toArray(ValueLayout.JAVA_BYTE)
+            else -> return -22
+        }
         val family = (bytes[0].toInt() and 255) or ((bytes[1].toInt() and 255) shl 8)
         var size = length
         when (family) {
@@ -110,7 +120,7 @@ internal object JvmSocketSyscalls {
         }
     }
 
-    fun bind(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
+    fun bind(fd: Int, buffer: ByteBuffer?, length: Int, at: Long = 0L): Int = address(buffer, length, at) { addr, size ->
         val state = errnoState.get(); status(state, LibcDowncall.FD_ADDRESS_LENGTH.invokeExact(Bind.at, state, fd, addr, size) as Int)
     }
     fun listen(fd: Int, backlog: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD_INT.invokeExact(Listen.at, state, fd, backlog) as Int) }
@@ -153,7 +163,7 @@ internal object JvmSocketSyscalls {
     }
 
     /** -EINPROGRESS retains completion ownership in the backend; this call never waits. */
-    fun connectStart(fd: Int, buffer: ByteBuffer?, length: Int): Int = address(buffer, length) { addr, size ->
+    fun connectStart(fd: Int, buffer: ByteBuffer?, length: Int, at: Long = 0L): Int = address(buffer, length, at) { addr, size ->
         val state = errnoState.get(); status(state, LibcDowncall.FD_ADDRESS_LENGTH.invokeExact(Connect.at, state, fd, addr, size) as Int)
     }
 
@@ -258,5 +268,48 @@ internal object JvmSocketSyscalls {
                 if (open) { open = false; pipe.forEach(JvmFileSyscalls::close) }
             }
         }
+    }
+
+    /** recv/send on native memory the caller owns: no heap copy, as the kernel ring reads an SQE's address. */
+    fun transferAt(fd: Int, address: Long, length: Int, read: Boolean, flags: Int): Int {
+        if (length < 0) return -22
+        if (flags != 0) return -95
+        val state = errnoState.get()
+        val bytes = MemorySegment.ofAddress(address).reinterpret(length.toLong())
+        return status(state, LibcDowncall.RECV.invokeExact(if (read) Recv.at else Send.at, state, fd, bytes, length.toLong(),
+            if (!read && linux) 0x4000 else 0) as Long) // MSG_NOSIGNAL
+    }
+    /** poll(2) over [count] pollfd records the caller keeps between calls; revents are read back from them. */
+    fun pollRecords(records: MemorySegment, count: Int, timeout: Int): Int {
+        val state = errnoState.get()
+        return status(state, if (linux) LibcDowncall.POLL.invokeExact(Poll.at, state, records, count.toLong(), timeout) as Int
+            else LibcDowncall.POLL.invokeExact(Poll.at, state, records, count, timeout) as Int)
+    }
+    /** epoll_create1(EPOLL_CLOEXEC). */
+    fun epollCreate(): Int {
+        val state = errnoState.get()
+        return status(state, LibcDowncall.FD.invokeExact(EpollCreate.at, state, 0x80000) as Int)
+    }
+    /** epoll_ctl with one epoll_event written to [scratch]: data carries [fd]; x86_64 packs the struct to 12 bytes. */
+    fun epollCtl(epfd: Int, op: Int, fd: Int, events: Int, scratch: MemorySegment, packed: Boolean): Int {
+        scratch.set(int, 0, events)
+        if (packed) {
+            scratch.set(int, 4, fd)
+            scratch.set(int, 8, 0)
+        } else scratch.set(ValueLayout.JAVA_LONG, 8, fd.toLong())
+        val state = errnoState.get()
+        return status(state, LibcDowncall.EPOLL_CTL.invokeExact(EpollCtl.at, state, epfd, op, fd, scratch) as Int)
+    }
+    fun epollWait(epfd: Int, events: MemorySegment, max: Int, timeout: Int): Int {
+        val state = errnoState.get()
+        return status(state, LibcDowncall.EPOLL_WAIT.invokeExact(EpollWait.at, state, epfd, events, max, timeout) as Int)
+    }
+    fun kqueueCreate(): Int {
+        val state = errnoState.get()
+        return status(state, LibcDowncall.KQUEUE.invokeExact(Kqueue.at, state) as Int)
+    }
+    fun kevent(kq: Int, changes: MemorySegment, count: Int, events: MemorySegment, max: Int, timeout: MemorySegment): Int {
+        val state = errnoState.get()
+        return status(state, LibcDowncall.KEVENT.invokeExact(Kevent.at, state, kq, changes, count, events, max, timeout) as Int)
     }
 }

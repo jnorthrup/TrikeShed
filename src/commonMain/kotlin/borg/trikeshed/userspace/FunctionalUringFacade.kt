@@ -57,6 +57,14 @@ public interface UserspaceChannelBackend {
      * Readiness is level-triggered across an empty reap and this call; cancellation awaits wait-resource cleanup.
      */
     suspend fun awaitCompletions(): Unit = error("Backend has no completion readiness binding")
+
+    /**
+     * [reapCompletions] that waits at most [timeoutNanos] for [minComplete] CQEs. A backend without a timed wait
+     * polls once instead of waiting.
+     */
+    fun reapCompletions(minComplete: Int, timeoutNanos: Long): List<SelectionResult> = reapCompletions(0)
+    /** Execution counters (readiness waits, kernel calls, mechanism switches), for traces and benchmarks. */
+    fun counters(): Map<String, Long> = emptyMap()
     /** Quiesce deferred effects and make their terminal cancellation CQEs reapable. */
     fun cancelPending() {}
     suspend fun batchEnqueue(submissions: Series<UringSubmission>): Series<UringCompletion>
@@ -65,6 +73,11 @@ public interface UserspaceChannelBackend {
     fun registerBuffers(buffers: Series<MemoryMapping>): Result<Unit> = unsupported()
     fun unregisterBuffers(): Result<Unit> = unsupported()
 
+    /**
+     * Releases what the backend itself holds once its deferred work has terminal CQEs. Descriptors that CQEs returned
+     * (OPENAT, SOCKET, ACCEPT) and descriptors it only borrowed belong to the caller and stay open, as they do when an
+     * io_uring is closed.
+     */
     fun close() {}
 }
 

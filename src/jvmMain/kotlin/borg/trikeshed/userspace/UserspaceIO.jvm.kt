@@ -155,52 +155,58 @@ internal fun jvmOpen(path: String, flags: Long, permissions: Int = 438): Int {
     return JvmFileTable.register(JvmChannelDescriptor(channel))
 }
 
+/** The longest single readiness wait while holding the backend monitor; longer waits repeat it. */
+private const val WAIT_SLICE_MILLIS = 10
+
 /** Blocking OS primitives servicing commonMain uring submissions; this is emulation. */
 internal class JvmUserspaceChannelBackend(
     override val availability: String = "emulated: JVM file and POSIX socket effects; kernel ring not selected",
-) : UserspaceChannelBackend {
+    private val readiness: JvmReadiness = JvmReadiness(),
+) : UserspaceChannelBackend, JvmReadiness.Sink {
     override val capabilities: Long get() = jvmUringOperations
     override val deferredCapabilities: Long
-        get() = if (connectWatchesPending) UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT) or
+        get() = if (connectWatches > 0) UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT) or
             UringOp.caps(UringOp.WRITE, UringOp.SEND, UringOp.READ, UringOp.RECV)
         else UringOp.caps(UringOp.POLL_ADD, UringOp.CONNECT)
 
-    /** True while a CONNECT watch is unsettled: io on that fd is deferred behind it. */
-    private val connectWatchesPending: Boolean
-        get() = synchronized(this) { watches.values.any { it.opcode == UringOp.CONNECT } }
-    private data class Watch(val descriptor: JvmDescriptor, val mask: Int, val opcode: UringOp)
-    private val watches = LinkedHashMap<Long, Watch>()
+    /** Unsettled CONNECT watches: while any is held, io on their descriptors waits behind them. */
+    @Volatile private var connectWatches = 0
+    /** POLL_ADD watches on JDK channels whose mask asks for neither POLLIN nor POLLOUT: they never fire. */
+    private val parked = HashSet<Long>()
     private val completions = ArrayDeque<SelectionResult>()
-    private val completionWaiters = mutableSetOf<() -> Unit>()
-    private var completionEpoch = 0L
     private var closed = false
     private var draining = false
 
     @Synchronized
-    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> =
-        submissions.mapNotNull { sub ->
+    override fun submitBatch(submissions: List<UringSubmission>): List<SelectionResult> {
+        val results = ArrayList<SelectionResult>(submissions.size)
+        for (sub in submissions) {
             val result = when (sub.opcode) {
                 UringOp.POLL_ADD -> pollAdd(sub)
                 UringOp.CONNECT -> connect(sub)
                 // Execution dependency: io on an fd with an unsettled CONNECT waits
                 // for the CONNECT CQE; it is re-executed on the following reap.
                 UringOp.WRITE, UringOp.SEND, UringOp.READ, UringOp.RECV ->
-                    if (connectPendingOn(sub.fd)) {
+                    if (connectWatches > 0 && connectPendingOn(sub.fd)) {
                         heldBehindConnect[sub.userData] = sub
                         null
                     } else execute(sub)
                 else -> execute(sub)
             }
-            result?.let { SelectionResult(it, sub.userData) }
-        }.also { completionEpoch++; completionWaiters.forEach { it() } }
+            if (result != null) results.add(SelectionResult(result, sub.userData))
+        }
+        return results
+    }
 
     /** io deferred behind an unsettled CONNECT on the same fd. */
     private val heldBehindConnect = LinkedHashMap<Long, UringSubmission>()
 
     private fun connectPendingOn(fd: Int): Boolean = synchronized(this) {
         val descriptor = JvmFileTable.descriptor(fd) ?: return false
-        watches.values.any { it.opcode == UringOp.CONNECT && it.descriptor == descriptor }
+        readiness.connectPending(descriptor)
     }
+
+    private fun watching(token: Long): Boolean = readiness.watching(token) || token in parked
 
     private fun pollAdd(sub: UringSubmission): Int? {
         if (closed) return -9
@@ -208,8 +214,19 @@ internal class JvmUserspaceChannelBackend(
         if (sub.flags != 0 || sub.len != 0 || sub.operationFlags and 0x3f.inv() != 0) return -95
         val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
         if (!descriptor.isOpen()) return -9
-        if (sub.userData in watches) return -17
-        watches[sub.userData] = Watch(descriptor, sub.operationFlags, UringOp.POLL_ADD)
+        if (watching(sub.userData)) return -17
+        val fd = when (descriptor) {
+            is JvmSocketDescriptor -> descriptor.fd
+            is JvmNativeDescriptor -> descriptor.fd
+            else -> -1
+        }
+        if (fd < 0) {
+            // A JDK channel is always ready for what it can do, as poll(2) answers for a regular file.
+            val ready = sub.operationFlags and (1 or 4)
+            if (ready != 0) completions.addLast(SelectionResult(ready, sub.userData)) else parked.add(sub.userData)
+            return null
+        }
+        readiness.watch(sub.userData, descriptor, fd, sub.operationFlags, connect = false, sink = this)
         return null
     }
 
@@ -219,123 +236,98 @@ internal class JvmUserspaceChannelBackend(
         if (sub.flags != 0 || sub.operationFlags != 0) return -95
         val descriptor = JvmFileTable.descriptor(sub.fd) ?: return -9
         if (descriptor !is JvmSocketDescriptor) return -88
-        if (sub.userData in watches) return -17
+        if (watching(sub.userData)) return -17
         return synchronized(descriptor) {
             if (!descriptor.isOpen()) return -9
-            val result = JvmSocketSyscalls.connectStart(descriptor.fd, sub.buffer, sub.len)
+            val result = JvmSocketSyscalls.connectStart(descriptor.fd, sub.buffer, sub.len, sub.addr)
             if (result != -115) result else {
-                watches[sub.userData] = Watch(descriptor, 4, UringOp.CONNECT)
+                readiness.watch(sub.userData, descriptor, descriptor.fd, 4, connect = true, sink = this)
+                connectWatches++
                 null
             }
         }
     }
 
-    override fun reapCompletions(minComplete: Int): List<SelectionResult> {
+    /** [JvmReadiness.Sink]: a POLL_ADD reports its revents; a CONNECT reports SO_ERROR once POLLOUT arrives. */
+    override fun ready(token: Long, revents: Int, connect: Boolean, descriptor: JvmDescriptor): Boolean {
+        if (!connect) {
+            completions.addLast(SelectionResult(revents, token))
+            return true
+        }
+        val socket = descriptor as JvmSocketDescriptor
+        val result = synchronized(socket) {
+            if (!socket.isOpen() || revents and 0x20 != 0) -9 else JvmSocketSyscalls.connectFinish(socket.fd)
+        }
+        if (result == -115 || result == -114) return false
+        connectWatches--
+        completions.addLast(SelectionResult(result, token))
+        return true
+    }
+
+    override fun ended(token: Long, res: Int, connect: Boolean) {
+        if (connect) connectWatches--
+        completions.addLast(SelectionResult(res, token))
+    }
+
+    override fun reapCompletions(minComplete: Int): List<SelectionResult> = reapCompletions(minComplete, -1L)
+
+    override fun reapCompletions(minComplete: Int, timeoutNanos: Long): List<SelectionResult> {
         require(minComplete >= 0)
         val results = ArrayList<SelectionResult>()
+        val deadline = if (timeoutNanos < 0L) Long.MAX_VALUE else System.nanoTime() + timeoutNanos
         // A settled CONNECT unblocks the io it held back: execute it now.
-        // Each mutation step synchronizes below; the wait loop releases the
-        // monitor between polls so cancelPending/drain can make progress.
-        val stillHeld = LinkedHashMap<Long, UringSubmission>()
-        synchronized(this) {
-            for ((token, sub) in heldBehindConnect) {
-                if (!connectPendingOn(sub.fd)) {
-                    execute(sub)?.let { results.add(SelectionResult(it, token)) }
-                } else stillHeld[token] = sub
+        releaseHeld(results)
+        // Each wait holds the monitor for one bounded slice, so cancelPending/drain can make progress between slices.
+        while (true) {
+            val more = synchronized(this) {
+                while (completions.isNotEmpty()) results.add(completions.removeFirst())
+                if (readiness.watches == 0) return@synchronized false
+                val remaining = deadline - System.nanoTime()
+                val slice = if (results.size >= minComplete || remaining <= 0L) 0
+                    else minOf(WAIT_SLICE_MILLIS.toLong(), (remaining + 999_999L) / 1_000_000L).toInt()
+                readiness.wait(slice, this)
+                while (completions.isNotEmpty()) results.add(completions.removeFirst())
+                results.size < minComplete && readiness.watches > 0 && System.nanoTime() < deadline
             }
-            heldBehindConnect.clear()
-            heldBehindConnect.putAll(stillHeld)
+            if (!more) break
         }
-        var pending: Boolean
-        do {
-            pending = synchronized(this) {
-            while (completions.isNotEmpty()) results.add(completions.removeFirst())
-            val snapshot = watches.toList()
-            if (snapshot.isEmpty()) return results
-            val immediate = snapshot.map { (_, watch) ->
-                when {
-                    !watch.descriptor.isOpen() -> -9
-                    watch.descriptor is JvmChannelDescriptor -> watch.mask and (1 or 4)
-                    else -> 0
-                }
-            }
-            val fds = IntArray(snapshot.size) { index ->
-                val descriptor = snapshot[index].second.descriptor
-                when {
-                    !descriptor.isOpen() -> -1
-                    descriptor is JvmSocketDescriptor -> descriptor.fd
-                    descriptor is JvmNativeDescriptor -> descriptor.fd
-                    else -> -1
-                }
-            }
-            val masks = IntArray(snapshot.size) { snapshot[it].second.mask }
-            // Bound monitor ownership so cancelPending can quiesce a synchronous wait.
-            val timeout = if (results.size < minComplete && immediate.none { it != 0 }) 10 else 0
-            val (status, ready) = JvmSocketSyscalls.poll(fds, masks, timeout)
-            for (index in snapshot.indices) {
-                val event = if (immediate[index] != 0) immediate[index]
-                    else if (status < 0) status else ready[index]
-                if (event == 0 || event == -4) continue
-                val (token, watch) = snapshot[index]
-                val result = if (watch.opcode != UringOp.CONNECT || event < 0) event
-                else synchronized(watch.descriptor) {
-                    val descriptor = watch.descriptor as JvmSocketDescriptor
-                    if (!descriptor.isOpen() || event and 32 != 0) -9
-                    else JvmSocketSyscalls.connectFinish(descriptor.fd)
-                }
-                if (watch.opcode == UringOp.CONNECT && (result == -115 || result == -114)) continue
-                watches.remove(token)
-                results.add(SelectionResult(result, token))
-            }
-            watches.isNotEmpty()
-            }
-        } while (results.size < minComplete && pending)
-        // A CONNECT that settled during the poll releases io deferred behind it.
-        synchronized(this) {
-            val unblocked = LinkedHashMap<Long, UringSubmission>()
-            for ((token, sub) in heldBehindConnect) {
-                if (!connectPendingOn(sub.fd)) {
-                    execute(sub)?.let { results.add(SelectionResult(it, token)) }
-                } else unblocked[token] = sub
-            }
-            heldBehindConnect.clear()
-            heldBehindConnect.putAll(unblocked)
-        }
+        // A CONNECT that settled during the wait releases io deferred behind it.
+        releaseHeld(results)
         return results
     }
 
-    internal fun completionReady(): Boolean = synchronized(this) {
-        completions.isNotEmpty() || watches.isEmpty() || watches.values.any {
-            !it.descriptor.isOpen() || it.descriptor is JvmChannelDescriptor
-        }
+    /** After one readiness wait of at most [millis], whether a completion is queued; with nothing watched it does not wait. */
+    internal fun queuedAfter(millis: Int): Boolean = synchronized(this) {
+        if (completions.isEmpty() && readiness.watches > 0) readiness.wait(millis, this)
+        completions.isNotEmpty()
     }
 
-    internal fun completionPollSet(): Pair<IntArray, IntArray> = synchronized(this) {
-        val snapshot = watches.values.map { watch ->
-                val fd = when (val descriptor = watch.descriptor) {
-                    is JvmSocketDescriptor -> descriptor.fd
-                    is JvmNativeDescriptor -> descriptor.fd
-                    else -> -1
-                }
-                fd to watch.mask
-        }
-        IntArray(snapshot.size) { snapshot[it].first } to IntArray(snapshot.size) { snapshot[it].second }
-    }
+    internal val watching: Boolean get() = synchronized(this) { readiness.watches > 0 }
 
+    /** A completion is queued, or nothing is watched: a reap would not wait on readiness. */
+    internal fun completionReady(): Boolean = synchronized(this) { completions.isNotEmpty() || readiness.watches == 0 }
+
+    /** The descriptors and events readiness waits on, for a waiter that polls them beside its own ring. */
+    internal fun completionPollSet(): Pair<IntArray, IntArray> = synchronized(this) { readiness.pollSet() }
+
+    /**
+     * Readiness waits in bounded slices on IO threads, each holding the monitor as [reapCompletions] does; a slice's
+     * events land in [completions], unconsumed. Returns once one is queued or nothing is watched; cancellation takes
+     * effect between slices.
+     */
     override suspend fun awaitCompletions() {
-        val (pollSet, epoch) = synchronized(this) {
-            if (completionReady()) return
-            completionPollSet() to completionEpoch
+        while (kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { !queuedAfter(WAIT_SLICE_MILLIS) && watching }) Unit
+    }
+
+    private fun releaseHeld(results: MutableList<SelectionResult>) = synchronized(this) {
+        if (heldBehindConnect.isEmpty()) return@synchronized
+        val stillHeld = LinkedHashMap<Long, UringSubmission>()
+        for ((token, sub) in heldBehindConnect) {
+            if (!connectPendingOn(sub.fd)) execute(sub).let { results.add(SelectionResult(it, token)) }
+            else stillHeld[token] = sub
         }
-        val (fds, masks) = pollSet
-        JvmSocketSyscalls.await(fds, masks) { wake ->
-            synchronized(this) {
-                completionWaiters.add(wake)
-                // Recheck after installing the wakeup: readiness cannot disappear between reap and subscription.
-                if (completionReady() || completionEpoch != epoch) wake()
-            }
-            AutoCloseable { synchronized(this) { completionWaiters.remove(wake) } }
-        }
+        heldBehindConnect.clear()
+        heldBehindConnect.putAll(stillHeld)
     }
 
     @Synchronized
@@ -343,14 +335,18 @@ internal class JvmUserspaceChannelBackend(
         draining = true
         // Cancel observation, retaining socket identity until CLOSE/backend close. The peer may
         // already have accepted the connection; no backend effect can still access the sockaddr.
-        for (token in watches.keys) completions.addLast(SelectionResult(-125, token))
-        watches.clear()
+        readiness.endAll(this, -125)
+        for (token in parked) completions.addLast(SelectionResult(-125, token))
+        parked.clear()
         // io deferred behind a CONNECT cannot proceed once the ring is cancelling.
-        for ((token, sub) in heldBehindConnect) completions.addLast(SelectionResult(-125, token))
+        for ((token, _) in heldBehindConnect) completions.addLast(SelectionResult(-125, token))
         heldBehindConnect.clear()
-        completionEpoch++
-        completionWaiters.forEach { it() }
     }
+
+    @Synchronized
+    override fun counters(): Map<String, Long> = readiness.counters() + mapOf(
+        "backend.held" to heldBehindConnect.size.toLong(), "backend.connects" to connectWatches.toLong(),
+    )
 
     internal fun execute(sub: UringSubmission): Int {
         val preflight = synchronized(this) {
@@ -368,8 +364,12 @@ internal class JvmUserspaceChannelBackend(
                 // -errno (BIND/LISTEN) — the same result the kernel ring reports.
                 UringOp.SOCKET -> jvmSocket(sub.fd, sub.len, sub.offset.toInt())
                 UringOp.POLL_REMOVE -> synchronized(this) {
-                    if (watches[sub.addr]?.opcode != UringOp.POLL_ADD) return -2
-                    if (watches.remove(sub.addr) == null) return -2
+                    if (parked.remove(sub.addr)) {
+                        completions.addLast(SelectionResult(-125, sub.addr))
+                        return 0
+                    }
+                    if (readiness.kind(sub.addr) != 0) return -2
+                    readiness.unwatch(sub.addr, this)
                     completions.addLast(SelectionResult(-125, sub.addr))
                     0
                 }
@@ -379,7 +379,11 @@ internal class JvmUserspaceChannelBackend(
                 UringOp.ASYNC_CANCEL -> synchronized(this) {
                     if (sub.operationFlags != 0) return -95
                     if (sub.len != 0 || sub.offset != 0L) return -22
-                    if (watches.remove(sub.addr) == null && heldBehindConnect.remove(sub.addr) == null) return -2
+                    val kind = readiness.kind(sub.addr)
+                    if (kind >= 0) {
+                        readiness.unwatch(sub.addr, this)
+                        if (kind == 1) connectWatches--
+                    } else if (!parked.remove(sub.addr) && heldBehindConnect.remove(sub.addr) == null) return -2
                     completions.addLast(SelectionResult(-125, sub.addr))
                     0
                 }
@@ -422,6 +426,8 @@ internal class JvmUserspaceChannelBackend(
                 }
                 UringOp.STATX -> statx(sub)
                 UringOp.CLOSE -> {
+                    // Watches on the descriptor end with EBADF before its number can be reused.
+                    JvmFileTable.descriptor(sub.fd)?.let { descriptor -> synchronized(this) { readiness.closing(descriptor, this) } }
                     JvmFileTable.close(sub.fd)
                 }
                 else -> {
@@ -493,10 +499,12 @@ internal class JvmUserspaceChannelBackend(
     private fun socketExecute(fd: Int, sub: UringSubmission): Int = when (sub.opcode) {
         UringOp.READ, UringOp.RECV, UringOp.WRITE, UringOp.SEND -> {
             if (sub.offset != -1L && sub.offset != 0L) -29
+            else if (sub.buffer == null && sub.addr != 0L) JvmSocketSyscalls.transferAt(fd, sub.addr, sub.len,
+                sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV, sub.operationFlags)
             else JvmSocketSyscalls.transfer(fd, sub.buffer, sub.len,
                 sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV, sub.operationFlags)
         }
-        UringOp.BIND -> JvmSocketSyscalls.bind(fd, sub.buffer, sub.len)
+        UringOp.BIND -> JvmSocketSyscalls.bind(fd, sub.buffer, sub.len, sub.addr)
         UringOp.LISTEN -> JvmSocketSyscalls.listen(fd, sub.len)
         UringOp.SHUTDOWN -> JvmSocketSyscalls.shutdown(fd, sub.len)
         UringOp.URING_CMD -> when (sub.offset) {
@@ -660,6 +668,7 @@ internal class JvmUserspaceChannelBackend(
         if (closed) return
         cancelPending()
         closed = true
+        readiness.close()
         // Returned descriptors belong to their callers and outlive the ring, as on Linux.
     }
 }
@@ -670,9 +679,14 @@ actual fun openUserspaceChannelBackend(entries: Int, mode: UringBackendMode?): U
     require(entries > 0)
     val discovery = discoverJvmUringBackend(entries, mode)
     val selected = discovery.backend ?: JvmUserspaceChannelBackend(discovery.report.description)
+    // The probe's verdict and what was actually selected (the FFM ring, the JNI module, or emulation) with the
+    // operations its kernel executes: a native label or a kernel NOP alone does not show native network I/O.
+    val report = discovery.report
+    val described = "${report.description}; probe module=${report.module ?: "none"} phase=${report.phase}; " +
+        "selected: ${selected.availability}; kernel ops 0x${selected.nativeCapabilities.toString(16)}"
     return object : UserspaceChannelBackend by selected {
-        override val probeReport = discovery.report
-        override val availability = discovery.report.description
+        override val probeReport = report
+        override val availability = described
     }
 }
 

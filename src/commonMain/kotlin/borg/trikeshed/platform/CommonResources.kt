@@ -12,21 +12,6 @@ import borg.trikeshed.forge.generated.ForgeResourceBundle
  *    `fopen` of the source tree). Targets without one bind [ResourceSource.NONE], whose every call
  *    is a [discontinued] chokepoint, so a missing resource is reported, never silently empty.
  */
-interface ResourceSource {
-    fun bytes(path: String): ByteArray? = discontinued("resources.bytes")
-
-    companion object {
-        val NONE: ResourceSource = object : ResourceSource {}
-    }
-}
-
-fun ResourceSource.text(path: String): String? = bytes(path)?.decodeToString()
-
-/** Normalises `classpath:/confix/x.json`, `/confix/x.json` and `confix/x.json` to the bundle key. */
-fun resourceKey(path: String): String = path.removePrefix("classpath:").trimStart('/')
-
-val PlatformHost.resourceSource: ResourceSource get() = (resources as? ResourceSource) ?: ResourceSource.NONE
-
 object CommonResources : ResourceSource {
     /** Keys the build baked in; a convenient inventory for the host view and tests. */
     val baked: Set<String> get() = ForgeResourceBundle.map.keys
