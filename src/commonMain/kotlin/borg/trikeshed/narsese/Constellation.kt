@@ -122,12 +122,14 @@ class Book(
     /**
      * Evidence section [k] gives statement [i]. A clause the parse reified enters as an input judgment does: confidence
      * [INPUT] scaled by the share of the clause it keeps, so w = c/(1-c) units and one statement of a clause reads
-     * c = [INPUT] whole. Jev's noul gates it: judged below [GATE] the section is one machine observation scaled by the noul.
-     * A book read before reification gives one unit, scaled by the noul where Jev judged it.
+     * c = [INPUT] whole. It is accepted only once its bearer is matched to a SUMO class (the sense Jev judged, the lexicon's,
+     * or the named-entity tag's) and Jev's noul, where judged, is at least [GATE]; otherwise the section is one machine
+     * observation, scaled by the noul. A book read before reification gives that unit too.
      */
     fun weight(i: Int, k: Int): Long {
         val noul = noul(i, k)
-        if (reified.isEmpty() || noul != null && noul < GATE) return noul?.let { maxOf(1L, (it * Nal.UNIT).toLong()) } ?: Nal.UNIT
+        if (reified.isEmpty() || statements[i].bearerClass < 0 || noul != null && noul < GATE)
+            return noul?.let { maxOf(1L, (it * Nal.UNIT).toLong()) } ?: Nal.UNIT
         val c = INPUT * reified[i]
         return maxOf(1L, (c / (1f - c) * Nal.UNIT).toLong())
     }

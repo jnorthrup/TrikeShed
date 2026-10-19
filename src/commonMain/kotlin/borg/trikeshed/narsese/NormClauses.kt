@@ -45,15 +45,16 @@ object NormClauses {
      * possessor or the subject of a condition, and a bare noun alias ("customer"). "You may cancel" is the user's norm.
      * Each subject the parse gives a verb (enhanced dependencies spread a verb over "the Seller or Coinbase") is a clause.
      */
-    fun extract(doc: NlpDocument, genericSubjects: Set<String> = emptySet(), parties: Map<String, String> = emptyMap()): List<NormClause> {
+    fun extract(doc: NlpDocument, genericSubjects: Set<String> = emptySet(), parties: Map<String, PartyAliases.Party> = emptyMap()): List<NormClause> {
         val out = ArrayList<NormClause>()
         for (s in doc.sentences.values()) {
             val tokens = s.tokens.values().associateBy { it.index }
             val deps = s.dependencies.values()
             fun kids(head: Int, vararg rel: String) = deps.filter { d -> d.governor == head && rel.any { d.relation.lowercase().startsWith(it) } }
-            fun party(t: NlpToken): String? = parties[t.lemma.lowercase()]?.takeIf {
+            fun partyOf(t: NlpToken) = parties[t.lemma.lowercase()]?.takeIf {
                 t.tag.startsWith("PRP") || t.tag.startsWith("NN") && kids(t.index, "compound", "amod").isEmpty()
             }
+            fun party(t: NlpToken): String? = partyOf(t)?.noun
             fun phrase(t: NlpToken): String {
                 party(t)?.let { return it }
                 val mods = kids(t.index, *modifiers).mapNotNull { tokens[it.dependent] }.filter { it.index < t.index }.sortedBy { it.index }
@@ -132,7 +133,7 @@ object NormClauses {
                     sentence = text,
                     condition = condition,
                     head = party(subj) ?: subj.lemma.lowercase(),
-                    ner = subj.ner,
+                    ner = partyOf(subj)?.ner?.takeIf { it != "O" } ?: subj.ner,
                     reified = if (words.isEmpty()) 1f else words.count { (party(it) ?: it.lemma.lowercase()) in kept }.toFloat() / words.size,
                 ))
                 }
@@ -144,6 +145,13 @@ object NormClauses {
             if (s.relations.isEmpty() && s.kbp.isEmpty()) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val text = doc.text.substring(s.begin, s.end).replace(Regex("\\s+"), " ").trim()
+            // A party's pronoun is the party; any other pronoun names no one without coref.
+            fun partyOf(t: NlpToken) = if (t.tag.startsWith("PRP")) parties[t.lemma.lowercase()] else null
+            fun content(t: NlpToken) = t.tag.startsWith("NN") || t.tag.startsWith("VB") || t.tag.startsWith("JJ") || t.tag == "CD" || partyOf(t) != null
+            val words = tokens.values.count(::content).coerceAtLeast(1)
+            // What a triple reifies: the extractor's confidence times the share of the sentence's content words its spans hold.
+            fun share(r: NlpRelation) = (r.confidence.toFloat() * (r.subject + r.relation + r.`object`).distinct()
+                .mapNotNull { tokens[it] }.count(::content) / words).coerceIn(0f, 1f)
             val named = HashMap<IntRange, String>()
             for (m in doc.mentions) if (m.sentence == s.index && !m.representative)
                 doc.mentions.firstOrNull { it.chain == m.chain && it.representative }?.let { named[m.span] = it.text }
@@ -152,7 +160,7 @@ object NormClauses {
             for (r in s.relations) {
                 val rel = r.relation.mapNotNull { tokens[it] }
                 if (rel.any { it.lemma.lowercase() in modals || it.word.lowercase() in modals }) continue
-                val head = r.subject.lastOrNull { tokens[it]?.tag?.startsWith("NN") == true } ?: continue
+                val head = r.subject.lastOrNull { tokens[it]?.let { t -> t.tag.startsWith("NN") || partyOf(t) != null } == true } ?: continue
                 val key = head to rel.filter { it.tag.startsWith("VB") }.joinToString("_") { it.lemma.lowercase() }
                 // A bare copula states no relation; its object is the predicate, which the fact tupler reads.
                 if (key.second.isEmpty() || key.second == "be") continue
@@ -169,8 +177,9 @@ object NormClauses {
                 val head = tokens[key.first]!!
                 val negated = rel.any { it.lemma.lowercase() in negators }
                 // Determiners, possessives and pronoun modifiers are not part of the bearer's name.
-                fun term(ts: List<NlpToken>) = ts.filter { !it.tag.startsWith("DT") && !it.tag.startsWith("PRP") && it.tag != "PDT" && it.tag != "POS" &&
-                    it.lemma.lowercase() !in setOf("such", "said", "same") }.joinToString(" ") { it.lemma.lowercase() }
+                // A party's pronoun or possessive is the party.
+                fun term(ts: List<NlpToken>) = ts.mapNotNull { partyOf(it)?.noun ?: it.takeIf { !it.tag.startsWith("DT") && !it.tag.startsWith("PRP") &&
+                    it.tag != "PDT" && it.tag != "POS" && it.lemma.lowercase() !in setOf("such", "said", "same") }?.lemma?.lowercase() }.joinToString(" ")
                 // A coreferent subject reads as its chain's representative mention.
                 val subject = named[r.subject]?.lowercase() ?: term(r.subject.mapNotNull { tokens[it] })
                 if (subject.isBlank()) continue
@@ -178,19 +187,23 @@ object NormClauses {
                 out.add(NormClause(
                     subject = subject.lowercase(), modal = "generic", affirmative = !negated,
                     verb = key.second, obj = obj, oblique = null, sentence = text,
-                    head = head.lemma.lowercase(), ner = head.ner,
+                    head = partyOf(head)?.noun ?: head.lemma.lowercase(), ner = partyOf(head)?.ner?.takeIf { it != "O" } ?: head.ner,
+                    reified = share(r),
                 ))
             }
             // Stanford relation extraction (KBP): typed relations between named mentions (org:founded_by,
             // per:spouse), asserted facts; the slot name is the verb, the mentions are bearer and object.
             for (r in s.kbp) {
                 val head = r.subject.lastOrNull()?.let { tokens[it] } ?: continue
-                // Without coref a pronoun names no one: neither bearer nor object is a term then.
-                if (head.tag.startsWith("PRP") || r.`object`.mapNotNull { tokens[it] }.all { it.tag.startsWith("PRP") }) continue
+                // Without coref a pronoun names no one, unless it is a party's: neither bearer nor object is a term then.
+                val objects = r.`object`.mapNotNull { tokens[it] }
+                if (head.tag.startsWith("PRP") && partyOf(head) == null || objects.all { it.tag.startsWith("PRP") && partyOf(it) == null }) continue
+                val bearer = partyOf(head)
                 out.add(NormClause(
-                    subject = r.subjectText.lowercase(), modal = "generic", affirmative = true,
-                    verb = r.relationText, obj = r.objectText.lowercase(), oblique = null, sentence = text,
-                    head = head.lemma.lowercase(), ner = head.ner,
+                    subject = bearer?.noun ?: r.subjectText.lowercase(), modal = "generic", affirmative = true,
+                    verb = r.relationText, obj = objects.singleOrNull()?.let(::partyOf)?.noun ?: r.objectText.lowercase(), oblique = null, sentence = text,
+                    head = bearer?.noun ?: head.lemma.lowercase(), ner = bearer?.ner?.takeIf { it != "O" } ?: head.ner,
+                    reified = share(r),
                 ))
             }
         }

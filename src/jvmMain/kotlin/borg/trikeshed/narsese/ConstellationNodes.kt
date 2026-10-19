@@ -968,7 +968,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val shape = cut.shape; val sections = cut.texts
         // The parties the work defines for itself, as each section's parse finds them (a preamble's come first): its
         // pronouns read as those nouns, so "you may …" is a party's norm.
-        val parties = LinkedHashMap<String, String>()
+        val parties = LinkedHashMap<String, PartyAliases.Party>()
         val cites = SectionShapes.cites(cut)
         // The notes' prose, read by the same parser: what the curator holds the work to. Its statements are
         // conventions for the reading (their bearers' classes steer senses) and the measure of conformance.
@@ -1309,7 +1309,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
      * Per sentence, everything the parse [doc] of [body] registered: each noun a concept typed by SUMO (with its
      * nearest ancestors), each named entity, each predicate, and the statements read from it.
      */
-    private fun sentences(body: String, doc: borg.trikeshed.nlp.NlpDocument, parties: Map<String, String> = emptyMap()): List<Map<String, Any?>> {
+    private fun sentences(body: String, doc: borg.trikeshed.nlp.NlpDocument, parties: Map<String, PartyAliases.Party> = emptyMap()): List<Map<String, Any?>> {
         val sumo = SumoCorpus.classifier
         val bySentence = NormClauses.extract(doc, parties = parties).groupBy { it.sentence }
         return doc.sentences.values().map { s ->

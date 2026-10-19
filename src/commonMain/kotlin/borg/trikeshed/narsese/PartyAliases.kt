@@ -9,11 +9,14 @@ import borg.trikeshed.nlp.NlpToken
  * "customer") and Coinbase, Inc. ("Coinbase," "we," "us," and "our")`. A definition names a party only when it binds
  * a personal pronoun. The party's noun is its first quoted term that is not a pronoun, as a lemma; every quoted term,
  * the head and each bound pronoun's lemma (CoreNLP lemmatises "your" to "you", "our" and "us" to "we") alias it.
+ * The party's named-entity tag is its definition's (`ORGANIZATION` for "Coinbase, Inc."), `O` where none is named.
  */
 object PartyAliases {
-    /** Lower-cased lemma → the party's noun. */
-    fun of(doc: NlpDocument): Map<String, String> {
-        val out = LinkedHashMap<String, String>()
+    class Party(val noun: String, val ner: String)
+
+    /** Lower-cased lemma → the party. */
+    fun of(doc: NlpDocument): Map<String, Party> {
+        val out = LinkedHashMap<String, Party>()
         for (s in doc.sentences.values()) {
             val t = s.tokens.values()
             for (open in t.indices) {
@@ -36,7 +39,8 @@ object PartyAliases {
                 val all = terms + listOf(head)
                 if (all.none { term -> term.any { it.tag.startsWith("PRP") } }) continue
                 val noun = (terms + listOf(head)).firstOrNull { term -> term.isNotEmpty() && term.none { it.tag.startsWith("PRP") } }?.let(::lemma) ?: continue
-                for (term in all) if (term.isNotEmpty()) out.getOrPut(lemma(term)) { noun }
+                val party = Party(noun, all.flatten().firstOrNull { it.ner != "O" }?.ner ?: "O")
+                for (term in all) if (term.isNotEmpty()) out.getOrPut(lemma(term)) { party }
             }
         }
         return out
