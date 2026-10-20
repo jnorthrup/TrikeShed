@@ -244,6 +244,12 @@ private fun wire(p: Panels) {
     debug.title = "Run once in the daemon; step nodes and rings, or enter in-process JS/Python/Ruby source. Pauses count toward timeouts."
     byId("runBtn").parentNode.insertBefore(debug, byId("stopBtn"))
     p.page.on(debug, "click", { p.admitProgram(debug = true) })
+    val oroboros = document.createElement("button").asDynamic()
+    oroboros.id = "oroborosBtn"; oroboros.type = "button"; oroboros.textContent = "Oroboros"
+    oroboros.title = "Observe existing local executions, select pointcuts, and intervene at supported boundaries"
+    oroboros.setAttribute("aria-label", "Oroboros execution viewer")
+    byId("runBtn").parentNode.insertBefore(oroboros, byId("stopBtn"))
+    p.page.on(oroboros, "click", { p.openOroboros() })
     val live = document.createElement("button").asDynamic()
     live.id = "liveBtn"; live.textContent = "Live"; live.setAttribute("aria-label", "Run live panel")
     live.title = "Run once in the daemon, then admit root gestures against its retained receipt"

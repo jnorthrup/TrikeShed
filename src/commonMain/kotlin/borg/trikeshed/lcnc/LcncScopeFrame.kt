@@ -24,14 +24,14 @@ import kotlin.coroutines.CoroutineContext
  */
 class LcncScopeFrame(
     /** Named bindings installed at ring entry — the specialization envelope. */
-    val bindings: Map<String, Any?>,
+    bindings: Map<String, Any?>,
     /** This ring's node outputs — the warm base inner rings read through the chain. */
     val outputs: MutableMap<String, Map<String, Any?>> = LinkedHashMap(),
     /** Identity — the same cid chain ProgramNavigator dives: cache prefix · task address · route. */
     val chain: FrameIdChain,
     /** The enclosing ring; null at the root. Nearest ring shadows on lookup. */
     val parent: LcncScopeFrame? = null,
-    val bindingSources: Map<String, String> = emptyMap(),
+    bindingSources: Map<String, String> = emptyMap(),
     /** Bound keys permit retention until an actual typed read removes them. Entry projection fills safe values. */
     val retainedBindings: MutableMap<String, Any?> = LinkedHashMap(bindings),
     /** Finalized after the actual walk, in dependency order. */
@@ -42,6 +42,21 @@ class LcncScopeFrame(
     val retainedReturnOrigins: MutableMap<String, LcncBindingOrigins> = LinkedHashMap(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<LcncScopeFrame>
+    var bindings: Map<String, Any?> = bindings
+        private set
+    var bindingSources: Map<String, String> = bindingSources
+        private set
+
+    /** Only the paused execution installs lexical overrides; prior node outputs are not replayed. */
+    internal fun intervene(patch: Map<String, Any?>) {
+        if (patch.isEmpty()) return
+        bindings = bindings + patch
+        bindingSources = bindingSources + patch.keys.associateWith { "intervention" }
+        for (name in patch.keys) {
+            retainedBindings.remove(name)
+            retainedBindingOrigins.remove(name)
+        }
+    }
 
     /** The exact output owner observed by a fed wire; later walks never re-resolve its identity. */
     internal fun outputOwner(nodeId: String): LcncScopeFrame? =

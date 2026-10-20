@@ -944,6 +944,36 @@ projection with a 404/409; this does not make the controller live. The pause ord
 commands advance the existing run, never replay
 it. The token is a correlation key, not an authentication boundary.
 
+### Oroboros execution viewer
+
+Open **Oroboros** beside the Panels execution controls, or from **Concentric work
+network**. It observes executions owned by this host, including admitted network
+work. Concentric networks retain their own admission and ownership. Remote work
+must be inspected on its executing host. Opening the viewer does not start work.
+
+Select a run, then enter its scopes and captured subprograms. The LCNC cards show
+execution indicators and pointcuts; the inspector shows bounded inputs, scope
+bindings, outputs and supported guest source state. Pause and cancel take effect
+at execution boundaries; an in-flight node can finish first. Resume/step and
+input or lexical binding edits use the observed pause ordinal. Edits apply on
+resume and invalidate retained replay state; authenticated case runs refuse
+edits. Automatic pointcuts stop after a failure or skipped invocation. Timeouts
+include pauses. Closing the viewer stops observation without cancelling work.
+
+The attachable monitor retains 256 detailed observations and 120 rate bins of
+250 ms. Logging aggregates observations beyond 64 per bin; explicit spiking
+retains the first observation per bin and counts the rest. Aggregation,
+overwrites, value truncation and retention omissions are reported separately.
+Only acknowledged durable receipt/evidence publications count as persistent
+effects; this is not a complete guest or external mutation journal.
+
+`GET /api/lcnc/oroboros` lists active and recent runs; `?runId=…` returns the
+captured LCNC documents and live or retained state. POST commands use that run ID
+and the advertised actions. Final receipts reference bounded debugger evidence
+through `oroborosCid`. Source controls use the existing Truffle callback inside
+supported OWN-trust guests. Other nodes remain host execution; this viewer adds
+no native-image isolate or security boundary.
+
 ## Process-host callbacks
 
 The VM terminal page uses the same `PanelsPage` owner as Panels and Hermes.

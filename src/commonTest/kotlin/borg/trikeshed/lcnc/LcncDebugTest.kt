@@ -8,6 +8,10 @@ import kotlin.test.*
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class LcncDebugTest {
+    private fun commands(snapshot: Map<String, Any?>): List<*> =
+        (snapshot["actions"] as List<*>).filter { it in LcncDebug.Command.entries.map { command ->
+            command.name.lowercase().replace('_', '-')
+        } }
     @Test fun nodeTypeAloneDoesNotAdmitSourceCommandsOrConsumeTheHold() = runTest {
         val debug = LcncDebug()
         var calls = 0
@@ -19,7 +23,7 @@ class LcncDebugTest {
         try {
             runCurrent()
             val pause = debug.snapshot()
-            assertEquals(listOf("step", "continue"), pause["actions"])
+            assertEquals(listOf("step", "continue"), commands(pause))
             assertEquals(0, calls)
             assertFalse(debug.command(pause["ordinal"] as Int, LcncDebug.Command.SOURCE_INTO))
             assertEquals(pause, debug.snapshot())
@@ -126,7 +130,7 @@ class LcncDebugTest {
             sourceDebugging = true) }
         runCurrent()
         val start = debug.snapshot()
-        assertEquals(listOf("step", "continue", "source-into"), start["actions"])
+        assertEquals(listOf("step", "continue", "source-into"), commands(start))
         assertFalse(debug.command(start["ordinal"] as Int, LcncDebug.Command.SOURCE_OVER))
         assertTrue(debug.command(start["ordinal"] as Int, LcncDebug.Command.SOURCE_INTO))
         assertTrue(node.await())

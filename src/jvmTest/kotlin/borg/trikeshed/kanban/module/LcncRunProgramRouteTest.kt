@@ -47,6 +47,69 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
  * (presets-only) program loader with zero registered runners.
  */
 class LcncRunProgramRouteTest {
+    @Test fun oroborosInterventionResumesTheAdmittedRunAndRetainsItsEvidence(): Unit = runBlocking {
+        val routes = ModuleRouteRegistry()
+        val cas = CasStore.inMemory()
+        val ctx = newContext(routes, tempDir("oroboros"), cas)
+        var calls = 0
+        ctx.lcncRunners["pick"] = LcncNodeRunner { _, inputs ->
+            calls++
+            mapOf("y" to inputs["x"])
+        }
+        val server = JvmKanbanServer(moduleRoutes = routes)
+        val supervisor = ModuleSupervisor(ctx)
+        supervisor.attach(KanbanModule())
+        val token = java.util.UUID.randomUUID().toString()
+        val execution = async(Dispatchers.Default) {
+            post(server, "/api/lcnc/run", jsonOf(mapOf(
+                "debugToken" to token, "timeoutMs" to 30000,
+                "document" to mapOf("nodes" to listOf(mapOf("id" to "effect", "type" to "pick")),
+                    "wires" to emptyList<Any>()),
+            )))
+        }
+        suspend fun get(path: String) =
+            server.routeHttp("GET $path HTTP/1.1\r\nHost: t\r\n\r\n".encodeToByteArray())
+        try {
+            val held = withTimeout(10000) {
+                var value = json(get("/api/lcnc/run/debug?token=$token"))
+                while (value["state"] != "paused") { delay(10); value = json(get("/api/lcnc/run/debug?token=$token")) }
+                value
+            }
+            val runId = held["runId"]
+            val listing = get("/api/lcnc/oroboros")
+            assertEquals(200, listing.status, listing.body)
+            assertTrue((json(listing)["executions"] as List<*>).any { (it as Map<*, *>)["runId"] == runId })
+            val identity = mapOf("runId" to runId, "ordinal" to held["ordinal"])
+            assertEquals(202, post(server, "/api/lcnc/oroboros",
+                jsonOf(identity + mapOf("action" to "monitor-attach"))).status)
+            assertEquals(202, post(server, "/api/lcnc/oroboros",
+                jsonOf(identity + mapOf("action" to "intervene", "inputs" to mapOf("x" to 42)))).status)
+            assertEquals(0, calls)
+            assertEquals(409, post(server, "/api/lcnc/oroboros",
+                jsonOf(identity + mapOf("ordinal" to 99999, "action" to "continue"))).status)
+            assertEquals(202, post(server, "/api/lcnc/oroboros",
+                jsonOf(identity + mapOf("action" to "continue"))).status)
+            val completed = withTimeout(10000) { execution.await() }
+            assertEquals(200, completed.status, completed.body)
+            assertEquals(1, calls)
+            val receipt = json(completed)
+            assertEquals(42, (((receipt["outputs"] as Map<*, *>)["effect"] as Map<*, *>)["y"] as? Number)?.toInt())
+            val evidence = content(server, receipt["oroborosCid"])
+            assertEquals(runId, evidence["runId"])
+            val detail = get("/api/lcnc/oroboros?runId=$runId")
+            assertEquals(200, detail.status, detail.body)
+            val debug = json(detail)["debug"] as Map<*, *>
+            assertEquals("completed", debug["state"])
+            assertTrue((debug["interventions"] as List<*>).isNotEmpty())
+            assertEquals(409, post(server, "/api/lcnc/oroboros",
+                jsonOf(identity + mapOf("action" to "pause"))).status)
+        } finally {
+            execution.cancelAndJoin()
+            supervisor.detach("kanban")
+            ctx.scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
+    }
+
     @Test fun nodeDispatchUsesTheSameServicePrecedenceAsProgramExecution(): Unit = runBlocking {
         for ((moduleClock, muxClock, callerClock, expected) in listOf(
             listOf(null, null, null, 1L), listOf(2L, null, null, 2L),

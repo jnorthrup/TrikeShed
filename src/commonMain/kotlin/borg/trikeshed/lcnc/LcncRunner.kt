@@ -304,6 +304,10 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
             val result = lcncContext(if (ledger == null) root else root + ledger) {
                 runRing(program.nodes, state, root, emptyList())
             }
+            if (currentCoroutineContext()[LcncDebug]?.intervened == true) {
+                retainedUnavailable = true
+                retainedReason = "debug_intervention"
+            }
             try {
                 if (!retainedUnavailable) {
                     // Only cached values need a mask before propagation; actual receipts stay untouched.
@@ -458,6 +462,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
             var status = "completed"
             var reason: String? = null
             var observedOutputs: Map<String, Any?>? = null
+            val debug = currentCoroutineContext()[LcncDebug]
             fun publish(value: Map<String, Any?>,
                         origins: () -> Map<String, LcncBindingOrigins> = { emptyMap() },
                         retained: () -> Map<String, Any?> = {
@@ -490,7 +495,13 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                 // then the declared default.
                 if (node.type == LcncContracts.SCOPE_IN) {
                     invocation?.capture("inputs", emptyMap<String, Any?>())
-                    currentCoroutineContext()[LcncDebug]?.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, emptyMap())
+                    debug?.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, emptyMap(),
+                        frame = frame, apply = { patch ->
+                            frame.intervene(patch.bindings)
+                            retainedUnavailable = true
+                            retainedReason = "debug_intervention"
+                            retainedProjections.clear()
+                        })
                     val name = node.params["name"]?.removeSuffix("?")
                     val installed = checkNotNull(currentCoroutineContext()[LcncScopeFrame])
                     check(installed === frame) { "scope frame differs from installed CoroutineContext element" }
@@ -527,19 +538,30 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
 
                 val retainedInputs = LinkedHashMap<String, Any?>()
                 val inputOrigins = LinkedHashMap<String, LcncBindingOrigins>()
-                val inputs = gather(node, state, frame, retainedInputs, inputOrigins)
-                invocation?.capture("inputs", inputs)
+                var inputs: Map<String, Any?> = gather(node, state, frame, retainedInputs, inputOrigins)
                 // Annotation-only nodes are not debugger stops. Rings and binding/yield nodes are:
                 // stepping enters their real nested walk, including each/carry iterations.
-                val debug = currentCoroutineContext()[LcncDebug]
                 var sourceStep = false
                 if (debug != null) {
                     val debugContract = LcncContracts.find(node.type)
                     if (debugContract == null || debugContract.inputs.isNotEmpty() || debugContract.outputs.isNotEmpty() ||
                         node.children.size > 0 || node.subprogram != null)
                         sourceStep = debug.checkpoint(ordinal, node, pathNames, parentInvocation, iteration, inputs,
-                            sourceDebugging = registry[node.type]?.sourceDebugging(node, inputs) == true)
+                            sourceDebugging = registry[node.type]?.sourceDebugging(node, inputs) == true,
+                            frame = frame, apply = { patch ->
+                                inputs = inputs + patch.inputs
+                                frame.intervene(patch.bindings)
+                                retainedUnavailable = true
+                                retainedReason = "debug_intervention"
+                                retainedProjections.clear()
+                                // Inputs authored during this run have no retained invocation provenance.
+                                for (port in patch.inputs.keys) {
+                                    retainedInputs.remove(port)
+                                    inputOrigins.remove(port)
+                                }
+                            })
                 }
+                invocation?.capture("inputs", inputs)
 
                 // scope.out gathers this ring's yield — the ONLY thing that crosses out.
                 if (node.type == LcncContracts.SCOPE_OUT) {
@@ -850,6 +872,7 @@ class LcncRunner(registry: Map<String, LcncNodeRunner>) {
                 throw failure
             } finally {
                 invocation?.finish(status, reason, observedOutputs)
+                debug?.completed(ordinal, node, pathNames, parentInvocation, iteration, status, reason, observedOutputs, frame)
             }
         }
         return returns

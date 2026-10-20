@@ -115,6 +115,8 @@ object RouteManifest {
             RouteEntry("POST", "/api/lcnc/run/cancel", "cancel an active scoped run; receipt lands on the durable work timeline"),
             RouteEntry("GET", "/api/lcnc/run/debug", "read an active run's transient node-boundary pause by debug token"),
             RouteEntry("POST", "/api/lcnc/run/debug", "step or continue the same admitted run at the observed pause ordinal; stale commands are refused"),
+            RouteEntry("GET", "/api/lcnc/oroboros", "local concentric execution inventory and live or retained LCNC debugger state by runId"),
+            RouteEntry("POST", "/api/lcnc/oroboros", "pointcut selection, cooperative pause/cancel, paused inputs and lexical scope edits, bounded monitoring"),
             RouteEntry("POST", "/api/lcnc/run/rebuild", "re-execute a completed receipt's exact program version with its recorded inputs {runId} or {receiptCid}; the new receipt names rebuildOf and retires the old stale marker"),
             RouteEntry("GET", "/api/lcnc/council", "council case read-back: index fact + transcript/verdict from CAS (?caseId=<id>)"),
             RouteEntry("GET", "/api/mcp", "MCP server card: protocol versions, tools, resource URIs"),

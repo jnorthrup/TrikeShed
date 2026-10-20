@@ -47,6 +47,7 @@ fun Panels.openWorkNetwork() {
     text("h3", "Concentric work network · Kademlia DHT")
     val closeButton = button("Close", ::close)
     closeButton.setAttribute("data-network-close", "")
+    button("Oroboros · view local executions") { close(); openOroboros() }
     text("p", "Store a construction with its subnet, publish this host, then discover a signed host name. Select a specific program version before requesting work.")
     val status = text("p", "Reading local network readiness…")
     status.setAttribute("role", "status"); status.setAttribute("data-network-status", "")

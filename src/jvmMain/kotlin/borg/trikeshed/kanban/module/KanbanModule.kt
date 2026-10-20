@@ -852,6 +852,9 @@ class KanbanModule : ForgeModule {
         claim(id, "/api/lcnc/run/debug") { method, path, text, _ ->
             runs.debug(method, path, rawBody(text))
         }
+        claim(id, "/api/lcnc/oroboros") { method, path, text, _ ->
+            runs.oroboros.route(method, path, rawBody(text))
+        }
 
         // The same vocabulary as a GRAPH: kinds, ports, and the binding edges,
         // as Turtle — queryable, countable, and the form LcncRdf's doc comment

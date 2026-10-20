@@ -19,6 +19,7 @@ import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.ValueBudget
 import borg.trikeshed.vm.VmSourceCoordinates
+import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -40,6 +41,7 @@ internal class LcncRunService(
     private val active = ConcurrentHashMap<String, Job>()
     private data class DebugRun(val runId: String, val control: LcncDebug)
     private val debuggers = ConcurrentHashMap<String, DebugRun>()
+    val oroboros = LcncOroboros(ctx)
     private val slots = Semaphore(3)
     private val admission = Mutex()
     private class RunPermit(val runId: String, val parentRunId: String?, val family: PermitFamily,
@@ -446,7 +448,21 @@ internal class LcncRunService(
         )
         store.intake.send(BoardIntake(raw, reply))
         return when (val result = reply.await()) {
-            is BoardApply.Committed -> project(receipt, result)
+            is BoardApply.Committed -> {
+                fun evidence(value: Map<*, *>?): Map<String, Any?> = value?.entries?.filter {
+                    it.key in setOf("jobId", "status", "timelineRevision", "receiptCid")
+                }?.associate { it.key as String to it.value } ?: emptyMap()
+                val before = evidence(ctx.blackboard.get(jobId) as? Map<*, *>)
+                val value = project(receipt, result)
+                // Deliver the acknowledged revision even if cancellation arrives during observation.
+                withContext(NonCancellable) {
+                    (receipt["runId"] as? String)?.let { oroboros.executions[it] }?.control?.persistent(
+                        (receipt["claimedAtSubnet"] as? String).orEmpty(), "receipt", before,
+                        evidence(value) + ("durability" to store.durability.name.lowercase()),
+                        durable = store.durability == StorageDurability.DURABLE)
+                }
+                value
+            }
             is BoardApply.Rejected -> if (queue) throw QueueFailure(409, "run_commit_refused: ${result.reason}")
                 else error("run commit refused: ${result.reason}")
         }
@@ -827,7 +843,11 @@ internal class LcncRunService(
         }
         if (method == "GET") {
             val receipt = ctx.blackboard.get("lcnc/run/${run.runId}") as? Map<*, *>
-            return response(200, run.control.snapshot() + mapOf("runId" to run.runId,
+            val snapshot = run.control.snapshot()
+            // Preserve the legacy stepper vocabulary; the separate Oroboros surface exposes interventions.
+            val commands = LcncDebug.Command.entries.map { it.name.lowercase().replace('_', '-') }.toSet()
+            return response(200, snapshot + mapOf("actions" to (snapshot["actions"] as? List<*>)?.filter { it in commands },
+                "runId" to run.runId,
                 "programCid" to receipt?.get("programCid"), "timeoutIncludesPauses" to true))
         }
         val command = when (request["action"]) {
@@ -854,7 +874,7 @@ internal class LcncRunService(
     suspend fun stopAdmission() = withContext(NonCancellable) {
         admission.withLock {
             draining = true
-            for (run in debuggers.values) run.control.drain()
+            for (run in oroboros.executions.values) run.control.drain()
             if (admittedRuns == 0) drained.complete(Unit)
         }
     }
@@ -918,13 +938,17 @@ internal class LcncRunService(
         if (request.containsKey("debugToken") && (token == null ||
                 !Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}").matches(token)))
             return response(400, mapOf("error" to "invalid_debug_token"))
-        val debug = token?.let { LcncDebug() }
+        val debug = LcncDebug(stepping = token != null, allowInterventions = !request.containsKey("case"))
         // Admission covers the interval before the cancellable execution Job is registered.
         val (admitted, permit) = admitRun(runId, token, debug, routing != null, queued != null)
         if (admitted != 200) return response(admitted, mapOf("ok" to false,
             "error" to if (admitted == 409) "debug_token_active" else "execution_capacity"))
         var executionJob: Job? = null
         try {
+            admission.withLock {
+                oroboros.attach(runId, program, debug)
+                if (draining) debug.drain()
+            }
             return withContext(checkNotNull(permit)) { coroutineScope {
                 executionJob = currentCoroutineContext().job
                 if (queued == null) active[runId] = checkNotNull(executionJob)
@@ -970,8 +994,12 @@ internal class LcncRunService(
                 }
                 val (frozen, cid) = if (queued == null) freeze(name, program)
                     else program to (queued.receipt["programCid"] as String)
+                oroboros.attach(runId, frozen, debug)
                 val invocation = routing?.let { LcncWorkgroupKey(it.a j (it.b j ContentId(cid))) }
-                if (named) { pinned[name] = frozen; versions[name] = cid }
+                if (named) {
+                    pinned[name] = frozen; versions[name] = cid
+                    oroboros.pin(runId, name, frozen)
+                }
                 // A rebuild (Forge genesis, Cut S) names the receipt it refreshes, must land on the very
                 // program version that receipt recorded, and pins the subprogram versions it recorded.
                 val rebuildOf = request["rebuildOf"]?.toString()?.takeIf { it.isNotBlank() }
@@ -981,6 +1009,7 @@ internal class LcncRunService(
                 }
                 (queued?.pins ?: pinnedVersions(frozen, ContentId(cid), retainedRequest)).forEach { (label, version) ->
                     pinned[label] = version.a
+                    oroboros.pin(runId, label, version.a)
                     versions[label] = version.b
                 }
                 var receipt: Map<String, Any?> = (queued?.receipt ?: mapOf(
@@ -1012,14 +1041,28 @@ internal class LcncRunService(
                     return receipt
                 }
                 suspend fun finish(code: Int, op: String, status: String, fields: Map<String, Any?>): HttpResponse {
+                    debug.finish(when (status) {
+                        "completed" -> "completed"
+                        "cancelled", "timed_out", "interrupted" -> "cancelled"
+                        else -> "failed"
+                    })
                     val observations = invocationLedger.snapshot()
                     val evidenceCid = withContext(Dispatchers.IO) {
-                        ctx.casStore.put(jsonOf(observations + mapOf(
+                        val identity = ctx.casStore.put(jsonOf(observations + mapOf(
                             "kind" to "lcnc-invocations", "runId" to runId, "programCid" to cid,
-                        )).encodeToByteArray()).value
+                        )).encodeToByteArray())
+                        ctx.casStore.sync()
+                        identity.value
+                    }
+                    debug.persistent((receipt["claimedAtSubnet"] as? String).orEmpty(), "invocations",
+                        emptyMap(), mapOf("runId" to runId, "invocationsCid" to evidenceCid,
+                            "durability" to ctx.casStore.durability.name.lowercase()),
+                        durable = ctx.casStore.durability == StorageDurability.DURABLE)
+                    val debugCid = withContext(Dispatchers.IO) {
+                        ctx.casStore.put(oroborosEvidence(runId, cid, debug.snapshot())).value
                     }
                     return response(code, record(op, status, fields + mapOf(
-                        "finishedAtMs" to ctx.clock(), "invocationsCid" to evidenceCid,
+                        "finishedAtMs" to ctx.clock(), "invocationsCid" to evidenceCid, "oroborosCid" to debugCid,
                         "invocationsAttempted" to observations["attempted"], "invocationsDropped" to observations["dropped"],
                     )))
                 }
@@ -1070,6 +1113,7 @@ internal class LcncRunService(
                                     val problems = LcncTypeCheck.check(body, contracts, strict = false)
                                     require(problems.isEmpty()) { "subprogram type_check_failed: $label" }
                                     pinned[label] = body; versions[label] = version
+                                    oroboros.pin(runId, label, body)
                                     body
                                 }
                             }
@@ -1079,7 +1123,7 @@ internal class LcncRunService(
                             val terminal = if (case == null) kotlin.coroutines.EmptyCoroutineContext
                                 else TribunalRecordKey(trustedRecord ?: { throw LcncCaseException(LcncCaseFailure.UNSUPPORTED, "case_terminal_boundary_not_implemented") })
                             val hostContext = ctx.scope.coroutineContext.minusKey(Job) +
-                                ctx.muxContext.minusKey(Job) + currentCoroutineContext() + (debug ?: kotlin.coroutines.EmptyCoroutineContext) +
+                                ctx.muxContext.minusKey(Job) + currentCoroutineContext() + debug +
                                 (invocation ?: kotlin.coroutines.EmptyCoroutineContext) + terminal
                             val binding = ctx.ccekBinding
                             if (binding == null) withContext(hostContext) { walker.runProcedure(frozen, args) }
@@ -1163,7 +1207,8 @@ internal class LcncRunService(
         } finally {
             withContext(NonCancellable) {
                 admission.withLock {
-                    debug?.close()
+                    debug.close()
+                    oroboros.release(runId)
                     if (token != null) debuggers.remove(token, DebugRun(runId, checkNotNull(debug)))
                     executionJob?.let { active.remove(runId, it) }
                     val family = checkNotNull(permits.remove(checkNotNull(permit)))
