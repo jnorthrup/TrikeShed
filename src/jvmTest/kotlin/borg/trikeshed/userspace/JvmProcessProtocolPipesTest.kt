@@ -130,15 +130,15 @@ class JvmProcessProtocolPipesTest {
     @Test fun secretKeysAreFilteredFromProcessProtocolPipesEnvironment(): Unit = runBlocking {
         withTimeout(15_000) {
             val pipes = JvmProcessProtocolPipes.open(
-                { port, token -> command("echo", port, token) },
+                { port, token -> command("environment", port, token) },
                 mapOf("MY_API_KEY" to "secret-leak", "OWN_VAR" to "explicit-fixture"), protocolTimeoutMillis = 5_000,
             )
             try {
                 pipes.closeInput()
                 pipes.closeProtocolInput()
                 val result = bytes(pipes::readProtocol).decodeToString()
-                assertContains(result, "|explicit-fixture|")
-                assertFalse(result.contains("secret-leak"))
+                assertEquals("OWN_VAR=explicit-fixture\nMY_API_KEY=null\nmIxEd_Secret=null", result)
+                assertEquals(0, pipes.awaitExit())
             } finally { pipes.close() }
         }
     }
@@ -172,18 +172,15 @@ class JvmProcessProtocolPipesTest {
         withTimeout(15_000) {
             val declared = mapOf("OWN_VAR" to "declared-value", "MY_API_KEY" to "fixture-key", "mIxEd_Secret" to "fixture-secret")
             val pipes = JvmProcessProtocolPipes.open(
-                { port, token -> command("echo", port, token) },
+                { port, token -> command("environment", port, token) },
                 declared, protocolTimeoutMillis = 5_000,
             )
             try {
-                pipes.write("".encodeToByteArray())
                 pipes.closeInput()
-                pipes.writeProtocol("".encodeToByteArray())
                 pipes.closeProtocolInput()
                 val response = bytes(pipes::readProtocol).decodeToString()
-                assertTrue(response.contains("declared-value"))
-                assertFalse(response.contains("fixture-key"))
-                assertFalse(response.contains("fixture-secret"))
+                assertEquals("OWN_VAR=declared-value\nMY_API_KEY=null\nmIxEd_Secret=null", response)
+                assertEquals(0, pipes.awaitExit())
             } finally { pipes.close() }
         }
     }
@@ -262,8 +259,11 @@ object JvmProcessProtocolChild {
                 System.err.flush()
                 val terminal = System.`in`.readAllBytes().decodeToString()
                 val protocol = socket.getInputStream().readAllBytes().decodeToString()
+                val response = if (args[0] == "environment") {
+                    listOf("OWN_VAR", "MY_API_KEY", "mIxEd_Secret").joinToString("\n") { "$it=${System.getenv(it)}" }
+                } else "$terminal|${System.getenv("OWN_VAR")}|$protocol"
                 socket.getOutputStream().apply {
-                    write("$terminal|${System.getenv("OWN_VAR")}|$protocol".encodeToByteArray())
+                    write(response.encodeToByteArray())
                     flush()
                 }
             }

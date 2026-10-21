@@ -108,13 +108,7 @@ class JvmProcessProtocolPipes private constructor(
                     val arguments = command(transport?.port, transport?.token)
                     require(arguments.isNotEmpty() && arguments[0].isNotBlank()) { "Process command is missing" }
                     val builder = ProcessBuilder(arguments)
-<<<<<<< HEAD
                     builder.environment().apply { clear(); putAll(environment.filterKeys { GuestEnvironment.deliberate(it) != GuestEnvironment.Disposition.BLOCKED }) }
-||||||| 5c8ebac33
-                    builder.environment().apply { clear(); putAll(environment) }
-=======
-                    builder.environment().apply { clear(); putAll(environment.filterKeys { borg.trikeshed.graal.subvm.GuestEnvironment.deliberate(it) != borg.trikeshed.graal.subvm.GuestEnvironment.Disposition.BLOCKED }) }
->>>>>>> origin/jules-16010010884251393291-91e3fa44
                     workingDirectory?.let { builder.directory(File(it)) }
                     if (inheritError) builder.redirectError(ProcessBuilder.Redirect.INHERIT)
                     builder.redirectErrorStream(mergeError)
