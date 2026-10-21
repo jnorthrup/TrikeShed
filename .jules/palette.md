@@ -5,3 +5,7 @@
 ## 2026-03-30 - Focus-Visible Styling for Core App CSS
 **Learning:** External CSS stylesheets for main UI applications (such as `mux.css`) often omit explicit `:focus-visible` ring indicators, relying on default browser focus rings that clash or fail color contrast requirements across custom themes.
 **Action:** In custom CSS stylesheets like `mux.css`, inject explicit `:focus-visible` rules using the application's primary accent color variable (e.g., `var(--green)`) to ensure high contrast and consistent keyboard navigation accessibility across interactive elements.
+
+## 2026-03-30 - Focus-Visible Styling for SpaceGraph Shadow CSS
+**Learning:** Component-specific CSS stylesheets for shadow overlays (such as `spacegraph-shadow.css`) often omit `:focus-visible` rules for custom interactive controls (`.sg-command`, `.sg-tree-node`, `.sg-port`), resulting in poor keyboard focus indicators.
+**Action:** In component CSS stylesheets, inject explicit `:focus-visible` ring indicators using the component's accent color (e.g. `#68c9a1`) targeting both standard controls and custom interactive elements.
