@@ -481,6 +481,19 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
     }
 
+    /**
+     * The book's rows in the CursorTrie under `<forge>/.oroboros/trie`: its sections and its citations of codified law
+     * ([LawCites]), under the constellation's project, one document node per source text, so a re-curation of the same
+     * source lands nothing twice and a new edition is a new document.
+     */
+    private fun landLanes(name: String, constellation: String, source: String, book: Book, sections: List<String>) = runCatching {
+        val trie = laneTrie(stateDir)
+        val project = trie.project(constellation)
+        val document = trie.document(project, "$name@$source", linkedMapOf<String, Any?>("work" to book.work, "date" to book.date) + book.provenance)
+        LawCites.land(trie, document, sections)
+        trie.commit()
+    }.onFailure { System.err.println("[CURATE] $name: CursorTrie lanes failed: ${it.message}") }
+
     /** The section texts beside a book, one JSON string per line in section order: what a section reading shows. */
     private fun saveSections(name: String, sections: List<String>) =
         File(books, "${safe(name)}.sections.jsonl").writeText(sections.joinToString("\n") { jsonOf(it) })
@@ -1259,7 +1272,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val senses = book.statements.filter { it.bearerClass >= 0 }.associate { it.bearer to SumoCorpus.classifier.className(SumoClassId(it.bearerClass)) }
         save(book)
         saveSections(name, sections)
-        sourceFile(name).writeText(borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)
+        val source = borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value
+        sourceFile(name).writeText(source)
+        landLanes(name, convention("constellation") ?: name, source, book, sections)
         invalidateFamilyViews()
         // Conformance: each noted statement is held (the text states it), contradicted (the text states the
         // opposing force on its proposition), or unstated.
@@ -2174,6 +2189,14 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
     }
 
     companion object {
+        private val tries = HashMap<String, borg.trikeshed.cas.LaneTrie>()
+
+        /** One CursorTrie per forge home, shared by every provider's nodes over it. */
+        fun laneTrie(stateDir: File): borg.trikeshed.cas.LaneTrie = synchronized(tries) {
+            val dir = File(stateDir, ".oroboros/trie").canonicalPath
+            tries.getOrPut(dir) { borg.trikeshed.cas.LaneTrie(borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), dir) }
+        }
+
         /** The language lane's LCNC nodes, registered in one call so the daemon's boot method stays under the JVM method limit. */
         fun registerLanguageNodes(ctx: borg.trikeshed.module.ModuleContext, bank: borg.trikeshed.kif.KifKnowledgeBase,
                                   liveRete: CausalityReteElement? = null): ConstellationNodes {

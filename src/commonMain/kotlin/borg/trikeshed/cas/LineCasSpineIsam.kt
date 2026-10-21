@@ -4,6 +4,8 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.isam.IsamDataFile
 import borg.trikeshed.isam.IsamOperations
 import borg.trikeshed.isam.defaultIsamOperations
+// The ISAM codec enum, not the cursor package's same-named one: the writer refuses any other ("No ISAM codec for spine").
+import borg.trikeshed.isam.meta.IOMemento
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
