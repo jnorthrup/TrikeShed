@@ -168,6 +168,26 @@ class JvmProcessProtocolPipesTest {
         }
     }
 
+    @Test fun openFiltersBlockedKeys(): Unit = runBlocking {
+        withTimeout(15_000) {
+            val declared = mapOf("OWN_VAR" to "declared-value", "MY_API_KEY" to "fixture-key", "mIxEd_Secret" to "fixture-secret")
+            val pipes = JvmProcessProtocolPipes.open(
+                { port, token -> command("echo", port, token) },
+                declared, protocolTimeoutMillis = 5_000,
+            )
+            try {
+                pipes.write("".encodeToByteArray())
+                pipes.closeInput()
+                pipes.writeProtocol("".encodeToByteArray())
+                pipes.closeProtocolInput()
+                val response = bytes(pipes::readProtocol).decodeToString()
+                assertTrue(response.contains("declared-value"))
+                assertFalse(response.contains("fixture-key"))
+                assertFalse(response.contains("fixture-secret"))
+            } finally { pipes.close() }
+        }
+    }
+
     @Test fun badIdentityPropagatesAndReapsChild(): Unit = runBlocking {
         withTimeout(15_000) {
             val marker = UUID.randomUUID().toString()
