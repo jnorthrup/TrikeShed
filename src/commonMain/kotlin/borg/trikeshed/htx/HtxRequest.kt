@@ -1,14 +1,6 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.lib.ByteSeries
-import borg.trikeshed.lib.forEach
-import borg.trikeshed.lib.Join
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.toArray
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 
 typealias HtxHeader = Join<String, String>
 typealias HtxHeaders = Series<HtxHeader>
