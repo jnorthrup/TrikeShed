@@ -36,6 +36,13 @@ class JvmProcessOperationsTest {
     }
 
     @Test
+    fun deliberateBlocksToxicDynamicLoaderAndInterpreterVars() {
+        listOf("LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "PYTHONPATH", "NODE_OPTIONS").forEach { key ->
+            assertEquals(GuestEnvironment.Disposition.BLOCKED, GuestEnvironment.deliberate(key))
+        }
+    }
+
+    @Test
     fun execFiltersBlockedKeysAndRetainsDeclaredDeferredValues(): Unit = runBlocking {
         val result = withTimeout(5_000) { JvmProcessOperations().exec("/usr/bin/env", env = declared) }
         assertEquals(0, result.exitCode)
