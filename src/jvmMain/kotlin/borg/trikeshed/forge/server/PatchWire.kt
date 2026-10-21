@@ -17,11 +17,7 @@ import borg.trikeshed.narsese.DecisionProvider
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import borg.trikeshed.job.CasStore
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.nio.file.spi.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
@@ -364,7 +360,11 @@ class ProjectScopes(
     private suspend fun remountUpload(name: String, kind: String = "assets", decisionProvider: DecisionProvider? = null): Boolean {
         val mf = manifestFileFor(name) ?: return false
         if (!mf.exists()) return false
-        val scope = beginUploadInternal(name, kind, decisionProvider) ?: return false
+        beginUploadInternal(name, kind, decisionProvider) ?: return false
+        val pdb = projectDbs?.get(name) ?: return false
+        // The commit chain is authoritative, including tombstones. Freeze its identities before
+        // replay so an empty/volatile store can still advance through successive manifest versions.
+        val restored = pdb.store.ids().view.toSet()
         var docs = 0
         var skipped = 0
         for (line in mf.readLines()) {
@@ -372,8 +372,8 @@ class ProjectScopes(
                 val parts = line.split('\t')
                 if (parts.size < 2) return@runCatching
                 parts.getOrNull(3)?.takeIf { it.isNotBlank() }?.let { documentProviders[name to parts[0]] = DecisionProvider.of(it) }
-                val pdb = projectDbs?.get(name) ?: return@runCatching
-                // Durable heads already hold it at this content: no second revision per boot.
+                if (parts[0] in restored) return@runCatching
+                // Repeated manifest lines at the same content need no second revision.
                 if (pdb.store.get(parts[0])?.fields?.any { it.name == "contentId" && it.value == parts[1] } == true) { docs++; return@runCatching }
                 val cid = borg.trikeshed.job.ContentId(parts[1])
                 val landed = filesRoot?.let { File(File(it, name), parts[0]) }?.takeIf { it.isFile }
@@ -397,9 +397,10 @@ class ProjectScopes(
             }.onFailure { skipped++ }
         }
         if (skipped > 0) System.err.println("[OROBOROS] project db $name manifest replay: $docs docs, $skipped malformed/missing lines skipped")
-        scopes = scopes.map { if (it.name == name) it.copy(paths = docs, docs = projectDbs?.get(name)?.docCount ?: docs) else it }
+        val live = pdb.store.ids().filter { pdb.gateway.getAttachmentRef(it) != null }
+        scopes = scopes.map { if (it.name == name) it.copy(paths = live.size, docs = pdb.docCount) else it }
         // A remounted document is offered again: the intake passes what it already curated and reads the rest.
-        onDocument?.let { hook -> for (line in mf.readLines()) line.substringBefore('\t').takeIf { it.isNotEmpty() }?.let { rel ->
+        onDocument?.let { hook -> for (rel in live.view) {
             if (!borg.trikeshed.lcnc.ProjectNodes.twin(rel)) hook(name, rel, this.decisionProvider(name, rel))
         } }
         return true
