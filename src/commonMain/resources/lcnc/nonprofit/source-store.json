@@ -1,0 +1,263 @@
+{
+  "nodes": [
+    {
+      "id": "documents",
+      "type": "scope.in",
+      "params": {
+        "name": "documents",
+        "kind": "json"
+      },
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "collection",
+      "type": "scope.in",
+      "params": {
+        "name": "collectionId",
+        "kind": "text",
+        "default": "npo-demo"
+      },
+      "x": 0,
+      "y": 180
+    },
+    {
+      "id": "include-text",
+      "type": "scope.in",
+      "params": {
+        "name": "includeText",
+        "kind": "json",
+        "default": "true"
+      },
+      "x": 0,
+      "y": 360
+    },
+    {
+      "id": "envelope",
+      "type": "scope",
+      "params": {},
+      "x": 350,
+      "y": 0,
+      "children": [
+        {
+          "id": "e-docs",
+          "type": "scope.in",
+          "params": {
+            "name": "documents",
+            "kind": "json"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "e-docs-out",
+          "type": "scope.out",
+          "params": {
+            "name": "documents",
+            "kind": "json"
+          },
+          "x": 320,
+          "y": 0
+        },
+        {
+          "id": "e-collection",
+          "type": "scope.in",
+          "params": {
+            "name": "collectionId",
+            "kind": "text"
+          },
+          "x": 0,
+          "y": 180
+        },
+        {
+          "id": "e-collection-out",
+          "type": "scope.out",
+          "params": {
+            "name": "collectionId",
+            "kind": "text"
+          },
+          "x": 320,
+          "y": 180
+        },
+        {
+          "id": "e-include",
+          "type": "scope.in",
+          "params": {
+            "name": "includeText",
+            "kind": "json"
+          },
+          "x": 0,
+          "y": 360
+        },
+        {
+          "id": "e-include-out",
+          "type": "scope.out",
+          "params": {
+            "name": "includeText",
+            "kind": "json"
+          },
+          "x": 320,
+          "y": 360
+        }
+      ]
+    },
+    {
+      "id": "postgres",
+      "type": "vm.camel",
+      "params": {
+        "authoring": "native-dsl",
+        "language": "groovy",
+        "module": "camel-postgres",
+        "reach": "DEPARTMENT",
+        "trust": "OWN",
+        "from": "direct:npo-source-store",
+        "source": "def request = (Map) input\ndef documents = (List) request.documents\ndef collection = request.collectionId?.toString()\ndef includeText = request.includeText?.toString() != 'false'\nif(documents == null || !collection) throw new IllegalArgumentException('documents and collectionId are required')\ndef config = new Properties()\nnew File(System.getProperty('user.home'),'.local/share/trikeshed/npo-demo/postgres.properties').withInputStream { config.load(it) }\ndef db = new org.postgresql.ds.PGSimpleDataSource()\ndb.setServerNames([config.getProperty('server')] as String[])\ndb.setPortNumbers([Integer.parseInt(config.getProperty('port'))] as int[])\ndb.setDatabaseName(config.getProperty('database'))\ndb.setUser(config.getProperty('user'))\ndb.setPassword(config.getProperty('password'))\ndb.setConnectTimeout(5)\ngetContext().getRegistry().bind('npo',db)\ndef schema = \"CREATE TABLE IF NOT EXISTS npo_source (collection_id text NOT NULL, source_id text NOT NULL, original_cid text NOT NULL, extracted_text_cid text NOT NULL, source_url text NOT NULL, content text NOT NULL, route text NOT NULL CHECK(route IN ('ready','review')), seen_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY(collection_id,original_cid,extracted_text_cid))\"\ndef insert = \"INSERT INTO npo_source(collection_id,source_id,original_cid,extracted_text_cid,source_url,content,route) VALUES(:?collectionId,:?sourceId,:?originalCid,:?extractedTextCid,:?sourceUrl,:?contentText,:?route) ON CONFLICT(collection_id,original_cid,extracted_text_cid) DO UPDATE SET source_id=EXCLUDED.source_id,source_url=EXCLUDED.source_url,content=EXCLUDED.content,route=EXCLUDED.route,seen_at=now()\"\ndef select = \"SELECT jsonb_build_object('collectionId',CAST(:?collectionId AS text),'storedCount',count(*),'readyCount',count(*) FILTER (WHERE route='ready'),'reviewCount',count(*) FILTER (WHERE route='review'),'documents',COALESCE(jsonb_agg(jsonb_build_object('sourceId',source_id,'originalCid',original_cid,'extractedTextCid',extracted_text_cid,'sourceUrl',source_url,'text',content,'route',route) ORDER BY original_cid,extracted_text_cid),'[]'::jsonb))::text AS payload FROM npo_source WHERE collection_id=:?collectionId\"\nfrom('direct:npo-extract').routeId('npo-source-enrichment')\n .process { e ->\n   def r = new LinkedHashMap((Map)e.message.body)\n   if(!r.containsKey('text')) {\n     if(!r.project || !r.sourceId) throw new IllegalArgumentException('project and sourceId required for extraction')\n     if(!(r.originalCid instanceof String) || !(r.originalCid ==~ /sha256:[0-9a-f]{64}/))\n       throw new IllegalArgumentException('Canonical original document CID required for project extraction')\n     def invoke = { String type, Map params ->\n       def connection = (java.net.HttpURLConnection)new URL('http://127.0.0.1:8890/api/lcnc/run').openConnection()\n       connection.requestMethod='POST'; connection.doOutput=true; connection.connectTimeout=5000; connection.readTimeout=60000\n       connection.setRequestProperty('Content-Type','application/json')\n       try {\n         def data=groovy.json.JsonOutput.toJson([type:type,params:params])\n         connection.outputStream.withCloseable { it.write(data.getBytes('UTF-8')) }\n         if(connection.responseCode!=200) throw new IllegalStateException('Project node failed: '+type+' HTTP '+connection.responseCode)\n         def result=connection.inputStream.withCloseable { new groovy.json.JsonSlurper().parse(it,'UTF-8') }\n         if(result.ok!=true) throw new IllegalStateException('Project node refused: '+type)\n         return (Map)result.outputs\n       } finally { connection.disconnect() }\n     }\n     def identity = { ->\n       def inventory=invoke('project.docs',[project:r.project,prefix:r.sourceId,limit:'1'])\n       def current=((List)inventory.docs).find { d -> d.id==r.sourceId }\n       return current\n     }\n     def before=identity()\n     if(before?.cid!=r.originalCid) throw new IllegalArgumentException('Original document CID does not match project inventory')\n     def result=invoke('project.extract',[project:r.project,id:r.sourceId])\n     def after=identity()\n     if(after?.cid!=r.originalCid) throw new IllegalStateException('Original document identity changed during extraction')\n     if(result.found==true) {\n       def twin=invoke('project.read',[project:r.project,id:r.sourceId+'.extract.md',maxChars:'1']).doc\n       if(twin?.cid!=result.cid) throw new IllegalStateException('Extraction identity changed during read')\n       def origin=invoke('project.read',[project:r.project,id:r.sourceId+'.extract-origin.tsv',maxChars:'512'])\n       def pair=origin.text instanceof String ? origin.text.split('\\t',-1) : new String[0]\n       if(pair.length!=2 || pair[0]!=r.originalCid || pair[1]!=result.cid)\n         throw new IllegalStateException('Extraction origin does not match source and text identities')\n     }\n     r.text=result.text ?: ''; r.extractedTextCid=result.cid ?: ''; r.extractionFound=result.found\n   }\n   e.message.body=r\n }\nfrom(entry).routeId('npo-postgres-eip')\n .setBody(constant(schema)).to('jdbc:npo')\n .setBody(constant(documents))\n .split(body()).stopOnException()\n   .enrich('direct:npo-extract', { original, enriched -> enriched } as org.apache.camel.AggregationStrategy)\n   .process { e ->\n     def r=(Map)e.message.body\n     if(!r.sourceId || !r.originalCid) throw new IllegalArgumentException('source identity required')\n     def text=r.text instanceof String?r.text:''\n     if(!text.isEmpty() || r.extractedTextCid) {\n       if(!(r.extractedTextCid instanceof String) || !(r.extractedTextCid ==~ /sha256:[0-9a-f]{64}/))\n         throw new IllegalArgumentException('Canonical extracted text CID required for retained content')\n       def digest=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance('SHA-256').digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)))\n       if(r.extractedTextCid != ('sha256:'+digest))\n         throw new IllegalArgumentException('Extracted text digest does not match retained content')\n     }\n     e.message.setHeader('collectionId',collection)\n     e.message.setHeader('sourceId',r.sourceId.toString())\n     e.message.setHeader('originalCid',r.originalCid.toString())\n     e.message.setHeader('extractedTextCid',r.extractedTextCid?.toString()?:'')\n     e.message.setHeader('sourceUrl',r.sourceUrl?.toString()?:'')\n     e.message.setHeader('contentText',text)\n     e.message.setHeader('textAvailable',!text.isBlank() && r.extractionFound!=false)\n   }\n   .choice()\n     .when(header('textAvailable').isEqualTo(true)).setHeader('route',constant('ready'))\n     .otherwise().setHeader('route',constant('review'))\n   .end()\n   .setBody(constant(insert)).to('jdbc:npo?useHeadersAsParameters=true')\n .end()\n .setHeader('collectionId',constant(collection))\n .setBody(constant(select)).to('jdbc:npo?useHeadersAsParameters=true')\n .removeHeaders('*')\n .process { e ->\n   def rows=(List)e.message.body\n   if(rows.size()!=1) throw new IllegalStateException('Expected PostgreSQL readback envelope')\n   def packet=new groovy.json.JsonSlurper().parseText(rows[0].payload.toString())\n   packet.documents.each { r ->\n     String text=r.text\n     r.textChars=text.length()\n     def passages=[];int matches=0\n     def lines=java.util.regex.Pattern.compile('[^\\\\r\\\\n]+').matcher(text)\n     def terms=java.util.regex.Pattern.compile('(?i)\\\\b(impact|outcomes?|outputs?|activities|activity|indicators?|assumptions?)\\\\b')\n     while(lines.find()) {\n       if(terms.matcher(lines.group()).find()) {\n         matches++\n         if(passages.size()<8) passages.add([text:lines.group(),begin:lines.start(),end:lines.end()])\n       }\n     }\n     r.passages=passages;r.passageCount=matches;r.passagesTruncated=matches>8\n     if(!includeText) r.remove('text')\n   }\n   e.message.body=groovy.json.JsonOutput.toJson(packet)\n }\n"
+      },
+      "x": 720,
+      "y": 0,
+      "width": 520,
+      "collapsed": true
+    },
+    {
+      "id": "readback",
+      "type": "js",
+      "params": {
+        "expr": "JSON.parse(x.reply)"
+      },
+      "x": 1300,
+      "y": 0
+    },
+    {
+      "id": "result",
+      "type": "scope.out",
+      "params": {
+        "name": "result",
+        "kind": "json"
+      },
+      "x": 1650,
+      "y": 0
+    },
+    {
+      "id": "receipt",
+      "type": "scope.out",
+      "params": {
+        "name": "camelReceipt",
+        "kind": "json"
+      },
+      "x": 1300,
+      "y": 240
+    }
+  ],
+  "wires": [
+    {
+      "from": [
+        "documents",
+        "value"
+      ],
+      "to": [
+        "envelope",
+        "documents"
+      ]
+    },
+    {
+      "from": [
+        "collection",
+        "value"
+      ],
+      "to": [
+        "envelope",
+        "collectionId"
+      ]
+    },
+    {
+      "from": [
+        "e-docs",
+        "value"
+      ],
+      "to": [
+        "e-docs-out",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "e-collection",
+        "value"
+      ],
+      "to": [
+        "e-collection-out",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "envelope",
+        "returns"
+      ],
+      "to": [
+        "postgres",
+        "messages"
+      ]
+    },
+    {
+      "from": [
+        "postgres",
+        "receipt"
+      ],
+      "to": [
+        "readback",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "readback",
+        "y"
+      ],
+      "to": [
+        "result",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "postgres",
+        "receipt"
+      ],
+      "to": [
+        "receipt",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "include-text",
+        "value"
+      ],
+      "to": [
+        "envelope",
+        "includeText"
+      ]
+    },
+    {
+      "from": [
+        "e-include",
+        "value"
+      ],
+      "to": [
+        "e-include-out",
+        "value"
+      ]
+    }
+  ],
+  "controls": {
+    "humanOversight": true,
+    "matingPoints": []
+  },
+  "seq": 1,
+  "view": {
+    "x": 0,
+    "y": 0,
+    "z": 0.6
+  }
+}

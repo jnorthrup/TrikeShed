@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "id": "source",
+      "type": "scope.in",
+      "params": {
+        "name": "source",
+        "kind": "json"
+      },
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "candidates",
+      "type": "js",
+      "params": {
+        "expr": "(()=>{const docs=Array.isArray(x.documents)?x.documents:[];const candidates=[],issues=[];let discovered=0;const cap=256;for(const d of docs){const segments=Array.isArray(d.passages)?d.passages:(d.text?[{text:d.text,begin:0}]:[]);if(d.route==='review'){issues.push({sourceId:d.sourceId,originalCid:d.originalCid,reason:'No usable extracted text: OCR or analyst intervention required'});continue;}for(const part of segments){for(const m of part.text.matchAll(/[^\\r\\n]+/g)){const kinds=new Set();for(const t of m[0].matchAll(/\\b(impact|outcomes?|outputs?|activities|activity|indicators?|assumptions?)\\b/gi)){let kind=t[1].toLowerCase();if(kind==='activities')kind='activity';else if(kind.endsWith('s'))kind=kind.slice(0,-1);kinds.add(kind);}for(const kind of kinds){discovered++;if(candidates.length>=cap)continue;const begin=part.begin+m.index;candidates.push({candidateId:d.originalCid+':'+d.extractedTextCid+':'+begin+':'+kind,type:kind,quote:m[0],begin,end:begin+m[0].length,offsetUnit:'UTF-16 code units in extracted text',sourceId:d.sourceId,originalCid:d.originalCid,extractedTextCid:d.extractedTextCid,sourceUrl:d.sourceUrl,status:'proposed',basis:'literal domain term; analyst classification required'});}}}}return {collectionId:x.collectionId||null,documentCount:docs.length,candidateCount:candidates.length,discoveredCandidateCount:discovered,sourcePassageCount:docs.reduce((n,d)=>n+(d.passageCount||0),0),truncated:discovered>cap||docs.some(d=>d.passagesTruncated),candidates,issues,acceptedRelationships:[],reviewRequired:true,note:'Bounded source-passage preview. Full extracted text is retained in PostgreSQL. No causal or measurement links are inferred from proximity; client ontology and analyst review are required.',retrievalRecords:candidates.map(c=>({id:c.candidateId,text:c.quote,metadata:{sourceId:c.sourceId,originalCid:c.originalCid,extractedTextCid:c.extractedTextCid,begin:c.begin,end:c.end,typeCandidate:c.type,reviewed:false,sourceUrl:c.sourceUrl},embedding:null}))};})()"
+      },
+      "x": 380,
+      "y": 0,
+      "width": 440,
+      "collapsed": true
+    },
+    {
+      "id": "review",
+      "type": "scope.out",
+      "params": {
+        "name": "review",
+        "kind": "json"
+      },
+      "x": 900,
+      "y": 0
+    }
+  ],
+  "wires": [
+    {
+      "from": [
+        "source",
+        "value"
+      ],
+      "to": [
+        "candidates",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "candidates",
+        "y"
+      ],
+      "to": [
+        "review",
+        "value"
+      ]
+    }
+  ],
+  "controls": {
+    "humanOversight": true,
+    "matingPoints": []
+  },
+  "seq": 1
+}

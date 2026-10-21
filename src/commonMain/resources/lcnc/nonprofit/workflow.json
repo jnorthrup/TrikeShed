@@ -1,0 +1,395 @@
+{
+  "nodes": [
+    {
+      "id": "source-documents",
+      "type": "project.docs",
+      "params": {
+        "project": "corpus",
+        "glob": "*.pdf",
+        "limit": "16"
+      },
+      "x": 0,
+      "y": 0,
+      "width": 330
+    },
+    {
+      "id": "source-links",
+      "type": "json.value",
+      "params": {
+        "value": "{\"sha256:e46da3031714709b87fcd219bb77f89afdd055a58408b97aca77189daa45c9c1\":\"https://africa.ippf.org/file/14974/download?token=LiyuVtxl\"}"
+      },
+      "x": 0,
+      "y": 400,
+      "width": 330,
+      "collapsed": true
+    },
+    {
+      "id": "document-inventory",
+      "type": "scope",
+      "params": {},
+      "x": 350,
+      "y": 0,
+      "collapsed": true,
+      "children": [
+        {
+          "id": "inventory-in",
+          "type": "scope.in",
+          "params": {
+            "name": "docs",
+            "kind": "List<ProjectDoc>"
+          },
+          "x": 0,
+          "y": 0
+        },
+        {
+          "id": "inventory-out",
+          "type": "scope.out",
+          "params": {
+            "name": "docs",
+            "kind": "List<ProjectDoc>"
+          },
+          "x": 320,
+          "y": 0
+        },
+        {
+          "id": "source-links-in",
+          "type": "scope.in",
+          "params": {
+            "name": "sourceLinks",
+            "kind": "json"
+          },
+          "x": 0,
+          "y": 200
+        },
+        {
+          "id": "source-links-out",
+          "type": "scope.out",
+          "params": {
+            "name": "sourceLinks",
+            "kind": "json"
+          },
+          "x": 320,
+          "y": 200
+        }
+      ]
+    },
+    {
+      "id": "source-envelopes",
+      "type": "js",
+      "params": {
+        "expr": "x.docs.map(d=>({project:d.project,sourceId:d.id,originalCid:d.cid,sourceUrl:x.sourceLinks && typeof x.sourceLinks[d.cid]==='string' ? x.sourceLinks[d.cid] : null}))"
+      },
+      "x": 800,
+      "y": 0,
+      "width": 360,
+      "collapsed": true
+    },
+    {
+      "id": "collection-id",
+      "type": "text.value",
+      "params": {
+        "value": "ippf-public-demo"
+      },
+      "x": 800,
+      "y": 400
+    },
+    {
+      "id": "include-text",
+      "type": "json.value",
+      "params": {
+        "value": "false"
+      },
+      "x": 800,
+      "y": 650
+    },
+    {
+      "id": "postgres-eip",
+      "type": "npo-source-store",
+      "params": {},
+      "x": 1220,
+      "y": 0,
+      "width": 380,
+      "collapsed": true
+    },
+    {
+      "id": "storage-summary",
+      "type": "js",
+      "params": {
+        "expr": "({collectionId:x.collectionId,storedCount:x.storedCount,readyCount:x.readyCount,reviewCount:x.reviewCount,sources:x.documents.map(d=>({sourceId:d.sourceId,originalCid:d.originalCid,extractedTextCid:d.extractedTextCid,sourceUrl:d.sourceUrl,route:d.route,characters:d.textChars,passageCount:d.passageCount,passagesTruncated:d.passagesTruncated}))})"
+      },
+      "x": 1640,
+      "y": 720
+    },
+    {
+      "id": "semantic-proposals",
+      "type": "npo-semantic-map",
+      "params": {},
+      "x": 1660,
+      "y": 0,
+      "width": 360,
+      "collapsed": true
+    },
+    {
+      "id": "review-summary",
+      "type": "js",
+      "params": {
+        "expr": "({documentCount:x.documentCount,candidateCount:x.candidateCount,sourcePassageCount:x.sourcePassageCount,truncated:x.truncated,issues:x.issues,acceptedRelationshipCount:x.acceptedRelationships.length,reviewRequired:x.reviewRequired,note:x.note,preview:x.candidates.slice(0,8)})"
+      },
+      "x": 2100,
+      "y": -230
+    },
+    {
+      "id": "review-desk",
+      "type": "display",
+      "params": {},
+      "x": 2500,
+      "y": -230,
+      "width": 500
+    },
+    {
+      "id": "source-review",
+      "type": "display",
+      "params": {},
+      "x": 2100,
+      "y": 160,
+      "width": 650
+    },
+    {
+      "id": "retrieval-projection",
+      "type": "js",
+      "params": {
+        "expr": "({status:\"unembedded-unreviewed\",records:x.retrievalRecords})"
+      },
+      "x": 2100,
+      "y": 700
+    },
+    {
+      "id": "rag-vector-handoff",
+      "type": "display",
+      "params": {},
+      "x": 2500,
+      "y": 700,
+      "width": 500
+    },
+    {
+      "id": "camel-receipt",
+      "type": "display",
+      "params": {},
+      "x": 1220,
+      "y": 500,
+      "width": 500
+    },
+    {
+      "id": "review-output",
+      "type": "scope.out",
+      "params": {
+        "name": "review",
+        "kind": "json"
+      },
+      "x": 2950,
+      "y": 0
+    },
+    {
+      "id": "storage-output",
+      "type": "scope.out",
+      "params": {
+        "name": "storage",
+        "kind": "json"
+      },
+      "x": 1660,
+      "y": 500
+    }
+  ],
+  "wires": [
+    {
+      "from": [
+        "source-envelopes",
+        "y"
+      ],
+      "to": [
+        "postgres-eip",
+        "documents"
+      ]
+    },
+    {
+      "from": [
+        "postgres-eip",
+        "result"
+      ],
+      "to": [
+        "semantic-proposals",
+        "source"
+      ]
+    },
+    {
+      "from": [
+        "postgres-eip",
+        "camelReceipt"
+      ],
+      "to": [
+        "camel-receipt",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "storage-summary",
+        "y"
+      ],
+      "to": [
+        "storage-output",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "semantic-proposals",
+        "review"
+      ],
+      "to": [
+        "review-summary",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "review-summary",
+        "y"
+      ],
+      "to": [
+        "review-desk",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "semantic-proposals",
+        "review"
+      ],
+      "to": [
+        "source-review",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "semantic-proposals",
+        "review"
+      ],
+      "to": [
+        "retrieval-projection",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "retrieval-projection",
+        "y"
+      ],
+      "to": [
+        "rag-vector-handoff",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "review-summary",
+        "y"
+      ],
+      "to": [
+        "review-output",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "postgres-eip",
+        "result"
+      ],
+      "to": [
+        "storage-summary",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "collection-id",
+        "value"
+      ],
+      "to": [
+        "postgres-eip",
+        "collectionId"
+      ]
+    },
+    {
+      "from": [
+        "document-inventory",
+        "returns"
+      ],
+      "to": [
+        "source-envelopes",
+        "x"
+      ]
+    },
+    {
+      "from": [
+        "include-text",
+        "value"
+      ],
+      "to": [
+        "postgres-eip",
+        "includeText"
+      ]
+    },
+    {
+      "from": [
+        "source-documents",
+        "docs"
+      ],
+      "to": [
+        "document-inventory",
+        "docs"
+      ]
+    },
+    {
+      "from": [
+        "inventory-in",
+        "value"
+      ],
+      "to": [
+        "inventory-out",
+        "value"
+      ]
+    },
+    {
+      "from": [
+        "source-links",
+        "value"
+      ],
+      "to": [
+        "document-inventory",
+        "sourceLinks"
+      ]
+    },
+    {
+      "from": [
+        "source-links-in",
+        "value"
+      ],
+      "to": [
+        "source-links-out",
+        "value"
+      ]
+    }
+  ],
+  "controls": {
+    "humanOversight": true,
+    "matingPoints": []
+  },
+  "view": {
+    "x": 0,
+    "y": 120,
+    "z": 0.35
+  },
+  "seq": 4
+}

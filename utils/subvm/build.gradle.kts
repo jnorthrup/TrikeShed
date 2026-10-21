@@ -64,6 +64,9 @@ val guestModules: Map<String, List<String>> = mapOf(
         "org.apache.camel:camel-jdbc:4.8.5",
         "com.h2database:h2:2.3.232",
     ),
+    "camel-postgres" to listOf(
+        "org.postgresql:postgresql:42.7.14",
+    ),
     // Text/metadata extraction. Listed so the door is open; note that unlike the other
     // two, Tika still has a real host-side consumer (JvmTikaIngestAdapter.kt), so it
     // cannot leave TrikeShed's classpath until that adapter moves guest-side too.
@@ -87,6 +90,7 @@ val guestModules: Map<String, List<String>> = mapOf(
 val departmentParents: Map<String, String> = mapOf(
     "camel-mail" to "camel",
     "camel-jdbc" to "camel",
+    "camel-postgres" to "camel-jdbc",
 )
 
 fun gradleName(module: String): String =
