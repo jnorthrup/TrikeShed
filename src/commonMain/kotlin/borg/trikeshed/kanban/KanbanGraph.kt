@@ -133,7 +133,7 @@ data class KanbanGraphValidation(val errors: List<KanbanGraphError>) { val valid
 fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRegistry()): KanbanGraphValidation {
     val errors = mutableListOf<KanbanGraphError>()
     // Bolt: avoid O(N) allocation when iterating Series by removing .toList()
-    val laneIds = lanes.map { it.id }
+    val laneIds = lanes.size j { i: Int -> lanes[i].id } /* ⚡ Bolt: Zero-allocation lazy view using j constructor */
     val seenOrders = mutableSetOf<Int>()
     lanes.forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
     val seenIds = mutableSetOf<String>()
