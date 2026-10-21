@@ -1,6 +1,8 @@
 import java.net.URI
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -1106,8 +1108,8 @@ fun daemonClasspathSnapshot(inputs: List<File>, root: File): List<File> {
     Files.createDirectories(directory.parentFile.toPath())
     // Serialize publishers across Gradle processes. Never replace an existing generation, even if
     // its contents were damaged externally: another JVM may still have those exact paths open.
-    java.nio.channels.FileChannel.open(directory.parentFile.resolve(".publish.lock").toPath(),
-        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE).use { channel ->
+    FileChannel.open(directory.parentFile.resolve(".publish.lock").toPath(),
+        StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
         channel.lock().use {
             if (directory.exists()) {
                 validateGeneration()
