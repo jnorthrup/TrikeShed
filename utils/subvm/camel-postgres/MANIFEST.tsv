@@ -1,0 +1,8 @@
+# guest module	camel-postgres
+# parent	camel-jdbc
+# declared	org.postgresql:postgresql:42.7.14
+# inherited	0 jars from camel-jdbc
+# resolved	2 jars	1462889 bytes
+file	size	sha256
+checker-qual-3.55.1.jar	241885	857658c8bdcbff794949a8d9922f88d63ee3751c203c7cd7d21ea97f9e745288
+postgresql-42.7.14.jar	1221004	73914527305a40cce504b0d3d90b23caf565136912d607ae8ae7c5895512332c

@@ -82,6 +82,18 @@ class ProjectScopes(
     @Volatile
     private var scopes: List<Scope> = emptyList()
     private val mutex = Mutex()
+    /** Serialize managed-path changes with promotion of their prior content into owned CAS bytes. */
+    private val sourceWrites = Any()
+    private val closingSources = mutableSetOf<String>()
+
+    private fun retainSource(name: String, ref: borg.trikeshed.util.oroboros.OroborosAttachmentRef) {
+        check(ref.contentId.value.matches(Regex("sha256:[0-9a-f]{64}"))) { "invalid source CID: ${ref.path}" }
+        val bytes = casStore.get(ref.contentId) ?: filesRoot?.let { root ->
+            File(File(root, name), ref.path).takeIf { it.isFile }?.readBytes()
+        }
+        check(bytes != null && ContentId.of(bytes) == ref.contentId) { "prior source bytes cannot be retained: $name/${ref.path}" }
+        check(casStore.put(bytes) == ref.contentId) { "retained source CID changed: $name/${ref.path}" }
+    }
 
     fun list(): List<Scope> = scopes
 
@@ -202,38 +214,46 @@ class ProjectScopes(
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
     fun uploadPut(name: String, relPath: String, bytes: ByteArray,
                   decisionProvider: DecisionProvider? = decisionProvider(name, relPath.trim('/'))): borg.trikeshed.job.ContentId {
-        val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
         val rel = relPath.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$relPath'" }
-        val cid = borg.trikeshed.job.ContentId.of(bytes)
-        // The upload lands once, under files/<name>/; the CAS names that file in place.
-        val landed = filesRoot?.let { fr ->
-            runCatching {
-                val f = File(File(fr, name), rel)
-                f.parentFile?.mkdirs()
-                if (!(f.isFile && f.length() == bytes.size.toLong() && borg.trikeshed.job.ContentId.of(f.readBytes()) == cid)) f.writeBytes(bytes)
-                f.absolutePath
-            }.getOrNull()
+        val cid = synchronized(sourceWrites) {
+            check(name !in closingSources) { "project is unmounting: $name" }
+            val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
+            val cid = borg.trikeshed.job.ContentId.of(bytes)
+            pdb.gateway.getAttachmentRef(rel)?.takeIf { it.contentId != cid }?.let { prior ->
+                retainSource(name, prior)
+                casStore.sync() // the old version must be durable before its file changes
+            }
+            // The upload lands once, under files/<name>/; the CAS names that file in place.
+            val landed = filesRoot?.let { fr ->
+                runCatching {
+                    val f = File(File(fr, name), rel)
+                    f.parentFile?.mkdirs()
+                    if (!(f.isFile && f.length() == bytes.size.toLong() && borg.trikeshed.job.ContentId.of(f.readBytes()) == cid)) f.writeBytes(bytes)
+                    f.absolutePath
+                }.getOrNull()
+            }
+            pdb.gateway.putAttachment(
+                borg.trikeshed.util.oroboros.OroborosAttachmentRef(
+                    path = rel,
+                    contentType = borg.trikeshed.util.io.ContentTypes.forPath(rel),
+                    length = bytes.size.toLong(),
+                    contentId = cid,
+                    agentId = "browser-drop",
+                    revision = "upload",
+                    sequence = System.currentTimeMillis(),
+                ),
+                bytes,
+                source = landed,
+            )
+            manifestFileFor(name)?.let { mf ->
+                mf.parentFile?.mkdirs()
+                mf.appendText("$rel\t${cid.value}\t${bytes.size}" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
+            }
+            decisionProvider?.let { documentProviders[name to rel] = it }
+            scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
+            cid
         }
-        pdb.gateway.putAttachment(
-            borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                path = rel,
-                contentType = borg.trikeshed.util.io.ContentTypes.forPath(rel),
-                length = bytes.size.toLong(),
-                contentId = cid,
-                agentId = "browser-drop",
-                revision = "upload",
-                sequence = System.currentTimeMillis(),
-            ),
-            bytes,
-            source = landed,
-        )
-        manifestFileFor(name)?.let { mf ->
-            mf.parentFile?.mkdirs()
-            mf.appendText("$rel\t${cid.value}\t${bytes.size}" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
-        }
-        decisionProvider?.let { documentProviders[name to rel] = it }
-        scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
         if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
             onDocument?.invoke(name, rel, decisionProvider)
         return cid
@@ -248,24 +268,29 @@ class ProjectScopes(
      * OCR pages; CAS blobs stay (content-addressed). The removed ids, twins included.
      */
     suspend fun uploadRemove(name: String, path: String): List<String> = mutex.withLock {
-        val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
-        require(scopes.firstOrNull { it.name == name }?.path == "@upload") { "'$name' mirrors a directory: remove it at its source" }
         val rel = path.trim('/')
         require(rel.isNotBlank() && !rel.split('/').any { it == ".." }) { "bad path '$path'" }
-        fun taken(id: String) = id == rel || id.startsWith("$rel/") || borg.trikeshed.lcnc.ProjectNodes.twinOf(id) == rel
-        val ids = pdb.store.ids().let { s -> (0 until s.a).map { s.b(it) } }.filter { taken(it) && !pdb.store.head.isDeleted(it) }
-        for (id in ids) pdb.store.delete(id)
-        documentProviders.keys.removeIf { it.first == name && taken(it.second) }
-        manifestFileFor(name)?.takeIf { it.isFile }?.let { mf ->
-            mf.writeText(mf.readLines().filter { it.isNotBlank() && !taken(it.substringBefore('\t')) }.joinToString("") { it + "\n" })
+        val ids = synchronized(sourceWrites) {
+            val pdb = projectDbs?.get(name) ?: throw IllegalArgumentException("no project db '$name'")
+            require(scopes.firstOrNull { it.name == name }?.path == "@upload") { "'$name' mirrors a directory: remove it at its source" }
+            fun taken(id: String) = id == rel || id.startsWith("$rel/") || borg.trikeshed.lcnc.ProjectNodes.twinOf(id) == rel
+            val ids = pdb.store.ids().let { s -> (0 until s.a).map { s.b(it) } }.filter { taken(it) && !pdb.store.head.isDeleted(it) }
+            for (id in ids) pdb.gateway.getAttachmentRef(id)?.let { retainSource(name, it) }
+            casStore.sync()
+            for (id in ids) pdb.store.delete(id)
+            documentProviders.keys.removeIf { it.first == name && taken(it.second) }
+            manifestFileFor(name)?.takeIf { it.isFile }?.let { mf ->
+                mf.writeText(mf.readLines().filter { it.isNotBlank() && !taken(it.substringBefore('\t')) }.joinToString("") { it + "\n" })
+            }
+            filesRoot?.let { fr ->
+                val dir = File(fr, name)
+                for (id in ids) File(dir, id).delete()
+                File(dir, rel).takeIf { it.isDirectory }?.deleteRecursively()
+            }
+            for (id in ids) ProjectMiner.ocrDir(name, id).takeIf { it.isDirectory }?.deleteRecursively()
+            scopes = scopes.map { if (it.name == name) it.copy(paths = maxOf(0, it.paths - ids.size), docs = pdb.docCount) else it }
+            ids
         }
-        filesRoot?.let { fr ->
-            val dir = File(fr, name)
-            for (id in ids) File(dir, id).delete()
-            File(dir, rel).takeIf { it.isDirectory }?.deleteRecursively()
-        }
-        for (id in ids) ProjectMiner.ocrDir(name, id).takeIf { it.isDirectory }?.deleteRecursively()
-        scopes = scopes.map { if (it.name == name) it.copy(paths = maxOf(0, it.paths - ids.size), docs = pdb.docCount) else it }
         for (id in ids) if (!borg.trikeshed.lcnc.ProjectNodes.twin(id)) onRemoved?.invoke(name, id)
         System.err.println("[OROBOROS] project db $name: removed ${ids.size} docs under $rel")
         ids
@@ -398,20 +423,39 @@ class ProjectScopes(
 
     /** Unmount: registry + ledger + manifest + files clone all released. Docs' CAS blobs stay (content-addressed). */
     suspend fun unmount(name: String): Boolean = mutex.withLock {
-        val had = scopes.any { it.name == name }
-        if (!had) return false
-        projectDbs?.remove(name)
-        scopes = scopes.filter { it.name != name }
-        documentProviders.keys.removeIf { it.first == name }
-        ledgerFile?.takeIf { it.exists() }?.let { f ->
-            runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
+        val had = synchronized(sourceWrites) {
+            if (scopes.none { it.name == name }) false
+            else {
+                projectDbs?.get(name)?.let { pdb ->
+                    val ids = pdb.store.ids()
+                    for (i in 0 until ids.a) {
+                        val id = ids.b(i)
+                        if (!pdb.store.head.isDeleted(id)) pdb.gateway.getAttachmentRef(id)?.let { retainSource(name, it) }
+                    }
+                    casStore.sync()
+                }
+                closingSources.add(name)
+                true
+            }
         }
-        manifestFileFor(name)?.delete()
-        commits.remove(name)?.close()
-        projectCouchDir(name)?.deleteRecursively()
-        filesRoot?.let { File(it, name).deleteRecursively() }
-        System.err.println("[OROBOROS] project db unmounted: $name")
-        true
+        if (!had) return false
+        try {
+            // Registry reader draining can suspend; no JVM monitor is held across it.
+            projectDbs?.remove(name)
+            synchronized(sourceWrites) {
+                scopes = scopes.filter { it.name != name }
+                documentProviders.keys.removeIf { it.first == name }
+                ledgerFile?.takeIf { it.exists() }?.let { f ->
+                    runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
+                }
+                manifestFileFor(name)?.delete()
+                commits.remove(name)?.close()
+                projectCouchDir(name)?.deleteRecursively()
+                filesRoot?.let { File(it, name).deleteRecursively() }
+            }
+            System.err.println("[OROBOROS] project db unmounted: $name")
+            true
+        } finally { synchronized(sourceWrites) { closingSources.remove(name) } }
     }
 
     /** Stop mounted readers before closing their durable commit owners; saved projects remain on disk. */

@@ -36,7 +36,7 @@ class JvmProjectCorpus(
         val pdb = registry.get(project) ?: return@withContext emptyList()
         val head = pdb.store.head
         pdb.gateway.listAttachments(prefix).asSequence()
-            .filter { !it.path.endsWith(ProjectNodes.EXTRACT_SUFFIX) && !it.path.endsWith(ProjectNodes.NOTES_SUFFIX) && ProjectGlob.matches(glob, it.path) }
+            .filter { !head.isDeleted(it.path) && !ProjectNodes.twin(it.path) && ProjectGlob.matches(glob, it.path) }
             .sortedBy { it.path }
             .take(limit)
             // seq is the store's own commit sequence (0-based, as `_changes` numbers it), never the
@@ -62,15 +62,17 @@ class JvmProjectCorpus(
     override suspend fun extract(project: String, id: String, maxChars: Int): ProjectText? =
         extracting.computeIfAbsent(project to id) { Mutex() }.withLock {
         val twin = id + ProjectNodes.EXTRACT_SUFFIX
-        // A PDF's extract is current only with its notes stream beside it: one read before page streams is read again.
-        // The stream is a completion marker here, independent of whether its TSV MIME type is textual.
-        val paged = id.lowercase().endsWith(".pdf")
-        val notes = !paged || withContext(Dispatchers.IO) {
-            (registry.get(project)?.gateway?.getAttachmentRef(id + ProjectMiner.FOOTNOTES_SUFFIX)?.length ?: 0) > 0
+        suspend fun cached(): ProjectText? = withContext(Dispatchers.IO) {
+            val pdb = registry.get(project) ?: return@withContext null
+            if (!ProjectMiner.currentExtraction(pdb, id)) return@withContext null
+            val text = read(project, twin, maxChars) ?: return@withContext null
+            if (!ProjectMiner.currentExtraction(pdb, id) || pdb.gateway.getAttachmentRef(twin)?.contentId?.value != text.cid)
+                return@withContext null
+            text
         }
-        if (notes) read(project, twin, maxChars)?.let { return@withLock it }
+        cached()?.let { return@withLock it }
         val mine = ingest ?: return@withLock null
         mine(project, id)
-        read(project, twin, maxChars)
+        cached()
     }
 }

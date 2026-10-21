@@ -159,7 +159,7 @@ object ProjectGlob {
     }
 
     private val TEXT_EXTENSIONS = setOf(
-        "md", "markdown", "txt", "text", "json", "csv", "kt", "kts", "java", "js", "cjs", "mjs", "ts", "py", "sh",
+        "md", "markdown", "txt", "text", "json", "csv", "tsv", "kt", "kts", "java", "js", "cjs", "mjs", "ts", "py", "sh",
         "html", "css", "xml", "yaml", "yml", "toml", "ini", "cfg", "conf", "rst", "adoc", "tex", "sql", "ttl", "kif",
     )
 
@@ -177,6 +177,8 @@ object ProjectNodes {
     const val EXTRACT = "project.extract"
     /** The mined twin the project miner leaves beside a document (ProjectMiner). */
     const val EXTRACT_SUFFIX = ".extract.md"
+    /** The source CID and extracted-text CID published together when mining completes. */
+    const val EXTRACT_ORIGIN_SUFFIX = ".extract-origin.tsv"
     /**
      * The curation-notes twin a curator (or the wiki) writes beside a document: conventions the text
      * does not carry about itself (`work:`, `edition:`, `date:`, … as `key: value` lines) and any prose
@@ -191,7 +193,7 @@ object ProjectNodes {
     fun twin(id: String): Boolean = twinOf(id) != null
 
     /** The document [id] is a twin of, or null when [id] is a document. */
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
+    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, EXTRACT_ORIGIN_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
     const val NOTES = "project.notes"
 
     /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */
