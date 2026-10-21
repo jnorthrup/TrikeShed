@@ -188,14 +188,10 @@ object ProjectNodes {
     const val EXTRACT = "project.extract"
     /** The mined twin the project miner leaves beside a document (ProjectMiner). */
     const val EXTRACT_SUFFIX = ".extract.md"
-<<<<<<< HEAD
     /** Completion record binds the extraction and layout to one exact source revision. */
     const val EXTRACTION_SUFFIX = ".extract.json"
-||||||| 0be87e2a5
-=======
     /** The source CID and extracted-text CID published together when mining completes. */
     const val EXTRACT_ORIGIN_SUFFIX = ".extract-origin.tsv"
->>>>>>> codex/npo-lcnc-flow
     /**
      * The curation-notes twin a curator (or the wiki) writes beside a document: conventions the text
      * does not carry about itself (`work:`, `edition:`, `date:`, … as `key: value` lines) and any prose
@@ -210,13 +206,7 @@ object ProjectNodes {
     fun twin(id: String): Boolean = twinOf(id) != null
 
     /** The document [id] is a twin of, or null when [id] is a document. */
-<<<<<<< HEAD
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, EXTRACTION_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
-||||||| 0be87e2a5
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
-=======
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, EXTRACT_ORIGIN_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
->>>>>>> codex/npo-lcnc-flow
+    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, EXTRACTION_SUFFIX, EXTRACT_ORIGIN_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
     const val NOTES = "project.notes"
 
     /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */

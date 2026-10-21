@@ -10,6 +10,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.narsese.DocumentAnchor
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -73,14 +74,19 @@ class ProjectMiner(
         /** A document's OCR pages stay under the configured JVM temporary root, never in the forge home. */
         fun ocrDir(name: String, id: String) = File(System.getProperty("java.io.tmpdir"), ".ocr/$name/$id")
 
-        /** A completed extraction names both its actual source and its retained text. */
+        /** Completion binds retained text and layout to the source CID and its exact document revision. */
         fun currentExtraction(pdb: ProjectDb, id: String): Boolean {
             if (pdb.store.head.isDeleted(id)) return false
             val source = pdb.gateway.getAttachmentRef(id)?.contentId ?: return false
-            val text = pdb.gateway.getAttachmentRef(id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX)?.contentId ?: return false
-            val origin = pdb.gateway.getAttachment(id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_ORIGIN_SUFFIX)
+            val sourceRev = pdb.store.head.getRev(id) ?: return false
+            val text = pdb.gateway.getAttachmentRef(id + ProjectNodes.EXTRACT_SUFFIX)?.contentId ?: return false
+            val origin = pdb.gateway.getAttachment(id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX)
                 ?.second?.decodeToString()?.split('\t') ?: return false
             if (origin.size != 2 || origin[0] != source.value || origin[1] != text.value) return false
+            val completion = pdb.gateway.getAttachment(id + ProjectNodes.EXTRACTION_SUFFIX)?.second ?: return false
+            val lineage = reifyStrict(completion.decodeToString()) as? Map<*, *> ?: return false
+            if (lineage["originalCid"] != source.value || lineage["originalRev"] != sourceRev ||
+                lineage["extractedTextCid"] != text.value) return false
             return !id.lowercase().endsWith(".pdf") || (pdb.gateway.getAttachmentRef(id + FOOTNOTES_SUFFIX)?.length ?: 0) > 0
         }
         /** Markup read as its markup declares it ([borg.trikeshed.narsese.MarkupStreams]): no print, no OCR, no Tika. */
@@ -93,20 +99,12 @@ class ProjectMiner(
     }
 
     /** A document's text by its format: PDF pages by [PDF_ROUTE], markup by its declared structure, the rest through Tika. */
-<<<<<<< HEAD
     private suspend fun textOf(name: String, id: String, src: File, originalCid: ContentId): Pair<String?, List<DocumentAnchor>> = when (id.substringAfterLast('.', "").lowercase()) {
         "pdf" -> readPages(name, id, src, PDF_ROUTE, originalCid)?.let { b ->
             putTwin(name, id + FOOTNOTES_SUFFIX, borg.trikeshed.narsese.PageStreams.notesTsv(b.notes).encodeToByteArray(), "project-miner", "page-streams")
             val prefix = "# ${id.substringAfterLast('/')}\n\n"
             (prefix + b.body) to b.anchors.map { it.copy(begin = it.begin + prefix.length, end = it.end + prefix.length) }
         } ?: (null to emptyList())
-||||||| 0be87e2a5
-    private suspend fun textOf(name: String, id: String, src: File): String? = when (id.substringAfterLast('.', "").lowercase()) {
-        "pdf" -> pdfText(name, id, src)?.let { "# ${src.name}\n\n$it\n" }
-=======
-    private suspend fun textOf(name: String, id: String, src: File, sourceCid: ContentId): String? = when (id.substringAfterLast('.', "").lowercase()) {
-        "pdf" -> pdfText(name, id, src, sourceCid)?.let { "# ${src.name}\n\n$it\n" }
->>>>>>> codex/npo-lcnc-flow
         in MARKUP -> src.readText().let { html ->
             // The anchors are their own stream, a twin beside the extract: what the page links out to is curated, never inlined.
             putTwin(name, id + borg.trikeshed.lcnc.ProjectNodes.LINKS_SUFFIX,
@@ -146,32 +144,6 @@ class ProjectMiner(
         OCR,
     }
 
-<<<<<<< HEAD
-||||||| 0be87e2a5
-    /**
-     * A PDF's text, page by page by [PDF_ROUTE]: a page drawn from text reads from its own layer, exactly as
-     * printed; a page that is a picture reads through today's OCR, which reads an old scan better than the
-     * text layer an upstream scanner left over it.
-     */
-    private suspend fun pdfText(name: String, id: String, f: File): String? = readPages(name, id, f, PDF_ROUTE)?.let { b ->
-        // The notes are their own stream, a twin beside the extract: page, folio, sections, marker, ordinal, measure.
-        putTwin(name, id + FOOTNOTES_SUFFIX, borg.trikeshed.narsese.PageStreams.notesTsv(b.notes).encodeToByteArray(), "project-miner", "page-streams")
-        b.body.takeIf { it.isNotBlank() }
-    }
-
-=======
-    /**
-     * A PDF's text, page by page by [PDF_ROUTE]: a page drawn from text reads from its own layer, exactly as
-     * printed; a page that is a picture reads through today's OCR, which reads an old scan better than the
-     * text layer an upstream scanner left over it.
-     */
-    private suspend fun pdfText(name: String, id: String, f: File, sourceCid: ContentId): String? = readPages(name, id, f, PDF_ROUTE, sourceCid)?.let { b ->
-        // The notes are their own stream, a twin beside the extract: page, folio, sections, marker, ordinal, measure.
-        putTwin(name, id + FOOTNOTES_SUFFIX, borg.trikeshed.narsese.PageStreams.notesTsv(b.notes).encodeToByteArray(), "project-miner", "page-streams")
-        b.body.takeIf { it.isNotBlank() }
-    }
-
->>>>>>> codex/npo-lcnc-flow
     /** A poppler or tesseract run, started with the guest environment rather than a copy of the daemon's. */
     private fun tool(vararg cmd: String): ProcessBuilder = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(*cmd))
 
@@ -280,29 +252,16 @@ class ProjectMiner(
      * the next page; the book is then read as page streams — running head, body, notes — from those boxes
      * ([borg.trikeshed.narsese.PageStreams]). Pages run [OCR_PARALLEL] at a time.
      */
-<<<<<<< HEAD
     private suspend fun readPages(name: String, id: String, f: File, route: PdfRoute, originalCid: ContentId): borg.trikeshed.narsese.PageStreams.Book? = coroutineScope {
-||||||| 0be87e2a5
-    private suspend fun readPages(name: String, id: String, f: File, route: PdfRoute): borg.trikeshed.narsese.PageStreams.Book? = coroutineScope {
-=======
-    private suspend fun readPages(name: String, id: String, f: File, route: PdfRoute, sourceCid: ContentId): borg.trikeshed.narsese.PageStreams.Book? = coroutineScope {
->>>>>>> codex/npo-lcnc-flow
         val pages = runCatching {
             val proc = tool("pdfinfo", f.absolutePath).start()
             Regex("Pages:[ \\t]+(\\d+)").find(proc.inputStream.readAllBytes().decodeToString().also { proc.waitFor() })?.groupValues?.get(1)?.toInt()
         }.getOrNull() ?: return@coroutineScope null
         val layered = if (route == PdfRoute.OCR) emptySet() else layeredPages(f)?.second.orEmpty()
         val fromLayer = if (route == PdfRoute.AUTO) layered - picturedPages(f, pages) else layered
-<<<<<<< HEAD
-        // A changed original must never reuse the previous revision's OCR pages.
-        val dir = File(ocrDir(name, id), originalCid.hex).apply { mkdirs() }
-||||||| 0be87e2a5
-        val dir = ocrDir(name, id).apply { mkdirs() }
-=======
-        val dir = File(ocrDir(name, id), "${sourceCid.hex}/${route.name.lowercase()}").apply { mkdirs() }
->>>>>>> codex/npo-lcnc-flow
+        val dir = File(ocrDir(name, id), "${originalCid.hex}/${route.name.lowercase()}").apply { mkdirs() }
         val gate = pageGate
-        val key = "$name/$id/${sourceCid.value}"
+        val key = "$name/$id/${originalCid.value}"
         ocrDone[key] = dir.listFiles { x -> x.name.endsWith(".tsv") }?.size ?: 0
         val queue = Channel<Int>(OCR_PARALLEL)
         val workers = List(OCR_PARALLEL) {
@@ -344,28 +303,6 @@ class ProjectMiner(
         borg.trikeshed.narsese.PageStreams.book(read)
     }
 
-<<<<<<< HEAD
-    /** Ingest one document, by hand: its text lands as the extract twin. The same reading [mine] does. */
-    suspend fun ingest(name: String, id: String): Map<String, Any?> = withContext(Dispatchers.IO) {
-        val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
-        val original = pdb.gateway.getAttachmentRef(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
-        val originalRev = pdb.store.head.getRev(id).orEmpty()
-        // The uploaded file itself when it is on disk; the attachment bytes are read only when it is not.
-        val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
-        val src = onDisk ?: run {
-            val att = pdb.gateway.getAttachment(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
-            File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second) }
-||||||| 0be87e2a5
-    /** Ingest one document, by hand: its text lands as the extract twin. The same reading [mine] does. */
-    suspend fun ingest(name: String, id: String): Map<String, Any?> = withContext(Dispatchers.IO) {
-        val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
-        if (pdb.gateway.getAttachmentRef(id) == null) return@withContext mapOf("error" to "absent", "id" to id)
-        // The uploaded file itself when it is on disk; the attachment bytes are read only when it is not.
-        val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
-        val src = onDisk ?: run {
-            val att = pdb.gateway.getAttachment(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
-            File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply { writeBytes(att.second) }
-=======
     private fun sourceDigest(file: File): String {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
         file.inputStream().use { input ->
@@ -375,7 +312,6 @@ class ProjectMiner(
                 if (count < 0) break
                 digest.update(buffer, 0, count)
             }
->>>>>>> codex/npo-lcnc-flow
         }
         return "sha256:" + java.util.HexFormat.of().formatHex(digest.digest())
     }
@@ -386,35 +322,11 @@ class ProjectMiner(
         val pdb = registry.get(name) ?: throw IllegalArgumentException("no project db '$name'")
         if (pdb.store.head.isDeleted(id)) return@withContext mapOf("error" to "absent", "id" to id)
         val source = pdb.gateway.getAttachmentRef(id) ?: return@withContext mapOf("error" to "absent", "id" to id)
+        val sourceRev = pdb.store.head.getRev(id).orEmpty()
         val dir = java.nio.file.Files.createTempDirectory(File(System.getProperty("java.io.tmpdir")).toPath(), "project-source-").toFile()
         val src = File(dir, id.substringAfterLast('/'))
         val began = System.currentTimeMillis()
         val ext = id.substringAfterLast('.', "").lowercase()
-<<<<<<< HEAD
-        val (md, anchors) = try {
-            require(ContentId.of(src.readBytes()) == original.contentId) { "Source bytes changed before extraction" }
-            textOf(name, id, src, original.contentId)
-        } finally { if (onDisk == null) src.delete() }
-        val body = md?.trim().orEmpty()
-        if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
-        require(pdb.gateway.getAttachmentRef(id)?.contentId == original.contentId && pdb.store.head.getRev(id) == originalRev) {
-            "Source revision changed during extraction"
-        }
-        putExtraction(name, id, original.contentId, originalRev, body, anchors)
-        mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
-            "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; else -> "tika" },
-            "ms" to (System.currentTimeMillis() - began))
-    }
-||||||| 0be87e2a5
-        val md = try { textOf(name, id, src) } finally { if (onDisk == null) src.delete() }
-        val body = md?.trim().orEmpty()
-        if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
-        putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "ingested")
-        mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
-            "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; else -> "tika" },
-            "ms" to (System.currentTimeMillis() - began))
-    }
-=======
         try {
             val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
             if (onDisk != null) onDisk.copyTo(src, overwrite = true)
@@ -424,27 +336,27 @@ class ProjectMiner(
                 src.writeBytes(att.second)
             }
             check(sourceDigest(src) == source.contentId.value) { "source snapshot does not match its CID: $id" }
-            val body = textOf(name, id, src, source.contentId)?.trim().orEmpty()
-            check(!pdb.store.head.isDeleted(id) && pdb.gateway.getAttachmentRef(id)?.contentId == source.contentId) {
+            val (md, anchors) = textOf(name, id, src, source.contentId)
+            val body = md?.trimEnd().orEmpty()
+            check(!pdb.store.head.isDeleted(id) && pdb.gateway.getAttachmentRef(id)?.contentId == source.contentId &&
+                pdb.store.head.getRev(id) == sourceRev) {
                 "source changed during extraction: $id"
             }
             if (body.length < 80) return@withContext mapOf("verdict" to "no_text", "id" to id)
-            val bytes = body.encodeToByteArray()
-            putTwin(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX, bytes, "project-miner", "ingested")
-            putTwin(name, id + borg.trikeshed.lcnc.ProjectNodes.EXTRACT_ORIGIN_SUFFIX,
-                "${source.contentId.value}\t${ContentId.of(bytes).value}".encodeToByteArray(), "project-miner", "origin")
+            putExtraction(name, id, source.contentId, sourceRev, body, anchors)
             mapOf("verdict" to "ingested", "id" to id, "chars" to body.length,
                 "route" to when { ext == "pdf" -> "pdf pages (${PDF_ROUTE.name.lowercase()})"; ext in MARKUP -> "markup"; else -> "tika" },
                 "ms" to (System.currentTimeMillis() - began))
         } finally { dir.deleteRecursively() }
     } }
->>>>>>> codex/npo-lcnc-flow
 
     /** Publish lineage last: a stale or interrupted extraction is never a current twin. */
     private fun putExtraction(name: String, id: String, originalCid: ContentId, originalRev: String,
                               text: String, anchors: List<DocumentAnchor>) {
         val bytes = text.encodeToByteArray()
         putTwin(name, id + ProjectNodes.EXTRACT_SUFFIX, bytes, "project-miner", "ingested")
+        putTwin(name, id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX,
+            "${originalCid.value}\t${ContentId.of(bytes).value}".encodeToByteArray(), "project-miner", "origin")
         putTwin(name, id + ProjectNodes.EXTRACTION_SUFFIX, jsonOf(mapOf(
             "version" to 1, "originalCid" to originalCid.value, "originalRev" to originalRev,
             "extractedTextCid" to ContentId.of(bytes).value, "anchors" to anchors.map(DocumentAnchor::toMap),
@@ -462,26 +374,8 @@ class ProjectMiner(
         val ids = mutableListOf<String>()
         for (i in 0 until storeIds.a) {
             val id = storeIds.b(i)
-<<<<<<< HEAD
-            if (id.endsWith(".extract.md")) {
-                already.add(id)
-            } else if (ProjectNodes.twin(id)) {
-                continue
-            } else if (id.substringAfterLast('.', "").lowercase() in MINEABLE) {
-                ids.add(id)
-            }
-||||||| 0be87e2a5
-            if (id.endsWith(".extract.md")) {
-                already.add(id)
-            } else if (id.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX) || id.endsWith(FOOTNOTES_SUFFIX)) {
-                continue
-            } else if (id.substringAfterLast('.', "").lowercase() in MINEABLE) {
-                ids.add(id)
-            }
-=======
             if (!pdb.store.head.isDeleted(id) && !borg.trikeshed.lcnc.ProjectNodes.twin(id) &&
                 id.substringAfterLast('.', "").lowercase() in MINEABLE) ids.add(id)
->>>>>>> codex/npo-lcnc-flow
         }
         val work = ids.filter { !currentExtraction(pdb, it) }.take(cap)
         prog.total = work.size
@@ -489,32 +383,12 @@ class ProjectMiner(
         withContext(Dispatchers.IO) {
             for (id in work) {
                 try {
-<<<<<<< HEAD
-                    if (pdb.gateway.getAttachmentRef(id) == null) { prog.skipped++; continue }
-                    if (ingest(name, id)["verdict"] == "ingested") prog.extracted++ else prog.failed++
-||||||| 0be87e2a5
-                    if (pdb.gateway.getAttachmentRef(id) == null) { prog.skipped++; continue }
-                    // A PDF reads page by page by PDF_ROUTE (pdfText); Tika is for non-PDF documents.
-                    // Prefer the on-disk twin (clone/mirror) — no byte copy for the parser.
-                    val onDisk = filesRoot?.let { File(File(it, name), id) }?.takeIf { it.isFile }
-                    val att = if (onDisk == null) pdb.gateway.getAttachment(id) else null
-                    if (onDisk == null && att == null) { prog.skipped++; continue }
-                    val src = onDisk ?: File.createTempFile("mine-", "-" + id.substringAfterLast('/')).apply {
-                        writeBytes(checkNotNull(att).second)
-                    }
-                    val md = try { textOf(name, id, src) } finally { if (onDisk == null) src.delete() }
-                    val body = md?.trim().orEmpty()
-                    if (body.length < 80) { prog.failed++; continue }   // no text worth landing
-                    putTwin(name, "$id.extract.md", body.encodeToByteArray(), "project-miner", "mined")
-                    prog.extracted++
-=======
                     val result = ingest(name, id)
                     when {
                         result["verdict"] == "ingested" -> prog.extracted++
                         result["error"] == "absent" -> prog.skipped++
                         else -> prog.failed++
                     }
->>>>>>> codex/npo-lcnc-flow
                 } catch (t: Throwable) {
                     prog.failed++
                     prog.note = "${id.take(60)}: ${t.message?.take(80)}"

@@ -38,13 +38,7 @@ class JvmProjectCorpus(
         val pdb = registry.get(project) ?: return@withContext emptyList()
         val head = pdb.store.head
         pdb.gateway.listAttachments(prefix).asSequence()
-<<<<<<< HEAD
-            .filter { !ProjectNodes.twin(it.path) && ProjectGlob.matches(glob, it.path) }
-||||||| 0be87e2a5
-            .filter { !it.path.endsWith(ProjectNodes.EXTRACT_SUFFIX) && !it.path.endsWith(ProjectNodes.NOTES_SUFFIX) && ProjectGlob.matches(glob, it.path) }
-=======
             .filter { !head.isDeleted(it.path) && !ProjectNodes.twin(it.path) && ProjectGlob.matches(glob, it.path) }
->>>>>>> codex/npo-lcnc-flow
             .sortedBy { it.path }
             .take(limit)
             // seq is the store's own commit sequence (0-based, as `_changes` numbers it), never the
@@ -56,17 +50,21 @@ class JvmProjectCorpus(
 
     override suspend fun document(project: String, id: String): ProjectDoc? = withContext(Dispatchers.IO) {
         val pdb = registry.get(project) ?: return@withContext null
+        if (pdb.store.head.isDeleted(id)) return@withContext null
         val ref = pdb.gateway.getAttachmentRef(id) ?: return@withContext null
         val head = pdb.store.head
         ProjectDoc(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, ref.length, ref.contentType)
     }
 
     override suspend fun bytes(project: String, id: String): ByteArray? = withContext(Dispatchers.IO) {
-        registry.get(project)?.gateway?.getAttachment(id)?.second
+        val pdb = registry.get(project) ?: return@withContext null
+        if (pdb.store.head.isDeleted(id)) return@withContext null
+        pdb.gateway.getAttachment(id)?.second
     }
 
     override suspend fun read(project: String, id: String, maxChars: Int): ProjectText? = withContext(Dispatchers.IO) {
         val pdb = registry.get(project) ?: return@withContext null
+        if (pdb.store.head.isDeleted(id)) return@withContext null
         val (ref, bytes) = pdb.gateway.getAttachment(id) ?: return@withContext null
         if (!ProjectGlob.isTextual(ref.contentType, id)) return@withContext null
         // A text larger than asked for is read to its head, never refused: maxChars bounds the answer, not the document.
@@ -93,48 +91,25 @@ class JvmProjectCorpus(
             return@withLock read(project, id, maxChars)?.copy(
             originalCid = original.cid, originalRev = original.rev)
         val twin = id + ProjectNodes.EXTRACT_SUFFIX
-<<<<<<< HEAD
         suspend fun current(): ProjectText? {
+            val pdb = registry.get(project) ?: return null
+            if (!ProjectMiner.currentExtraction(pdb, id)) return null
             val completion = read(project, id + ProjectNodes.EXTRACTION_SUFFIX, Int.MAX_VALUE / 4) ?: return null
             val lineage = reifyStrict(completion.text) as? Map<*, *> ?: return null
             if (lineage["originalCid"] != original.cid || lineage["originalRev"] != original.rev) return null
             val text = read(project, twin, maxChars) ?: return null
             if (lineage["extractedTextCid"] != text.cid) return null
+            val source = document(project, id) ?: return null
+            if (source.cid != original.cid || source.rev != original.rev || !ProjectMiner.currentExtraction(pdb, id) ||
+                pdb.gateway.getAttachmentRef(twin)?.contentId?.value != text.cid) return null
             return text.copy(originalCid = original.cid, originalRev = original.rev,
                 anchors = (lineage["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
                 unresolved = (lineage["unresolved"] as? List<*>)?.map { it as String }
                     ?: listOf("page", "folio", "section", "table", "diagram", "coordinates"))
-||||||| 0be87e2a5
-        // A PDF's extract is current only with its notes stream beside it: one read before page streams is read again.
-        // The stream is a completion marker here, independent of whether its TSV MIME type is textual.
-        val paged = id.lowercase().endsWith(".pdf")
-        val notes = !paged || withContext(Dispatchers.IO) {
-            (registry.get(project)?.gateway?.getAttachmentRef(id + ProjectMiner.FOOTNOTES_SUFFIX)?.length ?: 0) > 0
-=======
-        suspend fun cached(): ProjectText? = withContext(Dispatchers.IO) {
-            val pdb = registry.get(project) ?: return@withContext null
-            if (!ProjectMiner.currentExtraction(pdb, id)) return@withContext null
-            val text = read(project, twin, maxChars) ?: return@withContext null
-            if (!ProjectMiner.currentExtraction(pdb, id) || pdb.gateway.getAttachmentRef(twin)?.contentId?.value != text.cid)
-                return@withContext null
-            text
->>>>>>> codex/npo-lcnc-flow
         }
-<<<<<<< HEAD
         current()?.let { return@withLock it }
-||||||| 0be87e2a5
-        if (notes) read(project, twin, maxChars)?.let { return@withLock it }
-=======
-        cached()?.let { return@withLock it }
->>>>>>> codex/npo-lcnc-flow
         val mine = ingest ?: return@withLock null
         mine(project, id)
-<<<<<<< HEAD
         current()
-||||||| 0be87e2a5
-        read(project, twin, maxChars)
-=======
-        cached()
->>>>>>> codex/npo-lcnc-flow
     }
 }

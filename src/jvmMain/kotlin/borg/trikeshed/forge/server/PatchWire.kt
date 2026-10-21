@@ -254,51 +254,7 @@ class ProjectScopes(
             scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
             cid
         }
-<<<<<<< HEAD
-        pdb.gateway.putAttachment(
-            borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                path = rel,
-                contentType = borg.trikeshed.util.io.ContentTypes.forPath(rel),
-                length = bytes.size.toLong(),
-                contentId = cid,
-                agentId = "browser-drop",
-                revision = "upload",
-                sequence = System.currentTimeMillis(),
-            ),
-            bytes,
-            source = landed,
-        )
-        manifestFileFor(name)?.let { mf ->
-            mf.parentFile?.mkdirs()
-            mf.appendText("$rel\t${cid.value}\t${bytes.size}" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
-        }
-        decisionProvider?.let { documentProviders[name to rel] = it }
-        scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
         if (!borg.trikeshed.lcnc.ProjectNodes.twin(rel))
-||||||| 0be87e2a5
-        pdb.gateway.putAttachment(
-            borg.trikeshed.util.oroboros.OroborosAttachmentRef(
-                path = rel,
-                contentType = borg.trikeshed.util.io.ContentTypes.forPath(rel),
-                length = bytes.size.toLong(),
-                contentId = cid,
-                agentId = "browser-drop",
-                revision = "upload",
-                sequence = System.currentTimeMillis(),
-            ),
-            bytes,
-            source = landed,
-        )
-        manifestFileFor(name)?.let { mf ->
-            mf.parentFile?.mkdirs()
-            mf.appendText("$rel\t${cid.value}\t${bytes.size}" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
-        }
-        decisionProvider?.let { documentProviders[name to rel] = it }
-        scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
-        if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
-=======
-        if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
->>>>>>> codex/npo-lcnc-flow
             onDocument?.invoke(name, rel, decisionProvider)
         return cid
     }

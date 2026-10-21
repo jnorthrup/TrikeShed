@@ -40,7 +40,7 @@ class ProjectCorpusJvmTest {
         val gateway = registry.get(project)!!.gateway
         val source = gateway.getAttachmentRef(id)!!.contentId.value
         val text = gateway.getAttachmentRef(id + ProjectNodes.EXTRACT_SUFFIX)!!.contentId.value
-        scopes.uploadPut(project, id + ".extract-origin.tsv", "$source\t$text".encodeToByteArray())
+        scopes.uploadPut(project, id + ProjectNodes.EXTRACT_ORIGIN_SUFFIX, "$source\t$text".encodeToByteArray())
     }
 
     private fun html(marker: String) = ("<html><body><h1>Source version</h1><p>Outcome $marker is synthetic regression content. " +
@@ -116,14 +116,13 @@ class ProjectCorpusJvmTest {
     }
 
     @Test
-    fun unchangedSourceUploadKeepsItsValidExtraction(): Unit = runBlocking {
+    fun unchangedSourceRevisionKeepsItsValidExtraction(): Unit = runBlocking {
         val (scopes, registry, miner) = rig()
         val scope = scopes.beginUpload("unchanged-html")
         val corpus = JvmProjectCorpus(registry, scopes, miner)
         try {
             scopes.uploadPut(scope.name, "version.html", html("ALPHA001"))
             val first = corpus.extract(scope.name, "version.html", 10_000)!!
-            scopes.uploadPut(scope.name, "version.html", html("ALPHA001"))
             val second = corpus.extract(scope.name, "version.html", 10_000)!!
             assertEquals(first.cid, second.cid)
             assertEquals(first.rev, second.rev)
@@ -214,11 +213,6 @@ class ProjectCorpusJvmTest {
     }
 
     @Test
-<<<<<<< HEAD
-    fun pdfExtractReusesOnlyTheCompletionBoundToItsOriginalRevision(): Unit = runBlocking {
-||||||| 0be87e2a5
-    fun pdfExtractReusesItsFootnotesMarkerRegardlessOfMimeType(): Unit = runBlocking {
-=======
     fun deletedDocumentsDoNotConsumeInventoryLimit(): Unit = runBlocking {
         val (scopes, registry) = rig()
         val scope = scopes.beginUpload("deleted-inventory")
@@ -248,8 +242,8 @@ class ProjectCorpusJvmTest {
         val scope = scopes.beginUpload("derived-inventory")
         try {
             scopes.uploadPut(scope.name, "a.md", "source".encodeToByteArray())
-            for (suffix in listOf(ProjectNodes.EXTRACT_SUFFIX, ProjectNodes.NOTES_SUFFIX,
-                ProjectNodes.FOOTNOTES_SUFFIX, ProjectNodes.LINKS_SUFFIX, ".extract-origin.tsv")) {
+            for (suffix in listOf(ProjectNodes.EXTRACT_SUFFIX, ProjectNodes.EXTRACTION_SUFFIX, ProjectNodes.NOTES_SUFFIX,
+                ProjectNodes.FOOTNOTES_SUFFIX, ProjectNodes.LINKS_SUFFIX, ProjectNodes.EXTRACT_ORIGIN_SUFFIX)) {
                 scopes.uploadPut(scope.name, "a.md" + suffix, "derived".encodeToByteArray())
             }
             assertEquals(listOf("a.md"), JvmProjectCorpus(registry, scopes).docs(scope.name).map { it.id })
@@ -269,19 +263,13 @@ class ProjectCorpusJvmTest {
     }
 
     @Test
-    fun pdfExtractReusesItsFootnotesMarkerRegardlessOfMimeType(): Unit = runBlocking {
->>>>>>> codex/npo-lcnc-flow
+    fun pdfExtractReusesOnlyTheCompletionBoundToItsOriginalRevision(): Unit = runBlocking {
         val (scopes, registry) = rig()
         val scope = scopes.beginUpload("pdf-marker")
         scopes.uploadPut(scope.name, "book.pdf", "%PDF-fixture".encodeToByteArray())
         scopes.uploadPut(scope.name, "book.pdf.extract.md", "retained extraction".encodeToByteArray())
         scopes.uploadPut(scope.name, "book.pdf.footnotes.tsv", "page\ttext\n1\tnote".encodeToByteArray())
-<<<<<<< HEAD
         completion(scopes, registry, scope.name, "book.pdf", "retained extraction")
-||||||| 0be87e2a5
-=======
-        origin(scopes, registry, scope.name, "book.pdf")
->>>>>>> codex/npo-lcnc-flow
         val corpus = JvmProjectCorpus(registry, scopes, ingest = { _, _ -> error("completed PDF must not be extracted again") })
         try {
             assertEquals("application/octet-stream", registry.get(scope.name)!!.gateway
@@ -305,12 +293,7 @@ class ProjectCorpusJvmTest {
             release.await()
             scopes.uploadPut(project, id + ProjectMiner.FOOTNOTES_SUFFIX, "page\ttext\n1\tnote".encodeToByteArray())
             scopes.uploadPut(project, id + ProjectNodes.EXTRACT_SUFFIX, "completed extraction".encodeToByteArray())
-<<<<<<< HEAD
             completion(scopes, registry, project, id, "completed extraction")
-||||||| 0be87e2a5
-=======
-            origin(scopes, registry, project, id)
->>>>>>> codex/npo-lcnc-flow
         })
         try {
             withTimeout(5_000) {
@@ -328,6 +311,7 @@ class ProjectCorpusJvmTest {
 
     private fun completion(scopes: ProjectScopes, registry: ProjectDbRegistry, project: String, id: String, text: String) {
         val db = registry.get(project)!!
+        origin(scopes, registry, project, id)
         scopes.uploadPut(project, id + ProjectNodes.EXTRACTION_SUFFIX, jsonOf(mapOf(
             "originalCid" to db.gateway.getAttachmentRef(id)!!.contentId.value,
             "originalRev" to db.store.head.getRev(id), "extractedTextCid" to ContentId.of(text.encodeToByteArray()).value,
@@ -341,7 +325,10 @@ class ProjectCorpusJvmTest {
         val bytes = "%PDF-1.7\nfixture".encodeToByteArray()
         scopes.uploadPut(scope.name, "book.pdf", bytes)
         scopes.uploadPut(scope.name, "book.pdf.extract.md", "old extraction".encodeToByteArray())
+        scopes.uploadPut(scope.name, "book.pdf.footnotes.tsv", "page\ttext\n1\tnote".encodeToByteArray())
         completion(scopes, registry, scope.name, "book.pdf", "old extraction")
+        // Upload creates a document revision even when its CID repeats. Curation receipts bind
+        // originalRev, so a completed extraction cannot be relabeled as evidence for that new revision.
         scopes.uploadPut(scope.name, "book.pdf", bytes)
         var calls = 0
         val corpus = JvmProjectCorpus(registry, scopes, ingest = { project, id ->
