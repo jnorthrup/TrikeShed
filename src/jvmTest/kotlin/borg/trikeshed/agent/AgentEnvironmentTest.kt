@@ -25,10 +25,11 @@ class AgentEnvironmentTest {
     @Test
     fun extraEnvironmentFiltersToxicKeys() {
         val host = mapOf("HOME" to "/Users/x")
-        val extra = mapOf("SAFE_FLAG" to "1", "MY_API_KEY" to "leak", "USER_PASSWORD" to "secret")
+        val extra = mapOf("SAFE_FLAG" to "1", "MY_API_KEY" to "leak", "USER_PASSWORD" to "secret", "LD_PRELOAD" to "/tmp/evil.so")
         val env = AgentEnvironment.build(host, listOf("/usr/bin"), extra)
         assertEquals("1", env["SAFE_FLAG"])
         assertNull(env["MY_API_KEY"])
         assertNull(env["USER_PASSWORD"])
+        assertNull(env["LD_PRELOAD"])
     }
 }
