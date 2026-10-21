@@ -161,10 +161,7 @@ fun HtxRequest.renderWireRequest(): String {
     }
 }
 
-fun HtxRequest.headerValue(name: String): String? =
-    headers.toList()
-        .firstOrNull { it.a.equals(name, ignoreCase = true) }
-        ?.b
+fun HtxRequest.headerValue(name: String): String? = headers.headerValue(name)
 
 fun HtxRequest.withHeader(name: String, value: String): HtxRequest {
     val preserved = headers.toList().filterNot { it.a.equals(name, ignoreCase = true) }
@@ -190,12 +187,12 @@ fun parseHtxResponse(payload: HtxBody): HtxResponse {
         ?: 0
     val headers = lines.drop(1).mapNotNull(::parseHeaderLine).toSeries()
     val encodedBody = bytes.copyOfRange(boundary + 4, bytes.size)
+    val contentLengthVal = headers.headerValue("Content-Length")?.trim()?.toIntOrNull()
     val decodedBody = when {
         headers.headerValue("Transfer-Encoding")?.contains("chunked", ignoreCase = true) == true ->
             decodeChunkedBody(encodedBody)
-        headers.headerValue("Content-Length")?.trim()?.toIntOrNull() != null -> {
-            val contentLength = headers.headerValue("Content-Length")!!.trim().toInt()
-            encodedBody.copyOf(minOf(contentLength, encodedBody.size))
+        contentLengthVal != null -> {
+            encodedBody.copyOf(minOf(contentLengthVal, encodedBody.size))
         }
         else -> encodedBody
     }
@@ -260,8 +257,15 @@ private fun HtxTransportProtocol.defaultPort(): Int =
         HtxTransportProtocol.HTTPS -> 443
     }
 
-fun HtxHeaders.headerValue(name: String): String? =
-    toList().firstOrNull { it.a.equals(name, ignoreCase = true) }?.b
+fun HtxHeaders.headerValue(name: String): String? {
+    for (i in 0 until size) {
+        val header = this[i]
+        if (header.a.equals(name, ignoreCase = true)) {
+            return header.b
+        }
+    }
+    return null
+}
 
 private fun HtxMethod.wireToken(): String =
     when (this) {
