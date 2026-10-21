@@ -1,18 +1,6 @@
 package borg.trikeshed.kanban
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.toList
-import borg.trikeshed.lib.forEach
-import borg.trikeshed.lib.map
-import borg.trikeshed.lib.view
-import borg.trikeshed.lib.filter
-import borg.trikeshed.lib.mapIndexed
-import borg.trikeshed.lib.isEmpty
-import borg.trikeshed.lib.j
+import borg.trikeshed.lib.*
 
 /** Hermes-compatible production role carried by a lane, without fixing its order. */
 data class KanbanLane(
@@ -132,15 +120,8 @@ data class KanbanGraphValidation(val errors: List<KanbanGraphError>) { val valid
 
 fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRegistry()): KanbanGraphValidation {
     val errors = mutableListOf<KanbanGraphError>()
-<<<<<<< HEAD
-    // Bolt: avoid O(N) allocation when iterating Series by removing .toList()
-    val laneIds = lanes.size j { i: Int -> lanes[i].id } /* ⚡ Bolt: Zero-allocation lazy view using j constructor */
-||||||| 5c8ebac33
-    // Bolt: avoid O(N) allocation when iterating Series by removing .toList()
-    val laneIds = lanes.map { it.id }
-=======
-    val laneSet = HashSet<String>(lanes.size).apply { lanes.forEach { add(it.id) } }
->>>>>>> origin/jules-bolt-kanbangraph-lookup-opt-3105013726026875407
+    val laneIds = lanes α { it.id }
+    val laneSet = HashSet<String>(lanes.size).apply { laneIds.forEach { add(it) } }
     val seenOrders = mutableSetOf<Int>()
     lanes.forEach { if (!seenOrders.add(it.order)) errors += KanbanGraphError.IncompatibleIo("lane:${it.id}", "duplicate lane order ${it.order}") }
     val seenIds = mutableSetOf<String>()
@@ -194,7 +175,7 @@ fun KanbanGraph.validate(predicates: KanbanPredicateRegistry = KanbanPredicateRe
         edges.forEach { if (it.from == id) visit(it.to, path + id) }
         marks[id] = 2
     }
-    laneSet.forEach { visit(it, emptyList()) }
+    laneIds.forEach { visit(it, emptyList()) }
     return KanbanGraphValidation(errors)
 }
 
