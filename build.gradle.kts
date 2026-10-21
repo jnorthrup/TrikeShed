@@ -972,13 +972,13 @@ tasks.register<JavaExec>("runOroborosDaemon") {
 // ── AOT cache (JEP 483 / Leyden, JDK 25) ────────────────────────────────────
 // Two hard constraints shape these tasks, both verified against GraalVM CE 25.0.2:
 //   1. AOT create/consume REJECTS exploded-directory classpaths ("Error: non-empty directory
-//      build/live/classes") — it accepts JAR entries only. So these launch from jvmJar + the
-//      staged runtime jars, NOT the hot-swappable build/live/classes the dev launchers use.
+//      build/live/classes") — it accepts JAR entries only. These launch from immutable copies
+//      of jvmJar + the staged runtime jars, outside the cleanable build tree.
 //   2. The archive is bound to the EXACT classpath string. stageDaemonAot writes the -cp it used
 //      to a sidecar (oroboros.aot.cp); runOroborosDaemonAot reads that same string back, so create
 //      and consume use the same ordered entries. AOTMode=on requires an applicable cache.
 // Content fingerprints additionally bind runtime binaries, ordered JAR paths, sizes, mtimes and bytes.
-// The archive lands at build/staging/oroboros.aot — beside the jars it is bound to, and where the
+// The archive lands at build/staging/oroboros.aot, where the
 // build-plane absorber can pick it up so the AOT cache teleports with the install (gap-analysis §7).
 val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
 val daemonAotCpFile = layout.buildDirectory.file("staging/oroboros.aot.cp")
@@ -1072,13 +1072,87 @@ fun adoptDaemonAot(fingerprint: String): Boolean {
     }
 }
 
-// AOT preparation and verification never publish watched live classes.
-// Identical classpath construction for both tasks: app jar, then staged dependency jars in a stable
-// sorted order (glob expansion order is not guaranteed; sorting makes create == consume).
+// Copy before launch: overwriting a JAR already open in a JVM can corrupt its lazy ZIP reads.
+// The ordered content manifest identifies an immutable generation; builds never replace its files.
+fun daemonClasspathSnapshot(inputs: List<File>, root: File): List<File> {
+    require(inputs.isNotEmpty()) { "Daemon classpath is empty" }
+    val sources = inputs.map { it.canonicalFile }
+    val hashes = sources.map { source ->
+        check(source.isFile) { "Missing daemon classpath input: $source; build and stage the daemon first" }
+        daemonAotHash(source)
+    }
+    val names = sources.mapIndexed { index, source ->
+        "${index.toString().padStart(4, '0')}-${source.name.replace(Regex("[^A-Za-z0-9._-]"), "_")}"
+    }
+    val manifest = buildString {
+        appendLine("daemon-classpath-v1")
+        names.forEachIndexed { index, name -> appendLine("$name\t${hashes[index]}") }
+    }
+    val digest = MessageDigest.getInstance("SHA-256").digest(manifest.toByteArray())
+        .joinToString("") { "%02x".format(it) }
+    val directory = root.canonicalFile.resolve(digest)
+    val files = names.map(directory::resolve)
+    fun validateSources() = sources.forEachIndexed { index, source ->
+        check(source.isFile && daemonAotHash(source) == hashes[index]) {
+            "Daemon classpath changed during snapshot: $source; retry after the build finishes"
+        }
+    }
+    fun validateGeneration() {
+        check(directory.resolve("classpath.manifest").readText() == manifest &&
+            files.indices.all { files[it].isFile && daemonAotHash(files[it]) == hashes[it] }) {
+            "Daemon classpath generation was modified: $directory; refusing to replace files a JVM may be using"
+        }
+    }
+    Files.createDirectories(directory.parentFile.toPath())
+    // Serialize publishers across Gradle processes. Never replace an existing generation, even if
+    // its contents were damaged externally: another JVM may still have those exact paths open.
+    java.nio.channels.FileChannel.open(directory.parentFile.resolve(".publish.lock").toPath(),
+        java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE).use { channel ->
+        channel.lock().use {
+            if (directory.exists()) {
+                validateGeneration()
+                validateSources()
+            } else {
+                val pending = Files.createTempDirectory(directory.parentFile.toPath(), ".pending-").toFile()
+                try {
+                    sources.forEachIndexed { index, source ->
+                        val copy = pending.resolve(names[index])
+                        Files.copy(source.toPath(), copy.toPath())
+                        check(daemonAotHash(copy) == hashes[index]) { "Daemon JAR changed while copying: $source" }
+                        check(copy.setReadOnly()) { "Cannot protect daemon classpath copy: $copy" }
+                    }
+                    validateSources()
+                    pending.resolve("classpath.manifest").apply {
+                        writeText(manifest)
+                        check(setReadOnly()) { "Cannot protect daemon classpath manifest: $this" }
+                    }
+                    Files.move(pending.toPath(), directory.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                } finally { if (pending.exists()) pending.deleteRecursively() }
+            }
+        }
+    }
+    return files
+}
+
+// AOT preparation, verification and launch resolve the same immutable paths. Preserve the app
+// first, followed by staged dependencies sorted by name; indexed names also prevent collisions.
 fun daemonAotClasspath(): String {
     val jar = tasks.named("jvmJar", org.gradle.jvm.tasks.Jar::class).flatMap { it.archiveFile }.get().asFile
-    val libs = (stagingLibDir.get().asFile.listFiles { f -> f.extension == "jar" } ?: emptyArray()).sortedBy { it.name }
-    return (listOf(jar) + libs).joinToString(File.pathSeparator) { it.path }
+    fun sources(): List<File> {
+        val libs = (stagingLibDir.get().asFile.listFiles { f -> f.extension == "jar" } ?: emptyArray()).sortedBy { it.name }
+        check(libs.isNotEmpty()) { "Missing daemon runtime JARs; run ./gradlew stageDaemonLib" }
+        return (listOf(jar) + libs).map { it.canonicalFile }
+    }
+    val inputs = sources()
+    val snapshot = daemonClasspathSnapshot(inputs, File(System.getProperty("user.home"), ".local/forge/runtime/classpath"))
+    check(sources() == inputs) { "Daemon classpath entries changed during snapshot; retry after staging finishes" }
+    return snapshot.joinToString(File.pathSeparator) { it.path }
+}
+
+tasks.register("snapshotDaemonClasspath") {
+    group = "oroboros"
+    description = "Snapshot already-built daemon JARs into an immutable runtime classpath without rebuilding, training AOT or launching."
+    doLast { logger.lifecycle(daemonAotClasspath()) }
 }
 
 // Bounded JVM lifecycle shared by training and cache-consumption verification.
