@@ -24,7 +24,21 @@ internal object DocumentCuratorCodec {
         "originalCid" to source.originalCid.value, "extractedTextCid" to source.extractedTextCid.value,
         "text" to source.text, "name" to source.name, "mediaType" to source.mediaType,
         "correlation" to source.correlation, "metadata" to source.metadata,
+        "category" to source.category, "provenance" to source.provenance,
+        "project" to source.project?.toMap(), "extraction" to source.extraction?.toMap(),
+        "anchors" to source.anchors.map(DocumentAnchor::toMap), "unresolved" to source.unresolved,
     )
+
+    fun decodeSource(s: Map<*, *>): DocumentSource {
+        val original = ContentId(s.str("originalCid")); val extracted = ContentId(s.str("extractedTextCid"))
+        return DocumentSource(original, extracted, s.str("text"), s.str("name"), s.str("mediaType"), s.str("correlation"),
+            (s["metadata"] as? Map<*, *>).orEmpty().entries.associate { (k, v) -> k as String to (v as List<*>).map { it as String } },
+            s["category"] as? String ?: if (original == extracted) "text" else "document",
+            (s["provenance"] as? Map<*, *>).orEmpty().entries.associate { (k, v) -> k as String to v as String },
+            DocumentRevision.fromMap(s["project"]), DocumentRevision.fromMap(s["extraction"]),
+            (s["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
+            (s["unresolved"] as? List<*>)?.map { it as String } ?: listOf("page", "folio", "section", "table", "diagram", "coordinates"))
+    }
 
     /** Full stored form: reader metadata rides along; the prompt form below omits it. */
     fun nlp(doc: NlpDocument): Map<String, Any?> = mapOf("text" to doc.text,
@@ -148,9 +162,7 @@ internal object DocumentCuratorCodec {
         val m = CanonicalCbor.decodeMap(bytes)
         require(m.int("version") == 1) { "unsupported document curation record" }
         val s = m.obj("source")
-        val source = DocumentSource(ContentId(s.str("originalCid")), ContentId(s.str("extractedTextCid")),
-            s.str("text"), s.str("name"), s.str("mediaType"), s.str("correlation"),
-            s.obj("metadata").mapValues { (_, v) -> (v as List<*>).map { it as String } })
+        val source = decodeSource(s)
         val nlp = (m["nlp"] as? Map<*, *>)?.let { d -> NlpDocument(d.str("text"), d.array("sentences").map { v ->
             val sentence = v as Map<*, *>
             NlpSentence(sentence.int("index"), sentence.int("begin"), sentence.int("end"),

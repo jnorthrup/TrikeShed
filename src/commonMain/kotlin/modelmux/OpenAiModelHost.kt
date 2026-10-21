@@ -64,6 +64,8 @@ class OpenAiModelHost(
         }
         val failure = result.exceptionOrNull()
         if (failure is CancellationException) throw failure
+        if (failure is ModelHttpFailure && failure.status == 202)
+            return error(202, "upstream_pending", "Upstream model has not returned a completion")
         if (failure is ModelHttpFailure && failure.status in 400..599)
             return error(failure.status, "upstream_http_${failure.status}", "Upstream model returned HTTP ${failure.status}")
         if (failure != null) return error(502, "upstream_error", "Model completion failed")
@@ -76,6 +78,7 @@ class OpenAiModelHost(
     fun error(status: Int, code: String, message: String): HtxResponse = json(status,
         mapOf("error" to mapOf("message" to message,
             "type" to when {
+                status == 202 -> "model_pending"
                 status == 429 -> "rate_limit_error"
                 status < 500 -> "invalid_request_error"
                 else -> "server_error"

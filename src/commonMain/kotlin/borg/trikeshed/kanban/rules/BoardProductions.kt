@@ -364,7 +364,12 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
         val units = running.view.mapTo(mutableSetOf()) { BoardRules.wipUnit(it) }
         val ready = cards
             .filter { it.fields["column"] == BoardCol.READY.wire }
-            .sortedWith(compareBy({ (it.fields["lastMoveMs"] as? Long) ?: 0L }, { it.fields["jobId"] as? String ?: "" }))
+            .sortedWith(compareBy(
+                { (it.fields["priority"] as? Number)?.toInt() ?: 2 },
+                { (it.fields["order"] as? Number)?.toInt() ?: 0 },
+                { (it.fields["lastMoveMs"] as? Number)?.toLong() ?: 0L },
+                { it.fields["jobId"] as? String ?: "" },
+            ))
         for (card in ready) {
             if (card.fields["owner"] == "lcnc-runner" &&
                 (card.fields["executionFamily"] as? String)?.isNotBlank() == true) continue
@@ -378,10 +383,10 @@ class ClaimProduction(private val owner: String = BoardRules.CLAIM_OWNER) : Rete
                 Activation(
                     activationId = "claim-$jobId-r$revision",
                     ruleId = ruleId,
-                    ruleVersionCid = BoardRules.cid("rule-claim-v2"),
+                    ruleVersionCid = BoardRules.cid("rule-claim-v3"),
                     salience = salience,
                     sequence = revision,
-                    supportCids = (s_[card.versionCid] + running.α { it.versionCid }).toList(),
+                    supportCids = cards.α { it.versionCid }.toList(),
                     bindings = mapOf(
                         "jobId" to jobId,
                         "toColumn" to BoardCol.RUNNING.wire,
@@ -483,7 +488,7 @@ class ReaperProduction(
             if (idle <= thresholdMs) continue
             val jobId = card.fields["jobId"] as? String ?: continue
             val revision = (card.fields["revision"] as? Long) ?: 0L
-            val strike = priorStrikes(jobId) + 1
+            val strike = maxOf(priorStrikes(jobId), (card.fields["strikes"] as? Number)?.toInt() ?: 0) + 1
             fire(
                 Activation(
                     activationId = "reaper-$jobId-$lastMove",

@@ -100,10 +100,14 @@ sealed class JobCommand {
     ) : JobCommand()
 
     @Serializable
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     data class Acknowledge(
         override val jobId: JobId,
         override val idempotencyKey: String,
         val expectedRevision: Long,
+        /** Evidence acknowledgment retains the prior lifecycle; ordinary acknowledgment keeps its wire semantics. */
+        @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+        val receipt: Boolean = false,
     ) : JobCommand()
 
     @Serializable

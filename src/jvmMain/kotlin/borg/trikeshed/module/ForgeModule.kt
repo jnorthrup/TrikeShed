@@ -91,6 +91,8 @@ class ModuleContext(
 ) {
     /** Host-owned persistent Camel commands and publications; never closed by an LCNC invocation. */
     @Volatile var camelRoutes: borg.trikeshed.lcnc.CamelRouteElement? = null
+    /** Shared document authority; the root owns its WAL and drain, modules only borrow it. */
+    @Volatile var documentReview: borg.trikeshed.lcnc.CurationReview? = null
 
     private val councilCasesLock = Any()
     private var councilCasesStopped = false

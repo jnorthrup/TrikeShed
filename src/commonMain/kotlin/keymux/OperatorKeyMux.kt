@@ -14,20 +14,15 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
  *
  * Lane order is precedence order (first wins, [FirstWinsResolver]):
  *
- *  1. [HarnessSource] — conventional env names (`OPENAI_API_KEY`, …) plus the
- *     harnesses' own credential stores: hermes `.env`/profiles, `~/.codex/auth.json`,
- *     opencode's `auth.json`. A key the operator already gave another tool answers
- *     here without a second copy.
+ *  1. [HarnessSource] — conventional process env names (`OPENAI_API_KEY`, …).
  *  2. [EnvSource] — the legacy raw-env lane (`LLM_OPENAI_KEY` shape).
  *  3. [HermesCredentialSource] — hermes' OWN pool (`credential_pool`:
  *     priority-ordered, with cooldowns, following its `env:<VAR>` indirection).
- *     This is the BORROWING lane and it ranks last on purpose: an env key the
- *     operator set for this process must always outrank a pool row.
+ *  4. [HarnessSource] — remaining dotenv and harness credentials. A pool's
+ *     HTTP exhaustion cannot be bypassed by rereading its same dotenv token.
  *
- * The two file-backed lanes carry a short TTL ([ttlMs], default 5 minutes) so
- * pool rotation and exhaustion cooldowns are picked up within a coffee break;
- * the env lane keeps the [CachedKeySource] default, since process env cannot
- * change under a running JVM.
+ * The pool is read on every resolution. Remaining harness files carry [ttlMs];
+ * process env uses [CachedKeySource]'s default.
  *
  * [fileOps] must be passed explicitly. Both file lanes degrade SILENTLY to
  * env-only when no [FileOperations] rides the coroutine context, and the boot
@@ -38,11 +33,12 @@ fun operatorKeyMux(
     hermesHome: String = defaultHermesHome(),
     ttlMs: Long = 5 * 60_000L,
 ): KeyMux = KeyMux {
-    cached("*", HarnessSource(explicitFileOps = fileOps), ttlMs = ttlMs)
+    cached("*", HarnessSource(processEnvOnly = true))
     cached("*", EnvSource())
     // Uncached on purpose: a key rotated in auth.json or .env is used on the
     // very next call. The source itself re-reads its files per call.
     bind("llm.*.*", HermesCredentialSource(hermesHome, fileOps))
+    cached("*", HarnessSource(explicitFileOps = fileOps, hermesHomeOverride = hermesHome), ttlMs = ttlMs)
 }
 
 /**

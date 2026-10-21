@@ -234,7 +234,7 @@ class ProjectScopes(
         }
         decisionProvider?.let { documentProviders[name to rel] = it }
         scopes = scopes.map { if (it.name == name) it.copy(paths = it.paths + 1, docs = pdb.docCount) else it }
-        if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX))
+        if (!borg.trikeshed.lcnc.ProjectNodes.twin(rel))
             onDocument?.invoke(name, rel, decisionProvider)
         return cid
     }
@@ -375,7 +375,7 @@ class ProjectScopes(
         scopes = scopes.map { if (it.name == name) it.copy(paths = docs, docs = projectDbs?.get(name)?.docCount ?: docs) else it }
         // A remounted document is offered again: the intake passes what it already curated and reads the rest.
         onDocument?.let { hook -> for (line in mf.readLines()) line.substringBefore('\t').takeIf { it.isNotEmpty() }?.let { rel ->
-            if (!rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.EXTRACT_SUFFIX) && !rel.endsWith(borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX)) hook(name, rel, this.decisionProvider(name, rel))
+            if (!borg.trikeshed.lcnc.ProjectNodes.twin(rel)) hook(name, rel, this.decisionProvider(name, rel))
         } }
         return true
     }
@@ -499,6 +499,9 @@ class PatchWire(
      * what a restart re-reads to put the published head back where it was.
      */
     private val programs: borg.trikeshed.lcnc.ProgramLedger? = null,
+    private val blackboard: borg.trikeshed.graal.ConfixBlackboard? = null,
+    private val repository: String? = null,
+    private val pointcuts: borg.trikeshed.pointcut.PointcutBlackboardAdapter? = null,
 ) {
     private suspend fun modelCatalog() = hostedCatalog(catalogProvider?.invoke() ?: brain.modelMux())
     private val breadcrumbContexts = muxContext[modelmux.BreadcrumbElement] ?: modelmux.BreadcrumbElement(
@@ -508,6 +511,17 @@ class PatchWire(
         },
     )
     private val muxSessions = MuxSessionService(brain, attachments, mountScope, muxContext + breadcrumbContexts, ::modelCatalog, sessionSnapshot)
+    private val breadcrumbReel = if (mountScope != null && blackboard != null && repository != null)
+        BreadcrumbReelService(mountScope, muxContext + breadcrumbContexts, blackboard, repository, ::modelCatalog,
+            pointcuts = pointcuts ?: borg.trikeshed.pointcut.PointcutBlackboardAdapter(blackboard),
+            archive = sessionSnapshot?.let { snapshot ->
+                modelmux.BreadcrumbReelStore(
+                    modelmux.BreadcrumbFileStore(JvmFileOperations(),
+                        File(snapshot.absoluteFile.parentFile, "reels").path),
+                    breadcrumbContexts.cas,
+                )
+            })
+    else null
 
     suspend fun route(
         method: String,
@@ -516,6 +530,7 @@ class PatchWire(
         respond: (suspend (ByteArray) -> Unit)?,
     ): JvmKanbanServer.HttpResponse? {
         val p = path.substringBefore('?')
+        breadcrumbReel?.route(method, path, text)?.let { return it }
         if (p == "/v1/models" || p == "/v1/chat/completions" || p.startsWith("/v1/breadcrumbs")) {
             val httpMethod = borg.trikeshed.htx.HtxMethod.entries.firstOrNull { it.name == method }
                 ?: return json(mapOf("error" to "method_not_allowed"), 405)

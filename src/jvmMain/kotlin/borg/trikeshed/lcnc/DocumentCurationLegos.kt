@@ -9,6 +9,7 @@ import borg.trikeshed.forge.sheet.sheetSeed
 import borg.trikeshed.graal.subvm.DocumentFeed
 import borg.trikeshed.graal.subvm.CamelCatalog
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
@@ -25,6 +26,7 @@ import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentCuratorGrounding
 import borg.trikeshed.narsese.DocumentModel
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentRevision
 import borg.trikeshed.narsese.curationIndex
 import borg.trikeshed.narsese.facet
 import borg.trikeshed.narsese.nlpAxioms
@@ -39,6 +41,82 @@ import kotlinx.coroutines.currentCoroutineContext
 object DocumentCurationLegos {
     const val CURATE = "document.curate"
     const val SHEET = "document.sheet"
+    const val SOURCE = "document.source"
+
+    /** Resolve one source through the existing project owner or retain explicitly attributed text. */
+    fun source(cas: CasStore, corpus: ProjectCorpus): LcncNodeRunner = boundLcnc(CasStoreKey(cas), boundLcnc(ProjectCorpusKey(corpus)) { owner, _, inputs ->
+        val cas = CasStoreKey.require()
+        val doc = inputs["doc"] ?: inputs["doc?"]
+        val input = inputs["source"] ?: inputs["source?"]
+        require((doc != null) != (input != null)) { "$SOURCE requires exactly one of doc or source" }
+        val retained = if (doc != null) projectSource(cas, owner.value,
+            requireNotNull((doc as? Map<*, *>)?.let(ProjectDoc::fromMap)) { "$SOURCE.doc must be a ProjectDoc" })
+        else retainSource(cas, input).also { require(current(owner.value, it)) { "Source revision is no longer current" } }
+        val reference = DocumentCuratorCodec.source(retained)
+        val cid = cas.put(CanonicalCbor.encodeMap(reference - "text"))
+        cas.sync()
+        mapOf("source" to (reference + ("sourceCid" to cid.value)))
+    })
+
+    /** A ProjectDoc is a binary identity, never an alias for its extracted text. */
+    suspend fun projectSource(cas: CasStore, corpus: ProjectCorpus, expected: ProjectDoc): DocumentSource {
+        val original = requireNotNull(corpus.document(expected.project, expected.id)) { "Project document is unavailable" }
+        require(original.cid == expected.cid && (expected.rev.isEmpty() || expected.rev == original.rev) &&
+            (expected.rev.isEmpty() || expected.seq == original.seq)) { "Project document revision changed" }
+        val extracted = requireNotNull(corpus.extract(original.project, original.id, Int.MAX_VALUE / 4)) { "Document extraction is unavailable" }
+        require(extracted.originalCid == original.cid && extracted.originalRev == original.rev) { "Extraction belongs to another source revision" }
+        val bytes = requireNotNull(corpus.bytes(original.project, original.id)) { "Original document bytes are unavailable" }
+        require(ContentId.of(bytes).value == original.cid && ContentId.of(extracted.text.encodeToByteArray()).value == extracted.cid) {
+            "Source or extraction content identity mismatch"
+        }
+        val notesText = corpus.read(original.project, original.id + ProjectNodes.NOTES_SUFFIX, 262_144)
+        val notes = notesText?.text?.let(ProjectNodes::conventions).orEmpty()
+        val provenance = buildMap {
+            notesText?.let { put("notesCid", it.cid) }
+            notes["url"]?.let { put("finalUrl", it); put("requestedUrl", notes["requested"] ?: it) }
+            notes["retrieved"]?.let { put("retrieved", it) }
+        }
+        val source = DocumentSource(ContentId(original.cid), ContentId(extracted.cid), extracted.text, original.id,
+            original.contentType, "${original.project}/${original.id}@${original.rev}",
+            category = "document", provenance = provenance,
+            project = DocumentRevision(original.project, original.id, original.cid, original.rev, original.seq),
+            extraction = DocumentRevision(extracted.project, extracted.id, extracted.cid, extracted.rev, extracted.seq),
+            anchors = extracted.anchors, unresolved = extracted.unresolved)
+        require(current(corpus, source)) { "Source revision changed during retention" }
+        check(cas.put(bytes) == source.originalCid)
+        check(cas.put(extracted.text.encodeToByteArray()) == source.extractedTextCid)
+        cas.sync()
+        currentCoroutineContext()[LcncConsumedLedger]?.apply {
+            consumed(LcncConsumedLedger.PROJECT, "${original.project}/${original.id}", original.cid, original.seq, original.rev)
+            consumed(LcncConsumedLedger.PROJECT, "${extracted.project}/${extracted.id}", extracted.cid, extracted.seq, extracted.rev)
+        }
+        return retainSource(cas, source)
+    }
+
+    /** Read-only: review checks must never mine, repair, or silently replace a source revision. */
+    suspend fun current(corpus: ProjectCorpus, source: DocumentSource): Boolean {
+        suspend fun matches(revision: DocumentRevision): Boolean {
+            val row = corpus.document(revision.project, revision.id) ?: return false
+            return row.cid == revision.cid && row.rev == revision.rev && row.seq == revision.seq
+        }
+        // Two retained blobs do not prove that one was extracted from the other.
+        val original = source.project ?: return source.extraction == null &&
+            (source.originalCid == source.extractedTextCid || source.isTextCorrection)
+        if (original.cid != source.originalCid.value || !matches(original)) return false
+        if (source.provenance["notesCid"]?.let {
+                corpus.document(original.project, original.id + ProjectNodes.NOTES_SUFFIX)?.cid != it
+            } == true) return false
+        val extracted = source.extraction ?: return source.isTextCorrection
+        if (extracted.cid != source.extractedTextCid.value || !matches(extracted) || extracted.project != original.project) return false
+        if (extracted.id == original.id) return extracted.cid == original.cid
+        if (extracted.id != original.id + ProjectNodes.EXTRACT_SUFFIX) return false
+        val lineage = corpus.read(extracted.project, extracted.id, Int.MAX_VALUE / 4) ?: return false
+        return lineage.originalCid == original.cid && lineage.originalRev == original.rev &&
+            lineage.anchors == source.anchors && lineage.unresolved == source.unresolved
+    }
+
+    fun revision(source: DocumentSource): String = ContentId.of(CanonicalCbor.encodeMap(
+        DocumentCuratorCodec.source(source) - "text")).value
 
     /** Read-only navigation addresses the same receipt and cursor as the LC node. */
     fun sheetHref(cid: ContentId, view: String = "sentences", sentence: Int = 0, offset: Int = 0, limit: Int = 32): String =
@@ -74,6 +152,19 @@ object DocumentCurationLegos {
 
     /** Borrow the retained ledger, never re-enter curation to inspect a completed receipt. */
     fun sheet(curator: DocumentCuratorElement): LcncNodeRunner = boundLcnc(curator) { owner, node, inputs ->
+        sheet(owner::record, node, inputs)
+    }
+
+    /** Retained receipts remain inspectable with the model and belief bag disabled. */
+    fun sheet(cas: CasStore): LcncNodeRunner = boundLcnc(CasStoreKey(cas)) { owner, node, inputs ->
+        sheet({ cid -> owner.value.get(cid)?.let { bytes ->
+            require(ContentId.of(bytes) == cid) { "Document receipt CID mismatch" }
+            DocumentCuratorCodec.decode(bytes)
+        } }, node, inputs)
+    }
+
+    private suspend fun sheet(read: suspend (ContentId) -> DocumentCurationRecord?, node: LcncNode,
+                              inputs: Map<String, Any?>): Map<String, Any?> {
         fun value(key: String): Any? = when {
             key in inputs -> inputs[key]
             "$key?" in inputs -> inputs["$key?"]
@@ -88,7 +179,7 @@ object DocumentCurationLegos {
             return number.toInt()
         }
         val cid = ContentId(requireNotNull(value("receiptCid") as? String) { "$SHEET.receiptCid is required" })
-        val record = requireNotNull(owner.record(cid)) { "Unknown document curation receipt: ${cid.value}" }
+        val record = requireNotNull(read(cid)) { "Unknown document curation receipt: ${cid.value}" }
         val result = sheet(cid, record, mapOf("cursor" to (node.params["view"] ?: "sentences"),
             "sentence" to ordinal("sentence", 0).toString(), "offset" to ordinal("offset", 0).toString(),
             "limit" to ordinal("limit", 32).toString(), "axes" to (node.params["axes"] ?: "[]"),
@@ -99,7 +190,7 @@ object DocumentCurationLegos {
             }
         }
         currentCoroutineContext()[LcncConsumedLedger]?.consumed("document-curation", record.source.name, cid.value)
-        result
+        return result
     }
 
     /** A window of one retained cursor. Requested indexes read its key fields only; unrelated children stay lazy. */
@@ -330,6 +421,37 @@ object DocumentCurationLegos {
         val extracted = requireNotNull(cas.get(retained.extractedTextCid)) { "Extracted text is unavailable" }
         require(ContentId.of(original) == retained.originalCid && ContentId.of(extracted) == retained.extractedTextCid &&
             extracted.contentEquals(retained.text.encodeToByteArray())) { "Retained source does not match its content identities" }
+        require(retained.category in setOf("document", "text", "caseworker", "ai")) { "Unknown document source category" }
+        require(retained.provenance.keys.none { it in setOf("authenticated", "verified", "authentication", "approved") }) {
+            "Source attribution cannot assert authentication or approval"
+        }
+        fun evidence(name: String): ContentId {
+            val cid = ContentId(requireNotNull(retained.provenance[name]?.takeIf(String::isNotBlank)) { "$name is required" })
+            require(cas.get(cid)?.let { ContentId.of(it) == cid } == true) { "$name evidence is unavailable" }
+            return cid
+        }
+        when (retained.category) {
+            "caseworker" -> {
+                require(!retained.provenance["authorId"].isNullOrBlank()) { "Caseworker authorId is required" }
+                require(evidence("assertionCid") == retained.originalCid) { "Caseworker assertion must identify the original statement" }
+            }
+            "ai" -> {
+                require(!retained.provenance["modelId"].isNullOrBlank()) { "AI modelId is required" }
+                evidence("generatingRunCid"); evidence("modelReceiptCid")
+                require(retained.provenance["authorId"] == null) { "An AI proposal cannot claim a caseworker author" }
+            }
+        }
+        if (retained.provenance["correctedFrom"] != null || retained.provenance["correctionKind"] != null) {
+            evidence("correctedFrom")
+            require(retained.isTextCorrection) { "Corrected text requires manual-text lineage and unresolved layout without extraction anchors" }
+        }
+        require(retained.project?.cid?.let { it == retained.originalCid.value } != false &&
+            retained.extraction?.cid?.let { it == retained.extractedTextCid.value } != false) { "Source snapshot identity mismatch" }
+        retained.anchors.forEach { anchor ->
+            require(anchor.begin >= 0 && anchor.end > anchor.begin && anchor.end <= retained.text.length &&
+                (anchor.page == null || anchor.page > 0)) { "Invalid source anchor" }
+            require(anchor.coordinates == null || anchor.coordinates.size == 4 && anchor.coordinates.all { it >= 0 }) { "Invalid source coordinates" }
+        }
         return retained
     }
 
@@ -339,6 +461,7 @@ object DocumentCurationLegos {
         val sheet = mapOf("sheet" to "document/${cid.value}", "href" to "$href&view=sheet", "pageHref" to sheetHref(cid))
         return mapOf(
             "receiptCid" to cid.value,
+            "reviewSelections" to DocumentReviewCandidate.selections(record),
             "record" to mapOf("cid" to cid.value, "href" to href,
                 "originalCid" to record.source.originalCid.value,
                 "extractedTextCid" to record.source.extractedTextCid.value,
@@ -369,6 +492,7 @@ object DocumentCurationLegos {
         }
         return mapOf(
             "receiptCid" to cid.value,
+            "reviewSelections" to DocumentReviewCandidate.selections(record),
             "record" to DocumentCuratorCodec.record(record),
             "nlpStatus" to index.facet(DocumentCurationIndexK.NlpStatus).name,
             "nlpAxioms" to nlpAxiomsProjection(record),
@@ -382,7 +506,7 @@ object DocumentCurationLegos {
     /** Source-attributed candidates with the identity of the rule each would become; extraction weights are not parser confidence. */
     private fun nlpAxiomsProjection(record: DocumentCurationRecord): List<Map<String, Any?>> =
         (record.nlpAxioms α { axiom ->
-            mapOf(
+            record.source.quotation(axiom.begin, axiom.end) + mapOf(
                 "originalCid" to record.source.originalCid.value,
                 "extractedTextCid" to record.source.extractedTextCid.value,
                 "sentenceIndex" to axiom.sentenceIndex,
@@ -403,9 +527,6 @@ object DocumentCurationLegos {
         if (value is DocumentSource) return value
         val fields = requireNotNull(value as? Map<*, *>) { "$CURATE.source must be an object" }
         require(fields["base64"] == null) { "$CURATE requires retained extracted text, not file bytes" }
-        fun string(name: String): String = requireNotNull(fields[name] as? String) {
-            "$CURATE.source.$name must be a string"
-        }
         val metadata = fields["metadata"]?.let { raw ->
             requireNotNull(raw as? Map<*, *>) { "$CURATE.source.metadata must be an object" }.entries.associate { (key, values) ->
                 val name = requireNotNull(key as? String) { "Document metadata names must be strings" }
@@ -413,8 +534,7 @@ object DocumentCurationLegos {
                 name to items.map { requireNotNull(it as? String) { "Document metadata values must be strings" } }
             }
         }.orEmpty()
-        return DocumentSource(ContentId(string("originalCid")), ContentId(string("extractedTextCid")),
-            string("text"), sourceName(fields), string("mediaType"), string("correlation"), metadata)
+        return DocumentCuratorCodec.decodeSource(fields + mapOf("name" to sourceName(fields), "metadata" to metadata))
     }
 
     internal fun content(value: Any?): DocumentContent {

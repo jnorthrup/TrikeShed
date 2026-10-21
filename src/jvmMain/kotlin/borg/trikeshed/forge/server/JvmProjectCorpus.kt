@@ -6,6 +6,8 @@ import borg.trikeshed.lcnc.ProjectGlob
 import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectRef
 import borg.trikeshed.lcnc.ProjectText
+import borg.trikeshed.narsese.DocumentAnchor
+import borg.trikeshed.parse.reifyStrict
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
@@ -36,7 +38,7 @@ class JvmProjectCorpus(
         val pdb = registry.get(project) ?: return@withContext emptyList()
         val head = pdb.store.head
         pdb.gateway.listAttachments(prefix).asSequence()
-            .filter { !it.path.endsWith(ProjectNodes.EXTRACT_SUFFIX) && !it.path.endsWith(ProjectNodes.NOTES_SUFFIX) && ProjectGlob.matches(glob, it.path) }
+            .filter { !ProjectNodes.twin(it.path) && ProjectGlob.matches(glob, it.path) }
             .sortedBy { it.path }
             .take(limit)
             // seq is the store's own commit sequence (0-based, as `_changes` numbers it), never the
@@ -44,6 +46,17 @@ class JvmProjectCorpus(
             // document always has a head frame; -1 marks the impossible unknown rather than a lie.
             .map { ProjectDoc(project, it.path, it.contentId.value, head.getRev(it.path).orEmpty(), head.sequenceOf(it.path) ?: -1L, it.length, it.contentType) }
             .toList()
+    }
+
+    override suspend fun document(project: String, id: String): ProjectDoc? = withContext(Dispatchers.IO) {
+        val pdb = registry.get(project) ?: return@withContext null
+        val ref = pdb.gateway.getAttachmentRef(id) ?: return@withContext null
+        val head = pdb.store.head
+        ProjectDoc(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, ref.length, ref.contentType)
+    }
+
+    override suspend fun bytes(project: String, id: String): ByteArray? = withContext(Dispatchers.IO) {
+        registry.get(project)?.gateway?.getAttachment(id)?.second
     }
 
     override suspend fun read(project: String, id: String, maxChars: Int): ProjectText? = withContext(Dispatchers.IO) {
@@ -55,22 +68,39 @@ class JvmProjectCorpus(
         // binary decodes to replacement chars at a high rate; OCR/extraction leaves a few unmapped glyphs
         if (text.count { it == '\uFFFD' } * 100 > text.length) return@withContext null
         val head = pdb.store.head
-        ProjectText(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, text.take(maxChars))
+        val result = ProjectText(project, id, ref.contentId.value, head.getRev(id).orEmpty(), head.sequenceOf(id) ?: -1L, text.take(maxChars))
+        if (!id.endsWith(ProjectNodes.EXTRACT_SUFFIX)) return@withContext result
+        val lineageBytes = pdb.gateway.getAttachment(id.removeSuffix(ProjectNodes.EXTRACT_SUFFIX) + ProjectNodes.EXTRACTION_SUFFIX)?.second
+            ?: return@withContext result
+        val lineage = reifyStrict(lineageBytes.decodeToString(throwOnInvalidSequence = true)) as? Map<*, *> ?: return@withContext result
+        if (lineage["extractedTextCid"] != result.cid) return@withContext result
+        result.copy(originalCid = lineage["originalCid"] as? String, originalRev = lineage["originalRev"] as? String,
+            anchors = (lineage["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
+            unresolved = (lineage["unresolved"] as? List<*>)?.map { it as String } ?: result.unresolved)
     }
 
     /** The twin when mined; else the miner reads the document now (text layer, else OCR) and the twin is read back. */
     override suspend fun extract(project: String, id: String, maxChars: Int): ProjectText? =
         extracting.computeIfAbsent(project to id) { Mutex() }.withLock {
+        val original = document(project, id) ?: return@withLock null
+        if (ProjectGlob.isTextual(original.contentType, id) && id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE)
+            return@withLock read(project, id, maxChars)?.copy(
+            originalCid = original.cid, originalRev = original.rev)
         val twin = id + ProjectNodes.EXTRACT_SUFFIX
-        // A PDF's extract is current only with its notes stream beside it: one read before page streams is read again.
-        // The stream is a completion marker here, independent of whether its TSV MIME type is textual.
-        val paged = id.lowercase().endsWith(".pdf")
-        val notes = !paged || withContext(Dispatchers.IO) {
-            (registry.get(project)?.gateway?.getAttachmentRef(id + ProjectMiner.FOOTNOTES_SUFFIX)?.length ?: 0) > 0
+        suspend fun current(): ProjectText? {
+            val completion = read(project, id + ProjectNodes.EXTRACTION_SUFFIX, Int.MAX_VALUE / 4) ?: return null
+            val lineage = reifyStrict(completion.text) as? Map<*, *> ?: return null
+            if (lineage["originalCid"] != original.cid || lineage["originalRev"] != original.rev) return null
+            val text = read(project, twin, maxChars) ?: return null
+            if (lineage["extractedTextCid"] != text.cid) return null
+            return text.copy(originalCid = original.cid, originalRev = original.rev,
+                anchors = (lineage["anchors"] as? List<*>).orEmpty().map(DocumentAnchor::fromMap),
+                unresolved = (lineage["unresolved"] as? List<*>)?.map { it as String }
+                    ?: listOf("page", "folio", "section", "table", "diagram", "coordinates"))
         }
-        if (notes) read(project, twin, maxChars)?.let { return@withLock it }
+        current()?.let { return@withLock it }
         val mine = ingest ?: return@withLock null
         mine(project, id)
-        read(project, twin, maxChars)
+        current()
     }
 }

@@ -111,6 +111,124 @@ and add routes in failover order. Apply changes only that seat's `models`
 parameter. The runtime interprets these routes as an allowlist; key values
 remain in KeyMux. Discovery does not request a model completion.
 
+### Breadcrumb comparison and recall
+
+`/modelmux` contains the ACE comparison reel; the **ACE** control on `/graal`
+opens its desktop widget against the same live blackboard. A run freezes selected
+Kotlin source files and compares a main-model full-source summary, main-model
+hierarchical summaries, and local hierarchical summaries. Events link to faceted
+Cursor sheets with source and child identities. The automatic comparison is a
+blinded model judgment; human votes remain separate. Failed or truncated outputs
+are visible and do not become summary parents.
+
+Run history retains exact captured source, request, response, summary, assessment
+and correction payloads in CAS before publishing their manifests. The inspector
+can reopen a run after daemon restart and verify its payload hashes. Interrupted
+runs remain interrupted; recovery does not repeat provider calls. A retention pin
+selects a minimum byte fraction, up to 100%, within a half-open time window at a
+fixed capture watermark. This guarantee covers the manifest's captured payloads,
+not uncaptured conversations or HTTP-error bodies; selecting or rejecting a
+summary never deletes the underlying evidence.
+
+Reviews distinguish accuracy from selection and experiment rejection. A selected
+summary or correction can explicitly inform the next run. Human accuracy grades
+affect automatic main-model selection only for the same task, harness and known
+model revision, after credential and observed quota filtering. Unknown revisions
+remain inspectable but ungraded for routing. Explicit model selection still wins.
+`GET /api/mux/reel` returns history and selection candidates; `/review`, `/retain`
+and `/payload` beneath that route expose the same operations used by the UI.
+
+Board claims similarly retain admission prompts, source snapshots, results and
+grade receipts through CAS/WAL. The daemon restores them on boot. Claim admission
+uses authored priority and lane order and rechecks current allocation before work
+starts. The existing daemon observer owns claim/reaper cadence with the GUI closed;
+the separate browser Live timer still belongs to its page.
+
+The common Kotlin executive follows
+[`onegood1/CELLULAR_KERNEL.md`](../onegood1/onegood1/CELLULAR_KERNEL.md):
+parents retain removable lifecycle handles; bounded userspace channels dispatch
+and collect work under owning supervisors; drain joins admitted work. Graal
+pointcuts evaluate admission and publish actual dispatch/completion observations.
+Child seats cannot admit model or interpreter capabilities. Trusted Kotlin
+closures are not an untrusted-code sandbox.
+
+Breadcrumbs retain full CAS identities, line-spine fingerprints, typed Confix
+heritage and nested child references. Four-hex-digit references are short aliases;
+collisions require the full CID. Models receive `search` and `recall` tools;
+recall reports selected source ranges and omissions within a context heuristic.
+`GET /v1/breadcrumbs?context=ID&view=index` exposes the same index to the inspector.
+CAS blobs are shared across sessions; legacy checkpoint records still also retain
+their content strings.
+
+The local comparison endpoint is `http://127.0.0.1:18080/v1`, model
+`breadcrumb-local`, with a 2048-token runtime context. The initial CPU model is
+[Qwen3.5-2B Polaris INSTRUCT Q4_K_S](https://huggingface.co/mradermacher/Qwen3.5-2B-Polaris-HighIQ-INSTRUCT-GGUF),
+attributed by its quantizer to DavidAU. Its 1,207,730,784-byte GGUF fits the
+1.5 GB file limit; observed memory is workload-dependent. Source-summary trials
+exposed omissions and invented behavior, so the comparison must retain originals
+and report those quality failures.
+
+The reel reserves 512 output tokens for local summaries, 2048 for main-model
+summaries and 4096 for the assessment. Reasoning may consume that allowance;
+truncated responses cannot become summary parents. Each run records these limits,
+its harness version and actual provider usage. Request timeouts fail their lane;
+owner cancellation still waits for admitted effects to drain.
+For NVIDIA's Nemotron 3 Ultra endpoint, harness v3 explicitly disables optional
+thinking in both summary and assessment requests: observed reasoning exhausted
+the bounded output allowance before producing a complete parent summary. The
+setting is retained in the run and request payloads; other endpoints retain their
+provider defaults. A human preference requires an available completed output.
+
+### Comprehension strata — proposed integration
+
+Reuse the existing curator and evidence machinery in this order:
+
+| Work | Owner | Escalation |
+| --- | --- | --- |
+| Exact identities, ranges, names and lexical lookup | CAS, Confix and Cursor views | Missing or ambiguous candidates |
+| Entities, syntax, negation and relation candidates | CoreNLP/NER with source offsets and annotation revision | Unresolved bindings or sense |
+| Domain sense and retrieval candidates | BERT variants with matched tokenizer and task calibration | Abstention or conflicting evidence |
+| Explicit rule matches | RETE | Unmatched conditions |
+| Support, revision and contradiction | NARS/Constellation with independent-source provenance | Unresolved questions |
+| Titles and synthesis | Tiny summarizer, then main model as needed | Human comparison and correction |
+
+Use CoreNLP for prose and comments. Kotlin syntax and executable invariants need
+the language parser and recorded execution evidence; NER cannot validate a
+condition such as `isNotBlank()` or establish that a cleanup path ran.
+
+Adapt [Evoke's methodology](../Evoke/docs/architecture-and-design.md) over the
+existing CAS/ISAM ownership: publish lexical postings immediately, enrich changed
+content asynchronously, and publish immutable segments only after their closure
+is durable. Keep document visibility separate from encoder completeness. Use
+[reciprocal-rank fusion](../Evoke/docs/hybrid-fusion-engine.md) for independent
+ranked sources, retaining their individual ranks and provenance. Evoke's current
+PostgreSQL access method is not a drop-in dependency for this design.
+
+Keep one immutable source and Confix index, with Cursors as range/projection views;
+store per-model visibility and summaries separately. A summary or embedding is
+a derived view and cannot supply independent evidence for its own source.
+The next recall-size improvement is to coalesce adjacent source ranges and intern
+their repeated CID/provenance fields once per source. The current line-oriented
+JSON includes that metadata in its context budget, so it can spend much more on
+coordinates than on original text. Preserve exact UTF-16 offsets and explicit
+omissions when changing that wire representation.
+For compact handles, a 16-bit slot allocated within an immutable context
+generation would avoid truncated-hash collisions while the full CID remains the
+identity. This is a proposed alternative to the current four-hex-digit hash
+buckets. Keep ancestry depth separate from expansion size; an iterative lineage
+walk with a continuation cursor could page deep recall without dropping ancestry.
+[LegalBERT](https://huggingface.co/nlpaueb/legal-bert-small-uncased) is a candidate
+domain encoder, not an installed NER head or a calibrated retrieval model here.
+The shared stage policy, domain-task calibration and Evoke-style posting
+publication remain proposed work.
+
+The **Camel** popup on `/graal` maps Lucene segments and DocValues, Elasticsearch
+refresh, and Solr update/commit stages onto Confix facets, Couch revisions and
+ISAM projections. It links recorded pointcuts to their route documents and
+Cursor sheets. Existing Camel `direct:` processors call local services with CID
+envelopes; a search adapter would retain its writer/reader handles under the
+owning lifecycle. No Lucene, Elasticsearch or Solr adapter is installed.
+
 **Concentric work network** joins signed IPNS discovery over the existing
 Kademlia DHT to the existing stored-program workgroup host:
 

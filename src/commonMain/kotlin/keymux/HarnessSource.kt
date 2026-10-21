@@ -121,6 +121,8 @@ class HarnessSource(
     /** Test seam: pin the hermes home instead of resolving $HERMES_HOME/$HOME. */
     private val hermesHomeOverride: String? = null,
     private val homeDirOverride: String? = null,
+    /** Explicit process overrides can precede a live pool without bypassing its file-backed status. */
+    private val processEnvOnly: Boolean = false,
 ) : KeySource() {
     override val name = "harness"
 
@@ -162,7 +164,7 @@ class HarnessSource(
                 val v = dotenvValue(entry.envVars[i])
                 if (v != null) return v
             }
-            harnessFileKey(provider, entry)?.let { return it }
+            if (!processEnvOnly) harnessFileKey(provider, entry)?.let { return it }
         }
         // Custom integrations (registry miss): dash-form provider id maps to
         // HERMES_CUSTOM_<ID_UPPER_DASHES_TO_UNDERSCORES>_API_KEY — e.g.
@@ -185,7 +187,7 @@ class HarnessSource(
         val varName = provider.uppercase().replace('.', '_').replace('-', '_') + "_BASE_URL"
         getenv(varName)?.takeIf { it.isNotBlank() }?.let { return it }
         dotenvValue(varName)?.let { return it }
-        HarnessRegistry.byId(provider)?.defaultBaseUrl?.let { return it }
+        if (!processEnvOnly) HarnessRegistry.byId(provider)?.defaultBaseUrl?.let { return it }
         // Custom integrations pair their key with HERMES_CUSTOM_<ID>_BASE_URL.
         val customVar = "HERMES_CUSTOM_" + provider.uppercase().replace('-', '_') + "_BASE_URL"
         getenv(customVar)?.takeIf { it.isNotBlank() }?.let { return it }
@@ -201,6 +203,7 @@ class HarnessSource(
     }
 
     private suspend fun dotenvValue(name: String): String? {
+        if (processEnvOnly) return null
         val ops = fileOpsOrNull() ?: return null
         val files = dotenvFiles(ops)
         for (i in 0 until files.size) {

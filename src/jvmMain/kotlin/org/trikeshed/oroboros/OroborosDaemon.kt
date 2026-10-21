@@ -594,6 +594,7 @@ object OroborosDaemon {
         // previous pin (self-referential freeze). keyMux (reactor/catalog
         // identity) is the one wrapper, built once, on top of it.
         val baseKeyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = keymux.defaultHermesHome())
+        val hermesCredentials = keymux.HermesCredentialSource(keymux.defaultHermesHome(), fileOps)
         val keyMux = baseKeyMux.withBinding("*", hermesPinOverlay)
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
@@ -759,9 +760,6 @@ object OroborosDaemon {
             modelMuxProvider = { operatorMux.await().invoke() },
         )
         muxReactor.open()
-        val breadcrumbContexts = modelmux.BreadcrumbElement(store = modelmux.BreadcrumbFileStore(
-            fileOps, fileOps.resolvePath(forgeHome.absolutePath, "modelmux", "breadcrumbs"),
-        ))
         // ── CCEK binding: the single control plane for assemblies ────
         // Provides choreograph(), createUserContext(), and the bounded
         // agent fan-out that LCNC nodes, model panels, and the curator
@@ -855,6 +853,12 @@ object OroborosDaemon {
             "[OROBOROS] CAS STORE SELECTED: ${casStore::class.java.name} casRoot=$casRootPath " +
                     "TRIKESHED_CAS=$casSelection fstype=${casBacking?.first ?: "<undeterminable>"} " +
                     "source=${casBacking?.second ?: "<undeterminable>"}"
+        )
+        val breadcrumbContexts = modelmux.BreadcrumbElement(
+            store = modelmux.BreadcrumbFileStore(
+                fileOps, fileOps.resolvePath(forgeHome.absolutePath, "modelmux", "breadcrumbs"),
+            ),
+            cas = casStore,
         )
         // The D13 MATERIALIZE surface exists only when the btrfs store is live: reflinkReorganize
         // is a BtrfsReflinkStore member, absent from the CasStore base class.
@@ -1016,6 +1020,7 @@ object OroborosDaemon {
             attachmentGateway,
             projectDbs = projectDbRegistry,
             memoryStore = memoryStore,
+            pointcuts = pointcutAdapter,
             // The panel sync button reconciles the hermes home plane beside the worktree:
             // its boot absorb is the only other pass it ever gets, and filenodes missing
             // from disk otherwise survive in the terrain until the daemon restarts.
@@ -1258,10 +1263,8 @@ object OroborosDaemon {
         // Hermes' state.db / auth.json / .env change (HermesWatch), so the brain
         // follows a `/model` switch or a key rotation without a restart.
         val hermesWatch = borg.trikeshed.hermes.HermesWatch.default()
-        // ONE quota legion for every mux in the process, walked back from Hermes' success
-        // ledger: a provider's proven limit is the most it ever bore in one day, and what
-        // Hermes burned today is already charged — the key is shared, so the pool is.
-        // Refreshed (limits + pre-charge, meters kept) whenever the ledger changes.
+        // One meter for every mux. Hermes history contributes usage; only provider HTTP
+        // observations can establish exhausted capacity.
         val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
             val now = HostSystem.currentTimeMillis()
@@ -1270,8 +1273,8 @@ object OroborosDaemon {
             quotaLegion.refresh(borg.trikeshed.hermes.HermesModelUsage.ledgerRows(db), now)
             HostSystem.err(
                 "[OROBOROS] quota legion from hermes ledger ($db): " +
-                        quotaLegion.limitsByProvider.entries.joinToString("; ") { (p, lim) ->
-                            "$p proven $lim/day, spent today ${quotaLegion.ledgerSpentFor(p, now)}"
+                        quotaLegion.ledgerUsage.entries.joinToString("; ") { (p, usage) ->
+                            "$p observed peak ${usage.provenLimit}/day, recent usage ${quotaLegion.ledgerSpentFor(p, now)}"
                         }.ifEmpty { "no provider rows — every key unmetered" },
             )
         }
@@ -1285,6 +1288,10 @@ object OroborosDaemon {
 
         suspend fun buildBrain(): Pair<borg.trikeshed.modelmux.BrainClient, Map<String, Any?>> {
             refreshQuotaLegion()
+            val configuredModels = hermesCredentials.configuredModels().view.filter {
+                it.apiMode == "chat_completions" && it.baseUrl.isNotBlank() &&
+                    runCatching { baseKeyMux.get("llm.${it.provider}.key") }.getOrNull()?.isNotBlank() == true
+            }
             val hermesSession = borg.trikeshed.hermes.HermesActiveSession.current()
             val hermesProvider = hermesSession?.runtime?.provider
             // baseKeyMux, not keyMux: this resolves the NEXT pin, so it must not
@@ -1353,6 +1360,25 @@ object OroborosDaemon {
                 )
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(configLaunch.baseUrl)
                 borg.trikeshed.modelmux.BrainClient(apiKey = configLaunch.apiKey, base = configLaunch.baseUrl, model = configLaunch.model, errorSink = brainErrorSink, quotaLegion = quotaLegion)
+            } else if (configuredModels.isNotEmpty()) {
+                val specs = configuredModels.map {
+                    borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(it.baseUrl)
+                    borg.trikeshed.modelmux.BrainClient.EndpointSpec(
+                        name = "hermes:${it.provider}", envVar = "", base = it.baseUrl,
+                        model = it.model, provider = it.provider, contextWindow = it.contextWindow,
+                    )
+                }
+                val importedMux = modelmux.ModelMux(baseKeyMux) {
+                    quota(quotaLegion)
+                    defaultModel(specs.first().model)
+                    for (spec in specs) model(spec.model, setOf("chat", "tools"), baseUrl = spec.base,
+                        provider = spec.provider, contextWindow = spec.contextWindow)
+                }
+                HostSystem.err("[OROBOROS] Brain uses Hermes configured endpoint ${specs.first().model}; selected protocol unavailable: $configReason")
+                borg.trikeshed.modelmux.BrainClient(
+                    keyMux = baseKeyMux, modelMux = importedMux, endpointSpecs = specs,
+                    errorSink = brainErrorSink, quotaLegion = quotaLegion,
+                )
             } else {
                 HostSystem.err("[OROBOROS] Brain on the provider roster — hermes session pin unavailable: $hermesPinReason; config default unavailable: $configReason")
                 borg.trikeshed.modelmux.BrainClient(errorSink = brainErrorSink, keyMux = keyMux, quotaLegion = quotaLegion)
@@ -1363,6 +1389,9 @@ object OroborosDaemon {
                         mapOf("source" to "session", "model" to hermesModel, "baseUrl" to hermesBaseUrl, "provider" to hermesProvider, "sessionId" to hermesSession?.id)
                     configLaunch != null ->
                         mapOf("source" to "config", "model" to configLaunch.model, "baseUrl" to configLaunch.baseUrl, "provider" to configLaunch.provider, "configFile" to configLaunch.configFile, "keySource" to configLaunch.keySource)
+                    configuredModels.isNotEmpty() -> configuredModels.first().let {
+                        mapOf("source" to "configured-provider", "model" to it.model, "baseUrl" to it.baseUrl, "provider" to it.provider)
+                    }
                     else -> null
                 },
                 "reason" to listOfNotNull(hermesPinReason.ifEmpty { null }, configReason).joinToString("; ").ifEmpty { null },
@@ -1420,6 +1449,9 @@ object OroborosDaemon {
             miner = projectMiner,
             catalogProvider = { requireNotNull(muxReactor.modelMux()) },
             sessionSnapshot = jfile(File(Files.resolvePath(forgeHome, ".modelmux/sessions.json"))),
+            blackboard = daemonBlackboard,
+            repository = repoDir.path,
+            pointcuts = pointcutAdapter,
         )
         // (boot mounts + ledger remount happen below, once the Rete tendon hook is armed)
         // ── Dynamic modules: Rete (hoisted — the tendon below feeds it) + production
@@ -1590,8 +1622,10 @@ object OroborosDaemon {
         )
         // Belief bag, freeze/thaw and belief-field nodes retain the shared bank, rete and model context.
         registerBeliefNodes(moduleContext, hermesMemoryFiles, brainClient, kifBank)
+        val constellationNodes = borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete)
+        val documentReviewWire = borg.trikeshed.forge.server.DocumentReviewWire.open(moduleContext, projectCorpus, constellationNodes)
         val curationIntake = borg.trikeshed.forge.server.CurationIntake.install(
-            borg.trikeshed.narsese.ConstellationNodes.registerLanguageNodes(moduleContext, kifBank, causalityRete),
+            constellationNodes,
             moduleContext, projectCorpus, projectScopes, wireScope,
         )
         // ── Rule admission: the seam that ends the live rete's dead spin —
@@ -1602,6 +1636,7 @@ object OroborosDaemon {
             // below re-admits — the rules counterpart of the `kif-ledger/` axiom plane.
             moduleContext.lcncRunners["nal.rule.admit"] = borg.trikeshed.narsese.RuleNodes.ruleAdmitRunner(
                 liveRete,
+                review = documentReviewWire.review::consume,
                 ledger = { r ->
                     runCatching {
                         couchDb.put(
@@ -1731,16 +1766,16 @@ object OroborosDaemon {
             // secret is resolved inside PinOverlaySource.read, from pinMux's
             // OWN keyMux — never fetched here.
             val pinnedSpec = if (pinnedModel != null && pinnedProvider != null && pinnedBase != null) {
-                val pinLookup: Pair<keymux.KeyMux, String>? = runCatching {
+                val pinLookup: Pair<modelmux.ModelMux, String>? = runCatching {
                     val pinMux = liveBrain.modelMux()
                     val pinKeyId = requireNotNull(pinMux.modelKeyId(pinnedModel)) { "Configured model has no key binding" }
-                    pinMux.keyMux to pinKeyId
+                    pinMux to pinKeyId
                 }.onFailure {
                     // Explicit need, not a catalog-wide exception: the pin is one
                     // optional preference over the full provider catalog below.
                     HostSystem.err("[OROBOROS] hermes pin unavailable, catalog continues without it: ${it.message}")
                 }.getOrNull()
-                val pinKeyMux = pinLookup?.first
+                val pinKeyMux = pinLookup?.first?.keyMux
                 val pinKeyId = pinLookup?.second
                 if (pinKeyMux != null && pinKeyId != null && pinKeyMux !== keyMux) {
                     hermesPinOverlay.setPin(
@@ -1754,6 +1789,7 @@ object OroborosDaemon {
                     borg.trikeshed.modelmux.BrainClient.EndpointSpec(
                         name = "hermes:$pinnedProvider", envVar = "", base = pinnedBase,
                         model = pinnedModel, provider = pinnedProvider,
+                        contextWindow = pinLookup?.first?.contextWindow(pinnedModel) ?: 0,
                     )
                 } else {
                     if (pinKeyMux === keyMux) {
@@ -1781,7 +1817,18 @@ object OroborosDaemon {
                 }
             }
             val hermesInstances = hermesKnown.filter { hermesKeyed[it.provider] == true }
-            val hermesSpecs = borg.trikeshed.hermes.HermesInstances.specs(hermesInstances)
+            val configuredSpecs = hermesCredentials.configuredModels().view.filter {
+                it.apiMode == "chat_completions" && it.baseUrl.isNotBlank() &&
+                    runCatching { baseKeyMux.get("llm.${it.provider}.key") }.getOrNull()?.isNotBlank() == true
+            }.map {
+                borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(it.baseUrl)
+                borg.trikeshed.modelmux.BrainClient.EndpointSpec(
+                    name = "hermes:${it.provider}", envVar = "", base = it.baseUrl, model = it.model,
+                    provider = it.provider, contextWindow = it.contextWindow,
+                )
+            }
+            val hermesSpecs = (configuredSpecs + borg.trikeshed.hermes.HermesInstances.specs(hermesInstances))
+                .distinctBy { it.provider to it.model }
             val hermesClaimed = hermesSpecs.mapTo(HashSet()) { it.provider to it.model }
             val staticSpecs = liveBrain.providerRoster().filterNot { (it.provider ?: it.name) to it.model in hermesClaimed }
             val discovered = hermesSpecs + staticSpecs
@@ -1805,9 +1852,7 @@ object OroborosDaemon {
                             "already claimed — routable as '$id' (previously unreachable)",
                 )
             }
-            // Quota walked back from Hermes' success ledger: a provider's proven limit is the
-            // most it ever bore in one day, and what Hermes burned today is already charged —
-            // the key is shared, so the pool is. Rebuilt with the mux on every ledger change.
+            // Preserve usage history and HTTP quota observations across catalog rebuilds.
             refreshQuotaLegion()
             return modelmux.ModelMux(catalogKeys) {
                 quota(quotaLegion)
@@ -1821,6 +1866,7 @@ object OroborosDaemon {
                         // The qualified id is a LOCAL routing key; the provider still
                         // only answers to its own name for the model.
                         wireModel = ep.model,
+                        contextWindow = ep.contextWindow,
                     )
                 }
             }
@@ -2466,6 +2512,7 @@ object OroborosDaemon {
                 }
                 // Stop job-agent admission and await accepted writes/model work before their stores close.
                 runCatching { headhunterWire.drain() }
+                runCatching { documentReviewWire.stopAdmission() }
                 // The follow/Wiki producer stops at its admission boundary and settles its
                 // current pass before the runner registry, model clients, or stores close.
                 drainCuration(curatorFollowJob, curationIntake, moduleSupervisor, moduleContext)
@@ -2479,9 +2526,11 @@ object OroborosDaemon {
                 runCatching { kifTeeDisposer.close() }
                 runCatching { tribunalHolder.instance?.nexus?.drain() }
                 runCatching { headhunterWire.drainCuration() }
+                runCatching { documentReviewWire.drain() }
                 runCatching { confixIsam?.drain() }
                 runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
                 runCatching { headhunterWire.close() }
+                runCatching { documentReviewWire.close() }
                 runCatching { turnReview?.close() }
                 runCatching { causalityRete?.close() }
                 runCatching { curatorImpulse?.close() }

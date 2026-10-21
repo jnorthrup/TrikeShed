@@ -435,7 +435,7 @@ object HermesTerminalPage {
             val named = NAMED[e.key] ?: if (FKEY.matches(e.key)) e.key.uppercase() else null
             if (named == "ENTER" && (inputFailure != null || state == "failed" || state == "closed")) {
                 e.preventDefault()
-                if (state == "closed") page.submit { start() } else restart()
+                restart()
                 return@on
             }
             if (named != null) { e.preventDefault(); sendKey(named, e); return@on }

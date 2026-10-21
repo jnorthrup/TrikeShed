@@ -16,13 +16,16 @@ fun Panels.renderPorts(n: dynamic) {
     val t = contract(n.type) ?: return
     val ring = n.type == "scope" || arr(n.children).isNotEmpty()
     val envelope = if (ring) contract("scope") ?: t else t
+    val named = if (ring && arr(n.children).isEmpty()) contract(n.subprogram ?: n.params?.program) else null
+    val resolve = try { portKindResolver() } catch (_: dynamic) { null }
     body.textContent = ""
     for (dir in arrayOf("in", "out")) {
         val served = arr(if (dir == "in") envelope.ins else envelope.outs).map { str(it) }
-        val formals = if (ring) arr(n.children).filter { it.type == "scope.$dir" }
-            .map { str(it.params?.name ?: "") }.filter { it.isNotEmpty() } else emptyList()
+        val formals = if (named != null) arr(if (dir == "in") named.ins else named.outs).map { str(it) }
+            else if (ring) arr(n.children).filter { it.type == "scope.$dir" }
+                .map { str(it.params?.name ?: "") }.filter { it.isNotEmpty() } else emptyList()
         for (name in (served + formals).distinctBy { PatchKinds.bare(it) }) {
-            val kd = nodeKindOf(n, dir, name)
+            val kd = resolve?.invoke(n, dir, name) ?: nodeKindOf(n, dir, name)
             val row = document.createElement("div").asDynamic(); row.className = "row $dir"
             val port = document.createElement("span").asDynamic()
             port.className = "port " + PatchKinds.portClass(kd, kindAcceptance)
@@ -53,8 +56,18 @@ fun Panels.buildNode(n: dynamic) {
         if (lane != null) el.dataset.lane = lane.id
     }
     val hd = document.createElement("div").asDynamic(); hd.className = "hd"
-    hd.innerHTML = "<i></i><b>${t.title}</b><s role=\"button\" tabindex=\"0\" aria-label=\"Collapse node\" title=\"collapse\">▤</s><s role=\"button\" tabindex=\"0\" aria-label=\"Delete node\" title=\"delete\">✕</s>"
+    hd.innerHTML = "<i></i><b></b><s role=\"button\" tabindex=\"0\" aria-label=\"Collapse node\" title=\"collapse\">▤</s><s role=\"button\" tabindex=\"0\" aria-label=\"Delete node\" title=\"delete\">✕</s>"
+    hd.querySelector("b").textContent = if (isScope) str(n.id) else str(t.title)
+    hd.title = str(t.title) + " · " + str(n.id)
     el.appendChild(hd)
+    val readiness = t.context?.readiness
+    if (readiness != null && readiness.available == false) {
+        val unavailable = document.createElement("div").asDynamic()
+        unavailable.className = "runtime-status"
+        unavailable.textContent = "Unavailable: " + str(readiness.reason ?: "No runtime owner is bound")
+        unavailable.title = arr(readiness.prerequisites).joinToString(" · ") { str(it) }
+        el.appendChild(unavailable)
+    }
     sprites.attach(n, hd)
     // the hover blip: asserted / inferred / graal for THIS node, from the daemon
     on(el, "pointerenter", { e -> blip.enter(n, e) })

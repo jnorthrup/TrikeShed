@@ -45,7 +45,14 @@ enum class LlmAuth { REQUIRED, NONE }
 typealias KeyMuxCore = Join<Series<KeyBinding>, KeyResolver>
 
 fun KeyPath.asString(): String = view.joinToString(".")
-fun String.toKeyPath(): KeyPath = split(".").toSeries()
+fun String.toKeyPath(): KeyPath {
+    // Provider/model identifiers are opaque: custom:api.loom.example and glm-5.3 are single identities.
+    val field = substringAfterLast('.')
+    if (startsWith("llm.") && field in setOf("key", "base_url") && lastIndexOf('.') > 4) {
+        return s_["llm", substring(4, lastIndexOf('.')), field]
+    }
+    return split(".").toSeries()
+}
 
 // ═══════════════════════════════════════════
 // Source algebra — sealed, each wraps platform/reactor effects
@@ -532,7 +539,14 @@ class KeyMux constructor(
             KeyMuxBuilder().apply(block).build()
     }
 
-    suspend fun get(key: String): String? = resolver.resolve(bindings, key.toKeyPath()).a
+    suspend fun get(key: String): String? {
+        if (!key.startsWith("llm.") && ':' in key) {
+            for ((_, source) in bindings.view) if (source is HermesCredentialSource) {
+                source.credential(key)?.let { return it }
+            }
+        }
+        return resolver.resolve(bindings, key.toKeyPath()).a
+    }
 
     suspend fun getWithSource(key: String): KeyResult = resolver.resolve(bindings, key.toKeyPath())
 
@@ -554,19 +568,36 @@ class KeyMux constructor(
     ): LlmResolution? {
         if (auth == LlmAuth.NONE) return LlmResolution(null, null, fallbackBaseUrl)
         val pins = mutableMapOf<PinOverlaySource, PinBinding?>()
+        val pools = mutableMapOf<HermesCredentialSource, HermesCredentialSnapshot>()
         val snapshot = bindings.view.map { binding ->
             val source = binding.b
-            if (source !is PinOverlaySource) binding else {
-                if (!pins.containsKey(source)) pins[source] = source.snapshotPin()
-                binding.a j PinSnapshotSource(pins[source], source.name)
+            when (source) {
+                is PinOverlaySource -> {
+                    if (!pins.containsKey(source)) pins[source] = source.snapshotPin()
+                    binding.a j PinSnapshotSource(pins[source], source.name)
+                }
+                is HermesCredentialSource -> {
+                    val pool = pools[source] ?: source.snapshot().also { pools[source] = it }
+                    binding.a j pool
+                }
+                else -> binding
             }
         }.toSeries()
         suspend fun read(path: String): String? = resolver.resolve(snapshot, path.toKeyPath()).a
         val prefixes = listOfNotNull(providerTag?.let { "llm.$it" }, "llm.$modelId", "llm.default")
-        val key = prefixes.firstNotNullOfOrNull { prefix -> read("$prefix.key")?.let { "$prefix.key" j it } }
+        val key = prefixes.firstNotNullOfOrNull { prefix ->
+            val resolved = resolver.resolve(snapshot, "$prefix.key".toKeyPath())
+            resolved.a?.let { secret ->
+                val pool = pools.values.firstOrNull { it.name == resolved.b }?.credentials?.get(prefix.removePrefix("llm."))
+                val pin = pins.entries.firstOrNull {
+                    it.key.name == resolved.b && it.value?.provider == prefix.removePrefix("llm.")
+                }?.value
+                (pool?.keyId ?: pin?.keyId ?: "$prefix.key") j (secret j (pool?.baseUrl ?: pin?.baseUrl))
+            }
+        }
             ?: return null
-        val base = prefixes.firstNotNullOfOrNull { read("$it.base_url") } ?: fallbackBaseUrl
-        return LlmResolution(keyId = key.a, authKey = key.b, baseUrl = base)
+        val base = key.b.b ?: prefixes.firstNotNullOfOrNull { read("$it.base_url") } ?: fallbackBaseUrl
+        return LlmResolution(keyId = key.a, authKey = key.b.a, baseUrl = base)
     }
 
     /** Prepend one binding without copying or mutating the inherited source chain. */
@@ -599,7 +630,13 @@ class KeyMux constructor(
      *
      * @return the new value after rotation, or null if no next value existed
      */
-    suspend fun rotate(key: String): String? {
+    suspend fun rotate(
+        key: String,
+        resetAtMs: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() + 60_000L,
+    ): String? {
+        for ((_, source) in bindings.view) {
+            if (source is HermesCredentialSource && source.exhaust(key, resetAtMs)) return null
+        }
         val path = key.toKeyPath()
         val keyStr = key
         // Find all PersistSource instances that have this key

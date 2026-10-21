@@ -281,7 +281,7 @@ class PointcutBlackboardAdapter(
             className = typedef,
             methodName = method,
             bytecodeOffset = siteIdx,
-            timestamp = nanoToEpochMillis(0L),
+            timestamp = System.currentTimeMillis(),
             threadId = Thread.currentThread().threadId(),
         )
         // The value is already reified at delivery, so this is the AFTER side of

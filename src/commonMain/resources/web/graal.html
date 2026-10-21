@@ -21,8 +21,8 @@ body{background:var(--bg);color:var(--ink);font:13px/1.45 "SF Mono","JetBrains M
 #map{position:absolute;inset:0;cursor:grab}
 #map.drag{cursor:grabbing}
 /* ── HUD top bar ─────────────────────────────────────────── */
-#hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:stretch;gap:1px;background:linear-gradient(180deg,rgba(11,14,20,.96),rgba(11,14,20,.82) 75%,transparent);padding:8px 10px 14px;pointer-events:none;z-index:5}
-.chip{pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 10px;margin-right:6px;min-width:86px}
+#hud{position:absolute;top:0;left:0;right:0;display:flex;align-items:stretch;gap:1px;background:linear-gradient(180deg,rgba(11,14,20,.96),rgba(11,14,20,.82) 75%,transparent);padding:8px 10px 14px;pointer-events:auto;overflow-x:auto;overflow-y:hidden;z-index:5}
+.chip{flex-shrink:0;pointer-events:auto;background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:5px 10px;margin-right:6px;min-width:86px}
 .chip b{display:block;font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .chip span{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
 button.chip{font:inherit;color:var(--ink);text-align:left;cursor:pointer}
@@ -52,6 +52,16 @@ canvas.spark{display:block;margin-top:3px}
 .panel header{padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);display:flex;justify-content:space-between}
 .panel header b{color:var(--ink)}
 .panel .body{overflow:auto;padding:8px 10px;font-size:11px}
+#aceWidget{right:12px;top:88px;width:min(920px,92vw);height:76vh;min-width:320px;min-height:240px;max-width:96vw;resize:both;overflow:hidden;z-index:12}
+#aceWidget iframe{width:100%;flex:1;min-height:0;border:0;background:var(--panel)}
+#camel{left:50%;top:88px;transform:translateX(-50%);width:min(780px,94vw);max-height:78vh;z-index:13}
+#camel .body{font:12px/1.55 system-ui,sans-serif}
+#camel p,#camel table{margin-bottom:10px}
+#camel a{color:var(--commit)}
+#camel td,#camel th{vertical-align:top;text-align:left;padding:5px 7px;border-bottom:1px solid var(--line)}
+#camel th:first-child{width:24%}
+.camel-point{padding:8px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.camel-point button{margin:5px 6px 0 0}
 #doc{left:10px;top:78px;width:560px;max-height:78%}
 #doc pre{white-space:pre-wrap;word-break:break-all;color:var(--ink)}
 .hashchip{display:inline-block;background:var(--panel2);border:1px solid var(--line);border-radius:3px;padding:0 5px;cursor:copy;font-size:10px;letter-spacing:.03em}
@@ -223,6 +233,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   <div class="chip" id="cAot" onclick="toggleAot()" style="cursor:pointer"><b>–</b><span>aot cache</span></div>
   <div class="chip" id="cHermes" onclick="hermesRunner()" style="cursor:pointer"><b>XTERM256</b><span>hermes vm</span></div>
   <div class="chip" id="cBoard" onclick="toggleBoard()" style="cursor:pointer"><b>0</b><span>blackboard</span></div>
+  <button class="chip" id="cAce" type="button" onclick="toggleAce()"><b>ACE</b><span>models · context · lineage</span></button>
+  <button class="chip" id="cCamel" type="button" onclick="toggleCamel()"><b>Camel</b><span>search · pointcuts</span></button>
 </div>
 <div id="river"></div>
 <div class="panel" id="doc"><header><b id="docTitle">document</b><span><span class="x" id="docSheetsBtn" onclick="toggleSheetView()" title="grid-in-cell sheet family (CursorSheet)" style="margin-right:10px">▤ sheets</span><span class="x" role="button" tabindex="0" aria-label="Close panel" onclick="hide('doc')">✕</span></span></header><div class="body"><div id="docBody"></div><div id="docSheetBody" style="display:none"></div></div></div>
@@ -234,6 +246,21 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 <div class="panel" id="gc"><header><b>gc lane — live occupancy</b><span class="x" role="button" tabindex="0" aria-label="Close panel" onclick="hide('gc')">✕</span></header><div class="body" id="gcBody"></div></div>
 <div class="panel" id="zoom"><header><b>zoom / strength — bytes prove the grouping</b><span class="x" role="button" tabindex="0" aria-label="Close panel" onclick="hide('zoom')">✕</span></header><div class="body" id="zoomBody"></div></div>
 <div class="panel" id="board"><header><b>blackboard — durable facts</b><span class="x" role="button" tabindex="0" aria-label="Close panel" onclick="hide('board')">✕</span></header><div class="body" id="boardBody"></div></div>
+<section class="panel" id="aceWidget" aria-label="Adaptive Context Engineering desktop widget"><header><b>Code evolution · ACE comparison</b><button type="button" class="x" aria-label="Close ACE widget" onclick="toggleAce()">✕</button></header><iframe id="aceFrame" title="Models, contexts, breadcrumb lineage and summary comparison" src="about:blank"></iframe></section>
+<section class="panel" id="camel" aria-label="Camel, search and pointcut integration"><header><b>Camel · search · pointcuts</b><button type="button" class="x" aria-label="Close Camel panel" onclick="hide('camel')">✕</button></header><div class="body">
+  <p><b>Integration map.</b> Lucene is a local indexing library. Elasticsearch and Solr add server and distributed search services. The mappings below are proposed adapter boundaries; this application has no installed Lucene, Elasticsearch or Solr adapter.</p>
+  <table><thead><tr><th>Search mechanism</th><th>Confix · Couch · ISAM boundary</th></tr></thead><tbody>
+    <tr><td>Segments and reader snapshots</td><td>Pin a Couch revision and its CAS content while reading indexed ISAM ranges. Carry CID, Confix path and revision beside results: Lucene document numbers can change between readers.</td></tr>
+    <tr><td>Postings and DocValues</td><td>Existing <code>IsamDataReader.projection(names)</code> selects columns; <code>fence(column)</code> exposes range bounds for pruning. Confix facets and lazy Cursor rows can project those results. A postings, BM25 or vector adapter still needs implementation.</td></tr>
+    <tr><td>Visibility and durability</td><td>Keep search publication separate from durable storage. Couch ingress commits revision and sequence before HEAD and derived indices advance. Elasticsearch refresh and Solr soft commit make changes searchable; that visibility is a separate boundary from durable commit.</td></tr>
+    <tr><td>Update processors</td><td>Map Solr-style validation and transformation into owned stages before ISAM publication. Preserve source identity and the stage receipt so a result can return to its evidence.</td></tr>
+  </tbody></table>
+  <p><b>Local handle access.</b> Camel <code>direct:</code> calls synchronously inside one CamelContext. The existing document feed passes a small JSON CID envelope to an in-process payload processor, then calls storage and curation services locally. A proposed search stage can use the same owned, bounded channel and pointcut boundary: callers carry CID/range/facet coordinates while the owner retains the service handle and its lifetime. This avoids an HTTP round trip and bulk payload copying; admission and cancellation still apply. Elasticsearch and Solr retain their server and cluster semantics.</p>
+  <p class="vmctl"><a href="/panels?load=preset-camel-authoring" target="_blank" rel="noopener">Open Camel route editor ↗</a> · <a href="/panels?load=preset-native-java-camel" target="_blank" rel="noopener">Native Java DSL ↗</a> <button type="button" onclick="camelSheets(null)">Inspect Camel route evidence</button></p>
+  <details><summary>Primary references</summary><p><a href="https://lucene.apache.org/core/10_3_1/core/org/apache/lucene/index/package-summary.html" target="_blank" rel="noopener">Lucene index model</a> · <a href="https://www.elastic.co/docs/manage-data/data-store/near-real-time-search" target="_blank" rel="noopener">Elasticsearch refresh</a> · <a href="https://solr.apache.org/guide/solr/latest/configuration-guide/commits-transaction-logs.html" target="_blank" rel="noopener">Solr commits and transaction logs</a> · <a href="https://solr.apache.org/guide/solr/latest/indexing-guide/indexing-with-update-handlers.html" target="_blank" rel="noopener">Solr update processors</a> · <a href="https://camel.apache.org/components/4.18.x/direct-component.html" target="_blank" rel="noopener">Camel direct</a></p></details>
+  <p><b>Go to recorded pointcuts.</b> Open the actual route document, its recorded coordinates and available DAG links, or inspect its typed Cursor facets.</p>
+  <div id="camelPoints" aria-live="polite"></div>
+</div></section>
 <div id="notion"><div class="nhead"><input id="nfilter" placeholder="filter entries…" aria-label="Filter entries"><span id="nscope"></span></div><div class="nbody" id="nbody"></div></div>
 <canvas id="mini" width="200" height="124"></canvas>
 <div id="crumb">loading terrain…</div>

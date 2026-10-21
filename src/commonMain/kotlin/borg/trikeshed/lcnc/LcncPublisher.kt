@@ -118,6 +118,8 @@ class LcncPublisher(
         val bindingOf = facts.bindings()
         val shapes = facts.shapes()
         val registry = runners()
+        val readiness = blackboard.snapshot().values
+        val boundTypes = lb.bindings.filter { it.kind != LcncBindingKind.UNBOUND }.map { it.type }.toSet()
         return mapOf(
             "contracts" to lb.vocabulary.values.map { c -> mapOf(
                 "type" to c.type, "title" to c.title,
@@ -136,6 +138,10 @@ class LcncPublisher(
                 "context" to (LcncContextContract.of(c.type,
                     composite = lb.bindings.any { it.type == c.type && it.kind == LcncBindingKind.COMPOSITE }).toMap() + mapOf(
                     "runnerBound" to (c.type in registry),
+                    "readiness" to (readiness["lcnc/readiness/${c.type}"] ?: mapOf(
+                        "available" to (c.type in boundTypes),
+                        "reason" to if (c.type in boundTypes) null else "No runtime owner is bound",
+                    )),
                     "services" to (registry[c.type] as? LcncServiceBinding)?.let { services -> mapOf(
                         "requiredKeys" to services.requiredKeys.view.map(CcekNodes::keyName),
                         "providedKeys" to services.providedKeys.view.map(CcekNodes::keyName),
@@ -207,7 +213,9 @@ class LcncPublisher(
             val cid = LcncBlackboard.cidOf(program)
             val entry = blackboard.get(LcncBlackboard.programKey(name))
             if (entry == null || LcncBlackboard.sourceCidOf(entry) != cid) publishProgram(name, program, lb.vocabulary, cid)
-            else reconcileProgram(name)
+            // A named body's signature may change without changing its caller's
+            // source. Re-type the current board document, preserving board edits.
+            else publishProgram(name, LcncBlackboard.programOf(entry) ?: program, lb.vocabulary, cid)
         }
     }
 

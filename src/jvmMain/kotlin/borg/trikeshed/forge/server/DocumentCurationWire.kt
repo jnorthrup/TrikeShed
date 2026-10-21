@@ -41,7 +41,7 @@ class DocumentCurationWire private constructor(
         fun program(name: String, instructions: String? = null): LcncProgram {
             val nodes = SeriesBuffer<LcncNode>()
             val wires = SeriesBuffer<LcncWire>()
-            nodes.add(LcncNode("source", LcncContracts.SCOPE_IN, mapOf("name" to "source", "kind" to "json"), 40.0, 80.0))
+            nodes.add(LcncNode("source", LcncContracts.SCOPE_IN, mapOf("name" to "source", "kind" to "DocumentSource"), 40.0, 80.0))
             nodes.add(LcncNode("curate", DocumentCurationLegos.CURATE, instructions?.let { mapOf("instructions" to it) }.orEmpty(), 350.0, 80.0))
             wires.add(LcncWire("source", "value", "curate", "source"))
             if (instructions != null) {
@@ -52,7 +52,9 @@ class DocumentCurationWire private constructor(
             }
             // ruleCandidates is a typed yield shaped for nal.rule.admit; admission is a cable an operator adds.
             for ((index, port) in s_["receiptCid", "record", "sheet", "sheets", "ruleCandidates"].view.withIndex()) {
-                nodes.add(LcncNode(port, LcncContracts.SCOPE_OUT, mapOf("name" to port, "kind" to if (port == "receiptCid") "id" else "json"), 970.0, 240.0 + index * 160))
+                nodes.add(LcncNode(port, LcncContracts.SCOPE_OUT, mapOf("name" to port, "kind" to when (port) {
+                    "receiptCid" -> "id"; "ruleCandidates" -> "ProposedRules"; else -> "json"
+                }), 970.0, 240.0 + index * 160))
                 wires.add(LcncWire("curate", port, port, "value"))
             }
             return LcncProgram(name, nodes.drain(), wires.drain())
@@ -66,7 +68,12 @@ class DocumentCurationWire private constructor(
                 val model = mux.defaultModel ?: brain.lastModel() ?: brain.endpointSummaries().firstOrNull()?.model
                     ?: return@withContext unavailable(ctx,
                         "No document curation model is configured. Configure a chat model in ModelMux, then start the document curator.")
-                val session = mux.session(model).getOrThrow()
+                if ("corenlp" !in GuestModules.installed()) return@withContext unavailable(ctx,
+                    "The CoreNLP guest module is not installed. Install CoreNLP before starting document curation.")
+                val session = try { mux.session(model).getOrThrow() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (failure: Exception) { return@withContext unavailable(ctx,
+                        "Document curation model is unavailable: ${failure.message ?: failure::class.simpleName}") }
                 val base = session.baseUrl.trimEnd('/')
                 val destination = mapOf("provider" to (session.model.b.providerTag ?: model),
                     "model" to model, "url" to "$base/chat/completions")
@@ -88,6 +95,7 @@ class DocumentCurationWire private constructor(
                 val log = DocumentAppendLog.open(files.resolvePath(path, "curation.wal"), path)
                 val nlp = CoreNlpRuntime()
                 var curator: DocumentCuratorElement? = null
+                var wire: DocumentCurationWire? = null
                 try {
                     curator = DocumentCuratorElement.create(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext),
                         nlp, DocumentModel.through(ctx.muxContext, timeoutMs = 90_000, expectedBaseUrl = base),
@@ -99,20 +107,39 @@ class DocumentCurationWire private constructor(
                                 "stage" to stage, "correlation" to correlation, "atMs" to ctx.clock(),
                                 "references" to (refs α { it.value }).toList()), "document")
                         })
-                    DocumentCurationWire(ctx, curator, nlp, log, panels, destination).also { it.attach() }
+                    DocumentCurationWire(ctx, curator, nlp, log, panels, destination).also { wire = it; it.attach() }
                 } catch (failure: Throwable) {
                     withContext(NonCancellable) {
-                        try { curator?.drain() } finally { try { nlp.close() } finally { log.close() } }
+                        try {
+                            wire?.let { it.drain() } ?: curator?.drain()
+                        } finally { try { nlp.close() } finally { log.close() } }
                     }
-                    throw failure
+                    if (failure is CancellationException) throw failure
+                    ctx.routes.release("documents")
+                    unavailable(ctx, "Document curator could not start: ${failure.message ?: failure::class.simpleName}")
                 }
             }
 
         /** Reduced startup retains a read-only status surface, not a substitute curator or runner. */
         private fun unavailable(ctx: ModuleContext, reason: String): DocumentCurationWire? {
+            ctx.blackboard.put("lcnc/readiness/${DocumentCurationLegos.CURATE}", mapOf(
+                "available" to false, "reason" to reason,
+                "prerequisites" to listOf("belief bag", "CoreNLP guest module", "configured reachable chat model")), "documents")
             for (path in s_["/api/documents", "/api/documents/curate"].view)
                 ctx.routes.claim("documents", path) { method, target, _, _ ->
                     val read = method == "GET" && target.substringBefore('?') == "/api/documents"
+                    val query = CouchHttpSurface.parseQuery(target.substringAfter('?', ""))
+                    if (read && query["cid"] != null) {
+                        val response = runCatching {
+                            val cid = ContentId(query.getValue("cid"))
+                            val record = DocumentCuratorCodec.decode(requireNotNull(ctx.casStore.get(cid)) { "Unknown retained curation" })
+                            if (query["view"] == "sheet" && query.containsKey("cursor")) DocumentCurationLegos.sheet(cid, record, query)
+                            else if (query["view"] == "sheet") DocumentCurationLegos.output(cid, record)["sheets"]
+                            else DocumentCurationLegos.output(cid, record)
+                        }
+                        return@claim WireHttpResponse(if (response.isSuccess) 200 else 400,
+                            jsonOf(response.getOrElse { mapOf("error" to it.message) }), "application/json; charset=utf-8")
+                    }
                     val submit = method == "POST" && target.substringBefore('?') == "/api/documents/curate"
                     val status = when {
                         read && !CouchHttpSurface.parseQuery(target.substringAfter('?', "")).containsKey("cid") -> 200
@@ -129,11 +156,11 @@ class DocumentCurationWire private constructor(
 
     val available: Boolean get() = "corenlp" in GuestModules.installed()
     private val requests = HeadhunterRequests(CoroutineScope(ctx.scope.coroutineContext + ctx.muxContext + fileIoContext))
+    private var runner: LcncNodeRunner? = null
 
     private suspend fun attach() {
         for (receipt in curator.receipts().view) publish(receipt.a, receipt.b)
-        ctx.lcncRunners[DocumentCurationLegos.SHEET] = DocumentCurationLegos.sheet(curator)
-        ctx.lcncRunners[DocumentCurationLegos.CURATE] = boundLcnc(curator) { owner, node, inputs ->
+        val bound = boundLcnc(curator) { owner, node, inputs ->
             val raw = inputs["source"] ?: inputs["source?"]
             val source = DocumentCurationLegos.retainSource(ctx.casStore, raw)
             val output = DocumentCurationLegos.curate(owner, DocumentCurationLegos::reference).execute(node, inputs + ("source" to source))
@@ -142,6 +169,10 @@ class DocumentCurationWire private constructor(
             publish(cid, record)
             output
         }
+        runner = bound
+        ctx.lcncRunners[DocumentCurationLegos.CURATE] = bound
+        ctx.blackboard.put("lcnc/readiness/${DocumentCurationLegos.CURATE}", mapOf(
+            "available" to true, "reason" to null, "prerequisites" to emptyList<String>()), "documents")
         for (path in s_["/api/documents", "/api/documents/curate"].view)
             ctx.routes.claim("documents", path, route = ::route)
         ensureProgram(program(PROGRAM))
@@ -279,11 +310,14 @@ class DocumentCurationWire private constructor(
 
     suspend fun stopAdmission() {
         ctx.routes.release("documents")
+        ctx.blackboard.put("lcnc/readiness/${DocumentCurationLegos.CURATE}", mapOf(
+            "available" to false, "reason" to "Document curator is draining", "prerequisites" to listOf("running document curator")), "documents")
         requests.drain()
     }
 
     suspend fun drain() {
         stopAdmission()
+        if (ctx.lcncRunners[DocumentCurationLegos.CURATE] === runner) ctx.lcncRunners.remove(DocumentCurationLegos.CURATE)
         curator.drain()
     }
 

@@ -11,6 +11,7 @@ data class ModelCatalogEntry(
     val provider: String,
     val model: String,
     val freeTier: Boolean,
+    /** -1 = unobserved; zero is an explicit provider exhaustion report. */
     val quotaRemaining: Int,
     val latencyEstimateMs: Int,
     /** Prompt-token price the provider quoted; null = unknown (discovery refuses to invent). */
@@ -24,7 +25,9 @@ data class ModelCatalogEntry(
      * same way it carries quotaRemaining. 0 = cold lane.
      */
     val affinityScore: Double = 0.0,
-)
+) {
+    val quotaAvailable: Boolean get() = quotaRemaining != 0
+}
 
 class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
     override val a: Int

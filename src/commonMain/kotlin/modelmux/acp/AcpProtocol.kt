@@ -83,6 +83,10 @@ val AcpModelCard.id:   String               get() = a
 val AcpModelCard.caps: Series<AcpCapability> get() = b.a
 val AcpModelCard.meta: AcpMeta              get() = b.b
 
+/** Observed model revision; the ACP protocol version is not a model revision. */
+val AcpModelCard.modelVersion: String?
+    get() = meta.headers.view.firstOrNull { it.a == "model_version" }?.b?.takeIf { it.isNotBlank() }
+
 /**
  * The provider id a catalog ingester tagged this card with, if any.
  *

@@ -1,7 +1,10 @@
 package modelmux
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.*
+import borg.trikeshed.parse.confix.ConfixDoc
 import kotlinx.datetime.Clock
 import modelmux.acp.BREADCRUMB_SKILL
 import kotlin.jvm.JvmInline
@@ -67,10 +70,16 @@ data class BreadcrumbProjection(
     val children: List<BreadcrumbProjection> = emptyList(),
     /** False for a breadcrumb carried by another; the trail lists only roots. */
     val root: Boolean = true,
+    val reference: BreadcrumbRef? = null,
+    val cid: ContentId? = null,
+    val title: String? = null,
 ) {
     /** A zero-presence reference remains addressable with the breadcrumb tool. */
     fun render(): String = buildString {
         append("{\"id\":").append(jsonOf(id.value))
+        reference?.let { append(",\"ref\":").append(jsonOf(it.value)) }
+        cid?.let { append(",\"cid\":").append(jsonOf(it.value)) }
+        title?.let { append(",\"title\":").append(jsonOf(it.breadcrumbPrefix(600))) }
         append(",\"source\":").append(jsonOf(source.breadcrumbPrefix(160)))
         append(",\"presence\":").append(presence.value)
         if (presence.value > 0.0) append(",\"content\":").append(jsonOf(content))
@@ -120,6 +129,7 @@ fun String.breadcrumbPrefix(limit: Int): String {
 class BreadcrumbContext(
     val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
     val retention: BreadcrumbRetention = BreadcrumbRetention(),
+    val index: BreadcrumbIndex = BreadcrumbIndex(),
 ) {
     private val records = LinkedHashMap<BreadcrumbId, BreadcrumbRecord>()
     private val pending = LinkedHashMap<BreadcrumbId, BreadcrumbPresence>()
@@ -138,12 +148,13 @@ class BreadcrumbContext(
         private set
 
     /** A transaction checkpoint includes reservations; a durable state deliberately does not. */
-    fun copy(): BreadcrumbContext = BreadcrumbContext(clock, retention).also { it.restore(this) }
+    fun copy(): BreadcrumbContext = BreadcrumbContext(clock, retention, index.copy()).also { it.restore(this) }
 
     fun restore(checkpoint: BreadcrumbContext) {
         require(retention == checkpoint.retention) { "breadcrumb retention differs from checkpoint" }
         if (checkpoint === this) return
         records.clear(); records.putAll(checkpoint.records)
+        index.restore(checkpoint.index)
         pending.clear(); pending.putAll(checkpoint.pending)
         emissions.clear(); emissions.addAll(checkpoint.emissions)
         emissionReservations.clear(); emissionReservations.putAll(checkpoint.emissionReservations)
@@ -225,6 +236,7 @@ class BreadcrumbContext(
             "records" to records.values.map { mapOf("id" to it.id.value, "source" to it.source,
                 "content" to it.content, "createdAt" to it.createdAt.value.toString(), "lastAccessAt" to it.lastAccessAt.value.toString(),
                 "gain" to it.gain, "children" to it.children.map { child -> child.value }) },
+            "index" to index.metadataState(),
             "pending" to pending.map { mapOf("id" to it.key.value, "presence" to it.value.value) },
             "emissions" to emissions.map { it.value },
             "receipts" to calls.values.map(::receiptState),
@@ -275,12 +287,17 @@ class BreadcrumbContext(
         content: BreadcrumbContent,
         at: BreadcrumbTimestamp = BreadcrumbTimestamp(clock()),
         children: List<BreadcrumbId> = emptyList(),
+        title: String? = null,
+        heritage: ConfixDoc? = null,
     ): BreadcrumbRecord {
         records[id]?.let { record ->
             require(record.source == source && record.content == content) { "breadcrumb id already contains different evidence: ${id.value}" }
             return record
         }
-        return BreadcrumbRecord(id, source, content, at, at, children = children.filter { it != id }.distinct()).also { records[id] = it }
+        return BreadcrumbRecord(id, source, content, at, at, children = children.filter { it != id }.distinct()).also {
+            index.put(it, title ?: if (source.startsWith("summary:")) content else source, heritage)
+            records[id] = it
+        }
     }
 
     fun put(
@@ -319,6 +336,13 @@ class BreadcrumbContext(
         id: BreadcrumbId,
         presence: BreadcrumbPresence,
         at: BreadcrumbTimestamp = BreadcrumbTimestamp(clock()),
+    ): Boolean = access(id, at, presence)
+
+    /** Indexed recall refreshes lineage access without scheduling an unbounded legacy projection. */
+    fun access(
+        id: BreadcrumbId,
+        at: BreadcrumbTimestamp = BreadcrumbTimestamp(clock()),
+        presence: BreadcrumbPresence? = null,
     ): Boolean {
         if (id !in records) return false
         val visited = mutableSetOf<BreadcrumbId>()
@@ -326,7 +350,7 @@ class BreadcrumbContext(
             val record = records[next] ?: return
             if (!visited.add(next)) return
             records[next] = record.copy(lastAccessAt = BreadcrumbTimestamp(maxOf(record.lastAccessAt.value, at.value)))
-            pending[next] = presence
+            if (presence != null) pending[next] = presence
             for (child in record.children) explode(child)
         }
         explode(id)
@@ -359,6 +383,7 @@ class BreadcrumbContext(
         val lexicon = lexicon()
         fun one(record: BreadcrumbRecord, path: Set<BreadcrumbId>): BreadcrumbProjection =
             record.project(overrides[record.id] ?: retention.presence(record, at), lexicon).copy(
+                reference = index[record.id]?.ref, cid = index[record.id]?.cid, title = index[record.id]?.title,
                 children = record.children.filter { it !in path }.mapNotNull { byId[it] }.map { one(it, path + it.id) },
                 root = record.id !in carried)
         return rows.size j { index -> one(rows[index], setOf(rows[index].id)) }
@@ -373,16 +398,17 @@ class BreadcrumbContext(
         const val STATE_LIMIT = 24_000_000
 
         /** Decode before admission. Reads retain original time and queued overrides without exercising them. */
-        fun restore(state: String, clock: () -> Long = { Clock.System.now().toEpochMilliseconds() }): BreadcrumbContext {
+        fun restore(state: String, clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
+                    cas: CasStore = CasStore.inMemory()): BreadcrumbContext {
             require(state.length <= STATE_LIMIT) { "breadcrumb state capacity reached" }
             val fields = setOf("version", "retention", "sequence", "records", "pending", "emissions", "submission")
             val parsed = reifyStrict(state)
             val present = (parsed as? Map<*, *>)?.keys ?: emptySet<Any?>()
-            val root = objectState(parsed, fields + setOf("receipts", "horizon").filter { it in present })
+            val root = objectState(parsed, fields + setOf("receipts", "horizon", "index").filter { it in present })
             require(root["version"] == 1.0) { "unsupported breadcrumb state version" }
             val policy = objectState(root["retention"], setOf("ageHalfLifeMs", "recencyHalfLifeMs", "threshold"))
             val retention = BreadcrumbRetention(longState(policy["ageHalfLifeMs"]), longState(policy["recencyHalfLifeMs"]), presenceState(policy["threshold"]))
-            val context = BreadcrumbContext(clock, retention)
+            val context = BreadcrumbContext(clock, retention, BreadcrumbIndex(cas))
             context.sequence = longState(root["sequence"]).also { require(it in 0 until Long.MAX_VALUE) { "invalid breadcrumb sequence" } }
             var size = 0L
             for (value in arrayState(root["records"])) {
@@ -397,7 +423,9 @@ class BreadcrumbContext(
                 val children = if (row.containsKey("children")) arrayState(row["children"]).map { BreadcrumbId(stringState(it)) } else emptyList()
                 val record = BreadcrumbRecord(id, source, content, BreadcrumbTimestamp(longState(row["createdAt"])), BreadcrumbTimestamp(longState(row["lastAccessAt"])), gain, children)
                 require(context.records.put(id, record) == null) { "duplicate breadcrumb record" }
+                context.index.put(record)
             }
+            root["index"]?.let(context.index::restoreMetadata)
             for (value in arrayState(root["pending"])) {
                 val row = objectState(value, setOf("id", "presence"))
                 val id = BreadcrumbId(stringState(row["id"]))

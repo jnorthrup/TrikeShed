@@ -1,7 +1,7 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
-import borg.trikeshed.lcnc.LcncProgramConfix
+import borg.trikeshed.lcnc.*
 import borg.trikeshed.web.patch.PatchKinds
 import kotlinx.browser.document
 import kotlinx.browser.localStorage
@@ -128,7 +128,9 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
     val outputs = run.outputs ?: return
     val canvas = graph
     val projected = nodes().filter { !truthy(it._parentScope) }
-    fun current(): Boolean = !page.closing && graph === canvas && JSON.stringify(toConfix()) == document
+    val definition = LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, document)
+    fun current(): Boolean = !page.closing && graph === canvas && LcncProgramConfix.sameDefinition(definition,
+        LcncProgramConfix.fromJson(str(panelName().value).ifBlank { "canvas" }, JSON.stringify(toConfix())))
     // Replace display snapshots before asynchronous reads; these never feed execution.
     for (n in projected) {
         n._lastOut = undefined
@@ -155,7 +157,7 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
                     n._cols = out.columns
                     renderGroupedBoard(n)
                 }
-                "display" -> setResult(n, out.x)
+                "display" -> setResult(n, if (out.previewOnly == true) out else out.x)
                 "media.player" -> if (out.rendered != null) renderMedia(n, out.rendered)
                 "gauge" -> {
                     val value = out.x
@@ -176,6 +178,7 @@ suspend fun Panels.programOutputs(run: dynamic, document: String) {
                     else if (keysOf(out).isNotEmpty()) setResult(n, out)
                 }
             }
+            appendDocumentReviewReferences(n, out, ::current)
         } catch (e: CancellationException) { throw e }
         catch (e: dynamic) {
             if (current() && truthy(n.el.isConnected)) {
@@ -444,6 +447,7 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
         val refinements = arr(payload.kindRefinements)
         val hierarchy = arr(payload.kindHierarchy)
         val m = obj()
+        val typed = LinkedHashMap<String, LcncPortContract>()
         for (c in list) {
             require(c != null && typeOf(c.type) == "string" && str(c.type).isNotBlank() && m[c.type] == null) { "Invalid or duplicate node contract" }
             // an EMPTY opts array must not become a select
@@ -465,12 +469,28 @@ suspend fun Panels.syncContracts(announce: Boolean = true): Boolean {
             }
             c.params = ps
             m[c.type] = c
+            val type = str(c.type)
+            val inputKinds = c.inputKinds ?: obj()
+            val outputKinds = c.outputKinds ?: obj()
+            val shapes = c.kindShapes ?: obj()
+            val cardinality = c.cardinality ?: obj()
+            typed[type] = (LcncContracts.find(type) ?: LcncPortContract(type, inputs = emptyList(), outputs = emptyList())).copy(
+                title = str(c.title ?: c.type),
+                inputs = arr(c.ins).map { str(it) }, outputs = arr(c.outs).map { str(it) },
+                inputKinds = keysOf(inputKinds).associateWith { str(inputKinds[it]) },
+                outputKinds = keysOf(outputKinds).associateWith { str(outputKinds[it]) },
+                cardinality = keysOf(cardinality).associateWith { LcncCardinality.valueOf(str(cardinality[it])) },
+                kindShapes = keysOf(shapes).associateWith { key -> arr(shapes[key]).map { str(it) } },
+                isSource = truthy(c.source), isSink = truthy(c.sink), isEffect = truthy(c.effect),
+            )
         }
         contracts = m
+        portContracts = typed
         kindAcceptance = acceptance; kindRefinements = refinements; kindHierarchy = hierarchy
         // Hydration only adds presentation slots. Execution never dispatches a per-node browser runner.
         for (t in keysOf(m)) if (!runners.containsKey(t)) runners[t] = Runner()
-        for (t in arrayOf("document.curate", "document.tasks", "document.sheet")) runners[t]?.render = { n, out ->
+        for (t in arrayOf("document.curate", "document.tasks", "document.sheet", "book.curate", "book.snapshot",
+            "document.reviewSnapshot", "document.reviewDecision", "document.reviewRelease")) runners[t]?.render = { n, out ->
             renderDocumentReview(n, out)
         }
         runners["nars.reteFire"]?.render = { n, out -> renderSimulation(n, out) }

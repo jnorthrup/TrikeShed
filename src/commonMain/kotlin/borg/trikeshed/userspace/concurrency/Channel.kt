@@ -26,11 +26,15 @@ enum class ChannelCapacity {
     Rendezvous
 }
 
-class Channel<T>(val capacity: ChannelCapacity, val bufferSize: Int = 0) {
+class Channel<T>(
+    val capacity: ChannelCapacity,
+    val bufferSize: Int = 0,
+    onUndeliveredElement: ((T) -> Unit)? = null,
+) {
    val kChannel = when (capacity) {
-        ChannelCapacity.Unbounded -> KChannel<T>(KChannel.UNLIMITED)
-        ChannelCapacity.Buffered -> KChannel<T>(bufferSize)
-        ChannelCapacity.Rendezvous -> KChannel<T>(KChannel.RENDEZVOUS)
+        ChannelCapacity.Unbounded -> KChannel<T>(KChannel.UNLIMITED, onUndeliveredElement = onUndeliveredElement)
+        ChannelCapacity.Buffered -> KChannel<T>(bufferSize, onUndeliveredElement = onUndeliveredElement)
+        ChannelCapacity.Rendezvous -> KChannel<T>(KChannel.RENDEZVOUS, onUndeliveredElement = onUndeliveredElement)
     }
 
     fun isClosed(): Boolean = kChannel.isClosedForSend
@@ -59,7 +63,8 @@ class Channel<T>(val capacity: ChannelCapacity, val bufferSize: Int = 0) {
 
     companion object {
         fun <T> rendezvous() = Channel<T>(ChannelCapacity.Rendezvous)
-        fun <T> buffered(capacity: Int) = Channel<T>(ChannelCapacity.Buffered, capacity)
+        fun <T> buffered(capacity: Int, onUndeliveredElement: ((T) -> Unit)? = null) =
+            Channel<T>(ChannelCapacity.Buffered, capacity, onUndeliveredElement)
         fun <T> unbounded() = Channel<T>(ChannelCapacity.Unbounded)
     }
 }

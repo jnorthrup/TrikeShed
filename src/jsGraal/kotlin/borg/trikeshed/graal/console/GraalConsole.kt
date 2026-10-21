@@ -9,6 +9,7 @@ import borg.trikeshed.web.graal.byId
 import borg.trikeshed.web.graal.decUri
 import borg.trikeshed.web.graal.encUri
 import borg.trikeshed.web.graal.fetchJson
+import borg.trikeshed.web.graal.fetchResponse
 import borg.trikeshed.web.graal.jsRound
 import borg.trikeshed.web.graal.jsonIndent
 import borg.trikeshed.web.graal.jsonPost
@@ -32,6 +33,7 @@ import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.HTMLIFrameElement
 import org.w3c.dom.HTMLOptionElement
 import org.w3c.dom.HTMLSelectElement
 import org.w3c.dom.Node
@@ -147,6 +149,19 @@ object GraalConsole {
         w.toggleAot = { toggleAot() }
         w.hermesRunner = { hermesRunner() }
         w.toggleBoard = { toggleBoard() }
+        w.toggleCamel = { toggleCamel() }
+        w.camelSheets = { route: String? -> camelSheets(route) }
+        w.toggleAce = {
+            val panel = q("aceWidget")
+            val frame = q("aceFrame") as HTMLIFrameElement
+            if (panel.style.display == "flex") {
+                hide("aceWidget")
+                frame.src = "about:blank"
+            } else {
+                frame.src = "/modelmux?widget=1"
+                show("aceWidget")
+            }
+        }
         w.toggleSheetView = { toggleSheetView() }
         w.renderSheetFamily = { renderSheetFamily() }
         w.vtKill = { vtKill() }
@@ -166,6 +181,73 @@ object GraalConsole {
         w.captureAot = { captureAot() }
         w.boardRefresh = { boardRefresh() }
         w.buildNotion = { buildNotion() }
+    }
+
+    private fun toggleCamel() {
+        if (q("camel").style.display == "flex") { hide("camel"); return }
+        show("camel")
+        val target = q("camelPoints")
+        target.textContent = "Loading recorded pointcuts…"
+        scope.launch {
+            try {
+                val response = fetchResponse("/api/graal/pointcuts")
+                if (!response.ok) error("pointcuts HTTP " + response.status)
+                val result: dynamic = response.json().await()
+                val routes = orr(result.routes, js("[]")).unsafeCast<Array<dynamic>>()
+                target.textContent = if (routes.isEmpty()) "No pointcut landings recorded yet." else
+                    "${routes.size} recorded pointcuts · showing up to 80. These are observed routes, not proposed search adapters."
+                for (route in routes.take(80)) {
+                    val id = str(orr(route.route, ""))
+                    if (id.isEmpty()) continue
+                    val row = document.createElement("div") as HTMLElement
+                    row.className = "camel-point"
+                    val coordinate = document.createElement("div") as HTMLElement
+                    coordinate.textContent = id + " · " + str(orr(route.className, "")) + "." +
+                        str(orr(route.methodName, "")) + " @ " + str(orr(route.bci, ""))
+                    row.appendChild(coordinate)
+                    fun action(label: String, invoke: () -> Unit) {
+                        val button = document.createElement("button") as HTMLElement
+                        button.className = "vmbtn"; button.textContent = label
+                        button.addEventListener("click", { invoke() })
+                        row.appendChild(button)
+                    }
+                    action("Go to pointcut") { hide("camel"); openDoc(id) }
+                    action("Cursor facets") { camelSheets(id) }
+                    target.appendChild(row)
+                }
+            } catch (e: Throwable) { target.textContent = "Pointcut lookup failed: " + errText(e) }
+        }
+    }
+
+    private fun camelSheets(route: String?) {
+        hide("camel")
+        q("docTitle").textContent = route ?: "Camel route evidence"
+        q("docBody").textContent = route ?: "Durable facts under camel/route/. Open a nested sheet to inspect lifecycle or exchange evidence."
+        q("docBody").style.display = "none"
+        sel = if (route == null) null else byIdMap[route]
+        selEdges = emptyList(); window.asDynamic().selEdges = js("[]")
+        val target = q("docSheetBody")
+        target.style.display = ""
+        target.textContent = "Loading Cursor sheets…"
+        sheetFamily = null; window.asDynamic().sheetCurrentId = null
+        show("doc")
+        scope.launch {
+            try {
+                val url = if (route == null) "/blackboard/sheet?prefix=camel%2Froute%2F&max=128"
+                    else "/api/graal/sheet?id=" + encUri(route)
+                val response = fetchResponse(url)
+                if (!response.ok) error("sheet HTTP " + response.status)
+                val family = response.json().await().unsafeCast<Array<dynamic>>()
+                sheetFamily = family
+                window.asDynamic().sheetCurrentId = if (family.isNotEmpty()) family[0].id else null
+                renderSheetFamily()
+                if (family.any { truthy(it.truncated) }) {
+                    val limit = document.createElement("p") as HTMLElement
+                    limit.textContent = "This sheet family is bounded; some evidence was omitted."
+                    target.appendChild(limit)
+                }
+            } catch (e: Throwable) { target.textContent = "Sheet lookup failed: " + errText(e) }
+        }
     }
 
     fun resize() {

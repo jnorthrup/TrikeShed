@@ -20,7 +20,7 @@ package borg.trikeshed.kanban
  */
 object PlaneBrief {
     /** One plane fact as the brief sees it. */
-    data class Row(val partition: String, val id: String, val fields: Map<String, Any?>)
+    data class Row(val partition: String, val id: String, val fields: Map<String, Any?>, val contentId: String? = null)
 
     /** One RFC 2119 criterion from the card's spec. */
     data class Criterion(val level: String, val index: Int, val text: String) {
@@ -50,6 +50,8 @@ object PlaneBrief {
         val agent: String = "",
         /** `AGENT-BUDGET: <seconds>`, clamped by the lane to the reaper's ceiling. */
         val agentBudget: Int? = null,
+        /** Explicit proficiency category; distinct summary jobs keep distinct histories. */
+        val taskKind: String = "claim",
     ) {
         val musts: List<Criterion> get() = criteria.filter { it.level == "MUST" }
 
@@ -107,6 +109,7 @@ object PlaneBrief {
         var fanout: Int? = null
         var agent = ""
         var agentBudget: Int? = null
+        var taskKind = "claim"
         val counts = HashMap<String, Int>()
         for (raw in spec.lines()) {
             val h = specHead(raw) ?: continue
@@ -128,12 +131,13 @@ object PlaneBrief {
                 // The coding-agent lane: the colon is required, exactly as MODELS: reads.
                 "AGENT" -> if (h.colon) agent = rest.trim().lowercase()
                 "AGENT-BUDGET" -> if (h.colon) agentBudget = rest.trim().toIntOrNull()
+                "TASK" -> if (h.colon && rest.isNotBlank()) taskKind = rest.trim()
             }
         }
         if (criteria.none { it.level == "MUST" }) criteria.add(0, Criterion("MUST", 1, DEFAULT_MUST))
         // one MODELS entry is a MODEL, not a fan-out
         if (models.size == 1 && model.isBlank()) model = models[0]
-        return Spec(goal, criteria, out, human, model, tokens, models, fanout, agent, agentBudget)
+        return Spec(goal, criteria, out, human, model, tokens, models, fanout, agent, agentBudget, taskKind)
     }
 
     /** The card's own terms: lowercase words of 4+ letters, stopwords out, in first-seen order. */
@@ -215,6 +219,7 @@ object PlaneBrief {
         val ok: Boolean,
         val decision: String,
         val content: String,
+        val contentId: String? = null,
     )
 
     /** How much of one child's answer the merge brief carries; the receipt on the blackboard keeps the whole. */

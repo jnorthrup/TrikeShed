@@ -1,8 +1,10 @@
 package borg.trikeshed.web.patch
 
+import borg.trikeshed.lcnc.LcncFacts
+
 /**
  * Port kind lookups of the patch surface. Kinds and their accepted supertypes are served by
- * Kotlin (/api/lcnc/contracts kindAcceptance); this is lookup only, no parallel subtype rule.
+ * Kotlin (/api/lcnc/contracts kindAcceptance), with the same algebra for inferred kinds.
  */
 object PatchKinds {
     val kindClass: Map<String, String> = mapOf("trigger" to "t-trig", "json" to "t-json", "text" to "t-text", "id" to "t-id", "num" to "t-num")
@@ -10,7 +12,8 @@ object PatchKinds {
 
     /** "*" is the explicit generic ring escape, not a semantic class */
     fun compatible(a: String?, b: String?, acceptance: Map<String, List<String>>): Boolean =
-        !a.isNullOrEmpty() && !b.isNullOrEmpty() && (a == "*" || b == "*" || acceptance[a]?.contains(b) == true)
+        !a.isNullOrEmpty() && !b.isNullOrEmpty() &&
+            (a == "*" || b == "*" || LcncFacts.accepts(a, b) || acceptance[a]?.contains(b) == true)
 
     fun portClass(kind: String?, acceptance: Map<String, List<String>>): String {
         kindClass[kind]?.let { return it }

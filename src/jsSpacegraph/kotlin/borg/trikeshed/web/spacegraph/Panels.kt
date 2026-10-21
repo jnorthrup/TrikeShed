@@ -35,6 +35,7 @@ class Panels : PatchSurface {
     val mmx: dynamic = mm.getContext("2d")
 
     var contracts: dynamic = obj()
+    var portContracts: Map<String, LcncPortContract> = emptyMap()
     var kindAcceptance: Map<String, List<String>> = emptyMap()
     var kindRefinements: Array<dynamic> = emptyArray()
     var kindHierarchy: Array<dynamic> = emptyArray()
@@ -305,7 +306,10 @@ class Panels : PatchSurface {
         if (k != null) return if (dir == "out") refinedLiteralKind(nd, port, k) else k
         if (ring) {
             // PROGRESSIVE TYPING: a ring parameter is GENERIC until its scope.in/scope.out declares a `kind`.
-            if (!(truthy(nd.children) && num(nd.children.length) > 0) && truthy(nd.params) && truthy(nd.params.program)) return "*"
+            if (arr(nd.children).isEmpty()) {
+                val name = str(nd.subprogram ?: nd.params?.program ?: "")
+                if (name.isNotBlank()) return kindOf(name, dir, port) ?: "*"
+            }
             val want = if (dir == "out") "scope.out" else "scope.in"
             for (c in arr(nd.children)) {
                 if (c.type == want && PatchKinds.bare(str(c.params?.name ?: "")) == bare) {
@@ -328,7 +332,7 @@ class Panels : PatchSurface {
 
     /** One gesture's wired graph, shared by all its port queries; construction-time lookup remains declared. */
     fun portKindResolver(program: LcncProgram = boardDefinition()): (dynamic, String, String) -> String? {
-        val contracts = LcncContracts.all().associateBy { it.type }
+        val contracts = portContracts
         val indexed = mutableMapOf<String, LcncNode>()
         fun visit(nodes: Series<LcncNode>) {
             for (node in nodes.view) { indexed[node.id] = node; visit(node.children) }
@@ -353,7 +357,7 @@ class Panels : PatchSurface {
         val many = cardinality != null && cardinality[toPort] == "MANY"
         try {
             val current = boardDefinition()
-            val vocabulary = LcncContracts.all().associateBy { it.type }
+            val vocabulary = portContracts
             val baseline = LcncTypeCheck.check(current, vocabulary, strict = false).toSet()
             val retained = if (many) current.wires else current.wires.filter {
                 !(it.toNode == str(to[0]) && PatchKinds.bare(it.toPort) == toPort)

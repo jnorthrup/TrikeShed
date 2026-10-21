@@ -133,6 +133,8 @@ object LcncWorkspacePresets {
             LcncNode("sheet", "document.sheet", mapOf("receiptCid" to receiptCid, "view" to "rules", "limit" to "32"), x = 20.0, y = 50.0),
             LcncNode("evidence", "sheet.concentric", x = 370.0, y = 50.0),
             LcncNode("assumptions", "json.value", mapOf("value" to jsonOf(assertions), "columns" to "subject,obj"), x = 720.0, y = 50.0),
+            ruleEnvelope(370.0, 420.0),
+            LcncNode("rule-values", "pick", mapOf("path" to "rules"), x = 720.0, y = 230.0),
             LcncNode("simulation", "nars.reteFire", mapOf("discount" to "0.5"), x = 720.0, y = 420.0),
             LcncNode("firings", "display", x = 1080.0, y = 420.0),
             LcncNode("review", "note", mapOf("text" to "Receipt-pinned simulation. Run reads the retained record; it does not re-curate or call a model.\n" +
@@ -141,7 +143,10 @@ object LcncWorkspacePresets {
                 "Positive and negative support remain separate and dependent on the source. No live rule admission, clinical/legal decision, model call or actuation is wired. Save this construction to revisit the same evidence."), x = 20.0, y = 440.0),
         ], s_[
             LcncWire("sheet", "sheet", "evidence", "board"),
-            LcncWire("sheet", "ruleCandidates", "simulation", "rules?"),
+            LcncWire("sheet", "ruleCandidates", "rules", "rules"),
+            LcncWire("rules-in", "value", "rules-out", "value"),
+            LcncWire("rules", "returns", "rule-values", "x"),
+            LcncWire("rule-values", "y", "simulation", "rules?"),
             LcncWire("assumptions", "value", "simulation", "assertions?"),
             LcncWire("simulation", "firings", "firings", "x"),
         ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.65))
@@ -457,8 +462,16 @@ object LcncWorkspacePresets {
             view = LcncView(x = 20.0, y = 20.0, zoom = 0.8))
     }
 
+    /** Proposed rules become ordinary simulation input through an explicit record projection, never approval. */
+    private fun ruleEnvelope(x: Double, y: Double) = LcncNode("rules", LcncContracts.SCOPE, x = x, y = y,
+        children = s_[
+            LcncNode("rules-in", LcncContracts.SCOPE_IN, mapOf("name" to "rules", "kind" to "ProposedRules")),
+            LcncNode("rules-out", LcncContracts.SCOPE_OUT, mapOf("name" to "rules", "kind" to "ProposedRules"), x = 340.0),
+        ], collapsed = true)
+
     fun curation(name: String, file: String, text: String, subject: String = "", parties: List<String> = emptyList()): String = LcncProgramConfix.toJson(LcncProgram(name, s_[
         LcncNode("source", "json.value", mapOf("value" to jsonOf(mapOf("name" to file, "mediaType" to "text/plain", "text" to text))), x = 20.0, y = 50.0),
+        LcncNode("retained-source", "document.source", x = 20.0, y = 240.0),
         LcncNode("curate", "document.curate", x = 350.0, y = 50.0),
         LcncNode("evidence", "sheet.concentric", x = 680.0, y = 50.0),
         LcncNode("record", "display", x = 350.0, y = 400.0),
@@ -466,6 +479,8 @@ object LcncWorkspacePresets {
         LcncNode("assumptions", "json.value", mapOf("value" to jsonOf(parties.map { party ->
             mapOf("subject" to subject, "obj" to party, "party" to party, "hypothetical" to true)
         }), "columns" to "subject,obj"), x = 1020.0, y = 50.0),
+        ruleEnvelope(680.0, 700.0),
+        LcncNode("rule-values", "pick", mapOf("path" to "rules"), x = 1020.0, y = 230.0),
         LcncNode("simulation", "nars.reteFire", mapOf("discount" to "0.5"), x = 1020.0, y = 390.0),
         LcncNode("firings", "display", x = 1360.0, y = 390.0),
         LcncNode("review", "note", mapOf("text" to "Synthetic multi-party record. Review quotations, token spans and dependencies in the evidence sheet.\n" +
@@ -474,12 +489,16 @@ object LcncWorkspacePresets {
             "Both positive and negative support remain visible. A firing is dependent support, not agreement, approval or external verification.\n" +
             "Use the Document surface for the retained record and the blackboard for downstream observations."), x = 20.0, y = 480.0),
     ], s_[
-        LcncWire("source", "value", "curate", "source?"),
+        LcncWire("source", "value", "retained-source", "source?"),
+        LcncWire("retained-source", "source", "curate", "source?"),
         LcncWire("curate", "sheet", "evidence", "board"),
         LcncWire("curate", "sheets", "evidence", "byStatus?"),
         LcncWire("curate", "record", "record", "x"),
         LcncWire("curate", "ruleCandidates", "candidates", "x"),
-        LcncWire("curate", "ruleCandidates", "simulation", "rules?"),
+        LcncWire("curate", "ruleCandidates", "rules", "rules"),
+        LcncWire("rules-in", "value", "rules-out", "value"),
+        LcncWire("rules", "returns", "rule-values", "x"),
+        LcncWire("rule-values", "y", "simulation", "rules?"),
         LcncWire("assumptions", "value", "simulation", "assertions?"),
         LcncWire("simulation", "firings", "firings", "x"),
     ], view = LcncView(x = 20.0, y = 20.0, zoom = 0.55)))

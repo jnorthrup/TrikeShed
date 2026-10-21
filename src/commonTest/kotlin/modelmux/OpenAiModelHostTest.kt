@@ -114,13 +114,15 @@ class OpenAiModelHostTest {
         })
         try {
             val host = OpenAiModelHost(local())
-            for (upstream in s_[400, 429, 503].view) {
+            for (upstream in s_[202, 400, 429, 503].view) {
                 status = upstream
                 val response = withContext(htx) {
                     host.handle(request("""{"model":"host/fixture","messages":[]}"""))!!
                 }
                 assertEquals(upstream, response.status)
                 assertFalse(response.body.toArray().decodeToString().contains("operator-secret"))
+                if (upstream == 202) assertEquals("model_pending",
+                    confixDoc(response.body.toArray(), Syntax.JSON).value("error", "type"))
                 if (upstream == 429) assertEquals("rate_limit_error",
                     confixDoc(response.body.toArray(), Syntax.JSON).value("error", "type"))
             }

@@ -84,6 +84,8 @@ open class BrainClient(
     private val modelMux: ModelMux? = null,
     /** Quota legion for the internal mux — the daemon passes its ledger-fed legion so every mux meters one pool. */
     private val quotaLegion: modelmux.QuotaLegion? = null,
+    /** Operator-imported endpoints participate in the same failover loop as the built-in roster. */
+    endpointSpecs: List<EndpointSpec>? = null,
 ) {
     /** Outer timeout for the entire multi-provider failover loop. */
     companion object {
@@ -202,9 +204,16 @@ open class BrainClient(
          * provider's environment aliases, alongside the per-model bindings in [buildKeyMux].
          */
         val provider: String? = providerTagFor(envVar),
+        // Published native context ceilings; endpoint overrides can supply a smaller limit.
+        // https://build.nvidia.com/poolside/laguna-xs-2.1/modelcard
+        // https://docs.nvidia.com/nim/large-language-models/2.0.6/day-0/get-started-nemotron-3-ultra.html#context-length
+        val contextWindow: Int = if (base.trimEnd('/') == "https://integrate.api.nvidia.com/v1") when (model) {
+            "poolside/laguna-xs-2.1", "nvidia/nemotron-3-ultra-550b-a55b" -> 262_144
+            else -> 0
+        } else 0,
     )
 
-    private val endpoints: List<EndpointSpec> = when {
+    private val endpoints: List<EndpointSpec> = endpointSpecs ?: when {
         apiKey != null -> listOf(EndpointSpec("override", "BRAIN_OVERRIDE", base, model))
         // External keyMux: the full roster is admitted (env-present providers
         // first) — per-call KeyMux resolution decides key presence.
@@ -223,6 +232,7 @@ open class BrainClient(
             model(
                 id = endpoint.model, caps = setOf("chat", "conflict-resolve"), baseUrl = endpoint.base,
                 provider = endpoint.provider,
+                contextWindow = endpoint.contextWindow,
             )
         }
     }

@@ -7,7 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
-/** The ledger walked back: proven limit = the biggest day, spent = today's rows, both charged in the standings. */
+/** Historical usage is imported for observation and never promoted into an admission ceiling. */
 class QuotaLegionLedgerTest {
     private val day = QuotaLegion.DAY_MS
     private val now = 20L * day + 6 * 3_600_000L // some day, 06:00
@@ -42,19 +42,29 @@ class QuotaLegionLedgerTest {
             return (0 until s.size).map { s[it] }.first { it.provider == provider }
         }
         val zai = row(now, "zai"); val nvidia = row(now, "nvidia"); val groq = row(now, "groq")
-        assertEquals(1_255_094L, zai.limit); assertEquals(774_000L, zai.spent); assertTrue(zai.isUsable)
-        assertEquals(481_094L, zai.remaining, "remaining is proven minus what Hermes already burned today")
-        assertEquals(0L, nvidia.spent); assertEquals(415_051L, nvidia.limit)
+        assertEquals(0L, zai.limit); assertEquals(774_000L, zai.spent); assertTrue(zai.isUsable)
+        assertEquals(Long.MAX_VALUE, zai.remaining, "usage history does not reveal remaining capacity")
+        assertEquals(0L, nvidia.spent); assertEquals(0L, nvidia.limit)
         assertEquals(0L, groq.limit, "a provider the ledger never reached stays unmetered"); assertTrue(groq.isUsable)
 
         // This process's own receipt lands on top of the ledger's charge.
         legion.applyReceipt("llm.zai.key", "zai", receipt(inTok = 400_000, outTok = 90_000), now)
         val zai2 = row(now, "zai")
-        assertEquals(1_264_000L, zai2.spent); assertFalse(zai2.isUsable, "over the proven day: benched until the window rolls")
+        assertEquals(1_264_000L, zai2.spent); assertTrue(zai2.isUsable, "capacity stays available until HTTP evidence says otherwise")
 
         // Tomorrow the ledger's charge has expired and only fresh receipts count.
         val zai3 = row(now + day, "zai")
         assertEquals(0L, zai3.spent); assertTrue(zai3.isUsable)
+    }
+
+    @Test
+    fun ledgerOnlyProvidersNeverBecomeDispatchableKeys() {
+        val legion = QuotaLegion.fromLedger(rows, now)
+        val reactor = borg.trikeshed.userspace.reactor.MuxReactorElement()
+        assertEquals(null, legion.nextKey(reactor.flowState.value, now))
+        assertTrue(legion.standings(reactor.flowState.value, now).let { standings ->
+            (0 until standings.size).all { !standings[it].dispatchable }
+        })
     }
 
     private fun receipt(inTok: Int, outTok: Int) = borg.trikeshed.modelmux.ModelResponseReceipt(

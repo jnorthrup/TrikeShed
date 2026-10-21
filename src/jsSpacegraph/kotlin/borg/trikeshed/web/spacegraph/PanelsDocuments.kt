@@ -4,6 +4,362 @@ import borg.trikeshed.web.*
 import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
+// Credentials live only in this tab's memory, never in graph JSON, receipts or browser storage.
+private var documentReviewCredential: String? = null
+
+private suspend fun reviewRequest(path: String, body: dynamic = null, authenticated: Boolean = false): dynamic {
+    val init = objOf {
+        it.method = if (body == null) "GET" else "POST"
+        it.headers = objOf { headers ->
+            if (body != null) headers["Content-Type"] = "application/json"
+            if (authenticated) headers.Authorization = "Bearer " +
+                (documentReviewCredential ?: error("Authenticate a reviewer first"))
+        }
+        if (body != null) it.body = JSON.stringify(body)
+    }
+    val response = fetchJs("/api/documents/review" + path, init)
+    val result = JSON.parse<dynamic>(PatchRead.text(response))
+    require(truthy(response.ok)) { str(result?.detail ?: result?.error ?: "Review request failed") }
+    return result
+}
+
+private fun Panels.documentReviewPane(target: dynamic) {
+    val pane = target.closest(".result") ?: return
+    if (pane.classList.contains("document-review-result") == true) return
+    pane.classList.add("document-review-result")
+    page.on(pane, "wheel", { event -> event.stopPropagation() }, objOf { it.passive = true })
+    var observer: dynamic = null
+    var forget: (() -> Unit)? = null
+    observer = jsNew(js("ResizeObserver"), { _: dynamic ->
+        if (page.closing || !truthy(pane.isConnected)) { observer.disconnect(); forget?.invoke() }
+        else {
+            val owner = nodes().firstOrNull { it.el === pane.parentElement }
+            if (owner != null) growRingWorldFor(owner)
+            resolveTopLevelOverlaps()
+            redraw()
+        }
+    })
+    forget = page.own { observer.disconnect() }
+    observer.observe(pane)
+}
+
+/** A decision acts on the displayed immutable snapshot and revision, not on editable canvas values. */
+private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, current: () -> Boolean) {
+    documentReviewPane(target)
+    var review = initial
+    var generation = 0
+    val box = document.createElement("section").asDynamic()
+    box.className = "document-review"
+    target.appendChild(box)
+    fun render() {
+        val rendered = ++generation
+        fun present() = current() && truthy(box.isConnected) && generation == rendered
+        box.textContent = ""
+        val title = document.createElement("h4")
+        title.textContent = "Analyst review · " + str(review.state) + " · revision " + str(review.revision)
+        box.appendChild(title)
+        val details = document.createElement("details")
+        val detailTitle = document.createElement("summary")
+        detailTitle.textContent = "Frozen source, ontology and evidence"
+        details.appendChild(detailTitle); box.appendChild(details)
+        val evidence = document.createElement("pre")
+        evidence.textContent = JSON.stringify(review.snapshot, null, 2)
+        evidence.asDynamic().style.cssText = "white-space:pre-wrap;max-height:320px;overflow:auto"
+        details.appendChild(evidence)
+        if (review.sourceCurrent == true && isArray(review.snapshot?.selections)) {
+            val subset = document.createElement("details").asDynamic()
+            val summary = document.createElement("summary")
+            summary.textContent = "Choose a smaller evidence selection"
+            subset.appendChild(summary); box.appendChild(subset)
+            documentSnapshotAction(subset, str(review.snapshot.kind), str(review.snapshot.curationReceiptCid),
+                arr(review.snapshot.selections), ::present) { frozen -> review = frozen; render() }
+        }
+        val identity = document.createElement("p")
+        identity.textContent = if (review.synthetic == true) "Synthetic validation decision by " + str(review.reviewer)
+            else if (typeOf(review.reviewer) == "string") "Decision by " + str(review.reviewer) else "No authenticated decision yet."
+        box.appendChild(identity)
+        val credential = document.createElement("input").asDynamic()
+        credential.type = "password"; credential.autocomplete = "off"
+        credential.placeholder = "Reviewer credential"
+        credential.setAttribute("aria-label", "Reviewer credential")
+        box.appendChild(credential)
+        val note = document.createElement("textarea").asDynamic()
+        note.placeholder = "Decision note or correction reason"; note.maxLength = 4096
+        note.setAttribute("aria-label", "Review decision note")
+        note.style.cssText = "display:block;width:100%;margin:8px 0"
+        box.appendChild(note)
+        fun button(label: String, operation: suspend () -> Unit) {
+            val button = document.createElement("button").asDynamic()
+            button.textContent = label; box.appendChild(button)
+            on(button, "click", { event ->
+                event.stopPropagation(); button.disabled = true
+                launchJs {
+                    try { require(present()) { "The source result or review changed; reopen its current review" }; operation() }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: dynamic) { status("Review: " + failureText(error)) }
+                    finally { button.disabled = false }
+                }
+            })
+        }
+        button("Authenticate reviewer") {
+            val supplied = str(credential.value).trim()
+            if (supplied.isNotEmpty()) documentReviewCredential = supplied
+            credential.value = ""
+            val session = reviewRequest("/session", authenticated = true)
+            require(present()) { "The review changed while authenticating; reopen it" }
+            identity.textContent = (if (session.synthetic == true) "Synthetic validation reviewer: " else "Authenticated reviewer: ") + str(session.reviewer)
+        }
+        button("Forget credential") {
+            documentReviewCredential = null; credential.value = ""
+            identity.textContent = "Reviewer credential removed from this tab."
+        }
+        button("Refresh review") {
+            val refreshed = reviewRequest("?snapshotCid=" + encodeURIComponent(str(review.snapshotCid)))
+            require(present()) { "The source result changed while reading the review" }
+            review = refreshed
+            render()
+        }
+        for ((label, action) in arrayOf("Save draft" to "draft", "Approve exact selection" to "approve",
+            "Reject selection" to "reject", "Correct / withdraw approval" to "correct")) {
+            button(label) {
+                require(review.current == true) { "This review is stale; create a snapshot from current evidence" }
+                val request = objOf {
+                    it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision
+                    it.action = action; it.note = str(note.value)
+                }
+                val decided = reviewRequest("/decision", request, authenticated = true)
+                require(present()) { "Decision retained, but this result changed; reopen the review before continuing" }
+                review = decided
+                render()
+                status(if (action == "correct") "Approval withdrawn. Correct the source and curate a new snapshot before approval."
+                    else "Review " + action + " retained at revision " + str(review.revision))
+            }
+        }
+        if (review.state == "approve" && review.current == true) {
+            val reference = objOf {
+                it.snapshotCid = review.snapshotCid; it.approvalCid = review.decisionCid; it.expectedRevision = review.revision
+            }
+            val receipt = document.createElement("pre")
+            receipt.textContent = JSON.stringify(reference, null, 2)
+            receipt.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
+            box.appendChild(receipt)
+            val instruction = document.createElement("p")
+            instruction.textContent = "Put this reference in the workflow's approvals array, then run export. Export issues and consumes its own one-use permit."
+            box.appendChild(instruction)
+            for ((label, value) in arrayOf("Copy approval reference" to JSON.stringify(reference),
+                "Copy approvals array" to JSON.stringify(arrayOf(reference)))) {
+                val copy = document.createElement("button").asDynamic(); copy.textContent = label; box.appendChild(copy)
+                on(copy, "click", { event ->
+                    event.stopPropagation()
+                    if (present()) copyText(value) else status("Review changed; refresh before copying approval references.")
+                })
+            }
+        }
+        if (review.current != true) {
+            val warning = document.createElement("p")
+            warning.textContent = "This snapshot or source is no longer current. Decisions and release are refused."
+            box.appendChild(warning)
+        }
+    }
+    render()
+}
+
+private fun Panels.documentSourceActions(target: dynamic, selection: dynamic, current: () -> Boolean) {
+    val value = selection.value ?: selection
+    val quotation = value.quotation ?: value.sourceEvidence ?: selection.quotation ?: return
+    val source = document.createElement("div").asDynamic()
+    source.style.cssText = "margin:4px 0 12px 24px;overflow-wrap:anywhere"
+    target.appendChild(source)
+    val anchors = if (isArray(quotation.anchors)) arr(quotation.anchors) else emptyArray()
+    fun physicalPage(value: dynamic): Int? = if (typeOf(value) == "number" && num(value).isFinite() &&
+        num(value) >= 1 && num(value) % 1.0 == 0.0) num(value).toInt() else null
+    val firstPage = physicalPage(quotation.page) ?: anchors.firstNotNullOfOrNull { physicalPage(it.page) }
+    val description = document.createElement("p")
+    val span = if (typeOf(quotation.begin) == "number" && typeOf(quotation.end) == "number")
+        " · UTF-16 span " + str(quotation.begin) + "–" + str(quotation.end) else ""
+    description.textContent = str(quotation.category ?: "source") + span +
+        (if (firstPage == null) " · page unresolved" else " · PDF page " + firstPage)
+    source.appendChild(description)
+    for (anchor in anchors) {
+        val fields = arrayOf("page", "folio", "section", "table", "diagram", "coordinates", "coordinateSystem")
+            .filter { anchor[it] != null }.joinToString(" · ") { key ->
+                key + " " + if (isArray(anchor[key])) JSON.stringify(anchor[key]) else str(anchor[key])
+            }
+        if (fields.isNotBlank()) {
+            val detail = document.createElement("div"); detail.textContent = fields; source.appendChild(detail)
+        }
+    }
+    fun link(label: String, href: String, download: Boolean = false) {
+        val link = document.createElement("a").asDynamic()
+        link.textContent = label; link.href = href; link.target = "_blank"; link.rel = "noopener noreferrer"
+        link.style.cssText = "display:inline-block;margin:4px 12px 0 0;color:var(--wire)"
+        if (download) link.download = ""
+        on(link, "click", { event ->
+            event.stopPropagation()
+            if (!current()) { event.preventDefault(); status("Source result changed; reopen its retained evidence.") }
+        })
+        source.appendChild(link)
+    }
+    val provenance = quotation.provenance
+    for (url in arrayOf(provenance?.requestedUrl, provenance?.finalUrl).filter { typeOf(it) == "string" }
+        .map { str(it).trim() }.distinct().filter { Regex("^https?://", RegexOption.IGNORE_CASE).containsMatchIn(it) })
+        link("Source URL", url)
+    val cid = str(quotation.originalCid)
+    if (!Regex("^sha256:[0-9a-f]{64}$").matches(cid)) return
+    val path = "/api/v0/block/get?arg=" + encodeURIComponent(cid)
+    link("Download retained original", path, download = true)
+    val extracted = str(quotation.extractedTextCid)
+    if (extracted != cid && Regex("^sha256:[0-9a-f]{64}$").matches(extracted))
+        link("Download extracted text", "/api/v0/block/get?arg=" + encodeURIComponent(extracted), download = true)
+    val load = document.createElement("button").asDynamic()
+    load.textContent = "Load retained original"; source.appendChild(load)
+    on(load, "click", { event ->
+        event.stopPropagation(); load.disabled = true
+        launchJs {
+            try {
+                require(current()) { "Source result changed; reopen its retained evidence" }
+                val response = fetchJs(path)
+                require(truthy(response.ok)) { "Retained original could not be read" }
+                val bytes = PatchRead.bytes(response, 64 * 1024 * 1024)
+                val digest = awaitJs(js("crypto.subtle.digest('SHA-256', bytes)"))
+                val actual: String = "sha256:" + js("Array.from(new Uint8Array(digest), function(b){return b.toString(16).padStart(2,'0')}).join('')")
+                require(actual == cid) { "Retained original content identity mismatch" }
+                require(current() && truthy(source.isConnected)) { "Source result changed while reading its original" }
+                val pdf = num(bytes.length) >= 5 && num(bytes[0]) == 37.0 && num(bytes[1]) == 80.0 &&
+                    num(bytes[2]) == 68.0 && num(bytes[3]) == 70.0 && num(bytes[4]) == 45.0
+                val mime = if (pdf) "application/pdf" else if (cid == extracted) "text/plain;charset=utf-8" else "application/octet-stream"
+                val blob = js("new Blob([bytes], {type:mime})")
+                val url: String = js("URL").createObjectURL(blob)
+                page.own { js("URL").revokeObjectURL(url) }
+                link(if (pdf && firstPage != null) "Open retained PDF · page " + firstPage else "Open retained original",
+                    url + if (pdf && firstPage != null) "#page=" + firstPage else "")
+                load.hidden = true
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: dynamic) { status("Retained source: " + failureText(error)) }
+            finally { load.disabled = false }
+        }
+    })
+}
+
+/** Only identifiers are submitted; the server resolves tuples and quotations from the retained receipt. */
+private fun Panels.documentSnapshotAction(target: dynamic, kind: String, receiptCid: String,
+    selections: Array<dynamic>, current: () -> Boolean, frozen: ((dynamic) -> Unit)? = null) {
+    if (selections.isEmpty()) return
+    documentReviewPane(target)
+    val box = document.createElement("section").asDynamic()
+    target.appendChild(box)
+    val title = document.createElement("h4"); title.textContent = "Choose material for analyst review"; box.appendChild(title)
+    val entries = document.createElement("div").asDynamic()
+    entries.className = "document-review-choices"
+    entries.style.cssText = "max-height:320px;overflow:auto"
+    box.appendChild(entries)
+    val choices = selections.map { selection ->
+        val label = document.createElement("label").asDynamic()
+        label.style.cssText = "display:flex;align-items:flex-start;gap:8px;margin:6px 0"
+        val input = document.createElement("input").asDynamic(); input.type = "checkbox"
+        label.appendChild(input)
+        val caption = document.createElement("span")
+        val value = selection.value ?: selection
+        val relation = arrayOf(value.subject, value.predicate, value.`object`).filter { it != null }.joinToString(" ") { str(it) }
+        val mapping = value.ontologyMapping?.status
+        val classes = if (isArray(value.ontologyMapping?.classes)) arr(value.ontologyMapping.classes).joinToString(", ") { str(it) } else ""
+        caption.textContent = str(selection.label ?: relation.takeIf { it.isNotBlank() } ?: selection.id) +
+            (if (mapping == null) "" else " [" + str(mapping) + (if (classes.isBlank()) "" else ": " + classes) + "]") +
+            " · " + str(selection.quotation?.quote ?: value.quotation?.quote ?: value.sourceEvidence?.quote ?: selection.quote ?: "")
+        label.appendChild(caption); entries.appendChild(label)
+        documentSourceActions(entries, selection, current)
+        str(selection.id) to input
+    }
+    val button = document.createElement("button").asDynamic()
+    button.textContent = "Freeze selected evidence for review"; box.appendChild(button)
+    on(button, "click", { event ->
+        event.stopPropagation(); button.disabled = true
+        launchJs {
+            try {
+                require(current()) { "The source result changed; use its current receipt" }
+                val selected = choices.filter { it.second.checked == true }.map { it.first }
+                require(selected.isNotEmpty()) { "Select at least one relationship or rule" }
+                val review = reviewRequest("/snapshot", objOf {
+                    it.kind = kind; it.receiptCid = receiptCid; it.selection = selected.toTypedArray()
+                })
+                require(current()) { "The source result changed while retaining the snapshot; reopen its review" }
+                if (frozen != null) frozen(review) else documentReviewActions(target, review, current)
+                status("Exact evidence selection retained for analyst review.")
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: dynamic) { status("Review snapshot: " + failureText(error)) }
+            finally { button.disabled = false }
+        }
+    })
+}
+
+/** Composite results carry identifiers only; inspection resolves their authoritative snapshots on demand. */
+fun Panels.appendDocumentReviewReferences(n: dynamic, out: dynamic, canvasCurrent: () -> Boolean) {
+    val target = n.el.querySelector(".result") ?: return
+    if (target.querySelector(".document-review") != null || target.querySelector(".document-review-references") != null) return
+    val ids = linkedSetOf<String>()
+    val retained = linkedSetOf<String>()
+    var visited = 0
+    fun collect(value: dynamic, depth: Int) {
+        if (++visited > 4096 || depth > 8 || value == null || typeOf(value) != "object") return
+        if (isArray(value)) { for (item in arr(value)) collect(item, depth + 1); return }
+        if (value.previewOnly == true && typeOf(value.retainedCid) == "string" &&
+            Regex("^sha256:[0-9a-f]{64}$").matches(str(value.retainedCid))) retained.add(str(value.retainedCid))
+        val cid = value.snapshotCid
+        if (typeOf(cid) == "string" && Regex("^sha256:[0-9a-f]{64}$").matches(str(cid))) ids.add(str(cid))
+        if (isArray(cid)) for (item in arr(cid))
+            if (typeOf(item) == "string" && Regex("^sha256:[0-9a-f]{64}$").matches(str(item))) ids.add(str(item))
+        for (key in keysOf(value)) if (key != "snapshot" && key != "history" && key != "selections") collect(value[key], depth + 1)
+    }
+    collect(out, 0)
+    if (ids.isEmpty() && retained.isEmpty()) return
+    val box = document.createElement("section").asDynamic(); box.className = "document-review-references"
+    target.appendChild(box)
+    val current = { canvasCurrent() && n._lastOut === out && truthy(n.el.isConnected) && truthy(box.isConnected) }
+    val rendered = mutableSetOf<String>()
+    fun renderReferences() { for (cid in ids) {
+        if (!rendered.add(cid)) continue
+        val entry = document.createElement("section").asDynamic(); box.appendChild(entry)
+        val button = document.createElement("button").asDynamic()
+        button.textContent = "Inspect retained review · " + cid.take(23) + "…"; entry.appendChild(button)
+        val content = document.createElement("div").asDynamic(); entry.appendChild(content)
+        on(button, "click", { event ->
+            event.stopPropagation(); button.disabled = true
+            launchJs {
+                try {
+                    require(current()) { "The source result changed; use its current review references" }
+                    val review = reviewRequest("?snapshotCid=" + encodeURIComponent(cid))
+                    require(current() && review.snapshotCid == cid) { "The source result changed while reading the review" }
+                    content.textContent = ""
+                    documentReviewActions(content, review, current)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: dynamic) { status("Review inspection: " + failureText(error)) }
+                finally { button.disabled = false }
+            }
+        })
+    } }
+    renderReferences()
+    for (cid in retained) {
+        val button = document.createElement("button").asDynamic()
+        button.textContent = "Load review references from retained output"; box.appendChild(button)
+        on(button, "click", { event ->
+            event.stopPropagation(); button.disabled = true
+            launchJs {
+                try {
+                    require(current()) { "The source result changed; use its current output" }
+                    val response = fetchJs("/api/v0/block/get?arg=" + encodeURIComponent(cid))
+                    require(truthy(response.ok)) { "Retained output could not be read" }
+                    val value = JSON.parse<dynamic>(PatchRead.text(response))
+                    require(current()) { "The source result changed while reading retained output" }
+                    visited = 0; collect(value, 0); renderReferences()
+                    if (ids.isEmpty()) status("This retained output contains no review snapshot references.")
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: dynamic) { status("Retained review: " + failureText(error)) }
+                finally { button.disabled = false }
+            }
+        })
+    }
+}
+
 /** Resolve a saved task at load time; execution still requires the ordinary explicit Run action. */
 suspend fun Panels.loadDocumentTask(taskId: String): Boolean {
     require(taskId.isNotBlank()) { "A document task identity is required" }
@@ -129,6 +485,13 @@ fun Panels.documentRulePageActions(target: dynamic, page: dynamic, current: () -
 fun Panels.renderDocumentReview(n: dynamic, out: dynamic) {
     setResult(n, out)
     val target = n.el.querySelector(".result") ?: return
+    val current = { n._lastOut === out && truthy(n.el.isConnected) }
+    if (typeOf(out.snapshotCid) == "string" && out.snapshot != null && typeOf(out.revision) == "number")
+        documentReviewActions(target, out, current)
+    if (n.type in arrayOf("book.curate", "book.snapshot") && typeOf(out.curationReceiptCid) == "string")
+        documentSnapshotAction(target, "book", str(out.curationReceiptCid), arr(out.relationships), current)
+    if (n.type == "document.curate" && typeOf(out.receiptCid) == "string" && isArray(out.reviewSelections))
+        documentSnapshotAction(target, "document", str(out.receiptCid), arr(out.reviewSelections), current)
     fun action(label: String, preset: String, configure: (dynamic) -> Unit) =
         documentConstructionAction(target, label, preset, { n._lastOut === out && truthy(n.el.isConnected) }, configure = configure)
     if (n.type == "document.curate" && typeOf(out.receiptCid) == "string") {

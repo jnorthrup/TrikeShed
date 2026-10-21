@@ -5,6 +5,7 @@ import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobCommand
+import borg.trikeshed.lib.*
 
 /**
  * BoardFactElement — the committed board → Rete working-memory bridge, with
@@ -53,6 +54,9 @@ class BoardFactElement(
             "revision" to ev.snapshot.revision,
             "lastSequence" to ev.sequence,
             "lastMoveMs" to ev.lastMoveMs,
+            "priority" to ev.priority,
+            "order" to ev.order,
+            "strikes" to ev.strikes,
             // Delta (reaper): the owner rides the fact so a production can tell the
             // brain's claimed work (`claim:*`) from a human's. This element is the
             // one author of the card fact; nothing else adds a field to it.
@@ -71,6 +75,15 @@ class BoardFactElement(
         }
         if (known.add(jobId)) rete.assert(factId, fields, ev.cid, board)
         else rete.modify(factId, fields, ev.cid)
+        if (ev.ordering.isNotEmpty()) {
+            for (fact in rete.query(board, "kind" j "card").view) {
+                if (fact.factId.b == jobId) continue
+                val order = ev.ordering[fact.factId.b] ?: continue
+                if ((fact.fields["order"] as? Number)?.toInt() == order) continue
+                sequences[fact.factId.b] = ev.sequence
+                rete.modify(fact.factId, fact.fields + ("order" to order), ev.cid)
+            }
+        }
     }
 
     /** Coarse clock pulse: modify the single now-fact; stall evaluation follows through ordinary matching. */

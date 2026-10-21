@@ -84,7 +84,7 @@ private fun <C, K> Series<C>.rankedBy(key: (C) -> K, cmp: Comparator<K>): Series
  */
 private fun costComparator(tiebreak: Comparator<ModelCatalogEntry>?): Comparator<ModelCatalogEntry> =
     Comparator { x: ModelCatalogEntry, y: ModelCatalogEntry ->
-        val byUsable = (y.quotaRemaining > 0).compareTo(x.quotaRemaining > 0)
+        val byUsable = y.quotaAvailable.compareTo(x.quotaAvailable)
         if (byUsable != 0) return@Comparator byUsable
         val byTier = y.freeTier.compareTo(x.freeTier)
         if (byTier != 0) return@Comparator byTier
@@ -126,7 +126,8 @@ class WeightedStrategy<C, H>(private val lens: EntryLens<C>) : RoutingStrategy<C
 
     /** Quota is the numerator, so an exhausted candidate scores zero and sinks on its own. */
     private fun score(c: C): Double = lens(c).let { e ->
-        e.quotaRemaining.toDouble() / (1.0 + e.latencyEstimateMs / 1000.0)
+        (if (e.quotaRemaining < 0) 1.0 else e.quotaRemaining.toDouble()) /
+            (1.0 + e.latencyEstimateMs.coerceAtLeast(0) / 1000.0)
     }
 }
 

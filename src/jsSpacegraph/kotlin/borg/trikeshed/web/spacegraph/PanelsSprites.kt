@@ -112,7 +112,7 @@ class PanelsSprites(val panels: Panels) {
 
         try {
             val frozen = program()
-            val contracts = LcncContracts.all().associateBy { it.type }
+            val contracts = panels.portContracts
             val resolve = panels.portKindResolver(frozen)
             val contract = contracts[str(node.type)]
             val ports = section("Mating surfaces", "data-sprite-ports")

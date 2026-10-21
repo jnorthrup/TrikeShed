@@ -115,7 +115,7 @@ suspend fun ModelMux.swarm(
     }
 }
 
-/** Only the environment's breadcrumb tool is executed here; other tools stay with their caller. */
+/** Only the environment's breadcrumb tools are executed here; other tools stay with their caller. */
 private suspend fun ModelMux.agentCompletion(
     agent: MuxAgentRequest,
     breadcrumbs: BreadcrumbElement,
@@ -178,7 +178,7 @@ private suspend fun ModelMux.agentCompletion(
         }
         val calls = message.step("tool_calls", response.src)?.kids ?: return result
         if (calls.size == 0 || calls.view.any {
-                it.getAt("function", "name", src = response.src)?.reify(response.src) != TOOL_BREADCRUMB
+                it.getAt("function", "name", src = response.src)?.reify(response.src) !in BREADCRUMB_TOOLS_NAMES
             }) return result
         if (turn + 1 == agent.maxTurns) return Result.failure(IllegalStateException("Agent turn limit reached"))
         val toolResults = calls α { call ->
@@ -186,20 +186,33 @@ private suspend fun ModelMux.agentCompletion(
                 ?: throw IllegalArgumentException("Breadcrumb tool call identity required")
             val arguments = call.getAt("function", "arguments", src = response.src)?.reify(response.src) as? String
                 ?: throw IllegalArgumentException("Breadcrumb tool arguments required")
-            id j arguments
+            val tool = call.getAt("function", "name", src = response.src)?.reify(response.src) as String
+            id j (tool j arguments)
         }
         val messages = requireNotNull(input.getAt("messages")).kids
         val history = buildString {
             append('[')
             for (messageRow in messages.view) append(BreadcrumbModelHost.raw(input, messageRow)).append(',')
             append(BreadcrumbModelHost.raw(response, message))
-            for ((id, arguments) in toolResults.view) {
+            val ceiling = contextWindow(model)?.takeIf { it > 0 } ?: 2048
+            val outputReserve = (input.value("max_tokens") as? Number)?.toInt()?.coerceAtLeast(1) ?: 256
+            val additionalChars = BreadcrumbModelHost.raw(response, message).length.toLong() +
+                (input.getAt("tools")?.let { it.close - it.open + 1 } ?: 0) +
+                BREADCRUMB_TOOL_DEFINITIONS.length + 3
+            val currentTokens = (BreadcrumbModelHost.tokens(input) + (additionalChars + 3) / 4)
+                .coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            var toolChars = 0
+            for ((id, invocation) in toolResults.view) {
+                val (tool, arguments) = invocation
                 val args = reifyStrict(arguments) as? Map<*, *>
                     ?: throw IllegalArgumentException("Breadcrumb arguments must be an object")
                 val content = breadcrumbs.transact(agent.contextId) {
-                    BreadcrumbToolDispatcher(it).dispatch(TOOL_BREADCRUMB,
+                    BreadcrumbToolDispatcher(it, BreadcrumbBudget(ceiling, currentTokens =
+                        (currentTokens.toLong() + (toolChars + 3) / 4).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+                        outputTokens = outputReserve)).dispatch(tool,
                         args.entries.associate { entry -> entry.key.toString() to entry.value.toString() })!!.also { _ -> it.state() }
                 }
+                toolChars += content.length + 100
                 append(',').append(jsonOf(mapOf("role" to "tool", "tool_call_id" to id, "content" to content)))
             }
             append(']')

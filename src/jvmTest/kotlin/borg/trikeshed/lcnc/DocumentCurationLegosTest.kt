@@ -20,6 +20,7 @@ import borg.trikeshed.narsese.DocumentCuratorCodec
 import borg.trikeshed.narsese.DocumentCurationRecord
 import borg.trikeshed.narsese.DocumentCuratorElement
 import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentAnchor
 import borg.trikeshed.narsese.DocumentProposal
 import borg.trikeshed.lib.s_
 import borg.trikeshed.nlp.NlpDependency
@@ -186,11 +187,12 @@ class DocumentCurationLegosTest {
     }
 
     @Test
-    fun retainedDocumentReferencesKeepLargeNlpOutOfLcncReporting() {
+    fun retainedDocumentReferencesKeepNlpAndLayoutOutOfLcncReporting() {
         val text = "Kotlin ".repeat(1_000).trimEnd()
         val original = ContentId.of("original document bytes".encodeToByteArray())
         val source = DocumentSource(original, ContentId.of(text.encodeToByteArray()), text,
-            "synthetic.txt", "text/plain", "large-document")
+            "synthetic.txt", "text/plain", "large-document",
+            anchors = (0 until 1_000).map { i -> DocumentAnchor(i * 7, i * 7 + 6, page = i / 100 + 1) })
         var tokenReads = 0
         val nlp = NlpDocument(text, listOf(NlpSentence(0, 0, text.length,
             1_000 j { i -> tokenReads++; NlpToken(i + 1, i * 7, i * 7 + 6, "Kotlin", "Kotlin", "NN", "O") },
@@ -348,7 +350,7 @@ class DocumentCurationLegosTest {
                 }, session.model, "fixture", cas, log, bag)
             try {
                 val program = LcncProgram("canvas-document", listOf(
-                    LcncNode("source", "scope.in", mapOf("name" to "source", "kind" to "json")),
+                    LcncNode("source", "scope.in", mapOf("name" to "source", "kind" to "DocumentSource")),
                     LcncNode("instructions", "scope.in", mapOf("name" to "instructions", "kind" to "text")),
                     LcncNode("curate", DocumentCurationLegos.CURATE, mapOf("instructions" to "Node parameter must yield to the wired recipe")),
                     LcncNode("receipt", "scope.out", mapOf("name" to "receiptCid", "kind" to "id")),
@@ -357,7 +359,8 @@ class DocumentCurationLegosTest {
                     LcncWire("instructions", "value", "curate", "instructions?"),
                     LcncWire("curate", "receiptCid", "receipt", "value"),
                 ).toSeries())
-                assertTrue(LcncTypeCheck.check(program).isEmpty())
+                val violations = LcncTypeCheck.check(program)
+                assertTrue(violations.isEmpty(), violations.joinToString("\n") { it.render() })
                 val runner = DocumentCurationLegos.curate(curator, DocumentCurationLegos::reference)
                 val result = LcncRunner(mapOf(DocumentCurationLegos.CURATE to runner))
                     .runProcedure(program, mapOf("source" to DocumentCuratorCodec.source(source), "instructions" to instructions))

@@ -74,6 +74,18 @@ object MuxPage {
     private var detailShell: dynamic = null
     private var quotaAt: dynamic = null
     private val htmlCache = HashMap<Element, String>()
+    var reel: dynamic = null
+    var reelDefaults = false
+    var reelSubmitting = false
+    var reelVoteSubmitting = false
+    var reelSheets: dynamic = null
+    var reelSheetId: String? = null
+    var reelBoardKey: String? = null
+    var reelHistoryId: String? = null
+    var breadcrumbIndex: dynamic = null
+    var breadcrumbIndexRecall: dynamic = null
+    var breadcrumbIndexContext: String? = null
+    var breadcrumbIndexBusy = false
 
     private fun q(s: String): HTMLElement? = document.querySelector(s) as HTMLElement?
     private fun qq(s: String): HTMLElement = document.querySelector(s) as HTMLElement
@@ -211,6 +223,8 @@ object MuxPage {
         sources.add(Triple("Activity", "/api/mux/activity") { r -> calls = if (truthy(r.calls)) r.calls else js("[]") })
         sources.add(Triple("Sessions", "/api/mux/sessions") { r -> sessions = if (truthy(r.sessions)) r.sessions else js("[]") })
         sources.add(Triple("Quota", "/api/mux/standings") { r -> standings = if (truthy(r.standings)) r.standings else js("[]"); quotaAt = r.atMs })
+        if (page == "models") sources.add(Triple("Evolution reel",
+            "/api/mux/reel" + (reelHistoryId?.let { "?runId=" + reelUrl(it) } ?: "")) { r -> reel = r })
         if (page != "stats") {
             sources.add(Triple("Model contexts", "/v1/breadcrumbs") { r ->
                 breadcrumbContexts = if (truthy(r.contexts)) r.contexts else js("[]")
@@ -730,11 +744,239 @@ object MuxPage {
         }
     }
 
+    fun reelUrl(value: dynamic): String = js("encodeURIComponent")(strOrEmpty(value)) as String
+
+    fun renderBreadcrumbIndex() {
+        if (breadcrumbIndexContext != selectedContext()) {
+            breadcrumbIndex = null; breadcrumbIndexRecall = null
+        }
+        val index: dynamic = breadcrumbIndex
+        html("#breadcrumbIndexResults", if (index == null) "" else
+            "<p class=\"muted\">${count(index.total)} matches${if (num(index.omitted) > 0) " · ${count(index.omitted)} omitted" else ""}</p>" +
+                "<ol class=\"breadcrumb-index-results\">" + list(index.matches).joinToString("") { row ->
+                    "<li><header><span class=\"badge mono\">${esc(row.ref)}</span><strong>${esc(row.title)}</strong>" +
+                        "<button data-action=\"breadcrumb-index-recall\" data-ref=\"${esc(row.ref)}\" data-cid=\"${esc(row.cid)}\">Recall ranges</button></header>" +
+                        "<small>${esc(row.source)}</small><small class=\"mono\">${esc(row.cid)}</small>" +
+                        (if (list(row.children).isEmpty()) "" else "<small>Children: " + list(row.children).joinToString(" · ") {
+                            "<span class=\"mono\" title=\"${esc(it.cid)}\">${esc(it.ref)}</span>"
+                        } + "</small>") + "</li>"
+                } + "</ol>")
+        val recalled: dynamic = breadcrumbIndexRecall
+        html("#breadcrumbIndexRecall", if (recalled == null) "" else
+            "<div class=\"detail-meta\"><strong>${esc(recalled.title)}</strong><span class=\"mono\">${esc(recalled.ref)}</span>" +
+                "<span>${count(recalled.selectedChars)} selected / ${count(recalled.omittedChars)} omitted characters</span>" +
+                "<span>${esc(recalled.rangeUnit)}</span><span>Budget ${count(recalled.budgetChars)}</span></div>" +
+                "<p class=\"reel-measure-note\">${list(recalled.provenance).joinToString(" · ") { esc(it.source) }}</p>" +
+                list(recalled.ranges).joinToString("") { range ->
+                    "<div class=\"breadcrumb-range\"><b>[${esc(range.start)}, ${esc(range.end)})</b>\n${esc(range.content)}</div>"
+                })
+    }
+
+    suspend fun searchBreadcrumbIndex() {
+        val context = selectedContext() ?: return toast("Select a session or context first")
+        if (breadcrumbIndexBusy) return
+        breadcrumbIndexBusy = true
+        try {
+            val query = (qq("#breadcrumbIndexQuery") as HTMLInputElement).value
+            val index = request("/v1/breadcrumbs?context=" + reelUrl(context) + "&view=index&q=" + reelUrl(query))
+            if (selectedContext() == context) {
+                breadcrumbIndex = index; breadcrumbIndexContext = context; breadcrumbIndexRecall = null
+                renderBreadcrumbIndex()
+            }
+        } catch (failure: Throwable) { toast(failure.message ?: "Breadcrumb search failed") }
+        finally { breadcrumbIndexBusy = false }
+    }
+
+    fun reelVoteEligible(run: dynamic, winner: String): Boolean {
+        if (run == null || strOrEmpty(run.status) !in setOf("completed", "partial", "interrupted", "failed")) return false
+        val completed = list(run.lanes).filter {
+            strOrEmpty(it.id) in setOf("full", "main", "micro") && it.status == "completed" &&
+                strOrEmpty(it.output).isNotBlank() && strOrEmpty(it.resultId).isNotBlank()
+        }.map { str(it.id) }.toSet()
+        return if (winner == "tie") completed.size >= 2 else winner in completed
+    }
+
+    fun renderReel() {
+        val config: dynamic = reel?.defaults
+        val run: dynamic = reel?.run
+        qq("#reelLive").textContent = if (live) "Pause updates" else "Resume updates"
+        qq("#reelLive").setAttribute("aria-pressed", live.toString())
+        val modelSelect = qq("#reelMainModel") as HTMLSelectElement
+        val chosen = modelSelect.value
+        val configured = strOrEmpty(config?.mainModel)
+        html(modelSelect, "<option value=\"\">${esc(if (configured.isEmpty()) "Configured main model" else configured + " · configured")}</option>" +
+            list(models).joinToString("") { "<option value=\"${esc(it.model)}\">${esc(it.model)}</option>" })
+        if (list(models).any { it.model == chosen }) modelSelect.value = chosen
+        qq("#reelLocalModel").textContent = if (config == null) "Waiting for configuration" else strOrEmpty(config.summarizerModel)
+        qq("#reelLocalModel").title = strOrEmpty(config?.summarizerUrl)
+        if (!reelDefaults && config != null) {
+            val input = qq("#reelSources") as HTMLTextAreaElement
+            if (input.value.isBlank()) input.value = list(config.sources).joinToString("\n") { str(it) }
+            reelDefaults = true
+        }
+        val history = qq("#reelHistory") as HTMLSelectElement
+        html(history, "<option value=\"\">Latest run</option>" + list(reel?.history).joinToString("") {
+            "<option value=\"${esc(it.id)}\">${esc(date(it.startedAt))} · ${esc(it.id)} · ${esc(it.status)}</option>"
+        })
+        history.value = reelHistoryId ?: ""
+        val agenda = qq("#reelAgenda") as HTMLSelectElement
+        val prior = agenda.value
+        html(agenda, "<option value=\"\">No prior summary</option>" + list(reel?.selections).joinToString("") {
+            "<option value=\"${esc(it.attemptId)}\">${esc(it.runId)} / ${esc(it.lane)} · ${esc(it.concept)} · ${esc(it.correctness)}</option>"
+        })
+        if (list(reel?.selections).any { it.attemptId == prior }) agenda.value = prior
+        val running = truthy(reel?.activeRunId)
+        (qq("#reelRun") as HTMLButtonElement).disabled = reelSubmitting || running || config == null
+        html("#reelStatus", if (run == null) "<span>No archived comparison.</span>" else
+            badge(run.status) + "<span class=\"mono\">${esc(run.id)}</span><span>${esc(date(run.startedAt))}</span>" +
+                "<span>${count(run.sourceChars)} source characters</span>" +
+                (if (run.endedAt == null) "" else "<span>${MuxCore.duration(num(run.endedAt) - num(run.startedAt))} elapsed</span>") +
+                (if (truthy(run.error)) "<span class=\"reel-error\">${esc(run.error)}</span>" else ""))
+        val capture = run?.capture
+        qq("#reelCapture").textContent = if (capture == null) "No archive manifest is available." else
+            "${count(capture.watermark)} captured payloads · ${count(capture.capturedBytes)} bytes · " +
+                "${count(capture.missingPayloads)} missing · durable CAS: ${str(capture.durable)}. ${strOrEmpty(capture.scope)}"
+        val retainFrom = qq("#reelRetainFrom") as HTMLInputElement
+        val retainUntil = qq("#reelRetainUntil") as HTMLInputElement
+        fun localDate(ms: Double): String {
+            val value = Date(ms)
+            return Date(ms - value.getTimezoneOffset() * 60000).toISOString().take(16)
+        }
+        if (capture != null && capture.fromMs != null && retainFrom.value.isBlank()) {
+            retainFrom.value = localDate(num(capture.fromMs))
+            retainUntil.value = localDate(num(capture.throughMs) + 60000)
+        }
+        html("#reelPins", list(run?.retention).joinToString("<br>") {
+            "${esc(date(it.fromMs))} – ${esc(date(it.untilMs))} · ${count(it.pinnedBytes)} / ${count(it.populationBytes)} captured bytes pinned · watermark ${count(it.watermark)}"
+        })
+        html("#reelPayloads", list(capture?.records).joinToString("") {
+            "<button data-action=\"reel-payload\" data-cid=\"${esc(it.cid)}\">${esc(it.kind)} · ${esc(it.name)} · ${count(it.bytes)} bytes</button> "
+        })
+        (qq("#reelReviewSave") as HTMLButtonElement).disabled = run == null || list(run.lanes).none { truthy(it.resultId) }
+        html("#reelReviews", list(run?.reviews).joinToString("") {
+            "<p>${esc(time(it.atMs))} · ${esc(it.lane)} · ${esc(it.correctness)} · ${esc(it.disposition)}" +
+                (if (truthy(it.concept)) " · <strong>${esc(it.concept)}</strong>" else "") +
+                (if (truthy(it.note)) " · ${esc(it.note)}" else "") +
+                (if (truthy(it.correctionCid)) " · <button data-action=\"reel-payload\" data-cid=\"${esc(it.correctionCid)}\">Human correction</button>" else "") + "</p>"
+        })
+        val lanes = list(run?.lanes)
+        html("#reelLanes", if (lanes.isEmpty()) empty(
+            if (errors.containsKey("Evolution reel")) "Comparison service unavailable" else "Run the current source to collect actual model outputs", "git-branch"
+        ) else lanes.joinToString("") { lane ->
+            val model: dynamic = if (lane.id == "micro") reel?.run?.models?.summarizer else reel?.run?.models?.main
+            "<article class=\"reel-lane\" data-lane=\"${esc(lane.id)}\"><header><h3>${esc(lane.title)}</h3>${badge(lane.status)}</header>" +
+                "<span class=\"reel-model mono\">${esc(model)}</span>" +
+                (if (truthy(lane.error)) "<p class=\"reel-error\">${esc(lane.error)}</p>" else "") +
+                (if (truthy(lane.output)) "<div class=\"reel-output\">${esc(lane.output)}</div>" else
+                    empty(if (isActive(lane.status)) "Collecting evidence and summarizing" else "No output recorded", "file-text")) + "</article>"
+        })
+        val limits = run?.outputLimits
+        val reasoning = if (run?.mainRequestOptions?.chat_template_kwargs?.enable_thinking == false)
+            " Main model reasoning is disabled for summaries and assessment." else ""
+        val allowance = if (limits == null) "" else
+            "<p class=\"reel-measure-note\">${esc(run.harness)} · output-token limits: main ${count(limits.main)}, local ${count(limits.micro)}, assessment ${count(limits.assessment)}. Reasoning, when enabled, uses the same output allowance.$reasoning</p>"
+        html("#reelMeasurements", if (lanes.isEmpty()) "" else
+            "<div class=\"table-wrap reel-meters\"><table><thead><tr><th>Measured work</th><th>Calls / cached</th><th>Input tokens</th><th>Output tokens</th><th>Elapsed</th><th>Summary characters</th><th>Summary / source</th></tr></thead><tbody>" +
+                lanes.joinToString("") { lane ->
+                    val source = num(lane.sourceChars)
+                    val retained = if (source > 0 && lane.summaryChars != null)
+                        str((num(lane.summaryChars) / source * 100).asDynamic().toFixed(1)) + "%" else "--"
+                    "<tr><td>${esc(lane.title)}</td><td>${count(lane.calls)} / ${count(lane.cachedCalls)}</td><td>${count(lane.inputTokens)}</td><td>${count(lane.outputTokens)}</td>" +
+                        "<td>${if (lane.latencyMs == null) "--" else MuxCore.duration(num(lane.latencyMs))}</td>" +
+                        "<td>${count(lane.summaryChars)}</td><td>${esc(retained)}</td></tr>"
+                } + "</tbody></table></div>" + allowance + "<p class=\"reel-measure-note\">Cached calls add no provider tokens; their elapsed time is retrieval, not an inference-speed comparison. The character ratio measures compression, independently of complete source retention or factuality.</p>")
+        val assessment = run?.assessment
+        qq("#reelAssessment").hidden = assessment == null
+        if (assessment != null) {
+            html("#reelAssessmentStatus", badge(assessment.status))
+            qq("#reelAssessmentQualification").textContent = strOrEmpty(assessment.qualification)
+            html("#reelAssessmentLabels", "<span class=\"mono\">${esc(assessment.model)}</span>" +
+                listOf("A", "B", "C").joinToString("") { label ->
+                    if (assessment.labels == null || assessment.labels[label] == null) "" else "<span>$label = ${esc(assessment.labels[label])}</span>"
+                })
+            qq("#reelAssessmentContent").textContent = when {
+                truthy(assessment.content) -> str(assessment.content)
+                truthy(assessment.error) -> str(assessment.error)
+                assessment.status == "running" -> "Comparing anonymous outputs with the retained source."
+                else -> "No assessment recorded."
+            }
+        }
+        val voteButtons = document.querySelectorAll("#reelVoteButtons button")
+        for (i in 0 until voteButtons.length) {
+            val button = voteButtons.item(i) as HTMLButtonElement
+            button.disabled = reelVoteSubmitting || !reelVoteEligible(run, button.getAttribute("data-winner") ?: "")
+        }
+        html("#reelVotes", list(run?.votes).joinToString("<br>") {
+            "${esc(time(it.atMs))} · ${esc(it.winner)}${if (truthy(it.note)) " · " + esc(it.note) else ""}"
+        })
+        val events = list(run?.events)
+        html("#reelEvents", if (events.isEmpty()) "<li class=\"muted\">No observed events yet</li>" else events.joinToString("") { event ->
+            val parents = list(event.parentIds)
+            "<li class=\"reel-event\"><div class=\"reel-event-header\"><time>${esc(time(event.atMs))}</time>" +
+                badge("", strOrEmpty(event.kind).replace('_', ' ')) +
+                (if (truthy(event.lane)) badge("", event.lane) else "") + "<strong>${esc(event.title)}</strong></div>" +
+                (if (truthy(event.detail)) "<p>${esc(event.detail)}</p>" else "") +
+                (if (truthy(event.breadcrumbId)) "<p class=\"reel-lineage\">" +
+                    (if (parents.isEmpty()) "Source → " else parents.joinToString(" + ") { esc(it) } + " → ") + esc(event.breadcrumbId) + "</p>" else "") +
+                "<div class=\"detail-meta\">" +
+                (if (truthy(event.model)) "<span class=\"mono\">${esc(event.model)}</span>" else "") +
+                (if (truthy(event.contextId)) "<a href=\"/modelmux?context=${reelUrl(event.contextId)}\" target=\"_blank\" rel=\"noopener\">Context ${esc(event.contextId)}</a>" else "") +
+                (if (truthy(event.boardKey)) "<button data-action=\"reel-evidence\" data-key=\"${esc(event.boardKey)}\">${icon("table")}Inspect Cursor evidence</button>" else "") +
+                "</div></li>"
+        })
+    }
+
+    suspend fun reelEvidence(key: String) {
+        try {
+            val family = request("/blackboard/sheet?key=" + reelUrl(key))
+            reelSheets = family
+            reelBoardKey = key
+            reelSheetId = list(family).firstOrNull()?.id as String?
+            (qq("#reelSheetFilter") as HTMLInputElement).value = ""
+            qq("#reelSheet").hidden = false
+            renderReelSheet()
+            icons()
+            qq("#reelSheet").scrollIntoView()
+        } catch (failure: Throwable) { toast(failure.message ?: "Evidence unavailable") }
+    }
+
+    fun renderReelSheet() {
+        val sheet = list(reelSheets).firstOrNull { it.id == reelSheetId } ?: return
+        qq("#reelSheetTitle").textContent = strOrEmpty(sheet.title)
+        val columns = list(sheet.columns)
+        val select = qq("#reelSheetColumn") as HTMLSelectElement
+        val prior = select.value
+        html(select, "<option value=\"\">All columns</option>" + columns.mapIndexed { i, column ->
+            "<option value=\"$i\">${esc(column.name)}</option>"
+        }.joinToString(""))
+        if (prior.toIntOrNull()?.let { it in columns.indices } == true) select.value = prior
+        val facet = select.value.toIntOrNull()
+        val filter = (qq("#reelSheetFilter") as HTMLInputElement).value.lowercase()
+        val rows = list(sheet.rows).filter { row ->
+            val cells = list(row)
+            val values = if (facet != null) listOfNotNull(cells.getOrNull(facet)) else cells
+            values.any { str(if (it != null && jsTypeOf(it) == "object") JSON.stringify(it) else it).lowercase().contains(filter) }
+        }
+        html("#reelSheetNav",
+            (if (truthy(sheet.parent)) "<button data-action=\"reel-sheet\" data-sheet=\"${esc(sheet.parent)}\">${icon("corner-left-up")}Parent</button>" else "") +
+                "<span class=\"mono\">${esc(sheet.id)}</span><span>${rows.size} / ${list(sheet.rows).size} rows</span>" +
+                (if (truthy(sheet.truncated)) badge("queued", "Limited: " + strOrEmpty(sheet.limit)) else "") +
+                "<a href=\"/blackboard/sheet?key=${reelUrl(reelBoardKey)}\" target=\"_blank\" rel=\"noopener\">Source JSON ${icon("arrow-up-right")}</a>")
+        html("#reelSheetRows", "<table><thead><tr>" + columns.joinToString("") {
+            "<th>${esc(it.name)}<small>${esc(it.type)}</small></th>"
+        } + "</tr></thead><tbody>" + rows.joinToString("") { row ->
+            "<tr>" + list(row).joinToString("") { cell ->
+                "<td>" + (if (cell != null && truthy(cell.sheet)) "<button data-action=\"reel-sheet\" data-sheet=\"${esc(cell.sheet)}\">${icon("table")}${esc(cell.sheet)}</button>"
+                else esc(if (cell != null && jsTypeOf(cell) == "object") JSON.stringify(cell) else cell)) + "</td>"
+            } + "</tr>"
+        } + "</tbody></table>")
+    }
+
     private fun render() {
         showErrors(); metrics(); renderRecent()
         if (page == "keys") renderKeys()
-        if (page == "models") { renderModelRows(); html("#modelActivity", attemptsTable(list(calls).takeLast(6))) }
-        if (page != "stats") renderBreadcrumbs()
+        if (page == "models") { renderModelRows(); renderReel(); html("#modelActivity", attemptsTable(list(calls).takeLast(6))) }
+        if (page != "stats") { renderBreadcrumbs(); renderBreadcrumbIndex() }
         if (page == "sessions") renderSessions()
         if (page == "stats") renderStats()
         icons()
@@ -792,6 +1034,72 @@ object MuxPage {
         val b = (event.target as? Element)?.closest("[data-action]") as HTMLElement? ?: return
         val a = b.getAttribute("data-action")
         when (a) {
+            "breadcrumb-index-recall" -> {
+                val context = selectedContext() ?: return
+                val ref = b.getAttribute("data-ref") ?: return
+                val cid = b.getAttribute("data-cid") ?: return
+                if (context != breadcrumbIndexContext || breadcrumbIndexBusy) return
+                val presence = (qq("#breadcrumbIndexPresence") as HTMLInputElement).value.toDoubleOrNull()
+                if (presence == null || !presence.isFinite() || presence !in 0.0..1.0) { toast("Recall presence must be from 0 to 1"); return }
+                breadcrumbIndexBusy = true
+                launchPage {
+                    try {
+                        val payload: dynamic = obj()
+                        payload.context = context; payload.tool = "recall"; payload.ref = ref; payload.cid = cid
+                        payload.presence = presence; payload.query = (qq("#breadcrumbIndexQuery") as HTMLInputElement).value
+                        val recalled = request("/v1/breadcrumbs", payload)
+                        if (truthy(recalled.error)) throw Exception(str(recalled.error))
+                        if (selectedContext() == context) { breadcrumbIndexRecall = recalled; renderBreadcrumbIndex() }
+                        poll(true)
+                    } catch (failure: Throwable) { toast(failure.message ?: "Breadcrumb recall failed") }
+                    finally { breadcrumbIndexBusy = false }
+                }
+                return
+            }
+            "reel-live" -> { qq("#liveToggle").click(); renderReel(); return }
+            "reel-payload" -> {
+                val run = reel?.run ?: return
+                val cid = b.getAttribute("data-cid") ?: return
+                launchPage {
+                    try {
+                        val payload = request("/api/mux/reel/payload?runId=" + reelUrl(run.id) + "&cid=" + reelUrl(cid))
+                        qq("#reelPayload").hidden = false
+                        qq("#reelPayload").textContent = strOrEmpty(payload.content)
+                        qq("#reelPayload").scrollIntoView()
+                    } catch (failure: Throwable) { toast(failure.message ?: "Payload unavailable") }
+                }
+                return
+            }
+            "reel-evidence" -> { b.getAttribute("data-key")?.let { key -> launchPage { reelEvidence(key) } }; return }
+            "reel-sheet-close" -> { qq("#reelSheet").hidden = true; return }
+            "reel-sheet" -> {
+                val id = b.getAttribute("data-sheet") ?: return
+                if (list(reelSheets).any { it.id == id }) {
+                    reelSheetId = id
+                    (qq("#reelSheetFilter") as HTMLInputElement).value = ""
+                    (qq("#reelSheetColumn") as HTMLSelectElement).value = ""
+                    renderReelSheet(); icons()
+                } else toast("Child sheet is outside this bounded projection; inspect the source JSON")
+                return
+            }
+            "reel-vote" -> {
+                val run = reel?.run ?: return
+                val winner = b.getAttribute("data-winner") ?: return
+                if (reelVoteSubmitting || !reelVoteEligible(run, winner)) return
+                reelVoteSubmitting = true; renderReel()
+                launchPage {
+                    try {
+                        val payload: dynamic = obj()
+                        payload.runId = run.id; payload.winner = winner
+                        payload.note = (qq("#reelVoteNote") as HTMLInputElement).value
+                        request("/api/mux/reel/vote", payload)
+                        (qq("#reelVoteNote") as HTMLInputElement).value = ""
+                        toast("Quality vote recorded"); poll(true)
+                    } catch (failure: Throwable) { toast(failure.message ?: "Vote failed") }
+                    finally { reelVoteSubmitting = false; renderReel() }
+                }
+                return
+            }
             "refresh" -> { launchPage { poll(true) }; return }
             "close-dialog" -> { (qq("#endpointDialog") as HTMLDialogElement).close(); return }
             "close-rename" -> { (qq("#renameDialog") as HTMLDialogElement).close(); return }
@@ -842,7 +1150,73 @@ object MuxPage {
     }
 
     fun mount() {
+        if (URLSearchParams(window.location.search).get("widget") == "1") document.body?.classList?.add("reel-widget")
         document.addEventListener("click", { onClick(it) })
+        (q("#breadcrumbIndexForm") as HTMLFormElement?)?.onsubmit = { event: Event ->
+            event.preventDefault(); launchPage { searchBreadcrumbIndex() }; null
+        }
+        q("#reelSheetFilter")?.oninput = { renderReelSheet(); icons() }
+        q("#reelSheetColumn")?.onchange = { renderReelSheet(); icons() }
+        q("#reelHistory")?.onchange = {
+            reelHistoryId = (qq("#reelHistory") as HTMLSelectElement).value.takeIf { it.isNotBlank() }
+            qq("#reelPayload").hidden = true
+            launchPage { poll(true) }
+        }
+        (q("#reelRetention") as HTMLFormElement?)?.onsubmit = { event: Event ->
+            event.preventDefault()
+            launchPage {
+                try {
+                    val payload: dynamic = obj()
+                    payload.fromMs = Date((qq("#reelRetainFrom") as HTMLInputElement).value).getTime()
+                    payload.untilMs = Date((qq("#reelRetainUntil") as HTMLInputElement).value).getTime()
+                    payload.fraction = ((qq("#reelRetainPercent") as HTMLInputElement).value.toDoubleOrNull() ?: 100.0) / 100
+                    request("/api/mux/reel/retain", payload)
+                    toast("Captured-payload retention pinned"); poll(true)
+                } catch (failure: Throwable) { toast(failure.message ?: "Retention failed") }
+            }
+            null
+        }
+        (q("#reelReview") as HTMLFormElement?)?.onsubmit = { event: Event ->
+            event.preventDefault()
+            val run = reel?.run
+            if (run != null) launchPage {
+                try {
+                    val payload: dynamic = obj()
+                    payload.runId = run.id
+                    payload.lane = (qq("#reelReviewLane") as HTMLSelectElement).value
+                    payload.correctness = (qq("#reelCorrectness") as HTMLSelectElement).value
+                    payload.disposition = (qq("#reelDisposition") as HTMLSelectElement).value
+                    payload.concept = (qq("#reelConcept") as HTMLInputElement).value
+                    payload.note = (qq("#reelReviewNote") as HTMLInputElement).value
+                    payload.correction = (qq("#reelCorrection") as HTMLTextAreaElement).value
+                    request("/api/mux/reel/review", payload)
+                    toast("Human review saved"); poll(true)
+                } catch (failure: Throwable) { toast(failure.message ?: "Review failed") }
+            }
+            null
+        }
+        (q("#reelForm") as HTMLFormElement?)?.onsubmit = { event: Event ->
+            event.preventDefault()
+            if (!reelSubmitting) {
+                reelSubmitting = true; renderReel()
+                launchPage {
+                    try {
+                        val payload: dynamic = obj()
+                        val model = (qq("#reelMainModel") as HTMLSelectElement).value
+                        if (model.isNotBlank()) payload.mainModel = model
+                        val paths = (qq("#reelSources") as HTMLTextAreaElement).value.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                        if (paths.isNotEmpty()) payload.sources = paths.toTypedArray()
+                        val agenda = (qq("#reelAgenda") as HTMLSelectElement).value
+                        if (agenda.isNotBlank()) payload.selectionIds = arrayOf(agenda)
+                        request("/api/mux/reel/run", payload)
+                        reelHistoryId = null
+                        toast("Comparison started"); poll(true)
+                    } catch (failure: Throwable) { toast(failure.message ?: "Comparison failed") }
+                    finally { reelSubmitting = false; renderReel() }
+                }
+            }
+            null
+        }
         document.addEventListener("change", { event: Event ->
             val target = event.target as? HTMLInputElement
             if (target != null && target.matches("[data-model]")) {

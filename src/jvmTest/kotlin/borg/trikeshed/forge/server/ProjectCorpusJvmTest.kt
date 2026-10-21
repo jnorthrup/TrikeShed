@@ -9,6 +9,7 @@ import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import borg.trikeshed.parse.jsonOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
@@ -71,12 +72,13 @@ class ProjectCorpusJvmTest {
     }
 
     @Test
-    fun pdfExtractReusesItsFootnotesMarkerRegardlessOfMimeType(): Unit = runBlocking {
+    fun pdfExtractReusesOnlyTheCompletionBoundToItsOriginalRevision(): Unit = runBlocking {
         val (scopes, registry) = rig()
         val scope = scopes.beginUpload("pdf-marker")
         scopes.uploadPut(scope.name, "book.pdf", "%PDF-fixture".encodeToByteArray())
         scopes.uploadPut(scope.name, "book.pdf.extract.md", "retained extraction".encodeToByteArray())
         scopes.uploadPut(scope.name, "book.pdf.footnotes.tsv", "page\ttext\n1\tnote".encodeToByteArray())
+        completion(scopes, registry, scope.name, "book.pdf", "retained extraction")
         val corpus = JvmProjectCorpus(registry, scopes, ingest = { _, _ -> error("completed PDF must not be extracted again") })
         try {
             assertEquals("application/octet-stream", registry.get(scope.name)!!.gateway
@@ -100,6 +102,7 @@ class ProjectCorpusJvmTest {
             release.await()
             scopes.uploadPut(project, id + ProjectMiner.FOOTNOTES_SUFFIX, "page\ttext\n1\tnote".encodeToByteArray())
             scopes.uploadPut(project, id + ProjectNodes.EXTRACT_SUFFIX, "completed extraction".encodeToByteArray())
+            completion(scopes, registry, project, id, "completed extraction")
         })
         try {
             withTimeout(5_000) {
@@ -113,5 +116,35 @@ class ProjectCorpusJvmTest {
                 assertEquals(1, calls, "the waiter must recheck the twins after the first extraction completes")
             }
         } finally { release.complete(Unit); scopes.drain() }
+    }
+
+    private fun completion(scopes: ProjectScopes, registry: ProjectDbRegistry, project: String, id: String, text: String) {
+        val db = registry.get(project)!!
+        scopes.uploadPut(project, id + ProjectNodes.EXTRACTION_SUFFIX, jsonOf(mapOf(
+            "originalCid" to db.gateway.getAttachmentRef(id)!!.contentId.value,
+            "originalRev" to db.store.head.getRev(id), "extractedTextCid" to ContentId.of(text.encodeToByteArray()).value,
+            "anchors" to emptyList<Any>(), "unresolved" to listOf("page", "table", "diagram"))).encodeToByteArray())
+    }
+
+    @Test
+    fun revisedOriginalInvalidatesItsExtractionEvenWithUnchangedBytes(): Unit = runBlocking {
+        val (scopes, registry) = rig()
+        val scope = scopes.beginUpload("pdf-revision")
+        val bytes = "%PDF-1.7\nfixture".encodeToByteArray()
+        scopes.uploadPut(scope.name, "book.pdf", bytes)
+        scopes.uploadPut(scope.name, "book.pdf.extract.md", "old extraction".encodeToByteArray())
+        completion(scopes, registry, scope.name, "book.pdf", "old extraction")
+        scopes.uploadPut(scope.name, "book.pdf", bytes)
+        var calls = 0
+        val corpus = JvmProjectCorpus(registry, scopes, ingest = { project, id ->
+            calls++
+            scopes.uploadPut(project, id + ProjectNodes.EXTRACT_SUFFIX, "new extraction".encodeToByteArray())
+            completion(scopes, registry, project, id, "new extraction")
+        })
+        try {
+            assertEquals("new extraction", corpus.extract(scope.name, "book.pdf", 1000)?.text)
+            assertEquals(1, calls)
+            assertEquals(listOf("book.pdf"), corpus.docs(scope.name).map { it.id })
+        } finally { scopes.drain() }
     }
 }

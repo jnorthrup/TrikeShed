@@ -8,7 +8,13 @@ import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.CanonicalCbor
+import borg.trikeshed.lcnc.CurationReviewCandidate
+import borg.trikeshed.lcnc.CorpusOntologyNode
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.ontology.CorpusOntology
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
 import borg.trikeshed.lib.*
@@ -38,7 +44,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                              borg.trikeshed.userspace.nio.file.spi.fileIoContext),
                          private val owner: ConstellationNodes? = null,
                          private val modelIdentity: String? = null,
-                         namespace: String? = null) {
+                         namespace: String? = null,
+                         private val cas: CasStore? = null) {
     private val wiki = File(stateDir, "wiki")
     val root = File(stateDir, "constellations").apply { mkdirs() }
     private val books = File(root, "books").apply { mkdirs() }
@@ -78,7 +85,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         return synchronized(providers) {
             check(!drained && (!draining || reading)) { "Curation is draining" }
             if (namespace == decisionNamespace) this else providers.getOrPut(namespace) {
-                ConstellationNodes(stateDir, blackboard, bank, liveRete, bert, files, provider, scope, this, model, namespace)
+                ConstellationNodes(stateDir, blackboard, bank, liveRete, bert, files, provider, scope, this, model, namespace, cas)
             }
         }
     }
@@ -237,6 +244,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
 
     fun register(runners: MutableMap<String, LcncNodeRunner>) {
         runners[CURATE] = curate
+        runners[SNAPSHOT] = snapshot
+        cas?.let { CorpusOntologyNode.register(runners, it) }
         runners[JOIN] = join
         runners[RENDER] = render
         runners[WIKI_READ] = wikiRead
@@ -502,7 +511,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val m = reifyMap(f.readText())
         fun str(v: Any?) = v?.toString()?.takeIf { it.isNotEmpty() }
         // A bearer the sense rete or NARS types where the book was crafted takes that class over the one curation froze.
-        val at = mem?.let { located(m["name"].toString()).at }
+        val customerOntology = (m["provenance"] as? Map<*, *>)?.get("ontologyCid") != null
+        val at = if (customerOntology) null else mem?.let { located(m["name"].toString()).at }
         val statements = (m["statements"] as List<*>).map { s ->
             s as Map<*, *>
             val bearer = s["bearer"].toString(); val head = bearer.substringAfterLast(' ')
@@ -510,7 +520,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             NormStatement(bearer, Modality.entries.first { it.key == s["modality"] },
                 s["action"].toString(), str(s["object"]), str(s["condition"]), learned ?: (s["bearerClass"] as? Number)?.toInt() ?: -1)
         }
-        val (judged, nouls) = fidelity(m["name"].toString(), statements)
+        val (judged, nouls) = if (customerOntology) LongArray(0) to FloatArray(0) else fidelity(m["name"].toString(), statements)
         return Book(
             m["name"].toString(), m["work"].toString(), m["date"].toString(),
             (m["headings"] as List<*>).map { it.toString() },
@@ -518,7 +528,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             (m["support"] as List<*>).map { l -> (l as List<*>).map { (it as Number).toInt() }.toIntArray() },
             (m["facts"] as? List<*>)?.map { it.toString() }?.toSet() ?: emptySet(),
             (m["cites"] as? List<*>)?.map { p -> (p as List<*>).let { (it[0] as Number).toInt() to (it[1] as Number).toInt() } } ?: emptyList(),
-            judged, nouls, established(m["name"].toString()),
+            judged, nouls, if (customerOntology) emptySet() else established(m["name"].toString()),
             // A book frozen before section addresses takes them from the section texts saved beside it.
             (m["sections"] as? List<*>)?.map { it.toString() } ?: texts(m["name"].toString()).map(Book::urn),
             (m["paths"] as? List<*>)?.map { it.toString() }.orEmpty(),
@@ -953,7 +963,196 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
     }
 
+    /** Review authority is installed once by the host's durable review ledger. */
+    var reviewRelease: (suspend (ContentId) -> Map<String, Any?>)? = null
+
+    fun reviewCandidate(receiptCid: ContentId, selection: List<String>): CurationReviewCandidate =
+        BookCurationReceipt.candidate(requireNotNull(cas), receiptCid, selection)
+
+    fun reviewSource(receiptCid: ContentId): DocumentSource = BookCurationReceipt.source(requireNotNull(cas), receiptCid)
+
+    fun reviewCurrent(candidate: CurationReviewCandidate): Boolean {
+        val store = cas ?: return false
+        val receipt = BookCurationReceipt.read(store, candidate.curationReceiptCid)
+        val book = receipt["book"] as String
+        val source = BookCurationReceipt.source(store, candidate.curationReceiptCid)
+        val selected = forBook(book)
+        val sourcePath = selected.sourceFile(book).absolutePath
+        val receiptPath = File(selected.books, "${safe(book)}.curation").absolutePath
+        return receipt["ontologyCid"] == candidate.ontologyCid.value &&
+            receipt["sourceRevision"] == candidate.sourceRevision && store.get(candidate.ontologyCid) != null &&
+            selected.files.isFile(sourcePath) && selected.files.readString(sourcePath) == source.extractedTextCid.value &&
+            selected.files.isFile(receiptPath) && selected.files.readString(receiptPath) == candidate.curationReceiptCid.value
+    }
+
+    private val snapshot = LcncNodeRunner { node, inputs ->
+        val ontology = (inputs["ontologyCid"] ?: inputs["ontologyCid?"] ?: node.params["ontologyCid"])?.toString()
+            ?.takeIf(String::isNotBlank) ?: error("book.snapshot requires a retained ontologyCid")
+        corpus(node, inputs, ContentId(ontology), true)
+    }
+
+    /** Retained snapshots use bounded answers; fresh parsing keeps the owned publication lane. */
+    private suspend fun corpus(node: borg.trikeshed.lcnc.LcncNode, inputs: Map<String, Any?>,
+        ontologyCid: ContentId, snapshotOnly: Boolean): Map<String, Any?> {
+        if (snapshotOnly) {
+            val source = corpusSource(node, inputs)
+            val base = corpusBook(node, inputs, source)
+            val identity = ContentId.of(CanonicalCbor.encodeMap(mapOf("book" to base, "ontologyCid" to ontologyCid.value,
+                "source" to (DocumentCuratorCodec.source(source) - "text")))).value
+            val state = "$SNAPSHOT/${safe("$base@${ontologyCid.hex.take(16)}")}"
+            return curation.answer("$SNAPSHOT/$identity", state, ::admitting) {
+                curateCorpus(node, inputs + ("source" to DocumentCuratorCodec.source(source)), ontologyCid, true)
+            }
+        }
+        if (kotlinx.coroutines.currentCoroutineContext()[CurationElement] === curation)
+            return curateCorpus(node, inputs, ontologyCid, snapshotOnly)
+        var result: Map<String, Any?>? = null
+        curation.submit(admissible = ::admitting) { result = curateCorpus(node, inputs, ontologyCid, snapshotOnly) }
+            .await().getOrThrow()
+        return requireNotNull(result)
+    }
+
+    private fun corpusSource(node: borg.trikeshed.lcnc.LcncNode, inputs: Map<String, Any?>): DocumentSource {
+        val store = requireNotNull(cas) { "Book curation requires retained CAS" }
+        val doc = (inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>
+        return ((inputs["source"] ?: inputs["source?"]) as? Map<*, *>)?.let(DocumentCuratorCodec::decodeSource)
+            ?: run {
+                val text = (inputs["text"] ?: inputs["text?"]) as? String ?: error("Book source is required")
+                val textCid = store.put(text.encodeToByteArray())
+                val original = doc?.get("originalCid")?.toString()?.let(::ContentId) ?: textCid
+                DocumentSource(original, textCid, text, doc?.get("id")?.toString() ?: textCid.hex,
+                    if (original == textCid) "text/plain" else "application/pdf", node.id)
+            }
+    }
+
+    private fun corpusBook(node: borg.trikeshed.lcnc.LcncNode, inputs: Map<String, Any?>, source: DocumentSource): String =
+        node.params["book"]?.takeIf(String::isNotBlank) ?: (inputs["book"] ?: inputs["book?"])?.toString()
+            ?: ((inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>)?.get("id")?.toString() ?: source.name
+
+    /** Customer classification consumes syntax only; no global lexical, learned, NER or SUMO fallback. */
+    private suspend fun curateCorpus(node: borg.trikeshed.lcnc.LcncNode, inputs: Map<String, Any?>,
+        ontologyCid: ContentId, snapshotOnly: Boolean): Map<String, Any?> {
+        val store = requireNotNull(cas) { "Book curation requires retained CAS" }
+        val ontology = CorpusOntology.read(store, ontologyCid)
+        val source = corpusSource(node, inputs)
+        require(store.get(source.originalCid) != null &&
+            store.get(source.extractedTextCid)?.contentEquals(source.text.encodeToByteArray()) == true) { "Book source is not retained" }
+        val base = corpusBook(node, inputs, source)
+        val name = "$base@${ontology.cid.hex.take(16)}"
+        val sourcePath = sourceFile(base).absolutePath
+        val sectionsPath = File(books, "${safe(base)}.sections.jsonl").absolutePath
+        val sectionText = files.takeIf { it.isFile(sectionsPath) }?.readString(sectionsPath)
+        val savedSections = sectionText?.lineSequence()?.filter(String::isNotEmpty)?.map { (reify(it) as? String).orEmpty() }?.toList().orEmpty()
+        val retained = files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
+            savedSections.isNotEmpty() && savedSections.indices.all { files.isFile(readingFile(base, it).absolutePath) }
+        require(!snapshotOnly || retained) { "book.snapshot requires the retained parser reading of this exact source" }
+        val sections = if (retained) savedSections else SectionShapes.sections(source.text).texts
+        val parserIdentities = mutableListOf<Pair<String, ContentId>>()
+        val pendingReadings = if (snapshotOnly) mutableListOf<Pair<Int, ByteArray>>() else null
+        val spans = ArrayList<BookClause>()
+        val clauses = ArrayList<List<NormClause>>()
+        val unresolved = ArrayList<Map<String, Any?>>()
+        val generic = ((node.params["generic"] ?: "").split(',', ' ') + ontology.mappings.keys)
+            .filter(String::isNotBlank).map(String::lowercase).toSet()
+        val quotations = BookQuotationIndex(source.text)
+        var searchFrom = 0
+        fun quotation(sentence: String, section: Int, found: List<NormClause>, parserReceipt: ContentId) {
+            if (found.isEmpty()) return
+            val match = quotations.span(sentence, searchFrom)
+            if (match == null) {
+                unresolved.add(mapOf("section" to section, "sentence" to sentence,
+                    "reason" to "No exact source span after whitespace normalization", "statements" to found.map { NormStatement.of(it).toMap() }))
+                return
+            }
+            searchFrom = match.b
+            found.forEach { spans.add(BookClause(it, match.a.first, match.a.last + 1, section, parserReceipt)) }
+        }
+        fun clause(m: Map<*, *>, sentence: String): NormClause {
+            val force = m["force"]?.toString() ?: "presumed"
+            return NormClause(m["bearer"].toString(), if (force == "presumed") "generic" else force,
+                force != "must-not", m["action"].toString(), m["object"] as? String, null, sentence, m["condition"] as? String)
+        }
+        files.mkdirs(File(books, "${safe(name)}.readings").absolutePath)
+        fun retainReading(k: Int, reading: List<Map<String, Any?>>) {
+            val projected = reading.map { s ->
+                val concepts = (s["concepts"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }.map { c ->
+                    val term = c["lemma"]?.toString() ?: c["word"]?.toString().orEmpty()
+                    mapOf("word" to c["word"], "lemma" to term, "ontologyMapping" to ontology.mapping(term))
+                }
+                s + mapOf("concepts" to concepts, "ontologyCid" to ontology.cid.value,
+                    "statements" to (s["statements"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }.map { st ->
+                        st.entries.filter { it.key != "class" }.associate { it.key.toString() to it.value } +
+                            mapOf("ontologyMapping" to ontology.mapping(st["bearer"].toString()))
+                    })
+            }
+            val bytes = jsonOf(projected).encodeToByteArray()
+            if (pendingReadings != null) pendingReadings.add(k to bytes)
+            else files.writeAtomically(readingFile(name, k).absolutePath, bytes)
+        }
+        if (retained) for ((k, _) in sections.withIndex()) {
+            val parserText = files.readString(readingFile(base, k).absolutePath)
+            val parserReceipt = store.put(parserText.encodeToByteArray())
+            if (snapshotOnly) parserIdentities.add(readingFile(base, k).absolutePath to parserReceipt)
+            @Suppress("UNCHECKED_CAST")
+            val reading = reify(parserText) as List<Map<String, Any?>>
+            val found = ArrayList<NormClause>()
+            for (s in reading) {
+                val sentence = s["text"] as String
+                val inSentence = (s["statements"] as? List<*>).orEmpty().map { clause(it as Map<*, *>, sentence) }
+                found.addAll(inSentence); quotation(sentence, k, inSentence, parserReceipt)
+            }
+            clauses.add(found); retainReading(k, reading)
+        } else CoreNlpRuntime().use { nlp ->
+            for ((k, section) in sections.withIndex()) {
+                val parsed = nlp.analyze(section)
+                val parserReceipt = store.put(CanonicalCbor.encodeMap(DocumentCuratorCodec.nlp(parsed)))
+                val found = NormClauses.extract(parsed, generic)
+                clauses.add(found)
+                val bySentence = found.groupBy { it.sentence }
+                val reading = parsed.sentences.values().map { sentence ->
+                    val exact = section.substring(sentence.begin, sentence.end)
+                    val normalized = exact.replace(Regex("\\s+"), " ").trim()
+                    val inSentence = bySentence[normalized].orEmpty()
+                    quotation(normalized, k, inSentence, parserReceipt)
+                    mapOf("text" to normalized, "tokens" to sentence.tokens.size,
+                        "concepts" to sentence.tokens.values().filter { it.tag.startsWith("NN") }.map {
+                            mapOf("word" to it.word, "lemma" to it.lemma.lowercase()) },
+                        "statements" to inSentence.map { c -> val st = NormStatement.of(c)
+                            mapOf("bearer" to st.bearer, "force" to st.modality.key, "action" to st.action,
+                                "object" to st.obj, "condition" to st.condition) })
+                }
+                retainReading(k, reading)
+            }
+        }
+        if (snapshotOnly) {
+            require(files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
+                files.isFile(sectionsPath) && files.readString(sectionsPath) == sectionText &&
+                parserIdentities.all { (path, cid) -> files.isFile(path) && ContentId.of(files.readAllBytes(path)) == cid }) {
+                "Retained book source or parser reading changed during snapshot"
+            }
+            for ((k, bytes) in requireNotNull(pendingReadings)) files.writeAtomically(readingFile(name, k).absolutePath, bytes)
+        }
+        val receiptCid = BookCurationReceipt.retain(store, name, source, ontology, spans.toSeries(),
+            if (retained) "retained-book-parser" else "CoreNLP/NormClauses", unresolved)
+        val book = Book.of(name, base, ontology.version, sections, clauses,
+            provenance = mapOf("ontologyCid" to ontology.cid.value, "ontologyVersion" to ontology.version,
+                "curationReceiptCid" to receiptCid.value))
+        save(book); saveSections(name, sections)
+        files.writeAtomically(sourceFile(name).absolutePath, source.extractedTextCid.value.encodeToByteArray())
+        files.writeAtomically(File(books, "${safe(name)}.curation").absolutePath, receiptCid.value.encodeToByteArray())
+        if (snapshotOnly) synchronized(loaded) { loaded.remove(name) } else invalidateFamilyViews()
+        val receipt = BookCurationReceipt.read(store, receiptCid)
+        return mapOf("book" to name, "sections" to sections.size, "statements" to book.statements.size,
+            "curationReceiptCid" to receiptCid.value, "ontologyCid" to ontology.cid.value,
+            "ontologyVersion" to ontology.version, "sumoAlignmentCid" to ontology.alignment?.cid?.value,
+            "relationships" to receipt["relationships"], "unresolved" to unresolved,
+            "retainedParser" to retained, "reviewStatus" to "unreviewed")
+    }
+
     private val curate = LcncNodeRunner { node, inputs ->
+        val ontologyCid = (inputs["ontologyCid"] ?: inputs["ontologyCid?"] ?: node.params["ontologyCid"])
+            ?.toString()?.takeIf(String::isNotBlank)
+        if (ontologyCid != null) return@LcncNodeRunner corpus(node, inputs, ContentId(ontologyCid), false)
         val text = (inputs["text"] ?: inputs["text?"]) as? String ?: ""
         // The book is the document it was read from: a wired doc's id, else the text's own content id.
         val doc = (inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>
@@ -1106,6 +1305,17 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
     private fun read(b: Book, bookName: String, k: Int): Map<String, Any?> {
         val text = File(books, "${safe(bookName)}.sections.jsonl").takeIf { it.isFile }?.useLines { ls -> ls.drop(k).firstOrNull() }
             ?.let { reify(it) as? String }
+        b.provenance["curationReceiptCid"]?.let { cid ->
+            val receipt = BookCurationReceipt.read(requireNotNull(cas), ContentId(cid))
+            val relationships = (receipt["relationships"] as List<*>).filter { ((it as Map<*, *>)["section"] as Number).toInt() == k }
+            return mapOf("book" to b.name, "work" to b.work, "date" to b.date, "ordinal" to k,
+                "of" to b.headings.size, "heading" to b.headings[k], "text" to text,
+                "provenance" to b.provenance, "ontologyCid" to receipt["ontologyCid"],
+                "ontologyVersion" to receipt["ontologyVersion"], "curationReceiptCid" to cid,
+                "sentences" to readingFile(bookName, k).absolutePath.let { if (files.isFile(it)) reify(files.readString(it)) else null },
+                "statements" to relationships, "relationships" to relationships,
+                "unresolved" to receipt["unresolved"], "reviewStatus" to "unreviewed")
+        }
         val lines = (text ?: b.headings[k]).split(Regex("(?<=[.;:])\\s+")).toSeries()
         val metrics = borg.trikeshed.cas.textualMetrics(lines)
         val sig = borg.trikeshed.cas.kolmogorovSchemaSignature(lines, metrics)
@@ -1377,8 +1587,25 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
 
     private val join = LcncNodeRunner { node, inputs ->
         val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.join: name the constellation")
+        val releaseCid = (inputs["releaseCid"] ?: inputs["releaseCid?"] ?: node.params["releaseCid"])
+            ?.toString()?.takeIf(String::isNotBlank)
+        if (releaseCid != null) {
+            val admission = requireNotNull(reviewRelease) { "Authenticated curation review is unavailable" }(ContentId(releaseCid))
+            val output = DocumentCurationFacts.reviewed(admission)
+            val store = requireNotNull(cas)
+            val cid = store.put(CanonicalCbor.encodeMap(mapOf("kind" to "reviewed-result", "constellation" to name,
+                "releaseCid" to releaseCid, "relationships" to output.view.toList())))
+            store.sync()
+            return@LcncNodeRunner mapOf("constellation" to name, "outputCid" to cid.value,
+                "relationships" to output.view.map { it + mapOf("outputCid" to cid.value) },
+                "snapshotCid" to admission["snapshotCid"], "approvalCid" to admission["approvalCid"],
+                "releaseCid" to releaseCid, "reviewStatus" to "approved", "synthetic" to admission["synthetic"])
+        }
         val bookName = (inputs["book"] ?: inputs["book?"])?.toString() ?: node.params["book"] ?: error("constellation.join: no book")
         val selected = forBook(bookName)
+        require(selected.load(bookName)?.provenance?.get("ontologyCid") == null) {
+            "Customer ontology relationships require a reviewed releaseCid"
+        }
         if (SENSES_ENABLED) selected.memory()
         val book = selected.load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
         // A member curated again is read again: the constellation is cleared and rebuilt from its
@@ -1969,7 +2196,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             val decisionScope = kotlinx.coroutines.CoroutineScope(ctx.scope.coroutineContext + jev)
             val nodes = ConstellationNodes(ctx.stateDir, ctx.blackboard, bank, liveRete, bert,
                 ctx.scope.coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations]
-                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), provider, decisionScope).also { it.register(ctx.lcncRunners) }
+                    ?: borg.trikeshed.userspace.nio.file.spi.JvmFileOperations(), provider, decisionScope, cas = ctx.casStore).also { it.register(ctx.lcncRunners) }
             ctx.routes.claim("language", "/api/curation/providers") { method, _, _, _ ->
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val catalog = kotlinx.coroutines.withContext(jev) {
@@ -2122,6 +2349,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
 
         const val CURATE = "book.curate"
+        const val SNAPSHOT = "book.snapshot"
         /** Conflict bridges drawn per join. */
         const val CONFLICT_LINKS = 600
         /** Sections read whole kept for the next reader. */

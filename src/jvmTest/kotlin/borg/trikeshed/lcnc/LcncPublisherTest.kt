@@ -8,9 +8,7 @@ import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import borg.trikeshed.util.oroboros.OroborosAttachmentRef
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -154,5 +152,34 @@ class LcncPublisherTest {
         pub.publishProgram("p", program("p", "two"))
         assertEquals(2, puts)
         unsubscribe()
+    }
+
+    @Test
+    fun changingANamedSignatureRetypesItsCallerWithoutOverwritingBoardEdits(): Unit = runBlocking {
+        val board = ConfixBlackboard.empty()
+        val pub = publisher(board)
+        val caller = LcncProgram("caller", s_[
+            LcncNode("ring", "scope", mapOf("program" to "body")), LcncNode("show", "display"),
+        ], s_[LcncWire("ring", "result", "show", "x")])
+        fun corpus(kind: String): LcncPublisher.LateBound {
+            val body = LcncProgram("body", s_[
+                LcncNode("result", "scope.out", mapOf("name" to "result", "kind" to kind)),
+            ], emptySeriesOf())
+            val corpus = mapOf("body" to body, "caller" to caller)
+            val vocabulary = LcncVocabulary.resolve(corpus)
+            return LcncPublisher.LateBound(corpus, vocabulary, emptyList(), LcncFacts.of(vocabulary.values))
+        }
+        val initial = corpus("text")
+        pub.publishPrograms(initial)
+        val sourceCid = LcncBlackboard.cidOf(caller)
+        val edited = caller.copy(nodes = s_[
+            caller.nodes[0].copy(params = caller.nodes[0].params + ("note" to "board edit")), caller.nodes[1],
+        ])
+        pub.publishProgram("caller", edited, initial.vocabulary, sourceCid)
+        pub.publishPrograms(corpus("id"))
+        val entry = board.get(LcncBlackboard.programKey("caller")) as Map<*, *>
+        assertEquals("id", ((entry["cables"] as List<*>).single() as Map<*, *>)["type"])
+        assertEquals("board edit", LcncBlackboard.programOf(entry)!!.nodes[0].params["note"])
+        assertEquals(sourceCid, LcncBlackboard.sourceCidOf(entry))
     }
 }

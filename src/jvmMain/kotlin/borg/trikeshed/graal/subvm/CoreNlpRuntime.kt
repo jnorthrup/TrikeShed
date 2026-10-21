@@ -93,10 +93,32 @@ class CoreNlpRuntime : NlpReader, AutoCloseable {
                     lane.guest = null
                     Guest(loader).also { lane.guest = it }
                 }
-                if (text.length <= PARSE_CHARS) g.analyze(text) else stitch(text, pieces(text).map { r -> r.first to g.analyze(text.substring(r.first, r.last + 1)) })
+                val cased = sentenceCase(text)
+                if (cased.length <= PARSE_CHARS) g.analyze(cased) else stitch(cased, pieces(cased).map { r -> r.first to g.analyze(cased.substring(r.first, r.last + 1)) })
             }
             synchronized(parsed) { parsed.put(text, doc) }
             return doc
+        }
+
+        /**
+         * A span written in capitals (a disclaimer, a heading) read in sentence case: the tagger trained on cased text
+         * reads "DOES NOT GUARANTEE THAT ANY ORDER WILL BE EXECUTED" as proper nouns. The fold is char for char, so
+         * every offset still points into the source text.
+         */
+        fun sentenceCase(text: String): String {
+            val out = text.toCharArray()
+            var start = 0
+            while (start < text.length) {
+                var end = start
+                while (end < text.length && text[end] != '\n' && !(text[end] in ".!?;:" && (end + 1 == text.length || text[end + 1].isWhitespace()))) end++
+                val letters = (start until end).count { text[it].isLetter() }
+                if (letters >= 12 && (start until end).count { text[it].isUpperCase() } * 10 >= letters * 9) {
+                    var first = true
+                    for (i in start until end) if (text[i].isLetter()) { out[i] = if (first) text[i] else text[i].lowercaseChar(); first = false }
+                }
+                start = end + 1
+            }
+            return String(out)
         }
 
         /** Cuts of at most [PARSE_CHARS]: at the last paragraph break, else the last sentence end, else the last space. */

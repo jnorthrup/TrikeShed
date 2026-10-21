@@ -48,7 +48,7 @@ val productDocs = HashMap<String, dynamic>()
 /** heap continent leaves: id → {kind, cls, count?, bytes}. */
 val heapLeaves = HashMap<String, dynamic>()
 
-val EXCLUSIVE_PANELS = listOf("doc", "points", "vms", "sheet", "ledger", "aot", "gc", "zoom")
+val EXCLUSIVE_PANELS = listOf("doc", "points", "vms", "sheet", "ledger", "aot", "gc", "zoom", "camel")
 
 /* floating panels: doc/sheet/notion share ONE screen rectangle, vms/ledger/aot share ANOTHER —
    show()/hide() are the only entry points, so at most one of this concentric set is visible at once. */
@@ -241,8 +241,8 @@ fun GraalConsole.renderSheetFamily() {
     sb.innerHTML = html
 }
 
-/** JSON.stringify(x) as the original wrote it inside a double-quoted attribute. */
-private fun attrQuoted(x: dynamic): String = jsonStringify(x)
+/** A JSON string literal inside a double-quoted HTML attribute. */
+private fun attrQuoted(x: dynamic): String = Projection.attrEsc(jsonStringify(x))
 
 suspend fun GraalConsole.projectBytes(id: String, ct0: String?, ext0: String?) {
     val proj = document.getElementById("proj") as HTMLElement? ?: return

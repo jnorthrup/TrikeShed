@@ -15,6 +15,7 @@ class JobReducer {
         val causalKey: String,
         val priorStateCid: String? = null,
         val stateCid: String? = null,
+        val receipt: Boolean = false,
     )
 
     private val idempotencyKeys = mutableSetOf<String>()
@@ -73,6 +74,7 @@ class JobReducer {
             causalKey = "",
             priorStateCid = (command as? JobCommand.State)?.priorStateCid,
             stateCid = (command as? JobCommand.State)?.stateCid,
+            receipt = (command as? JobCommand.Acknowledge)?.receipt == true,
         ),
         canonicalBytes = CanonicalCbor.encode(command),
     )
@@ -141,7 +143,9 @@ class JobReducer {
         val priorDeps = jobSnapshots[input.jobId]?.dependencies ?: emptyList()
         val effectiveDeps = if (input.dependencies.isNotEmpty()) input.dependencies else priorDeps
 
-        val lifecycle = if (input.operation == "update" || input.operation == "state") checkNotNull(priorSnapshot).lifecycle
+        val preservesSnapshot = input.operation == "update" || input.operation == "state" ||
+            input.receipt && priorSnapshot != null
+        val lifecycle = if (preservesSnapshot) checkNotNull(priorSnapshot).lifecycle
             else deriveLifecycle(input.operation, effectiveDeps)
 
         val attemptCount = when (input.operation) {
@@ -151,7 +155,7 @@ class JobReducer {
         }
         jobAttemptCounts[input.jobId] = attemptCount
 
-        val snapshot = if (input.operation == "update" || input.operation == "state") checkNotNull(priorSnapshot).copy(
+        val snapshot = if (preservesSnapshot) checkNotNull(priorSnapshot).copy(
             revision = newRevision,
             stateCid = if (input.operation == "state") input.stateCid else priorSnapshot.stateCid,
         ) else JobSnapshot(

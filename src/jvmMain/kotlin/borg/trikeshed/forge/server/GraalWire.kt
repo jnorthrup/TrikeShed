@@ -96,6 +96,7 @@ class GraalWire(
      * returns its snapshot and the response sums the counts; a lane that fails fails the sync.
      */
     private val planeSyncs: List<suspend () -> WorktreeCouchGateway.Snapshot> = emptyList(),
+    private val pointcuts: borg.trikeshed.pointcut.PointcutBlackboardAdapter? = null,
 ) {
     private val occupancies = ConcurrentHashMap<String, RepoOccupancy>()
     private val classEvents = MutableSharedFlow<JvmVitals.VitalEvent>(extraBufferCapacity = 256)
@@ -264,6 +265,7 @@ class GraalWire(
         val id = borg.trikeshed.relaxfactory.CouchHttpSurface
             .parseQuery(path.substringAfter('?', ""))["id"]
             ?: return json(400, mapOf("error" to "id_required"))
+        livePointcut(id)?.let { return json(200, sanitizeGraalDocument(id, it)) }
         val target = graalDocTarget(id)
             ?: return json(503, mapOf("error" to "cas_database_unavailable", "id" to id))
         val doc = target.store.get(target.docId)
@@ -477,6 +479,10 @@ class GraalWire(
     private fun sheetRoute(path: String): JvmKanbanServer.HttpResponse {
         val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
         val id = q["id"] ?: return JvmKanbanServer.HttpResponse(400, """{"error":"id required"}""")
+        livePointcut(id)?.let {
+            val safe = sanitizeGraalDocument(id, it)
+            return json(200, projectionSheets(id, safe).map { sheet -> sheet.toMap() })
+        }
 
         if (id == "vms") {
             val host = vmHost ?: return JvmKanbanServer.HttpResponse(503, """{"error":"no sub-VM host mounted"}""")
@@ -1002,32 +1008,49 @@ class GraalWire(
 
     private fun pointcutDocs() = couchStore?.all().orEmpty().filter { it.id.startsWith("pointcut/") }
 
+    /** Live observations are read through their owner, without pretending they are Couch revisions. */
+    private fun livePointcut(id: String): Map<String, Any?>? =
+        (pointcuts?.blackboard?.get(id) as? borg.trikeshed.pointcut.PointcutBlackboardAdapter.PointcutLanding)
+            ?.let(::pointcutFields)
+
+    private fun pointcutFields(landing: borg.trikeshed.pointcut.PointcutBlackboardAdapter.PointcutLanding): Map<String, Any?> =
+        mapOf("_id" to landing.key, "facet" to landing.facet.id, "mark" to landing.markRaw.toInt(),
+            "property" to landing.propertyName, "value" to landing.value,
+            "coordinate" to landing.coordinateFields(), "persistence" to "live observation") + landing.sourceFields()
+
     private fun pointcutSummary(): Map<String, Any?> {
-        val docs = pointcutDocs()
+        val rows = pointcutRoutes()
         return mapOf(
-            "routes" to docs.size,
-            "byFacet" to docs.groupingBy { d -> d.fields.firstOrNull { it.name == "facet" }?.value?.toString() ?: "?" }.eachCount(),
+            "routes" to rows.size,
+            "byFacet" to rows.groupingBy { it["facet"]?.toString() ?: "?" }.eachCount(),
         )
     }
 
-    private fun pointcutRoutes(): List<Map<String, Any?>> = pointcutDocs().map { d ->
-        fun f(n: String): Any? = d.fields.firstOrNull { it.name == n }?.value
-        @Suppress("UNCHECKED_CAST")
-        val coord = f("coordinate") as? Map<String, Any?> ?: emptyMap()
-        mapOf(
-            "route" to d.id,
-            "facet" to f("facet"),
-            "property" to f("property"),
-            "value" to f("value"),
-            "mark" to f("mark"),
-            "className" to coord["className"],
-            "methodName" to coord["methodName"],
-            "bci" to coord["bytecodeOffset"],
-            "sourcePath" to f("sourcePath"),
-            "line" to f("line"),
-            "column" to f("column"),
-        )
-    }.sortedBy { it["route"].toString() }
+    private fun pointcutRoutes(): List<Map<String, Any?>> {
+        val live = pointcuts?.blackboard?.snapshot()?.values?.values.orEmpty().mapNotNull {
+            (it as? borg.trikeshed.pointcut.PointcutBlackboardAdapter.PointcutLanding)?.let(::pointcutFields)
+        }
+        val stored = pointcutDocs().map { d -> d.fields.associate { it.name to it.value } + ("_id" to d.id) }
+        return (live + stored).distinctBy { it["_id"] }.map { row ->
+            val d = sanitizeGraalDocument(row["_id"].toString(), row)
+            fun f(n: String): Any? = d[n]
+            @Suppress("UNCHECKED_CAST")
+            val coord = f("coordinate") as? Map<String, Any?> ?: emptyMap()
+            mapOf(
+                "route" to d["_id"],
+                "facet" to f("facet"),
+                "property" to f("property"),
+                "value" to f("value"),
+                "mark" to f("mark"),
+                "className" to coord["className"],
+                "methodName" to coord["methodName"],
+                "bci" to coord["bytecodeOffset"],
+                "sourcePath" to f("sourcePath"),
+                "line" to f("line"),
+                "column" to f("column"),
+            )
+        }.sortedBy { it["route"].toString() }
+    }
 
     // ── the flourish feed ────────────────────────────────────────
 

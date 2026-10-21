@@ -1,6 +1,7 @@
 package modelmux
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.job.CasStore
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -27,11 +28,13 @@ class BreadcrumbAdmission(val owner: BreadcrumbElement, val id: String, val cont
 
 /** Session-local context transactions; admitted work drains before its caller's scope exits. */
 class BreadcrumbElement(
-    val factory: () -> BreadcrumbContext = { BreadcrumbContext() },
+    factory: (() -> BreadcrumbContext)? = null,
     val capacity: Int = 250,
     val store: BreadcrumbStore? = null,
+    val cas: CasStore = CasStore.inMemory(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<BreadcrumbElement>
+    val factory: () -> BreadcrumbContext = factory ?: { BreadcrumbContext(index = BreadcrumbIndex(cas)) }
 
     private val contexts = mutableMapOf<String, BreadcrumbContext>()
     private val states = mutableMapOf<String, String>()
@@ -80,7 +83,8 @@ class BreadcrumbElement(
             require(id.isNotBlank() && id.length <= 128) { "breadcrumb context must contain 1-128 characters" }
             require(id !in restored) { "duplicate stored breadcrumb context" }
             require(restored.size < capacity) { "stored breadcrumb context capacity exceeded" }
-            val context = BreadcrumbContext.restore(entry.b, factory().clock)
+            val template = factory()
+            val context = BreadcrumbContext.restore(entry.b, template.clock, template.index.cas)
             restored[id] = context
             encoded[id] = context.state()
         }

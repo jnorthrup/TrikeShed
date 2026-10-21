@@ -24,6 +24,24 @@ import borg.trikeshed.lib.α
  * production or a reader can walk fact → key → fact without a second vocabulary.
  */
 object DocumentCurationFacts {
+    /** Only the host's consumed review permit supplies this envelope; graph-supplied tuples never enter this projection. */
+    fun reviewed(admission: Map<String, Any?>): Series<Map<String, Any?>> {
+        require(admission["admissionCid"] is String && admission["approvalCid"] is String &&
+            admission["snapshotCid"] is String && admission["releaseCid"] is String) { "A consumed review permit is required" }
+        val selected = (admission["relationships"] as? List<*>).orEmpty()
+        return selected.size j { i: Int ->
+            val selection = selected[i] as Map<*, *>
+            @Suppress("UNCHECKED_CAST") val value = selection["value"] as Map<String, Any?>
+            value + mapOf("selectionId" to selection["id"], "quotation" to (value["quotation"] ?: selection["quotation"]),
+                "curationReceiptCid" to admission["curationReceiptCid"], "ontologyCid" to admission["ontologyCid"],
+                "sourceRevision" to admission["sourceRevision"], "snapshotCid" to admission["snapshotCid"],
+                "approvalCid" to admission["approvalCid"], "releaseCid" to admission["releaseCid"],
+                "admissionCid" to admission["admissionCid"], "reviewer" to admission["reviewer"],
+                "synthetic" to admission["synthetic"], "reviewStatus" to "approved",
+                "taxonomyClosureIsCausalProof" to false)
+        }
+    }
+
     const val PARTITION = "documents"
     const val PROPOSAL = "document-proposal"
     const val STAGE_RECEIPT = "document-stage-receipt"

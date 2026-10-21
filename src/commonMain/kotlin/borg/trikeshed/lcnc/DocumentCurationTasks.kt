@@ -20,6 +20,7 @@ import kotlinx.coroutines.sync.withLock
 class DocumentCurationTasks(
     private val cas: CasStore,
     private val sourceCurrent: (DocumentSource) -> Boolean = { true },
+    private val invalidateReview: suspend (ContentId) -> Unit = {},
 ) {
     companion object {
         const val TASKS = "document.tasks"
@@ -200,6 +201,7 @@ class DocumentCurationTasks(
         }
         val next = envelope + mapOf("previousCid" to envelopeCid(row).value,
             "correction" to mapOf("baseRevision" to expectedRevision, "source" to correction))
+        invalidateReview(priorReceiptCid)
         val applied = command(store, row, taskId, "acknowledge", next)
         correctionOutput(applied, next, prior.instructions)
     }
@@ -329,8 +331,15 @@ class DocumentCurationTasks(
             (value as? List<*>)?.map { it as? String ?: error("Source metadata values must be strings") }
                 ?: error("Source metadata values must be string arrays")
         } - setOf("taskId", "taskRevision", "priorReceiptCid")
-        return DocumentSource(original, cid, bytes.decodeToString(throwOnInvalidSequence = true), fields["name"] as? String ?: "Document",
-            fields["mediaType"] as? String ?: "text/plain", fields["correlation"] as? String ?: original.value, metadata)
+        val retainedFields = if (cid.value == previous["extractedTextCid"]) fields else fields + mapOf(
+            "extraction" to null, "anchors" to emptyList<Any?>(),
+            "unresolved" to listOf("page", "folio", "section", "table", "diagram", "coordinates"),
+            "provenance" to ((fields["provenance"] as? Map<*, *>).orEmpty() +
+                mapOf("correctedFrom" to previous["extractedTextCid"], "correctionKind" to "manual-text")))
+        return DocumentCuratorCodec.decodeSource(retainedFields + mapOf("originalCid" to original.value,
+            "extractedTextCid" to cid.value, "text" to bytes.decodeToString(throwOnInvalidSequence = true),
+            "name" to (fields["name"] as? String ?: "Document"), "mediaType" to (fields["mediaType"] as? String ?: "text/plain"),
+            "correlation" to (fields["correlation"] as? String ?: original.value), "metadata" to metadata))
     }
 
     private fun sourceReference(source: DocumentSource, taskMetadata: Boolean = false): Map<String, Any?> =

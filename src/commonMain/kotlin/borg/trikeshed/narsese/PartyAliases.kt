@@ -37,7 +37,8 @@ object PartyAliases {
                 while (h >= 0 && (t[h].tag.startsWith("NN") || t[h].tag.startsWith("PRP") || last.ner != "O" && t[h].ner == last.ner)) h--
                 val head = t.subList(h + 1, open).filter { it.tag.startsWith("NN") || it.tag.startsWith("PRP") }
                 val all = terms + listOf(head)
-                if (all.none { term -> term.any { it.tag.startsWith("PRP") } }) continue
+                // A personal pronoun binds a party; a possessive ("your Coinbase Account") only marks a defined term.
+                if (all.none { term -> term.any { it.tag == "PRP" } }) continue
                 val noun = (terms + listOf(head)).firstOrNull { term -> term.isNotEmpty() && term.none { it.tag.startsWith("PRP") } }?.let(::lemma) ?: continue
                 val party = Party(noun, all.flatten().firstOrNull { it.ner != "O" }?.ner ?: "O")
                 for (term in all) if (term.isNotEmpty()) out.getOrPut(lemma(term)) { party }

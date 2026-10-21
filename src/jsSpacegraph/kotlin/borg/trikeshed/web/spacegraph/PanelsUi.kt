@@ -201,6 +201,13 @@ suspend fun Panels.buildPalette() {
                 val kout = arr(c.outs).joinToString("  ") { p2 -> str(p2) + ":" + (kindOf(t, "out", str(p2)) ?: "?") }
                 d.title = str(c.title) + "\nin   " + kin.ifEmpty { "—" } + "\nout  " + kout.ifEmpty { "—" }
                 d.innerHTML = t + "<i>" + str(c.title) + "</i>"
+                val readiness = c.context?.readiness
+                if (readiness != null && readiness.available == false) {
+                    val note = document.createElement("small").asDynamic()
+                    note.textContent = "Unavailable: " + str(readiness.reason ?: "No runtime owner is bound")
+                    d.appendChild(note)
+                    d.title += "\n" + str(readiness.reason) + "\n" + arr(readiness.prerequisites).joinToString(" · ") { str(it) }
+                }
                 on(d, "dragstart", { e -> e.dataTransfer.setData("text/x-lcnc-type", t); e.dataTransfer.effectAllowed = "copy" })
                 on(d, "click", { addNode(t, (num(viewport.clientWidth) / 2 - num(view.x)) / num(view.z), (num(viewport.clientHeight) / 2 - num(view.y)) / num(view.z)) })
                 body.appendChild(d)

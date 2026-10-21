@@ -85,9 +85,8 @@ object LcncTypeCheck {
                 ))
                 continue
             }
-            // A node whose ports cannot be known: an untyped type, or a NAMED ring
-            // whose ports are declared by the body the loader fetches at run time
-            // (the canvas says the same: "a named ring defers to the daemon").
+            // A named body's formal ports are known when its composite is in the
+            // late-bound vocabulary. Only an absent body remains opaque.
             val fromOpaque = isOpaque(from, contracts)
             val toOpaque = isOpaque(to, contracts)
             val outs = outputsOf(from, contracts)
@@ -150,7 +149,7 @@ object LcncTypeCheck {
 
     /** A ring's outputs are its body's `scope.out` names plus the composed `returns`. */
     fun outputsOf(n: LcncNode, contracts: Map<String, LcncPortContract>): List<String> =
-        if (isRing(n)) ringPorts(n, LcncContracts.SCOPE_OUT) + "returns"
+        if (isRing(n)) (namedContract(n, contracts)?.outputs ?: ringPorts(n, LcncContracts.SCOPE_OUT)) + "returns"
         else contracts[n.type]?.outputs.orEmpty()
 
     /** The ring's iteration socket. Typed by derivation; never auto-wired (feeding it re-types the ring). */
@@ -158,7 +157,8 @@ object LcncTypeCheck {
 
     /** A ring's inputs are the `args?`/`when?`/`each?` envelope plus its body's `scope.in` names. */
     fun inputsOf(n: LcncNode, contracts: Map<String, LcncPortContract>): List<String> =
-        if (isRing(n)) listOf("args?", "when?", "each?") + ringPorts(n, LcncContracts.SCOPE_IN)
+        if (isRing(n)) listOf("args?", "when?", "each?") +
+            (namedContract(n, contracts)?.inputs ?: ringPorts(n, LcncContracts.SCOPE_IN))
         else contracts[n.type]?.inputs.orEmpty()
 
     /**
@@ -278,6 +278,7 @@ object LcncTypeCheck {
             // UNRESOLVED, never untyped, so it cannot leak a false mismatch through
             // a ring parameter or a type variable.
             if (n.type !in contracts && !isRing(n)) return unresolved
+            if (n.children.size == 0 && isRing(n) && namedContract(n, contracts) == null) return unresolved
             // The bindings: a `scope.in`'s value IS the ring parameter of that name;
             // a `scope.out`'s value takes what is plugged into it. Their contract
             // rows carry a `json` placeholder that must not type either.
@@ -306,11 +307,21 @@ object LcncTypeCheck {
             // is a placeholder that must not type it (the scope.in/scope.out precedent).
             if (isRing(n) && dir == "in" && port == "each") {
                 val item = n.params["item"]?.takeIf { it.isNotBlank() } ?: "item"
-                childOf(n, LcncContracts.SCOPE_IN, item)?.params?.get("kind")?.takeIf { it.isNotBlank() }
+                (childOf(n, LcncContracts.SCOPE_IN, item)?.params?.get("kind")
+                    ?: namedContract(n, contracts)?.inputKinds?.get(item))
+                    ?.takeIf { it.isNotBlank() && it != LcncKinds.UNRESOLVED }
                     ?.let { return PortKind("List<$it>", generic = false) }
                 return feederOf(n.id, "each") ?: unresolved
             }
-            val contract = contracts[n.type]
+            val listed = isRing(n) && dir == "out" && eachFed(n)
+            // The composed envelope stays in the declared Confix json slot: one
+            // map, or an array of maps under each. Per-name yields retain their
+            // precise kinds and are lifted below; this is not List<K> subtyping.
+            if (isRing(n) && dir == "out" && port == "returns")
+                return PortKind("json", generic = false)
+            val named = namedContract(n, contracts)
+            val contract = named?.takeIf { port in (if (dir == "out") it.outputKinds else it.inputKinds) }
+                ?: contracts[n.type]
             val declared = contract?.let { if (dir == "out") it.outputKinds[port] else it.inputKinds[port] }
             if (declared != null) {
                 // A composite's formal that declared nothing (LcncComposites spells it `*`).
@@ -321,7 +332,8 @@ object LcncTypeCheck {
                 if (LcncKinds.isTypeVariable(declared) && contract != null) {
                     for ((p, k) in contract.inputKinds) if (k == declared) {
                         val fixed = feederOf(n.id, p) ?: continue
-                        if (!fixed.generic) return fixed
+                        if (!fixed.generic) return if (listed && fixed.kind != null)
+                            PortKind("List<${fixed.kind}>", generic = false) else fixed
                     }
                     return unresolved
                 }
@@ -330,7 +342,7 @@ object LcncTypeCheck {
                 if (dir == "out" && contract != null && declared == "json" && LcncKinds.isLiteral(contract, port)) {
                     return PortKind(facts.refineLiteral(n, port, declared), generic = false)
                 }
-                return PortKind(declared, generic = false)
+                return PortKind(if (listed) "List<$declared>" else declared, generic = false)
             }
             if (!isRing(n)) return PortKind(null, generic = false)
             // A ring's per-name port: the kind its scope.in/scope.out child declares,
@@ -338,7 +350,6 @@ object LcncTypeCheck {
             val childType = if (dir == "out") LcncContracts.SCOPE_OUT else LcncContracts.SCOPE_IN
             val child = childOf(n, childType, port)
             // Under a fed `each`, a per-name yield is the LIST of what one iteration yields.
-            val listed = dir == "out" && eachFed(n)
             child?.params?.get("kind")?.takeIf { it.isNotBlank() }?.let { return PortKind(if (listed) "List<$it>" else it, generic = false) }
             if (dir == "in") return feederOf(n.id, port) ?: unresolved
             val fed = child?.let { feederOf(it.id, "value") } ?: return unresolved
@@ -350,11 +361,21 @@ object LcncTypeCheck {
     }
 
     private fun isRing(n: LcncNode): Boolean =
-        n.children.size > 0 || !n.subprogram.isNullOrBlank() || !n.params["program"].isNullOrBlank()
+        n.children.size > 0 || !n.subprogram.isNullOrBlank() ||
+            (n.type == LcncContracts.SCOPE && !n.params["program"].isNullOrBlank())
+
+    private fun namedContract(n: LcncNode, contracts: Map<String, LcncPortContract>): LcncPortContract? {
+        if (n.children.size > 0) return null // Inline children own the body, as in LcncRunner.
+        val name = n.subprogram?.takeIf { it.isNotBlank() }
+            ?: n.params["program"]?.takeIf { n.type == LcncContracts.SCOPE && it.isNotBlank() }
+            ?: return null
+        // Compiled contracts own their type names, not a stored body with that name.
+        return if (LcncContracts.find(name) == null) contracts[name] else null
+    }
 
     /** A named ring (body loaded at run time) or a type outside the contract table. */
     private fun isOpaque(n: LcncNode, contracts: Map<String, LcncPortContract>): Boolean =
-        n.type !in contracts || (n.children.size == 0 && isRing(n))
+        n.type !in contracts || (n.children.size == 0 && isRing(n) && namedContract(n, contracts) == null)
 
     private fun ringPorts(n: LcncNode, childType: String): List<String> {
         val names = ArrayList<String>()

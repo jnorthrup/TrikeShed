@@ -20,12 +20,16 @@ interface ProjectCorpus {
     suspend fun docs(project: String, prefix: String = "", glob: String = "", limit: Int = 256): List<ProjectDoc>
     /** Null when the document is absent, binary, or over the character budget. */
     suspend fun read(project: String, id: String, maxChars: Int = 65_536): ProjectText?
+    /** Exact original bytes for a source boundary; textual reads must never substitute for these. */
+    suspend fun bytes(project: String, id: String): ByteArray? = null
+    suspend fun document(project: String, id: String): ProjectDoc? = docs(project, prefix = id, limit = Int.MAX_VALUE).firstOrNull { it.id == id }
     /**
      * The document's extracted text: its twin when one exists, else the text the corpus reads out of
      * the document (text layer or OCR) and keeps as the twin. Null when nothing can be read from it.
      */
     suspend fun extract(project: String, id: String, maxChars: Int): ProjectText? =
         read(project, id + ProjectNodes.EXTRACT_SUFFIX, maxChars)
+            ?: read(project, id, maxChars)?.let { it.copy(originalCid = it.cid, originalRev = it.rev) }
 }
 
 /** One mounted project, as `project.list` reports it. */
@@ -72,11 +76,15 @@ data class ProjectDoc(
     }
 }
 
-data class ProjectText(val project: String, val id: String, val cid: String, val rev: String, val seq: Long, val text: String)
+data class ProjectText(val project: String, val id: String, val cid: String, val rev: String, val seq: Long, val text: String,
+    val originalCid: String? = null, val originalRev: String? = null,
+    val anchors: List<borg.trikeshed.narsese.DocumentAnchor> = emptyList(),
+    val unresolved: List<String> = listOf("page", "folio", "section", "table", "diagram", "coordinates"))
 
 /** Map-backed corpus — the zero-thread test seam; documents carry real content ids. */
 class InMemoryProjectCorpus : ProjectCorpus {
-    private class Entry(val bytes: ByteArray, val contentType: String, val cid: String, val rev: String, val seq: Long)
+    private class Entry(val bytes: ByteArray, val contentType: String, val cid: String, val rev: String, val seq: Long,
+        val originalCid: String? = null, val originalRev: String? = null)
 
     private val projects = linkedMapOf<String, LinkedHashMap<String, Entry>>()
     private val kinds = linkedMapOf<String, String>()
@@ -88,7 +96,8 @@ class InMemoryProjectCorpus : ProjectCorpus {
         if (project !in kinds) kinds[project] = kind
         val cid = ContentId.of(bytes).value
         val generation = (docs[id]?.rev?.substringBefore('-')?.toIntOrNull() ?: 0) + 1
-        docs[id] = Entry(bytes, contentType, cid, "$generation-${cid.removePrefix("sha256:").take(8)}", ++sequence)
+        val original = id.takeIf { it.endsWith(ProjectNodes.EXTRACT_SUFFIX) }?.removeSuffix(ProjectNodes.EXTRACT_SUFFIX)?.let(docs::get)
+        docs[id] = Entry(bytes, contentType, cid, "$generation-${cid.removePrefix("sha256:").take(8)}", ++sequence, original?.cid, original?.rev)
         return cid
     }
 
@@ -112,8 +121,10 @@ class InMemoryProjectCorpus : ProjectCorpus {
         if (!ProjectGlob.isTextual(e.contentType, id)) return null
         val text = runCatching { e.bytes.decodeToString() }.getOrNull() ?: return null
         if (text.any { it == '�' }) return null
-        return ProjectText(project, id, e.cid, e.rev, e.seq, if (text.length > maxChars) text.take(maxChars) else text)
+        return ProjectText(project, id, e.cid, e.rev, e.seq, if (text.length > maxChars) text.take(maxChars) else text, e.originalCid, e.originalRev)
     }
+
+    override suspend fun bytes(project: String, id: String): ByteArray? = projects[project]?.get(id)?.bytes?.copyOf()
 
     companion object {
         fun contentTypeOf(id: String): String = when (id.substringAfterLast('.', "").lowercase()) {
@@ -177,6 +188,8 @@ object ProjectNodes {
     const val EXTRACT = "project.extract"
     /** The mined twin the project miner leaves beside a document (ProjectMiner). */
     const val EXTRACT_SUFFIX = ".extract.md"
+    /** Completion record binds the extraction and layout to one exact source revision. */
+    const val EXTRACTION_SUFFIX = ".extract.json"
     /**
      * The curation-notes twin a curator (or the wiki) writes beside a document: conventions the text
      * does not carry about itself (`work:`, `edition:`, `date:`, … as `key: value` lines) and any prose
@@ -191,7 +204,7 @@ object ProjectNodes {
     fun twin(id: String): Boolean = twinOf(id) != null
 
     /** The document [id] is a twin of, or null when [id] is a document. */
-    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
+    fun twinOf(id: String): String? = listOf(EXTRACT_SUFFIX, EXTRACTION_SUFFIX, NOTES_SUFFIX, FOOTNOTES_SUFFIX, LINKS_SUFFIX).firstOrNull { id.endsWith(it) }?.let { id.removeSuffix(it) }
     const val NOTES = "project.notes"
 
     /** The `key: value` lines of a notes twin, lower-cased keys; other lines are prose. */
@@ -254,7 +267,10 @@ object ProjectNodes {
             val twin = service.value.extract(project, id, maxChars)
             if (twin != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id$EXTRACT_SUFFIX", twin.cid, twin.seq, twin.rev)
             if (twin == null) mapOf("found" to false)
-            else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true)
+            else mapOf("text" to twin.text, "cid" to twin.cid, "found" to true,
+                "originalCid" to twin.originalCid, "originalRev" to twin.originalRev,
+                "extraction" to mapOf("project" to twin.project, "id" to twin.id, "cid" to twin.cid, "rev" to twin.rev, "seq" to twin.seq),
+                "anchors" to twin.anchors.map { it.toMap() }, "unresolved" to twin.unresolved)
         },
         NOTES to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
             val doc = docOf(inputs)

@@ -83,7 +83,7 @@ class HermesCredentialSourceTest {
     }
 
     @Test
-    fun allExhaustedAndUncooledFallsBackToBestByPriorityRatherThanNull() = runTest {
+    fun allExhaustedAndUncooledDoesNotRetryAReportedExhaustedCredential() = runTest {
         val future = (kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000.0) + 3600.0
         val json = """
             {"credential_pool": {"deepseek": [
@@ -93,11 +93,7 @@ class HermesCredentialSourceTest {
             ]}}
         """.trimIndent()
         val src = HermesCredentialSource("/hermes", fakeFs(json))
-        assertEquals(
-            "sk-only",
-            src.read("llm.deepseek.key".toKeyPath()),
-            "no usable entry exists — degrade to best-by-priority rather than leaving the caller with nothing",
-        )
+        assertNull(src.read("llm.deepseek.key".toKeyPath()))
     }
 
     @Test
@@ -136,7 +132,22 @@ class HermesCredentialSourceTest {
         val byId = (0 until entries.size).map { entries[it] }.associateBy { it.keyId }
         assertEquals(MuxKeyStatus.ACTIVE, byId.getValue("xai:a").status)
         assertEquals(42L, byId.getValue("xai:a").accessCount)
-        assertEquals(MuxKeyStatus.BACKOFF, byId.getValue("xai:b").status)
+        assertEquals(MuxKeyStatus.ACTIVE, byId.getValue("xai:b").status,
+            "a status without a reset or observation time cannot prove current exhaustion")
+    }
+
+    @Test
+    fun exhaustedStatusWithoutResetUsesHermesBoundedCooldown() = runTest {
+        val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() / 1000.0
+        fun pool(at: Double) = """{"credential_pool":{"p":[{"id":"a","source":"manual",
+            "access_token":"fixture","last_status":"exhausted","last_error_code":429,"last_status_at":$at}]}}"""
+        val source = HermesCredentialSource("/hermes", fakeFs(pool(now - 10)))
+        assertNull(source.read("llm.p.key".toKeyPath()))
+        val entry = source.keyEntries()[0]
+        assertEquals(MuxKeyStatus.BACKOFF, entry.status)
+        assertTrue(entry.leaseExpiresAt in ((now + 49) * 1000).toLong()..((now + 51) * 1000).toLong(),
+            "reactor projection must expire at the same bounded source cooldown")
+        assertEquals("fixture", HermesCredentialSource("/hermes", fakeFs(pool(now - 61))).read("llm.p.key".toKeyPath()))
     }
 
     @Test
@@ -226,6 +237,83 @@ class HermesCredentialSourceTest {
         val src = HermesCredentialSource("/hermes", fs)
         assertEquals("sk-zai", src.read("llm.zai.key".toKeyPath()), "profile pool provider")
         assertEquals("sk-gh", src.read("llm.copilot.key".toKeyPath()), "default-only provider must be reachable")
+    }
+
+    @Test
+    fun explicitProfileConfigAndDotenvResolveWithoutAmbientHermesHome() = runTest {
+        val fs = KeyMuxTest.FakeFileOperations(mutableMapOf(
+            "/profile/config.yaml" to """
+                model:
+                  provider: custom:local
+                  default: micro
+                  base_url: http://localhost:8080/v1
+                  key_env: PROFILE_KEY
+                  context_length: 4096
+            """.trimIndent().encodeToByteArray(),
+            "/profile/.env" to "PROFILE_KEY=profile-secret".encodeToByteArray(),
+        ))
+        val source = HermesCredentialSource("/profile", fs) { null }
+        val config = source.modelConfig()!!
+        assertEquals("micro", config.model)
+        assertEquals(4096, config.contextWindow)
+        assertEquals("profile-secret", source.read("llm.custom:local.key".toKeyPath()))
+        assertEquals(1, source.providers()[0].available)
+        assertTrue("profile-secret" !in config.toString())
+    }
+
+    @Test
+    fun customModelMetadataPreservesItsContextCeiling() = runTest {
+        val fs = KeyMuxTest.FakeFileOperations(mutableMapOf(
+            "/profile/config.yaml" to """
+                custom_providers:
+                  - name: Example
+                    base_url: https://example.invalid/v1
+                    model: large
+                    context_length: 8192
+                    models:
+                      large:
+                        context_length: 262000
+                      small:
+                        context_window: 4096
+            """.trimIndent().encodeToByteArray(),
+        ))
+        val models = HermesCredentialSource("/profile", fs) { null }.configuredModels()
+        assertEquals(2, models.size)
+        assertEquals("large", models[0].model)
+        assertEquals(262000, models[0].contextWindow)
+        assertEquals(4096, models[1].contextWindow)
+    }
+
+    @Test
+    fun failedPoolCredentialRotatesWithItsEndpointAndIdentity() = runTest {
+        val fs = fakeFs("""{"credential_pool":{"custom:p":[
+            {"id":"one","priority":0,"access_token":"one-secret","base_url":"https://one.invalid/v1"},
+            {"id":"two","priority":1,"access_token":"two-secret","base_url":"https://two.invalid/v1"}
+        ]}}""")
+        val source = HermesCredentialSource("/hermes", fs) { null }
+        val mux = KeyMux { bind("llm.*.*", source) }
+        val first = mux.resolveLlm("m", "custom:p", "https://fallback.invalid/v1")!!
+        assertEquals("custom:p:one", first.keyId)
+        assertEquals("https://one.invalid/v1", first.baseUrl)
+        mux.rotate(first.keyId!!)
+        val second = mux.resolveLlm("m", "custom:p", "https://fallback.invalid/v1")!!
+        assertEquals("custom:p:two", second.keyId)
+        assertEquals("two-secret", second.authKey)
+        assertEquals("https://two.invalid/v1", second.baseUrl)
+    }
+
+    @Test
+    fun cooledPoolRowsAreActiveAndDuplicateIdsAreNotCountedTwice() = runTest {
+        val json = """{"credential_pool":{"p":[
+            {"id":"one","access_token":"test","last_status":"exhausted","last_error_reset_at":"2020-01-01T00:00:00Z"}
+        ]}}"""
+        val fs = KeyMuxTest.FakeFileOperations(mutableMapOf(
+            "/profile/auth.json" to json.encodeToByteArray(),
+            "~/.hermes/auth.json" to json.encodeToByteArray(),
+        ))
+        val entries = HermesCredentialSource("/profile", fs) { null }.keyEntries()
+        assertEquals(1, entries.size)
+        assertEquals(MuxKeyStatus.ACTIVE, entries[0].status)
     }
 }
 

@@ -27,8 +27,42 @@ typealias RouteResult = Join<Series<ModelEntry>, AcpAction>
 /** The mux: models j router */
 typealias ModelMuxCore = Join<Series<ModelEntry>, ModelRouter>
 
+/** Resolved credential identity and admission from observed quota; null identity is explicit auth NONE. */
+typealias ModelAdmission = Join<String?, Boolean>
+
 /** Upstream status is separate from diagnostics so HTTP hosts can relay it without exposing response bodies. */
 class ModelHttpFailure(val status: Int, message: String) : IllegalStateException(message)
+
+private fun loomEndpoint(baseUrl: String): Boolean = baseUrl.trimEnd('/') in setOf(
+    "https://api.loom.vsiwest.com/v1", "https://loom.vsiwest.com/v1",
+    "https://api.loom.vsiwest.com:443/v1", "https://loom.vsiwest.com:443/v1",
+)
+
+/** LOOM commits HTTP 200 before inference; its failure envelope retains the actual status. */
+private fun loomStatus(doc: ConfixDoc, baseUrl: String): Int? =
+    if (loomEndpoint(baseUrl) && doc.getAt("error") != null)
+        (doc.scalar("loom", "status") as? Number)?.toInt()?.takeIf { it in 100..599 }
+    else null
+
+private fun completedResponse(raw: String, baseUrl: String): ConfixDoc {
+    val doc = confixDoc(raw)
+    if (doc.getAt("error") != null) {
+        throw ModelHttpFailure(loomStatus(doc, baseUrl) ?: 502, "Provider returned an error envelope")
+    }
+    AcpCodec.parseCompletion(raw)
+    if (loomEndpoint(baseUrl)) {
+        val text = doc.scalar("choices", 0, "message", "content") as? String ?: ""
+        // This reserved prefix is also stripped by LOOM's assistant-history parser.
+        // Billing can remain pending after real inference, so billing metadata is not a signal.
+        var rest = text.trimStart()
+        val notice = rest.startsWith("⏳ LOOM: ")
+        while (rest.startsWith("⏳ LOOM: ")) rest = rest.substringAfter('\n', "").trimStart()
+        if (notice && rest.isEmpty() && doc.getAt("choices", 0, "message", "tool_calls")?.kids?.size.let { it == null || it == 0 }) {
+            throw ModelHttpFailure(202, "LOOM completion pending; received only provider waiting notices")
+        }
+    }
+    return doc
+}
 
 // ═══════════════════════════════════════════
 // Model Router — capability-based selection
@@ -187,6 +221,7 @@ class ModelMux internal constructor(
 
     /** Create a session for a specific model by ID */
     suspend fun session(modelId: String): Result<LlmSession> {
+        borg.trikeshed.kernel.KernelExecution.require(borg.trikeshed.kernel.KernelCapability.MODEL)
         runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
             ?: return Result.failure(NoSuchElementException("need(model): model not found: $modelId"))
@@ -211,13 +246,8 @@ class ModelMux internal constructor(
      * or the model explicitly uses credential-free authentication.
      */
     private suspend fun resolveKeyId(card: AcpModelCard): String? {
-        if (auth(card.id) == LlmAuth.NONE) return null
-        val keyMux = credentialMux(card.id)
-        val providerTag = card.providerTag
-        if (providerTag != null && keyMux.get("llm.$providerTag.key") != null) return "llm.$providerTag.key"
-        if (keyMux.get("llm.${card.id}.key") != null) return "llm.${card.id}.key"
-        if (keyMux.get("llm.default.key") != null) return "llm.default.key"
-        return null
+        return credentialMux(card.id).resolveLlm(card.id, card.providerTag,
+            configuredBaseUrls[card.id] ?: "https://api.openai.com/v1", auth(card.id))?.keyId
     }
 
     /**
@@ -423,6 +453,7 @@ class ModelMux internal constructor(
         var inputTokens = 0
         var outputTokens = 0
         var requestHash = ""
+        var responseHeaders = emptyHtxHeaders()
         try {
             val card = session.model.b
             val json = encode(card.wireName)
@@ -447,7 +478,7 @@ class ModelMux internal constructor(
                     val lookup = reactor.lookupApiCall(provider = card.id, modelId = modelId, requestHash = id, ttlMs = 3600_000)
                     if (lookup is CacheLookup.Hit) { hit = lookup; break }
                 }
-                if (hit != null) {
+                if (hit != null && runCatching { completedResponse(hit.entry.payload, session.baseUrl) }.isSuccess) {
                     cachedHit = true
                     httpStatus = 200
                     val cached = decode(hit.entry.payload)
@@ -469,6 +500,7 @@ class ModelMux internal constructor(
                 }
             }
 
+            requireQuota(keyId)
             val htx = currentCoroutineContext()[HtxKey] ?: throw IllegalStateException("No HtxKey found in coroutine context")
             val url = "${session.baseUrl.trimEnd('/')}/chat/completions"
             val htxHeaders = htxHeaders(*session.authHeaders().toArray())
@@ -492,16 +524,27 @@ class ModelMux internal constructor(
             val resp = htx.request(htxReq)
             val respBody = resp.body.toArray().decodeToString()
             httpStatus = resp.status
+            responseHeaders = resp.headers
+            if (loomEndpoint(session.baseUrl) && resp.status in 200..299) {
+                val envelope = runCatching { confixDoc(respBody) }.getOrNull()
+                if (envelope != null) {
+                    loomStatus(envelope, session.baseUrl)?.let { httpStatus = it }
+                    val retry = (envelope.scalar("loom", "retry_after_seconds") as? Number)?.toLong()
+                    if (retry != null && retry >= 0) {
+                        responseHeaders = (responseHeaders.view + ("Retry-After" j retry.toString())).toSeries()
+                    }
+                }
+            }
 
-            if (reactor != null) {
+            if (reactor != null && (httpStatus !in 200..299 || httpStatus == 202)) {
                 reactor.recordProviderHealth(
                     provider = card.id,
-                    success = resp.status in 200..299,
+                    success = false,
                     latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0
                 )
             }
 
-            if (resp.status !in 200..299) {
+            if (httpStatus !in 200..299 || httpStatus == 202) {
                 // Record the failure receipt BEFORE returning: the finally-block legion
                 // metering reads session.lastReceipt, and a 429 that left no receipt
                 // never exhausted its key — the provider's "no" fell on the floor.
@@ -511,18 +554,23 @@ class ModelMux internal constructor(
                         action = "chat", httpStatus = httpStatus,
                         latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0,
                         assessmentId = receiptAssessment, sessionId = session.sessionId,
-                        error = IllegalStateException("HTTP ${resp.status}"),
+                        error = IllegalStateException("Provider status $httpStatus"),
                     )
                 )
                 // 429: the credential is rate-limited; the next session() resolves the pool's next key.
-                if (resp.status == 429 && keyId != null) {
-                    runCatching { credentialMux(modelId).rotate(keyId) }
+                if (httpStatus == 429 && keyId != null) {
+                    val quota = HttpQuota.parse(httpStatus, responseHeaders, kotlinx.datetime.Clock.System.now().toEpochMilliseconds())
+                    runCatching { credentialMux(modelId).rotate(keyId, quota.resetAtMs) }
                         .onFailure { println("[MODELMUX] rotate($keyId) failed: ${it.message}") }
                 }
-                return Result.failure(ModelHttpFailure(resp.status, "ModelMux chat failed with HTTP ${resp.status}: ${respBody.take(500)}"))
+                return Result.failure(ModelHttpFailure(httpStatus, "ModelMux chat returned provider status $httpStatus"))
             }
 
+            // HTTP acceptance and cold-start status payloads are not completed model work.
+            completedResponse(respBody, session.baseUrl)
             val parsed = decode(respBody)
+            reactor?.recordProviderHealth(provider = card.id, success = true,
+                latencyMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() - t0)
             val usage = AcpCodec.parseResponse(respBody).b
             inputTokens = usage.a
             outputTokens = usage.b
@@ -567,10 +615,12 @@ class ModelMux internal constructor(
                 capture(receipt, keyId)
                 lastReceipt = receipt
                 if (keyId != null && !receipt.cachedHit) {
+                    val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+                    val provider = session.model.b.providerTag ?: session.model.b.id
                     quotaLegion?.applyReceipt(
-                        keyId, receipt.providerId, receipt,
-                        kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+                        keyId, provider, receipt, now,
                     )
+                    if (httpStatus > 0) quotaLegion?.observeHttp(keyId, provider, httpStatus, responseHeaders, now)
                 }
             }
             if (reactor != null && keyId != null) {
@@ -607,6 +657,7 @@ class ModelMux internal constructor(
             reactor.recordAccess(keyId = keyId, provider = session.model.b.providerTag ?: session.model.b.id, label = keyId)
         }
         try {
+            requireQuota(keyId)
             val card = models.let { ms -> (0 until ms.size).first { ms[it].a == modelId }.let { ms[it] } }.b
             val meta: AcpMeta = card.wireName j ("stream" j session.authHeaders())
             val body: AcpRequestBody = messages j tools
@@ -625,13 +676,35 @@ class ModelMux internal constructor(
             Airgap.requireRemote()
             val resp = htx.request(htxReq)
             val text = resp.body.toArray().decodeToString()
-            var emitted = false
+            val envelope = if (loomEndpoint(session.baseUrl) && text.trimStart().startsWith('{')) confixDoc(text) else null
+            val status = observeQuota(session, resp.status, resp.headers, envelope)
+            if (status !in 200..299 || status == 202) {
+                throw ModelHttpFailure(status, "ModelMux stream returned provider status $status")
+            }
+            var frames = false
+            var finished = false
             text.lineSequence().forEach { line ->
                 if (line.startsWith("data:")) {
-                    AcpCodec.parseChunk(line)?.let { emit(it); emitted = true }
+                    frames = true
+                    val data = line.removePrefix("data:").trim()
+                    if (data != "[DONE]") {
+                        val doc = confixDoc(data)
+                        if (doc.getAt("error") != null) {
+                            val status = loomStatus(doc, session.baseUrl) ?: 502
+                            observeQuota(session, status, resp.headers, doc)
+                            throw ModelHttpFailure(status, "Provider stream returned an error envelope")
+                        }
+                        if (doc.scalar("choices", 0, "finish_reason") != null) finished = true
+                        AcpCodec.parseChunk(line)?.let {
+                            if (it.a.isNotEmpty() || it.b.a > 0 || it.b.b > 0) emit(it)
+                        }
+                    }
                 }
             }
-            if (!emitted && text.isNotBlank()) {
+            if (frames) {
+                check(finished) { "Model stream ended before a completion; provider heartbeats are not model output" }
+            } else {
+                completedResponse(text, session.baseUrl)
                 val parsed = AcpCodec.parseResponse(text)
                 emit(parsed.a j parsed.b)
             }
@@ -685,6 +758,7 @@ class ModelMux internal constructor(
                 }
             }
 
+            requireQuota(keyId)
             val htx = currentCoroutineContext()[HtxKey] ?: error("No HtxKey found in coroutine context")
             val url = "${session.baseUrl.trimEnd('/')}/embeddings"
             val htxHeaders = htxHeaders(*meta.b.b.toArray())
@@ -697,6 +771,7 @@ class ModelMux internal constructor(
             val t0 = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
             Airgap.requireRemote()
             val resp = htx.request(htxReq)
+            observeQuota(session, resp.status, resp.headers)
             val respBody = resp.body.toArray().decodeToString()
 
             if (reactor != null) {
@@ -730,11 +805,53 @@ class ModelMux internal constructor(
     suspend fun modelKeyId(modelId: String): String? =
         models.view.firstOrNull { it.a == modelId }?.b?.let { resolveKeyId(it) }
 
+    /**
+     * Resolve the same binding as [session], including credential cooldowns,
+     * then consult known HTTP quota. Unknown quota remains admitted; this
+     * projection sends no request to the model or provider. Null means the
+     * model or its required credential cannot resolve.
+     */
+    suspend fun modelAdmission(
+        modelId: String,
+        nowMs: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+    ): ModelAdmission? {
+        val card = models.view.firstOrNull { it.a == modelId }?.b ?: return null
+        val binding = credentialMux(modelId).resolveLlm(
+            card.id, card.providerTag, configuredBaseUrls[modelId] ?: "https://api.openai.com/v1", auth(modelId),
+        ) ?: return null
+        val keyId = binding.keyId
+        return keyId j (keyId == null || quotaLegion?.isAvailable(keyId, nowMs) != false)
+    }
+
     fun configuredBaseUrl(modelId: String): String? = configuredBaseUrls[modelId]
+
+    fun contextWindow(modelId: String): Int? = models.view.firstOrNull { it.a == modelId }?.b
+        ?.meta?.headers?.view?.firstOrNull { it.a == "context_window" }?.b?.toIntOrNull()?.takeIf { it > 0 }
 
     fun auth(modelId: String): LlmAuth = configuredAuth[modelId] ?: LlmAuth.REQUIRED
 
     private fun credentialMux(modelId: String): KeyMux = configuredKeys[modelId] ?: keyMux
+
+    private fun requireQuota(keyId: String?) {
+        check(keyId == null || quotaLegion?.isAvailable(keyId, kotlinx.datetime.Clock.System.now().toEpochMilliseconds()) != false) {
+            "Provider quota exhausted; awaiting its reported reset"
+        }
+    }
+
+    /** Streaming and embedding calls share HTTP admission evidence even without chat receipts. */
+    private suspend fun observeQuota(session: LlmSession, status: Int, headers: HtxHeaders, envelope: ConfixDoc? = null): Int {
+        val reportedStatus = envelope?.let { loomStatus(it, session.baseUrl) } ?: status
+        val keyId = session.keyId ?: return reportedStatus
+        val retry = if (envelope != null && loomEndpoint(session.baseUrl))
+            (envelope.scalar("loom", "retry_after_seconds") as? Number)?.toLong()?.takeIf { it >= 0 } else null
+        val reportedHeaders = if (retry != null) (headers.view + ("Retry-After" j retry.toString())).toSeries() else headers
+        val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+        val provider = session.model.b.providerTag ?: session.model.b.id
+        val observation = quotaLegion?.observeHttp(keyId, provider, reportedStatus, reportedHeaders, now)
+            ?: HttpQuota.parse(reportedStatus, reportedHeaders, now)
+        if (reportedStatus == 429) runCatching { credentialMux(session.model.a).rotate(keyId, observation.resetAtMs) }
+        return reportedStatus
+    }
 
     /** Cache scope includes the resolved destination; receipts continue to identify the exact request bytes. */
     private fun cacheIdentities(session: LlmSession, json: String): Series<Twin<String>> {
@@ -863,6 +980,10 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         wireModel: String? = null,
         /** Credential-free hosts must have an explicit destination; default keys never reach them. */
         auth: LlmAuth = LlmAuth.REQUIRED,
+        /** Advertised input/output context ceiling, in tokens; zero keeps it unknown. */
+        contextWindow: Int = 0,
+        /** Observed model revision, independent of the ACP protocol [version]. */
+        modelVersion: String? = null,
     ): ModelMuxBuilder = apply {
         require(auth != LlmAuth.NONE || !baseUrl.isNullOrBlank()) {
             "Credential-free models require an explicit baseUrl"
@@ -872,6 +993,8 @@ class ModelMuxBuilder(private val keyMux: KeyMux) {
         val tags = buildList {
             if (provider != null) add("provider" j provider)
             if (wireModel != null && wireModel != id) add("wire_model" j wireModel)
+            if (contextWindow > 0) add("context_window" j contextWindow.toString())
+            if (!modelVersion.isNullOrBlank()) add("model_version" j modelVersion)
         }
         val headers: Series<Join<String, String>> = if (tags.isNotEmpty()) {
             tags.toSeries()

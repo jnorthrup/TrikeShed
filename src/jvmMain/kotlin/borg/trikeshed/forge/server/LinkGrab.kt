@@ -74,15 +74,11 @@ class LinkGrab(
      * A dragged link: its document fetched and landed as the root of a group of its own, named for its host and path,
      * at `<host>/<path>` like every document its links reach. Answers the group and the root's id.
      */
-    suspend fun root(url: String, provider: DecisionProvider?): Pair<String, String> {
+    suspend fun root(url: String, provider: DecisionProvider?, requirePdf: Boolean = false): Pair<String, String> {
         val host = name(host(url) ?: error("not a web address: $url"))
         val group = (host + "-" + stem(url).lowercase()).replace(Regex("[^a-z0-9._-]+"), "-").trim('-', '.').take(64).trimEnd('-', '.')
         val (bytes, type, at) = fetch(url)
-        val ext = when {
-            "pdf" in type -> "pdf"
-            "html" in type -> "html"
-            else -> error("neither markup nor PDF: $type")
-        }
+        val ext = extension(bytes, type, requirePdf)
         val digest = borg.trikeshed.job.ContentId.of(bytes).hex
         if (scopes.list().none { it.name == group }) scopes.beginUpload(group, "assets", provider)
         held(group).let { h -> h.works.add(work(url)); h.works.add(work(at)); h.digests.add(digest) }
@@ -159,6 +155,20 @@ class LinkGrab(
     }
 
     companion object {
+        /** Runs before beginUpload, CAS retention, notes, or intake notification. */
+        internal fun extension(bytes: ByteArray, type: String, requirePdf: Boolean): String {
+            val mime = type.substringBefore(';').trim().lowercase()
+            if (mime == "application/pdf") {
+                require(bytes.size >= 8 && bytes.copyOfRange(0, 5).decodeToString() == "%PDF-" &&
+                    bytes[5].toInt().toChar() in '1'..'2' && bytes[6].toInt().toChar() == '.' &&
+                    bytes[7].toInt().toChar().isDigit()) { "PDF content does not carry a PDF header" }
+                return "pdf"
+            }
+            require(!requirePdf) { "PDF intake requires application/pdf; received $type" }
+            require(mime in setOf("text/html", "application/xhtml+xml")) { "neither markup nor PDF: $type" }
+            return "html"
+        }
+
         /** Links grabbed per document, levels of links followed, redirects followed, and the wait per fetch. */
         const val GRABS = 64
         const val DEPTH = 2

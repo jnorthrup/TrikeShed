@@ -1133,17 +1133,13 @@ internal class LcncRunService(
                             val result = walk(args, trustedRecord)
                             val promptVersions = PromptNodes.promptVersionsOf(listOf(frozen) + pinned.values, result.nodeOutputs) +
                                 (walker.ledger?.promptVersions() ?: emptyMap())
-                            val outputs = result.nodeOutputs.mapValues { (_, v) ->
-                                val over = ValueBudget().violation(v)
-                                if (over == null) v else mapOf<String, Any?>("truncated" to over, "keys" to v.keys.toList())
-                            }
-                            val output = mapOf("returns" to result.returns, "outputs" to outputs,
+                            val output = mapOf("returns" to result.returns, "outputs" to result.nodeOutputs,
                                 "bindings" to result.bindings, "bindingsTruncated" to result.bindingsTruncated,
                                 "promptVersions" to promptVersions,
                                 "consumed" to result.consumed, "consumedTruncated" to result.consumedTruncated,
                                 "inputFingerprint" to result.inputFingerprint)
-                            ValueBudget().violation(output)?.let { throw EvidenceFailure(413, it) }
-                            return LcncCaseResult(output + rootState(cid, result.retained), invocationLedger.snapshot())
+                            val projection = borg.trikeshed.lcnc.LcncOutputReceipt.retain(ctx.casStore, output)
+                            return LcncCaseResult(projection + rootState(cid, result.retained), invocationLedger.snapshot())
                         }
                         val result = if (case != null && selectedCase != null) {
                             val completed = case.transitionLcncCase(ctx.casStore, selectedCase, frozen, checkNotNull(owner), ::output)

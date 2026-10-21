@@ -78,6 +78,7 @@ object RuleNodes {
      */
     fun ruleAdmitRunner(
         element: CausalityReteElement,
+        review: (suspend (borg.trikeshed.job.ContentId) -> Map<String, Any?>)? = null,
         /**
          * Durability tee for admitted rules. The rete is in-memory and the daemon boots it over
          * zero rules, so without this every rule admitted through this node is gone at the next
@@ -88,7 +89,19 @@ object RuleNodes {
         ledger: ((EternalRule) -> Unit)? = null,
     ): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         // Decode the whole offer before admission: a malformed later row cannot partially admit earlier rows.
-        val specs = specifications(node, inputs)
+        val release = inputs["releaseCid"] ?: inputs["releaseCid?"]
+        val admittedReview = release?.let {
+            checkNotNull(review) { "Document review authority is unavailable" }(borg.trikeshed.job.ContentId(it as String))
+        }
+        val specs = if (admittedReview != null) {
+            val selected = admittedReview["ruleCandidates"] as List<*>
+            require(selected.isNotEmpty()) { "Review release contains no rules" }
+            selected.map { (it as Map<*, *>)["value"] as Map<*, *> }.toSeries()
+        } else specifications(node, inputs).also { rows ->
+            require(rows.view.none { "admission" in it || "quotation" in it || "sourceEvidence" in it || "snapshotCid" in it }) {
+                "Document rule proposals require a current authenticated review release"
+            }
+        }
         val decoded = Array(specs.size) { rule(specs[it]) }
         val offered = (decoded.size j decoded::get).filter { it.isEternal }
         val admitted = if (offered.size == 0) 0 else element.admit(offered)
@@ -99,6 +112,7 @@ object RuleNodes {
             "admitted" to admitted,
             "ruleCids" to (offered α { it.ruleCid.value }).view.toList(),
             "rejected" to decoded.size - offered.size,
+            "review" to admittedReview?.filterKeys { it in setOf("releaseCid", "approvalCid", "snapshotCid", "admissionCid") },
         )
     }
 

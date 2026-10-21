@@ -20,7 +20,69 @@ data class DocumentSource(
     val mediaType: String,
     val correlation: String,
     val metadata: Map<String, List<String>> = emptyMap(),
-)
+    val category: String = if (originalCid == extractedTextCid) "text" else "document",
+    /** Attribution supplied by the source; authentication belongs to the host's review boundary. */
+    val provenance: Map<String, String> = emptyMap(),
+    val project: DocumentRevision? = null,
+    val extraction: DocumentRevision? = null,
+    val anchors: List<DocumentAnchor> = emptyList(),
+    val unresolved: List<String> = listOf("page", "folio", "section", "table", "diagram", "coordinates"),
+) {
+    val isTextCorrection: Boolean get() = provenance["correctionKind"] == "manual-text" &&
+        !provenance["correctedFrom"].isNullOrBlank() && extraction == null && anchors.isEmpty() &&
+        unresolved.containsAll(listOf("page", "folio", "section", "table", "diagram", "coordinates"))
+
+    /** Exact UTF-16 quotation plus every retained layout span it intersects. */
+    fun quotation(begin: Int, end: Int): Map<String, Any?> {
+        require(begin >= 0 && end > begin && end <= text.length) { "Quotation outside extracted text" }
+        return mapOf("originalCid" to originalCid.value, "extractedTextCid" to extractedTextCid.value,
+            "begin" to begin, "end" to end, "quote" to text.substring(begin, end),
+            "anchors" to anchors.filter { it.begin < end && it.end > begin }.map(DocumentAnchor::toMap),
+            "unresolved" to unresolved, "category" to category, "provenance" to provenance,
+            "authentication" to "unverified",
+            "quotationSource" to if (isTextCorrection) "manual-correction" else "extracted-text")
+    }
+}
+
+/** The source and its extraction have separate store revisions as well as separate content identities. */
+data class DocumentRevision(val project: String, val id: String, val cid: String, val rev: String, val seq: Long) {
+    fun toMap(): Map<String, Any?> = mapOf("project" to project, "id" to id, "cid" to cid, "rev" to rev, "seq" to seq)
+    companion object {
+        fun fromMap(value: Any?): DocumentRevision? = (value as? Map<*, *>)?.let { m ->
+            val seq = (m["seq"] as Number).toDouble()
+            require(seq.isFinite() && seq >= 0 && seq <= 9_007_199_254_740_991.0 && seq % 1.0 == 0.0) { "Invalid source sequence" }
+            DocumentRevision(m["project"] as String, m["id"] as String, m["cid"] as String,
+                m["rev"] as String, seq.toLong())
+        }
+    }
+}
+
+/** A span of the retained extraction, with only layout actually supplied by the reader. */
+data class DocumentAnchor(
+    val begin: Int, val end: Int, val page: Int? = null, val folio: String? = null,
+    val section: String? = null, val table: String? = null, val diagram: String? = null,
+    val coordinates: List<Int>? = null,
+    val unresolved: List<String> = listOf("table", "diagram"),
+) {
+    fun toMap(): Map<String, Any?> = mapOf("begin" to begin, "end" to end, "page" to page, "folio" to folio,
+        "section" to section, "table" to table, "diagram" to diagram, "coordinates" to coordinates,
+        "coordinateSystem" to coordinates?.let { "pixels-300dpi" }, "unresolved" to unresolved)
+    companion object {
+        fun fromMap(value: Any?): DocumentAnchor {
+            val m = requireNotNull(value as? Map<*, *>) { "Source anchor must be an object" }
+            fun integer(value: Any?): Int {
+                val n = requireNotNull(value as? Number) { "Source coordinates must be integers" }.toDouble()
+                require(n.isFinite() && n >= 0 && n <= Int.MAX_VALUE && n % 1.0 == 0.0) { "Invalid source coordinate" }
+                return n.toInt()
+            }
+            return DocumentAnchor(integer(m["begin"]), integer(m["end"]),
+                m["page"]?.let(::integer), m["folio"] as? String, m["section"] as? String,
+                m["table"] as? String, m["diagram"] as? String,
+                (m["coordinates"] as? List<*>)?.map(::integer),
+                (m["unresolved"] as? List<*>)?.map { it as String } ?: listOf("table", "diagram"))
+        }
+    }
+}
 
 /** Raw JSON is retained even when no typed proposal can be recovered. */
 data class DocumentProposal(

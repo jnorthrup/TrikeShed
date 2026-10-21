@@ -11,6 +11,7 @@ import modelmux.MuxCallContext
 import modelmux.MuxCallRecord
 import modelmux.acp.AcpMessage
 import modelmux.acp.providerTag
+import modelmux.acp.modelVersion
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -96,7 +97,7 @@ object BrainMuxNodes {
 
         // ── mux.models ──────────────────────────────────────────────
         // Queries the daemon's ModelMux for available models.
-        // Returns: [{id, caps, provider}] — provider lets the browser
+        // Returns: [{id, caps, provider, modelVersion, quotaAvailable}] — provider lets the browser
         // map a model to its KeyMux binding for credential selection.
         "mux.models" to boundLcnc(ModelMuxProviderKey(mux), LcncNodeRunner { _, _ ->
             val modelMux = ModelMuxProviderKey.require().invoke()
@@ -106,7 +107,7 @@ object BrainMuxNodes {
             for (i in 0 until cards.size) {
                 val card = cards[i] // AcpModelCard = Join<String, Join<Series<AcpCapability>, AcpMeta>>
                 val id = card.a
-                if (modelMux.modelKeyId(id) == null) continue
+                val admission = modelMux.modelAdmission(id) ?: continue
                 val capsList = ArrayList<String>()
                 val caps = card.b.a
                 for (c in 0 until caps.size) capsList += caps[c]
@@ -126,6 +127,8 @@ object BrainMuxNodes {
                     "id" to id,
                     "caps" to capsList,
                     "provider" to providerTag,
+                    "modelVersion" to card.modelVersion,
+                    "quotaAvailable" to admission.b,
                 ))
             }
             mapOf("models" to models)

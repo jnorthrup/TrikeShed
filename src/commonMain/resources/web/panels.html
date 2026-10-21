@@ -81,6 +81,16 @@ button.stop{border-color:var(--err);color:var(--err)}
 .params input,.params textarea,.params select{background:var(--bg);border:1px solid var(--line);color:var(--ink);border-radius:3px;font:11px/1.4 inherit;padding:3px 5px;width:100%;user-select:text}
 .params textarea{resize:both;min-height:44px;white-space:pre}
 .result{margin:0 8px 6px;padding:5px 6px;background:var(--bg);border:1px solid var(--line);border-radius:3px;font-size:10px;color:var(--dim);max-height:150px;max-width:340px;overflow:auto;white-space:pre;user-select:text;resize:both}
+.node:has(>.result.document-review-result){min-width:max-content}
+.result.document-review-result{width:min(660px,calc(100vw - 64px));min-width:min(420px,calc(100vw - 64px));max-width:calc(100vw - 64px);max-height:calc(100vh - 180px);white-space:normal;overflow-wrap:anywhere;font-size:13px;line-height:1.45;color:var(--ink)}
+.document-review-result h4{margin:8px 0;font-size:14px}
+.document-review-result p,.document-review-result details{margin:8px 0}
+.document-review-result summary{cursor:pointer}
+.document-review-result button{max-width:100%;margin:4px 4px 0 0;white-space:normal;overflow-wrap:anywhere}
+.document-review-result input[type=password],.document-review-result textarea{max-width:100%;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:4px;color:var(--ink);font:inherit}
+.document-review-result .ctree{white-space:pre-wrap;overflow-wrap:anywhere}
+.document-review-choices input[type=checkbox]{flex:none;margin-top:3px}
+.document-review-choices span{min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .result:has(>.simulation){width:min(560px,calc(100vw - 48px));max-width:none;max-height:440px;white-space:normal;color:var(--ink)}
 .simulation{font:13px/1.5 var(--sans);overflow-wrap:anywhere}
 .simulation h4,.simulation h5{margin:6px 0;font-size:14px}

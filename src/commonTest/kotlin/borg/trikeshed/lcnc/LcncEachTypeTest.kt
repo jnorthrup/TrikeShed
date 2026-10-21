@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -24,6 +24,7 @@ class LcncEachTypeTest {
                 LcncWire("in", "value", "read", "doc?"),
                 LcncWire("read", "text", "out", "value"),
                 LcncWire("ring", "summary", "show", "x"),
+                LcncWire("ring", "returns", "show", "x"),
             ).toSeries(),
         )
         assertEquals(emptyList(), LcncTypeCheck.check(program))
@@ -32,6 +33,7 @@ class LcncEachTypeTest {
         assertEquals(ProjectDoc.KIND, types[1], "the item parameter is one ProjectDoc")
         assertEquals("text", types[2])
         assertEquals("List<text>", types[3], "a per-name yield under each is the list of one iteration's yield")
+        assertEquals("json", types[4], "the composed returns envelope is json even when it contains an array of iteration maps")
     }
 
     @Test
@@ -56,5 +58,58 @@ class LcncEachTypeTest {
         assertEquals(emptyList(), LcncTypeCheck.check(program))
         assertEquals(ProjectDoc.LIST_KIND, LcncTypeCheck.cableTypes(program)[0])
         assertTrue(LcncTypeCheck.inputsOf(ring(null), LcncContracts.all().associateBy { it.type }).contains("each?"))
+    }
+
+    private fun release() = LcncProgram("release", s_[
+        LcncNode("doc", "scope.in", mapOf("name" to "doc", "kind" to ProjectDoc.KIND)),
+        LcncNode("relationships", "scope.out", mapOf("name" to "relationships", "kind" to "ReviewedRelationships")),
+        LcncNode("output", "scope.out", mapOf("name" to "outputCid", "kind" to "id")),
+    ], emptySeriesOf())
+
+    @Test
+    fun namedEachUsesRetainedFormalKindsAndComposesLists() {
+        val scope = LcncNode("ring", "scope", mapOf("program" to "release", "item" to "doc"))
+        val vocabulary = LcncVocabulary.resolve(mapOf("release" to release()))
+        val program = LcncProgram("caller", s_[
+            LcncNode("docs", ProjectNodes.DOCS), scope, LcncNode("show", "display"),
+        ], s_[
+            LcncWire("docs", "docs", "ring", "each?"),
+            LcncWire("ring", "relationships", "show", "x"),
+            LcncWire("ring", "outputCid", "show", "x"),
+            LcncWire("ring", "returns", "show", "x"),
+        ])
+        assertEquals(emptyList(), LcncTypeCheck.check(program, vocabulary))
+        assertEquals(listOf(ProjectDoc.LIST_KIND, "List<ReviewedRelationships>", "List<id>", "json"),
+            LcncTypeCheck.cableTypes(program, vocabulary))
+        assertEquals(ProjectDoc.LIST_KIND, LcncTypeCheck.portKind(scope, "in", "each?", vocabulary).kind)
+        assertTrue("doc" in LcncTypeCheck.inputsOf(scope, vocabulary))
+        assertTrue("outputCid" in LcncTypeCheck.outputsOf(scope, vocabulary))
+    }
+
+    @Test
+    fun namedSingleInvocationPreservesItsFormalKindsAndRejectsFalsePorts() {
+        val vocabulary = LcncVocabulary.resolve(mapOf("release" to release()))
+        val scope = LcncNode("ring", "scope", subprogram = "release")
+        assertEquals("ReviewedRelationships", LcncTypeCheck.portKind(scope, "out", "relationships", vocabulary).kind)
+        assertEquals("json", LcncTypeCheck.portKind(scope, "out", "returns", vocabulary).kind)
+        val program = LcncProgram("caller", s_[scope, LcncNode("sink", "mux.chat")], s_[
+            LcncWire("ring", "outputCid", "sink", "prompt?"),
+            LcncWire("ring", "absent", "sink", "prompt?"),
+        ])
+        assertEquals(listOf("kind-mismatch", "undeclared-port"), LcncTypeCheck.check(program, vocabulary).map { it.rule })
+    }
+
+    @Test
+    fun aMissingNamedBodyRemainsUnresolvedAndInlineChildrenOwnTheirKinds() {
+        val vocabulary = LcncVocabulary.resolve(mapOf("release" to release()))
+        val missing = LcncNode("ring", "scope", mapOf("program" to "missing"))
+        val program = LcncProgram("caller", s_[missing, LcncNode("show", "display")],
+            s_[LcncWire("ring", "relationships", "show", "x")])
+        assertEquals(listOf(null), LcncTypeCheck.cableTypes(program, vocabulary))
+        assertTrue(LcncTypeCheck.portKind(missing, "out", "relationships", vocabulary).generic)
+        val inline = missing.copy(params = mapOf("program" to "release"), children = s_[
+            LcncNode("out", "scope.out", mapOf("name" to "relationships", "kind" to "text")),
+        ])
+        assertEquals("text", LcncTypeCheck.portKind(inline, "out", "relationships", vocabulary).kind)
     }
 }

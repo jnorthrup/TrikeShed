@@ -58,7 +58,7 @@ class LcncContractParityTest {
         // terminator; anything else is a manual/action node (vm.spawn fires
         // when the sweep reaches it) — both flags may legitimately be false.
         val declaredSources = LcncContracts.all().filter { it.isSource }.map { it.type }.toSet()
-        assertEquals(setOf("timer", "graal.events", "vm.events"), declaredSources,
+        assertEquals(setOf("timer", "graal.events", "vm.events", "dom.events"), declaredSources,
             "the auto-firing set must stay explicit, not accrete")
         for (c in LcncContracts.all()) {
             if (c.outputs.isEmpty()) {

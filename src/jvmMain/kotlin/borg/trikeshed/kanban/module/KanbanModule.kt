@@ -192,7 +192,7 @@ class KanbanModule : ForgeModule {
         )
         val lcncRegistry = lcnc.registry()
         install(lcncRegistry)
-        val documentTasks = borg.trikeshed.lcnc.DocumentCurationTasks(ctx.casStore) { source ->
+        val documentTasks = borg.trikeshed.lcnc.DocumentCurationTasks(ctx.casStore, sourceCurrent = { source ->
             val sourceId = source.metadata["evidenceId"]?.singleOrNull()
             if (sourceId == null) true else {
                 val head = ctx.blackboard.snapshot().values["headhunter/$sourceId"] as? Map<*, *>
@@ -200,7 +200,7 @@ class KanbanModule : ForgeModule {
                 head?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() && fields?.get("deleted") != true &&
                     (fields?.get("text") as? String)?.let { ContentId.of(it.encodeToByteArray()) == source.extractedTextCid } == true
             }
-        }
+        }, invalidateReview = { receipt -> checkNotNull(ctx.documentReview) { "Document review authority is unavailable" }.invalidate(receipt) })
         install(documentTasks.registry(store))
 
         // ── NARS garnish (Phase 5): review bridge + attention order, iff the bag is live.
@@ -294,7 +294,7 @@ class KanbanModule : ForgeModule {
             runner = { ctx.lcncRunners[it] },
             clock = ctx.clock,
             // The brief is grounded in the plane: one snapshot per claim, selected by the card's terms.
-            plane = { ctx.rete.snapshot().α { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.a, f.factId.b, f.fields) }.toList() },
+            plane = { ctx.rete.snapshot().α { f -> borg.trikeshed.kanban.PlaneBrief.Row(f.factId.a, f.factId.b, f.fields, f.versionCid.value) }.toList() },
             // The coding-agent lane: the daemon fills ctx.agentRuns after attach, like the runners.
             agents = { ctx.agentRuns },
             mintRunId = { java.util.UUID.randomUUID().toString() },
@@ -445,6 +445,8 @@ class KanbanModule : ForgeModule {
                         "idempotencyKey" to "$jobId#${a.ruleId}#$rev",
                         "expectedRevision" to rev,
                         "toColumn" to if (block) borg.trikeshed.kanban.BoardCol.BLOCKED.wire else a.bindings["toColumn"],
+                        "strikes" to strike,
+                        "actor" to "reaper",
                     )
                     if (block) move["owner"] = ""
                     actions.submit {
@@ -473,6 +475,8 @@ class KanbanModule : ForgeModule {
         val observation = BoardObservationElement(
             store = store,
             seed = {
+                claimWorker.recoverClaims()
+                claimWorker.restoreReceipts()
                 receiptLog.seedFrom(store.cards())
                 for (row in store.cards()) {
                     facts.onCommitted(
@@ -503,6 +507,9 @@ class KanbanModule : ForgeModule {
                             spec = row.spec,
                             parent = row.parent,
                             executionFamily = row.executionFamily,
+                            priority = row.priority,
+                            order = row.order,
+                            strikes = row.strikes,
                         ),
                     )
                 }
@@ -553,6 +560,18 @@ class KanbanModule : ForgeModule {
         claim(id, "/api/board") { method, path, _, _ ->
             if (method != "GET") return@claim JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
             val query = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
+            query["receiptId"]?.let { receiptId ->
+                val receipt = store.receipt(receiptId)
+                    ?: return@claim JvmKanbanServer.HttpResponse(404, """{"error":"receipt_not_found"}""")
+                return@claim JvmKanbanServer.HttpResponse(200, jsonOf(receipt))
+            }
+            if (query["receipts"] == "1") {
+                val refs = store.receiptRefs().view.filter { query["jobId"] == null || it.jobId == query["jobId"] }
+                return@claim JvmKanbanServer.HttpResponse(200, jsonOf(mapOf(
+                    "receipts" to refs.map { mapOf("id" to it.id, "jobId" to it.jobId, "cid" to it.cid.value, "sequence" to it.sequence) },
+                    "durability" to store.durability.name,
+                )))
+            }
             val taskId = query["documentTask"] ?: return@claim JvmKanbanServer.HttpResponse(200, boardJson())
             try {
                 val view = query["view"]

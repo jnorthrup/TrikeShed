@@ -81,7 +81,7 @@ class DocumentCurationWireTest {
             assertContains(html, "data-curate-submit=\"1\" disabled")
             assertContains(html, "keep source")
             for ((method, path, expected) in listOf(
-                Triple("GET", "/api/documents?cid=sha256:missing", 503),
+                Triple("GET", "/api/documents?cid=sha256:missing", 400),
                 Triple("POST", "/api/documents/curate", 503),
                 Triple("DELETE", "/api/documents", 405),
             )) {
@@ -90,7 +90,14 @@ class DocumentCurationWireTest {
             }
             assertFalse(ctx.lcncRunners.containsKey(DocumentCurationLegos.CURATE))
             assertFalse(ctx.lcncRunners.containsKey(DocumentCurationLegos.SHEET))
-            assertEquals(board, ctx.blackboard.snapshot())
+            val after = ctx.blackboard.snapshot()
+            val readiness = "lcnc/readiness/${DocumentCurationLegos.CURATE}"
+            assertEquals(board.values, after.values - readiness)
+            assertEquals(board.provenance, after.provenance - readiness)
+            val status = assertIs<Map<*, *>>(after.values[readiness])
+            assertEquals(false, status["available"])
+            assertContains(assertIs<String>(status["reason"]), reason)
+            assertEquals(listOf("belief bag", "CoreNLP guest module", "configured reachable chat model"), status["prerequisites"])
             assertEquals(before, writes, "Readiness and refusals must not retain a source or run anything")
             assertFalse(java.io.File(ctx.stateDir, "documents").exists())
         }

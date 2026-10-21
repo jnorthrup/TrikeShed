@@ -1,11 +1,7 @@
 package modelmux
 
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.get
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
+import borg.trikeshed.lib.*
+import borg.trikeshed.htx.HtxHeaders
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.userspace.reactor.MuxKeyEntry
@@ -15,11 +11,9 @@ import borg.trikeshed.userspace.reactor.MuxReactorState
 /**
  * One key's quota standing in one metering window.
  *
- * `limit` is the window budget in tokens (0 = unknown/unmetered — the key is
- * ACTIVE on reputation alone). `spent` is metered from receipts; `remaining`
- * is derived, never stored. A 429 or explicit exhaustion flips [exhausted]
- * regardless of arithmetic headroom — the provider said no, that outranks
- * our ledger.
+ * `limit` is a configured estimate or HTTP-reported token window (0 = unknown).
+ * Receipt arithmetic remains telemetry. Only HTTP observations and credential
+ * status close admission; historical usage never establishes a quota ceiling.
  */
 data class QuotaStanding(
     val keyId: String,
@@ -30,9 +24,13 @@ data class QuotaStanding(
     val spent: Long,
     val exhausted: Boolean,
     val accessCount: Long,
+    /** Provider HTTP evidence, when present, supersedes local receipt arithmetic. */
+    val observedRemaining: Long? = null,
+    val resetAtMs: Long? = null,
+    val dispatchable: Boolean = true,
 ) {
-    val remaining: Long get() = if (limit <= 0L) Long.MAX_VALUE else (limit - spent).coerceAtLeast(0L)
-    val isUsable: Boolean get() = !exhausted && (limit <= 0L || spent < limit)
+    val remaining: Long get() = observedRemaining ?: if (limit <= 0L) Long.MAX_VALUE else (limit - spent).coerceAtLeast(0L)
+    val isUsable: Boolean get() = dispatchable && !exhausted
 
     /** Fraction of the window consumed; 0.0 when unmetered. */
     val utilization: Double get() = if (limit <= 0L) 0.0 else (spent.toDouble() / limit).coerceIn(0.0, 1.0)
@@ -62,22 +60,24 @@ class QuotaLegion(
     /** Per-provider budget overrides, keyed by provider id. */
     limitsByProvider: Map<String, Long> = emptyMap(),
     /**
-     * Tokens a SHARED key already burned this window outside this process — Hermes'
-     * own sessions on the same provider key ([fromLedger]). Charged against every key
-     * of that provider in [standings] until the window that started at
-     * [ledgerWindowStartMs] rolls; after that the ledger's word has expired and only
-     * this process's receipts count. The ledger is per provider, so the pre-charge is
-     * too — a provider's quota is one pool no matter which process spends it.
+     * Hermes usage rows observed in this window. Session aggregates are not exact
+     * per-call spend and provider-level attribution cannot identify individual keys.
+     * Kept for telemetry only; HTTP remaining/reset observations govern admission.
      */
     ledgerSpentByProvider: Map<String, Long> = emptyMap(),
     ledgerWindowStartMs: Long = 0L,
 ) {
+    init {
+        require(windowMs > 0L) { "Quota window must be positive" }
+    }
     private val meterGate = Any()
     var limitsByProvider: Map<String, Long> = limitsByProvider
         private set
     var ledgerSpentByProvider: Map<String, Long> = ledgerSpentByProvider
         private set
     var ledgerWindowStartMs: Long = ledgerWindowStartMs
+        private set
+    var ledgerUsage: Map<String, LedgerQuota> = emptyMap()
         private set
 
     /**
@@ -87,7 +87,8 @@ class QuotaLegion(
      */
     fun refresh(rows: List<LedgerRow>, nowMs: Long): Unit = synchronizedLock(meterGate) {
         val walked = walkBack(rows, nowMs, windowMs)
-        limitsByProvider = walked.mapValues { it.value.provenLimit }
+        // Historical throughput is usage evidence, never an advertised ceiling.
+        ledgerUsage = walked
         ledgerSpentByProvider = walked.mapValues { it.value.spentThisWindow }
         ledgerWindowStartMs = nowMs - (nowMs % windowMs)
     }
@@ -102,14 +103,11 @@ class QuotaLegion(
         const val DAY_MS: Long = 86_400_000L
 
         /**
-         * Walk a success ledger back into quotas. For each provider, the PROVEN limit
-         * is the most tokens the ledger shows burned in any one window-sized bucket —
-         * the provider demonstrably bore that much, so it is a floor, not a guess —
-         * and the SPENT is the tokens whose rows fall inside the window ending at
-         * [nowMs]. Rows without a provider are skipped. Nothing here invents a tier:
-         * a provider the ledger never reached keeps [defaultLimit] (unmetered).
+         * Summarize observed usage rows by provider and time bucket. `provenLimit`
+         * retains its legacy field name but is an observed peak, never a ceiling.
          */
         fun walkBack(rows: List<LedgerRow>, nowMs: Long, windowMs: Long = DAY_MS): Map<String, LedgerQuota> {
+            require(windowMs > 0L)
             val buckets = HashMap<String, HashMap<Long, Long>>()
             val spent = HashMap<String, Long>()
             val rowsBy = HashMap<String, Int>()
@@ -138,22 +136,34 @@ class QuotaLegion(
             return out
         }
 
-        /** A legion whose limits and pre-charged spend come from [walkBack] over [rows]. */
+        /** Import historical spend without inventing a provider quota ceiling. */
         fun fromLedger(rows: List<LedgerRow>, nowMs: Long, windowMs: Long = DAY_MS): QuotaLegion {
             val walked = walkBack(rows, nowMs, windowMs)
             return QuotaLegion(
                 windowMs = windowMs,
                 defaultLimit = 0L,
-                limitsByProvider = walked.mapValues { it.value.provenLimit },
                 ledgerSpentByProvider = walked.mapValues { it.value.spentThisWindow },
                 ledgerWindowStartMs = nowMs - (nowMs % windowMs),
-            )
+            ).also { it.ledgerUsage = walked }
         }
     }
 
-    private data class Meter(var windowStartMs: Long, var spent: Long, var exhausted: Boolean)
+    private data class Meter(
+        var windowStartMs: Long,
+        var spent: Long,
+        var exhausted: Boolean,
+        var blockedUntilMs: Long = 0L,
+        var observation: HttpQuota? = null,
+        var observationSpent: Long = 0L,
+    )
 
     private val meters = mutableMapOf<String, Meter>()
+
+    /** Unknown capacity stays admitted. Only unexpired HTTP observations can close admission. */
+    fun isAvailable(keyId: String, nowMs: Long): Boolean = synchronizedLock(meterGate) {
+        val meter = meters[keyId] ?: return true
+        !(meter.exhausted && meter.blockedUntilMs > nowMs)
+    }
 
     /** Per-key budget: provider override, else the legion default. */
     fun limitFor(provider: String): Long = synchronizedLock(meterGate) { limitsByProvider[provider] ?: defaultLimit }
@@ -164,6 +174,7 @@ class QuotaLegion(
         val meter = meterFor(keyId, provider, nowMs)
         if (receipt.httpStatus == 429) {
             meter.exhausted = true
+            if (meter.blockedUntilMs <= nowMs) meter.blockedUntilMs = nowMs + minOf(windowMs, 60_000L)
             return
         }
         if (tokens > 0L) meter.spent += tokens
@@ -171,21 +182,45 @@ class QuotaLegion(
 
     /** Record an out-of-band exhaustion signal (429 surfaced by the caller). */
     fun exhaust(keyId: String, provider: String, nowMs: Long): Unit = synchronizedLock(meterGate) {
-        meterFor(keyId, provider, nowMs).exhausted = true
+        meterFor(keyId, provider, nowMs).also {
+            it.exhausted = true
+            it.blockedUntilMs = nowMs + minOf(windowMs, 60_000L)
+        }
     }
+
+    /** Fold real provider headers after charging the response receipt. */
+    fun observeHttp(keyId: String, provider: String, status: Int, headers: HtxHeaders, nowMs: Long): HttpQuota =
+        synchronizedLock(meterGate) {
+            val observed = HttpQuota.parse(status, headers, nowMs, minOf(windowMs, 60_000L))
+            val meter = meterFor(keyId, provider, nowMs)
+            if (observed.limit != null || observed.remaining != null) {
+                meter.observation = observed
+                meter.observationSpent = meter.spent
+            }
+            if (observed.exhausted) {
+                meter.exhausted = true
+                meter.blockedUntilMs = observed.resetAtMs
+            } else if (status in 200..299) {
+                meter.exhausted = false
+                meter.blockedUntilMs = 0L
+            }
+            observed
+        }
 
     /** Clear exhaustion after backoff — the key re-enters the legion. */
     fun reinstate(keyId: String): Unit = synchronizedLock(meterGate) {
-        meters[keyId]?.exhausted = false
+        meters[keyId]?.also { it.exhausted = false; it.blockedUntilMs = 0L }
     }
 
     private fun meterFor(keyId: String, provider: String, nowMs: Long): Meter {
         val meter = meters.getOrPut(keyId) { Meter(nowMs, 0L, false) }
         if (meter.windowStartMs + windowMs <= nowMs) {
             meter.windowStartMs = nowMs
+            meter.observationSpent -= meter.spent
             meter.spent = 0L
-            meter.exhausted = false // a fresh window clears provider backoff
         }
+        if (meter.blockedUntilMs <= nowMs) meter.exhausted = false
+        if ((meter.observation?.resetAtMs ?: Long.MAX_VALUE) <= nowMs) meter.observation = null
         return meter
     }
 
@@ -202,13 +237,15 @@ class QuotaLegion(
         // the first dispatch. They are not dispatchable keys — the reactor's are.
         val seenProviders = HashSet<String>()
         for (key in keys) seenProviders.add(key.provider)
-        for ((provider, limit) in limitsByProvider) if (provider !in seenProviders) {
+        for (provider in (limitsByProvider.keys + ledgerSpentByProvider.keys)) if (provider !in seenProviders) {
+            val limit = limitFor(provider)
             val spent = ledgerSpentFor(provider, nowMs)
             out.add(
                 QuotaStanding(
                     keyId = "ledger:$provider", provider = provider,
                     windowStartMs = if (nowMs < ledgerWindowStartMs + windowMs) ledgerWindowStartMs else nowMs,
                     windowMs = windowMs, limit = limit, spent = spent, exhausted = false, accessCount = 0L,
+                    dispatchable = false,
                 ),
             )
         }
@@ -217,16 +254,24 @@ class QuotaLegion(
             val meter = meters[key.keyId]
             val windowStart = meter?.windowStartMs ?: nowMs
             val inWindow = meter != null && windowStart + windowMs > nowMs
+            val observed = meter?.observation?.takeIf { it.resetAtMs > nowMs }
+            val observedRemaining = observed?.remaining?.let {
+                (it - ((meter?.spent ?: 0L) - (meter?.observationSpent ?: 0L)).coerceAtLeast(0L)).coerceAtLeast(0L)
+            }
             out.add(
                 QuotaStanding(
                     keyId = key.keyId,
                     provider = key.provider,
                     windowStartMs = if (inWindow) windowStart else nowMs,
                     windowMs = windowMs,
-                    limit = limitFor(key.provider),
+                    limit = observed?.limit ?: limitFor(key.provider),
                     spent = (if (inWindow) meter.spent else 0L) + ledgerSpentFor(key.provider, nowMs),
-                    exhausted = (inWindow && meter.exhausted) || key.status != MuxKeyStatus.ACTIVE,
+                    exhausted = (meter?.exhausted == true && meter.blockedUntilMs > nowMs) ||
+                        key.status == MuxKeyStatus.BENCHED ||
+                        key.status == MuxKeyStatus.BACKOFF && (key.leaseExpiresAt <= 0L || key.leaseExpiresAt > nowMs),
                     accessCount = key.accessCount,
+                    observedRemaining = observedRemaining,
+                    resetAtMs = maxOf(observed?.resetAtMs ?: 0L, meter?.blockedUntilMs ?: 0L).takeIf { it > nowMs },
                 ),
             )
         }
@@ -268,7 +313,7 @@ class QuotaLegion(
         }
         for (i in 0 until ranked.size) {
             val s = ranked[i]
-            if (!s.isUsable) continue
+            if (!s.isUsable || !s.dispatchable) continue
             if (provider != null && s.provider != provider) continue
             if (s.keyId in excluding) continue
             return s

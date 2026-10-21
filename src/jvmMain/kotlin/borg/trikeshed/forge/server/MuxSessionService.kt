@@ -58,8 +58,15 @@ class MuxSessionService(
      */
     private suspend fun discover(mux: ModelMux): Map<String, Any?> = withContext(muxContext) {
         val roster = mux.listModels("chat").view.mapTo(HashSet()) { (it.providerTag ?: it.a) to it.wireName }
+        val hermes = keymux.HermesCredentialSource(keymux.defaultHermesHome(), JvmFileOperations())
+        val hermesProviders = hermes.providers()
+        val configured = hermes.configuredModels()
+        val historical = ModelDiscovery.fromHermes(hermes.modelConfig(),
+            borg.trikeshed.hermes.HermesModelUsage.ledgerRows().toSeries())
         val probes = Semaphore(4)
-        val providers = keymux.HarnessRegistry.providers.view.map { provider ->
+        val providerCatalog = (keymux.HarnessRegistry.providers.view.toList() +
+            hermesProviders.view.map { keymux.HarnessProvider(it.provider, emptySeriesOf(), it.baseUrl) }).distinctBy { it.id }
+        val providers = providerCatalog.map { provider ->
             async {
                 probes.withPermit {
                     val key = runCatching { mux.keyMux.getWithSource("llm.${provider.id}.key") }.getOrNull()
@@ -79,7 +86,10 @@ class MuxSessionService(
                 }
             }
         }.awaitAll().filterNotNull()
-        mapOf("atMs" to System.currentTimeMillis(), "providers" to providers)
+        mapOf("atMs" to System.currentTimeMillis(), "providers" to providers,
+            "configured" to configured.view.map { mapOf("provider" to it.provider, "model" to it.model,
+                "baseUrl" to it.baseUrl, "apiMode" to it.apiMode, "contextWindow" to it.contextWindow) },
+            "historical" to historical.view.map { mapOf("provider" to it.provider, "model" to it.modelId) })
     }
 
     suspend fun route(method: String, path: String, text: String): JvmKanbanServer.HttpResponse? {

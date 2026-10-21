@@ -94,6 +94,13 @@ object InvokeLowering {
             }
             "block" -> withRev(key, type, revision) { JobCommand.Block(jobId, key, it, raw["reason"]?.toString() ?: "unspecified") }
             "cancel" -> withRev(key, type, revision) { JobCommand.Cancel(jobId, key, it) }
+            "receipt" -> {
+                val allowed = setOf("type", "jobId", "idempotencyKey", "expectedRevision", "receipt", "atMs")
+                for (field in raw.keys) if (field !in allowed)
+                    return Outcome.Rejected(key, type, "receipt cannot change '$field'")
+                if (raw["receipt"] !is Map<*, *>) return Outcome.Rejected(key, type, "receipt without payload")
+                withRev(key, type, revision) { JobCommand.Acknowledge(jobId, key, it, receipt = true) }
+            }
             "acknowledge", "ack" -> withRev(key, type, revision) { JobCommand.Acknowledge(jobId, key, it) }
             "retract", "delete" -> withRev(key, type, revision) { JobCommand.Retract(jobId, key, it) }
 

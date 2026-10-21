@@ -4,17 +4,13 @@ import borg.trikeshed.parse.reify
 
 import keymux.KeyMux
 import keymux.LlmAuth
+import keymux.HermesModelConfig
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.emptyHtxHeaders
 import borg.trikeshed.htx.htxHeaders
 import borg.trikeshed.htx.parseHtxRequest
-import borg.trikeshed.lib.Series
-import borg.trikeshed.lib.emptySeriesOf
-import borg.trikeshed.lib.j
-import borg.trikeshed.lib.size
-import borg.trikeshed.lib.toSeries
-import borg.trikeshed.lib.α
+import borg.trikeshed.lib.*
 import kotlinx.coroutines.currentCoroutineContext
 
 /**
@@ -44,6 +40,17 @@ data class DiscoveredModel(
  * discovery reports what the provider said, nothing more.
  */
 object ModelDiscovery {
+    /** Config and observed Hermes models retain their provider identity without assuming quota. */
+    fun fromHermes(config: HermesModelConfig?, rows: Series<LedgerRow>): Series<DiscoveredModel> {
+        val models = linkedMapOf<borg.trikeshed.lib.Join<String, String>, DiscoveredModel>()
+        if (config != null) models[config.provider j config.model] =
+            DiscoveredModel(config.provider, config.model, config.contextWindow)
+        for (row in rows.view) {
+            if (row.provider.isBlank() || row.model.isBlank()) continue
+            models.getOrPut(row.provider j row.model) { DiscoveredModel(row.provider, row.model) }
+        }
+        return models.values.toSeries()
+    }
 
     /** Parse one provider `/models` payload into discovered models. */
     fun parseModels(provider: String, json: String): Series<DiscoveredModel> {
@@ -118,7 +125,7 @@ object ModelDiscovery {
      */
     fun toCatalog(
         models: Series<DiscoveredModel>,
-        quotaOf: (DiscoveredModel) -> Int = { 0 },
+        quotaOf: (DiscoveredModel) -> Int = { -1 },
     ): Series<ModelCatalogEntry> = models α { d ->
         ModelCatalogEntry(
             provider = d.provider,

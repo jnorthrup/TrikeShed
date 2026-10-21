@@ -8,33 +8,25 @@ import borg.trikeshed.lcnc.AgentRunResult
 import borg.trikeshed.lcnc.AgentRuns
 import borg.trikeshed.lcnc.LcncNode
 import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.lib.*
+import borg.trikeshed.job.ContentId
+import borg.trikeshed.parse.jsonOf
+import modelmux.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.onSubscription
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * BoardClaimWorker — what a `claim` activation becomes once the sink has it:
  *
- *   1. Move(RUNNING, owner=claim:brain), idempotency `<jobId>#claim#<rev>`;
- *      wait for THAT commit on the store's committed flow (subscribed before
- *      the send — the flow has no replay), [commitTimeoutMs] → give up, and
- *      the receipt says so. Nothing else happens for a claim that never landed.
- *   2. The card's title is the brief. `prompt.chat` — the daemon's own brain
- *      (ModelMux over KeyMux; quota it already has) — answers in ≤ 3 sentences,
- *      maxTokens 256. The model is the first entry of `mux.models`, which is
- *      (Delta 2026-09-04: MAX_TOKENS is 1024 — see the constant; 256 starved a thinking model.)
- *      the newest model Hermes ran here (LcncContracts: "the live list leads,
- *      and its first entry is the newest") — `prompt.chat` itself refuses a
- *      blank model, so the worker resolves it the way the picklist would.
- *   3. Receipt `kanban/claim/<jobId>` = {owner, model, ok, content|error, atMs,
- *      revision}, then Move(REVIEW) at the card's CURRENT revision (idempotency
- *      `<jobId>#claim-review#<rev>`), owner untouched. A failed brain call still
- *      goes to REVIEW with ok=false — a human reads the receipt. Nothing here
- *      ever moves a card to DONE; the store's claim guard would refuse it anyway.
+ *   1. Commit RUNNING with an immutable attempt identity.
+ *   2. Retain the exact brief, sources, model identity and task harness before inference.
+ *   3. Retain the answer and measured evidence compliance before applying the judge's move.
+ *
+ * Unspecified models use task-specific proficiency; explicit models retain precedence.
+ * A receipt acknowledgment preserves lifecycle, lane order and transition age. A concurrent
+ * card edit wins over subsequent worker moves. Every admitted store command is awaited.
+ * Startup recovery restores answer projections and settles interrupted attempts.
  *
  * A daemon with NO `prompt.chat` runner at all (a reduced/test context) takes
  * no claim: the receipt says "no brain", the card stays READY for whoever has
@@ -59,7 +51,6 @@ class BoardClaimWorker(
     private val blackboard: ConfixBlackboard,
     private val runner: (String) -> LcncNodeRunner?,
     private val clock: () -> Long,
-    private val commitTimeoutMs: Long = 10_000L,
     /**
      * The fact plane at claim time, for [PlaneBrief]. Delta (2026-09-04): the brief
      * was the title alone; the module hands one `ReteNetwork.snapshot()` here so the
@@ -77,6 +68,7 @@ class BoardClaimWorker(
     companion object {
         const val RECEIPT_PREFIX: String = "kanban/claim/"
         const val LANGUAGE: String = "kanban-claim"
+        const val HARNESS: String = "kanban-plane-v1"
         /** The actor the plane judge signs its REVIEW→DONE move with — never the claimant. */
         const val JUDGE_ACTOR: String = "judge:plane"
         /**
@@ -124,8 +116,8 @@ class BoardClaimWorker(
          * that has a `kanban/claim/<child>` receipt on the blackboard, in the order given. [children] are the
          * card's dependencies whose row says `parent == this card` (the durable edge from S1) — an ordinary
          * dependency is never briefed as a child, however it was closed. A child WITHOUT a receipt is not
-         * skipped silently by [claim]: it refuses the merge with a receipt naming the missing keys (the
-         * blackboard is in-memory; a restart between the children's Done and the merge loses them).
+ * skipped silently by [claim]: it restores retained answers first, then refuses a merge whose
+ * child never retained an answer.
          * The evidence id is the blackboard key as the plane names it, so the reply can cite it and the judge accepts it.
          */
         fun childReceipts(blackboard: ConfixBlackboard, children: List<String>): List<PlaneBrief.ChildReceipt> =
@@ -138,6 +130,7 @@ class BoardClaimWorker(
                         ok = m["ok"] == true,
                         decision = m["decision"]?.toString().orEmpty(),
                         content = (m["content"] ?: m["error"])?.toString().orEmpty(),
+                        contentId = m["receiptCid"] as? String,
                     )
                 }
             }
@@ -197,22 +190,15 @@ class BoardClaimWorker(
             ) + ("review" to "not attempted")
         }
 
-        // ── 1. RUNNING, and the commit that proves it ─────────────────────────
-        val events = Channel<BoardCommitted>(Channel.UNLIMITED)
-        val subscribed = CompletableDeferred<Unit>()
-        val tap = launch {
-            store.committed
-                .onSubscription { subscribed.complete(Unit) }
-                .collect { if (it.jobId == jobId) events.trySend(it) }
-        }
-        subscribed.await()
+        // The store acknowledges only after CAS/WAL flush and publication.
+        val attemptId = "$jobId#${BoardRules.CLAIM}#$expectedRevision"
         val reply = CompletableDeferred<BoardApply>()
         store.intake.send(
             BoardIntake(
                 mapOf(
                     "type" to "move",
                     "jobId" to jobId,
-                    "idempotencyKey" to "$jobId#${BoardRules.CLAIM}#$expectedRevision",
+                    "idempotencyKey" to attemptId,
                     "expectedRevision" to expectedRevision,
                     "toColumn" to BoardCol.RUNNING.wire,
                     "owner" to owner,
@@ -220,25 +206,10 @@ class BoardClaimWorker(
                 reply,
             ),
         )
-        val verdict = withTimeoutOrNull(commitTimeoutMs) { reply.await() }
-        val landed: BoardCommitted? = when (verdict) {
-            is BoardApply.Committed -> withTimeoutOrNull(commitTimeoutMs) {
-                var found: BoardCommitted? = null
-                while (found == null) {
-                    val ev = events.receive()
-                    if (ev.sequence == verdict.sequence && ev.col == BoardCol.RUNNING) found = ev
-                }
-                found
-            }
-            else -> null
-        }
-        tap.cancel()
+        val verdict = reply.await()
+        val landed = verdict as? BoardApply.Committed
         if (landed == null) {
-            val why = when (verdict) {
-                is BoardApply.Rejected -> "claim refused: ${verdict.reason}"
-                is BoardApply.Committed -> "claim committed (seq ${verdict.sequence}) but no RUNNING event within ${commitTimeoutMs}ms"
-                null -> "no reply from the store within ${commitTimeoutMs}ms"
-            }
+            val why = "claim refused: ${(verdict as BoardApply.Rejected).reason}"
             return@coroutineScope receipt(jobId, owner, model = "", ok = false, body = "error" to why, revision = expectedRevision) +
                 ("review" to "not attempted")
         }
@@ -255,26 +226,32 @@ class BoardClaimWorker(
         // restart lost it; a person closed the child without a claim) makes the merge a lie, so
         // it is refused with a receipt naming the keys and the card parks in REVIEW for a person.
         val childIds = card?.dependencies.orEmpty().filter { store.card(it)?.parent == jobId }
+        restoreReceipts()
         val missingReceipts = childIds.filter { blackboard.get(RECEIPT_PREFIX + it) == null }
         if (missingReceipts.isNotEmpty()) {
-            val current0 = landed.snapshot.revision
+            val current0 = landed.revision
             val written = receipt(
                 jobId, owner, model = "", ok = false, revision = current0,
                 body = "error" to "child receipts lost: ${missingReceipts.joinToString { RECEIPT_PREFIX + it }} — " +
                     "no merge without every child's answer; a person decides",
+                attemptId = attemptId,
             )
             val reply2 = CompletableDeferred<BoardApply>()
-            store.intake.send(BoardIntake(mapOf("type" to "move", "jobId" to jobId, "idempotencyKey" to "$jobId#claim-review#$current0", "expectedRevision" to current0, "toColumn" to BoardCol.REVIEW.wire, "actor" to JUDGE_ACTOR), reply2))
-            val r = withTimeoutOrNull(commitTimeoutMs) { reply2.await() }
+            val receiptRevision = (written["receiptRevision"] as? Number)?.toLong() ?: current0
+            if (receiptRevision != current0 + 1) return@coroutineScope written + ("review" to "card changed; result retained")
+            store.intake.send(BoardIntake(mapOf("type" to "move", "jobId" to jobId, "idempotencyKey" to "$jobId#claim-review#$current0", "expectedRevision" to receiptRevision, "toColumn" to BoardCol.REVIEW.wire, "actor" to JUDGE_ACTOR), reply2))
+            val r = reply2.await()
             return@coroutineScope written + ("review" to when (r) {
                 is BoardApply.Committed -> "review r${r.revision}"
                 is BoardApply.Rejected -> "review refused: ${r.reason}"
-                null -> "review: no reply within ${commitTimeoutMs}ms"
             })
         }
         val children = childReceipts(blackboard, childIds)
         // An agent runs its own model; the mux pick is the brain's business only.
-        val model = if (agentInfo != null) spec.model else spec.model.ifBlank { resolveModel() }
+        val harness = agentInfo?.let { "kanban-agent/${it.id}/${it.version}" } ?: HARNESS
+        val selected: ProficiencyModel = if (agentInfo != null) spec.model j null
+            else resolveModel(spec.taskKind, spec.model)
+        val model = selected.a
         // A merge never gets less than a child did: the floor is MERGE_TOKENS, the same
         // rule as the worker's child floor (max of the parent's TOKENS: and 4096).
         val tokens = (if (children.isNotEmpty()) maxOf(spec.tokens ?: 0, MERGE_TOKENS) else (spec.tokens ?: MAX_TOKENS.toInt())).toString()
@@ -291,6 +268,30 @@ class BoardClaimWorker(
         }
         val briefText = brief(jobId, title, specText, planeRows, priorReceipts, children, agentBlock)
         val mentioned = PlaneBrief.select(planeRows, title + " " + specText).size
+        val sources = planeRows.map { r -> mapOf(
+            "id" to PlaneBrief.evidenceId(r),
+            "cid" to (r.contentId ?: ContentId.of(jsonOf(r.fields).encodeToByteArray()).value),
+            "fields" to r.fields,
+        ) } + children.map { c -> mapOf(
+            "id" to c.evidenceId, "jobId" to c.jobId, "model" to c.model,
+            "cid" to c.contentId,
+            "ok" to c.ok, "decision" to c.decision, "content" to c.content,
+        ) }
+        val admission = store.recordReceipt(jobId, mapOf(
+            "id" to "$attemptId/admission", "kind" to "claim-admission", "attemptId" to attemptId,
+            "jobId" to jobId, "owner" to owner, "model" to model, "modelVersion" to selected.b,
+            "harness" to harness, "taskKind" to spec.taskKind, "claimRevision" to landed.revision,
+            "priority" to card?.priority, "order" to card?.order, "spec" to specText,
+            "brief" to briefText, "sources" to sources, "atMs" to clock(),
+        ))
+        check(admission is BoardApply.Committed) { "Claim admission receipt rejected: $admission" }
+        // A concurrent move wins. The receipt remains retained, but no model is called.
+        if (admission.revision != landed.revision + 1 || store.card(jobId)?.col != BoardCol.RUNNING) {
+            return@coroutineScope receipt(
+                jobId, owner, model, false, "error" to "card changed before model admission",
+                landed.revision, attemptId = attemptId,
+            ) + ("review" to "card changed")
+        }
         // Delta 2026-09-05 (receipt timing): this worker's clock brackets the brain call so the
         // receipt shows when the model was asked and when it answered, independent of what
         // prompt.chat reports (latencyMs there is the provider round trip, measured by the node).
@@ -364,34 +365,48 @@ class BoardClaimWorker(
             )
         // The revision the card landed RUNNING on — NOT store.card().revision: a person who
         // moved the card during the brain call must win, and the CAS refusal records it.
-        val current = landed.snapshot.revision
+        val current = admission.revision
         val judged = linkedMapOf<String, Any?>(
             "decision" to decision.outcome.name,
             "why" to decision.reason,
             "verdict" to (decision.reply?.verdict ?: ""),
             "criteria" to (decision.reply?.lines?.map { l -> mapOf("label" to l.label, "met" to l.met, "evidence" to l.evidence) } ?: emptyList<Any>()),
+            "harness" to harness,
+            "taskKind" to spec.taskKind,
+            "modelVersion" to selected.b,
+            "admissionId" to "$attemptId/admission",
+            "basis" to "plane-evidence-v1",
+            // Citation compliance is measurable here; semantic accuracy requires a separate assessment.
+            "score" to when {
+                !ok || decision.outcome == PlaneJudge.Outcome.REVIEW -> null
+                decision.outcome == PlaneJudge.Outcome.DONE -> 1.0
+                else -> 0.0
+            },
+            "correctness" to "UNKNOWN",
+            "disposition" to "UNSELECTED",
         )
         agentResult?.let { r ->
             judged["agent"] = r.agent; judged["runId"] = r.runId; judged["patchCid"] = r.patchCid; judged["transcriptCid"] = r.transcriptCid
             judged["exit"] = r.exit; judged["killed"] = r.killed; judged["truncated"] = r.truncated; judged["patchBytes"] = r.patchBytes
         }
-        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged, timing = timing)
+        val written = receipt(jobId, owner, model = answer["model"]?.toString() ?: model, ok = ok, body = body, revision = current, facts = mentioned, judged = judged, timing = timing, attemptId = attemptId)
+        val retainedRevision = (written["receiptRevision"] as Number).toLong()
+        if (retainedRevision != current + 1) return@coroutineScope written + ("moves" to listOf("card changed during claim; result retained"))
         val trail = ArrayList<String>()
-        suspend fun move(to: BoardCol, rev: Long, key: String, extra: Map<String, Any?> = emptyMap()): BoardApply? {
+        suspend fun move(to: BoardCol, rev: Long, key: String, extra: Map<String, Any?> = emptyMap()): BoardApply {
             val reply = CompletableDeferred<BoardApply>()
             store.intake.send(BoardIntake(mapOf("type" to "move", "jobId" to jobId, "idempotencyKey" to key, "expectedRevision" to rev, "toColumn" to to.wire) + extra, reply))
-            val r = withTimeoutOrNull(commitTimeoutMs) { reply.await() }
+            val r = reply.await()
             trail += when (r) {
                 is BoardApply.Committed -> "${to.wire} r${r.revision}"
                 is BoardApply.Rejected -> "${to.wire} refused: ${r.reason}"
-                null -> "${to.wire}: no reply within ${commitTimeoutMs}ms"
             }
             return r
         }
         when (decision.outcome) {
-            PlaneJudge.Outcome.REVIEW -> move(BoardCol.REVIEW, current, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
+            PlaneJudge.Outcome.REVIEW -> move(BoardCol.REVIEW, retainedRevision, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
             PlaneJudge.Outcome.DONE -> {
-                val r1 = move(BoardCol.REVIEW, current, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
+                val r1 = move(BoardCol.REVIEW, retainedRevision, "$jobId#claim-review#$current", mapOf("actor" to JUDGE_ACTOR))
                 if (r1 is BoardApply.Committed) move(BoardCol.DONE, r1.revision, "$jobId#judge-done#${r1.revision}", mapOf("actor" to JUDGE_ACTOR))
             }
             PlaneJudge.Outcome.RETRY -> {
@@ -403,32 +418,125 @@ class BoardClaimWorker(
                     mapOf("jobId" to jobId, "strike" to "$strike", "toColumn" to (if (block) BoardCol.BLOCKED.wire else BoardCol.READY.wire), "expectedRevision" to "$current", "why" to decision.reason, "by" to JUDGE_ACTOR),
                     LANGUAGE,
                 )
-                if (block) move(BoardCol.BLOCKED, current, "$jobId#judge-block#$current", mapOf("owner" to "", "strikes" to strike, "actor" to JUDGE_ACTOR))
-                else move(BoardCol.READY, current, "$jobId#judge-retry#$current", mapOf("strikes" to strike, "actor" to JUDGE_ACTOR))
+                if (block) move(BoardCol.BLOCKED, retainedRevision, "$jobId#judge-block#$current", mapOf("owner" to "", "strikes" to strike, "actor" to JUDGE_ACTOR))
+                else move(BoardCol.READY, retainedRevision, "$jobId#judge-retry#$current", mapOf("strikes" to strike, "actor" to JUDGE_ACTOR))
             }
         }
         written + ("moves" to trail)
     }
 
     /** `mux.models#models[0].id` — the newest model Hermes ran here, or "" when the daemon offers none. */
-    private suspend fun resolveModel(): String {
-        val models = runner("mux.models") ?: return ""
+    private suspend fun resolveModel(taskKind: String, explicit: String): Join<String, String?> {
+        val models = runner("mux.models") ?: return explicit j null
         val out = try {
             models.run(LcncNode(id = "claim-models", type = "mux.models"), emptyMap())
         } catch (t: CancellationException) {
             throw t
         } catch (_: Throwable) {
-            return ""
+            return explicit j null
         }
         val list = when (val m = out["models"]) {
             is List<*> -> m
             is Array<*> -> m.toList()
             else -> emptyList<Any?>()
         }
-        return (list.firstOrNull() as? Map<*, *>)?.get("id")?.toString().orEmpty()
+        val candidates = list.mapNotNull { it as? Map<*, *> }.toSeries()
+        fun identity(value: Map<*, *>): Join<String, String?> =
+            value["id"]?.toString().orEmpty() j (value["modelVersion"] as? String)
+        if (explicit.isNotBlank()) return candidates.view.firstOrNull { it["id"] == explicit }?.let(::identity) ?: (explicit j null)
+        val available = candidates.filter {
+            it["quotaAvailable"] != false &&
+                (InvokeLowering.listishOf(it["caps"])?.any { cap -> cap == "chat" } ?: true)
+        }
+        val grades = ArrayList<ModelGrade>()
+        for (ref in store.receiptRefs().view) {
+            val value = store.receipt(ref.id) ?: continue
+            modelGrade(value, ref.sequence)?.takeIf { it.model.b != null }?.let { grades.add(it) }
+        }
+        val task = HARNESS j taskKind
+        val evidence = rankModelProficiency(available, grades.toSeries(), task, "plane-evidence-v1", ::identity)
+        val ranked = rankModelProficiency(evidence, grades.toSeries(), task, "human-correctness-v1", ::identity)
+        return if (ranked.size == 0) "" j null else identity(ranked[0])
     }
 
-    private fun receipt(
+    suspend fun restoreReceipts() {
+        for (ref in store.receiptRefs().view) {
+            val value = store.receipt(ref.id) ?: continue
+            if (value["kind"] == "claim") blackboard.put(RECEIPT_PREFIX + ref.jobId,
+                value.entries.associate { it.key.toString() to it.value } + ("receiptCid" to ref.cid.value), LANGUAGE)
+        }
+    }
+
+    /** Called once before startup facts admit work; interrupted claims cannot disappear on restart. */
+    suspend fun recoverClaims() {
+        for (row in store.cards()) {
+            if (row.col !in setOf(BoardCol.RUNNING, BoardCol.REVIEW) || !row.owner.startsWith(BoardStoreElement.CLAIM_OWNER_PREFIX) ||
+                row.claimAttemptId.isBlank()) continue
+            val attemptId = row.claimAttemptId
+            var result = store.receipt("$attemptId/result")
+            if (row.col == BoardCol.REVIEW) {
+                val command = store.command(row.jobId)
+                val key = command?.get("idempotencyKey") as? String ?: continue
+                if (result?.get("decision") != PlaneJudge.Outcome.DONE.name || command?.get("actor") != JUDGE_ACTOR ||
+                    !(key.startsWith("${row.jobId}#claim-review#") || key.startsWith("$attemptId/recover/review/"))) continue
+                val reply = CompletableDeferred<BoardApply>()
+                store.intake.send(BoardIntake(mapOf(
+                    "type" to "move", "jobId" to row.jobId, "expectedRevision" to row.revision,
+                    "idempotencyKey" to "$attemptId/recover/done/${row.revision}",
+                    "toColumn" to BoardCol.DONE.wire, "actor" to JUDGE_ACTOR,
+                ), reply))
+                reply.await()
+                continue
+            }
+            var revision = row.revision
+            if (result == null) {
+                val admission = store.receipt("$attemptId/admission")
+                val ownedRevision = (admission?.get("claimRevision") as? Number)?.toLong()?.plus(1)
+                    ?: attemptId.substringAfterLast('#').toLongOrNull()?.plus(1)
+                val interrupted = linkedMapOf<String, Any?>(
+                    "id" to "$attemptId/result", "kind" to "claim", "jobId" to row.jobId,
+                    "attemptId" to attemptId, "owner" to row.owner, "revision" to ownedRevision,
+                    "observedRevision" to row.revision,
+                    "admissionId" to admission?.get("id"), "model" to admission?.get("model")?.toString().orEmpty(),
+                    "modelVersion" to admission?.get("modelVersion"), "harness" to (admission?.get("harness") ?: HARNESS),
+                    "taskKind" to (admission?.get("taskKind") ?: PlaneBrief.parseSpec(row.title, row.spec).taskKind),
+                    "ok" to false, "error" to "claim interrupted before result retention",
+                    "decision" to PlaneJudge.Outcome.RETRY.name, "atMs" to clock(),
+                    "basis" to ModelGradeBasis.EVIDENCE, "score" to null,
+                    "correctness" to ModelCorrectness.UNKNOWN.name, "disposition" to ModelDisposition.UNSELECTED.name,
+                )
+                val retained = store.recordReceipt(row.jobId, interrupted)
+                check(retained is BoardApply.Committed) { "Interrupted claim receipt rejected: $retained" }
+                result = interrupted
+                if (retained.revision != row.revision + 1 || ownedRevision != row.revision) continue
+                revision = retained.revision
+            } else if ((result["revision"] as? Number)?.toLong()?.plus(1) != row.revision) continue
+            suspend fun move(to: BoardCol, expected: Long, extra: Map<String, Any?> = emptyMap()): BoardApply {
+                val reply = CompletableDeferred<BoardApply>()
+                store.intake.send(BoardIntake(mapOf(
+                    "type" to "move", "jobId" to row.jobId, "expectedRevision" to expected,
+                    "idempotencyKey" to "$attemptId/recover/${to.wire}/$expected",
+                    "toColumn" to to.wire, "actor" to JUDGE_ACTOR,
+                ) + extra, reply))
+                return reply.await()
+            }
+            when (result["decision"]) {
+                PlaneJudge.Outcome.DONE.name -> {
+                    val review = move(BoardCol.REVIEW, revision)
+                    if (review is BoardApply.Committed) move(BoardCol.DONE, review.revision)
+                }
+                PlaneJudge.Outcome.RETRY.name -> {
+                    val strikes = row.strikes + 1
+                    val blocked = strikes >= BoardRules.REAPER_BLOCK_STRIKE
+                    move(if (blocked) BoardCol.BLOCKED else BoardCol.READY, revision,
+                        mapOf("strikes" to strikes, "owner" to if (blocked) "" else row.owner))
+                }
+                else -> move(BoardCol.REVIEW, revision)
+            }
+        }
+    }
+
+    private suspend fun receipt(
         jobId: String,
         owner: String,
         model: String,
@@ -438,6 +546,7 @@ class BoardClaimWorker(
         facts: Int = 0,
         judged: Map<String, Any?> = emptyMap(),
         timing: Timing = Timing.NONE,
+        attemptId: String? = null,
     ): Map<String, Any?> {
         // atMs stays the moment the answer was in hand (what the page has always shown); an
         // early-return receipt never asked a brain, so its atMs is simply now and it carries
@@ -464,6 +573,16 @@ class BoardClaimWorker(
         timing.outputTokens?.let { value["outputTokens"] = it }
         timing.cachedHit?.let { value["cachedHit"] = it }
         value.putAll(judged)
+        if (attemptId != null) {
+            value["id"] = "$attemptId/result"
+            value["kind"] = "claim"
+            value["jobId"] = jobId
+            value["attemptId"] = attemptId
+            val retained = store.recordReceipt(jobId, value)
+            check(retained is BoardApply.Committed) { "Claim result receipt rejected: $retained" }
+            value["receiptRevision"] = retained.revision
+            value["receiptCid"] = retained.cid.value
+        }
         blackboard.put(RECEIPT_PREFIX + jobId, value, LANGUAGE)
         return value
     }

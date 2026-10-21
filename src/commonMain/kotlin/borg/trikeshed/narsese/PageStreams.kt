@@ -29,7 +29,7 @@ object PageStreams {
      */
     class Note(val page: Int, val folio: String?, val sections: String, val from: Int, val marker: String, val ordinal: Int, val continued: Boolean, val stream: Int, val text: String)
 
-    class Book(val body: String, val notes: List<Note>, val sign: String?)
+    class Book(val body: String, val notes: List<Note>, val sign: String?, val anchors: List<DocumentAnchor> = emptyList())
 
     /** The lines of a TSV page, in Tesseract's reading order; a line's height is its words' median. */
     fun lines(tsv: CharSequence): List<Line> {
@@ -108,7 +108,7 @@ object PageStreams {
         // The sign the heads print before a section number, when they print one.
         val sign = pages.mapNotNull { p -> p.head?.split(' ')?.let { t -> t.indices.firstOrNull { i -> i + 1 < t.size && sectionMark.matches(t[i]) && t[i + 1].all(Char::isDigit) }?.let { t[it] } } }
             .groupingBy { it }.eachCount().maxByOrNull { it.value }?.takeIf { it.value >= 3 }?.key
-        val body = StringBuilder(); val notes = ArrayList<Note>()
+        val body = StringBuilder(); val notes = ArrayList<Note>(); val anchors = ArrayList<DocumentAnchor>()
         var last = 0
         val open = HashMap<Int, Note>()
         // Marker sequences run on across pages; a note series restarting at 1 is always believed.
@@ -126,7 +126,12 @@ object PageStreams {
                         if (m.groupValues[1] != sign) text = sign + " " + text.substring(m.groupValues[0].lastIndexOf(m.groupValues[2]) + m.range.first)
                     }
                 }
-                body.append(if (body.isEmpty()) "" else if (l.block != block || l.par != par) "\n\n" else "\n").append(text)
+                body.append(if (body.isEmpty()) "" else if (l.block != block || l.par != par) "\n\n" else "\n")
+                val begin = body.length
+                body.append(text)
+                anchors.add(DocumentAnchor(begin, body.length, p.page, p.folio, p.headSection,
+                    coordinates = listOf(l.left, l.top, l.width, l.height),
+                    unresolved = listOfNotNull("table", "diagram", "folio".takeIf { p.folio == null }, "section".takeIf { p.headSection == null })))
                 block = l.block; par = l.par
             }
             if (body.isNotEmpty()) body.append('\n')
@@ -176,7 +181,7 @@ object PageStreams {
             }
             close()
         }
-        return Book(body.toString(), notes, sign)
+        return Book(body.toString(), notes, sign, anchors)
     }
 
     /** The notes as TSV rows, one fragment a row: page, folio, sections, from, marker, ordinal, continued, text. */

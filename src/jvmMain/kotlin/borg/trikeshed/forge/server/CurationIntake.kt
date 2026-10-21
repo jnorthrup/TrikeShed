@@ -7,6 +7,9 @@ import borg.trikeshed.lcnc.ProjectNodes
 import borg.trikeshed.lcnc.ProjectCorpus
 import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.narsese.DecisionProvider
+import borg.trikeshed.narsese.DocumentSource
+import borg.trikeshed.narsese.DocumentCuratorCodec
+import borg.trikeshed.lcnc.DocumentCurationLegos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -33,6 +36,7 @@ class CurationIntake(
     private val settled: suspend () -> Unit = { constellations()?.releaseDecision() },
     /** What a scored document's referenced links reach, landed as documents of their own scopes ([LinkGrab]). */
     private val grab: suspend (Doc) -> Unit = {},
+    private val retainedSource: (suspend (String, String) -> DocumentSource)? = null,
     private val score: suspend (DecisionProvider, String) -> Unit = { provider, book ->
         requireNotNull(constellations()) { "Curation is not available" }.forProvider(provider).ingestScore(book)
     },
@@ -97,7 +101,7 @@ class CurationIntake(
 
     /** Queue one landed document. PDFs and the miner's other formats curate; twins and the rest do not. */
     fun offer(project: String, id: String, decisionProvider: DecisionProvider? = selectedProvider(project, id)) {
-        if (id.endsWith(ProjectNodes.EXTRACT_SUFFIX) || id.endsWith(ProjectNodes.NOTES_SUFFIX) || id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX)) return
+        if (ProjectNodes.twin(id)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
         val d = Doc(project, id, decisionProvider)
         synchronized(admission) {
@@ -128,7 +132,8 @@ class CurationIntake(
             r = if (d.decisionProvider != null && nodes != null)
                 LinkedHashMap<String, LcncNodeRunner>().also { nodes.register(it) } else runners()
             fun runner(type: String) = r[type] ?: error("no runner '$type'")
-            val text = corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text
+            val source = retainedSource?.invoke(d.project, d.id)
+            val text = source?.text ?: corpus.extract(d.project, d.id, Int.MAX_VALUE / 4)?.text
                 ?: error("no text read from ${d.id}")
             // Held only when curated from this very text: a re-read source curates again by itself.
             if (nodes != null && nodes.holds(constellation, d.id, borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value)) {
@@ -142,13 +147,17 @@ class CurationIntake(
                 return
             }
             val notes = corpus.read(d.project, d.id + ProjectNodes.NOTES_SUFFIX, 262_144)?.text
-            val doc = mapOf("project" to d.project, "id" to d.id)
+            val doc = mapOf("project" to d.project, "id" to d.id) + (source?.let { retained ->
+                retained.project?.toMap().orEmpty() + mapOf("originalCid" to retained.originalCid.value,
+                    "extractedTextCid" to retained.extractedTextCid.value)
+            } ?: emptyMap())
             reading.withLock {
             LcncTrail.live.run("intake/${d.project}")
             val curated = runner(ConstellationNodes.CURATE).run(
                 LcncNode("curate", ConstellationNodes.CURATE, params = params),
                 buildMap {
                     put("text", text); put("doc", doc)
+                    source?.let { put("source", DocumentCuratorCodec.source(it)) }
                     notes?.let { put("conventions", ProjectNodes.conventions(it)); put("notes", ProjectNodes.prose(it)) }
                 },
             )
@@ -205,7 +214,11 @@ class CurationIntake(
                     scopes: ProjectScopes, scope: CoroutineScope): CurationIntake {
             val links = LinkGrab(nodes, corpus, scopes, ctx.muxContext)
             val intake = CurationIntake(corpus, { ctx.lcncRunners }, { nodes }, scope, scopes::decisionProvider,
-                grab = { d -> links.grab(d.project, d.id, d.decisionProvider) })
+                grab = { d -> links.grab(d.project, d.id, d.decisionProvider) },
+                retainedSource = { project, id ->
+                    DocumentCurationLegos.projectSource(ctx.casStore, corpus,
+                        requireNotNull(corpus.document(project, id)) { "Source document is unavailable" })
+                })
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }
             scope.launch { runCatching { intake.resume() }.onFailure { System.err.println("[INTAKE] resume failed: ${it.message}") } }
@@ -219,7 +232,8 @@ class CurationIntake(
                 val q = runCatching { borg.trikeshed.parse.reifyMap(text.substringAfter("\r\n\r\n", text)) }.getOrDefault(emptyMap())
                 val url = q["url"]?.toString()?.trim().orEmpty()
                 runCatching {
-                    links.root(url, q["decisionProvider"]?.toString()?.takeIf { it.isNotBlank() }?.let(DecisionProvider::of))
+                    require(q["requirePdf"] == null || q["requirePdf"] is Boolean) { "requirePdf must be a boolean" }
+                    links.root(url, q["decisionProvider"]?.toString()?.takeIf { it.isNotBlank() }?.let(DecisionProvider::of), q["requirePdf"] == true)
                 }.fold(
                     onSuccess = { (name, id) -> borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(200,
                         borg.trikeshed.parse.jsonOf(mapOf("verdict" to "ok", "name" to name, "id" to id))) },

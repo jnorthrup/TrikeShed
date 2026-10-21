@@ -16,6 +16,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobReducer
 import borg.trikeshed.job.JobSnapshot
+import borg.trikeshed.lib.*
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.userspace.nio.file.spi.StorageDurability
 import kotlinx.coroutines.CompletableDeferred
@@ -105,7 +106,15 @@ data class BoardCommitted(
     val atMs: Long = 0L,
     /** One root LCNC execution budget, shared by its validated nested runs. */
     val executionFamily: String = "",
+    val priority: Int = 2,
+    val order: Int = 0,
+    val strikes: Int = 0,
+    /** A positional move changes sibling order under the same committed command. */
+    val ordering: Map<String, Int> = emptyMap(),
 )
+
+/** The WAL orders evidence; CAS retains its complete payload independently of the current card. */
+data class BoardReceiptRef(val id: String, val jobId: String, val cid: ContentId, val sequence: Long)
 
 /** One card = one row (the SoA projection reads these; strings only at the wire). */
 data class CardRow(
@@ -143,6 +152,8 @@ data class CardRow(
     val executionFamily: String = "",
     /** Retained service parent; ordinary cards use [parent] instead. */
     val parentRunId: String? = null,
+    /** Identity of the committed RUNNING claim, preserved through receipt acknowledgments. */
+    val claimAttemptId: String = "",
 )
 
 /** Ordinary cards and LCNC execution families occupy disjoint WIP units. */
@@ -201,13 +212,43 @@ class BoardStoreElement(
 
     // Private working rows let guards see earlier commands in the same batch.
     private var rows: Map<String, CardRow> = emptyMap()
-    private data class Published(val rows: Map<String, CardRow>, val sequence: Long)
+    private var receipts: Map<String, BoardReceiptRef> = emptyMap()
+    private data class Published(
+        val rows: Map<String, CardRow>,
+        val sequence: Long,
+        val receipts: Map<String, BoardReceiptRef> = emptyMap(),
+    )
     @Volatile
     private var published = Published(emptyMap(), 0L)
 
     fun cards(): Collection<CardRow> = published.rows.values
 
     fun card(jobId: String): CardRow? = published.rows[jobId]
+
+    fun receiptRefs(): Series<BoardReceiptRef> = published.receipts.values.toSeries()
+
+    suspend fun receipt(id: String): Map<*, *>? {
+        val ref = published.receipts[id] ?: return null
+        return withContext(Dispatchers.Unconfined) {
+            (cas.get(ref.cid)?.let { reify(it) } as? Map<*, *>)?.get("receipt") as? Map<*, *>
+        }
+    }
+
+    /** Evidence admission preserves the card's column, order and transition clock. */
+    suspend fun recordReceipt(jobId: String, receipt: Map<String, Any?>): BoardApply {
+        val id = receipt["id"] as? String ?: return BoardApply.Rejected(null, "receipt without id")
+        while (true) {
+            val row = card(jobId) ?: return BoardApply.Rejected(id, "receipt of unknown card '$jobId'")
+            val reply = CompletableDeferred<BoardApply>()
+            intake.send(BoardIntake(mapOf(
+                "type" to "receipt", "jobId" to jobId, "receipt" to receipt,
+                "idempotencyKey" to "$id#receipt#${row.revision}",
+                "expectedRevision" to row.revision,
+            ), reply))
+            val applied = reply.await()
+            if (applied !is BoardApply.Rejected || !applied.reason.startsWith("stale expectedRevision")) return applied
+        }
+    }
 
     suspend fun command(jobId: String): Map<*, *>? {
         val cid = published.rows[jobId]?.commandCid ?: return null
@@ -262,7 +303,7 @@ class BoardStoreElement(
             }
             throw caught
         }
-        published = Published(rows, sequence)
+        published = Published(rows, sequence, receipts)
         if (state == ElementState.OPEN) state = ElementState.ACTIVE
         consumer = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             for (first in intake) {
@@ -278,7 +319,7 @@ class BoardStoreElement(
                         wal?.flush()
                     }
                     events.forEach { publishCommit(it) }
-                    published = Published(rows, sequence)
+                    published = Published(rows, sequence, receipts)
                     // Acknowledgments and causal fanout are released only after the durability barrier.
                     events.forEach { _committed.emit(it.event) }
                     batch.zip(results).forEach { (cmd, result) -> cmd.reply?.complete(result) }
@@ -287,6 +328,7 @@ class BoardStoreElement(
                     // Fail closed; a fresh element must recover from the WAL.
                     rows = published.rows
                     sequence = published.sequence
+                    receipts = published.receipts
                     this@BoardStoreElement.failure = failure
                     intake.close(failure)
                     batch.forEach { it.reply?.completeExceptionally(failure) }
@@ -360,6 +402,10 @@ class BoardStoreElement(
                 (raw["lcncRun"] as? Map<*, *>)?.get("parentRunId") as? String else prev?.parentRunId,
         )
         rows = if (row == null) rows - jobId else rows + (jobId to row)
+        (raw["receipt"] as? Map<*, *>)?.let { value ->
+            val id = value["id"] as String
+            receipts = receipts + (id to BoardReceiptRef(id, jobId, cid, seq))
+        }
 
         // Positional insert: a move carrying beforeJobId lands BETWEEN cards, not
         // at the bottom. The raw map is the WAL truth, so replay re-derives the
@@ -386,6 +432,11 @@ class BoardStoreElement(
             parent = row?.parent ?: "",
             atMs = (raw["atMs"] as? Number)?.toLong() ?: 0L,
             executionFamily = row?.executionFamily.orEmpty(),
+            priority = row?.priority ?: 2,
+            order = rows[jobId]?.order ?: 0,
+            strikes = row?.strikes ?: 0,
+            ordering = if (beforeId != null && row != null) rows.values
+                .filter { it.col == row.col }.associate { it.jobId to it.order } else emptyMap(),
         )
         val commit = PendingCommit(event, raw)
         if (pending != null) pending.add(commit) else publishCommit(commit)
@@ -416,13 +467,48 @@ class BoardStoreElement(
      * [raw] is the intake map (the WAL truth) — a Move may carry `"actor"` (who
      * is moving); it is read here and nowhere else.
      */
-    private fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? {
+    private suspend fun boardGuard(cmd: JobCommand, raw: Map<*, *>): String? {
+        if (raw.containsKey("receipt")) {
+            if (raw["type"]?.toString()?.lowercase() != "receipt") return "receipt requires type=receipt"
+            val value = raw["receipt"] as? Map<*, *> ?: return "invalid receipt"
+            val id = value["id"] as? String ?: return "receipt without id"
+            if (id.isBlank() || value["jobId"] != cmd.jobId.value) return "invalid receipt identity"
+            if (rows[cmd.jobId.value] == null) return "receipt of unknown card '${cmd.jobId.value}'"
+            if (id in receipts) return "receipt already retained: $id"
+            val attemptId = value["attemptId"] as? String
+            if (attemptId.isNullOrBlank()) return "receipt without attempt identity"
+            when (value["kind"]) {
+                "claim-admission" -> if (id != "$attemptId/admission") return "invalid claim admission identity"
+                "claim" -> if (id != "$attemptId/result") return "invalid claim result identity"
+                "grade" -> {
+                    val grade = modelmux.modelGrade(value, sequence + 1) ?: return "invalid model grade"
+                    if (grade.basis != modelmux.ModelGradeBasis.CORRECTNESS) return "external grade requires human-correctness-v1"
+                    val ref = receipts["$attemptId/result"] ?: return "grade requires retained claim result"
+                    if (ref.jobId != cmd.jobId.value) return "grade belongs to another card"
+                    val result = withContext(Dispatchers.Unconfined) {
+                        (cas.get(ref.cid)?.let { reify(it) } as? Map<*, *>)?.get("receipt") as? Map<*, *>
+                    } ?: return "grade result unavailable"
+                    for (field in s_["model", "modelVersion", "harness", "taskKind"].view)
+                        if (value[field] != result[field]) return "grade changes attempt $field"
+                    if ((value["actor"] as? String).isNullOrBlank() || (value["note"] as? String).isNullOrBlank())
+                        return "grade requires actor and assessment note"
+                    val evidence = InvokeLowering.listishOf(value["evidenceIds"]) ?: return "grade requires retained evidence"
+                    // The result points to the admission's exact prompt and source snapshot.
+                    val identities = setOf("$attemptId/result", "$attemptId/admission")
+                    if (evidence.isEmpty() || evidence.any { it !in identities || it !in receipts })
+                        return "grade evidence must name this attempt's retained admission or result"
+                }
+                else -> return "unknown receipt kind"
+            }
+        }
         executionFamilyGuard(cmd.jobId.value, raw)?.let { return it }
         return when (cmd) {
             is JobCommand.Move -> {
                 val target = BoardCol.fromWire(cmd.toColumn.value)
                 val wip = target?.let { wipGuard(it, cmd.jobId.value, raw) }
                 if (wip != null) wip
+                else if (target == BoardCol.RUNNING && (raw["owner"] as? String)?.startsWith(CLAIM_OWNER_PREFIX) == true)
+                    admissionGuard(cmd.jobId.value) ?: ownerGuard(cmd.jobId.value, raw, target)
                 // Delta 2026-09-04 (verifier finding): ARCHIVED is a settling column too, and a
                 // re-owning Move was a two-step way around the gate — both go through the guards.
                 else if (target == BoardCol.DONE || target == BoardCol.ARCHIVED) claimGuard(cmd.jobId.value, raw) ?: ownerGuard(cmd.jobId.value, raw, target)
@@ -498,6 +584,29 @@ class BoardStoreElement(
         val unit = boardWipUnit(jobId, executionFamily(jobId, raw))
         return if (unit !in occupied && occupied.size >= limit) "WIP limit $limit full for '${target.wire}'" else null
     }
+
+    /** Queued activations cannot overtake a newer priority or positional edit at admission. */
+    private fun admissionGuard(jobId: String): String? {
+        if (rows[jobId]?.col != BoardCol.READY) return null
+        val occupied = rows.values.filter { it.col == BoardCol.RUNNING }
+            .map { boardWipUnit(it.jobId, it.executionFamily) }.toSet().size
+        val available = (BoardCol.RUNNING.wipLimit ?: return null) - occupied
+        val ready = rows.values.toSeries().filter { row ->
+            row.col == BoardCol.READY && row.executionFamily.isEmpty() &&
+                !(PlaneBrief.parseSpec(row.title, row.spec).fansOut &&
+                    rulesFanOutPending(row))
+        }.sortedWith(compareBy({ it.priority }, { it.order }, { it.lastMoveMs }, { it.jobId }))
+        for ((index, row) in ready.view.withIndex()) {
+            if (index >= available) break
+            if (row.jobId == jobId) return null
+        }
+        return "claim allocation changed for '$jobId'"
+    }
+
+    private fun rulesFanOutPending(row: CardRow): Boolean =
+        borg.trikeshed.kanban.rules.BoardRules.fanOutPending(row.jobId, row.dependencies,
+            rows.values.filter { it.parent == row.jobId &&
+                borg.trikeshed.kanban.rules.BoardRules.isMintedChild(row.jobId, it.jobId) }.map { it.jobId })
 
     /**
      * Claimed work passes review first. A card whose owner is `claim:*` was
@@ -615,9 +724,9 @@ class BoardStoreElement(
         seq: Long,
     ): CardRow? {
         // An edit changes metadata, not the lifecycle projection, claim or transition clock.
-        if (cmd is JobCommand.Update) return checkNotNull(prev).copy(
-            title = cmd.title ?: prev.title,
-            priority = cmd.priority ?: prev.priority,
+        if (cmd is JobCommand.Update || cmd is JobCommand.Acknowledge && cmd.receipt && prev != null) return checkNotNull(prev).copy(
+            title = (cmd as? JobCommand.Update)?.title ?: prev.title,
+            priority = (cmd as? JobCommand.Update)?.priority ?: prev.priority,
             revision = snapshot.revision,
             lastSequence = seq,
         )
@@ -659,6 +768,9 @@ class BoardStoreElement(
             // dependencies (the fan-out join) must not detach a child from its tree.
             parent = (raw["parent"] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: prev?.parent ?: "",
             executionFamily = executionFamily(jobId, raw),
+            claimAttemptId = if (cmd is JobCommand.Move && col == BoardCol.RUNNING &&
+                (raw["owner"] as? String)?.startsWith(CLAIM_OWNER_PREFIX) == true)
+                cmd.idempotencyKey else prev?.claimAttemptId.orEmpty(),
         )
     }
 
