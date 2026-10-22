@@ -16,6 +16,7 @@ fun Expr.aggregated(): Boolean = when (this) {
     is Call -> name in AGGREGATES || args.view.any { it.aggregated() }
     is BinaryExpr -> left.aggregated() || right.aggregated()
     is Path -> cell.aggregated()
+    is Cast -> expr.aggregated()
     else -> false
 }
 
@@ -130,7 +131,7 @@ fun SelectStmt.plan(
     residual?.let { stages += QueryK.Filter(it) }
 
     if (orderBy.size > 0 || limit != null || offset != null) {
-        val axis = orderBy.view.map { order -> orderSource(order.expr, items, sources) }
+        val axis = orderBy.view.map { order -> orderSource(order.expr, items, sources, ::derive) }
         stages += QueryK.Order(
             axis.toSeries(),
             BooleanArray(orderBy.size) { orderBy[it].descending },
@@ -154,6 +155,7 @@ fun Expr.references(): List<String> = when (this) {
     is ColumnRef -> listOf(id.asString())
     is BinaryExpr -> left.references() + right.references()
     is Path -> cell.references()
+    is Cast -> expr.references()
     is Call -> args.view.flatMap { it.references() }
     else -> emptyList()
 }
@@ -165,8 +167,11 @@ fun displayName(item: Column): String = item.alias?.asString() ?: when (val e = 
     else -> "?column?"
 }
 
-/** An ORDER BY item: a 1-based select ordinal, a select alias, a select expression, or any column. */
-fun orderSource(expr: Expr, items: List<Column>, sources: List<Twin<String>>): String {
+/**
+ * An ORDER BY item: a 1-based select ordinal, a select alias, a select expression, or a column. Any other
+ * expression (`ORDER BY embedding <=> '[1,0,0]'`) becomes a hidden derived column through [derive].
+ */
+fun orderSource(expr: Expr, items: List<Column>, sources: List<Twin<String>>, derive: (Expr) -> String): String {
     val lit = (expr as? LitExpr)?.lit
     if (lit is NumericLiteral) {
         val k = lit.value.toInt()
@@ -176,6 +181,5 @@ fun orderSource(expr: Expr, items: List<Column>, sources: List<Twin<String>>): S
     val text = expr.render()
     items.indexOfFirst { it.alias?.asString() == text || it.expr.render() == text }.takeIf { it >= 0 }
         ?.let { return sources[it].a }
-    require(expr is ColumnRef) { "ORDER BY $text must name a column or a select-list item" }
-    return expr.id.asString()
+    return if (expr is ColumnRef) expr.id.asString() else derive(expr)
 }

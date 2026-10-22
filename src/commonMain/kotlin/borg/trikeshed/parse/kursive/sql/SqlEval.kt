@@ -7,6 +7,7 @@ import borg.trikeshed.parse.confix.close
 import borg.trikeshed.parse.confix.confixDoc
 import borg.trikeshed.parse.confix.get
 import borg.trikeshed.parse.confix.idx
+import borg.trikeshed.parse.confix.kids
 import borg.trikeshed.parse.confix.key
 import borg.trikeshed.parse.confix.open
 import borg.trikeshed.parse.confix.reify
@@ -52,6 +53,9 @@ fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
             left.compile(names).let { subject -> { row -> SqlRuntime.likeCompiled(subject(row), regex) } }
         } else binary(op.uppercase(), left.compile(names), right.compile(names))
     is Path -> cell.compile(names).let { source -> { row -> SqlRuntime.path(source(row), path, text) } }
+    is Cast ->
+        if (expr is LitExpr) literal(expr.lit).let { SqlRuntime.cast(it, type) }.let { folded -> { _ -> folded } }
+        else expr.compile(names).let { source -> { row -> SqlRuntime.cast(source(row), type) } }
     is Call -> error("function $name(...) is not available in a scalar context")
     Star -> error("* is only an argument of COUNT")
 }
@@ -74,6 +78,9 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     ">=" -> { row -> SqlRuntime.ge(left(row), right(row)) }
     "LIKE" -> { row -> SqlRuntime.like(left(row), right(row)) }
     "||" -> { row -> SqlRuntime.concat(left(row), right(row)) }
+    "<=>" -> { row -> SqlRuntime.cosineDistance(left(row), right(row)) }
+    "<->" -> { row -> SqlRuntime.l2Distance(left(row), right(row)) }
+    "<#>" -> { row -> SqlRuntime.negInnerProduct(left(row), right(row)) }
     "+" -> { row -> SqlRuntime.add(left(row), right(row)) }
     "-" -> { row -> SqlRuntime.sub(left(row), right(row)) }
     "*" -> { row -> SqlRuntime.mul(left(row), right(row)) }
@@ -147,5 +154,49 @@ fun Expr.render(): String = when (this) {
     is Path -> cell.render() + path.view.mapIndexed { i, step ->
         (if (text && i == path.size - 1) "->>" else "->") + (step.key?.let { "'$it'" } ?: step.idx.toString())
     }.joinToString("")
+    is Cast -> "${expr.render()}::$type"
     Star -> "*"
+}
+
+/** A vector cell as floats: a FloatArray / DoubleArray, a Confix array of numbers, or pgvector text `[1, 2.5, -3]`. */
+fun vectorOf(value: Any?): FloatArray? = when (value) {
+    null -> null
+    is FloatArray -> value
+    is DoubleArray -> FloatArray(value.size) { value[it].toFloat() }
+    is String -> {
+        val body = value.trim()
+        require(body.startsWith("[") && body.endsWith("]")) { "invalid input syntax for type vector: \"$value\"" }
+        val parts = body.substring(1, body.length - 1).split(',').map { it.trim() }
+        if (parts.size == 1 && parts[0].isEmpty()) FloatArray(0)
+        else FloatArray(parts.size) { i -> parts[i].toFloatOrNull() ?: error("invalid input syntax for type vector: \"$value\"") }
+    }
+    else -> {
+        val cell = confixCellOf(value)?.takeIf { it.row.tag == IOMemento.IoArray }
+            ?: error("cannot read a vector from ${value::class.simpleName}")
+        val kids = cell.row.kids
+        FloatArray(kids.size) { i -> (kids[i].reify(cell.src) as? Number)?.toFloat() ?: error("vector element $i is not a number") }
+    }
+}
+
+/** `value::type`. Integral types answer Long and fractional types Double, as the arithmetic does. */
+fun castTo(value: Any?, type: String): Any? {
+    if (value == null) return null
+    return when (type) {
+        "vector" -> vectorOf(value)
+        "int", "integer", "int2", "int4", "int8", "smallint", "bigint" ->
+            if (value is Number) value.toLong() else scalarText(value).trim().toLongOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
+        "float", "float4", "float8", "real", "double", "numeric", "decimal" ->
+            if (value is Number) value.toDouble() else scalarText(value).trim().toDoubleOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
+        "text", "varchar", "string", "char" -> scalarText(value)
+        "bool", "boolean" -> when (value) {
+            is Boolean -> value
+            is Number -> value.toDouble() != 0.0
+            else -> when (scalarText(value).trim().lowercase()) {
+                "t", "true", "y", "yes", "on", "1" -> true
+                "f", "false", "n", "no", "off", "0" -> false
+                else -> error("invalid input syntax for type boolean: \"$value\"")
+            }
+        }
+        else -> error("type \"$type\" does not exist")
+    }
 }

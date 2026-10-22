@@ -33,6 +33,8 @@ data class BinaryExpr(val left: Expr, val op: String, val right: Expr) : Expr
 data class Call(val name: String, val args: Series<Expr>) : Expr
 /** The `*` argument of `COUNT(*)`. */
 data object Star : Expr
+/** `expr::type` (pg, DuckDB cast). */
+data class Cast(val expr: Expr, val type: String) : Expr
 /**
  * Semi-structured access into a Confix cell: pg `->` / `->>` / `#>>`, DuckDB `->`,
  * Snowflake `col:a.b[0]`. [text] is the `->>` / `#>>` form, which answers the scalar as text.
@@ -216,10 +218,10 @@ class SqlParser(private val cs: CharSeries) {
             val e = parseExpr()
             skipWs()
             if (peek() == ')') cs.pos++
-            return parsePath(e ?: return null)
+            return parsePostfix(e ?: return null)
         }
-        parseStringLiteral()?.let { return LitExpr(it) }
-        parseNumberLit()?.let { return LitExpr(it) }
+        parseStringLiteral()?.let { return parsePostfix(LitExpr(it)) }
+        parseNumberLit()?.let { return parsePostfix(LitExpr(it)) }
         val id = parseIdentifier() ?: return null
         skipWs()
         if (peek() == '(') {
@@ -235,13 +237,26 @@ class SqlParser(private val cs: CharSeries) {
             skipWs()
             if (peek() != ')') return null
             cs.pos++
-            return parsePath(Call(id.asString().lowercase(), args.toSeries()))
+            return parsePostfix(Call(id.asString().lowercase(), args.toSeries()))
         }
         if (peek() == ':' && !(cs.pos + 1 < cs.limit && cs[cs.pos + 1] == ':')) {
             cs.pos++
-            return parsePath(Path(ColumnRef(id), parseColonPath(), text = false))
+            return parsePostfix(Path(ColumnRef(id), parseColonPath(), text = false))
         }
-        return parsePath(ColumnRef(id))
+        return parsePostfix(ColumnRef(id))
+    }
+
+    /** `->` paths and `::type` casts, in any order: `doc->>'n'::int`, `'[1,2]'::vector`. */
+    fun parsePostfix(head: Expr): Expr {
+        var left = parsePath(head)
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            if (!matchSymbol("::")) { cs.pos = save; return left }
+            skipWs()
+            val type = parseIdentifier() ?: run { cs.pos = save; return left }
+            left = parsePath(Cast(left, type.asString().lowercase()))
+        }
     }
 
     /** Snowflake `col:a.b[0]` segments after the colon. */
@@ -327,8 +342,20 @@ class SqlParser(private val cs: CharSeries) {
         }
     }
 
-    fun parseComparison(): Expr? {
+    /** pgvector `<=>` cosine distance, `<->` L2 distance, `<#>` negative inner product: looser than `+ -`, tighter than comparisons. */
+    fun parseVector(): Expr? {
         var left = parseAdditive() ?: return null
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val op = listOf("<=>", "<->", "<#>").firstOrNull { matchSymbol(it) } ?: run { cs.pos = save; return left }
+            val right = parseAdditive() ?: run { cs.pos = save; return left }
+            left = BinaryExpr(left, op, right)
+        }
+    }
+
+    fun parseComparison(): Expr? {
+        var left = parseVector() ?: return null
         skipWs()
         val ops = listOf("!=", "<>", ">=", "<=", "=", ">", "<", "LIKE")
         for (op in ops) {
@@ -347,7 +374,7 @@ class SqlParser(private val cs: CharSeries) {
                 cs.pos = save; continue
             }
             skipWs()
-            val right = parseAdditive() ?: run { cs.pos = save; return left }
+            val right = parseVector() ?: run { cs.pos = save; return left }
             left = BinaryExpr(left, op, right)
             break
         }

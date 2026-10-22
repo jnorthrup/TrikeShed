@@ -44,6 +44,8 @@ class ClassfileExprCompilerTest {
             "x || '-' || k",
             "doc->>'t'", "doc->'a'", "doc:t", "doc->'a'->>0", "doc#>>'{a,1}'",
             "doc->>'t' = 'q' AND k > 0",
+            "doc->'a' <-> '[1,2]'", "'[1,2]'::vector <=> '[2,3]'::vector", "'[1,2]'::vector <#> '[2,3]'",
+            "k::double / 2", "k::text || 'a'", "x::text", "n::int + 1", "f::int", "k::bool",
         )) {
             val (expected, actual) = both(sql, jit)
             assertEquals(expected, actual, sql)

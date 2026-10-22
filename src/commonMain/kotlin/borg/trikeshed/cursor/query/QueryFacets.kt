@@ -69,6 +69,8 @@ fun Cursor.project(stage: QueryK.Project): Cursor {
     val outputs = ArrayList<String>()
     for (pair in stage.columns.view) {
         if (pair.a == "*") for (c in 0 until names.size) {
+            // `#n` columns are the planner's hidden derivations (ORDER BY expressions, aggregate arguments).
+            if (names[c].startsWith("#")) continue
             ordinals += c
             outputs += names[c].toString().substringAfterLast('.')
         } else {

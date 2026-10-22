@@ -115,6 +115,14 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
                 c.loadConstant(if (e.text) 1 else 0)
                 c.invokestatic(runtime, "path", MethodTypeDesc.of(CD_Object, CD_Object, CD_Object, CD_boolean))
             }
+            is Cast ->
+                // A cast of a literal folds once, at emission; anything else casts per row.
+                if (e.expr is LitExpr) constant(c, constants, SqlRuntime.cast(literal(e.expr.lit), e.type))
+                else {
+                    node(c, e.expr, names, constants)
+                    c.ldc(c.constantPool().stringEntry(e.type))
+                    c.invokestatic(runtime, "cast", MethodTypeDesc.of(CD_Object, CD_Object, CD_String))
+                }
             is BinaryExpr -> binaryNode(c, e, names, constants)
             is Call -> error("function ${e.name}(...) has no scalar form")
             Star -> error("* is only an argument of COUNT")
@@ -169,6 +177,9 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
         ">" -> "gt"
         ">=" -> "ge"
         "||" -> "concat"
+        "<=>" -> "cosineDistance"
+        "<->" -> "l2Distance"
+        "<#>" -> "negInnerProduct"
         "+" -> "add"
         "-" -> "sub"
         "*" -> "mul"
@@ -188,6 +199,9 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
         when (expr) {
             is LitExpr -> literal(expr.lit).let { if (it !is String) constants += it }
             is Path -> { collect(expr.cell, names, constants); constants += expr.path }
+            is Cast ->
+                if (expr.expr is LitExpr) constants += SqlRuntime.cast(literal(expr.expr.lit), expr.type)
+                else collect(expr.expr, names, constants)
             is BinaryExpr -> {
                 val op = expr.op.uppercase()
                 collect(expr.left, names, constants)

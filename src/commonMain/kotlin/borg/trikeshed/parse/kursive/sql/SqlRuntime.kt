@@ -65,6 +65,26 @@ object SqlRuntime {
         return if (integral(a) && integral(b)) a.toLong() % b.toLong() else a.toDouble() % b.toDouble()
     }
 
+    /** pgvector `<=>`: 1 − cosine similarity (a zero vector is similarity 0). Dimensions must agree. */
+    @JvmStatic fun cosineDistance(a: Any?, b: Any?): Any? = distance(a, b) { x, y, out -> borg.trikeshed.lib.floatp.cosine(x, 1, x.size, y, out); 1.0 - out[0] }
+
+    /** pgvector `<->`: Euclidean distance. */
+    @JvmStatic fun l2Distance(a: Any?, b: Any?): Any? =
+        distance(a, b) { x, y, out -> borg.trikeshed.lib.floatp.l2Squared(x, 1, x.size, y, out); kotlin.math.sqrt(out[0].toDouble()) }
+
+    /** pgvector `<#>`: the negative inner product, so ascending order is most similar first. */
+    @JvmStatic fun negInnerProduct(a: Any?, b: Any?): Any? = distance(a, b) { x, y, out -> borg.trikeshed.lib.floatp.dot(x, 1, x.size, y, out); -out[0].toDouble() }
+
+    private inline fun distance(a: Any?, b: Any?, kernel: (FloatArray, FloatArray, FloatArray) -> Double): Any? {
+        val x = vectorOf(a) ?: return null
+        val y = vectorOf(b) ?: return null
+        require(x.size == y.size) { "different vector dimensions ${x.size} and ${y.size}" }
+        return kernel(x, y, FloatArray(1))
+    }
+
+    /** `value::type` for the types the SQL surfaces share; null casts to null. */
+    @JvmStatic fun cast(value: Any?, type: String): Any? = castTo(value, type)
+
     /** pg `->` / `->>`, DuckDB `->`, Snowflake `:`; [path] is a `JsPath` (`Series<JsPathElement>`). */
     @Suppress("UNCHECKED_CAST")
     @JvmStatic fun path(value: Any?, path: Any?, text: Boolean): Any? = navigate(value, path as Series<JsPathElement>, text)
