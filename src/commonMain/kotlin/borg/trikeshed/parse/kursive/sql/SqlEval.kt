@@ -44,10 +44,14 @@ fun Series<CharSequence>.ordinalOf(name: CharSequence): Int {
 
 /** Compile against the column [names] of the Cursor whose rows it will read. */
 fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
-    is ColumnRef -> names.ordinalOf(id.asString()).let { ordinal -> { row -> row.values[ordinal] } }
+    is ColumnRef -> names.ordinalOf(id.asString()).let { ordinal -> { row -> SqlRuntime.cell(row, ordinal) } }
     is LitExpr -> literal(lit).let { value -> { _ -> value } }
-    is BinaryExpr -> binary(op.uppercase(), left.compile(names), right.compile(names))
-    is Path -> cell.compile(names).let { source -> { row -> navigate(source(row), path, text) } }
+    is BinaryExpr ->
+        if (op.uppercase() == "LIKE" && right is LitExpr) {
+            val regex = likeRegex(literal(right.lit).toString())
+            left.compile(names).let { subject -> { row -> SqlRuntime.likeCompiled(subject(row), regex) } }
+        } else binary(op.uppercase(), left.compile(names), right.compile(names))
+    is Path -> cell.compile(names).let { source -> { row -> SqlRuntime.path(source(row), path, text) } }
     is Call -> error("function $name(...) is not available in a scalar context")
     Star -> error("* is only an argument of COUNT")
 }
@@ -62,19 +66,19 @@ fun literal(lit: SqlNode): Any? = when (lit) {
 fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     "AND" -> { row -> left(row) == true && right(row) == true }
     "OR" -> { row -> left(row) == true || right(row) == true }
-    "=" -> { row -> compareOrNull(left(row), right(row))?.let { it == 0 } }
-    "!=", "<>" -> { row -> compareOrNull(left(row), right(row))?.let { it != 0 } }
-    "<" -> { row -> compareOrNull(left(row), right(row))?.let { it < 0 } }
-    "<=" -> { row -> compareOrNull(left(row), right(row))?.let { it <= 0 } }
-    ">" -> { row -> compareOrNull(left(row), right(row))?.let { it > 0 } }
-    ">=" -> { row -> compareOrNull(left(row), right(row))?.let { it >= 0 } }
-    "LIKE" -> { row ->
-        val subject = left(row)
-        val pattern = right(row)
-        if (subject == null || pattern == null) null else likeRegex(pattern.toString()).matches(subject.toString())
-    }
-    "||" -> { row -> left(row)?.let { l -> right(row)?.let { r -> l.toString() + r.toString() } } }
-    "+", "-", "*", "/", "%" -> { row -> arithmetic(op, left(row), right(row)) }
+    "=" -> { row -> SqlRuntime.eq(left(row), right(row)) }
+    "!=", "<>" -> { row -> SqlRuntime.ne(left(row), right(row)) }
+    "<" -> { row -> SqlRuntime.lt(left(row), right(row)) }
+    "<=" -> { row -> SqlRuntime.le(left(row), right(row)) }
+    ">" -> { row -> SqlRuntime.gt(left(row), right(row)) }
+    ">=" -> { row -> SqlRuntime.ge(left(row), right(row)) }
+    "LIKE" -> { row -> SqlRuntime.like(left(row), right(row)) }
+    "||" -> { row -> SqlRuntime.concat(left(row), right(row)) }
+    "+" -> { row -> SqlRuntime.add(left(row), right(row)) }
+    "-" -> { row -> SqlRuntime.sub(left(row), right(row)) }
+    "*" -> { row -> SqlRuntime.mul(left(row), right(row)) }
+    "/" -> { row -> SqlRuntime.div(left(row), right(row)) }
+    "%" -> { row -> SqlRuntime.mod(left(row), right(row)) }
     else -> error("operator $op")
 }
 
@@ -88,35 +92,6 @@ fun likeRegex(pattern: String): Regex = Regex(buildString {
 })
 
 fun integral(value: Any?): Boolean = value is Long || value is Int || value is Short || value is Byte
-
-/** Integral operands stay Long (`/` truncates, as pg); any fraction makes the result Double; null propagates. */
-fun arithmetic(op: String, left: Any?, right: Any?): Any? {
-    if (left !is Number || right !is Number) return null
-    if (integral(left) && integral(right)) {
-        val l = left.toLong()
-        val r = right.toLong()
-        return when (op) {
-            "+" -> l + r
-            "-" -> l - r
-            "*" -> l * r
-            "/" -> l / r
-            else -> l % r
-        }
-    }
-    val l = left.toDouble()
-    val r = right.toDouble()
-    return when (op) {
-        "+" -> l + r
-        "-" -> l - r
-        "*" -> l * r
-        "/" -> l / r
-        else -> l % r
-    }
-}
-
-/** Three-valued comparison: null when either side is null; numbers numerically, else by kind. */
-fun compareOrNull(left: Any?, right: Any?): Int? =
-    if (left == null || right == null) null else compareCells(left, right)
 
 /** Total order over non-null cells: numbers numerically, then strings, booleans, others by text. */
 fun compareCells(left: Any, right: Any): Int = when {

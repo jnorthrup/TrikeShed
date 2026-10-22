@@ -10,15 +10,18 @@ import borg.trikeshed.isam.meta.IOMemento
  */
 fun Cursor.extractDoubleSeries(columnIndex: Int): DoubleSeries {
     val series: DoubleSeries = DoubleSeries()
-    for (i in 0 until this.a) {
-        val cellValue = this.b(i).b(columnIndex).a
-        val doubleValue = when (cellValue) {
-            is Double -> cellValue
-            is Number -> cellValue.toDouble()
-            is String -> cellValue.toDoubleOrNull() ?: Double.NaN
-            else -> Double.NaN
+    val column = dense(columnIndex)
+    when (val data = column.data) {
+        is DoubleArray -> for (i in 0 until data.size) series.append(if (column.valid?.get(i) == false) Double.NaN else data[i])
+        is LongArray -> for (i in 0 until data.size) series.append(if (column.valid?.get(i) == false) Double.NaN else data[i].toDouble())
+        else -> for (i in 0 until this.a) {
+            val cellValue = column[i]
+            series.append(when (cellValue) {
+                is Number -> cellValue.toDouble()
+                is String -> cellValue.toDoubleOrNull() ?: Double.NaN
+                else -> Double.NaN
+            })
         }
-        series.append(doubleValue)
     }
     return series
 }

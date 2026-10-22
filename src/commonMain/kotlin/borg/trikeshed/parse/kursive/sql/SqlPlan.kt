@@ -3,6 +3,8 @@ package borg.trikeshed.parse.kursive.sql
 import borg.trikeshed.cursor.*
 import borg.trikeshed.cursor.query.*
 import borg.trikeshed.lib.*
+import borg.trikeshed.userspace.nio.platform.spi.ColumnOperations
+import borg.trikeshed.userspace.nio.platform.spi.KotlinColumnOperations
 import borg.trikeshed.cursor.ReifiedSplitSeries2
 
 /** Aggregate function names the planner lowers to [Reduce] kinds. */
@@ -25,6 +27,7 @@ fun Cursor.qualify(qualifier: String): Cursor {
         val meta = exemplar[c]()
         ColumnMeta("$qualifier.${meta.name}", meta.type, meta.child)
     }
+    if (this is ColumnCursor) return renamed(metas)
     val metaSeries: Series<`ColumnMeta↻`> = metas.size j { c: Int -> { metas[c] } }
     return size j { r: Int -> ReifiedSplitSeries2(this[r].values, metaSeries) }
 }
@@ -37,7 +40,11 @@ fun Cursor.qualify(qualifier: String): Cursor {
  * → Project (select list). ORDER BY resolves select-list ordinals, aliases and expressions
  * before projection, so it may also name columns the select list drops.
  */
-fun SelectStmt.plan(resolve: (String) -> Cursor): QueryCursor {
+fun SelectStmt.plan(
+    resolve: (String) -> Cursor,
+    ops: ColumnOperations = KotlinColumnOperations,
+    compiler: ExprCompiler = ClosureExprCompiler,
+): QueryCursor {
     val table = requireNotNull(from) { "SELECT without FROM" }
     val source = resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
     val stages = mutableListOf<QueryK<Cursor>>()
@@ -132,7 +139,7 @@ fun SelectStmt.plan(resolve: (String) -> Cursor): QueryCursor {
         )
     }
     stages += QueryK.Project(sources.toSeries())
-    return QueryCursor(source, stages.toSeries())
+    return QueryCursor(source, stages.toSeries(), ops, compiler)
 }
 
 /** The AND-separated conjuncts of [e]. */

@@ -4,6 +4,8 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.cursor.ReifiedSplitSeries2
 import borg.trikeshed.parse.confix.columnCell
+import borg.trikeshed.userspace.nio.platform.spi.ColumnOperations
+import borg.trikeshed.userspace.nio.platform.spi.KotlinColumnOperations
 import borg.trikeshed.parse.confix.kids
 import borg.trikeshed.parse.confix.row
 import borg.trikeshed.parse.confix.src
@@ -14,30 +16,41 @@ import borg.trikeshed.parse.kursive.sql.confixCellOf
 import borg.trikeshed.parse.kursive.sql.integral
 import borg.trikeshed.parse.kursive.sql.ordinalOf
 
-/** The single executor of [QueryK] stages: one `when`, one cast. */
+/**
+ * The single executor of [QueryK] stages: one `when`, one cast. A [ColumnCursor] source runs the
+ * stage on the kernels in [ops] when its shape is covered, and otherwise falls through to the
+ * closure path below, which handles every shape and every Cursor.
+ */
 @Suppress("UNCHECKED_CAST")
-fun <R> Cursor.facet(key: QueryK<R>): R = when (key) {
-    is QueryK.Filter -> filterRows(key)
-    is QueryK.Derive -> derive(key)
-    is QueryK.Project -> project(key)
-    is QueryK.Widen -> widen(key)
-    is QueryK.Aggregate -> aggregate(key)
-    is QueryK.Order -> order(key)
-    is QueryK.Unnest -> unnest(key)
-} as R
+fun <R> Cursor.facet(
+    key: QueryK<R>,
+    ops: ColumnOperations = KotlinColumnOperations,
+    compiler: ExprCompiler = ClosureExprCompiler,
+): R {
+    val columnar = this as? ColumnCursor
+    return when (key) {
+        is QueryK.Filter -> columnar?.routeFilter(key.where, ops) ?: filterRows(key, compiler)
+        is QueryK.Derive -> columnar?.routeDerive(key, ops) ?: derive(key, compiler)
+        is QueryK.Project -> project(key)
+        is QueryK.Widen -> columnar?.routeWiden(key, ops) ?: widen(key)
+        is QueryK.Aggregate -> columnar?.routeAggregate(key, ops) ?: aggregate(key)
+        is QueryK.Order -> columnar?.routeOrder(key) ?: order(key)
+        is QueryK.Unnest -> unnest(key)
+    } as R
+}
 
 /** Column names from the row-0 exemplar; empty when there are no rows. */
 val Cursor.names: Series<CharSequence> get() = if (size == 0) emptySeriesOf() else columnNames
 
-fun Cursor.filterRows(stage: QueryK.Filter): Cursor {
+fun Cursor.filterRows(stage: QueryK.Filter, compiler: ExprCompiler = ClosureExprCompiler): Cursor {
     if (size == 0) return this
-    val test by lazy { stage.where.compile(names) }
+    val test by lazy { compiler.compile(stage.where, names) }
     return filter { row -> test(row) == true }
 }
 
-fun Cursor.derive(stage: QueryK.Derive): Cursor {
+fun Cursor.derive(stage: QueryK.Derive, compiler: ExprCompiler = ClosureExprCompiler): Cursor {
     if (size == 0) return this
-    val expr = stage.expr.compile(names)
+    val expr = compiler.compile(stage.expr, names)
     val meta by lazy { ColumnMeta(stage.name, mementoOf(expr(this[0]))) }
     val metas = this[0].metas
     val width = metas.size
