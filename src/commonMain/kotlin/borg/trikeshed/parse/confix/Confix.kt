@@ -445,6 +445,8 @@ enum class Syntax {
 
         val structuralNodes by lazy { buildStructuralNodes(flat, src) }
 
+        val columns by lazy { confixColumns(tree, src) }
+
         return flat.spans.size j { operation: Any? ->
             when (operation) {
                 ConfixIndexK.Spans -> flat.spans
@@ -454,6 +456,7 @@ enum class Syntax {
                 ConfixIndexK.TreeCursor -> tree
                 ConfixIndexK.KeyToChild -> ({ key: CharSequence -> keys[key.toString()] })
                 ConfixIndexK.StructuralNodes -> structuralNodes
+                ConfixIndexK.Columns -> columns
                 else -> null
             }
         }
