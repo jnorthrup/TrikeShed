@@ -23,5 +23,7 @@ void    ts_sum_by_group_f64(const double *restrict v, const int32_t *restrict se
 void    ts_sum_by_group_i64(const int64_t *restrict v, const int32_t *restrict sel, const int32_t *restrict ids, int32_t m, int64_t *restrict sums);
 void    ts_count_by_group(const int32_t *restrict ids, int32_t m, int64_t *restrict counts);
 void    ts_cosine_f32(const float *restrict flat, int32_t n, int32_t dims, const float *restrict probe, float *restrict out);
+void    ts_dot_f32(const float *restrict flat, int32_t n, int32_t dims, const float *restrict probe, float *restrict out);
+void    ts_l2sq_f32(const float *restrict flat, int32_t n, int32_t dims, const float *restrict probe, float *restrict out);
 
 #endif

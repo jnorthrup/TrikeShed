@@ -15,6 +15,9 @@ class CountingOps(val inner: ColumnOperations = KotlinColumnOperations) : Column
     override fun sumF64(values: DoubleArray, sel: IntArray, m: Int): Double { calls++; return inner.sumF64(values, sel, m) }
     override fun affineF64(a: DoubleArray, scale: Double, shift: Double, sel: IntArray, m: Int, out: DoubleArray) { calls++; inner.affineF64(a, scale, shift, sel, m, out) }
     override fun groupIdsI64(keys: LongArray, sel: IntArray, m: Int, ids: IntArray, firstRow: IntArray, table: IntArray, tableKeys: LongArray): Int { calls++; return inner.groupIdsI64(keys, sel, m, ids, firstRow, table, tableKeys) }
+    override fun cosineF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) { calls++; inner.cosineF32(flat, n, dims, probe, out) }
+    override fun dotF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) { calls++; inner.dotF32(flat, n, dims, probe, out) }
+    override fun l2SquaredF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) { calls++; inner.l2SquaredF32(flat, n, dims, probe, out) }
 }
 
 class KernelRoutingTest {

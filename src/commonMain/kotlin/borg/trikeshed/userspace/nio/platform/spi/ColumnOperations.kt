@@ -31,6 +31,8 @@ interface ColumnOperations : CoroutineContext.Element {
     fun sumByGroupI64(values: LongArray, sel: IntArray, ids: IntArray, m: Int, sums: LongArray)
     fun countByGroup(ids: IntArray, m: Int, counts: LongArray)
     fun cosineF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray)
+    fun dotF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray)
+    fun l2SquaredF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray)
 
     /** Releases native resources; a no-op for the Kotlin provider. */
     fun close() {}
@@ -56,4 +58,8 @@ object KotlinColumnOperations : ColumnOperations {
     override fun countByGroup(ids: IntArray, m: Int, counts: LongArray) = borg.trikeshed.lib.longp.countByGroup(ids, m, counts)
     override fun cosineF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) =
         borg.trikeshed.lib.floatp.cosine(flat, n, dims, probe, out)
+    override fun dotF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) =
+        borg.trikeshed.lib.floatp.dot(flat, n, dims, probe, out)
+    override fun l2SquaredF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) =
+        borg.trikeshed.lib.floatp.l2Squared(flat, n, dims, probe, out)
 }

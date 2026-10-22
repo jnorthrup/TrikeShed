@@ -125,8 +125,41 @@ private fun ColumnCursor.denseExpr(e: Expr, ops: ColumnOperations): DoubleArray?
     }
 }
 
+/** The constant vector an expression stands for: a literal, or a literal cast to `vector`. Null for anything per-row. */
+private fun constantVector(e: Expr): FloatArray? {
+    val lit = when {
+        e is LitExpr -> e
+        e is Cast && e.type == "vector" -> e.expr as? LitExpr
+        else -> null
+    } ?: return null
+    return runCatching { vectorOf(literal(lit.lit)) }.getOrNull()
+}
+
+/**
+ * `column <=> probe`, `<->` and `<#>` over a vector column and a constant: one kernel pass over the
+ * flat array, then the same scalar the closure path computes per row (`1 - cosine`, `sqrt(l2²)`, `-dot`),
+ * so the answers are identical. A null row stays null. A width mismatch is left to the closure path,
+ * which reports it as the row is read.
+ */
+private fun ColumnCursor.vectorDistance(e: BinaryExpr, ops: ColumnOperations): DenseColumn? {
+    if (e.op != "<=>" && e.op != "<->" && e.op != "<#>") return null
+    val ref = (e.left as? ColumnRef) ?: (e.right as? ColumnRef) ?: return null
+    val probe = constantVector(if (ref === e.left) e.right else e.left) ?: return null
+    val column = dense(ordinals().ordinalOf(ref.id.asString()))
+    val vectors = column.data as? VectorColumn ?: return null
+    if (vectors.dims == 0 || probe.size != vectors.dims) return null
+    val raw = FloatArray(rows)
+    val scores = when (e.op) {
+        "<=>" -> { ops.cosineF32(vectors.flat, rows, vectors.dims, probe, raw); DoubleArray(rows) { 1.0 - raw[it] } }
+        "<->" -> { ops.l2SquaredF32(vectors.flat, rows, vectors.dims, probe, raw); DoubleArray(rows) { kotlin.math.sqrt(raw[it].toDouble()) } }
+        else -> { ops.dotF32(vectors.flat, rows, vectors.dims, probe, raw); DoubleArray(rows) { -raw[it].toDouble() } }
+    }
+    return DenseColumn(scores, column.valid)
+}
+
 internal fun ColumnCursor.routeDerive(stage: QueryK.Derive, ops: ColumnOperations): Cursor? {
     if (rows == 0 || stage.expr !is BinaryExpr) return null
+    vectorDistance(stage.expr, ops)?.let { distance -> return with(ColumnMeta(stage.name, IOMemento.IoDouble)) { distance } }
     val computed = denseExpr(stage.expr, ops) ?: return null
     return with(ColumnMeta(stage.name, IOMemento.IoDouble)) { DenseColumn(computed) }
 }

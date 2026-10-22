@@ -39,6 +39,8 @@ class JvmColumnOperations private constructor(private val lookup: SymbolLookup) 
     private val sumByGroupI64 = find("ts_sum_by_group_i64")
     private val countByGroup = find("ts_count_by_group")
     private val cosineF32 = find("ts_cosine_f32")
+    private val dotF32 = find("ts_dot_f32")
+    private val l2SquaredF32 = find("ts_l2sq_f32")
 
     private fun seg(a: IntArray) = MemorySegment.ofArray(a)
     private fun seg(a: LongArray) = MemorySegment.ofArray(a)
@@ -88,6 +90,14 @@ class JvmColumnOperations private constructor(private val lookup: SymbolLookup) 
 
     override fun cosineF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) {
         ColumnDowncall.COSINE.invokeExact(cosineF32, seg(flat), n, dims, seg(probe), seg(out))
+    }
+
+    override fun dotF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) {
+        ColumnDowncall.COSINE.invokeExact(dotF32, seg(flat), n, dims, seg(probe), seg(out))
+    }
+
+    override fun l2SquaredF32(flat: FloatArray, n: Int, dims: Int, probe: FloatArray, out: FloatArray) {
+        ColumnDowncall.COSINE.invokeExact(l2SquaredF32, seg(flat), n, dims, seg(probe), seg(out))
     }
 
     companion object {

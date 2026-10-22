@@ -2,6 +2,7 @@ package borg.trikeshed.cursor
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.lib.intp.Selection
+import borg.trikeshed.parse.kursive.sql.vectorOf
 
 /**
  * Dictionary-coded strings: `codes[r]` indexes [dictionary]. Equality over the column is an Int
@@ -25,7 +26,7 @@ class DictColumn(val codes: IntArray, val dictionary: Array<String>) {
 
 /**
  * One column's rows as a primitive array: [data] is a `DoubleArray`, `LongArray`, `IntArray`,
- * `FloatArray`, `BooleanArray`, [DictColumn] or `Array<Any?>`; [valid] (true = present) is null
+ * `FloatArray`, `BooleanArray`, [DictColumn], [VectorColumn] or `Array<Any?>`; [valid] (true = present) is null
  * when no row is null, which is what the kernels require.
  */
 class DenseColumn(val data: Any, val valid: BooleanArray? = null) {
@@ -36,6 +37,7 @@ class DenseColumn(val data: Any, val valid: BooleanArray? = null) {
         is FloatArray -> data.size
         is BooleanArray -> data.size
         is DictColumn -> data.codes.size
+        is VectorColumn -> data.rows
         is Array<*> -> data.size
         else -> error("not a dense column: ${data::class.simpleName}")
     }
@@ -47,6 +49,7 @@ class DenseColumn(val data: Any, val valid: BooleanArray? = null) {
         is FloatArray -> data[row]
         is BooleanArray -> data[row]
         is DictColumn -> data[row]
+        is VectorColumn -> data[row]
         is Array<*> -> data[row]
         else -> error("not a dense column: ${data::class.simpleName}")
     }
@@ -59,6 +62,7 @@ class DenseColumn(val data: Any, val valid: BooleanArray? = null) {
             is FloatArray -> FloatArray(m) { data[sel[it]] }
             is BooleanArray -> BooleanArray(m) { data[sel[it]] }
             is DictColumn -> data.gather(sel, m)
+            is VectorColumn -> data.gather(sel, m)
             is Array<*> -> Array<Any?>(m) { data[sel[it]] }
             else -> error("not a dense column: ${data::class.simpleName}")
         },
@@ -151,11 +155,12 @@ fun Cursor.dense(column: Int): DenseColumn {
     if (this is ColumnCursor) return dense(column)
     val n = size
     if (n == 0) return DenseColumn(DoubleArray(0))
-    val type = this[0].metas[column]().type
+    val meta = this[0].metas[column]()
+    val type = meta.type
     val valid = BooleanArray(n)
     var anyNull = false
     fun cell(r: Int): Any? = this[r].values[column].also { if (it == null) anyNull = true else valid[r] = true }
-    val data: Any = when (type) {
+    val data: Any = if (meta.isVector) vectors(n, ::cell) else when (type) {
         IOMemento.IoLong, IOMemento.IoInt -> LongArray(n) { r -> (cell(r) as? Number)?.toLong() ?: 0L }
         IOMemento.IoDouble -> DoubleArray(n) { r -> (cell(r) as? Number)?.toDouble() ?: Double.NaN }
         IOMemento.IoFloat -> FloatArray(n) { r -> (cell(r) as? Number)?.toFloat() ?: Float.NaN }
@@ -164,4 +169,16 @@ fun Cursor.dense(column: Int): DenseColumn {
         else -> Array<Any?>(n) { r -> cell(r) }
     }
     return DenseColumn(data, if (anyNull) valid else null)
+}
+
+/** The cells as a [VectorColumn] when they all read as vectors of one width, else the boxed cells. */
+private fun vectors(n: Int, cell: (Int) -> Any?): Any {
+    val rows = arrayOfNulls<FloatArray>(n)
+    var dims = -1
+    for (r in 0 until n) {
+        val v = cell(r)?.let { runCatching { vectorOf(it) }.getOrNull() ?: return Array<Any?>(n) { cell(it) } } ?: continue
+        if (dims < 0) dims = v.size else if (v.size != dims) return Array<Any?>(n) { cell(it) }
+        rows[r] = v
+    }
+    return VectorColumn.of(maxOf(dims, 0), n) { rows[it] }
 }

@@ -130,3 +130,21 @@ void ts_cosine_f32(const float *restrict flat, int32_t n, int32_t dims, const fl
         out[r] = norm == 0.0f ? 0.0f : dot / norm;
     }
 }
+
+void ts_dot_f32(const float *restrict flat, int32_t n, int32_t dims, const float *restrict probe, float *restrict out) {
+    for (int32_t r = 0; r < n; r++) {
+        float s = 0.0f;
+        const float *row = flat + (int64_t)r * dims;
+        for (int32_t d = 0; d < dims; d++) s += row[d] * probe[d];
+        out[r] = s;
+    }
+}
+
+void ts_l2sq_f32(const float *restrict flat, int32_t n, int32_t dims, const float *restrict probe, float *restrict out) {
+    for (int32_t r = 0; r < n; r++) {
+        float s = 0.0f;
+        const float *row = flat + (int64_t)r * dims;
+        for (int32_t d = 0; d < dims; d++) { float x = row[d] - probe[d]; s += x * x; }
+        out[r] = s;
+    }
+}

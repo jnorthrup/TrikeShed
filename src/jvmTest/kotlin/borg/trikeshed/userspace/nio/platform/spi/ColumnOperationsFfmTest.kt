@@ -102,6 +102,40 @@ class ColumnOperationsFfmTest {
         assertContentEquals(a, b)
     }
 
+    @Test fun dotAndL2Agree() {
+        val native = provider()
+        for (dims in intArrayOf(1, 7, 33, 128)) {
+            val rows = 300
+            val flat = FloatArray(rows * dims) { random.nextFloat() - 0.5f }
+            val probe = FloatArray(dims) { random.nextFloat() - 0.5f }
+            val a = FloatArray(rows); val b = FloatArray(rows)
+            kotlin.dotF32(flat, rows, dims, probe, a); native.dotF32(flat, rows, dims, probe, b)
+            assertContentEquals(a, b, "dot $dims")
+            kotlin.l2SquaredF32(flat, rows, dims, probe, a); native.l2SquaredF32(flat, rows, dims, probe, b)
+            assertContentEquals(a, b, "l2 $dims")
+        }
+    }
+
+    @Test fun vectorStatementsAgree() {
+        val native = provider()
+        val dims = 24
+        val rows = 3_000
+        val vectors = VectorColumn.of(dims, rows) { r -> FloatArray(dims) { d -> ((r * 7 + d * 13) % 101) / 50f - 1f } }
+        val data = ColumnCursor.of(
+            arrayOf(ColumnMeta("id", IOMemento.IoLong), vectorMeta("embedding")),
+            arrayOf(DenseColumn(LongArray(rows) { it.toLong() }), DenseColumn(vectors)),
+        )
+        val probe = "[" + (0 until dims).joinToString(",") { ((it * 5) % 11 / 10f).toString() } + "]"
+        for (op in listOf("<=>", "<->", "<#>")) {
+            val sql = "SELECT id, embedding $op '$probe' AS d FROM t ORDER BY d LIMIT 20"
+            fun run(ops: ColumnOperations): List<List<Any?>> {
+                val c = SqlParser.parse(sql)!!.plan({ data }, ops).result
+                return (0 until c.size).map { r -> c[r].values.let { v -> (0 until v.size).map { v[it] } } }
+            }
+            assertEquals(run(kotlin), run(native), op)
+        }
+    }
+
     @Test fun wholeStatementsAgree() {
         val native = provider()
         val data = TpchLineitem.generate(50_000)
