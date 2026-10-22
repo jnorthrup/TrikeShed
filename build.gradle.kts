@@ -2124,10 +2124,21 @@ benchmark {
         named("main") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "emulated")
+            exclude("TpchShapeBench")
         }
         register("native") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "native")
+            exclude("TpchShapeBench")
+        }
+        // The DuckDB-parity run: TPC-H Q1 and Q6 from SQL text over 1,000,000 generated lineitem rows, on each execution
+        // path (closure / generated class on boxed rows; Kotlin / native kernels on a column-major source).
+        // `./gradlew jvmBenchTpchBenchmark`
+        register("tpch") {
+            warmups = 3; iterations = 5; iterationTime = 2; iterationTimeUnit = "s"
+            include("TpchShapeBench")
+            param("rows", "1000000")
+            param("path", "rows", "jit", "dense", "ffi")
         }
     }
     targets { kotlin.targets.matching { it.name in benchTargetNames }.all { register("${this.name}Bench") } }
