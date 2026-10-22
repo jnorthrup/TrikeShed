@@ -2063,6 +2063,32 @@ tasks.register<Exec>("buildJvmUring") {
     doFirst { layout.buildDirectory.dir("native/jvm").get().asFile.mkdirs() }
 }
 
+// The column-kernel library behind JvmColumnOperations (ColumnOperations.jvm.kt): the loops of lib/<primitive>p in C, built
+// with -O3 so the compiler vectorizes the selection and arithmetic loops, and -ffp-contract=off so sums stay bit-identical
+// to the Kotlin kernels. Built where a C compiler exists; elsewhere KotlinColumnOperations answers.
+val kernelsLibrary = layout.buildDirectory.file("native/jvm/libtrikeshed_kernels.so")
+val hasCCompiler = (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, "cc").canExecute() }
+val buildJvmKernels = tasks.register<Exec>("buildJvmKernels") {
+    inputs.files("src/nativeInterop/c/trikeshed_kernels.c", "src/nativeInterop/c/trikeshed_kernels.h")
+    outputs.file(kernelsLibrary)
+    commandLine("cc", "-O3", "-ffp-contract=off", "-shared", "-fPIC", "-Wall", "-Wextra",
+        project.file("src/nativeInterop/c/trikeshed_kernels.c").absolutePath,
+        "-o", kernelsLibrary.get().asFile.absolutePath, "-lm")
+    doFirst { kernelsLibrary.get().asFile.parentFile.mkdirs() }
+}
+if (hasCCompiler) {
+    tasks.named<Test>("jvmTest") {
+        dependsOn(buildJvmKernels)
+        inputs.file(kernelsLibrary)
+        systemProperty("trikeshed.libkernels", kernelsLibrary.get().asFile.absolutePath)
+    }
+    tasks.matching { it.name.startsWith("jvmBench") && it is JavaExec }.configureEach {
+        this as JavaExec
+        dependsOn(buildJvmKernels)
+        jvmArgs("-Dtrikeshed.libkernels=" + kernelsLibrary.get().asFile.absolutePath)
+    }
+}
+
 tasks.register<JavaExec>("uringBenchmarkJvm") {
     dependsOn("jvmMainClasses")
     val compilation = kotlin.targets.getByName("jvm").compilations.getByName("main")

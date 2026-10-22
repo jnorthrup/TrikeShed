@@ -8,6 +8,8 @@ import borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.JvmReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.file.spi.JvmSystemOperations
+import borg.trikeshed.cursor.query.jit.ClassfileExprCompiler
+import borg.trikeshed.userspace.nio.platform.spi.JvmColumnOperations
 import borg.trikeshed.userspace.nio.platform.spi.JvmMatrixOperations
 import kotlin.coroutines.CoroutineContext
 
@@ -23,6 +25,8 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
         JvmFileOperations(),
         JvmSystemOperations(),
         JvmMatrixOperations.available(),
+        JvmColumnOperations.available(),
+        ClassfileExprCompiler(),
         channelOperations,
         reactorOperations,
         JvmProcessOperations(),
