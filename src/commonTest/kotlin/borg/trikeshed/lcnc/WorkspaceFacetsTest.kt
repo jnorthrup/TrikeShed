@@ -235,7 +235,7 @@ class WorkspaceFacetsTest {
         val program = LcncWorkspacePresets.simulation("sha256:retained", assertions)
         assertTrue(program.controls.humanOversight)
         assertTrue(LcncTypeCheck.check(program).isEmpty())
-        assertEquals(setOf("document.sheet", "sheet.concentric", "json.value", "nars.reteFire", "display", "note"),
+        assertEquals(setOf("document.sheet", "sheet.concentric", "json.value", "scope", "pick", "nars.reteFire", "display", "note"),
             program.nodes.view.map { it.type }.toSet())
         val sheet = program.nodes.view.single { it.type == "document.sheet" }
         assertEquals("sha256:retained", sheet.params["receiptCid"])
@@ -244,7 +244,10 @@ class WorkspaceFacetsTest {
         assertEquals(assertions, reify(program.nodes.view.single { it.id == "assumptions" }.params.getValue("value")))
         assertEquals(emptyList<Any?>(), reify(LcncWorkspacePresets.simulation().nodes.view
             .single { it.id == "assumptions" }.params.getValue("value")))
-        assertTrue(program.wires.view.any { it.fromNode == "sheet" && it.fromPort == "ruleCandidates" && it.toPort == "rules?" })
+        // Proposed rules reach Rete only through the explicit record projection, never directly from the sheet.
+        assertTrue(program.wires.view.any { it.fromNode == "sheet" && it.fromPort == "ruleCandidates" && it.toNode == "rules" && it.toPort == "rules" })
+        assertTrue(program.wires.view.any { it.fromNode == "rule-values" && it.toNode == "simulation" && it.toPort == "rules?" })
+        assertTrue(program.wires.view.none { it.fromNode == "sheet" && it.toNode == "simulation" })
         assertTrue(program.nodes.view.single { it.type == "note" }.params.getValue("text").contains("Only the selected rules page"))
     }
 
