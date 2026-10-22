@@ -7,6 +7,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import modelmux.acp.providerTag
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
