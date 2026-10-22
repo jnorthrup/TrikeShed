@@ -330,6 +330,67 @@ class HeadhunterWorkflowTest {
         }
     }
 
+    @Test fun evidenceAssemblyNeverConvenesACouncil() = runTest {
+        val fixture = Fixture().apply { open() }
+        val workflow = HeadhunterWorkflow(fixture.rig.store,
+            council = { error("Evidence assembly must not convene a council") }) { error("Evidence assembly must not call a model") }
+        val result = fixture.run(workflow, fixture.request())
+        for (artifact in artifacts(result).view) {
+            assertEquals("assembled", fields(artifact)["generation"])
+            assertNull(fields(artifact)["council"])
+        }
+    }
+
+    @Test fun theCouncilTrailRidesOnEveryArtifactAndTheLoneSeatIsNeverCalled() = runTest {
+        val fixture = Fixture().apply { open() }
+        val supplied = mutableListOf<String>()
+        val workflow = HeadhunterWorkflow(fixture.rig.store,
+            council = { prompt ->
+                supplied.add(prompt)
+                CouncilAnswer(jsonOf(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q")),
+                    "chair-fixture",
+                    listOf(CouncilTurn("seat-a-fixture", "opening", "first position"),
+                        CouncilTurn("seat-b-fixture", "opening", "second position"),
+                        CouncilTurn("seat-a-fixture", "critique", "an unsupported metric"),
+                        CouncilTurn("chair-fixture", "synthesis", "final drafts")))
+            }) { error("A council preparation must not call the lone drafting seat") }
+        val result = fixture.run(workflow, workflow.pin(fixture.request("model")))
+        assertEquals(1, supplied.size, "The council convenes once over the grounded prompt")
+        assertTrue(fields(fixture.evidence)["text"].toString() in supplied.single(), "The council sees only the selected evidence")
+        val trail = fields(artifacts(result)[0])["council"] as List<*>
+        assertEquals(listOf("opening", "opening", "critique", "synthesis"), trail.map { (it as Map<*, *>)["phase"] })
+        assertEquals(listOf("seat-a-fixture", "seat-b-fixture", "seat-a-fixture", "chair-fixture"),
+            trail.map { (it as Map<*, *>)["model"] })
+        for (artifact in artifacts(result).view) {
+            val fields = fields(artifact)
+            assertEquals("model", fields["generation"])
+            assertEquals("chair-fixture", fields["model"])
+            assertEquals("proposed", fields["reviewStatus"])
+            assertEquals(trail, fields["council"])
+            assertEquals(fixture.versions(), HeadhunterStore.references(fields).view.associate { it.pair })
+        }
+    }
+
+    @Test fun councilFailureAndOversizedTrailsSaveNoArtifacts() = runTest {
+        val drafts = jsonOf(mapOf("resume" to "r", "email" to "e", "phone" to "p", "qa" to "q"))
+        for (council in listOf<suspend (String) -> CouncilAnswer>(
+            { error("Council unavailable") },
+            { CouncilAnswer(drafts, "chair-fixture",
+                listOf(CouncilTurn("seat-fixture", "opening", "x".repeat(HeadhunterWorkflow.MAX_COUNCIL_TRAIL_CHARACTERS)))) },
+        )) {
+            val fixture = Fixture().apply { open() }
+            val before = fixture.rig.log.committed
+            val revision = fixture.rig.board.snapshot().revision
+            val workflow = HeadhunterWorkflow(fixture.rig.store, council = council) { error("The lone seat is not the council's fallback") }
+            val failure = assertFails { fixture.run(workflow, fixture.request("model")) }
+            if ("Council unavailable" !in failure.message.orEmpty())
+                assertTrue(failure.toString().contains("${HeadhunterWorkflow.MAX_COUNCIL_TRAIL_CHARACTERS}"), failure.toString())
+            assertEquals(0, fixture.rig.store.records().view.count { it["kind"] == "artifact" })
+            assertEquals(before, fixture.rig.log.committed)
+            assertEquals(revision, fixture.rig.board.snapshot().revision)
+        }
+    }
+
     companion object {
         fun context(result: LcncRunner.ScopeResult) = objectOf(result.nodeOutputs.getValue("context")["context"], "context")
         fun objects(value: Any?): Series<HeadhunterRecord> =

@@ -8,6 +8,7 @@ import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.graal.subvm.GuestModules
 import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.lcnc.*
+import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
@@ -70,9 +71,42 @@ class HeadhunterWire private constructor(
                     val curation = HeadhunterCuration(store, documents?.destination.orEmpty(), { documents?.available == true }) { source, instructions ->
                         checkNotNull(documents) { "Shared document curator is unavailable" }.curate(source, instructions)
                     }
-                    val workflow = HeadhunterWorkflow(store) { prompt ->
+                    // Model preparation convenes a council when the admitted roster fields two or more seats;
+                    // a narrower roster drafts through the lone seat below. Seats prefer distinct providers so
+                    // one provider's outage cannot kill every position; a sparse roster fills from any provider.
+                    val mux = brain.modelMux()
+                    val breadcrumbs = ctx.muxContext[modelmux.BreadcrumbElement] ?: modelmux.BreadcrumbElement()
+                    val admitted = mutableListOf<String>()
+                    val seats = borg.trikeshed.collections.SeriesBuffer<String>()
+                    val providers = mutableSetOf<String>()
+                    for (card in mux.listModels("chat").view) {
+                        if (seats.size == HeadhunterCouncil.SEATS) break
+                        if (mux.modelAdmission(card.a) == null) continue
+                        admitted.add(card.a)
+                        if (providers.add(card.providerTag ?: card.a)) seats.add(card.a)
+                    }
+                    for (model in admitted) {
+                        if (seats.size == HeadhunterCouncil.SEATS) break
+                        if (model !in seats.view) seats.add(model)
+                    }
+                    val councilSeats = seats.drain()
+                    val workflow = HeadhunterWorkflow(store,
+                        council = if (councilSeats.size >= 2) ({ prompt ->
+                            try {
+                                mux.council(breadcrumbs, councilSeats, prompt)
+                            } catch (refusal: CouncilRefusal) {
+                                // The council could not convene; the lone drafting seat answers, and the
+                                // refused seats stay on the trail the artifacts record.
+                                val answer = brain.chatSeat(listOf(
+                                    "system" to HeadhunterCouncil.SEAT_SYSTEM,
+                                    "user" to prompt,
+                                ), maxTokens = 6000, temperature = 0.2, contextId = "headhunter.prepare", preferredModel = null, timeoutMs = 90_000L)
+                                CouncilAnswer(answer.first, answer.second,
+                                    refusal.trail + CouncilTurn(answer.second, HeadhunterCouncil.SYNTHESIS, answer.first))
+                            }
+                        }) else null) { prompt ->
                         val answer = brain.chatSeat(listOf(
-                            "system" to "Prepare private job-application drafts grounded in selected evidence. Never execute external actions.",
+                            "system" to HeadhunterCouncil.SEAT_SYSTEM,
                             "user" to prompt,
                         ), maxTokens = 6000, temperature = 0.2, contextId = "headhunter.prepare", preferredModel = null, timeoutMs = 90_000L)
                         answer.first j answer.second
@@ -333,7 +367,12 @@ class HeadhunterWire private constructor(
             it["kind"] == "review" && fields(it)["subjectId"] == id && fields(it)["subjectCid"] == record["cid"]
         }.maxByOrNull { (it["updatedAtMs"] as? Number)?.toLong() ?: 0L }
         val decision = review?.let { "${fields(it)["decision"]} — ${it["id"]}@${it["cid"]}" } ?: "Awaiting review"
-        val text = "$content\n\nEvidence versions:\n$references\n\nArtifact: ${record["id"]}@${record["cid"]}\nReview: $decision\n"
+        val debate = (fields["council"] as? List<*>)?.takeIf { it.isNotEmpty() }?.joinToString("\n\n") { turn ->
+            val record = turn as Map<*, *>
+            "### ${record["phase"]} — ${record["model"]}\n\n${record["statement"]}"
+        }?.let { "Council debate:\n\n$it\n\n" }.orEmpty()
+        val text = "$content\n\n$debate" +
+            "Evidence versions:\n$references\n\nArtifact: ${record["id"]}@${record["cid"]}\nReview: $decision\n"
         val title = fields["title"]?.toString() ?: "Application artifact"
         val (body, mime, extension) = when (format) {
             "markdown" -> Triple(text, "text/markdown; charset=utf-8", "md")

@@ -411,6 +411,21 @@ object HeadhunterPage {
         if (list.children.length > 0) host.append(list) else host.append(node("p", "small error-text", "No evidence references are attached. Review this before use."))
     }
 
+    /** The recorded council debate behind this artifact; provenance of the decision, never content to edit. */
+    private fun council(host: HTMLElement, art: dynamic) {
+        val turns = jsArray(art.fields.council)
+        if (turns.isEmpty()) return
+        val details = node("details")
+        details.append(node("summary", "", "Council debate (" + turns.length + " turns)"))
+        for (turn in turns) {
+            val row = node("div", "history-item")
+            row.append(node("strong", "", listOf(turn.phase, turn.model).filter { truthy(it) }.joinToString(" · ")),
+                node("pre", "code", strOrEmpty(turn.statement)))
+            details.append(row)
+        }
+        host.append(details)
+    }
+
     private fun renderArtifacts() {
         val host = el("artifacts"); host.asDynamic().replaceChildren()
         val artifacts = recordsOf("artifact").filter { it.fields.applicationId == applicationId }
@@ -422,7 +437,7 @@ object HeadhunterPage {
             val review = reviewFor(a)
             card.append(badge(if (truthy(fl.type)) fl.type else "artifact"), badge(if (fl.generation == "model") "Model draft" else "Evidence assembly"),
                 badge(if (truthy(review)) review.fields.decision else "Needs review", if (truthy(review) && review.fields.decision == "approved") "" else "warning"), node("h3", "", title(a)))
-            card.append(node("pre", "artifact-preview", if (truthy(fl.content)) fl.content else "No content saved.")); provenance(card, a)
+            card.append(node("pre", "artifact-preview", if (truthy(fl.content)) fl.content else "No content saved.")); provenance(card, a); council(card, a)
             val actions = node("div", "actions"); actions.append(button("Edit & review", "primary") { openArtifact(a) })
             for (format in listOf("markdown", "html", "text")) {
                 val link = node("a", "", if (format == "markdown") "Markdown" else if (format == "html") "HTML" else "Text") as HTMLAnchorElement
@@ -680,7 +695,7 @@ object HeadhunterPage {
         val fe = elements(form("artifact-form"))
         fe.title.value = if (truthy(r.fields.title)) r.fields.title else title(r)
         fe.content.value = if (truthy(r.fields.content)) r.fields.content else ""
-        el("artifact-provenance").asDynamic().replaceChildren(); provenance(el("artifact-provenance"), r)
+        el("artifact-provenance").asDynamic().replaceChildren(); provenance(el("artifact-provenance"), r); council(el("artifact-provenance"), r)
         el("artifact-message").textContent = ""; el("review-message").textContent = ""; form("review-form").reset()
         el("review-version").textContent = "Review applies to saved version " + str(r.cid) + ". Save content changes before reviewing."
         if (!dlg.open) dlg.showModal()

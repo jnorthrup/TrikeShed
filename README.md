@@ -55,11 +55,29 @@ the directory with spaces and emoji in the names, the repo with 40k files.
 That's the workload it's built for, and every place it stumbles is a bug we
 want to hear about.
 
-**Quickstart (five minutes, one port):**
+**Quickstart (one paste, one port):**
 
 ```bash
-git clone --recurse-submodules git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed
-./gradlew runOroborosDaemon --args='--watch'  # builds the live feed and launches with HotSwapAgent (JDK 25)
+# brings the latest GraalVM (JDK 25) if you don't have one, then starts the daemon.
+# after this paste Gradle owns the versions: the wrapper pulls the current Gradle
+# release and the build resolves the Kotlin toolchain and libraries itself.
+if ! (java -version 2>&1 | grep -q GraalVM && java -version 2>&1 | grep -q '"25\.'); then
+  case "$(uname -sm)" in
+    Darwin\ arm64)  plat=macos-aarch64 ;;
+    Darwin\ *)      plat=macos-x64 ;;
+    Linux\ aarch64) plat=linux-aarch64 ;;
+    Linux\ *)       plat=linux-x64 ;;
+  esac
+  jdk="$HOME/.trikeshed/graalvm-jdk-25"
+  mkdir -p "$jdk"
+  curl -fL "https://download.oracle.com/graalvm/25/latest/graalvm-jdk-25_${plat}_bin.tar.gz" |
+    tar -xz -C "$jdk" --strip-components=1
+  export JAVA_HOME="$jdk"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+[ -d TrikeShed ] || git clone --recurse-submodules https://github.com/jnorthrup/TrikeShed.git
+cd TrikeShed
+./gradlew runOroborosDaemon --args='--watch'  # builds the live feed and launches with HotSwapAgent
 ```
 
 Hermes source lives in the `utils/hermes-trikeshed-graalpy` submodule, pinned to
