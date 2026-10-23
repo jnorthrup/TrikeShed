@@ -89,7 +89,7 @@ class SqlGraphTest {
         val program = SqlGraph.lift(stmt)
         val flipped = SqlGraph.lower(rebuilt(program, wires = wiresOf(program).reversed()))
         assertEquals(
-            SqlGraph.signature(stmt).replace("group by col(a), col(b)", "group by col(b), col(a)"),
+            SqlGraph.signature(stmt).replace("group by col(\"a\"), col(\"b\")", "group by col(\"b\"), col(\"a\")"),
             SqlGraph.signature(flipped),
             "select list and ORDER BY follow ord; GROUP BY follows wire order",
         )
@@ -104,7 +104,7 @@ class SqlGraphTest {
         val grown = rebuilt(program, nodesOf(program) + extra, wiresOf(program) + listOf(
             LcncWire("new-col", "expr", "new-item", "expr"), LcncWire("new-item", "item", hub.id, "items"),
         ))
-        assertEquals("select col(a), col(b), col(c) from t", SqlGraph.signature(SqlGraph.lower(grown)))
+        assertEquals("select col(\"a\"), col(\"b\"), col(\"c\") from \"t\"", SqlGraph.signature(SqlGraph.lower(grown)))
     }
 
     @Test fun graphsTheStatementCannotSayAreRefusedAtTheNode() {
@@ -121,13 +121,14 @@ class SqlGraphTest {
         refused("missing-input", rebuilt(base, wires = wiresOf(base).filterNot { it.toPort == "from" }))
         // a ring
         refused("unsupported-in-ast", rebuilt(base, nodesOf(base).map { if (it.id == hub.id) it.copy(children = listOf(LcncNode("c", SqlGraph.COL)).toSeries()) else it }))
-        // a join whose right side is a join
+        // a join whose right side is a join: (t JOIN u) moved to the right of v
         val joined = SqlGraph.lift(strict("SELECT a FROM t JOIN u ON t.k = u.k JOIN v ON t.k = v.k"))
         val outer = nodesOf(joined).last { it.type == SqlGraph.JOIN }
         val inner = nodesOf(joined).first { it.type == SqlGraph.JOIN }
+        val v = wiresOf(joined).single { it.toNode == outer.id && it.toPort == "right" }.fromNode
         val swapped = wiresOf(joined).map {
             when {
-                it.toNode == outer.id && it.toPort == "left" -> it.copy(fromNode = nodesOf(joined).first { n -> n.type == SqlGraph.TABLE_NAME && n.params["name"] == "t" }.id, fromPort = "table")
+                it.toNode == outer.id && it.toPort == "left" -> LcncWire(v, "table", outer.id, "left")
                 it.toNode == outer.id && it.toPort == "right" -> LcncWire(inner.id, "table", outer.id, "right")
                 else -> it
             }
@@ -135,11 +136,52 @@ class SqlGraphTest {
         refused("unsupported-in-ast", rebuilt(joined, wires = swapped))
     }
 
-    @Test fun aCycleIsNamedNotLooped() {
+    @Test fun picklistParamsAreStrictAndBlankMeansTheDefault() {
+        val program = SqlGraph.lift(strict("SELECT a FROM t JOIN u ON t.k = u.k ORDER BY a DESC"))
+        fun with(type: String, key: String, value: String) =
+            rebuilt(program, nodesOf(program).map { if (it.type == type) it.copy(params = it.params + (key to value)) else it })
+        refused("bad-param", with(SqlGraph.JOIN, "join", "RIGHT"))
+        refused("bad-param", with(SqlGraph.SORT_KEY, "direction", "DESCENDING"))
+        assertTrue(SqlGraph.lower(with(SqlGraph.SORT_KEY, "direction", "desc")).orderBy[0].descending, "case-folded")
+        assertFalse(SqlGraph.lower(with(SqlGraph.SORT_KEY, "direction", "")).orderBy[0].descending, "blank is the default ASC")
+        refused("bad-param", with(SqlGraph.SORT_KEY, "ord", "first"))
+    }
+
+    @Test fun functionNamesAndCastTypesLowerAsTheParserSpellsThem() {
+        val program = SqlGraph.lift(strict("SELECT COUNT(*), k::INT FROM t"))
+        val upper = rebuilt(program, nodesOf(program).map {
+            when (it.type) {
+                SqlGraph.CALL -> it.copy(params = it.params + ("name" to "COUNT"))
+                SqlGraph.CAST -> it.copy(params = it.params + ("type" to "INT"))
+                else -> it
+            }
+        })
+        assertEquals("select count(*), cast(col(\"k\") as int) from \"t\"", SqlGraph.signature(SqlGraph.lower(upper)))
+    }
+
+    @Test fun aSyntaxTreeFeedsEachNodeToOneConsumer() {
         val program = SqlGraph.lift(strict("SELECT a + b FROM t"))
         val arith = nodesOf(program).single { it.type == SqlGraph.ARITH }
+        val a = wiresOf(program).single { it.toNode == arith.id && it.toPort == "left" }.fromNode
+        val shared = wiresOf(program).filterNot { it.toNode == arith.id && it.toPort == "right" } + LcncWire(a, "expr", arith.id, "right")
+        refused("shared-node", rebuilt(program, nodesOf(program).filterNot { n -> n.id == wiresOf(program).single { it.toNode == arith.id && it.toPort == "right" }.fromNode }, shared))
+    }
+
+    @Test fun pathStepsTheGraphCannotCarryAreRefusedAtLift() {
+        for (sql in listOf("SELECT doc->'' FROM t", "SELECT doc->-1 FROM t", "SELECT doc#>>'{}' FROM t")) {
+            val stmt = runCatching { SqlParser.parse(sql.toSeries()) }.getOrNull() ?: continue
+            assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError>(sql) { SqlGraph.lift(stmt) }.code, sql)
+        }
+        assertEquals("parse", assertFailsWith<SqlGraphError> { SqlGraph.parse("SELECT doc:a[ FROM t") }.code)
+    }
+
+    @Test fun aCycleIsRefusedNotLooped() {
+        // A node that feeds itself and its parent feeds two inputs: the tree check names it before any traversal.
+        val program = SqlGraph.lift(strict("SELECT a + b FROM t"))
+        val arith = nodesOf(program).single { it.type == SqlGraph.ARITH }
+        val a = wiresOf(program).single { it.toNode == arith.id && it.toPort == "left" }.fromNode
         val rewired = wiresOf(program).filterNot { it.toNode == arith.id && it.toPort == "left" } + LcncWire(arith.id, "expr", arith.id, "left")
-        refused("cycle", rebuilt(program, wires = rewired))
+        refused("shared-node", rebuilt(program, nodesOf(program).filterNot { it.id == a }, rewired))
     }
 
     @Test fun theGuardRefusesWhatTheStrictParserMisreads() {

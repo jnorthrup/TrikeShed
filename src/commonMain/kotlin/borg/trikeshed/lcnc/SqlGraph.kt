@@ -143,12 +143,17 @@ object SqlGraph {
 
     /** Parse with the strict SELECT grammar (never the regex fallback) and lift. */
     fun parse(text: String, name: String = "sql"): LcncProgram {
-        val stmt = SqlParser.parse(text.toSeries())
+        val stmt = runCatching { SqlParser.parse(text.toSeries()) }.getOrNull()
             ?: throw SqlGraphError("", "parse", "not a statement the strict SELECT grammar accepts")
         return lift(stmt, name)
     }
 
-    /** The graph of [stmt]; the parser's silent misreads are refused here rather than drawn. */
+    /**
+     * The graph of [stmt]. The parser's silent misreads that are visible in the AST (keywords read as
+     * names, syntax read as calls, the `||` precedence, path steps the graph cannot carry) are refused here
+     * rather than drawn; wrapped numbers and dropped clauses are not visible in the AST and wait for the
+     * parser fix. A quoted keyword is refused too, since the AST does not record quoting.
+     */
     fun lift(stmt: SelectStmt, name: String = "sql"): LcncProgram {
         guard(stmt)
         val lift = Lift()
@@ -158,6 +163,7 @@ object SqlGraph {
             nodes = lift.placed(root).toSeries(),
             wires = lift.wires.toSeries(),
             controls = LcncConfixControls(inspectionOnly = true),
+            seq = lift.seq + 1,
         )
     }
 
@@ -166,7 +172,7 @@ object SqlGraph {
         val wires = ArrayList<LcncWire>()
         private val typeOf = HashMap<String, String>()
         private val feeds = HashMap<String, MutableList<String>>()
-        private var seq = 0
+        var seq = 0
 
         fun node(type: String, vararg params: Pair<String, String?>): String {
             val id = "n${++seq}"
@@ -280,6 +286,13 @@ object SqlGraph {
 
     private val CONDITION_OPS: Set<String> = (CMP_OPS + LOGIC_OPS + "LIKE").toSet()
 
+    /** The sql.* contracts by type, and the whole vocabulary the type check reads, built once. */
+    private val CONTRACTS: Map<String, LcncPortContract> by lazy { contracts().associateBy { it.type } }
+    private val VOCABULARY: Map<String, LcncPortContract> by lazy { LcncContracts.all().associateBy { it.type } }
+
+    /** Deeper nesting than any statement a person writes; the recursive lowering stops here instead of overflowing. */
+    const val MAX_DEPTH = 1_000
+
     private fun isStar(e: Expr): Boolean = e is LitExpr && (e.lit as? StringLiteral)?.asString() == "*"
     private fun isIntegral(n: Number): Boolean = n is Int || n is Long || n is Short || n is Byte
 
@@ -304,18 +317,28 @@ object SqlGraph {
                     val l = e.left as? BinaryExpr
                     val r = e.right as? BinaryExpr
                     // `a || b + c` and `(a || b) + c` parse alike, but pg reads the first as `a || (b + c)`;
-                    // likewise `a <=> b || c`. Until dialect precedence tables exist the ambiguous shape is refused.
-                    if (e.op in setOf("+", "-") && l != null && (l.op == "||" || l.op in VECTOR_OPS))
-                        throw SqlGraphError("", "ambiguous-precedence", "`${l.op}` under `${e.op}`: parenthesise or split the expression")
+                    // likewise `a <=> b || c`. The AST drops parentheses, so the shape is refused until
+                    // dialect precedence tables exist.
+                    if (e.op in setOf("+", "-") && l != null && l.op == "||")
+                        throw SqlGraphError("", "ambiguous-precedence", "`||` under `${e.op}`: split the expression")
                     if (e.op in VECTOR_OPS && r != null && r.op == "||")
-                        throw SqlGraphError("", "ambiguous-precedence", "`||` under `${e.op}`: parenthesise or split the expression")
+                        throw SqlGraphError("", "ambiguous-precedence", "`||` under `${e.op}`: split the expression")
                 }
                 is Call -> {
                     if (e.name in SYNTAX_CALLS) throw SqlGraphError("", "reserved-word", "${e.name}(...) is SQL syntax the strict parser reads as a function call")
                     for (i in 0 until e.args.size) visit(e.args[i])
                 }
                 is Cast -> visit(e.expr)
-                is Path -> visit(e.cell)
+                is Path -> {
+                    visit(e.cell)
+                    if (e.path.size == 0) throw SqlGraphError("", "unsupported-in-ast", "an empty path")
+                    for (i in 0 until e.path.size) {
+                        val key = e.path[i].key
+                        val idx = e.path[i].idx
+                        if (key.isNullOrEmpty() && (idx == null || idx < 0))
+                            throw SqlGraphError("", "unsupported-in-ast", "path step $i is neither a key nor a non-negative index")
+                    }
+                }
                 is LitExpr, Star -> Unit
             }
         }
@@ -347,29 +370,38 @@ object SqlGraph {
         private val into = HashMap<String, MutableList<Pair<Int, LcncWire>>>()
         private val reached = HashSet<String>()
         private val visiting = HashSet<String>()
+        /** sql.* node id → its wires into other sql.* nodes; a syntax tree feeds each node to one consumer. */
+        private val consumers = HashMap<String, Int>()
 
         init {
             for (i in 0 until program.nodes.size) {
                 val n = program.nodes[i]
                 if (n.children.size > 0) throw SqlGraphError(n.id, "unsupported-in-ast", "rings (sub-queries) are not part of this vocabulary yet")
+                if (n.subprogram != null) throw SqlGraphError(n.id, "unsupported-in-ast", "named rings are not part of this vocabulary yet")
                 byId[n.id] = n
             }
             for (i in 0 until program.wires.size) {
                 val w = program.wires[i]
                 into.getOrPut(w.toNode + "\u0000" + w.toPort.removeSuffix("?")) { ArrayList() } += i to w
+                if (isSql(w.fromNode) && isSql(w.toNode)) consumers[w.fromNode] = (consumers[w.fromNode] ?: 0) + 1
             }
         }
 
+        /** Only sql.* nodes say the statement; anything else on the canvas (a display, a note) is presentation. */
+        private fun isSql(id: String): Boolean = byId[id]?.type?.startsWith("sql.") == true
+
         fun statement(): SelectStmt {
-            LcncTypeCheck.check(program, strict = true).firstOrNull()?.let {
+            LcncTypeCheck.check(program, VOCABULARY, strict = true).firstOrNull()?.let {
                 throw SqlGraphError(it.toNode, "type-check", it.render())
             }
-            val hubs = byId.values.filter { it.type == SELECT }
-            val roots = hubs.filter { hub -> (0 until program.wires.size).none { program.wires[it].fromNode == hub.id } }
+            consumers.entries.firstOrNull { it.value > 1 }?.let {
+                throw SqlGraphError(it.key, "shared-node", "${byId.getValue(it.key).type} feeds ${it.value} inputs; a syntax tree feeds one")
+            }
+            val roots = byId.values.filter { it.type == SELECT && it.id !in consumers }
             if (roots.isEmpty()) throw SqlGraphError("", "no-root", "no sql.select without a consumer")
             if (roots.size > 1) throw SqlGraphError(roots[1].id, "multiple-roots", "${roots.size} statements; a graph says one")
             val stmt = select(roots[0])
-            byId.values.firstOrNull { it.id !in reached && it.type != "note" }
+            byId.values.firstOrNull { it.type.startsWith("sql.") && it.id !in reached }
                 ?.let { throw SqlGraphError(it.id, "orphan-node", "${it.type} is not reachable from the statement") }
             return stmt
         }
@@ -377,6 +409,7 @@ object SqlGraph {
         private fun node(id: String): LcncNode {
             val n = byId.getValue(id)
             if (!visiting.add(id)) throw SqlGraphError(id, "cycle", "${n.type} feeds itself")
+            if (visiting.size > MAX_DEPTH) throw SqlGraphError(id, "depth", "nesting deeper than $MAX_DEPTH")
             reached += id
             return n
         }
@@ -398,12 +431,35 @@ object SqlGraph {
         /** Sources into a MANY port, by wire order. */
         private fun many(n: LcncNode, port: String): List<String> = wiresInto(n, port).map { it.second.fromNode }
 
-        /** Sources into a MANY port ordered by their `ord` param, an absent one after every numbered one, then wire order. */
-        private fun ordered(n: LcncNode, port: String): List<String> =
-            wiresInto(n, port).sortedWith(compareBy({ byId.getValue(it.second.fromNode).params["ord"]?.trim()?.toIntOrNull() ?: Int.MAX_VALUE }, { it.first }))
-                .map { it.second.fromNode }
+        /**
+         * Sources into a MANY port ordered by their `ord` param, an absent one after every numbered one, then
+         * wire order. A present `ord` must be an integer and unique among the port's sources.
+         */
+        private fun ordered(n: LcncNode, port: String): List<String> {
+            val sources = wiresInto(n, port)
+            val seen = HashSet<Int>()
+            val ords = sources.map { (_, w) ->
+                val source = byId.getValue(w.fromNode)
+                val text = source.params["ord"]?.trim().orEmpty()
+                if (text.isEmpty()) Int.MAX_VALUE else {
+                    val ord = text.toIntOrNull() ?: throw SqlGraphError(source.id, "bad-param", "ord '$text' is not an integer")
+                    if (!seen.add(ord)) throw SqlGraphError(source.id, "bad-param", "ord $ord repeats in ${n.type}.$port")
+                    ord
+                }
+            }
+            return sources.indices.sortedWith(compareBy({ ords[it] }, { sources[it].first })).map { sources[it].second.fromNode }
+        }
 
         private fun text(n: LcncNode, key: String): String = n.params[key].orEmpty()
+
+        /** A picklist param: blank is the contract default, anything else must be one of its options. */
+        private fun choice(n: LcncNode, key: String): String {
+            val spec = CONTRACTS.getValue(n.type).params.getValue(key)
+            val value = text(n, key).trim()
+            if (value.isEmpty()) return spec.v
+            return spec.opts.firstOrNull { it.equals(value, ignoreCase = true) }
+                ?: throw SqlGraphError(n.id, "bad-param", "${n.type}.$key '$value' is not one of ${spec.opts}")
+        }
 
         private fun required(n: LcncNode, key: String): String =
             text(n, key).takeIf { it.isNotBlank() } ?: throw SqlGraphError(n.id, "bad-param", "${n.type} needs $key")
@@ -427,7 +483,8 @@ object SqlGraph {
                         if (itemIds.size > 1) throw SqlGraphError(id, "ambiguous-star", "sql.itemStar beside other items; the planner reads * only as the sole item")
                         Column(LitExpr(StringLiteral("*".toSeries())), null)
                     }
-                    else -> Column(expr(one(item, "expr")), text(item, "alias").takeIf { it.isNotBlank() }?.let { Identifier(it.toSeries()) })
+                    ITEM_EXPR -> Column(expr(one(item, "expr")), name(item, "alias"))
+                    else -> throw SqlGraphError(id, "unexpected-node", "${item.type} where a select item is expected")
                 }
                 done(id)
                 column
@@ -439,7 +496,8 @@ object SqlGraph {
             val having = optional(hub, "having")?.let(::expr)
             val orderBy = ordered(hub, "orderBy").map { id ->
                 val key = node(id)
-                val order = OrderItem(expr(one(key, "expr")), text(key, "direction").uppercase() == "DESC")
+                if (key.type != SORT_KEY) throw SqlGraphError(id, "unexpected-node", "${key.type} where a sort key is expected")
+                val order = OrderItem(expr(one(key, "expr")), choice(key, "direction") == "DESC")
                 done(id)
                 order
             }
@@ -461,7 +519,7 @@ object SqlGraph {
                     if (right.type != TABLE_NAME) throw SqlGraphError(right.id, "unsupported-in-ast", "a join's right side must be a table; the AST joins left to right")
                     node(right.id)
                     val left = spine(one(n, "left"), joins)
-                    joins += JoinClause(tableRef(right), optional(n, "on")?.let(::expr), text(n, "join").uppercase() == "LEFT")
+                    joins += JoinClause(tableRef(right), optional(n, "on")?.let(::expr), choice(n, "join") == "LEFT")
                     done(right.id)
                     left
                 }
@@ -471,17 +529,19 @@ object SqlGraph {
             return ref
         }
 
-        private fun tableRef(n: LcncNode) =
-            TableRef(Identifier(required(n, "name").toSeries()), text(n, "alias").takeIf { it.isNotBlank() }?.let { Identifier(it.toSeries()) })
+        private fun tableRef(n: LcncNode) = TableRef(Identifier(required(n, "name").trim().toSeries()), name(n, "alias"))
+
+        private fun name(n: LcncNode, key: String): Identifier? = text(n, key).trim().takeIf { it.isNotEmpty() }?.let { Identifier(it.toSeries()) }
 
         private fun expr(id: String): Expr {
             val n = node(id)
             val e: Expr = when (n.type) {
-                COL -> ColumnRef(Identifier(required(n, "name").toSeries()))
+                COL -> ColumnRef(Identifier(required(n, "name").trim().toSeries()))
                 LIT -> literal(n)
                 CALL -> {
-                    val name = required(n, "name")
-                    if (text(n, "star") == "true") {
+                    // The parser lowercases function names and cast types; the planner matches only that spelling.
+                    val name = required(n, "name").trim().lowercase()
+                    if (choice(n, "star") == "true") {
                         if (wiresInto(n, "args").isNotEmpty()) throw SqlGraphError(id, "bad-param", "COUNT(*) form with argument wires")
                         Call(name, listOf<Expr>(Star).toSeries())
                     } else {
@@ -490,8 +550,8 @@ object SqlGraph {
                         Call(name, args.map(::expr).toSeries())
                     }
                 }
-                CAST -> Cast(expr(one(n, "value")), required(n, "type"))
-                PATH -> Path(expr(one(n, "cell")), steps(n), text(n, "text") == "true")
+                CAST -> Cast(expr(one(n, "value")), required(n, "type").trim().lowercase())
+                PATH -> Path(expr(one(n, "cell")), steps(n), choice(n, "text") == "true")
                 ARITH -> BinaryExpr(expr(one(n, "left")), operator(n, ARITH_OPS), expr(one(n, "right")))
                 CMP -> BinaryExpr(expr(one(n, "left")), operator(n, CMP_OPS), expr(one(n, "right")))
                 LIKE -> BinaryExpr(expr(one(n, "match")), "LIKE", expr(one(n, "pattern")))
@@ -504,15 +564,11 @@ object SqlGraph {
             return e
         }
 
-        private fun operator(n: LcncNode, allowed: List<String>): String {
-            val op = text(n, "op").trim().let { if (allowed == LOGIC_OPS) it.uppercase() else it }
-            if (op !in allowed) throw SqlGraphError(n.id, "bad-param", "op '$op' is not one of $allowed")
-            return op
-        }
+        private fun operator(n: LcncNode, allowed: List<String>): String = choice(n, "op").also { check(it in allowed) }
 
         private fun literal(n: LcncNode): Expr {
             val value = text(n, "value")
-            return when (val kind = text(n, "kind")) {
+            return when (val kind = choice(n, "kind")) {
                 "string" -> LitExpr(StringLiteral(value.toSeries()))
                 "int" -> {
                     val v = value.trim().toLongOrNull() ?: throw SqlGraphError(n.id, "bad-param", "int literal '$value'")
@@ -524,7 +580,8 @@ object SqlGraph {
         }
 
         private fun steps(n: LcncNode): JsPath {
-            val cell = confixCellOf(text(n, "steps"))?.takeIf { it.row.tag == IOMemento.IoArray }
+            val json = text(n, "steps").trim()
+            val cell = json.takeIf { it.startsWith("[") }?.let(::confixCellOf)?.takeIf { it.row.tag == IOMemento.IoArray }
                 ?: throw SqlGraphError(n.id, "bad-param", "steps is not a JSON array")
             val kids = cell.row.kids
             if (kids.size == 0) throw SqlGraphError(n.id, "bad-param", "steps is empty")
@@ -532,8 +589,8 @@ object SqlGraph {
             for (i in 0 until kids.size) {
                 val v = kids[i].reify(cell.src)
                 out += when {
-                    v is String -> keyOf(v)
-                    v is Number && v.toDouble() % 1.0 == 0.0 && v.toDouble() >= 0 -> idxOf(v.toInt())
+                    v is String && v.isNotEmpty() -> keyOf(v)
+                    v is Number && v.toDouble() % 1.0 == 0.0 && v.toDouble() in 0.0..Int.MAX_VALUE.toDouble() -> idxOf(v.toInt())
                     else -> throw SqlGraphError(n.id, "bad-param", "step $i is neither a key nor a non-negative index")
                 }
             }
@@ -553,7 +610,7 @@ object SqlGraph {
         for (i in 0 until stmt.columns.size) {
             if (i > 0) append(", ")
             append(sig(stmt.columns[i].expr))
-            stmt.columns[i].alias?.let { append(" as ").append(it.asString()) }
+            stmt.columns[i].alias?.let { append(" as ").append(jsonString(it.asString())) }
         }
         stmt.from?.let { append(" from ").append(sig(it)) }
         for (i in 0 until stmt.joins.size) {
@@ -571,10 +628,10 @@ object SqlGraph {
         stmt.offset?.let { append(" offset ").append(it) }
     }
 
-    private fun sig(t: TableRef): String = t.name.asString() + (t.alias?.let { " " + it.asString() } ?: "")
+    private fun sig(t: TableRef): String = jsonString(t.name.asString()) + (t.alias?.let { " " + jsonString(it.asString()) } ?: "")
 
     private fun sig(e: Expr): String = when (e) {
-        is ColumnRef -> "col(${e.id.asString()})"
+        is ColumnRef -> "col(" + jsonString(e.id.asString()) + ")"
         is LitExpr -> when (val lit = e.lit) {
             is StringLiteral -> "str(" + jsonString(lit.asString()) + ")"
             is NumericLiteral -> (if (isIntegral(lit.value)) "int(" else "double(") + lit.value + ")"
