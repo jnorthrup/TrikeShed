@@ -27,7 +27,7 @@ class SqlGraphTest {
         "SELECT x FROM t WHERE x LIKE 'gr%'",
         "SELECT a > 1 FROM t",
         "SELECT a FROM t WHERE flag",
-        "SELECT doc->>'it\\'s' FROM t", // the strict parser reads a backslash escape; the SQL doubled quote is the open M0 defect
+        "SELECT doc->>'it''s' FROM t", // the SQL doubled quote, the one escape under standard_conforming_strings
         TpchLineitem.Q1,
         TpchLineitem.Q6,
     )

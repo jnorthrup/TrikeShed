@@ -58,26 +58,74 @@ class Catalog(private val sources: List<() -> Iterable<CatalogTable>>) {
 
     fun tables(): List<CatalogTable> = sources.flatMap { it() }
 
-    fun table(name: String): CatalogTable? = when (name) {
-        "information_schema.tables" -> CursorTable(name) { facet(CatalogK.Tables) }
-        "information_schema.columns" -> CursorTable(name) { facet(CatalogK.Columns) }
-        else -> tables().let { all -> all.firstOrNull { it.name == name } ?: all.firstOrNull { it.name.equals(name, ignoreCase = true) } }
+    /** A table by name; `public.` and `pg_catalog.` qualify what the one schema and the derived catalog answer anyway. */
+    fun table(name: String): CatalogTable? {
+        val bare = name.removePrefix("public.").removePrefix("PUBLIC.")
+        return when (bare.lowercase().removePrefix("pg_catalog.")) {
+            "information_schema.tables" -> CursorTable(name) { facet(CatalogK.Tables) }
+            "information_schema.columns" -> CursorTable(name) { facet(CatalogK.Columns) }
+            "pg_class" -> CursorTable(name) { facet(CatalogK.PgClass) }
+            "pg_namespace" -> CursorTable(name) { facet(CatalogK.PgNamespace) }
+            "pg_attribute" -> CursorTable(name) { facet(CatalogK.PgAttribute) }
+            "pg_type" -> CursorTable(name) { facet(CatalogK.PgType) }
+            "pg_database" -> CursorTable(name) { facet(CatalogK.PgDatabase) }
+            "pg_am" -> CursorTable(name) { facet(CatalogK.PgAm) }
+            else -> tables().let { all -> all.firstOrNull { it.name == bare } ?: all.firstOrNull { it.name.equals(bare, ignoreCase = true) } }
+        }
     }
 
     fun resolve(name: String): Cursor = (table(name) ?: throw UndefinedTable(name)).scan()
+
+    /** The object id of a table: a function of its name, so every session and every scan agrees without shared state. */
+    fun oid(table: CatalogTable): Long = oid(table.name)
+
+    /** FNV-1a of the name folded into pg's user-oid range `[FIRST_USER_OID, 2^31)`; a collision among a catalog's few names is a 2^-31 event. */
+    fun oid(name: String): Long {
+        var h = 0x811c9dc5.toInt()
+        for (b in name.encodeToByteArray()) h = (h xor (b.toInt() and 0xff)) * 0x01000193
+        return FIRST_USER_OID + (h.toLong() and 0x7fffffffL) % (0x80000000L - FIRST_USER_OID)
+    }
+
+    companion object {
+        const val FIRST_USER_OID = 16384L
+    }
 }
 
-/** The catalog's own tables, as `information_schema` shapes them. */
+/** The catalog's own tables, as `information_schema` and `pg_catalog` shape them. */
 sealed class CatalogK<out R> : OpK<R>() {
     /** table_schema, table_name, table_type. */
     data object Tables : CatalogK<Cursor>()
 
     /** table_schema, table_name, column_name, ordinal_position, data_type. */
     data object Columns : CatalogK<Cursor>()
+
+    /** One relation per table: oid, relname, relnamespace, relkind and the flags psql reads. */
+    data object PgClass : CatalogK<Cursor>()
+
+    /** pg_catalog 11, information_schema 13, public 2200. */
+    data object PgNamespace : CatalogK<Cursor>()
+
+    /** One row per column: attrelid, attname, atttypid, attnum, attnotnull, … */
+    data object PgAttribute : CatalogK<Cursor>()
+
+    /** The built-in types the wire reports, by their pg OIDs. */
+    data object PgType : CatalogK<Cursor>()
+
+    /** The one database. */
+    data object PgDatabase : CatalogK<Cursor>()
+
+    /** The heap access method. */
+    data object PgAm : CatalogK<Cursor>()
 }
 
 @Suppress("UNCHECKED_CAST")
 fun <R> Catalog.facet(key: CatalogK<R>): R = when (key) {
+    CatalogK.PgClass -> pgClass()
+    CatalogK.PgNamespace -> pgNamespace()
+    CatalogK.PgAttribute -> pgAttribute()
+    CatalogK.PgType -> pgTypes()
+    CatalogK.PgDatabase -> pgDatabase()
+    CatalogK.PgAm -> pgAm()
     CatalogK.Tables -> tables().let { all ->
         rowsCursor(
             listOf("table_schema", "table_name", "table_type"),

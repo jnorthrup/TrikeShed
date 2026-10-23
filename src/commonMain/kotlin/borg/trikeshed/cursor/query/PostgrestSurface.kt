@@ -102,13 +102,19 @@ class PostgrestSurface(
     }
 
     /** Virtuoso's SPASQL: a SPARQL query inside the SQL entry point, planned over the catalog's `DB.DBA.RDF_QUAD`; ASK answers one `ask` row. */
-    fun spasql(text: String): PostgrestReply {
+    fun spasql(text: String): PostgrestReply = spasqlRows(text).let { (columns, cursor) -> ok(jsonRows(names(cursor, columns), rows(cursor))) }
+
+    /** The SPASQL result as its column names and rows: ASK one `ask` row, a graph form `s, p, o` rows, else the solutions. */
+    fun spasqlRows(text: String): Join<List<String>, Cursor> {
         val query = try { SparqlQuery.parse(text) } catch (e: SparqlError) { throw PostgrestError(400, "42601", e.message ?: "SPARQL syntax error") }
         val quads = catalog.resolve(QuadStore.RDF_QUAD)
-        if (query.ask) return ok("""[{"ask":${query.plan(quads, compiler = compiler).size > 0}}]""")
         val cursor = query.plan(quads, compiler = compiler)
-        if (query.graphResult) return ok(jsonRows(listOf("s", "p", "o"), query.triples(cursor, quads).map { (s, p, o) -> listOf(s, p, o) }))
-        return ok(jsonRows(names(cursor, query.variables), rows(cursor)))
+        return when {
+            query.ask -> listOf("ask") j rowsCursor(listOf("ask"), listOf(mapOf("ask" to (cursor.size > 0))))
+            query.graphResult -> listOf("s", "p", "o") j
+                rowsCursor(listOf("s", "p", "o"), query.triples(cursor, quads).map { (s, p, o) -> mapOf("s" to s, "p" to p, "o" to o) })
+            else -> query.variables j cursor
+        }
     }
 
     // ── errors and headers ───────────────────────────────────────────────────────────────────
@@ -137,15 +143,20 @@ class PostgrestSurface(
         return reply.copy(headers = headers)
     }
 
-    private fun classify(e: Throwable): PostgrestError {
+    /** Any failure as a PostgREST error with its SQLSTATE; the pg wire reports the same codes. */
+    fun classify(e: Throwable): PostgrestError {
         val message = e.message ?: (e::class.simpleName ?: "error")
         return when {
             e is PostgrestError -> e
             e is DuplicateKey -> PostgrestError(409, "23505", message, "Key (id)=(${e.id}) already exists.")
             e is UndefinedTable -> PostgrestError(404, "42P01", message)
+            e is SparqlError -> PostgrestError(400, "42601", message)
             message.startsWith("invalid input syntax for type") -> PostgrestError(400, "22P02", message)
             message.startsWith("column \"") && "does not exist" in message ->
                 PostgrestError(400, "42703", message.substringBefore(" among "))
+            message.startsWith("column reference \"") -> PostgrestError(400, "42702", message)
+            message.startsWith("function ") && "does not exist" in message -> PostgrestError(400, "42883", message)
+            message.startsWith("invalid regular expression") -> PostgrestError(400, "2201B", message)
             message.startsWith("type \"") -> PostgrestError(400, "42704", message)
             message.startsWith("different vector dimensions") -> PostgrestError(400, "22000", message)
             message.startsWith("could not serialize access") -> PostgrestError(409, "40001", message)
@@ -296,7 +307,7 @@ class PostgrestSurface(
 
     // ── DDL ──────────────────────────────────────────────────────────────────────────────────
 
-    private fun createTable(statement: String): PostgrestReply {
+    fun createTable(statement: String): PostgrestReply {
         val ddl = ddl ?: throw PostgrestError(400, "0A000", "CREATE TABLE is not supported by this catalog")
         val m = Regex("(?is)CREATE\\s+TABLE\\s+(IF\\s+NOT\\s+EXISTS\\s+)?(?:public\\.)?(\"[^\"]+\"|[A-Za-z_][A-Za-z0-9_]*)\\s*\\((.*)\\)").matchEntire(statement)
             ?: throw PostgrestError(400, "42601", "syntax error in CREATE TABLE")
@@ -312,7 +323,7 @@ class PostgrestSurface(
         return ok("[]")
     }
 
-    private fun dropTable(statement: String): PostgrestReply {
+    fun dropTable(statement: String): PostgrestReply {
         val ddl = ddl ?: throw PostgrestError(400, "0A000", "DROP TABLE is not supported by this catalog")
         val m = Regex("(?is)DROP\\s+TABLE\\s+(IF\\s+EXISTS\\s+)?(.+?)(\\s+(CASCADE|RESTRICT))?").matchEntire(statement)
             ?: throw PostgrestError(400, "42601", "syntax error in DROP TABLE")

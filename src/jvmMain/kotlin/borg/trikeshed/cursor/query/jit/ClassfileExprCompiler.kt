@@ -137,9 +137,20 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
                 }
                 if (e.negated) c.invokestatic(runtime, "not", MethodTypeDesc.of(CD_Object, CD_Object))
             }
-            // IN lists stay on the closure path (see the class comment).
+            // IN lists and CASE (lazy arms) stay on the closure path (see the class comment).
             is InList -> error("IN (...) has no emitted form")
-            is Call -> error("function ${e.name}(...) has no scalar form")
+            is Call -> {
+                if (e.name in AGGREGATES || e.name == SqlParser.CASE || e.name == SqlParser.CASE_WHEN) error("function ${e.name}(...) has no scalar form")
+                SqlFunctions.require(e.name, e.args.size)
+                c.ldc(c.constantPool().stringEntry(e.name))
+                c.loadConstant(e.args.size).anewarray(CD_Object)
+                for (i in 0 until e.args.size) {
+                    c.dup().loadConstant(i)
+                    node(c, e.args[i], names, constants)
+                    c.aastore()
+                }
+                c.invokestatic(runtime, "call", MethodTypeDesc.of(CD_Object, CD_String, objects))
+            }
             Star -> error("* is only an argument of COUNT")
         }
     }
@@ -161,15 +172,29 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
                 c.labelBinding(decided).getstatic(CD_Boolean, if (op == "AND") "FALSE" else "TRUE", CD_Boolean)
                 c.labelBinding(end)
             }
+            // A string literal pattern is a constant compiled once; anything else is matched per row (and null-propagates), as the closure path does.
             "LIKE", "ILIKE" -> {
                 node(c, e.left, names, constants)
-                val pattern = e.right
-                if (pattern is LitExpr) {
-                    constant(c, constants, likeRegex(literal(pattern.lit).toString(), ignoreCase = op == "ILIKE"))
+                val pattern = stringLiteral(e.right)
+                if (pattern != null) {
+                    constant(c, constants, likeRegex(pattern, ignoreCase = op == "ILIKE"))
                     c.invokestatic(runtime, "likeCompiled", binary)
                 } else {
-                    node(c, pattern, names, constants)
+                    node(c, e.right, names, constants)
                     c.invokestatic(runtime, op.lowercase(), binary)
+                }
+            }
+            "~", "~*", "!~", "!~*" -> {
+                node(c, e.left, names, constants)
+                val pattern = stringLiteral(e.right)
+                if (pattern != null) {
+                    constant(c, constants, regexOf(pattern, ignoreCase = op.endsWith("*")))
+                    c.loadConstant(if (op.startsWith("!")) 1 else 0)
+                    c.invokestatic(runtime, "regexCompiled", MethodTypeDesc.of(CD_Object, CD_Object, CD_Object, CD_boolean))
+                } else {
+                    node(c, e.right, names, constants)
+                    c.loadConstant(if (op.endsWith("*")) 1 else 0).loadConstant(if (op.startsWith("!")) 1 else 0)
+                    c.invokestatic(runtime, "regexMatch", MethodTypeDesc.of(CD_Object, CD_Object, CD_Object, CD_boolean, CD_boolean))
                 }
             }
             else -> {
@@ -200,6 +225,9 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
         else -> error("operator $op")
     }
 
+    /** The text of a string literal pattern; null for any other right side. */
+    private fun stringLiteral(e: Expr): String? = (e as? LitExpr)?.let { literal(it.lit) as? String }
+
     /** Pushes `k[constants.size]` and records [value] as that constant. */
     private fun constant(c: CodeBuilder, constants: ArrayList<Any?>, value: Any?) {
         c.aload(0).getfield(self, "k", objects).loadConstant(constants.size).aaload()
@@ -217,11 +245,14 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
             is BinaryExpr -> {
                 val op = expr.op.uppercase()
                 collect(expr.left, names, constants)
-                if ((op == "LIKE" || op == "ILIKE") && expr.right is LitExpr) constants += likeRegex(literal(expr.right.lit).toString(), ignoreCase = op == "ILIKE")
+                val pattern = stringLiteral(expr.right)
+                if ((op == "LIKE" || op == "ILIKE") && pattern != null) constants += likeRegex(pattern, ignoreCase = op == "ILIKE")
+                else if (op in REGEX_OPS && pattern != null) constants += regexOf(pattern, ignoreCase = op.endsWith("*"))
                 else collect(expr.right, names, constants)
             }
             is Not -> collect(expr.expr, names, constants)
             is Is -> collect(expr.expr, names, constants)
+            is Call -> for (i in 0 until expr.args.size) collect(expr.args[i], names, constants)
             else -> Unit
         }
     }

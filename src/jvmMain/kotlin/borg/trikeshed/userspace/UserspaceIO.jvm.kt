@@ -510,6 +510,15 @@ internal class JvmUserspaceChannelBackend(
         UringOp.URING_CMD -> when (sub.offset) {
             UringOp.SOCKET_URING_OP_GETSOCKNAME.toLong() ->
                 JvmSocketSyscalls.name(fd, sub.buffer, sub.len, sub.operationFlags)
+            // SETSOCKOPT with level and optname in addr's halves and one native-order int in the window, as the posix emulation reads it.
+            UringOp.SOCKET_URING_OP_SETSOCKOPT.toLong() -> {
+                val level = (sub.addr and 0xffffffffL).toInt()
+                val name = (sub.addr ushr 32).toInt()
+                val window = sub.buffer
+                if (window == null || sub.len != 4) -22
+                else if (!(level == UringOp.SOL_SOCKET && name == UringOp.SO_REUSEADDR || level == 6 && name == 1)) -92
+                else intOption(sub.fd, level, name, java.nio.ByteBuffer.wrap(window.array(), window.arrayOffset() + window.position(), 4).order(java.nio.ByteOrder.nativeOrder()).int)
+            }
             else -> -95
         }
         UringOp.ACCEPT -> {

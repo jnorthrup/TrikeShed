@@ -98,8 +98,21 @@ class SqlParser(private val cs: CharSeries) {
         val RESERVED = setOf(
             "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
             "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ASC", "DESC", "AND", "OR",
-            "NOT", "IN", "IS", "NULL", "TRUE", "FALSE", "LIKE", "ILIKE",
+            "NOT", "IN", "IS", "NULL", "TRUE", "FALSE", "LIKE", "ILIKE", "CASE", "WHEN", "THEN", "ELSE", "END",
         )
+
+        /** pg's bare session words: a zero-argument call without parentheses. */
+        val SESSION_WORDS = setOf("current_user", "session_user", "current_role", "current_schema", "current_catalog")
+
+        /** The catalog schema pg clients qualify functions and types with; the names are the same here. */
+        const val PG_CATALOG = "pg_catalog."
+
+        /** The call names a CASE lowers to: the simple form with its operand first, the searched form without. */
+        const val CASE = "case"
+        const val CASE_WHEN = "case_when"
+
+        /** pg's "any other operator" class, tighter than comparisons and left-associative: the regex and vector operators. */
+        val OTHER_OPS = listOf("!~*", "!~", "~*", "~", "<=>", "<->", "<#>")
 
         fun parse(src: Series<Char>): SelectStmt? = SqlParser(CharSeries(src).trim).parseSelect()
         fun parse(text: String): SelectStmt? {
@@ -202,17 +215,24 @@ class SqlParser(private val cs: CharSeries) {
         return null
     }
 
+    /** `'text'` under standard_conforming_strings: a doubled quote `''` is one quote and a backslash is a character. */
     fun parseStringLiteral(): StringLiteral? {
         skipWs()
         if (peek() != '\'') return null
-        val tmp = CharSeries(cs, cs.pos, cs.limit)
-        tmp.pos++
-        val start = tmp.pos
-        if (!tmp.seekTo('\'', '\\')) return null
-        val end = tmp.pos - 1
-        val value = cs[start until end]
-        cs.pos = tmp.pos
-        return StringLiteral(value)
+        var i = cs.pos + 1
+        var doubled = false
+        while (i < cs.limit) {
+            val c = cs[i]
+            when {
+                c == '\'' && i + 1 < cs.limit && cs[i + 1] == '\'' -> { doubled = true; i += 2 }
+                c == '\'' -> break
+                else -> i++
+            }
+        }
+        if (i >= cs.limit) return null
+        val value = cs[cs.pos + 1 until i]
+        cs.pos = i + 1
+        return StringLiteral(if (doubled) value.asString().replace("''", "'").toSeries() else value)
     }
 
     fun parseNumberLit(): NumericLiteral? {
@@ -258,6 +278,8 @@ class SqlParser(private val cs: CharSeries) {
         if (matchKeyword("NULL")) return parsePostfix(LitExpr(NullLiteral))
         if (matchKeyword("TRUE")) return parsePostfix(LitExpr(BooleanLiteral(true)))
         if (matchKeyword("FALSE")) return parsePostfix(LitExpr(BooleanLiteral(false)))
+        if (matchKeyword("CASE")) return parsePostfix(parseCase() ?: return null)
+        val quoted = peek() == '"'
         val id = parseIdentifier() ?: return null
         skipWs()
         if (peek() == '(') {
@@ -273,8 +295,9 @@ class SqlParser(private val cs: CharSeries) {
             skipWs()
             if (peek() != ')') return null
             cs.pos++
-            return parsePostfix(Call(id.asString().lowercase(), args.toSeries()))
+            return parsePostfix(Call(id.asString().lowercase().removePrefix(PG_CATALOG), args.toSeries()))
         }
+        if (!quoted) id.asString().lowercase().let { word -> if (word in SESSION_WORDS) return parsePostfix(Call(word, emptySeriesOf())) }
         if (peek() == ':' && !(cs.pos + 1 < cs.limit && cs[cs.pos + 1] == ':')) {
             cs.pos++
             return parsePostfix(Path(ColumnRef(id), parseColonPath(), text = false))
@@ -282,17 +305,54 @@ class SqlParser(private val cs: CharSeries) {
         return parsePostfix(ColumnRef(id))
     }
 
-    /** `->` paths and `::type` casts, in any order: `doc->>'n'::int`, `'[1,2]'::vector`. */
+    /**
+     * `->` paths, `::type` casts and `COLLATE name` (one collation here, so it is read and dropped), in any order:
+     * `doc->>'n'::int`, `'[1,2]'::vector`, `c.oid::pg_catalog.regclass`, `relname COLLATE pg_catalog.default`.
+     */
     fun parsePostfix(head: Expr): Expr {
         var left = parsePath(head)
         while (true) {
             val save = cs.pos
             skipWs()
+            if (matchKeyword("COLLATE")) {
+                skipWs()
+                if (parseIdentifier() == null) { cs.pos = save; return left }
+                continue
+            }
             if (!matchSymbol("::")) { cs.pos = save; return left }
             skipWs()
             val type = parseIdentifier() ?: run { cs.pos = save; return left }
-            left = parsePath(Cast(left, type.asString().lowercase()))
+            left = parsePath(Cast(left, type.asString().lowercase().removePrefix(PG_CATALOG)))
         }
+    }
+
+    /**
+     * `CASE operand WHEN v THEN r … [ELSE e] END` as `case(operand, v1, r1, …, else)` and the searched
+     * `CASE WHEN c THEN r … [ELSE e] END` as `case_when(c1, r1, …, else)`; a missing ELSE is `NULL`. The
+     * evaluator reads the arms in order and only as far as the first match, as pg does.
+     */
+    fun parseCase(): Expr? {
+        skipWs()
+        val args = mutableListOf<Expr>()
+        val save = cs.pos
+        val searched = matchKeyword("WHEN").also { cs.pos = save }
+        if (!searched) args += parseExpr() ?: return null
+        var arms = 0
+        while (true) {
+            skipWs()
+            if (!matchKeyword("WHEN")) break
+            args += parseExpr() ?: return null
+            skipWs()
+            if (!matchKeyword("THEN")) return null
+            args += parseExpr() ?: return null
+            arms++
+        }
+        if (arms == 0) return null
+        skipWs()
+        args += if (matchKeyword("ELSE")) parseExpr() ?: return null else LitExpr(NullLiteral)
+        skipWs()
+        if (!matchKeyword("END")) return null
+        return Call(if (searched) CASE_WHEN else CASE, args.toSeries())
     }
 
     /** Snowflake `col:a.b[0]` segments after the colon. */
@@ -378,16 +438,39 @@ class SqlParser(private val cs: CharSeries) {
         }
     }
 
-    /** pgvector `<=>` cosine distance, `<->` L2 distance, `<#>` negative inner product: looser than `+ -`, tighter than comparisons. */
+    /**
+     * pg's other operators, looser than `+ -` and tighter than comparisons: the regex matches `~ ~* !~ !~*` and
+     * pgvector's `<=>` cosine distance, `<->` L2 distance, `<#>` negative inner product; also spelled
+     * `OPERATOR([pg_catalog.] op)`, as psql writes `relname OPERATOR(pg_catalog.~) '^(x)$'`.
+     */
     fun parseVector(): Expr? {
         var left = parseAdditive() ?: return null
         while (true) {
             val save = cs.pos
             skipWs()
-            val op = listOf("<=>", "<->", "<#>").firstOrNull { matchSymbol(it) } ?: run { cs.pos = save; return left }
+            val op = OTHER_OPS.firstOrNull { matchSymbol(it) } ?: parseOperatorSpelling() ?: run { cs.pos = save; return left }
             val right = parseAdditive() ?: run { cs.pos = save; return left }
             left = BinaryExpr(left, op, right)
         }
+    }
+
+    /** `OPERATOR([schema.]op)` naming one of [OTHER_OPS]; null, with the position kept, for anything else. */
+    fun parseOperatorSpelling(): String? {
+        val save = cs.pos
+        if (!matchKeyword("OPERATOR")) return null
+        skipWs()
+        if (peek() != '(') { cs.pos = save; return null }
+        cs.pos++
+        skipWs()
+        // An identifier here is the schema qualifier, read with its trailing dot (`pg_catalog.`); anything else is not this spelling.
+        val qualifier = parseIdentifier()
+        if (qualifier != null && !qualifier.asString().endsWith(".")) { cs.pos = save; return null }
+        skipWs()
+        val op = OTHER_OPS.firstOrNull { matchSymbol(it) } ?: run { cs.pos = save; return null }
+        skipWs()
+        if (peek() != ')') { cs.pos = save; return null }
+        cs.pos++
+        return op
     }
 
     /** `[NOT] IN (list)`, `[NOT] LIKE` and `[NOT] ILIKE`: tighter than comparisons, as pg. */

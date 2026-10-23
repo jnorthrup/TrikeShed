@@ -48,9 +48,15 @@ fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
     is ColumnRef -> names.ordinalOf(id.asString()).let { ordinal -> { row -> SqlRuntime.cell(row, ordinal) } }
     is LitExpr -> literal(lit).let { value -> { _ -> value } }
     is BinaryExpr -> op.uppercase().let { op ->
-        if ((op == "LIKE" || op == "ILIKE") && right is LitExpr) {
-            val regex = likeRegex(literal(right.lit).toString(), ignoreCase = op == "ILIKE")
+        // A string literal pattern compiles once; any other right side (a column, NULL, a number) takes the row path, which null-propagates.
+        val pattern = (right as? LitExpr)?.let { literal(it.lit) as? String }
+        if ((op == "LIKE" || op == "ILIKE") && pattern != null) {
+            val regex = likeRegex(pattern, ignoreCase = op == "ILIKE")
             left.compile(names).let { subject -> { row -> SqlRuntime.likeCompiled(subject(row), regex) } }
+        } else if (op in REGEX_OPS && pattern != null) {
+            val regex = regexOf(pattern, ignoreCase = op.endsWith("*"))
+            val negated = op.startsWith("!")
+            left.compile(names).let { subject -> { row -> SqlRuntime.regexCompiled(subject(row), regex, negated) } }
         } else binary(op, left.compile(names), right.compile(names))
     }
     is Not -> expr.compile(names).let { e -> { row -> SqlRuntime.not(e(row)) } }
@@ -67,9 +73,31 @@ fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
     is Cast ->
         if (expr is LitExpr) literal(expr.lit).let { SqlRuntime.cast(it, type) }.let { folded -> { _ -> folded } }
         else expr.compile(names).let { source -> { row -> SqlRuntime.cast(source(row), type) } }
-    is Call -> error("function $name(...) is not available in a scalar context")
+    is Call -> when {
+        name in AGGREGATES -> error("function $name(...) is not available in a scalar context")
+        name == SqlParser.CASE || name == SqlParser.CASE_WHEN -> {
+            val searched = name == SqlParser.CASE_WHEN
+            val head: RowExpr = if (searched) { _ -> null } else args[0].compile(names)
+            val first = if (searched) 0 else 1
+            val arms = Array(args.size - first) { args[it + first].compile(names) }
+            ({ row -> SqlRuntime.case(head(row), searched, Array(arms.size) { i -> { arms[i](row) } }) })
+        }
+        else -> {
+            SqlFunctions.require(name, args.size)
+            val parts = Array(args.size) { args[it].compile(names) }
+            ({ row -> SqlRuntime.call(name, Array(parts.size) { parts[it](row) }) })
+        }
+    }
     Star -> error("* is only an argument of COUNT")
 }
+
+/** pg's regular-expression operators. */
+val REGEX_OPS = setOf("~", "~*", "!~", "!~*")
+
+/** A regex operator's pattern, compiled; a pattern the engine refuses is pg's `2201B invalid_regular_expression`. */
+fun regexOf(pattern: String, ignoreCase: Boolean): Regex =
+    try { Regex(pattern, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet()) }
+    catch (e: Throwable) { error("invalid regular expression: ${e.message ?: pattern}") }
 
 fun literal(lit: SqlNode): Any? = when (lit) {
     is StringLiteral -> lit.asString()
@@ -92,6 +120,10 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     "LIKE" -> { row -> SqlRuntime.like(left(row), right(row)) }
     "ILIKE" -> { row -> SqlRuntime.ilike(left(row), right(row)) }
     "@@" -> { row -> SqlRuntime.matches(left(row), right(row)) }
+    "~" -> { row -> SqlRuntime.regexMatch(left(row), right(row), false, false) }
+    "~*" -> { row -> SqlRuntime.regexMatch(left(row), right(row), true, false) }
+    "!~" -> { row -> SqlRuntime.regexMatch(left(row), right(row), false, true) }
+    "!~*" -> { row -> SqlRuntime.regexMatch(left(row), right(row), true, true) }
     "||" -> { row -> SqlRuntime.concat(left(row), right(row)) }
     "<=>" -> { row -> SqlRuntime.cosineDistance(left(row), right(row)) }
     "<->" -> { row -> SqlRuntime.l2Distance(left(row), right(row)) }
@@ -289,11 +321,11 @@ fun castTo(value: Any?, type: String): Any? {
     if (value == null) return null
     return when (type) {
         "vector" -> vectorOf(value)
-        "int", "integer", "int2", "int4", "int8", "smallint", "bigint" ->
+        "int", "integer", "int2", "int4", "int8", "smallint", "bigint", "oid" ->
             if (value is Number) value.toLong() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toLongOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
         "float", "float4", "float8", "real", "double", "numeric", "decimal" ->
             if (value is Number) value.toDouble() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toDoubleOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
-        "text", "varchar", "string", "char", "regclass" -> scalarText(value)
+        "text", "varchar", "string", "char", "name", "regclass", "regtype", "regnamespace", "regproc" -> scalarText(value)
         "bool", "boolean" -> when (value) {
             is Boolean -> value
             is Number -> value.toDouble() != 0.0

@@ -13,7 +13,8 @@ private object SocketOption {
     val darwin = System.getProperty("os.name").lowercase().contains("mac")
 }
 
-private fun intOption(fd: Int, level: Int, name: Int, value: Int): Int {
+/** setsockopt of one int on the ring socket [fd] (a JvmFileTable id). 0, or -errno. */
+fun intOption(fd: Int, level: Int, name: Int, value: Int): Int {
     val descriptor = JvmFileTable.descriptor(fd) as? JvmSocketDescriptor ?: return -88
     if (!descriptor.isOpen()) return -9
     return Arena.ofConfined().use { arena ->

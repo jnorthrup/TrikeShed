@@ -77,6 +77,28 @@ object SqlRuntime {
     @JvmStatic fun ilike(subject: Any?, pattern: Any?): Any? =
         if (subject == null || pattern == null) null else likeRegex(pattern.toString(), ignoreCase = true).matches(subject.toString())
 
+    /** pg `~` / `~*` (`!~` / `!~*` negate): the pattern is found somewhere in the subject, a POSIX regex search. */
+    @JvmStatic fun regexMatch(subject: Any?, pattern: Any?, ignoreCase: Boolean, negated: Boolean): Any? =
+        if (subject == null || pattern == null) null else regexCompiled(subject, regexOf(scalarText(pattern), ignoreCase), negated)
+
+    /** `~` against a pattern compiled once from a literal; [regex] is a [Regex]. */
+    @JvmStatic fun regexCompiled(subject: Any?, regex: Any?, negated: Boolean): Any? =
+        if (subject == null) null else (regex as Regex).containsMatchIn(scalarText(subject)) != negated
+
+    /** `CASE` over its parsed arguments: `operand, when1, then1, …, else`, read lazily; see [SqlParser.parseCase]. */
+    @JvmStatic fun case(operand: Any?, searched: Boolean, arms: Array<() -> Any?>): Any? {
+        var i = 0
+        while (i + 1 < arms.size) {
+            val test = arms[i]()
+            if (if (searched) isTrue(test) else test != null && operand != null && compareCells(operand, test) == 0) return arms[i + 1]()
+            i += 2
+        }
+        return arms[arms.size - 1]()
+    }
+
+    /** A scalar function by [name] over its evaluated [args]; the table is [SqlFunctions]. */
+    @JvmStatic fun call(name: String, args: Array<Any?>): Any? = SqlFunctions.call(name, args)
+
     /** Evoke `document @@ 'query text'`: the document holds a query term (a local match, not a corpus score). */
     @JvmStatic fun matches(document: Any?, query: Any?): Any? {
         if (document == null || query == null) return null

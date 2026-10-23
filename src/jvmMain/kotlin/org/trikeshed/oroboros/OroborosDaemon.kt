@@ -178,6 +178,7 @@ object OroborosDaemon {
     const val DEFAULT_INTERVAL_MS = 30_000L
     const val DEFAULT_MAX_SLOTS = 15
     const val DEFAULT_KANBAN_PORT = 8888
+    const val DEFAULT_PG_PORT = borg.trikeshed.pgwire.PgServerElement.DEFAULT_PORT
 
     data class DaemonConfig(
         val watch: Boolean,
@@ -195,6 +196,8 @@ object OroborosDaemon {
         /** Coding agents offered to AGENT: cards and agent.run: --agents codex,opencode or TRIKESHED_AGENTS; default codex,opencode. */
         val agents: Set<String> = borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED,
         val airgap: Boolean = Airgap.configured(),
+        /** The pg wire listener's port: --pg-port N; 0 binds an ephemeral port. */
+        val pgPort: Int = DEFAULT_PG_PORT,
     )
 
     @Volatile
@@ -209,6 +212,7 @@ object OroborosDaemon {
         var intervalMs = DEFAULT_INTERVAL_MS
         var maxSlots = DEFAULT_MAX_SLOTS
         var kanbanPort = DEFAULT_KANBAN_PORT
+        var pgPort = DEFAULT_PG_PORT
         var hermesRoot: String? = null
         var hermesSleeve: String? = null
         var hermesConsole = false
@@ -241,6 +245,11 @@ object OroborosDaemon {
                 kanbanPort = v
                 i + 1
             },
+            ForgeCliArgs.Flag(name = "--pg-port", withValue = true) { a, i ->
+                val v = a[i].toIntOrNull()?.takeIf { it in 0..0xffff } ?: die("--pg-port requires a port number")
+                pgPort = v
+                i + 1
+            },
             ForgeCliArgs.Flag(name = "--hermes-root", withValue = true) { a, i ->
                 hermesRoot = a[i]
                 i + 1
@@ -263,7 +272,7 @@ object OroborosDaemon {
         val agentsResolved = agents
             ?: HostSystem.getenv("TRIKESHED_AGENTS")?.split(',')?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet()
             ?: borg.trikeshed.agent.AgentRegistry.DEFAULT_ENABLED
-        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap)
+        return DaemonConfig(watch, intervalMs, maxSlots, kanbanPort, hermesRoot, hermesSleeve, hermesConsole, positional, projects, modules, agentsResolved, airgap, pgPort)
     }
 
     @JvmStatic
@@ -618,6 +627,7 @@ object OroborosDaemon {
         val watch = config.watch
         val maxSlots = config.maxSlots
         val kanbanPort = config.kanbanPort
+        val pgPort = config.pgPort
         val positional = config.positional
 
         val home = HostSystem.getProperty("user.home")
@@ -2170,7 +2180,18 @@ object OroborosDaemon {
             if (remounted > 0) HostSystem.err("[OROBOROS] project dbs remounted from ledger: $remounted")
         }
         val kanbanJob = SupervisorJob(coroutineContext[kotlinx.coroutines.Job])
+        // The pg wire: psql and the drivers read the same catalog PostgREST serves, on their own port over the userspace ring.
+        val pgServer = if (watch) borg.trikeshed.pgwire.PgServerElement(CoroutineScope(coroutineContext + kanbanJob), postgrestWire.surface, "0.0.0.0:$pgPort") else null
         if (watch) {
+            launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
+                try {
+                    pgServer!!.open()
+                    val bound = pgServer.localAddress?.substringAfterLast(':') ?: pgPort.toString()
+                    HostSystem.err("[OROBOROS] pg wire listening on ${pgServer.localAddress} (psql -h 127.0.0.1 -p $bound -U trikeshed -d trikeshed)")
+                } catch (t: Throwable) {
+                    HostSystem.err("[OROBOROS] pg wire failed to listen on :$pgPort: ${t.message}")
+                }
+            }
             launch(CoroutineScope(kanbanJob).coroutineContext + Dispatchers.Default) {
                 // Boot race seen in the wild: bindAndServe dies with "Parent job is Cancelling"
                 // moments after the port binds. Until the racing job is named, the server RETRIES —
@@ -2535,6 +2556,7 @@ object OroborosDaemon {
                 projectScopes.drain()
                 runCatching { worktreeReconcileElement.drain() }
                 changesFacts.drain()
+                pgServer?.let { runCatching { it.drain() } }
                 runCatching { kanbanJob.cancel() }
                 runCatching { kifTeeDisposer.close() }
                 runCatching { tribunalHolder.instance?.nexus?.drain() }
@@ -2885,7 +2907,7 @@ object OroborosDaemon {
 
     private fun usage() {
         HostSystem.err(
-            """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N]
+            """usage: OroborosDaemon [--once | --watch] [--airgap] [--interval-ms N] [--max-slots N] [--kanban-port N] [--pg-port N]
               [--hermes-root PATH] [--hermes-sleeve PATH] [--hermes-console] [forgeHome] [repoDir]
               --airgap: disable remote Jev/LLM calls; keep local BERT
               env: JULES_API_KEY (required)
@@ -2894,7 +2916,8 @@ object OroborosDaemon {
                    the curator is airgapped unless it is set off (TRIKESHED_AIRGAP=off)
               forgeHome default: ~/.local/forge (ForgeHome.defaultHome)
               repoDir  default: cwd
-              kanban-port default: 8888"""
+              kanban-port default: 8888
+              pg-port default: 5433 (the pg wire: psql, pgjdbc; 0 for an ephemeral port)"""
         )
     }
 }

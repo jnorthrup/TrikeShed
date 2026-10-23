@@ -55,8 +55,9 @@ fun SelectStmt.plan(
     /** The statement text the receipt hashes when this SELECT was lowered from another language; the rendered SQL otherwise. */
     statement: String? = null,
 ): QueryCursor {
-    val table = requireNotNull(from) { "SELECT without FROM" }
-    val source = resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
+    val table = from
+    // A FROM-less SELECT (`SELECT 1`, `SELECT version()`) reads the one-row, no-column relation, as pg's Result node does.
+    val source = if (table == null) UNIT else resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
     val stages = mutableListOf<QueryK<Cursor>>()
     stages += prelude
 
@@ -156,6 +157,7 @@ fun SelectStmt.plan(
         /** Replace aggregate calls by references to their reduction columns. */
         fun lift(e: Expr): Expr = when {
             e is Call && e.name in AGGREGATES -> ColumnRef(Identifier(reduction(e).toSeries()))
+            e is Call -> Call(e.name, e.args.view.map { lift(it) }.toSeries())
             e is BinaryExpr -> BinaryExpr(lift(e.left), e.op, lift(e.right))
             e is Cast -> Cast(lift(e.expr), e.type)
             e is Path -> Path(lift(e.cell), e.path, e.text)
@@ -196,9 +198,12 @@ fun SelectStmt.plan(
         )
     }
     stages += QueryK.Project(sources.toSeries())
-    val tables = listOf(table.name.asString()) + joins.view.map { it.table.name.asString() }
+    val tables = listOfNotNull(table?.name?.asString()) + joins.view.map { it.table.name.asString() }
     return QueryCursor(source, stages.toSeries(), ops, compiler, statement ?: render(), tables.associateWith(provenance))
 }
+
+/** The one-row relation with no columns: what a SELECT without FROM scans. */
+val UNIT: Cursor = 1 j { _: Int -> ReifiedSplitSeries2(emptySeriesOf<Any?>(), emptySeriesOf<`ColumnMeta↻`>()) }
 
 /** A literal's value, through a cast of a literal (`'idx'::regclass`); null for anything else. */
 fun constant(e: Expr): Any? = when (e) {
@@ -232,7 +237,7 @@ fun Expr.references(): List<String> = when (this) {
 /** pg naming: the alias, else a column's last segment, else the function name, else `?column?`. */
 fun displayName(item: Column): String = item.alias?.asString() ?: when (val e = item.expr) {
     is ColumnRef -> e.id.asString().substringAfterLast('.')
-    is Call -> e.name
+    is Call -> if (e.name == SqlParser.CASE_WHEN) SqlParser.CASE else e.name
     else -> "?column?"
 }
 

@@ -75,6 +75,37 @@ class SqlPlanTest {
     }
 
     @Test
+    fun caseRegexScalarCallsAndFromLessSelect() {
+        fun plan(sql: String) = assertNotNull(SqlParser.parse(sql.toSeries()), sql).plan(::resolve)
+        // y ascending: 2, 4, 5, 7, 9, 10
+        assertEquals(listOf(listOf("tiny"), listOf("tiny"), listOf("small")),
+            rows(plan("SELECT CASE WHEN y < 5 THEN 'tiny' WHEN y < 9 THEN 'small' ELSE 'big' END AS size FROM b ORDER BY y LIMIT 3")))
+        // the arms are the parsed literals, so small integers stay Int as every literal does
+        assertEquals(listOf(listOf(1), listOf(null), listOf(1), listOf(2)), rows(plan("SELECT CASE x WHEN 'red' THEN 1 WHEN 'blue' THEN 2 END FROM a ORDER BY k")))
+        assertEquals(listOf("case"), plan("SELECT CASE x WHEN 'red' THEN 1 END FROM a").columnNames.view.map { it.toString() })
+        assertEquals(listOf(listOf(1L), listOf(3L)), rows(plan("SELECT k FROM a WHERE x ~ '^r' AND x !~* 'GREEN' ORDER BY k")))
+        assertEquals(listOf(listOf(2L), listOf(4L)), rows(plan("SELECT k FROM a WHERE x !~ 'd\$' ORDER BY k")))
+        val scalars = plan("SELECT version(), current_schema(), session_user, 1 + 1, upper('a') AS u")
+        assertEquals(listOf("version", "current_schema", "session_user", "?column?", "u"), scalars.columnNames.view.map { it.toString() })
+        assertEquals(listOf(listOf("PostgreSQL 14.0 (TrikeShed)", "public", "trikeshed", 2L, "A")), rows(scalars))
+        assertEquals(listOf(listOf("it's", "RED", 3L)), rows(plan("SELECT 'it''s', upper(x), length(x) FROM a WHERE k = 1")))
+        assertEquals(listOf(listOf(4L)), rows(plan("SELECT COUNT(*) FROM a WHERE pg_catalog.pg_table_is_visible(k) AND coalesce(NULL, k) IS NOT NULL")))
+        assertEquals(listOf(listOf("bigint", "trikeshed")), rows(plan("SELECT format_type(20, -1), pg_get_userbyid(10)")))
+        // the plan is lazy: an unknown function is refused when the rows are read
+        assertTrue(assertFailsWith<IllegalStateException> { rows(plan("SELECT nope(1) FROM a")) }.message!!.startsWith("function nope(...) does not exist"))
+        assertTrue(assertFailsWith<IllegalStateException> { rows(plan("SELECT upper(x, x) FROM a")) }.message!!.contains("2 arguments"))
+        // CASE reads no arm past the first match: the division never runs
+        assertEquals(listOf(listOf(0)), rows(plan("SELECT CASE WHEN k = 1 THEN 0 ELSE 10 / (k - 1) END FROM a WHERE k = 1")))
+        assertEquals(listOf(listOf(2)), rows(plan("SELECT CASE NULL WHEN TRUE THEN 1 ELSE 2 END")), "a NULL operand is compared, never truth-tested")
+        // scalar functions over aggregates; the other operators bind tighter than comparisons; a NULL pattern is NULL; psql's OPERATOR() spelling
+        assertEquals(listOf(listOf(37L, "some")), rows(plan("SELECT coalesce(sum(y), 0), CASE WHEN count(*) > 0 THEN 'some' ELSE 'none' END FROM b")))
+        assertEquals(listOf(listOf(true), listOf(false), listOf(true), listOf(false)), rows(plan("SELECT x ~ '^r' = TRUE FROM a ORDER BY k")))
+        assertEquals(listOf(listOf(null)), rows(plan("SELECT x ~ NULL FROM a WHERE k = 1")))
+        assertEquals(listOf(listOf(1L), listOf(3L)), rows(plan("SELECT k FROM a WHERE x OPERATOR(pg_catalog.~) '^(red)$' COLLATE pg_catalog.default ORDER BY k")))
+        assertTrue(assertFailsWith<IllegalStateException> { rows(plan("SELECT k FROM a WHERE x ~ '('")) }.message!!.startsWith("invalid regular expression"))
+    }
+
+    @Test
     fun parserRejectsTrailingInput() {
         assertNull(SqlParser(CharSeries("SELECT k FROM a ORDER BY k garbage".toSeries()).trim).parseSelect())
     }
