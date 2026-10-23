@@ -55,9 +55,14 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
             "transaction isolation level" to "transaction_isolation", "time zone" to "TimeZone", "session authorization" to "session_authorization",
         )
 
+        /** Whether the quote at [i] opens pg's `E'…'` escape string, whose backslash escapes the next character: an `E` before it that ends no word. */
+        fun escapeString(text: CharSequence, i: Int): Boolean =
+            i > 0 && (text[i - 1] == 'E' || text[i - 1] == 'e') && (i < 2 || !(text[i - 2].isLetterOrDigit() || text[i - 2] == '_'))
+
         /** Text outside quotes with `-- …` and nested `/* … */` comments removed. */
         fun strip(text: String): String = buildString {
             var quote = '\u0000'
+            var escaping = false
             var depth = 0
             var i = 0
             while (i < text.length) {
@@ -65,8 +70,9 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
                 val next = if (i + 1 < text.length) text[i + 1] else '\u0000'
                 when {
                     depth > 0 -> { if (c == '*' && next == '/') { depth--; i++ } else if (c == '/' && next == '*') { depth++; i++ } }
+                    quote != '\u0000' && escaping && c == '\\' && next != '\u0000' -> { append(c); append(next); i++ }
                     quote != '\u0000' -> { append(c); if (c == quote) quote = '\u0000' }
-                    c == '\'' || c == '"' -> { quote = c; append(c) }
+                    c == '\'' || c == '"' -> { quote = c; escaping = c == '\'' && escapeString(text, i); append(c) }
                     c == '-' && next == '-' -> { while (i < text.length && text[i] != '\n') i++; continue }
                     c == '/' && next == '*' -> { depth = 1; i++ }
                     else -> append(c)
@@ -80,14 +86,18 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
             val clean = strip(text)
             val out = ArrayList<String>()
             var quote = '\u0000'
+            var escaping = false
             var start = 0
-            for (i in clean.indices) {
+            var i = 0
+            while (i < clean.length) {
                 val c = clean[i]
                 when {
+                    quote != '\u0000' && escaping && c == '\\' -> i++
                     quote != '\u0000' -> if (c == quote) quote = '\u0000'
-                    c == '\'' || c == '"' -> quote = c
+                    c == '\'' || c == '"' -> { quote = c; escaping = c == '\'' && escapeString(clean, i) }
                     c == ';' -> { out += clean.substring(start, i); start = i + 1 }
                 }
+                i++
             }
             out += clean.substring(start)
             return out.map { it.trim() }.filter { it.isNotEmpty() }
@@ -96,12 +106,14 @@ class PgSession(val surface: PostgrestSurface, val pid: Int, val secret: Int) {
         /** `$n` placeholders outside quotes, each replaced by [literal] of its 1-based index. */
         fun splice(text: String, literal: (Int) -> String): String = buildString {
             var quote = '\u0000'
+            var escaping = false
             var i = 0
             while (i < text.length) {
                 val c = text[i]
                 when {
+                    quote != '\u0000' && escaping && c == '\\' && i + 1 < text.length -> { append(c); append(text[i + 1]); i += 2 }
                     quote != '\u0000' -> { append(c); if (c == quote) quote = '\u0000'; i++ }
-                    c == '\'' || c == '"' -> { quote = c; append(c); i++ }
+                    c == '\'' || c == '"' -> { quote = c; escaping = c == '\'' && escapeString(text, i); append(c); i++ }
                     c == '$' && i + 1 < text.length && text[i + 1].isDigit() -> {
                         var j = i + 1
                         while (j < text.length && text[j].isDigit()) j++

@@ -71,13 +71,24 @@ data class Not(val expr: Expr) : Expr
 data class Is(val expr: Expr, val value: Boolean?, val negated: Boolean = false) : Expr
 /** `expr [NOT] IN (items)`: true on a match, else NULL when an item is NULL, else false. */
 data class InList(val expr: Expr, val items: Series<Expr>, val negated: Boolean = false) : Expr
+/**
+ * `(SELECT …)` as a value: one column, one row (NULL for none, pg's 21000 for more); with [array],
+ * `ARRAY(SELECT …)`: the column's values as one array cell. A reference qualified by an outer FROM
+ * item makes it correlated: the planner binds that row's cell before planning it.
+ */
+data class Subselect(val select: SelectStmt, val array: Boolean = false) : Expr
+/** `left op ANY|SOME (right)` or `left op ALL (right)`: [right] is array-valued, an `ARRAY(SELECT …)`, a subselect read as its column, or an array cell. */
+data class Quantified(val left: Expr, val op: String, val right: Expr, val all: Boolean = false) : Expr
+/** A cell the planner bound into a statement (an outer row's value inside a correlated subselect); it has no source text of its own. */
+class CellLiteral(val value: Any?) : SqlNode
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
-/** A FROM item: a table, or with [args] a table function `name(args) [AS] alias` (pg's shape; `evoke_query(index, query, k)` here). */
+/** A FROM item: a table, or with [args] a table function `name(args) [AS] alias` (pg's shape; `evoke_query(index, query, k)` and `unnest(array)` here). */
 data class TableRef(val name: Identifier, val alias: Identifier? = null, val args: Series<Expr>? = null) : SqlNode
-/** `[LEFT [OUTER] | INNER] JOIN table ON expr`. */
+/** `[LEFT [OUTER] | INNER] JOIN table ON expr`; [on] null is `CROSS JOIN table` or the comma form, a Cartesian product. */
 data class JoinClause(val table: TableRef, val on: Expr?, val outer: Boolean) : SqlNode
 /** [nullsFirst] null is pg's default: NULLS LAST ascending, NULLS FIRST descending. */
 data class OrderItem(val expr: Expr, val descending: Boolean, val nullsFirst: Boolean? = null) : SqlNode
+/** A SELECT; [union] holds the `UNION [ALL]` arms (ALL as the flag), whose ORDER BY, LIMIT and OFFSET are this statement's. */
 data class SelectStmt(
     val columns: Series<Column>,
     val from: TableRef?,
@@ -88,6 +99,7 @@ data class SelectStmt(
     val orderBy: Series<OrderItem> = emptySeriesOf(),
     val limit: Int? = null,
     val offset: Int? = null,
+    val union: Series<Join<Boolean, SelectStmt>> = emptySeriesOf(),
 ) : SqlNode
 
 /**
@@ -100,6 +112,7 @@ class SqlParser(private val cs: CharSeries) {
             "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
             "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ASC", "DESC", "AND", "OR",
             "NOT", "IN", "IS", "NULL", "TRUE", "FALSE", "LIKE", "ILIKE", "CASE", "WHEN", "THEN", "ELSE", "END",
+            "ANY", "SOME", "ALL", "ARRAY",
         )
 
         /** pg's bare session words: a zero-argument call without parentheses. */
@@ -216,9 +229,13 @@ class SqlParser(private val cs: CharSeries) {
         return null
     }
 
-    /** `'text'` under standard_conforming_strings: a doubled quote `''` is one quote and a backslash is a character. */
+    /**
+     * `'text'` under standard_conforming_strings: a doubled quote `''` is one quote and a backslash is a
+     * character. `E'text'` is pg's escape string, read by [parseEscapeString].
+     */
     fun parseStringLiteral(): StringLiteral? {
         skipWs()
+        if ((peek() == 'E' || peek() == 'e') && cs.pos + 1 < cs.limit && cs[cs.pos + 1] == '\'') { cs.pos++; return parseEscapeString() }
         if (peek() != '\'') return null
         var i = cs.pos + 1
         var doubled = false
@@ -234,6 +251,28 @@ class SqlParser(private val cs: CharSeries) {
         val value = cs[cs.pos + 1 until i]
         cs.pos = i + 1
         return StringLiteral(if (doubled) value.asString().replace("''", "'").toSeries() else value)
+    }
+
+    /**
+     * The body of `E'…'`, the cursor on the opening quote: `\b \f \n \r \t` as C reads them, `\\` and `\'`
+     * themselves, any other escaped character itself, `''` one quote (psql's describe queries join with `E'\n'`).
+     */
+    fun parseEscapeString(): StringLiteral? {
+        val out = StringBuilder()
+        var i = cs.pos + 1
+        while (i < cs.limit) {
+            val c = cs[i]
+            when {
+                c == '\\' && i + 1 < cs.limit -> {
+                    out.append(when (val e = cs[i + 1]) { 'b' -> '\b'; 'f' -> '\u000C'; 'n' -> '\n'; 'r' -> '\r'; 't' -> '\t'; else -> e })
+                    i += 2
+                }
+                c == '\'' && i + 1 < cs.limit && cs[i + 1] == '\'' -> { out.append('\''); i += 2 }
+                c == '\'' -> { cs.pos = i + 1; return StringLiteral(out.toString().toSeries()) }
+                else -> { out.append(c); i++ }
+            }
+        }
+        return null
     }
 
     fun parseNumberLit(): NumericLiteral? {
@@ -269,10 +308,21 @@ class SqlParser(private val cs: CharSeries) {
         skipWs()
         if (peek() == '(') {
             cs.pos++
+            skipWs()
+            // `(SELECT …)`: a scalar subselect; anything else in parentheses is an expression
+            val save = cs.pos
+            if (matchKeyword("SELECT")) { cs.pos = save; return parsePostfix(Subselect(parseParenthesisedSelect() ?: return null)) }
             val e = parseExpr()
             skipWs()
             if (peek() == ')') cs.pos++
             return parsePostfix(e ?: return null)
+        }
+        // `ARRAY(SELECT …)`: the column as one array cell; `ARRAY[…]` literals are not read
+        if (matchKeyword("ARRAY")) {
+            skipWs()
+            if (peek() != '(') return null
+            cs.pos++
+            return parsePostfix(Subselect(parseParenthesisedSelect() ?: return null, array = true))
         }
         parseStringLiteral()?.let { return parsePostfix(LitExpr(it)) }
         parseNumberLit()?.let { return parsePostfix(LitExpr(it)) }
@@ -513,11 +563,32 @@ class SqlParser(private val cs: CharSeries) {
         for (op in listOf("!=", "<>", ">=", "<=", "=", ">", "<", "@@")) {
             if (!matchSymbol(op)) continue
             skipWs()
+            // `op ANY|SOME (…)` / `op ALL (…)`: the right side is a subselect read as its column, or an array value
+            val all = when { matchKeyword("ANY") || matchKeyword("SOME") -> false; matchKeyword("ALL") -> true; else -> null }
+            if (all != null) {
+                skipWs()
+                if (peek() != '(') { cs.pos = save; return left }
+                cs.pos++
+                skipWs()
+                val mark = cs.pos
+                val right = if (matchKeyword("SELECT")) { cs.pos = mark; Subselect(parseParenthesisedSelect() ?: run { cs.pos = save; return left }, array = true) }
+                else parseExpr()?.also { skipWs(); if (peek() != ')') { cs.pos = save; return left }; cs.pos++ } ?: run { cs.pos = save; return left }
+                return Quantified(left, op, right, all)
+            }
             val right = parsePattern() ?: run { cs.pos = save; return left }
             return BinaryExpr(left, op, right)
         }
         cs.pos = save
         return left
+    }
+
+    /** A SELECT whose closing parenthesis follows, the cursor after the opening one; the cursor ends after `)`. */
+    fun parseParenthesisedSelect(): SelectStmt? {
+        val stmt = parseSelectBody(tail = true) ?: return null
+        skipWs()
+        if (peek() != ')') return null
+        cs.pos++
+        return stmt
     }
 
     /** `IS [NOT] NULL | UNKNOWN | TRUE | FALSE`: looser than comparisons, tighter than `NOT`, as pg. */
@@ -652,7 +723,21 @@ class SqlParser(private val cs: CharSeries) {
         return TableRef(name, alias, args)
     }
 
+    /** The whole input as one statement: a SELECT, an optional `;`, nothing after. */
     fun parseSelect(): SelectStmt? {
+        val stmt = parseSelectBody(tail = true) ?: return null
+        skipWs()
+        if (peek() == ';') cs.pos++
+        skipWs()
+        if (cs.pos < cs.limit) return null
+        return stmt
+    }
+
+    /**
+     * A SELECT up to where its text ends; with [tail], its `UNION [ALL]` arms (each read without a tail) and the
+     * ORDER BY, LIMIT and OFFSET that belong to the whole; an arm or a subselect leaves them to its owner.
+     */
+    fun parseSelectBody(tail: Boolean): SelectStmt? {
         skipWs()
         if (!matchKeyword("SELECT")) return null
         skipWs()
@@ -665,15 +750,19 @@ class SqlParser(private val cs: CharSeries) {
             from = parseTableRef() ?: return null
         }
         val joins = mutableListOf<JoinClause>()
-        while (true) {
+        while (from != null) {
             val save = cs.pos
             skipWs()
+            // `FROM a, b`: the comma form of a cross join
+            if (peek() == ',') { cs.pos++; joins += JoinClause(parseTableRef() ?: return null, null, false); continue }
             val outer = matchKeyword("LEFT")
-            if (outer) { skipWs(); matchKeyword("OUTER"); skipWs() } else if (matchKeyword("INNER")) skipWs()
+            val cross = !outer && matchKeyword("CROSS")
+            if (outer) { skipWs(); matchKeyword("OUTER"); skipWs() } else if (cross) skipWs() else if (matchKeyword("INNER")) skipWs()
             if (!matchKeyword("JOIN")) { cs.pos = save; break }
             val table = parseTableRef() ?: return null
             skipWs()
-            val on = if (matchKeyword("ON")) { skipWs(); parseExpr() } else null
+            // a join reads its ON; CROSS JOIN takes none
+            val on = if (cross) null else { if (!matchKeyword("ON")) return null; skipWs(); parseExpr() ?: return null }
             joins += JoinClause(table, on, outer)
         }
         skipWs()
@@ -698,6 +787,17 @@ class SqlParser(private val cs: CharSeries) {
         skipWs()
         val having = if (matchKeyword("HAVING")) { skipWs(); parseExpr() } else null
         skipWs()
+        val union = mutableListOf<Join<Boolean, SelectStmt>>()
+        if (tail) while (true) {
+            val save = cs.pos
+            if (!matchKeyword("UNION")) { cs.pos = save; break }
+            skipWs()
+            val all = matchKeyword("ALL")
+            skipWs()
+            union += all j (parseSelectBody(tail = false) ?: return null)
+            skipWs()
+        }
+        if (!tail) return SelectStmt(cols, from, where, joins.toSeries(), groupBy.toSeries(), having)
         val orderBy = mutableListOf<OrderItem>()
         if (matchKeyword("ORDER")) {
             skipWs()
@@ -724,10 +824,6 @@ class SqlParser(private val cs: CharSeries) {
         val limit = if (matchKeyword("LIMIT")) { skipWs(); parseNumberLit()?.value?.toInt() } else null
         skipWs()
         val offset = if (matchKeyword("OFFSET")) { skipWs(); parseNumberLit()?.value?.toInt() } else null
-        skipWs()
-        if (peek() == ';') cs.pos++
-        skipWs()
-        if (cs.pos < cs.limit) return null
-        return SelectStmt(cols, from, where, joins.toSeries(), groupBy.toSeries(), having, orderBy.toSeries(), limit, offset)
+        return SelectStmt(cols, from, where, joins.toSeries(), groupBy.toSeries(), having, orderBy.toSeries(), limit, offset, union.toSeries())
     }
 }

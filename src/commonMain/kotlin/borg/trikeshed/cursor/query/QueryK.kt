@@ -48,6 +48,16 @@ sealed class QueryK<out R> : OpK<R>() {
     class Unnest(val column: String) : QueryK<Cursor>()
 
     /**
+     * A subselect's value per row as column [name]: [rows] answers the subselect's rows for one input row (the
+     * planner binds a correlated row's cells first); the one cell of its one column (NULL for no row, pg's 21000
+     * for more) or, with [array], the column's values as one array cell. Every row's value is computed once.
+     */
+    class Subquery(val name: String, val array: Boolean, val rows: (RowVec) -> Cursor) : QueryK<Cursor>()
+
+    /** `UNION ALL`: the input's rows then each of [arms]', which must answer the same column count. */
+    class Combine(val arms: Series<Cursor>) : QueryK<Cursor>()
+
+    /**
      * Evoke's `evoke_query(index, query[, k])`: exact BM25 of [query] over text column [column] with
      * corpus statistics from every row of the input, keeping only matching rows (the best [k] when
      * k >= 0, best first) and adding their score as column [name].
@@ -105,6 +115,8 @@ val QueryK<*>.stageName: String
         is QueryK.Aggregate -> "Aggregate"
         is QueryK.Order -> "Order"
         is QueryK.Unnest -> "Unnest"
+        is QueryK.Subquery -> "Subquery"
+        is QueryK.Combine -> "Combine"
         is QueryK.LexicalTopK -> "LexicalTopK"
         is QueryK.Fuse -> "Fuse"
         is QueryK.Graph -> "Graph"

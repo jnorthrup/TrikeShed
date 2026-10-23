@@ -38,6 +38,8 @@ fun <R> Cursor.facet(
         is QueryK.Aggregate -> columnar?.routeAggregate(key, ops) ?: aggregate(key)
         is QueryK.Order -> columnar?.routeOrder(key) ?: order(key)
         is QueryK.Unnest -> unnest(key)
+        is QueryK.Subquery -> subquery(key)
+        is QueryK.Combine -> combine(key)
         is QueryK.LexicalTopK -> lexicalTopK(key)
         is QueryK.Fuse -> fuse(key)
         is QueryK.Graph -> columnar?.routeGraph(key) ?: graph(key)
@@ -46,12 +48,55 @@ fun <R> Cursor.facet(
 }
 
 /** Column names from the row-0 exemplar; empty when there are no rows. */
-val Cursor.names: Series<CharSequence> get() = if (size == 0) emptySeriesOf() else columnNames
+/** Column names: a [ColumnCursor] knows them at any row count, any other cursor from its first row. */
+val Cursor.names: Series<CharSequence> get() = when {
+    this is ColumnCursor -> metas.size j { c: Int -> metas[c].name }
+    size == 0 -> emptySeriesOf()
+    else -> columnNames
+}
 
 fun Cursor.filterRows(stage: QueryK.Filter, compiler: ExprCompiler = ClosureExprCompiler): Cursor {
     if (size == 0) return this
     val test by lazy { compiler.compile(stage.where, names) }
     return filter { row -> test(row) == true }
+}
+
+/**
+ * Every row's subselect value, computed once on the first read of any row, widened as column [stage.name]:
+ * one column always, one row for a scalar (none is NULL, more is pg's 21000), every row as one array cell for `ARRAY(…)`.
+ */
+fun Cursor.subquery(stage: QueryK.Subquery): Cursor {
+    if (size == 0) return this
+    val cells: Array<Any?> by lazy {
+        Array(size) { r ->
+            val result = stage.rows(this[r])
+            if (result.size > 0) require(result[0].size == 1) { "subquery must return only one column" }
+            if (stage.array) Array<Any?>(result.size) { i -> result[i].values[0] }
+            else when (result.size) {
+                0 -> null
+                1 -> result[0].values[0]
+                else -> error("more than one row returned by a subquery used as an expression")
+            }
+        }
+    }
+    val meta: `ColumnMeta↻` = { ColumnMeta(stage.name, if (stage.array) IOMemento.IoArray else mementoOf(cells.firstOrNull { it != null })) }
+    val metas = this[0].metas
+    val width = metas.size
+    val widened: Series<`ColumnMeta↻`> = width + 1 j { c: Int -> if (c < width) metas[c] else meta }
+    return size j { r: Int ->
+        val values = this[r].values
+        ReifiedSplitSeries2(width + 1 j { c: Int -> if (c < width) values[c] else cells[r] }, widened)
+    }
+}
+
+/** `UNION ALL`: this cursor's rows then each arm's; an arm with rows must answer this cursor's column count. */
+fun Cursor.combine(stage: QueryK.Combine): Cursor {
+    var out: Cursor = this
+    for (arm in stage.arms.view) {
+        require(arm.size == 0 || out.size == 0 || arm.names.size == out.names.size) { "each UNION query must have the same number of columns" }
+        out = combine(out, arm)
+    }
+    return out
 }
 
 fun Cursor.derive(stage: QueryK.Derive, compiler: ExprCompiler = ClosureExprCompiler): Cursor {
@@ -118,7 +163,19 @@ fun Cursor.project(stage: QueryK.Project): Cursor {
 
 fun Cursor.widen(stage: QueryK.Widen): Cursor {
     if (size == 0) return this
-    if (stage.right.size == 0) return if (stage.outer) this else emptySeriesOf()
+    if (stage.right.size == 0) {
+        if (!stage.outer) return emptySeriesOf()
+        // LEFT JOIN onto an empty relation: every left row stays, widened with nulls under the right side's
+        // columns when it declares them (a ColumnCursor), so `c2.relname` still resolves downstream.
+        val rightMetas = (stage.right as? ColumnCursor)?.metas ?: return this
+        val metaSeries: Series<`ColumnMeta↻`> = rightMetas.size j { c: Int -> { rightMetas[c] } }
+        val nulls: RowVec = ReifiedSplitSeries2(rightMetas.size j { _: Int -> null }, metaSeries)
+        return size j { row: Int ->
+            val lr = this[row]
+            val lw = lr.size
+            lw + nulls.size j { c: Int -> if (c < lw) lr[c] else nulls[c - lw] }
+        }
+    }
     val left = names
     val right = stage.right.names
     val on = IntArray(stage.on.size) { left.ordinalOf(stage.on[it].a) } j
@@ -273,5 +330,6 @@ fun mementoOf(value: Any?): TypeMemento = when (value) {
     is Double -> IOMemento.IoDouble
     is String -> IOMemento.IoString
     is ByteArray -> IOMemento.IoBytes
+    is Array<*> -> IOMemento.IoArray
     else -> if (confixCellOf(value) != null) IOMemento.IoObject else IOMemento.IoString
 }

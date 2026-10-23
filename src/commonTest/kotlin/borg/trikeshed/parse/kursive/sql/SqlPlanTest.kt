@@ -39,6 +39,37 @@ class SqlPlanTest {
     }
 
     @Test
+    fun subselectsCommaFromQuantifiersAndUnion() {
+        // an uncorrelated subselect is planned once; a correlated one is bound to each outer row
+        assertEquals(listOf(listOf(1L, 10L), listOf(2L, 10L), listOf(3L, 10L), listOf(4L, 10L)), rows(SqlParser.parse("SELECT k, (SELECT MAX(y) FROM b) FROM a ORDER BY k")!!.plan(::resolve)))
+        val correlated = SqlParser.parse("SELECT a.k, (SELECT SUM(b.y) FROM b WHERE b.k = a.k) FROM a ORDER BY a.k")!!.plan(::resolve)
+        assertEquals(listOf("k", "sum"), correlated.columnNames.view.map { it.toString() }, "a scalar subselect is named after its column, as pg names it")
+        assertEquals(listOf(listOf(1L, 12L), listOf(2L, 4L), listOf(3L, 9L), listOf(4L, 12L)), rows(correlated))
+        assertTrue(assertFailsWith<IllegalStateException> { rows(SqlParser.parse("SELECT (SELECT y FROM b)")!!.plan(::resolve)) }.message!!.startsWith("more than one row returned by a subquery"))
+        assertTrue(assertFailsWith<IllegalArgumentException> { rows(SqlParser.parse("SELECT (SELECT k, y FROM b WHERE k = 2)")!!.plan(::resolve)) }.message!!.startsWith("subquery must return only one column"))
+        val array = rows(SqlParser.parse("SELECT a.k, ARRAY(SELECT b.y FROM b WHERE b.k = a.k ORDER BY b.y) FROM a WHERE a.k = 1")!!.plan(::resolve))
+        assertEquals(1, array.size)
+        assertEquals(1L, array[0][0])
+        assertEquals(listOf<Any?>(5L, 7L), (array[0][1] as Array<*>).toList())
+        // the comma FROM and CROSS JOIN are the Cartesian product; a JOIN without ON does not parse
+        assertEquals(listOf(listOf(24L)), rows(SqlParser.parse("SELECT COUNT(*) FROM a, b")!!.plan(::resolve)))
+        assertEquals(listOf(listOf(3L, 9L), listOf(4L, 10L)), rows(SqlParser.parse("SELECT a.k, b.y FROM a, b WHERE a.k = b.k AND b.y > 8 ORDER BY a.k")!!.plan(::resolve)))
+        assertEquals("SELECT count(*) FROM a CROSS JOIN b", SqlParser.parse("SELECT COUNT(*) FROM a, b")!!.render())
+        assertNull(SqlParser.parse("SELECT a.k FROM a JOIN b".toSeries()), "a JOIN without ON is a syntax error to the strict parser")
+        // ANY and ALL over a subselect read as its column
+        assertEquals(listOf(listOf(3L), listOf(4L)), rows(SqlParser.parse("SELECT a.k FROM a WHERE a.k = ANY (SELECT b.k FROM b WHERE b.y > 8) ORDER BY a.k")!!.plan(::resolve)))
+        assertEquals(listOf(listOf(4L)), rows(SqlParser.parse("SELECT a.k FROM a WHERE a.k >= ALL (SELECT b.k FROM b WHERE b.y < 5)")!!.plan(::resolve)))
+        // UNION ALL keeps every row under the head's names, UNION is distinct, the arity is checked
+        val union = SqlParser.parse("SELECT k FROM a UNION ALL SELECT y FROM b ORDER BY 1 LIMIT 3")!!.plan(::resolve)
+        assertEquals(listOf("k"), union.columnNames.view.map { it.toString() })
+        assertEquals(listOf(listOf(1L), listOf(2L), listOf(2L)), rows(union))
+        assertEquals(3, rows(SqlParser.parse("SELECT x FROM a UNION SELECT x FROM a")!!.plan(::resolve)).size)
+        assertTrue(assertFailsWith<IllegalArgumentException> { rows(SqlParser.parse("SELECT k FROM a UNION ALL SELECT k, y FROM b")!!.plan(::resolve)) }.message!!.startsWith("each UNION query must have the same number of columns"))
+        // unnest of a pg array literal in FROM, its column named by the alias
+        assertEquals(listOf(listOf("1"), listOf("2")), rows(SqlParser.parse("SELECT x FROM unnest('{1,2}') x ORDER BY 1")!!.plan(::resolve)))
+    }
+
+    @Test
     fun leftJoinKeepsUnmatchedRows() {
         val stmt = assertNotNull(SqlParser.parse("SELECT a.k, b.y FROM a LEFT JOIN b ON a.k = b.k AND b.y > 8 ORDER BY a.k"))
         assertEquals(listOf(listOf(1L, null), listOf(2L, null), listOf(3L, 9L), listOf(4L, 10L)), rows(stmt.plan(::resolve)))

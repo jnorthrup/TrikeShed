@@ -156,6 +156,9 @@ class PostgrestSurface(
                 PostgrestError(400, "42703", message.substringBefore(" among "))
             message.startsWith("column reference \"") -> PostgrestError(400, "42702", message)
             message.startsWith("function ") && "does not exist" in message -> PostgrestError(400, "42883", message)
+            message.startsWith("more than one row returned by a subquery") -> PostgrestError(400, "21000", message)
+            message.startsWith("subquery must return only one column") || message.startsWith("each UNION query must have") ||
+                message.startsWith("ORDER BY on a UNION") -> PostgrestError(400, "42601", message)
             message.startsWith("invalid regular expression") -> PostgrestError(400, "2201B", message)
             message.startsWith("type \"") -> PostgrestError(400, "42704", message)
             message.startsWith("different vector dimensions") -> PostgrestError(400, "22000", message)

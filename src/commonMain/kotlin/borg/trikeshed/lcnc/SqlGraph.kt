@@ -198,13 +198,15 @@ object SqlGraph {
                 feed(expr(column.expr, EXPR), item, "expr")
                 feed(item, hub, "items")
             }
+            if (stmt.union.size > 0) throw SqlGraphError("", "unsupported-in-ast", "UNION is not part of this vocabulary yet")
             var table = tableRef(from)
             for (i in 0 until stmt.joins.size) {
                 val clause = stmt.joins[i]
+                val on = clause.on ?: throw SqlGraphError("", "unsupported-in-ast", "CROSS JOIN and the comma FROM are not part of this vocabulary yet")
                 val join = node(JOIN, "join" to if (clause.outer) "LEFT" else "INNER")
                 feed(table, join, "left")
                 feed(tableRef(clause.table), join, "right")
-                clause.on?.let { feed(expr(it, COND), join, "on") }
+                feed(expr(on, COND), join, "on")
                 table = join
             }
             feed(table, hub, "from")
@@ -249,6 +251,7 @@ object SqlGraph {
             is Cast -> node(CAST, "type" to e.type).also { feed(expr(e.expr, EXPR), it, "value") }
             is Path -> node(PATH, "steps" to stepsJson(e.path), "text" to e.text.toString()).also { feed(expr(e.cell, EXPR), it, "cell") }
             is Not, is Is, is InList -> throw SqlGraphError("", "unsupported-in-ast", "NOT, IS and IN are not part of this vocabulary yet")
+            is Subselect, is Quantified -> throw SqlGraphError("", "unsupported-in-ast", "a subselect or a quantified comparison is not part of this vocabulary yet")
         }
 
         private fun binary(e: BinaryExpr): String {
@@ -336,6 +339,7 @@ object SqlGraph {
                 is Not -> visit(e.expr)
                 is Is -> visit(e.expr)
                 is InList -> { visit(e.expr); for (i in 0 until e.items.size) visit(e.items[i]) }
+                is Subselect, is Quantified -> throw SqlGraphError("", "unsupported-in-ast", "a subselect or a quantified comparison is not part of this vocabulary yet")
                 is Path -> {
                     visit(e.cell)
                     if (e.path.size == 0) throw SqlGraphError("", "unsupported-in-ast", "an empty path")
@@ -359,7 +363,11 @@ object SqlGraph {
             stmt.columns[i].alias?.let { identifier(it.asString(), "alias") }
             visit(stmt.columns[i].expr)
         }
-        for (i in 0 until stmt.joins.size) { table(stmt.joins[i].table); stmt.joins[i].on?.let(::visit) }
+        if (stmt.union.size > 0) throw SqlGraphError("", "unsupported-in-ast", "UNION is not part of this vocabulary yet")
+        for (i in 0 until stmt.joins.size) {
+            table(stmt.joins[i].table)
+            visit(stmt.joins[i].on ?: throw SqlGraphError("", "unsupported-in-ast", "CROSS JOIN and the comma FROM are not part of this vocabulary yet"))
+        }
         stmt.where?.let(::visit)
         for (i in 0 until stmt.groupBy.size) visit(stmt.groupBy[i])
         stmt.having?.let(::visit)
@@ -623,12 +631,13 @@ object SqlGraph {
         stmt.from?.let { append(" from ").append(sig(it)) }
         for (i in 0 until stmt.joins.size) {
             val j = stmt.joins[i]
-            append(if (j.outer) " left join " else " join ").append(sig(j.table))
+            append(if (j.on == null) " cross join " else if (j.outer) " left join " else " join ").append(sig(j.table))
             j.on?.let { append(" on ").append(sig(it)) }
         }
         stmt.where?.let { append(" where ").append(sig(it)) }
         if (stmt.groupBy.size > 0) append(" group by ").append((0 until stmt.groupBy.size).joinToString(", ") { sig(stmt.groupBy[it]) })
         stmt.having?.let { append(" having ").append(sig(it)) }
+        for (i in 0 until stmt.union.size) append(if (stmt.union[i].a) " union all (" else " union (").append(signature(stmt.union[i].b)).append(")")
         if (stmt.orderBy.size > 0) append(" order by ").append((0 until stmt.orderBy.size).joinToString(", ") {
             sig(stmt.orderBy[it].expr) + (if (stmt.orderBy[it].descending) " desc" else " asc") +
                 (stmt.orderBy[it].nullsFirst?.let { first -> if (first) " nulls first" else " nulls last" } ?: "")
@@ -656,6 +665,8 @@ object SqlGraph {
         is Not -> "not(" + sig(e.expr) + ")"
         is Is -> "is(" + sig(e.expr) + "," + e.value + "," + e.negated + ")"
         is InList -> "in(" + sig(e.expr) + "," + e.negated + (0 until e.items.size).joinToString("") { "," + sig(e.items[it]) } + ")"
+        is Subselect -> "sub(" + signature(e.select) + "," + e.array + ")"
+        is Quantified -> "quant(" + sig(e.left) + " " + e.op + " " + (if (e.all) "all" else "any") + " " + sig(e.right) + ")"
     }
 
     private fun stepsJson(path: JsPath): String = buildString {

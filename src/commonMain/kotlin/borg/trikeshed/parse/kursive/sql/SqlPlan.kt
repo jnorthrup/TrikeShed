@@ -20,17 +20,18 @@ fun Expr.aggregated(): Boolean = when (this) {
     is Not -> expr.aggregated()
     is Is -> expr.aggregated()
     is InList -> expr.aggregated() || items.view.any { it.aggregated() }
+    is Quantified -> left.aggregated() || right.aggregated()
     else -> false
 }
 
-/** Rename every column of a scan to `qualifier.name`, so joined tables keep distinct names. */
+/** Rename every column of a scan to `qualifier.name`, so joined tables keep distinct names; a ColumnCursor keeps its columns at any row count. */
 fun Cursor.qualify(qualifier: String): Cursor {
-    if (size == 0) return this
-    val exemplar = this[0].metas
-    val metas = Array(exemplar.size) { c ->
-        val meta = exemplar[c]()
-        meta.renamed("$qualifier.${meta.name}")
+    val exemplar: Series<ColumnMeta> = when {
+        this is ColumnCursor -> metas.toSeries()
+        size > 0 -> this[0].metas α { it() }
+        else -> return this
     }
+    val metas = Array(exemplar.size) { c -> exemplar[c].let { meta -> meta.renamed("$qualifier.${meta.name}") } }
     if (this is ColumnCursor) return renamed(metas)
     val metaSeries: Series<`ColumnMeta↻`> = metas.size j { c: Int -> { metas[c] } }
     return size j { r: Int -> ReifiedSplitSeries2(this[r].values, metaSeries) }
@@ -55,6 +56,7 @@ fun SelectStmt.plan(
     /** The statement text the receipt hashes when this SELECT was lowered from another language; the rendered SQL otherwise. */
     statement: String? = null,
 ): QueryCursor {
+    if (union.size > 0) return planUnion(resolve, ops, compiler, provenance, prelude, statement)
     val table = from
     // A FROM-less SELECT (`SELECT 1`, `SELECT version()`) reads the one-row, no-column relation, as pg's Result node does.
     val (source, itemPlan) = if (table == null) UNIT j emptySeriesOf<QueryK<Cursor>>() else fromItem(table, resolve)
@@ -67,6 +69,8 @@ fun SelectStmt.plan(
         val qualifier = (clause.table.alias ?: clause.table.name).asString()
         val (rightScan, rightPlan) = fromItem(clause.table, resolve)
         val right = if (rightPlan.size == 0) rightScan else QueryCursor(rightScan, rightPlan, ops, compiler)
+        // CROSS JOIN and the comma form: the Cartesian product, a widen on no keys
+        if (clause.on == null) { stages += QueryK.Widen(right, emptySeriesOf(), false); continue }
         val pairs = mutableListOf<Twin<String>>()
         val rightOnly = mutableListOf<Expr>()
         val residual = mutableListOf<Expr>()
@@ -105,11 +109,19 @@ fun SelectStmt.plan(
             is Not -> mark(e.expr)
             is Is -> mark(e.expr)
             is InList -> { mark(e.expr); e.items.view.forEach(::mark) }
-            is ColumnRef, is LitExpr, Star -> Unit
+            is Quantified -> { mark(e.left); mark(e.right) }
+            is ColumnRef, is LitExpr, Star, is Subselect -> Unit
         }
     }
     columns.view.forEach { mark(it.expr) }
     orderBy.view.forEach { mark(it.expr) }
+    // Each distinct subselect becomes one hidden column `#sN` through a Subquery stage placed where the rewrite meets
+    // it: before WHERE's Filter for a predicate, after it (fewer rows) for the select list and ORDER BY.
+    val subqueries = LinkedHashMap<String, String>()
+    val scopes = scopes()
+    fun subquery(e: Subselect): String = subqueries.getOrPut(e.render()) {
+        "#s${subqueries.size}".also { name -> stages += QueryK.Subquery(name, e.array, e.select.subqueryRows(resolve, ops, compiler, scopes)) }
+    }
     /**
      * [e] with every marker read as its score column. Series are rebuilt through `map { }`, not
      * `α ::lexical`: a reference to a local function inside an inline lambda compiles to a class that
@@ -123,9 +135,11 @@ fun SelectStmt.plan(
         is Not -> Not(lexical(e.expr))
         is Is -> Is(lexical(e.expr), e.value, e.negated)
         is InList -> InList(lexical(e.expr), e.items.view.map { lexical(it) }.toSeries(), e.negated)
+        is Quantified -> Quantified(lexical(e.left), e.op, lexical(e.right), e.all)
+        is Subselect -> ColumnRef(Identifier(subquery(e).toSeries()))
         is ColumnRef, is LitExpr, Star -> e
     }
-    where?.let { stages += QueryK.Filter(it) }
+    where?.let { stages += QueryK.Filter(lexical(it)) }
 
     val items = columns.view.toList()
     val star = items.size == 1 && (items[0].expr as? LitExpr)?.lit.let { it is StringLiteral && it.asString() == "*" }
@@ -197,12 +211,139 @@ fun SelectStmt.plan(
         )
     }
     stages += QueryK.Project(sources.toSeries())
-    val tables = listOfNotNull(table?.scanName()) + joins.view.map { it.table.scanName() }
+    val tables = listOfNotNull(table?.scanName()) + joins.view.mapNotNull { it.table.scanName() }
     return QueryCursor(source, stages.toSeries(), ops, compiler, statement ?: render(), tables.associateWith(provenance))
 }
 
-/** Evoke's marker and the one function a FROM item may call. */
+/**
+ * `UNION [ALL]`: the head's rows then each arm's ([QueryK.Combine]), distinct unless ALL (a grouping on every output
+ * column), then the union's ORDER BY, LIMIT and OFFSET, which name the head's output columns or their positions.
+ */
+fun SelectStmt.planUnion(
+    resolve: (String) -> Cursor,
+    ops: ColumnOperations,
+    compiler: ExprCompiler,
+    provenance: (String) -> borg.trikeshed.job.ContentId?,
+    prelude: List<QueryK<Cursor>>,
+    statement: String?,
+): QueryCursor {
+    val head = copy(orderBy = emptySeriesOf(), limit = null, offset = null, union = emptySeriesOf()).plan(resolve, ops, compiler, provenance, prelude)
+    val arms = union.view.map { it.b.plan(resolve, ops, compiler, provenance) }
+    val star = columns.size == 1 && (columns[0].expr as? LitExpr)?.lit.let { it is StringLiteral && it.asString() == "*" }
+    // the head's output names: its display names, or for `SELECT *` the columns the head answers
+    val outputs: List<String> by lazy { if (star) head.names.view.map { it.toString() } else columns.view.map(::displayName) }
+    val stages = mutableListOf<QueryK<Cursor>>(QueryK.Combine(arms.toSeries()))
+    if (union.view.any { !it.a }) stages += QueryK.Aggregate(outputs.toSeries(), emptySeriesOf())
+    if (orderBy.size > 0 || limit != null || offset != null) {
+        val axis = orderBy.view.map { o -> unionOrderSource(o.expr, outputs) }
+        stages += QueryK.Order(
+            axis.toSeries(),
+            BooleanArray(orderBy.size) { orderBy[it].descending },
+            limit ?: -1,
+            offset ?: 0,
+            BooleanArray(orderBy.size) { orderBy[it].nullsFirst ?: orderBy[it].descending },
+        )
+    }
+    val tables = (listOf(this) + union.view.map { it.b }).flatMap { s -> listOfNotNull(s.from?.scanName()) + s.joins.view.mapNotNull { it.table.scanName() } }
+    return QueryCursor(head, stages.toSeries(), ops, compiler, statement ?: render(), tables.associateWith(provenance))
+}
+
+/** A union's ORDER BY item: a 1-based output position or an output column's name; pg allows nothing else. */
+fun unionOrderSource(expr: Expr, outputs: List<String>): String {
+    val lit = (expr as? LitExpr)?.lit
+    if (lit is NumericLiteral) {
+        val k = lit.value.toInt()
+        require(k in 1..outputs.size) { "ORDER BY position $k is not in select list" }
+        return outputs[k - 1]
+    }
+    val text = expr.render()
+    require(text in outputs) { "ORDER BY on a UNION names an output column or its position: $text" }
+    return text
+}
+
+/** [f] applied to every node of this expression after its children, bottom-up; a [Subselect] is one node, its statement is not descended. */
+fun Expr.transform(f: (Expr) -> Expr): Expr = f(
+    when (this) {
+        is BinaryExpr -> BinaryExpr(left.transform(f), op, right.transform(f))
+        is Call -> Call(name, args.view.map { it.transform(f) }.toSeries())
+        is Cast -> Cast(expr.transform(f), type)
+        is Path -> Path(cell.transform(f), path, text)
+        is Not -> Not(expr.transform(f))
+        is Is -> Is(expr.transform(f), value, negated)
+        is InList -> InList(expr.transform(f), items.view.map { it.transform(f) }.toSeries(), negated)
+        is Quantified -> Quantified(left.transform(f), op, right.transform(f), all)
+        is ColumnRef, is LitExpr, Star, is Subselect -> this
+    },
+)
+
+/** The FROM items' names as references qualify them: the alias, else the table's name. */
+fun SelectStmt.scopes(): List<String> =
+    listOfNotNull(from?.let { (it.alias ?: it.name).asString() }) + joins.view.map { (it.table.alias ?: it.table.name).asString() }
+
+/** Every expression of the statement: select list, WHERE, HAVING, FROM item arguments, ON, GROUP BY, ORDER BY, and the union arms'. */
+fun SelectStmt.expressions(): List<Expr> =
+    columns.view.map { it.expr } + listOfNotNull(where, having) + (from?.args?.view?.toList() ?: emptyList()) +
+        joins.view.flatMap { listOfNotNull(it.on) + (it.table.args?.view?.toList() ?: emptyList()) } + groupBy.view.toList() +
+        orderBy.view.map { it.expr } + union.view.flatMap { it.b.expressions() }
+
+/** Whether a reference qualified by one of [outer]'s names and none of [inner]'s occurs anywhere, nested subselects included. */
+fun SelectStmt.correlated(outer: List<String>, inner: List<String> = scopes()): Boolean {
+    var found = false
+    for (e in expressions()) e.transform { n ->
+        when (n) {
+            is ColumnRef -> n.id.asString().substringBeforeLast('.', "").let { q -> if (q.isNotEmpty() && q !in inner && q in outer) found = true }
+            is Subselect -> if (n.select.correlated(outer, inner + n.select.scopes())) found = true
+            else -> Unit
+        }
+        n
+    }
+    return found
+}
+
+/** The statement with every reference to one of [row]'s columns, qualified by a name outside [inner], replaced by that cell. */
+fun SelectStmt.bind(row: RowVec, inner: List<String> = scopes()): SelectStmt {
+    val names = row.metas α { it().name.toString() }
+    fun cell(ref: String): Expr? {
+        if (ref.substringBeforeLast('.', "") in inner) return null
+        val c = (0 until names.size).firstOrNull { names[it] == ref } ?: return null
+        return LitExpr(CellLiteral(row.values[c]))
+    }
+    fun g(e: Expr): Expr = e.transform { n ->
+        when (n) {
+            is ColumnRef -> cell(n.id.asString()) ?: n
+            is Subselect -> Subselect(n.select.bind(row, inner + n.select.scopes()), n.array)
+            else -> n
+        }
+    }
+    fun item(t: TableRef) = TableRef(t.name, t.alias, t.args?.let { a -> a.view.map(::g).toSeries() })
+    return copy(
+        columns = columns.view.map { Column(g(it.expr), it.alias) }.toSeries(),
+        from = from?.let(::item),
+        where = where?.let(::g),
+        joins = joins.view.map { JoinClause(item(it.table), it.on?.let(::g), it.outer) }.toSeries(),
+        groupBy = groupBy.view.map(::g).toSeries(),
+        having = having?.let(::g),
+        orderBy = orderBy.view.map { OrderItem(g(it.expr), it.descending, it.nullsFirst) }.toSeries(),
+        union = union.view.map { it.a j it.b.bind(row, it.b.scopes()) }.toSeries(),
+    )
+}
+
+/**
+ * A subselect's rows for one outer row. Uncorrelated: planned once and shared by every row. Correlated (a reference
+ * qualified by one of the [outer] FROM items): that row's cells bound as literals, then planned, on the closure
+ * compiler (a class per row would cost more than it saves): O(outer × inner), the catalog's sizes.
+ */
+fun SelectStmt.subqueryRows(resolve: (String) -> Cursor, ops: ColumnOperations, compiler: ExprCompiler, outer: List<String>): (RowVec) -> Cursor {
+    if (!correlated(outer)) {
+        val once by lazy { plan(resolve, ops, compiler) }
+        return { once }
+    }
+    return { row -> bind(row).plan(resolve, ops, ClosureExprCompiler) }
+}
+
+/** Evoke's marker and the FROM-item functions: `evoke_query(index, query, k)` and pg's `unnest(array)`. */
 const val EVOKE_QUERY = "evoke_query"
+const val UNNEST = "unnest"
 
 /** `evoke_query(index, query[, k])`'s constant arguments, the one reading for the marker and the FROM form; k is -1 when absent. */
 fun evokeArgs(args: Series<Expr>): Triple<String, String, Int> {
@@ -222,8 +363,12 @@ fun evokeIndex(index: String): Twin<String> {
     return bare.substringBefore('.') j bare.substringAfter('.', "")
 }
 
-/** The table a FROM item scans: its own name, or the index's table of `evoke_query(index, …)`. */
-fun TableRef.scanName(): String = args?.let { a -> constantText(a[0])?.let { evokeIndex(it).a } } ?: name.asString()
+/** The table a FROM item scans: its own name, or the index's table of `evoke_query(index, …)`; `unnest` scans none. */
+fun TableRef.scanName(): String? = when {
+    args == null -> name.asString()
+    name.asString().lowercase().removePrefix(SqlParser.PG_CATALOG) == UNNEST -> null
+    else -> constantText(args[0])?.let { evokeIndex(it).a }
+}
 
 /**
  * A FROM item as the scan qualified by its alias and the stages that make the item's relation: none
@@ -238,6 +383,16 @@ fun fromItem(ref: TableRef, resolve: (String) -> Cursor): Join<Cursor, QueryPlan
     val qualifier = (ref.alias ?: ref.name).asString()
     val args = ref.args ?: return resolve(ref.name.asString()).qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
     val function = ref.name.asString().lowercase().removePrefix(SqlParser.PG_CATALOG)
+    if (function == UNNEST) {
+        // pg's `unnest(array) [AS] alias`: one row per element in the column the alias names; the array is a literal or an
+        // outer row's cell the planner bound, since no expression is evaluated while planning
+        require(args.size == 1) { "$UNNEST(array) in FROM takes one argument" }
+        val arg = args[0]
+        val cell = if (arg is LitExpr || arg is Cast && arg.expr is LitExpr) constant(arg) else error("$UNNEST in FROM takes an array value: a literal or an outer row's column")
+        val column = ref.alias?.asString() ?: UNNEST
+        val elements = cell?.let(SqlFunctions::elementsOf) ?: emptyList()
+        return rowsCursor(listOf(column), elements.map { mapOf(column to it) }).qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
+    }
     if (function != EVOKE_QUERY) error("function $function(...) does not exist as a table function")
     require(args.size == 3) { "$EVOKE_QUERY(index, query, k) in FROM takes three arguments; the two-argument form is a scalar" }
     val (index, query, k) = evokeArgs(args)
@@ -285,13 +440,15 @@ fun Expr.references(): List<String> = when (this) {
     is Not -> expr.references()
     is Is -> expr.references()
     is InList -> expr.references() + items.view.flatMap { it.references() }
+    is Quantified -> left.references() + right.references()
     else -> emptyList()
 }
 
-/** pg naming: the alias, else a column's last segment, else the function name, else `?column?`. */
+/** pg naming: the alias, else a column's last segment, else the function name, a scalar subselect's one column, `array` for ARRAY(…), else `?column?`. */
 fun displayName(item: Column): String = item.alias?.asString() ?: when (val e = item.expr) {
     is ColumnRef -> e.id.asString().substringAfterLast('.')
     is Call -> if (e.name == SqlParser.CASE_WHEN) SqlParser.CASE else e.name
+    is Subselect -> if (e.array) "array" else e.select.columns.view.singleOrNull()?.let(::displayName) ?: "?column?"
     else -> "?column?"
 }
 

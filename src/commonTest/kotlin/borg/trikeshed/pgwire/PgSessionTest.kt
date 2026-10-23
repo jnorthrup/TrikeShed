@@ -224,4 +224,191 @@ ORDER BY 1,2;"""
         assertEquals(listOf(listOf("heap")), rows("SELECT amname FROM pg_am"))
         assertEquals(listOf(listOf("documents", "BASE TABLE")), rows("SELECT table_name, table_type FROM information_schema.tables WHERE table_type = 'BASE TABLE'"))
     }
+
+    /** psql 16.15's `\l`, `\dn+`, `\dt+`, `\di` and `\du`, captured verbatim against this server (it reports 14.0, so the 14-shaped forms). */
+    @Test fun psqlsListingsRunVerbatim() {
+        seed()
+        assertEquals(listOf(listOf("trikeshed", "trikeshed", "UTF8", "libc", "C", "C", null, null, null)), rows("""SELECT
+  d.datname as "Name",
+  pg_catalog.pg_get_userbyid(d.datdba) as "Owner",
+  pg_catalog.pg_encoding_to_char(d.encoding) as "Encoding",
+  'libc' AS "Locale Provider",
+  d.datcollate as "Collate",
+  d.datctype as "Ctype",
+  NULL as "ICU Locale",
+  NULL as "ICU Rules",
+  pg_catalog.array_to_string(d.datacl, E'\n') AS "Access privileges"
+FROM pg_catalog.pg_database d
+ORDER BY 1;"""), "\\l")
+        assertEquals(listOf(listOf("public", "trikeshed", null, null)), rows("""SELECT n.nspname AS "Name",
+  pg_catalog.pg_get_userbyid(n.nspowner) AS "Owner",
+  pg_catalog.array_to_string(n.nspacl, E'\n') AS "Access privileges",
+  pg_catalog.obj_description(n.oid, 'pg_namespace') AS "Description"
+FROM pg_catalog.pg_namespace n
+WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+ORDER BY 1;"""), "\\dn+")
+        assertEquals(listOf(listOf("public", "documents", "table", "trikeshed", "permanent", "heap", "0 bytes", null)), rows("""SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "Type",
+  pg_catalog.pg_get_userbyid(c.relowner) as "Owner",
+  CASE c.relpersistence WHEN 'p' THEN 'permanent' WHEN 't' THEN 'temporary' WHEN 'u' THEN 'unlogged' END as "Persistence",
+  am.amname as "Access method",
+  pg_catalog.pg_size_pretty(pg_catalog.pg_table_size(c.oid)) as "Size",
+  pg_catalog.obj_description(c.oid, 'pg_class') as "Description"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+WHERE c.relkind IN ('r','p','')
+      AND n.nspname <> 'pg_catalog'
+      AND n.nspname !~ '^pg_toast'
+      AND n.nspname <> 'information_schema'
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1,2;"""), "\\dt+")
+        val di = query("""SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'i' THEN 'index' WHEN 'S' THEN 'sequence' WHEN 't' THEN 'TOAST table' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' WHEN 'I' THEN 'partitioned index' END as "Type",
+  pg_catalog.pg_get_userbyid(c.relowner) as "Owner",
+  c2.relname as "Table"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+     LEFT JOIN pg_catalog.pg_am am ON am.oid = c.relam
+     LEFT JOIN pg_catalog.pg_index i ON i.indexrelid = c.oid
+     LEFT JOIN pg_catalog.pg_class c2 ON i.indrelid = c2.oid
+WHERE c.relkind IN ('i','I','')
+      AND n.nspname <> 'pg_catalog'
+      AND n.nspname !~ '^pg_toast'
+      AND n.nspname <> 'information_schema'
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1,2;""")
+        assertTrue(di.none { it.first == 'E' }, "\\di: no indexes is an empty listing, not an error")
+        assertEquals(emptyList(), di.filter { it.first == 'D' })
+        assertEquals(listOf(listOf("trikeshed", "f", "t", "f", "f", "t", "-1", null, "f", "f")), rows("""SELECT r.rolname, r.rolsuper, r.rolinherit,
+  r.rolcreaterole, r.rolcreatedb, r.rolcanlogin,
+  r.rolconnlimit, r.rolvaliduntil
+, r.rolreplication
+, r.rolbypassrls
+FROM pg_catalog.pg_roles r
+WHERE r.rolname !~ '^pg_'
+ORDER BY 1;"""), "\\du")
+        // the constructs those needed, on their own: escape strings, pg's size text, an array joined
+        assertEquals(listOf(listOf("a\nb", "it's", "x")), rows("SELECT E'a\\nb', E'it\\'s', 'x'"))
+        assertEquals(listOf(listOf("1023 bytes", "10 kB", "1500 kB", "1024 MB")), rows("SELECT pg_size_pretty(1023), pg_size_pretty(10240), pg_size_pretty(1536000), pg_size_pretty(1073741824)"))
+        assertEquals(listOf(listOf("1.0,0.0,0.0")), rows("SELECT pg_catalog.array_to_string(embedding, ',') FROM documents WHERE id = 1"))
+        assertEquals("42P01", error("SELECT * FROM pg_catalog.pg_nothing"), "a relation pg has and this catalog does not model stays undefined")
+    }
+
+    /**
+     * psql 16.15's `\d documents` (eight queries at server version 14), `\d+`'s options query and `\dp`, verbatim with the
+     * table's oid spliced in as psql does: every one answers its rows or none, never an ErrorResponse.
+     */
+    @Test fun psqlDescribesATable() {
+        seed()
+        val oid = surface.catalog.oid("documents").toString()
+        assertEquals(listOf(listOf(oid, "public", "documents")), rows("""SELECT c.oid,
+  n.nspname,
+  c.relname
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relname OPERATOR(pg_catalog.~) '^(documents)$' COLLATE pg_catalog.default
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 2, 3;"""), "Q1")
+        assertEquals(listOf(listOf("0", "r", "f", "f", "f", "f", "f", "f", "f", "", "0", "", "p", "d", "heap")), rows("""SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, false AS relhasoids, c.relispartition, '', c.reltablespace, CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, c.relpersistence, c.relreplident, am.amname
+FROM pg_catalog.pg_class c
+ LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)
+LEFT JOIN pg_catalog.pg_am am ON (c.relam = am.oid)
+WHERE c.oid = '$oid';"""), "Q2")
+        // Q3: two correlated scalar subselects (defaults, collations) and a comma FROM inside the second
+        val columns = query("""SELECT a.attname,
+  pg_catalog.format_type(a.atttypid, a.atttypmod),
+  (SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid, true)
+   FROM pg_catalog.pg_attrdef d
+   WHERE d.adrelid = a.attrelid AND d.adnum = a.attnum AND a.atthasdef),
+  a.attnotnull,
+  (SELECT c.collname FROM pg_catalog.pg_collation c, pg_catalog.pg_type t
+   WHERE c.oid = a.attcollation AND t.oid = a.atttypid AND a.attcollation <> t.typcollation) AS attcollation,
+  a.attidentity,
+  a.attgenerated
+FROM pg_catalog.pg_attribute a
+WHERE a.attrelid = '$oid' AND a.attnum > 0 AND NOT a.attisdropped
+ORDER BY a.attnum;""")
+        assertEquals(listOf("attname", "format_type", "pg_get_expr", "attnotnull", "attcollation", "attidentity", "attgenerated"), fields(columns[0].second).map { it.first }, "Q3 names")
+        assertEquals(
+            listOf(listOf("id", "bigint", null, "t", null, "", ""), listOf("title", "text", null, "f", null, "", ""), listOf("score", "double precision", null, "f", null, "", ""), listOf("embedding", "real[]", null, "f", null, "", "")),
+            columns.filter { it.first == 'D' }.map { cells(it.second) }, "Q3 rows",
+        )
+        // Q4-Q8: policies (array(select …) and = any), extended statistics, publications (UNION ALL), parents and children (comma FROM)
+        for ((name, sql) in listOf(
+            "Q4" to "SELECT pol.polname, pol.polpermissive, CASE WHEN pol.polroles = '{0}' THEN NULL ELSE pg_catalog.array_to_string(array(select rolname from pg_catalog.pg_roles where oid = any (pol.polroles) order by 1),',') END, pg_catalog.pg_get_expr(pol.polqual, pol.polrelid), pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid), CASE pol.polcmd WHEN 'r' THEN 'SELECT' WHEN 'a' THEN 'INSERT' WHEN 'w' THEN 'UPDATE' WHEN 'd' THEN 'DELETE' END AS cmd FROM pg_catalog.pg_policy pol WHERE pol.polrelid = '$oid' ORDER BY 1;",
+            "Q5" to "SELECT oid, stxrelid::pg_catalog.regclass, stxnamespace::pg_catalog.regnamespace::pg_catalog.text AS nsp, stxname, pg_catalog.pg_get_statisticsobjdef_columns(oid) AS columns, 'd' = any(stxkind) AS ndist_enabled, 'f' = any(stxkind) AS deps_enabled, 'm' = any(stxkind) AS mcv_enabled, stxstattarget FROM pg_catalog.pg_statistic_ext WHERE stxrelid = '$oid' ORDER BY nsp, stxname;",
+            "Q6" to "SELECT pubname , NULL , NULL FROM pg_catalog.pg_publication p JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid WHERE pr.prrelid = '$oid' UNION ALL SELECT pubname , NULL , NULL FROM pg_catalog.pg_publication p WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('$oid') ORDER BY 1;",
+            "Q7" to "SELECT c.oid::pg_catalog.regclass FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid = i.inhparent AND i.inhrelid = '$oid' AND c.relkind != 'p' AND c.relkind != 'I' ORDER BY inhseqno;",
+            "Q8" to "SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid) FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i WHERE c.oid = i.inhrelid AND i.inhparent = '$oid' ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text;",
+        )) {
+            val q = query(sql)
+            assertTrue(q.none { it.first == 'E' }, "$name: " + (q.firstOrNull { it.first == 'E' }?.second?.let { strings(it).toString() } ?: ""))
+            assertEquals(emptyList(), q.filter { it.first == 'D' }, "$name answers no rows")
+        }
+        assertEquals(listOf("pubname", "?column?", "?column?"), fields(query("SELECT pubname , NULL , NULL FROM pg_catalog.pg_publication p WHERE p.puballtables UNION ALL SELECT pubname , NULL , NULL FROM pg_catalog.pg_publication p ORDER BY 1")[0].second).map { it.first })
+        // \d+'s options: NULL reloptions || array(select … from unnest(tc.reloptions) x) is NULL, which psql prints as no options
+        assertEquals(listOf(listOf("0", "r", "f", "f", "f", "f", "f", "f", "f", null, "0", "", "p", "d", "heap")), rows("""SELECT c.relchecks, c.relkind, c.relhasindex, c.relhasrules, c.relhastriggers, c.relrowsecurity, c.relforcerowsecurity, false AS relhasoids, c.relispartition, pg_catalog.array_to_string(c.reloptions || array(select 'toast.' || x from pg_catalog.unnest(tc.reloptions) x), ', ')
+, c.reltablespace, CASE WHEN c.reloftype = 0 THEN '' ELSE c.reloftype::pg_catalog.regtype::pg_catalog.text END, c.relpersistence, c.relreplident, am.amname
+FROM pg_catalog.pg_class c
+ LEFT JOIN pg_catalog.pg_class tc ON (c.reltoastrelid = tc.oid)
+LEFT JOIN pg_catalog.pg_am am ON (c.relam = am.oid)
+WHERE c.oid = '$oid';"""), "\\d+ options")
+        // \dp: three ARRAY(SELECT …) columns over the relations, two of them correlated and one nested
+        assertEquals(
+            listOf(listOf("public", "DB.DBA.RDF_QUAD", "view", null, "", ""), listOf("public", "documents", "table", null, "", ""), listOf("public", "triples", "view", null, "", "")),
+            rows("""SELECT n.nspname as "Schema",
+  c.relname as "Name",
+  CASE c.relkind WHEN 'r' THEN 'table' WHEN 'v' THEN 'view' WHEN 'm' THEN 'materialized view' WHEN 'S' THEN 'sequence' WHEN 'f' THEN 'foreign table' WHEN 'p' THEN 'partitioned table' END as "Type",
+  pg_catalog.array_to_string(c.relacl, E'\n') AS "Access privileges",
+  pg_catalog.array_to_string(ARRAY(
+    SELECT attname || E':\n  ' || pg_catalog.array_to_string(attacl, E'\n  ')
+    FROM pg_catalog.pg_attribute a
+    WHERE attrelid = c.oid AND NOT attisdropped AND attacl IS NOT NULL
+  ), E'\n') AS "Column privileges",
+  pg_catalog.array_to_string(ARRAY(
+    SELECT polname
+    || CASE WHEN NOT polpermissive THEN
+       E' (RESTRICTIVE)'
+       ELSE '' END
+    || CASE WHEN polcmd != '*' THEN
+           E' (' || polcmd::pg_catalog.text || E'):'
+       ELSE E':'
+       END
+    || CASE WHEN polqual IS NOT NULL THEN
+           E'\n  (u): ' || pg_catalog.pg_get_expr(polqual, polrelid)
+       ELSE E''
+       END
+    || CASE WHEN polwithcheck IS NOT NULL THEN
+           E'\n  (c): ' || pg_catalog.pg_get_expr(polwithcheck, polrelid)
+       ELSE E''
+       END    || CASE WHEN polroles <> '{0}' THEN
+           E'\n  to: ' || pg_catalog.array_to_string(
+               ARRAY(
+                   SELECT rolname
+                   FROM pg_catalog.pg_roles
+                   WHERE oid = ANY (polroles)
+                   ORDER BY 1
+               ), E', ')
+       ELSE E''
+       END
+    FROM pg_catalog.pg_policy pol
+    WHERE polrelid = c.oid), E'\n')
+    AS "Policies"
+FROM pg_catalog.pg_class c
+     LEFT JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+WHERE c.relkind IN ('r','v','m','S','f','p')
+      AND n.nspname <> 'pg_catalog'
+      AND n.nspname <> 'information_schema'
+  AND pg_catalog.pg_table_is_visible(c.oid)
+ORDER BY 1, 2;"""), "\\dp",
+        )
+        // the constructs on their own, and their SQLSTATEs
+        assertEquals(listOf(listOf("documents"), listOf("public")), rows("SELECT relname FROM pg_class WHERE relkind = 'r' UNION ALL SELECT nspname FROM pg_namespace WHERE nspname = 'public' ORDER BY 1"))
+        assertEquals("42601", error("SELECT 1 UNION ALL SELECT 1, 2"))
+        assertEquals("21000", error("SELECT (SELECT id FROM documents)"))
+        assertEquals(listOf("1", "3"), rows("SELECT id FROM documents WHERE id = ANY (SELECT id FROM documents WHERE score IS NOT NULL) ORDER BY id").map { it[0] })
+    }
 }

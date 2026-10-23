@@ -69,6 +69,9 @@ fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
         val test: RowExpr = { row -> SqlRuntime.inList(e(row), Array(parts.size) { parts[it](row) }) }
         if (negated) { row -> SqlRuntime.not(test(row)) } else test
     }
+    is Quantified -> left.compile(names).let { l -> right.compile(names).let { r -> { row -> SqlRuntime.quantified(l(row), op, r(row), all) } } }
+    // the planner turns every subselect into a hidden column before anything compiles
+    is Subselect -> error("a subselect is a planned column, not an expression to compile: ${render()}")
     is Path -> cell.compile(names).let { source -> { row -> SqlRuntime.path(source(row), path, text) } }
     is Cast ->
         if (expr is LitExpr) literal(expr.lit).let { SqlRuntime.cast(it, type) }.let { folded -> { _ -> folded } }
@@ -104,6 +107,7 @@ fun literal(lit: SqlNode): Any? = when (lit) {
     is NumericLiteral -> lit.value
     is Identifier -> lit.asString()
     is BooleanLiteral -> lit.value
+    is CellLiteral -> lit.value
     NullLiteral -> null
     else -> error("literal $lit")
 }
@@ -204,12 +208,15 @@ fun Expr.render(): String = when (this) {
         is BooleanLiteral -> if (lit.value) "TRUE" else "FALSE"
         NullLiteral -> "NULL"
         is Identifier -> lit.asString()
+        is CellLiteral -> lit.value?.let { "'" + scalarText(it).replace("'", "''") + "'" } ?: "NULL"
         else -> error("no SQL text for literal ${lit::class.simpleName}")
     }
     is BinaryExpr -> "(${left.render()} $op ${right.render()})"
     is Not -> "(NOT ${expr.render()})"
     is Is -> "(${expr.render()} IS ${if (negated) "NOT " else ""}${when (value) { null -> "NULL"; true -> "TRUE"; false -> "FALSE" }})"
     is InList -> "(${expr.render()} ${if (negated) "NOT " else ""}IN (${(items α { it.render() }).view.joinToString(", ")}))"
+    is Subselect -> (if (array) "ARRAY" else "") + "(" + select.render() + ")"
+    is Quantified -> "(${left.render()} $op ${if (all) "ALL" else "ANY"} (${right.render()}))"
     is Call -> "$name(${(args α { it.render() }).view.joinToString(", ")})"
     is Path -> cell.render() + path.view.mapIndexed { i, step ->
         (if (text && i == path.size - 1) "->>" else "->") + (step.key?.let { "'$it'" } ?: step.idx.toString())
@@ -265,12 +272,13 @@ fun SelectStmt.render(): String = buildString {
     append(columns.view.joinToString(", ") { c -> c.expr.render() + (c.alias?.let { " AS " + it.asString() } ?: "") })
     from?.let { t -> append(" FROM ").append(t.render()) }
     for (j in joins.view) {
-        append(if (j.outer) " LEFT JOIN " else " JOIN ").append(j.table.render())
+        append(if (j.on == null) " CROSS JOIN " else if (j.outer) " LEFT JOIN " else " JOIN ").append(j.table.render())
         j.on?.let { append(" ON ").append(it.render()) }
     }
     where?.let { append(" WHERE ").append(it.render()) }
     if (groupBy.size > 0) append(" GROUP BY ").append(groupBy.view.joinToString(", ") { it.render() })
     having?.let { append(" HAVING ").append(it.render()) }
+    for ((all, arm) in union.view) append(if (all) " UNION ALL " else " UNION ").append(arm.render())
     if (orderBy.size > 0) append(" ORDER BY ").append(orderBy.view.joinToString(", ") { o ->
         o.expr.render() + (if (o.descending) " DESC" else " ASC") + (o.nullsFirst?.let { if (it) " NULLS FIRST" else " NULLS LAST" } ?: "")
     })

@@ -4,12 +4,14 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 
 /**
- * `pg_catalog` derived from the [Catalog]: the rows psql's `\dt`, `\d` (without a name), `\dn` and a driver's
- * type lookups read, built with [rowsCursor] on each scan so a table created after connect is listed. psql's
- * `\d <table>` is not served: its column query is a correlated scalar subselect, which the grammar does not
- * take yet, and it reads pg_attrdef and pg_collation, which have no rows here. Object ids:
- * namespaces as pg numbers them (pg_catalog 11, information_schema 13, public 2200), the heap access
- * method 2 (views carry none), user tables by [Catalog.oid] of their names, types by their pg OIDs ([PG_TYPES]).
+ * `pg_catalog` derived from the [Catalog]: the rows psql's `\dt`, `\d`, `\d <table>` (its eight queries at server
+ * version 14), `\d+`, `\dt+`, `\di`, `\df`, `\du`, `\dp`, `\dn+`, `\l` and a driver's type lookups read, built with
+ * [rowsCursor] on each scan so a table created after connect is listed. Relations this catalog has no objects for
+ * (defaults, indexes, constraints, policies, inheritance, statistics, publications, rules, triggers, descriptions,
+ * functions) answer their columns and no rows ([PgEmptyRelation]); the one role is the owner, the one collation
+ * pg's `default`. Object ids: namespaces as pg numbers them (pg_catalog 11, information_schema 13, public 2200),
+ * the heap access method 2 (views carry none), user tables by [Catalog.oid] of their names, types by their pg
+ * OIDs ([PG_TYPES]). Not served: DBeaver's `c.*`, `ARRAY[…]` literals, SCRAM.
  */
 
 /** A pg type the wire reports: its OID, name, length (-1 variable), pass-by-value, category and array OID. */
@@ -31,6 +33,7 @@ val PG_TYPES: List<PgType> = listOf(
     PgType(700, "float4", 4, true, "N", 1021),
     PgType(701, "float8", 8, true, "N", 1022),
     PgType(705, "unknown", -2, false, "X", 0),
+    PgType(1009, "_text", -1, false, "A", 0, element = 25),
     PgType(1021, "_float4", -1, false, "A", 0, element = 700),
     PgType(1043, "varchar", -1, false, "S", 1015),
     PgType(1082, "date", 4, true, "D", 1182),
@@ -40,12 +43,14 @@ val PG_TYPES: List<PgType> = listOf(
 
 /**
  * The pg type a column's memento reports, agreeing with [pgType]'s names: bigint 20, double precision 701, boolean 16,
- * text 25, vector as `_float4` 1021 (its cells are sent as that array), a column typed from nothing (NULL) as text, else jsonb 3802.
+ * text 25, vector as `_float4` 1021 (its cells are sent as that array), any other array as `_text` 1009, a column typed
+ * from nothing (NULL) as text, else jsonb 3802.
  */
 fun pgTypeOid(meta: ColumnMeta): Long = when {
     meta.type == IOMemento.IoNothing -> 25
     else -> when (pgType(meta)) {
         "vector" -> 1021
+        "text[]" -> 1009
         "bigint" -> 20
         "double precision" -> 701
         "boolean" -> 16
@@ -60,6 +65,7 @@ const val NS_PUBLIC = 2200L
 const val AM_HEAP = 2L
 const val OWNER_OID = 10L
 const val DATABASE_OID = 5L
+const val COLLATION_DEFAULT = 100L
 
 private val PG_CLASS_COLUMNS = listOf(
     "oid", "relname", "relnamespace", "reltype", "relowner", "relam", "relfilenode", "reltablespace", "relpages", "reltuples",
@@ -161,3 +167,74 @@ fun Catalog.pgAm(): ColumnCursor = rowsCursor(
     listOf(mapOf("oid" to AM_HEAP, "amname" to "heap", "amhandler" to 0L, "amtype" to "t")),
     mapOf("oid" to "int8", "amhandler" to "int8"),
 )
+
+/** The one role, the owner: what `\du` lists and what `pg_get_userbyid` names. */
+fun Catalog.pgRoles(): ColumnCursor = rowsCursor(
+    listOf("oid", "rolname", "rolsuper", "rolinherit", "rolcreaterole", "rolcreatedb", "rolcanlogin", "rolreplication", "rolconnlimit", "rolpassword", "rolvaliduntil", "rolbypassrls", "rolconfig"),
+    listOf(mapOf(
+        // not a superuser and no CREATE ROLE / DATABASE, as the session reports is_superuser off and the wire's DDL is CREATE / DROP TABLE
+        "oid" to OWNER_OID, "rolname" to borg.trikeshed.parse.kursive.sql.SqlFunctions.OWNER, "rolsuper" to false, "rolinherit" to true, "rolcreaterole" to false,
+        "rolcreatedb" to false, "rolcanlogin" to true, "rolreplication" to false, "rolconnlimit" to -1L, "rolpassword" to "********", "rolvaliduntil" to null,
+        "rolbypassrls" to false, "rolconfig" to null,
+    )),
+    mapOf("oid" to "int8", "rolsuper" to "bool", "rolinherit" to "bool", "rolcreaterole" to "bool", "rolcreatedb" to "bool", "rolcanlogin" to "bool", "rolreplication" to "bool", "rolconnlimit" to "int8", "rolvaliduntil" to "text", "rolbypassrls" to "bool", "rolconfig" to "text"),
+)
+
+/** The one collation, pg's `default` (oid 100): what every text column and type here carries as its collation. */
+fun Catalog.pgCollation(): ColumnCursor = rowsCursor(
+    listOf("oid", "collname", "collnamespace", "collowner", "collprovider", "collisdeterministic", "collencoding", "collcollate", "collctype", "collversion"),
+    listOf(mapOf(
+        "oid" to COLLATION_DEFAULT, "collname" to "default", "collnamespace" to NS_PG_CATALOG, "collowner" to OWNER_OID, "collprovider" to "d",
+        "collisdeterministic" to true, "collencoding" to -1L, "collcollate" to "", "collctype" to "", "collversion" to null,
+    )),
+    mapOf("oid" to "int8", "collnamespace" to "int8", "collowner" to "int8", "collisdeterministic" to "bool", "collencoding" to "int8", "collversion" to "text"),
+)
+
+/**
+ * The pg_catalog relations this catalog has no rows for: no defaults, indexes, constraints, policies,
+ * inheritance, extended statistics, publications, rules, triggers, descriptions or functions. psql's
+ * describe queries read them, so each answers its columns (pg's names and types) and no rows.
+ */
+enum class PgEmptyRelation(vararg columns: Pair<String, String>) {
+    PG_ATTRDEF("oid" to "int8", "adrelid" to "int8", "adnum" to "int8", "adbin" to "text"),
+    PG_INDEX(
+        "indexrelid" to "int8", "indrelid" to "int8", "indnatts" to "int8", "indnkeyatts" to "int8", "indisunique" to "bool", "indisprimary" to "bool",
+        "indisexclusion" to "bool", "indimmediate" to "bool", "indisclustered" to "bool", "indisvalid" to "bool", "indcheckxmin" to "bool",
+        "indisready" to "bool", "indislive" to "bool", "indisreplident" to "bool", "indkey" to "text", "indcollation" to "text", "indclass" to "text",
+        "indoption" to "text", "indexprs" to "text", "indpred" to "text",
+    ),
+    PG_POLICY("oid" to "int8", "polname" to "text", "polrelid" to "int8", "polcmd" to "text", "polpermissive" to "bool", "polroles" to "text", "polqual" to "text", "polwithcheck" to "text"),
+    PG_CONSTRAINT(
+        "oid" to "int8", "conname" to "text", "connamespace" to "int8", "contype" to "text", "condeferrable" to "bool", "condeferred" to "bool",
+        "convalidated" to "bool", "conrelid" to "int8", "contypid" to "int8", "conindid" to "int8", "conparentid" to "int8", "confrelid" to "int8",
+        "confupdtype" to "text", "confdeltype" to "text", "confmatchtype" to "text", "conislocal" to "bool", "coninhcount" to "int8",
+        "connoinherit" to "bool", "conkey" to "text", "confkey" to "text", "conbin" to "text",
+    ),
+    PG_INHERITS("inhrelid" to "int8", "inhparent" to "int8", "inhseqno" to "int8", "inhdetachpending" to "bool"),
+    PG_STATISTIC_EXT("oid" to "int8", "stxrelid" to "int8", "stxname" to "text", "stxnamespace" to "int8", "stxowner" to "int8", "stxstattarget" to "int8", "stxkeys" to "text", "stxkind" to "text"),
+    PG_PUBLICATION("oid" to "int8", "pubname" to "text", "pubowner" to "int8", "puballtables" to "bool", "pubinsert" to "bool", "pubupdate" to "bool", "pubdelete" to "bool", "pubtruncate" to "bool", "pubviaroot" to "bool"),
+    PG_PUBLICATION_REL("oid" to "int8", "prpubid" to "int8", "prrelid" to "int8"),
+    PG_REWRITE("oid" to "int8", "rulename" to "text", "ev_class" to "int8", "ev_type" to "text", "ev_enabled" to "text", "is_instead" to "bool", "ev_qual" to "text", "ev_action" to "text"),
+    PG_TRIGGER(
+        "oid" to "int8", "tgrelid" to "int8", "tgparentid" to "int8", "tgname" to "text", "tgfoid" to "int8", "tgtype" to "int8", "tgenabled" to "text",
+        "tgisinternal" to "bool", "tgconstrrelid" to "int8", "tgconstrindid" to "int8", "tgconstraint" to "int8", "tgdeferrable" to "bool",
+        "tginitdeferred" to "bool", "tgnargs" to "int8", "tgattr" to "text", "tgargs" to "text", "tgqual" to "text", "tgoldtable" to "text", "tgnewtable" to "text",
+    ),
+    PG_DESCRIPTION("objoid" to "int8", "classoid" to "int8", "objsubid" to "int8", "description" to "text"),
+    PG_PROC(
+        "oid" to "int8", "proname" to "text", "pronamespace" to "int8", "proowner" to "int8", "prolang" to "int8", "procost" to "float8", "prorows" to "float8",
+        "provariadic" to "int8", "prosupport" to "text", "prokind" to "text", "prosecdef" to "bool", "proleakproof" to "bool", "proisstrict" to "bool",
+        "proretset" to "bool", "provolatile" to "text", "proparallel" to "text", "pronargs" to "int8", "pronargdefaults" to "int8", "prorettype" to "int8",
+        "proargtypes" to "text", "proallargtypes" to "text", "proargmodes" to "text", "proargnames" to "text", "proargdefaults" to "text",
+        "protrftypes" to "text", "prosrc" to "text", "probin" to "text", "prosqlbody" to "text", "proconfig" to "text", "proacl" to "text",
+    );
+
+    val relname: String = name.lowercase()
+    val declared: Map<String, String> = mapOf(*columns)
+
+    fun cursor(): ColumnCursor = rowsCursor(declared.keys.toList(), emptyList(), declared)
+
+    companion object {
+        val byName: Map<String, PgEmptyRelation> = entries.associateBy { it.relname }
+    }
+}

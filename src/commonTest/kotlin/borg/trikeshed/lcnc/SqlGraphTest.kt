@@ -112,6 +112,16 @@ class SqlGraphTest {
         assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError> { SqlGraph.parse("SELECT h.id FROM docs d JOIN evoke_query('docs', 'q', 3) h ON h.id = d.id") }.code)
     }
 
+    @Test fun subselectsQuantifiersCrossJoinsAndUnionsAreRefusedByName() {
+        for (sql in listOf(
+            "SELECT (SELECT 1) FROM t", "SELECT a FROM t WHERE a = ANY (SELECT b FROM u)", "SELECT a FROM t, u",
+            "SELECT a FROM t CROSS JOIN u", "SELECT a FROM t UNION ALL SELECT b FROM u",
+        )) {
+            assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError> { SqlGraph.lift(strict(sql)) }.code, "lift: $sql")
+            assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError> { SqlGraph.parse(sql) }.code, "parse: $sql")
+        }
+    }
+
     @Test fun graphsTheStatementCannotSayAreRefusedAtTheNode() {
         val base = SqlGraph.lift(strict("SELECT a FROM t"))
         val hub = nodesOf(base).single { it.type == SqlGraph.SELECT }

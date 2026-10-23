@@ -61,7 +61,7 @@ class Catalog(private val sources: List<() -> Iterable<CatalogTable>>) {
     /** A table by name; `public.` and `pg_catalog.` qualify what the one schema and the derived catalog answer anyway. */
     fun table(name: String): CatalogTable? {
         val bare = name.removePrefix("public.").removePrefix("PUBLIC.")
-        return when (bare.lowercase().removePrefix("pg_catalog.")) {
+        return when (val relation = bare.lowercase().removePrefix("pg_catalog.")) {
             "information_schema.tables" -> CursorTable(name) { facet(CatalogK.Tables) }
             "information_schema.columns" -> CursorTable(name) { facet(CatalogK.Columns) }
             "pg_class" -> CursorTable(name) { facet(CatalogK.PgClass) }
@@ -70,6 +70,9 @@ class Catalog(private val sources: List<() -> Iterable<CatalogTable>>) {
             "pg_type" -> CursorTable(name) { facet(CatalogK.PgType) }
             "pg_database" -> CursorTable(name) { facet(CatalogK.PgDatabase) }
             "pg_am" -> CursorTable(name) { facet(CatalogK.PgAm) }
+            "pg_roles" -> CursorTable(name) { facet(CatalogK.PgRoles) }
+            "pg_collation" -> CursorTable(name) { facet(CatalogK.PgCollation) }
+            in PgEmptyRelation.byName -> CursorTable(name) { facet(CatalogK.Empty(PgEmptyRelation.byName.getValue(relation))) }
             else -> tables().let { all -> all.firstOrNull { it.name == bare } ?: all.firstOrNull { it.name.equals(bare, ignoreCase = true) } }
         }
     }
@@ -116,6 +119,15 @@ sealed class CatalogK<out R> : OpK<R>() {
 
     /** The heap access method. */
     data object PgAm : CatalogK<Cursor>()
+
+    /** The one role, the owner. */
+    data object PgRoles : CatalogK<Cursor>()
+
+    /** The one collation, `default`. */
+    data object PgCollation : CatalogK<Cursor>()
+
+    /** A pg_catalog relation with pg's columns and no rows: [PgEmptyRelation]. */
+    class Empty(val relation: PgEmptyRelation) : CatalogK<Cursor>()
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -126,6 +138,9 @@ fun <R> Catalog.facet(key: CatalogK<R>): R = when (key) {
     CatalogK.PgType -> pgTypes()
     CatalogK.PgDatabase -> pgDatabase()
     CatalogK.PgAm -> pgAm()
+    CatalogK.PgRoles -> pgRoles()
+    CatalogK.PgCollation -> pgCollation()
+    is CatalogK.Empty -> key.relation.cursor()
     CatalogK.Tables -> tables().let { all ->
         rowsCursor(
             listOf("table_schema", "table_name", "table_type"),
@@ -150,6 +165,7 @@ fun pgType(meta: ColumnMeta): String = when {
         IOMemento.IoDouble, IOMemento.IoFloat -> "double precision"
         IOMemento.IoBoolean -> "boolean"
         IOMemento.IoString -> "text"
+        IOMemento.IoArray -> "text[]"
         else -> "jsonb"
     }
 }

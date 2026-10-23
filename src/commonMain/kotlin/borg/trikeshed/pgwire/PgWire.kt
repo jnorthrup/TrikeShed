@@ -125,9 +125,17 @@ object PgBackend {
         is Boolean -> (if (value) "t" else "f").encodeToByteArray()
         is String -> value.encodeToByteArray()
         is FloatArray -> value.joinToString(",", "{", "}").encodeToByteArray()
+        is Array<*> -> value.joinToString(",", "{", "}") { arrayElement(it) }.encodeToByteArray()
         is Number -> value.toString().encodeToByteArray()
         else -> confixCellOf(value)?.let { cell -> ByteArray(cell.row.close - cell.row.open + 1) { cell.src[cell.row.open + it] } }
             ?: scalarText(value).encodeToByteArray()
+    }
+
+    /** One element of a pg array literal: `NULL`, or its text, double-quoted when empty, spelled NULL, or holding a brace, comma, quote, backslash or space. */
+    fun arrayElement(x: Any?): String {
+        if (x == null) return "NULL"
+        val s = scalarText(x)
+        return if (s.isEmpty() || s.equals("NULL", ignoreCase = true) || s.any { it in "{},\"\\ " }) "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" else s
     }
 
     /**

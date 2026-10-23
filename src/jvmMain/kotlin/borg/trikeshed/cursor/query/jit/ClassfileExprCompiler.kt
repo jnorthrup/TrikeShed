@@ -137,8 +137,10 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
                 }
                 if (e.negated) c.invokestatic(runtime, "not", MethodTypeDesc.of(CD_Object, CD_Object))
             }
-            // IN lists and CASE (lazy arms) stay on the closure path (see the class comment).
+            // IN lists, ANY/ALL, subselects (planned columns) and CASE (lazy arms) stay on the closure path (see the class comment).
             is InList -> error("IN (...) has no emitted form")
+            is Quantified -> error("ANY / ALL has no emitted form")
+            is Subselect -> error("a subselect has no emitted form")
             is Call -> {
                 if (e.name in AGGREGATES || e.name == SqlParser.CASE || e.name == SqlParser.CASE_WHEN) error("function ${e.name}(...) has no scalar form")
                 SqlFunctions.require(e.name, e.args.size)

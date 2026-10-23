@@ -58,6 +58,35 @@ object SqlRuntime {
         return if (unknown) null else false
     }
 
+    /**
+     * `value op ANY (array)` / `value op ALL (array)`, three-valued as pg: ANY is true on one hit, else unknown
+     * when an element is NULL, else false; ALL is false on one miss, else unknown, else true. A scalar right side
+     * is a one-element array.
+     */
+    @JvmStatic fun quantified(value: Any?, op: String, array: Any?, all: Boolean): Any? {
+        if (value == null || array == null) return null
+        val items = SqlFunctions.elementsOf(array) ?: listOf(array)
+        var unknown = false
+        for (item in items) {
+            if (item == null) { unknown = true; continue }
+            val hit = compares(op, compareCells(value, item))
+            if (hit && !all) return true
+            if (!hit && all) return false
+        }
+        return if (unknown) null else all
+    }
+
+    /** Whether a comparison [op] holds for the ordering [c] of its operands. */
+    fun compares(op: String, c: Int): Boolean = when (op) {
+        "=" -> c == 0
+        "<>", "!=" -> c != 0
+        "<" -> c < 0
+        "<=" -> c <= 0
+        ">" -> c > 0
+        ">=" -> c >= 0
+        else -> error("operator $op cannot be quantified with ANY or ALL")
+    }
+
     @JvmStatic fun eq(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) == 0
     @JvmStatic fun ne(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) != 0
     @JvmStatic fun lt(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) < 0
