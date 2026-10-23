@@ -1357,11 +1357,13 @@ benchmark {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "emulated")
             exclude("TpchShapeBench")
+            exclude("LexicalShapeBench")
         }
         register("native") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "native")
             exclude("TpchShapeBench")
+            exclude("LexicalShapeBench")
         }
         // The DuckDB-parity run: TPC-H Q1 and Q6 from SQL text over 1,000,000 generated lineitem rows, on each execution
         // path (closure / generated class on boxed rows; Kotlin / native kernels on a column-major source).
@@ -1371,6 +1373,12 @@ benchmark {
             include("TpchShapeBench")
             param("rows", "1000000")
             param("path", "rows", "jit", "dense", "ffi")
+        }
+        register("lexical") {
+            warmups = 3; iterations = 5; iterationTime = 2; iterationTimeUnit = "s"
+            include("LexicalShapeBench")
+            param("docs", "2557")
+            param("k", "1000")
         }
     }
     targets { kotlin.targets.matching { it.name in benchTargetNames }.all { register("${this.name}Bench") } }

@@ -55,7 +55,11 @@ interface TableDdl {
 class PostgrestSurface(
     val catalog: Catalog,
     val ddl: TableDdl? = null,
-    val functions: Map<String, RpcFunction> = mapOf("match_documents" to MatchDocuments()),
+    val functions: Map<String, RpcFunction> = mapOf(
+        "match_documents" to MatchDocuments(),
+        "evoke_query" to EvokeQuery(),
+        "evoke_hybrid_fuse_candidates" to EvokeHybridFuseCandidates(),
+    ),
     val compiler: ExprCompiler = ClosureExprCompiler,
     val base: String = "/rest/v1",
 ) {
@@ -546,6 +550,62 @@ class MatchDocuments(val table: String = "documents", val vector: String = "embe
             columns.toSeries(), TableRef(id(table)), BinaryExpr(similarity, ">", LitExpr(NumericLiteral(threshold))),
             orderBy = listOf(OrderItem(distance, false)).toSeries(), limit = count,
         ).plan(catalog::resolve, compiler = compiler)
+    }
+}
+
+/**
+ * Evoke's explicit-hit `evoke_query(index, query, k)` as an rpc: [index] names a catalog table,
+ * `column` its text column (the first text column when absent), and the rows come back with their
+ * non-vector columns and a `score` (`evoke_score` when the table owns a `score` column), best first —
+ * the same planner marker a SELECT would use.
+ */
+class EvokeQuery : RpcFunction {
+    override val parameters = listOf("index", "query", "k", "column")
+
+    override fun call(args: Map<String, Any?>, catalog: Catalog, compiler: ExprCompiler): Cursor {
+        val table = args["index"]?.toString()?.removeSuffix("::regclass")?.trim('\'') ?: throw PostgrestError(400, "22023", "evoke_query: index is required")
+        val source = catalog.table(table) ?: throw UndefinedTable(table)
+        val column = args["column"]?.toString()
+            ?: source.columns().firstOrNull { it.type == IOMemento.IoString && it.name.toString() != "id" }?.name?.toString()
+            ?: throw PostgrestError(400, "22023", "evoke_query: $table has no text column to index")
+        val query = args["query"]?.toString() ?: throw PostgrestError(400, "22023", "evoke_query: query is required")
+        val k = args["k"].let { (it as? Number)?.toInt() ?: it?.toString()?.toIntOrNull() ?: 10 }
+        fun id(name: String) = Identifier(name.toSeries())
+        val marker = Call("evoke_query", listOf(LitExpr(StringLiteral(column.toSeries())), LitExpr(StringLiteral(query.toSeries())), LitExpr(NumericLiteral(k))).toSeries())
+        val own = source.columns().filter { !it.isVector }.map { it.name.toString() }
+        val score = if ("score" in own) "evoke_score" else "score"
+        val columns = own.map { Column(ColumnRef(id(it)), id(it)) } + Column(marker, id(score))
+        return SelectStmt(columns.toSeries(), TableRef(id(table)), null, orderBy = listOf(OrderItem(marker, true)).toSeries()).plan(catalog::resolve, compiler = compiler)
+    }
+}
+
+/**
+ * `evoke_hybrid_fuse_candidates(candidates, k, fusion, rrf_k, epsilon)` as an rpc: `candidates` is a
+ * JSON array of Evoke candidate objects (`source_name`, `id` or `ctid`, `raw_value`, `source_rank`,
+ * `weight`, `normalizer`, `direction`); the hit table comes back as [Cursor.fuse] shapes it. POST
+ * only: the candidate array has no query-string encoding.
+ */
+class EvokeHybridFuseCandidates : RpcFunction {
+    override val parameters = listOf("candidates", "k", "fusion", "rrf_k", "epsilon")
+    override val stable: Boolean get() = false
+
+    override fun call(args: Map<String, Any?>, catalog: Catalog, compiler: ExprCompiler): Cursor {
+        val items = (args["candidates"] as? List<*>)?.map { it as? Map<*, *> ?: throw PostgrestError(400, "22023", "candidates must be objects") }
+            ?: throw PostgrestError(400, "22023", "evoke_hybrid_fuse_candidates: candidates must be an array")
+        val rows = items.map { c ->
+            mapOf(
+                "source_name" to c["source_name"], "id" to (c["id"] ?: c["ctid"]), "raw_value" to c["raw_value"], "source_rank" to c["source_rank"],
+                "weight" to c["weight"], "normalizer" to c["normalizer"], "direction" to c["direction"],
+            )
+        }
+        val candidates = rowsCursor(listOf("source_name", "id", "raw_value", "source_rank", "weight", "normalizer", "direction"), rows)
+        val method = when (args["fusion"]?.toString()?.lowercase() ?: "rrf") {
+            "rrf" -> FusionMethod.RRF
+            "score" -> FusionMethod.SCORE
+            else -> throw PostgrestError(400, "22023", "unsupported evoke hybrid fusion method: ${args["fusion"]}", hint = "Use rrf or score.")
+        }
+        fun num(name: String, default: Double) = args[name].let { (it as? Number)?.toDouble() ?: it?.toString()?.toDoubleOrNull() ?: default }
+        return candidates.facet(QueryK.Fuse(num("k", 10.0).toInt(), method, num("rrf_k", 60.0), num("epsilon", 1e-6)))
     }
 }
 

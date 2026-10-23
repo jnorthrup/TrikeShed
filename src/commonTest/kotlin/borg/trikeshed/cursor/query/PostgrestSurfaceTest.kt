@@ -79,6 +79,25 @@ class PostgrestSurfaceTest {
         assertEquals("""[{"id":1,"title":"Rust ownership"},{"id":3,"title":"rust lifetimes"}]""", reply.body)
     }
 
+    @Test fun evokeRpcsRankAndFuseOverTheCatalog() {
+        seed()
+        // documents owns a `score` column, so the marker comes back as evoke_score.
+        val ranked = call("POST", "/rest/v1/rpc/evoke_query?select=id,title,evoke_score", """{"index":"documents","query":"rust","k":2}""")
+        assertEquals(200, ranked.status, ranked.body)
+        assertEquals(listOf(1L, 3L), Regex("\"id\":(\\d+)").findAll(ranked.body).map { it.groupValues[1].toLong() }.toList())
+        assertTrue("\"evoke_score\":" in ranked.body, ranked.body)
+        val fused = call(
+            "POST", "/rest/v1/rpc/evoke_hybrid_fuse_candidates?select=id,score,source_names",
+            """{"candidates":[{"source_name":"title","id":1,"raw_value":10,"source_rank":1,"weight":2},
+                              {"source_name":"embedding","id":1,"raw_value":0.4,"source_rank":2,"direction":"lower_is_better"},
+                              {"source_name":"embedding","id":2,"raw_value":0.1,"source_rank":1,"direction":"lower_is_better"}],"k":5}""",
+        )
+        assertEquals(200, fused.status, fused.body)
+        assertTrue(fused.body.startsWith("""[{"id":1,"score":0.04891"""), fused.body)
+        assertTrue("\"source_names\":[\"embedding\",\"title\"]" in fused.body.replace(" ", ""), fused.body)
+        assertEquals(405, call("GET", "/rest/v1/rpc/evoke_hybrid_fuse_candidates?k=1").status)
+    }
+
     @Test fun errorsCarryPostgrestCodes() {
         seed()
         for ((path, expected) in listOf(
