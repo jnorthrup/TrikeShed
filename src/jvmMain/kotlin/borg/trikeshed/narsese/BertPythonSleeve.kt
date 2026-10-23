@@ -30,7 +30,7 @@ class BertPythonSleeve private constructor(
             val root = module.toPath().resolve("src/main/python")
             val sleeve = java.lang.System.getProperty("trikeshed.bert.sleeve")?.let(Path::of)
                 ?: requireNotNull(GuestModules.root()) { "BERT sleeve source tree is not installed" }
-                    .parentFile.parentFile.toPath().resolve("graalpy-sleeve/bert")
+                    .parentFile.parentFile.toPath().resolve("utils/graalpy-sleeve/bert")
             return open(scope, root, sleeve, JvmBertEncoder::local)
         }
 

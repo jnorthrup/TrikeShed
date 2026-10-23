@@ -308,7 +308,7 @@ object FutonPage {
         d.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;display:flex;align-items:center;justify-content:center"
         d.innerHTML = "<div style=\"background:#11151e;border:1px solid #f29111;border-radius:8px;padding:18px 22px;max-width:580px;color:#d8dce6;font:13px monospace\">" +
             "<b style=\"color:#f29111\">Run TrikeShed in anger &mdash; five minutes, one port</b>" +
-            "<pre id=\"qsCmds\" style=\"background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap\">git clone git@github.com:jnorthrup/TrikeShed.git &amp;&amp; cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>" +
+            "<pre id=\"qsCmds\" style=\"background:#0b0e14;padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap\">git clone git@github.com:jnorthrup/TrikeShed.git &amp;&amp; cd TrikeShed\n./gradlew hotswapFeed\nutils/oroboros --watch</pre>" +
             "<div style=\"color:#7b8496;margin-bottom:10px\">then open http://localhost:8888 &mdash; drop a REAL folder on /graal, run a stored program via POST /api/lcnc/run, abuse the board. Every stumble is a bug we want.</div>" +
             "<button onclick=\"navigator.clipboard.writeText(document.getElementById('qsCmds').textContent)\" style=\"background:#161b26;border:1px solid #3ddc84;color:#3ddc84;border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit\">copy commands</button> " +
             "<a href=\"https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please\" target=\"_blank\" style=\"color:#3fd0ff;margin-left:10px\">README &#8599;</a>" +

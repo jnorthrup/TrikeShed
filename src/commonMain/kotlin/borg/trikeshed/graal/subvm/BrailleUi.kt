@@ -14,7 +14,7 @@ package borg.trikeshed.graal.subvm
  * replaceable.
  *
  * Common contract: no AWT, no Swing, no Qt. Host VT (`XtermTerminal`) renders the returned
- * String; the Python sleeve (`graalpy-sleeve/hermes/braille/`) projects the same cells.
+ * String; the Python sleeve (`utils/graalpy-sleeve/hermes/braille/`) projects the same cells.
  */
 object BrailleUi {
 

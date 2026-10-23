@@ -12,7 +12,7 @@ class PythonSqliteGuestTest {
     fun pythonCallbacksAndCommittedRowsSurviveAnIsolateReopen() {
         val world = BtrfsWorldStore.ofMemory()
         val sqlite = "sqlite3/__init__.py"
-        val source = Files.readString(Path.of("graalpy-sleeve/python", sqlite))
+        val source = Files.readString(Path.of("utils/graalpy-sleeve/python", sqlite))
         repeat(2) {
             GraalBtrfsSupervisor("python-sqlite", VmFacet.GRAAL_PYTHON,
                 budget = Budget(wallMillis = 30_000), world = world).use { guest ->

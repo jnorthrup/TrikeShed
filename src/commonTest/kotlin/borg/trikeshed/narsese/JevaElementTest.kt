@@ -142,7 +142,7 @@ class JevaElementTest {
         assertTrue(ops.closed.isCompleted)
     }
 
-    @Test fun cancelledReleaseWaiterStillReleasesAfterTheAdmittedInference(): Unit = runTest {
+    @Test fun cancelledReleaseWaiterStillReleasesAfterTheAdmittedInference() = runTest {
         val entered = CompletableDeferred<Unit>()
         val continueInference = CompletableDeferred<Unit>()
         val ops = Operations { request -> if (request["op"] == "status") status() else {
@@ -170,7 +170,7 @@ class JevaElementTest {
         } finally { continueInference.complete(Unit); element.drain() }
     }
 
-    @Test fun releaseBeforeFirstResolutionDoesNotPreventLaterProviderAdmission(): Unit = runTest {
+    @Test fun releaseBeforeFirstResolutionDoesNotPreventLaterProviderAdmission() = runTest {
         val ops = Operations { status() }
         val element = JevaElement(CoroutineScope(coroutineContext + ops), JevaConfig(runtime = JevaRuntime.PYTHON))
         try {
@@ -181,7 +181,7 @@ class JevaElementTest {
         } finally { element.drain() }
     }
 
-    @Test fun expiredRuntimeFailsQueuedAsksWithoutComputeUntilExplicitRelease(): Unit = runTest {
+    @Test fun expiredRuntimeFailsQueuedAsksWithoutComputeUntilExplicitRelease() = runTest {
         val entered = CompletableDeferred<Unit>()
         val continueInference = CompletableDeferred<Unit>()
         val expired = JevaDeadline.Expired("fixture decision", 600_000, 600_001)

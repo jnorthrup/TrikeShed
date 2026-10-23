@@ -20,7 +20,7 @@ object HermesSingleLanguagePortCli {
         fun v(flag: String) = opts.indexOf(flag).takeIf { it >= 0 }?.let { opts.getOrNull(it + 1) }
         val root = Path.of(v("--root") ?: "utils/hermes-trikeshed-graalpy").toAbsolutePath().normalize()
         val report = Path.of(v("--report") ?: "build/reports/hermes-single-language-port.json").toAbsolutePath().normalize()
-        val pySleeve = Path.of(v("--py-sleeve") ?: "graalpy-sleeve/hermes").toAbsolutePath().normalize()
+        val pySleeve = Path.of(v("--py-sleeve") ?: "utils/graalpy-sleeve/hermes").toAbsolutePath().normalize()
         val jsSleeve = Path.of(v("--js-sleeve") ?: "graaljs-sleeve").toAbsolutePath().normalize()
 
         HermesPythonPort().use { port ->

@@ -10,7 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * The classifier over the PINNED corpus (Merge + Mid-level, gradle/sumo-corpus.pins).
+ * The classifier over the PINNED corpus (Merge + Mid-level, utils/sumo/sumo-corpus.pins).
  * Numbers are the 2026-09-04 measurement; the ref is pinned so they are exact.
  */
 class SumoClassifierCorpusTest {

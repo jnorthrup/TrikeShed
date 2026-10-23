@@ -81,7 +81,7 @@ class HermesTerminalReceiptTest {
         val events = mutableListOf<Pair<String, List<Teleported>>>()
         ProcessIsolate("terminal-receipts", VmFacet.GRAAL_PYTHON,
             budget = Budget(statements = 0, wallMillis = 0),
-            pythonWorker = PythonWorker(pythonPath = listOf(Path.of("graalpy-sleeve/bridges").toAbsolutePath().toString()))).use { guest ->
+            pythonWorker = PythonWorker(pythonPath = listOf(Path.of("utils/graalpy-sleeve/bridges").toAbsolutePath().toString()))).use { guest ->
             guest.delegate("sleeve_cli_input") { args ->
                 events.add("input" to args)
                 Teleported.Str("host-cause-${events.size}")

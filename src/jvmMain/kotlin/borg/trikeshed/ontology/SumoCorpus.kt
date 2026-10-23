@@ -9,7 +9,7 @@ import java.security.MessageDigest
 /**
  * The pinned SUMO corpus as a classifier. `fetchSumoCorpus` (build.gradle.kts)
  * lands `sumo/Merge.kif` and `sumo/Mid-level-ontology.kif` on the jvmMain
- * classpath, checksum-verified against gradle/sumo-corpus.pins; this is the
+ * classpath, checksum-verified against utils/sumo/sumo-corpus.pins; this is the
  * first reader of those bytes. Missing middle resources retain their empty-text
  * fallback. [full] requires the complete separate manifest and verifies every
  * payload again at runtime. See docs/ontology/sumo-corpus.md for scope and counts.

@@ -1,6 +1,10 @@
 package borg.trikeshed.parse.kursive.sql
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.parse.confix.JsPath
+import borg.trikeshed.parse.confix.JsPathElement
+import borg.trikeshed.parse.confix.idxOf
+import borg.trikeshed.parse.confix.keyOf
 
 private val CharSeries.cseq: CharSequence get() = cs
 
@@ -25,9 +29,33 @@ sealed interface Expr : SqlNode
 class ColumnRef(val id: Identifier) : Expr
 class LitExpr(val lit: SqlNode) : Expr
 data class BinaryExpr(val left: Expr, val op: String, val right: Expr) : Expr
+/** `name(args)`; `COUNT(*)` carries [Star] as its argument. */
+data class Call(val name: String, val args: Series<Expr>) : Expr
+/** The `*` argument of `COUNT(*)`. */
+data object Star : Expr
+/** `expr::type` (pg, DuckDB cast). */
+data class Cast(val expr: Expr, val type: String) : Expr
+/**
+ * Semi-structured access into a Confix cell: pg `->` / `->>` / `#>>`, DuckDB `->`,
+ * Snowflake `col:a.b[0]`. [text] is the `->>` / `#>>` form, which answers the scalar as text.
+ */
+data class Path(val cell: Expr, val path: JsPath, val text: Boolean) : Expr
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
 data class TableRef(val name: Identifier, val alias: Identifier? = null) : SqlNode
-data class SelectStmt(val columns: Series<Column>, val from: TableRef?, val where: Expr?) : SqlNode
+/** `[LEFT [OUTER] | INNER] JOIN table ON expr`. */
+data class JoinClause(val table: TableRef, val on: Expr?, val outer: Boolean) : SqlNode
+data class OrderItem(val expr: Expr, val descending: Boolean) : SqlNode
+data class SelectStmt(
+    val columns: Series<Column>,
+    val from: TableRef?,
+    val where: Expr?,
+    val joins: Series<JoinClause> = emptySeriesOf(),
+    val groupBy: Series<Expr> = emptySeriesOf(),
+    val having: Expr? = null,
+    val orderBy: Series<OrderItem> = emptySeriesOf(),
+    val limit: Int? = null,
+    val offset: Int? = null,
+) : SqlNode
 
 /**
  * Recursive-descent parser for a SELECT subset (SELECT ... FROM ... WHERE ...)
@@ -35,6 +63,11 @@ data class SelectStmt(val columns: Series<Column>, val from: TableRef?, val wher
  */
 class SqlParser(private val cs: CharSeries) {
     companion object {
+        val RESERVED = setOf(
+            "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
+            "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ASC", "DESC", "AND", "OR",
+        )
+
         fun parse(src: Series<Char>): SelectStmt? = SqlParser(CharSeries(src).trim).parseSelect()
         fun parse(text: String): SelectStmt? {
             // try the recursive-descent parser first
@@ -157,7 +190,8 @@ class SqlParser(private val cs: CharSeries) {
         while (cs.pos < cs.limit && cs[cs.pos].isDigit()) {
             cs.pos++; seen = true
         }
-        if (cs.pos < cs.limit && cs[cs.pos] == '.') {
+        val fraction = cs.pos < cs.limit && cs[cs.pos] == '.'
+        if (fraction) {
             cs.pos++
             while (cs.pos < cs.limit && cs[cs.pos].isDigit()) {
                 cs.pos++; seen = true
@@ -168,7 +202,7 @@ class SqlParser(private val cs: CharSeries) {
         }
         val slice: Series<Char> = cs[start until cs.pos]
 
-        val num = slice.parseDoubleOrNull() ?: slice.parseLong()
+        val num = if (fraction) slice.parseDoubleOrNull() ?: return null.also { cs.pos = start } else slice.parseLong()
         val value = when (num) {
             is Long -> if (num in Int.MIN_VALUE..Int.MAX_VALUE) num.toInt() else num
             is Double -> num
@@ -184,16 +218,144 @@ class SqlParser(private val cs: CharSeries) {
             val e = parseExpr()
             skipWs()
             if (peek() == ')') cs.pos++
-            return e
+            return parsePostfix(e ?: return null)
         }
-        parseStringLiteral()?.let { return LitExpr(it) }
-        parseNumberLit()?.let { return LitExpr(it) }
-        parseIdentifier()?.let { return ColumnRef(it) }
-        return null
+        parseStringLiteral()?.let { return parsePostfix(LitExpr(it)) }
+        parseNumberLit()?.let { return parsePostfix(LitExpr(it)) }
+        val id = parseIdentifier() ?: return null
+        skipWs()
+        if (peek() == '(') {
+            cs.pos++
+            skipWs()
+            val args = mutableListOf<Expr>()
+            if (peek() == '*') { cs.pos++; args += Star }
+            else while (peek() != ')') {
+                args += parseExpr() ?: return null
+                skipWs()
+                if (peek() == ',') { cs.pos++; skipWs() } else break
+            }
+            skipWs()
+            if (peek() != ')') return null
+            cs.pos++
+            return parsePostfix(Call(id.asString().lowercase(), args.toSeries()))
+        }
+        if (peek() == ':' && !(cs.pos + 1 < cs.limit && cs[cs.pos + 1] == ':')) {
+            cs.pos++
+            return parsePostfix(Path(ColumnRef(id), parseColonPath(), text = false))
+        }
+        return parsePostfix(ColumnRef(id))
+    }
+
+    /** `->` paths and `::type` casts, in any order: `doc->>'n'::int`, `'[1,2]'::vector`. */
+    fun parsePostfix(head: Expr): Expr {
+        var left = parsePath(head)
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            if (!matchSymbol("::")) { cs.pos = save; return left }
+            skipWs()
+            val type = parseIdentifier() ?: run { cs.pos = save; return left }
+            left = parsePath(Cast(left, type.asString().lowercase()))
+        }
+    }
+
+    /** Snowflake `col:a.b[0]` segments after the colon. */
+    fun parseColonPath(): JsPath {
+        val steps = mutableListOf<JsPathElement>()
+        while (cs.pos < cs.limit) {
+            if (peek() == '[') {
+                cs.pos++
+                val start = cs.pos
+                while (cs.pos < cs.limit && cs[cs.pos].isDigit()) cs.pos++
+                steps += idxOf(cs[start until cs.pos].asString().toInt())
+                if (peek() == ']') cs.pos++
+            } else {
+                if (peek() == '.') cs.pos++
+                val start = cs.pos
+                while (cs.pos < cs.limit && (cs[cs.pos].isLetterOrDigit() || cs[cs.pos] == '_')) cs.pos++
+                if (start == cs.pos) break
+                steps += keyOf(cs[start until cs.pos].asString())
+            }
+        }
+        return steps.toSeries()
+    }
+
+    /** pg / DuckDB postfix `->`, `->>`, `#>>`. */
+    fun parsePath(head: Expr): Expr {
+        var left = head
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val text: Boolean
+            val hash = peek() == '#'
+            when {
+                matchSymbol("->>") || matchSymbol("#>>") -> text = true
+                matchSymbol("->") || matchSymbol("#>") -> text = false
+                else -> { cs.pos = save; return left }
+            }
+            skipWs()
+            val step: JsPath = if (hash) {
+                val lit = parseStringLiteral() ?: run { cs.pos = save; return left }
+                val body = lit.asString().trim().removePrefix("{").removeSuffix("}")
+                body.split(',').map { seg -> seg.trim().toIntOrNull()?.let { idxOf(it) } ?: keyOf(seg.trim()) }.toSeries()
+            } else {
+                parseStringLiteral()?.let { s_[keyOf(it.asString())] }
+                    ?: parseNumberLit()?.let { s_[idxOf(it.value.toInt())] }
+                    ?: run { cs.pos = save; return left }
+            }
+            left = Path(left, step, text)
+        }
+    }
+
+    fun matchSymbol(symbol: String): Boolean {
+        if (cs.pos + symbol.length > cs.limit) return false
+        for (i in symbol.indices) if (cs[cs.pos + i] != symbol[i]) return false
+        cs.pos += symbol.length
+        return true
+    }
+
+    fun parseMultiplicative(): Expr? {
+        var left = parseTerm() ?: return null
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val op = peek()
+            if (op != '*' && op != '/' && op != '%') { cs.pos = save; return left }
+            cs.pos++
+            val right = parseTerm() ?: run { cs.pos = save; return left }
+            left = BinaryExpr(left, op.toString(), right)
+        }
+    }
+
+    fun parseAdditive(): Expr? {
+        var left = parseMultiplicative() ?: return null
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val op = peek()
+            val arrow = cs.pos + 1 < cs.limit && cs[cs.pos + 1] == '>'
+            val concat = op == '|' && cs.pos + 1 < cs.limit && cs[cs.pos + 1] == '|'
+            if (!((op == '+' || op == '-') && !arrow) && !concat) { cs.pos = save; return left }
+            cs.pos += if (concat) 2 else 1
+            val right = parseMultiplicative() ?: run { cs.pos = save; return left }
+            left = BinaryExpr(left, if (concat) "||" else op.toString(), right)
+        }
+    }
+
+    /** pgvector `<=>` cosine distance, `<->` L2 distance, `<#>` negative inner product: looser than `+ -`, tighter than comparisons. */
+    fun parseVector(): Expr? {
+        var left = parseAdditive() ?: return null
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val op = listOf("<=>", "<->", "<#>").firstOrNull { matchSymbol(it) } ?: run { cs.pos = save; return left }
+            val right = parseAdditive() ?: run { cs.pos = save; return left }
+            left = BinaryExpr(left, op, right)
+        }
     }
 
     fun parseComparison(): Expr? {
-        var left = parseTerm() ?: return null
+        var left = parseVector() ?: return null
         skipWs()
         val ops = listOf("!=", "<>", ">=", "<=", "=", ">", "<", "LIKE")
         for (op in ops) {
@@ -208,8 +370,11 @@ class SqlParser(private val cs: CharSeries) {
             if (!ok) {
                 cs.pos = save; continue
             }
+            if (op == "LIKE" && cs.pos < cs.limit && !cs[cs.pos].isWhitespace() && cs[cs.pos] != '\'') {
+                cs.pos = save; continue
+            }
             skipWs()
-            val right = parseTerm() ?: run { cs.pos = save; return left }
+            val right = parseVector() ?: run { cs.pos = save; return left }
             left = BinaryExpr(left, op, right)
             break
         }
@@ -250,8 +415,7 @@ class SqlParser(private val cs: CharSeries) {
 
     fun parseColumn(): Column? {
         skipWs()
-        val save = cs.pos
-        val expr = parseTerm() ?: return null
+        val expr = parseExpr() ?: return null
         skipWs()
         var alias: Identifier? = null
         val save2 = cs.pos
@@ -266,7 +430,7 @@ class SqlParser(private val cs: CharSeries) {
             if (maybe != null) {
                 val nameStr = maybe.name.asString().uppercase().toString()
                 val reserved =
-                    _s["FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT"]
+                    RESERVED
                 if (nameStr in reserved) {
                     cs.pos = save2
                 } else {
@@ -308,9 +472,7 @@ class SqlParser(private val cs: CharSeries) {
             val maybe = parseIdentifier()
             if (maybe != null) {
                 val nameStr = maybe.name.asString().uppercase().toString()
-                val reserved = setOf(
-                    "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
-                )
+                val reserved = RESERVED
                 if (nameStr in reserved) {
                     cs.pos = save
                 } else {
@@ -332,12 +494,64 @@ class SqlParser(private val cs: CharSeries) {
             skipWs()
             from = parseTableRef()
         }
+        val joins = mutableListOf<JoinClause>()
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            val outer = matchKeyword("LEFT")
+            if (outer) { skipWs(); matchKeyword("OUTER"); skipWs() } else if (matchKeyword("INNER")) skipWs()
+            if (!matchKeyword("JOIN")) { cs.pos = save; break }
+            val table = parseTableRef() ?: return null
+            skipWs()
+            val on = if (matchKeyword("ON")) { skipWs(); parseExpr() } else null
+            joins += JoinClause(table, on, outer)
+        }
         skipWs()
         var where: Expr? = null
         if (matchKeyword("WHERE")) {
             skipWs()
             where = parseExpr()
         }
-        return SelectStmt(cols, from, where)
+        skipWs()
+        val groupBy = mutableListOf<Expr>()
+        if (matchKeyword("GROUP")) {
+            skipWs()
+            if (!matchKeyword("BY")) return null
+            while (true) {
+                skipWs()
+                groupBy += parseExpr() ?: return null
+                skipWs()
+                if (peek() != ',') break
+                cs.pos++
+            }
+        }
+        skipWs()
+        val having = if (matchKeyword("HAVING")) { skipWs(); parseExpr() } else null
+        skipWs()
+        val orderBy = mutableListOf<OrderItem>()
+        if (matchKeyword("ORDER")) {
+            skipWs()
+            if (!matchKeyword("BY")) return null
+            while (true) {
+                skipWs()
+                val e = parseExpr() ?: return null
+                skipWs()
+                val descending = matchKeyword("DESC")
+                if (!descending) matchKeyword("ASC")
+                orderBy += OrderItem(e, descending)
+                skipWs()
+                if (peek() != ',') break
+                cs.pos++
+            }
+        }
+        skipWs()
+        val limit = if (matchKeyword("LIMIT")) { skipWs(); parseNumberLit()?.value?.toInt() } else null
+        skipWs()
+        val offset = if (matchKeyword("OFFSET")) { skipWs(); parseNumberLit()?.value?.toInt() } else null
+        skipWs()
+        if (peek() == ';') cs.pos++
+        skipWs()
+        if (cs.pos < cs.limit) return null
+        return SelectStmt(cols, from, where, joins.toSeries(), groupBy.toSeries(), having, orderBy.toSeries(), limit, offset)
     }
 }

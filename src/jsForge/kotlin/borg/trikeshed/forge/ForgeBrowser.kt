@@ -360,7 +360,7 @@ object ForgeBrowser {
             "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99;display:flex;align-items:center;justify-content:center"
         d.innerHTML = "<div style=\"background:var(--bg,#fff);border:1px solid var(--border,#ccc);border-radius:8px;padding:18px 22px;max-width:580px;color:var(--text,#222);font:13px monospace;box-shadow:0 8px 30px rgba(0,0,0,.25)\">" +
             "<b>Run TrikeShed in anger — five minutes, one port</b>" +
-            "<pre id=\"qsCmds\" style=\"background:rgba(127,127,127,.12);padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap\">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nbin/oroboros-daemon --watch</pre>" +
+            "<pre id=\"qsCmds\" style=\"background:rgba(127,127,127,.12);padding:10px;border-radius:4px;margin:10px 0;user-select:text;white-space:pre-wrap\">git clone git@github.com:jnorthrup/TrikeShed.git && cd TrikeShed\n./gradlew hotswapFeed\nutils/oroboros --watch</pre>" +
             "<button id=\"qsCopy\" style=\"font:inherit;padding:4px 12px;cursor:pointer\">copy commands</button>" +
             "<a href=\"https://github.com/jnorthrup/TrikeShed#run-it-in-anger--please\" target=\"_blank\" style=\"margin-left:10px\">README ↗</a>" +
             "<button id=\"qsClose\" style=\"background:none;border:none;padding:0;font:inherit;color:inherit;text-decoration:underline;margin-left:14px;cursor:pointer\">close</button></div>"

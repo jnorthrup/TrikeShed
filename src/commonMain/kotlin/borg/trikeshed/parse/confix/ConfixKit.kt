@@ -335,7 +335,7 @@ val RowVec.close: Int                                 get() = this[1] as Int
 val RowVec.tag:   borg.trikeshed.cursor.IOMemento get() = this[2] as borg.trikeshed.cursor.IOMemento
 val RowVec.kids:  Cursor                              get() = this[3] as Cursor
 
-private fun Series<Byte>.spanStr(open: Int, close: Int): String {
+fun Series<Byte>.spanStr(open: Int, close: Int): String {
     if (close < open) return ""
     val len = close - open + 1
     return CharArray(len) { this[open + it].toInt().toChar() }.concatToString()

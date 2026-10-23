@@ -254,12 +254,14 @@ class BigInt internal constructor(internal val sign: Boolean?, internal val magn
         for (i in 0 until maxSize) {
             val x = m1.getOrNull(i) ?: 0u
             val y = m2.getOrNull(i) ?: 0u
-            val sum = if (addition) x + y + carry else x - y - carry
+            // Widen before combining: UInt + UInt wraps at 32 bits and would drop the carry out of the limb.
+            val sum = if (addition) x.toULong() + y.toULong() + carry else x.toULong() - y.toULong() - carry
             result.add(sum.toUInt())
-            carry = sum shr 32
+            // An underflowed difference has every high bit set; the borrow is the one bit.
+            carry = if (addition) sum shr 32 else (sum shr 32) and 1uL
         }
 
-        if (carry != 0uL) result.add(carry.toUInt())
+        if (addition && carry != 0uL) result.add(carry.toUInt())
         return result.toUIntArray().toSeries()
     }
 

@@ -1,22 +1,12 @@
 import java.net.URI
-import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.nio.file.StandardOpenOption
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
-import java.net.ServerSocket
-import java.util.concurrent.TimeUnit
-import groovy.json.JsonSlurper
 import java.security.MessageDigest
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.targets.jvm.KotlinJvmTarget
-import org.jetbrains.kotlin.gradle.tasks.Kotlin2JsCompile
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpack
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinBrowserJsIr
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
@@ -50,8 +40,6 @@ val kotlinJsBrowserApps = listOf("forge", "documents", "spacegraph", "graal", "h
 val kotlinJsApps = providers.gradleProperty("kotlinJsApps").orElse(kotlinJsBrowserApps.joinToString(",")).get()
     .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
 require(kotlinJsApps.all { it in kotlinJsBrowserApps }) { "kotlinJsApps must name apps in $kotlinJsBrowserApps" }
-val focusedTransportSlice = providers.gradleProperty("focusedTransportSlice").orNull == "true"
-val viewServerNodeSlice = false
 val linuxHost = System.getProperty("os.name").lowercase().contains("linux")
 val arm64Host = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
 val enableLinuxX64Target = (linuxHost && !arm64Host) || providers.gradleProperty("enableLinuxX64").orNull == "true"
@@ -458,20 +446,12 @@ kotlin {
     // here cannot resolve at configuration time.
 }
 
-// The JVM library as class directories, so :tools compiles, tests and runs against compileKotlinJvm
-// output: jvmJar and jvmMainClasses also run stageKotlinJs (the browser webpack builds) and fetchSumoCorpus.
-val jvmMainClassesDirs = kotlin.jvm().compilations.getByName("main").output.classesDirs
-for (elements in listOf("jvmApiElements", "jvmRuntimeElements")) configurations.named(elements) {
-    outgoing.variants.create("classes") {
-        attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
-        for (dir in jvmMainClassesDirs.files) artifact(dir) {
-            type = ArtifactTypeDefinition.JVM_CLASS_DIRECTORY
-            builtBy("compileKotlinJvm", "compileJvmMainJava")
-        }
-    }
-}
-
-// Shared Kotlin -> app compilation -> webpack -> staging -> JVM resources.
+// The browser bundles are a downstream artifact of commonMain, built on their own schedule: the JVM
+// compiles, tests and packages without them (GWT's split between the compiled page and the server that
+// hosts it). Only what HOSTS pages consumes them: the daemon and page servers get them as one more jar on
+// the staged lib classpath (the AOT classpath is jars only), the Pages publisher reads the staged
+// directory, and the manual-browser tests (*_UI=1) add the jar to their own classpath.
+// Shared Kotlin -> app compilation -> webpack -> staging -> bundles jar -> hosts.
 val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
     group = "forge"
     description = "Package the Kotlin/JS browser apps selected by kotlinJsApps."
@@ -482,9 +462,16 @@ val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
     into(layout.buildDirectory.dir("generated/kotlinJs/resources"))
 }
 
-tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
+val kotlinJsBundlesJar = tasks.register<Jar>("kotlinJsBundlesJar") {
+    group = "forge"
+    description = "Package the staged browser bundles (web/kotlin/<app>/) as the jar the daemon and page servers serve /kotlin/ from."
     from(stageKotlinJs)
-    doFirst { project.delete(destinationDir.resolve("web/kotlin")) }
+    archiveClassifier.set("web")
+}
+
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
+    // Purge what an earlier layout staged here: processedResources must not shadow the bundles jar.
+    doFirst { destinationDir.resolve("web/kotlin").deleteRecursively() }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -504,18 +491,21 @@ val prebuiltLiburing = providers.gradleProperty("uringLiburingBuildDir")
 val liburingBuild = layout.dir(prebuiltLiburing.map { project.file(it) })
     .orElse(layout.buildDirectory.dir("native/liburing"))
 val validatePrebuiltLiburing = tasks.register("validatePrebuiltLiburing") {
-    onlyIf { prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { prebuilt }
+    val build = liburingBuild
     doLast {
         val required = listOf("src/liburing.a", "src/include/liburing/compat.h", "src/include/liburing/io_uring_version.h")
-        val missing = required.filter { !liburingBuild.get().file(it).asFile.isFile }
+        val missing = required.filter { !build.get().file(it).asFile.isFile }
         check(missing.isEmpty()) {
-            "uringLiburingBuildDir=${liburingBuild.get().asFile} lacks required Linux build artifacts: ${missing.joinToString()}"
+            "uringLiburingBuildDir=${build.get().asFile} lacks required Linux build artifacts: ${missing.joinToString()}"
         }
     }
 }
 val configureLiburing = tasks.register<Exec>("configureLiburing") {
     dependsOn(validatePrebuiltLiburing)
-    onlyIf { !prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { !prebuilt }
     inputs.file(liburingSource.file("configure"))
     inputs.file(liburingSource.file("Makefile.common"))
     outputs.files(liburingBuild.map { it.file("config-host.mak") }, liburingBuild.map { it.file("config-host.h") },
@@ -524,14 +514,17 @@ val configureLiburing = tasks.register<Exec>("configureLiburing") {
     workingDir(liburingBuild)
     environment("CFLAGS", "-O3 -fPIC")
     commandLine("sh", liburingSource.file("configure").asFile.absolutePath, "--use-libc")
+    val linux = linuxHost
+    val buildDir = liburingBuild.get().asFile
     doFirst {
-        check(linuxHost) { "The liburing build requires a Linux host" }
-        liburingBuild.get().asFile.mkdirs()
+        check(linux) { "The liburing build requires a Linux host" }
+        buildDir.mkdirs()
     }
 }
 val buildLiburing = tasks.register<Exec>("buildLiburing") {
     dependsOn(configureLiburing)
-    onlyIf { !prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { !prebuilt }
     inputs.dir(liburingSource.dir("src"))
     inputs.file(liburingSource.file("Makefile"))
     inputs.file(liburingSource.file("Makefile.common"))
@@ -585,17 +578,6 @@ tasks.register<Exec>("buildNodeUring") {
     commandLine("cmake", "--build", layout.buildDirectory.dir("native/node").get().asFile.absolutePath, "--parallel", "2")
 }
 
-if (!focusedTransportSlice) {
-    // Exclude transport tests from global runs to avoid CInterop linker errors
-    kotlin {
-        sourceSets.getByName("commonTest") {
-            // transport/ipfs/quic excludes dropped: no matching test sources exist.
-            // Remaining trees restored to the compile path; failures are repaired,
-            // not excluded (PRELOAD: no excluded tests).
-        }
-    }
-}
-
 // ─────────────────────────────────────────────────────────────────
 // Explicit Task Graph Hooks
 // ─────────────────────────────────────────────────────────────────
@@ -619,9 +601,19 @@ tasks.withType<Test>().configureEach {
         "--add-exports", "java.base/jdk.internal.classfile.instruction=ALL-UNNAMED",
         "--add-exports", "java.base/jdk.internal.classfile.components=ALL-UNNAMED"
     )
+    dependsOn("hotswapAgentJar")
 }
 
 tasks.named<Test>("jvmTest") {
+    // The manual-browser tests (any *_UI=1 gate) serve the compiled bundles from the classpath; no other test
+    // reads one, so only an opted-in run depends on the JS build. -PkotlinJsBundles forces it.
+    val serveBundles = System.getenv().any { (name, value) -> name.endsWith("_UI") && value == "1" } ||
+        providers.gradleProperty("kotlinJsBundles").isPresent
+    inputs.property("serveKotlinJsBundles", serveBundles)
+    if (serveBundles) {
+        dependsOn(kotlinJsBundlesJar)
+        classpath += files(kotlinJsBundlesJar)
+    }
     // The same canonical-curation contract can explicitly exercise the operator's provider.
     // Keep fixture/live runs distinct in Gradle's up-to-date checks; none of these inputs is a credential.
     listOf("TRIKESHED_CURATION_PROFILE", "TRIKESHED_CURATION_BASE", "TRIKESHED_CURATION_MODEL").forEach { name ->
@@ -636,35 +628,6 @@ tasks.named<Test>("jvmTest") {
         include("**/src/**/kotlin/**/*.kt", "**/src/**/java/**/*.java")
         exclude("**/build/**", "**/node_modules/**", "**/.*/**")
     }).withPropertyName("confixBoundarySources")
-}
-
-tasks.register<Test>("btrfsStorageCheck") {
-    group = "verification"
-    description = "Verify userspace Btrfs storage, world replication, ISAM, and fresh-process crash recovery."
-    val jvmTests = tasks.named<Test>("jvmTest")
-    dependsOn("jvmTestClasses")
-    testClassesDirs = jvmTests.get().testClassesDirs
-    classpath = jvmTests.get().classpath
-    filter {
-        includeTestsMatching("borg.trikeshed.btrfs.*")
-        includeTestsMatching("borg.trikeshed.graal.subvm.BtrfsHostedVmWorldTest")
-        includeTestsMatching("borg.trikeshed.graal.subvm.TrikeShedGraalVfs*Test")
-        includeTestsMatching("borg.trikeshed.isam.*")
-        includeTestsMatching("borg.trikeshed.job.CanonicalCborTest")
-        includeTestsMatching("borg.trikeshed.job.ContentIdTest")
-        includeTestsMatching("borg.trikeshed.util.oroboros.Sha2CasBusTest")
-        includeTestsMatching("borg.trikeshed.userspace.nio.file.spi.DurableStoragePrimitivesTest")
-        includeTestsMatching("borg.trikeshed.userspace.JvmUserspaceChannelBackendTest")
-        includeTestsMatching("borg.trikeshed.userspace.FunctionalUringFacadeLifecycleTest")
-        includeTestsMatching("borg.trikeshed.couch.replicate.*")
-        includeTestsMatching("borg.trikeshed.couch.CouchReplicationTest")
-        includeTestsMatching("borg.trikeshed.couch.CouchWireRouterAttachmentTest")
-    }
-    timeout.set(Duration.ofSeconds(120))
-    outputs.upToDateWhen { false }
-    doFirst {
-        systemProperty("trikeshed.storage.classpath", classpath.asPath)
-    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -694,73 +657,6 @@ tasks.named("wasmJsTest") {
     dependsOn("wasmJsBrowserTest")
 }
 
-// Ensure resources are copied before compilation
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name.contains("Jvm")) {
-        dependsOn("jvmProcessResources")
-    }
-}
-
-// JMH Setup
-tasks.register<JavaExec>("jmh") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args(".*", "-wi", "3", "-i", "5", "-f", "1")
-}
-
-tasks.register<JavaExec>("jmhJoin") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("JoinBenchmark", "-wi", "5", "-i", "10", "-f", "1")
-}
-
-tasks.register<JavaExec>("jmhConfix") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("borg.trikeshed.parse.confix.ConfixDocCursorBenchmark", "-wi", "5", "-i", "10", "-f", "1")
-}
-
-tasks.register<JavaExec>("jmhWal") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("ConfixWalAppendBenchmark", "-wi", "5", "-i", "10", "-f", "1")
-}
-
-tasks.register<JavaExec>("benchmarkJoin") {
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.lib.JoinBenchmarkRunner")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-tasks.register<JavaExec>("benchmarkSequence") {
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.lib.SequenceBenchmarkRunner")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-tasks.register<JavaExec>("benchmarkVector") {
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.lib.VectorBenchmarkRunner")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-tasks.register<JavaExec>("benchmarkMath") {
-    dependsOn(":compileKotlinJvm")
-    mainClass.set("org.openjdk.jmh.Main")
-    classpath(tasks.named("jvmJar"), configurations.named("jvmRuntimeClasspath"))
-    args("MathJoinBenchmark", "-wi", "5", "-i", "10", "-f", "1")
-}
-
-tasks.register<JavaExec>("benchmarkConfix") {
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.parse.confix.ConfixBenchmarkRunner")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
 // Forge widget gallery — print the catalog + blackboard to stdout for JVM sanity checks
 tasks.register<JavaExec>("printForgeGallery") {
     group = "forge"
@@ -779,75 +675,13 @@ val freezeSumo = tasks.register<JavaExec>("freezeSumo") {
     mainClass.set("borg.trikeshed.ontology.SumoFrozen")
     classpath(tasks.named("jvmJar"), tasks.named("sumoFullCorpusJar"), configurations.getByName("jvmRuntimeClasspath"))
     val out = sumoFrozenDir.map { it.file("sumo/frozen.bin") }
-    inputs.file("gradle/sumo-full-corpus.pins")
-    inputs.file("gradle/sumo-corpus.pins")
+    inputs.file("utils/sumo/sumo-full-corpus.pins")
+    inputs.file("utils/sumo/sumo-corpus.pins")
     // The image's format is the code's: re-freeze when the writer or the lexicon parse changes.
     inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoFrozen.kt")
     inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoCorpus.kt")
     outputs.file(out)
     argumentProviders.add(CommandLineArgumentProvider { listOf(out.get().asFile.absolutePath) })
-}
-
-// CoreNLP → NAL → rete over SUMO superclasses
-tasks.register<JavaExec>("corenlpRete") {
-    group = "narsese"
-    description = "CoreNLP lines → NAL evidence → eternal rules → rete fired over SUMO superclasses."
-    dependsOn("jvmJar", freezeSumo)
-    mainClass.set("borg.trikeshed.narsese.CorenlpReteCli")
-    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
-    workingDir = rootDir
-}
-
-// Masked-LM substitutes → SUMO class induced per noun
-tasks.register<JavaExec>("fillSubsume") {
-    group = "narsese"
-    description = "Masked-LM substitutes of a noun → the SUMO class their sense closures share."
-    dependsOn("jvmJar", freezeSumo)
-    mainClass.set("borg.trikeshed.narsese.FillSubsumer")
-    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
-    workingDir = rootDir
-    maxHeapSize = "4g"
-}
-
-// TrajectoryReduction CLI — fold SessionCause chains into freeze verdicts
-tasks.register<JavaExec>("trajectoryReduction") {
-    group = "oroboros"
-    description = "Run TrajectoryReduction: fold SessionCause trajectory into freeze verdict."
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.lcnc.reduction.TrajectoryReductionCliKt")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-// Writes the mux CLI runtime classpath to a file so `bin/mux` can exec java
-// directly. A diagnostic you run twenty times while chasing a credential must
-// not cost a Gradle daemon round-trip each time — that is the difference
-// between a tool an operator reaches for and one they work around.
-tasks.register("muxClasspath") {
-    group = "oroboros"
-    description = "Write the mux CLI runtime classpath to build/mux/classpath.txt for bin/mux."
-    dependsOn("jvmJar")
-    val outFile = layout.buildDirectory.file("mux/classpath.txt")
-    val cp = files(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-    outputs.file(outFile)
-    doLast {
-        val f = outFile.get().asFile
-        f.parentFile.mkdirs()
-        f.writeText(cp.joinToString(":") { it.absolutePath })
-    }
-}
-
-// mux — the keymux/modelmux operator surface. `bin/mux` wraps this; the task is
-// here so `./gradlew mux --args="doctor"` works without the wrapper.
-tasks.register<JavaExec>("mux") {
-    group = "oroboros"
-    description = "keymux/modelmux operator surface: keys | models | chat | doctor."
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.mux.MuxCli")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-    // The whole point is the process environment the operator is standing in —
-    // a sanitized env would resolve a different key set than their shell does.
-    environment(System.getenv())
-    standardInput = System.`in`
 }
 
 // Forge JVM shell — interactive Compose Desktop window that hosts the same
@@ -885,48 +719,8 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     dependsOn("jvmJar")
     from(configurations.named("jvmRuntimeClasspath"))
     from(sumoFrozenJar)
+    from(kotlinJsBundlesJar)
     into(stagingLibDir)
-}
-
-// ── Sub-VM capability harness ──────────────────────────────────────────────
-// `subvmHarness` runs the probe suite on the JVM and writes docs/subvm/capabilities-<host>.json +
-// capability-matrix.md. `subvmHarnessNative` builds the same harness as a native-image binary
-// (build/native/subvm-harness) so the macOS-native and linux-native columns are measured by the
-// identical probes; run it inside a linux GraalVM container for the linux row.
-tasks.register<JavaExec>("subvmHarness") {
-    group = "subvm"
-    description = "Measure the sub-VM capability matrix on this JVM (docs/subvm/)."
-    useStagedJvmClasspath()
-    mainClass.set("borg.trikeshed.graal.subvm.harness.HarnessMain")
-    args(listOf("docs/subvm"))
-}
-
-tasks.register<JavaExec>("documentFeedHarness") {
-    group = "subvm"
-    description = "Run managed Tika/Camel/CoreNLP through the document curator and NARS intake."
-    useStagedJvmClasspath()
-    mainClass.set("borg.trikeshed.graal.subvm.harness.DocumentFeedHarness")
-    maxHeapSize = "3g"
-}
-
-tasks.register<Exec>("subvmHarnessNative") {
-    group = "subvm"
-    description = "native-image the sub-VM harness (GraalVM CE; Truffle languages + execution-listener instrument included)."
-    dependsOn("stageDaemonLib", "compileKotlinJvm")
-    val nativeImage = file(System.getProperty("java.home")).resolve("bin/native-image")
-    val outDir = layout.buildDirectory.dir("native").get().asFile
-    doFirst {
-        outDir.mkdirs()
-        if (!nativeImage.exists()) throw GradleException("no native-image at $nativeImage — run Gradle on GraalVM (sdk use java 25.0.2-graalce)")
-        val cp = (listOf(file("build/classes/kotlin/jvm/main")) + fileTree(stagingLibDir) { include("*.jar") }.files).joinToString(File.pathSeparator)
-        commandLine(
-            nativeImage.path, "--no-fallback", "-O1",
-            "-H:+UnlockExperimentalVMOptions", "-H:+IncludeAllInstruments",
-            "--initialize-at-build-time=kotlin",
-            "-cp", cp, "borg.trikeshed.graal.subvm.harness.HarnessMain",
-            "-o", outDir.resolve("subvm-harness").path,
-        )
-    }
 }
 
 // `-Pjdwp=5005` attaches a JDWP listener (suspend=n); `-Pjdwp=5005,suspend` waits for the debugger
@@ -934,388 +728,32 @@ tasks.register<Exec>("subvmHarnessNative") {
 val jdwpSpec: String? = providers.gradleProperty("jdwp").orNull
 
 fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
-    dependsOn("stageDaemonLib", "compileKotlinJvm")
+    dependsOn("stageDaemonLib", "compileKotlinJvm", "jvmProcessResources")
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()
         val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
         jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
     }
-    dependsOn("jvmProcessResources")
-    doFirst {
-        val classes = file(if (name == "runOroborosDaemon") "build/live/classes" else "build/classes/kotlin/jvm/main")
-        val resources = file("build/processedResources/jvm/main")
-        val lib = file(stagingLibDir)
-        if (!classes.isDirectory) throw GradleException("missing $classes; run ./gradlew compileKotlinJvm")
-        if (!lib.isDirectory) throw GradleException("missing $lib; run ./gradlew stageDaemonLib")
-        // Resources (web/graal.html, futon.html, META-INF/services, openapi/*) must be on the
-        // classpath or the daemon serves /graal and /futon as 404 — the exact reason the gradle
-        // launch looked broken next to the hand-rolled java invocation.
-        classpath = files(classes, resources) + fileTree(lib) { include("*.jar") }
-    }
+    // Naked classes and processed resources (web/graal.html, futon.html, META-INF/services, openapi/*:
+    // without them the server answers /graal and /futon with 404) plus the staged runtime jars.
+    classpath = files("build/classes/kotlin/jvm/main", "build/processedResources/jvm/main") + fileTree(stagingLibDir) { include("*.jar") }
 }
 
-// Jules CAS bridge tasks removed: Jules is externalized, its in-repo CLI layer deleted.
-
-tasks.register<JavaExec>("portHermesPython") {
-    group = "subvm"
-    description = "Project Hermes into no-native GraalPy; --args forwards --root/--sleeve/--entry or --console/--command/--columns/--rows."
-    mainClass.set("borg.trikeshed.hermes.HermesPythonPortCli")
-    dependsOn("jvmJar")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-// Normal launch uses the same required AOT path as the retained AOT task name.
+// The daemon on the classpath utils/oroboros uses: jvmJar plus the staged runtime jars (which carry the
+// browser bundles and the frozen SUMO image). --args passes daemon arguments; -Pjdwp attaches a debugger.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"
-    description = "Automatically stage a compatible HotSpot AOT cache and launch OroborosDaemon with AOT required. --args preserves daemon home/repo arguments."
-    useDaemonAot()
-}
-
-// ── AOT cache (JEP 483 / Leyden, JDK 25) ────────────────────────────────────
-// Two hard constraints shape these tasks, both verified against GraalVM CE 25.0.2:
-//   1. AOT create/consume REJECTS exploded-directory classpaths ("Error: non-empty directory
-//      build/live/classes") — it accepts JAR entries only. These launch from immutable copies
-//      of jvmJar + the staged runtime jars, outside the cleanable build tree.
-//   2. The archive is bound to the EXACT classpath string. stageDaemonAot writes the -cp it used
-//      to a sidecar (oroboros.aot.cp); runOroborosDaemonAot reads that same string back, so create
-//      and consume use the same ordered entries. AOTMode=on requires an applicable cache.
-// Content fingerprints additionally bind runtime binaries, ordered JAR paths, sizes, mtimes and bytes.
-// The archive lands at build/staging/oroboros.aot, where the
-// build-plane absorber can pick it up so the AOT cache teleports with the install (gap-analysis §7).
-val daemonAotCache = layout.buildDirectory.file("staging/oroboros.aot")
-val daemonAotCpFile = layout.buildDirectory.file("staging/oroboros.aot.cp")
-val daemonAotFingerprintFile = layout.buildDirectory.file("staging/oroboros.aot.fingerprint")
-val daemonAotJvmArgs = listOf("--add-modules=jdk.internal.vm.ci", "--enable-native-access=ALL-UNNAMED")
-
-fun daemonAotJava(): File = File(System.getProperty("java.home"), "bin/java").canonicalFile
-
-fun daemonAotHash(file: File): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    file.inputStream().buffered().use { input ->
-        val buffer = ByteArray(128 * 1024)
-        while (true) {
-            val count = input.read(buffer)
-            if (count < 0) break
-            digest.update(buffer, 0, count)
-        }
-    }
-    return digest.digest().joinToString("") { "%02x".format(it) }
-}
-
-fun daemonAotFingerprint(): String {
-    val java = daemonAotJava()
-    val runtime = java.parentFile.parentFile
-    val runtimeFiles = listOf(java, File(runtime, "release"), File(runtime, "lib/modules")) +
-        listOf("lib/server/libjvm.dylib", "lib/server/libjvm.so", "bin/server/jvm.dll")
-            .map { File(runtime, it) }.filter { it.isFile }
-    val inputs = runtimeFiles + daemonAotClasspath().split(File.pathSeparator).map(::File)
-    val fingerprint = buildString {
-        appendLine("hotspot-aot-v2")
-        daemonAotJvmArgs.forEach { appendLine(it) }
-        appendLine(System.getProperty("os.arch"))
-        for (name in listOf("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")) appendLine("$name=${System.getenv(name).orEmpty()}")
-        for (input in inputs) {
-            check(input.isFile) { "Missing AOT input: $input" }
-            appendLine("${input.canonicalPath}\t${input.length()}\t${input.lastModified()}\t${daemonAotHash(input)}")
-        }
-    }
-    return MessageDigest.getInstance("SHA-256").digest(fingerprint.toByteArray()).joinToString("") { "%02x".format(it) }
-}
-
-fun daemonAotMatches(fingerprint: String): Boolean {
-    val aot = daemonAotCache.get().asFile
-    return aot.isFile && aot.length() > 0 && runCatching {
-        daemonAotCpFile.get().asFile.readText() == daemonAotClasspath() &&
-            daemonAotFingerprintFile.get().asFile.readText() == "$fingerprint\n${daemonAotHash(aot)}\n"
-    }.getOrDefault(false)
-}
-
-fun writeDaemonAotReceipt(target: File, text: String) {
-    val temporary = Files.createTempFile(target.parentFile.toPath(), ".aot-", ".tmp")
-    try {
-        Files.writeString(temporary, text)
-        Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-    } finally { Files.deleteIfExists(temporary) }
-}
-
-fun adoptDaemonAot(fingerprint: String): Boolean {
-    val aot = daemonAotCache.get().asFile
-    val cp = daemonAotClasspath()
-    if (!aot.isFile || aot.length() == 0L || daemonAotFingerprintFile.get().asFile.exists() ||
-        !daemonAotCpFile.get().asFile.isFile || daemonAotCpFile.get().asFile.readText() != cp) return false
-    val archiveHash = daemonAotHash(aot)
-    val log = layout.buildDirectory.file("reports/aot/adopt.log").get().asFile
-    log.parentFile.mkdirs()
-    val process = ProcessBuilder(listOf(daemonAotJava().path) + daemonAotJvmArgs + listOf(
-        "-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info", "-cp", cp, "-version"))
-        .redirectErrorStream(true).redirectOutput(log).start()
-    try {
-        if (!process.waitFor(20, TimeUnit.SECONDS) || process.exitValue() != 0) {
-            logger.lifecycle("[aot] existing cache rejected or acceptance timed out; see $log")
-            return false
-        }
-        val evidence = log.readText()
-        if (!evidence.contains("Opened AOT cache ${aot.path}.") ||
-            !evidence.contains("Mapped static  region #0") || !evidence.contains("Using AOT-linked classes: true")) {
-            logger.lifecycle("[aot] existing cache lacks JVM acceptance evidence; see $log")
-            return false
-        }
-        check(daemonAotFingerprint() == fingerprint && daemonAotHash(aot) == archiveHash) {
-            "AOT inputs or archive changed during acceptance; refusing legacy receipt"
-        }
-        writeDaemonAotReceipt(daemonAotFingerprintFile.get().asFile, "$fingerprint\n$archiveHash\n")
-        logger.lifecycle("[aot] adopted JVM-verified existing cache without retraining: $aot")
-        return true
-    } finally {
-        if (process.isAlive) {
-            process.destroyForcibly()
-            check(process.waitFor(5, TimeUnit.SECONDS)) { "AOT acceptance JVM did not stop; see $log" }
-        }
-    }
-}
-
-// Copy before launch: overwriting a JAR already open in a JVM can corrupt its lazy ZIP reads.
-// The ordered content manifest identifies an immutable generation; builds never replace its files.
-fun daemonClasspathSnapshot(inputs: List<File>, root: File): List<File> {
-    require(inputs.isNotEmpty()) { "Daemon classpath is empty" }
-    val sources = inputs.map { it.canonicalFile }
-    val hashes = sources.map { source ->
-        check(source.isFile) { "Missing daemon classpath input: $source; build and stage the daemon first" }
-        daemonAotHash(source)
-    }
-    val names = sources.mapIndexed { index, source ->
-        "${index.toString().padStart(4, '0')}-${source.name.replace(Regex("[^A-Za-z0-9._-]"), "_")}"
-    }
-    val manifest = buildString {
-        appendLine("daemon-classpath-v1")
-        names.forEachIndexed { index, name -> appendLine("$name\t${hashes[index]}") }
-    }
-    val digest = MessageDigest.getInstance("SHA-256").digest(manifest.toByteArray())
-        .joinToString("") { "%02x".format(it) }
-    val directory = root.canonicalFile.resolve(digest)
-    val files = names.map(directory::resolve)
-    fun validateSources() = sources.forEachIndexed { index, source ->
-        check(source.isFile && daemonAotHash(source) == hashes[index]) {
-            "Daemon classpath changed during snapshot: $source; retry after the build finishes"
-        }
-    }
-    fun validateGeneration() {
-        check(directory.resolve("classpath.manifest").readText() == manifest &&
-            files.indices.all { files[it].isFile && daemonAotHash(files[it]) == hashes[it] }) {
-            "Daemon classpath generation was modified: $directory; refusing to replace files a JVM may be using"
-        }
-    }
-    Files.createDirectories(directory.parentFile.toPath())
-    // Serialize publishers across Gradle processes. Never replace an existing generation, even if
-    // its contents were damaged externally: another JVM may still have those exact paths open.
-    FileChannel.open(directory.parentFile.resolve(".publish.lock").toPath(),
-        StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
-        channel.lock().use {
-            if (directory.exists()) {
-                validateGeneration()
-                validateSources()
-            } else {
-                val pending = Files.createTempDirectory(directory.parentFile.toPath(), ".pending-").toFile()
-                try {
-                    sources.forEachIndexed { index, source ->
-                        val copy = pending.resolve(names[index])
-                        Files.copy(source.toPath(), copy.toPath())
-                        check(daemonAotHash(copy) == hashes[index]) { "Daemon JAR changed while copying: $source" }
-                        check(copy.setReadOnly()) { "Cannot protect daemon classpath copy: $copy" }
-                    }
-                    validateSources()
-                    pending.resolve("classpath.manifest").apply {
-                        writeText(manifest)
-                        check(setReadOnly()) { "Cannot protect daemon classpath manifest: $this" }
-                    }
-                    Files.move(pending.toPath(), directory.toPath(), StandardCopyOption.ATOMIC_MOVE)
-                } finally { if (pending.exists()) pending.deleteRecursively() }
-            }
-        }
-    }
-    return files
-}
-
-// AOT preparation, verification and launch resolve the same immutable paths. Preserve the app
-// first, followed by staged dependencies sorted by name; indexed names also prevent collisions.
-fun daemonAotClasspath(): String {
-    val jar = tasks.named("jvmJar", org.gradle.jvm.tasks.Jar::class).flatMap { it.archiveFile }.get().asFile
-    fun sources(): List<File> {
-        val libs = (stagingLibDir.get().asFile.listFiles { f -> f.extension == "jar" } ?: emptyArray()).sortedBy { it.name }
-        check(libs.isNotEmpty()) { "Missing daemon runtime JARs; run ./gradlew stageDaemonLib" }
-        return (listOf(jar) + libs).map { it.canonicalFile }
-    }
-    val inputs = sources()
-    val snapshot = daemonClasspathSnapshot(inputs, File(System.getProperty("user.home"), ".local/forge/runtime/classpath"))
-    check(sources() == inputs) { "Daemon classpath entries changed during snapshot; retry after staging finishes" }
-    return snapshot.joinToString(File.pathSeparator) { it.path }
-}
-
-tasks.register("snapshotDaemonClasspath") {
-    group = "oroboros"
-    description = "Snapshot already-built daemon JARs into an immutable runtime classpath without rebuilding, training AOT or launching."
-    doLast { logger.lifecycle(daemonAotClasspath()) }
-}
-
-// Bounded JVM lifecycle shared by training and cache-consumption verification.
-fun aotProbe(flags: List<String>, port: Int, seconds: Long, log: File): String {
-    ServerSocket(port).use { }
-    // macOS's default temp path exceeds the daemon Unix-domain socket limit.
-    val tempRoot = File("/tmp").takeIf { it.isDirectory } ?: File(System.getProperty("java.io.tmpdir"))
-    val home = Files.createTempDirectory(tempRoot.toPath(), "ts-aot-").toFile()
-    val javaBin = daemonAotJava()
-    val command = listOf(javaBin.path) + daemonAotJvmArgs + flags + listOf("-Xlog:aot=info", "-cp", daemonAotClasspath(),
-        "borg.trikeshed.daemon.OroborosDaemon", "--watch", "--kanban-port", port.toString(),
-        "--interval-ms", "86400000", "--agents", "none", home.resolve("forge").path, projectDir.path)
-    log.parentFile.mkdirs()
-    val builder = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(log)
-    builder.environment()["HOME"] = home.path
-    builder.environment()["TRIKESHED_AOT_DEFAULT"] = "1"
-    val process = builder.start()
-    try {
-        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build()
-        val deadline = System.nanoTime() + Duration.ofSeconds(90).toNanos()
-        var ready = false
-        while (process.isAlive && System.nanoTime() < deadline) {
-            ready = runCatching {
-                client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/health"))
-                    .timeout(Duration.ofSeconds(2)).GET().build(), HttpResponse.BodyHandlers.discarding()).statusCode() == 200
-            }.getOrDefault(false)
-            if (ready) break
-            Thread.sleep(500)
-        }
-        check(ready && process.isAlive) { "AOT daemon did not become healthy; see $log" }
-        val response = client.send(HttpRequest.newBuilder(URI("http://127.0.0.1:$port/api/graal/aot"))
-            .timeout(Duration.ofSeconds(5)).GET().build(), HttpResponse.BodyHandlers.ofString())
-        check(response.statusCode() == 200) { "AOT status unavailable: ${response.statusCode()}" }
-        logger.lifecycle("[aot] live switches: ${response.body()}")
-        if (flags.any { it.startsWith("-XX:AOTCache=") }) {
-            val status = JsonSlurper().parseText(response.body()) as Map<*, *>
-            val expectedCache = flags.single { it.startsWith("-XX:AOTCache=") }.substringAfter('=')
-            check(status["mode"] == "on" && status["cacheInput"] == expectedCache && status["exists"] == true) {
-                "AOT daemon did not require the selected cache; see $log"
-            }
-        }
-        Thread.sleep(seconds * 1000)
-        check(process.isAlive) { "AOT daemon exited before probe completed; see $log" }
-        if (flags.any { it.startsWith("-XX:AOTCacheOutput=") }) {
-            val status = JsonSlurper().parseText(response.body()) as Map<*, *>
-            if (status["mxBeanRegistered"] == true) {
-                val vm = com.sun.tools.attach.VirtualMachine.attach(process.pid().toString())
-                val address = try { vm.startLocalManagementAgent() } finally { vm.detach() }
-                javax.management.remote.JMXConnectorFactory.connect(javax.management.remote.JMXServiceURL(address)).use { connector ->
-                    val ended = connector.mBeanServerConnection.invoke(
-                        javax.management.ObjectName("jdk.management:type=HotSpotAOTCache"),
-                        "endRecording", emptyArray<Any>(), emptyArray<String>())
-                    check(ended == true) { "HotSpot AOT recording did not finalize; see $log" }
-                }
-                logger.lifecycle("[aot] HotSpotAOTCacheMXBean.endRecording completed")
-            } else logger.lifecycle("[aot] AOT MXBean unavailable on this runtime; finalizing at JVM shutdown")
-        }
-        process.destroy()
-        check(process.waitFor(60, TimeUnit.SECONDS)) { "AOT daemon did not finish cache shutdown; see $log" }
-        return response.body()
-    } finally {
-        if (process.isAlive) {
-            process.destroyForcibly()
-            process.waitFor(10, TimeUnit.SECONDS)
-        }
-        logger.lifecycle("[aot] log: $log; probe home: $home")
-    }
-}
-
-tasks.register("stageDaemonAot") {
-    group = "oroboros"
-    description = "Reuse a fingerprint-matched HotSpot AOT cache or train and finalize one automatically. -PaotWarmSeconds=30 -PaotTrainPort=8971."
-    dependsOn("jvmJar", "stageDaemonLib", "jvmProcessResources")
-    timeout.set(Duration.ofSeconds(180))
-    doLast {
-        val fingerprint = daemonAotFingerprint()
-        if (daemonAotMatches(fingerprint) || adoptDaemonAot(fingerprint)) {
-            logger.lifecycle("[aot] reusing compatible cache: ${daemonAotCache.get().asFile} ($fingerprint)")
-            return@doLast
-        }
-        logger.lifecycle("[aot] cache missing or incompatible; training current JAR and runtime ($fingerprint)")
-        val warm = providers.gradleProperty("aotWarmSeconds").orElse("30").get().toLong()
-        require(warm in 0..30) { "aotWarmSeconds must be 0..30 to retain the three-minute bound" }
-        val port = providers.gradleProperty("aotTrainPort").orElse("8971").get().toInt()
-        val aot = daemonAotCache.get().asFile
-        val pending = File(aot.parentFile, "oroboros.pending.aot")
-        aot.parentFile.mkdirs()
-        Files.deleteIfExists(pending.toPath())
-        val log = layout.buildDirectory.file("reports/aot/train.log").get().asFile
-        aotProbe(listOf("-XX:AOTCacheOutput=${pending.path}"), port, warm, log)
-        val entries = Regex("Class +CP entries += +([0-9]+)").findAll(log.readText())
-            .lastOrNull()?.groupValues?.get(1)?.toLongOrNull() ?: 0
-        check(pending.isFile && pending.length() > 0 && entries >= 30000) {
-            "No validated daemon AOT archive ($entries class CP entries); see $log"
-        }
-        check(daemonAotFingerprint() == fingerprint) { "AOT inputs changed during training; refusing cache promotion" }
-        val archiveHash = daemonAotHash(pending)
-        Files.move(pending.toPath(), aot.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-        writeDaemonAotReceipt(daemonAotCpFile.get().asFile, daemonAotClasspath())
-        writeDaemonAotReceipt(daemonAotFingerprintFile.get().asFile, "$fingerprint\n$archiveHash\n")
-        logger.lifecycle("[aot] validated ${aot.length()} bytes, $entries class CP entries: $aot")
-    }
-}
-
-tasks.register("prepareDaemonAot") {
-    group = "oroboros"
-    description = "Prepare a compatible required-AOT daemon cache after the current application and runtime jars are staged."
-    dependsOn("stageDaemonAot")
-}
-
-fun requireDaemonAot(): File {
-    val aot = daemonAotCache.get().asFile
-    check(daemonAotMatches(daemonAotFingerprint())) {
-        "AOT inputs or cache changed after staging; refusing launch without a compatible AOT cache"
-    }
-    return aot
-}
-
-tasks.register<JavaExec>("runOroborosDaemonAot") {
-    group = "oroboros"
-    description = "Alias launch configuration for the normal required-AOT daemon chain."
-    useDaemonAot()
-}
-
-fun org.gradle.api.tasks.JavaExec.useDaemonAot() {
-    dependsOn("prepareDaemonAot")
+    description = "Launch OroborosDaemon on jvmJar + build/staging/lib, as utils/oroboros does."
+    dependsOn(stageDaemonLib)
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
-    standardInput = System.`in`
-    environment("TRIKESHED_AOT_DEFAULT", "1")
-    jvmArgs(daemonAotJvmArgs)
-    providers.gradleProperty("daemonArgs").orNull?.let { setArgsString(it) }
+    classpath(tasks.named("jvmJar"), fileTree(stagingLibDir) { include("*.jar") })
+    jvmArgs("-Xmx8g", "--add-modules=jdk.internal.vm.ci", "--enable-native-access=ALL-UNNAMED")
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()
         val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
         jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
     }
-    doFirst {
-        val aot = requireDaemonAot()
-        setExecutable(daemonAotJava().path)
-        classpath = files(daemonAotClasspath().split(File.pathSeparator))
-        jvmArgs("-XX:AOTCache=${aot.path}", "-XX:AOTMode=on", "-Xlog:aot=info")
-        logger.lifecycle("[aot] required cache: $aot; TRIKESHED_AOT_DEFAULT=1")
-    }
-}
-
-tasks.register("verifyDaemonAot") {
-    group = "verification"
-    description = "Boot with required AOT cache, query live AOT switches, and stop the isolated daemon."
-    dependsOn("stageDaemonAot")
-    timeout.set(Duration.ofSeconds(180))
-    doLast {
-        val aot = requireDaemonAot()
-        val log = layout.buildDirectory.file("reports/aot/verify.log").get().asFile
-        aotProbe(listOf("-XX:AOTCache=${aot.path}", "-XX:AOTMode=on"),
-            providers.gradleProperty("aotTrainPort").orElse("8971").get().toInt(), 0, log)
-        val evidence = log.readText()
-        check(evidence.contains("Opened AOT cache ${aot.path}.") &&
-            evidence.contains("Mapped static  region #0") &&
-            evidence.contains("Using AOT-linked classes: true")) { "JVM did not enable AOT-linked classes; see $log" }
-        logger.lifecycle("[aot] AOT-linked classes active and daemon health verified")
-    }
+    standardInput = System.`in`
 }
 
 // Kanban HTTP server for the modelmux CLI.
@@ -1331,37 +769,8 @@ tasks.register<JavaExec>("runKanbanHttpServerJvm") {
 //
 //   ./gradlew generateForgePages                        # stage jvm: JVM-baked index.html + sw/manifest/icons/css/js
 //   ./gradlew generateForgePages -PforgePagesStages=jvm,js,wasm   # + Kotlin/JS and wasmJs bundles under docs/js, docs/wasm
-//   ./gradlew forgePagesProbe                           # is the next stage green? (compiles JS + wasm targets)
 //   Deploy = generate, commit docs/, push. Pages = branch master, folder /docs; no Actions workflows.
 //
-// Ratchet: gradle/js-target-debt.excludes lists commonMain files cut from the JS-target compiles only;
-// delete a line when it compiles. Unselected stages never enter the task graph, so a red stage cannot
-// fail a publish of the green ones.
-fun debtExcludes(name: String): List<String> =
-    providers.fileContents(layout.projectDirectory.file("gradle/$name")).asText
-        .map { text -> text.lines().map { it.substringBefore('#').trim() }.filter { it.isNotEmpty() } }
-        .getOrElse(emptyList())
-
-val jsTargetDebt = debtExcludes("js-target-debt.excludes")
-val wasmTargetDebt = debtExcludes("wasm-target-debt.excludes")
-val nativeTargetDebt = debtExcludes("native-target-debt.excludes")
-
-// Same ratchet, native side: cut jvm-only commonMain debt from the Kotlin/Native compiles and
-// the shared-metadata compile so `gradle build` stays green without touching the JVM path.
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinNativeCompile>().configureEach {
-    exclude(nativeTargetDebt)
-    inputs.property("nativeDebtExcludes", nativeTargetDebt)
-}
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompileCommon>().configureEach {
-    exclude(nativeTargetDebt)
-    inputs.property("nativeDebtExcludes", nativeTargetDebt)
-}
-
-tasks.withType<Kotlin2JsCompile>().configureEach {
-    val globs = jsTargetDebt + (if (name.contains("WasmJs")) wasmTargetDebt else emptyList())
-    exclude(globs)
-    inputs.property("forgeDebtExcludes", globs)
-}
 
 val forgePagesStages: Set<String> = providers.gradleProperty("forgePagesStages").orElse("jvm").get()
     .split(',').map(String::trim).filter(String::isNotEmpty).toSet()
@@ -1435,39 +844,18 @@ tasks.register<Sync>("generateForgePages") {
     val stageStamp = forgePagesStages.sorted().joinToString("-")
     inputs.property("forgePagesStages", forgePagesStages.sorted())
 
+    val noJekyllFile = layout.projectDirectory.file("docs/.nojekyll").asFile
     doLast {
-        val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
+        val noJekyll = noJekyllFile
         if (!noJekyll.exists()) noJekyll.writeText("\n")
-        println("Forge PWA published to docs/ (stages: $stageStamp). Live: bin/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
+        println("Forge PWA published to docs/ (stages: $stageStamp). Live: utils/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
     }
 }
 
-tasks.register("forgePagesProbe") {
-    group = "documentation"
-    description = "Compile the JS and wasmJs targets under gradle/*-target-debt.excludes; green = ready to add that stage."
-    dependsOn("compileKotlinJs", "compileKotlinWasmJs")
-}
-
-// Config cache
-tasks.register("kmpPartiallyResolvedDependenciesCheckerIgnore") {
-    doLast { }
-}
-tasks.named("checkKotlinGradlePluginConfigurationErrors") {
-    enabled = false
-}
 tasks.configureEach {
     if (name == "kmpPartiallyResolvedDependenciesChecker") {
         enabled = false
     }
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "skipped", "failed")
-        showStandardStreams = true
-    }
-    dependsOn("hotswapAgentJar")
 }
 
 
@@ -1537,7 +925,7 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
 
     doLast {
         val outDirFile = outputDir.get().asFile
-        project.delete(outDirFile)
+        outDirFile.deleteRecursively()
         outDirFile.mkdirs()
 
         fun createByteArray(name: String, bytes: ByteArray): String {
@@ -1603,120 +991,6 @@ kotlin.sourceSets.getByName("commonMain") {
     kotlin.srcDir(generateForgeAssets.map { it.outputs.files })
 }
 
-tasks.register("metrics") {
-    group = "verification"
-    description = "Run JMH + regression gate against metrics-baseline.json"
-
-    dependsOn("jmh", "jsNodeTest")
-
-    doLast {
-        val jmhResultsFile = project.layout.buildDirectory.file("jmh-result.json").get().asFile
-        require(jmhResultsFile.exists()) { "JMH results file not found at \${jmhResultsFile.absolutePath}" }
-        val jmhJsonText = jmhResultsFile.readText()
-
-        var coldStart = -1.0
-        var zoomLatency = -1.0
-
-        val coldStartRegex = """"benchmark"\s*:\s*"[^"]*coldStartInteractive"[^}]*"primaryMetric"\s*:\s*\{[^}]*"score"\s*:\s*([0-9.]+)""".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val coldStartMatch = coldStartRegex.find(jmhJsonText)
-        if (coldStartMatch != null) {
-            coldStart = coldStartMatch.groupValues[1].toDouble()
-        }
-
-        val zoomRegex = """"benchmark"\s*:\s*"[^"]*zoomLatency"[^}]*"primaryMetric"\s*:\s*\{[^}]*"score"\s*:\s*([0-9.]+)""".toRegex(RegexOption.DOT_MATCHES_ALL)
-        val zoomMatch = zoomRegex.find(jmhJsonText)
-        if (zoomMatch != null) {
-            zoomLatency = zoomMatch.groupValues[1].toDouble()
-        }
-
-        require(coldStart >= 0.0) { "coldStartInteractive metric not found in JMH output" }
-        require(zoomLatency >= 0.0) { "zoomLatency metric not found in JMH output" }
-
-        var keystrokeToPaint = -1.0
-        val jsTestReportDir = project.layout.buildDirectory.dir("test-results/jsNodeTest").get().asFile
-        if (jsTestReportDir.exists()) {
-            val files = jsTestReportDir.listFiles()
-            if (files != null) {
-                for (file in files) {
-                    if (file.name.endsWith(".xml")) {
-                        val content = file.readText()
-                        val match = "METRIC:keystrokeToPaint:([0-9.]+)".toRegex().find(content)
-                        if (match != null) {
-                            keystrokeToPaint = match.groupValues[1].toDouble()
-                            break
-                        }
-                    }
-                }
-            }
-        }
-
-        require(keystrokeToPaint >= 0.0) { "keystrokeToPaint metric not found in jsNodeTest output" }
-
-        println("=== UX Metrics ===")
-        println("coldStartInteractive: \$coldStart ms/op")
-        println("zoomLatency: \$zoomLatency ms/op")
-        println("keystrokeToPaint: \$keystrokeToPaint ms")
-
-        val baselineFile = project.file("metrics-baseline.json")
-        if (!baselineFile.exists()) {
-            println("No baseline found. Creating metrics-baseline.json...")
-            val json = """
-            {
-              "coldStartInteractive": \$coldStart,
-              "zoomLatency": \$zoomLatency,
-              "keystrokeToPaint": \$keystrokeToPaint
-            }
-            """.trimIndent()
-            baselineFile.writeText(json)
-            println("Baseline created successfully.")
-        } else {
-            val baselineContent = baselineFile.readText()
-
-            val baseColdStartMatch = """"coldStartInteractive"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
-            val baseZoomMatch = """"zoomLatency"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
-            val baseKeystrokeMatch = """"keystrokeToPaint"\s*:\s*([0-9.]+)""".toRegex().find(baselineContent)
-
-            val baseColdStart = baseColdStartMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
-            val baseZoom = baseZoomMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
-            val baseKeystroke = baseKeystrokeMatch?.groupValues?.get(1)?.toDouble() ?: 0.0
-
-            val maxAllowedColdStart = baseColdStart * 1.2
-            val maxAllowedZoom = baseZoom * 1.2
-            val maxAllowedKeystroke = baseKeystroke * 1.2
-
-            var failed = false
-            if (coldStart > maxAllowedColdStart) {
-                System.err.println("REGRESSION: coldStartInteractive (\$coldStart) exceeded baseline (\$baseColdStart) by >20% (max \$maxAllowedColdStart)")
-                failed = true
-            }
-            if (zoomLatency > maxAllowedZoom) {
-                System.err.println("REGRESSION: zoomLatency (\$zoomLatency) exceeded baseline (\$baseZoom) by >20% (max \$maxAllowedZoom)")
-                failed = true
-            }
-            if (keystrokeToPaint > maxAllowedKeystroke) {
-                System.err.println("REGRESSION: keystrokeToPaint (\$keystrokeToPaint) exceeded baseline (\$baseKeystroke) by >20% (max \$maxAllowedKeystroke)")
-                failed = true
-            }
-
-            if (failed) {
-                throw GradleException("UX Metrics Regression detected (>20% over baseline)")
-            } else {
-                println("All metrics within acceptable bounds of baseline.")
-            }
-        }
-    }
-}
-
-tasks.register<JavaExec>("queueGraphWork") {
-    group = "trikeshed"
-    description = "Queue Graphify + pgGraph merged work to the kanban board"
-    classpath = files(
-        layout.buildDirectory.dir("classes/kotlin/jvm/main"),
-        configurations.named("jvmRuntimeClasspath")
-    )
-    mainClass.set("borg.trikeshed.utils.ingress.QueueGraphWorkKt")
-}
-
 
 // ─────────────────────────────────────────────────────────────────
 // commonMain Purity Check — detect JVM-specific patterns
@@ -1728,12 +1002,13 @@ tasks.register("commonMainPurity") {
     // Scope to the Kotlin source dir: resources/ carries vendored data (subvm, tspy,
     // ingest) whose own jvmMain is legitimately JVM code, not commonMain sources.
     val sources = fileTree("src/commonMain/kotlin") { include("**/*.kt") }
+    val root = projectDir
     inputs.files(sources)
     doLast {
         val forbidden = Regex("^\\s*import\\s+(java\\.|javax\\.|sun\\.|com\\.sun\\.)")
         val violations = sources.files.sorted().flatMap { source ->
             source.readLines().mapIndexedNotNull { index, line ->
-                if (forbidden.containsMatchIn(line)) "${source.relativeTo(projectDir)}:${index + 1}: $line" else null
+                if (forbidden.containsMatchIn(line)) "${source.relativeTo(root)}:${index + 1}: $line" else null
             }
         }
         if (violations.isNotEmpty()) throw GradleException(violations.joinToString("\n"))
@@ -1798,39 +1073,23 @@ tasks.register("hotswapFeed") {
     }
 }
 
-tasks.register("oroborosDoctor") {
-    group = "verification"
-    description = "Check live daemon health and operator routes; -PdaemonUrl=http://127.0.0.1:8888."
-    val base = providers.gradleProperty("daemonUrl").orElse("http://127.0.0.1:8888")
-    doLast {
-        val client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()
-        val failures = mutableListOf<String>()
-        listOf("/api/health", "/api/board", "/panels", "/graal").forEach { path ->
-            val url = base.get().trimEnd('/') + path
-            try {
-                val request = HttpRequest.newBuilder(URI(url)).timeout(Duration.ofSeconds(10)).GET().build()
-                val response = client.send(request, HttpResponse.BodyHandlers.discarding())
-                logger.lifecycle("${response.statusCode()} $url")
-                if (response.statusCode() != 200) failures.add(url)
-            } catch (failure: Exception) {
-                failures.add("$url: ${failure.javaClass.simpleName}: ${failure.message.orEmpty()}")
-            }
-        }
-        if (failures.isNotEmpty()) throw GradleException(failures.joinToString("\n"))
-    }
-}
-
 tasks.register("scriptPolicy") {
     group = "verification"
     description = "Report remaining non-Gradle operator scripts as policy violations."
+    val root = projectDir
     doLast {
-        val violations = fileTree("scripts").files + fileTree("bin") {
-            include("*.sh", "oroboros-*", "mux", "modelmux-cli", "trikeshed-btrfs")
-        }.files
-        val shells = file("build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
-            if (Regex("commandLine\\(\"(bash|sh|zsh)\"").containsMatchIn(line)) "build.gradle.kts:${index + 1}: ${line.trim()}" else null
+        // `scripts` at the root is the owner's marker file that keeps a scripts/ directory from existing.
+        val scriptsDir = File(root, "scripts")
+        val violations = (if (scriptsDir.isDirectory) scriptsDir.walkTopDown().filter { it.isFile }.toList() else emptyList()) +
+            File(root, "bin").listFiles().orEmpty().filter { f ->
+                f.name.endsWith(".sh") || f.name.startsWith("oroboros-") || f.name in setOf("mux", "modelmux-cli", "trikeshed-btrfs")
+            }
+        val shells = File(root, "build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
+            // The vendored liburing `configure` is third-party build plumbing, not an operator script.
+            if (Regex("commandLine\\(\"(bash|sh|zsh)\"").containsMatchIn(line) && "liburingSource.file(\"configure\")" !in line)
+                "build.gradle.kts:${index + 1}: ${line.trim()}" else null
         }
-        val remaining = violations.sorted().map { it.relativeTo(projectDir).path } + shells
+        val remaining = violations.sorted().map { it.relativeTo(root).path } + shells
         if (remaining.isNotEmpty()) throw GradleException("Remaining script entrypoints:\n" + remaining.joinToString("\n"))
     }
 }
@@ -1843,7 +1102,7 @@ tasks.register("scriptPolicy") {
 // The middle fetch keeps its optional offline fallback (-PsumoStrict disables
 // it). Full is deferred/experimental and only fetched or packaged by explicit
 // tasks below. Its fetch always requires every pin. See doc/todo.md.
-val sumoPinFile = file("gradle/sumo-corpus.pins")
+val sumoPinFile = file("utils/sumo/sumo-corpus.pins")
 
 fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: Boolean = false) = tasks.register(taskName) {
     group = "data"
@@ -1852,6 +1111,9 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
     val outDir = layout.buildDirectory.dir(resourceDir)
     val cacheRoot = File(gradle.gradleUserHomeDir, "trikeshed/sumo")
     val strict = full || providers.gradleProperty("sumoStrict").isPresent
+    // Read at configuration time: the action must not reach back into the build script (configuration cache).
+    val offline = gradle.startParameter.isOffline
+    val root = rootDir
 
     inputs.file(pinFile)
     // Strictness participates in up-to-date checking: flipping it must re-run the
@@ -1909,7 +1171,7 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
 
             if (!cacheFile.isFile) {
                 val url = "https://raw.githubusercontent.com/ontologyportal/sumo/$ref/$repoPath"
-                val body = if (gradle.startParameter.isOffline) null else runCatching { URI(url).toURL().readBytes() }.getOrNull()
+                val body = if (offline) null else runCatching { URI(url).toURL().readBytes() }.getOrNull()
                 if (body == null) {
                     missing += "$repoPath (download failed, cold cache)"
                     continue
@@ -1946,14 +1208,14 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
         // A full loader never mistakes a partial or stale directory for a complete corpus.
         if (missing.isEmpty()) pinFile.copyTo(manifest, overwrite = true)
         logger.lifecycle(
-            "SUMO corpus @ $ref -> ${dest.relativeTo(rootDir)} " +
+            "SUMO corpus @ $ref -> ${dest.relativeTo(root)} " +
                 "(${pins.size - missing.size}/${pins.size} files; $fetched fetched, $cached cached)"
         )
     }
 }
 
 val fetchSumoCorpus = sumoCorpusTask("fetchSumoCorpus", sumoPinFile, "generated/sumo/resources/sumo")
-val fetchSumoFullCorpus = sumoCorpusTask("fetchSumoFullCorpus", file("gradle/sumo-full-corpus.pins"), "generated/sumo-full/resources/sumo/full", full = true)
+val fetchSumoFullCorpus = sumoCorpusTask("fetchSumoFullCorpus", file("utils/sumo/sumo-full-corpus.pins"), "generated/sumo-full/resources/sumo/full", full = true)
 
 tasks.matching { it.name == "jvmProcessResources" }.configureEach {
     dependsOn(fetchSumoCorpus)
@@ -1986,67 +1248,6 @@ tasks.register<Test>("sumoFullTest") {
     classpath = files(sumoFullCompilation.output.allOutputs, sumoFullCompilation.runtimeDependencyFiles, sumoFullResources)
 }
 
-// Curator state model — read Hermes' .usage.json and report where the
-// AttentionEconomy floor crossings disagree with the 30/90 wall clock.
-// Read-only: proposes nothing, writes nothing, touches no live skill.
-tasks.register<JavaExec>("curatorStateModel") {
-    group = "oroboros"
-    description = "Model Hermes curation state as AttentionEconomy floor crossings; report divergences."
-    dependsOn("compileKotlinJvm")
-    mainClass.set("borg.trikeshed.narsese.CuratorStateModelCli")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-    providers.gradleProperty("profileDir").orNull?.let { args(it) }
-    providers.gradleProperty("daysAhead").orNull?.let { args(it) }
-}
-
-// nl.rules over a corpus in two runs: evidence accumulates, rules and answers told to a bank.
-tasks.register<JavaExec>("nlRules") {
-    group = "narsese"
-    description = "Run the nl.rules LCNC node twice over a corpus and query the tuples it told."
-    dependsOn("jvmJar", freezeSumo)
-    mainClass.set("borg.trikeshed.narsese.NlRulesNode")
-    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
-}
-
-tasks.register("printJvmRuntimeClasspath") {
-    val cp = configurations.getByName("jvmRuntimeClasspath")
-    doLast { File(project.findProperty("cpOut") as String).writeText(cp.asPath) }
-}
-
-// preset-describe headless: parse, type-check and run the stored program with the real runners.
-tasks.register<JavaExec>("describePreset") {
-    group = "narsese"
-    description = "Type-check and run preset-describe (nl.rules + skill.curate) through LcncRunner; query the bank."
-    dependsOn("jvmJar", freezeSumo)
-    mainClass.set("borg.trikeshed.narsese.DescribePresetCli")
-    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
-}
-
-// skill.overlap distribution over a profile's SKILL.md files.
-tasks.register<JavaExec>("skillOverlap") {
-    group = "oroboros"
-    description = "Class-set Jaccard distribution of a Hermes profile's skills (skill.overlap probe)."
-    dependsOn("jvmJar", freezeSumo)
-    mainClass.set("borg.trikeshed.narsese.SkillOverlapCli")
-    classpath(tasks.named("jvmJar"), sumoFrozenDir, configurations.getByName("jvmRuntimeClasspath"))
-}
-
-// skill.curate once over a profile: usage → lifecycle tuples → bank queries.
-tasks.register<JavaExec>("skillCurate") {
-    group = "oroboros"
-    description = "Run the skill.curate LCNC node over a Hermes profile and query the tuples it told."
-    dependsOn("jvmJar")
-    mainClass.set("borg.trikeshed.narsese.SkillCurateCli")
-    classpath(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
-}
-
-// Native IPNS client; its transport and durable state use the common uring facade.
-tasks.register<JavaExec>("ipns") {
-    useStagedJvmClasspath()
-    mainClass.set("borg.trikeshed.ipns.IpnsMainKt")
-    providers.gradleProperty("ipnsArgs").orNull?.let { args(it.split(Regex("\\s+")).filter(String::isNotBlank)) }
-}
-
 tasks.register<Exec>("buildJvmUring") {
     dependsOn(buildLiburing)
     inputs.file("src/jvmMain/c/uring_jni.c")
@@ -2060,17 +1261,34 @@ tasks.register<Exec>("buildJvmUring") {
         project.file("src/jvmMain/c/uring_jni.c").absolutePath,
         liburingBuild.get().file("src/liburing.a").asFile.absolutePath,
         "-o", layout.buildDirectory.file("native/jvm/libtrikeshed_uring.so").get().asFile.absolutePath)
-    doFirst { layout.buildDirectory.dir("native/jvm").get().asFile.mkdirs() }
+    val nativeDir = layout.buildDirectory.dir("native/jvm").get().asFile
+    doFirst { nativeDir.mkdirs() }
 }
 
-tasks.register<JavaExec>("uringBenchmarkJvm") {
-    dependsOn("jvmMainClasses")
-    val compilation = kotlin.targets.getByName("jvm").compilations.getByName("main")
-    classpath = files(compilation.output.allOutputs, compilation.runtimeDependencyFiles)
-    mainClass.set("borg.trikeshed.userspace.benchmark.JvmUringBenchmark")
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-    systemProperty("java.library.path", layout.buildDirectory.dir("native/jvm").get().asFile.absolutePath)
-    providers.gradleProperty("uringBenchmarkArgs").orNull?.let { setArgsString(it) }
+// The column-kernel library behind JvmColumnOperations (ColumnOperations.jvm.kt): the loops of lib/<primitive>p in C, built
+// with -O3 so the compiler vectorizes the selection and arithmetic loops, and -ffp-contract=off so sums stay bit-identical
+// to the Kotlin kernels. Built where a C compiler exists; elsewhere KotlinColumnOperations answers.
+val kernelsLibrary = layout.buildDirectory.file("native/jvm/libtrikeshed_kernels.so")
+val hasCCompiler = (System.getenv("PATH") ?: "").split(File.pathSeparator).any { File(it, "cc").canExecute() }
+val buildJvmKernels = tasks.register<Exec>("buildJvmKernels") {
+    inputs.files("src/nativeInterop/c/trikeshed_kernels.c", "src/nativeInterop/c/trikeshed_kernels.h")
+    outputs.file(kernelsLibrary)
+    val library = kernelsLibrary.get().asFile
+    commandLine("cc", "-O3", "-ffp-contract=off", "-shared", "-fPIC", "-Wall", "-Wextra",
+        project.file("src/nativeInterop/c/trikeshed_kernels.c").absolutePath, "-o", library.absolutePath, "-lm")
+    doFirst { library.parentFile.mkdirs() }
+}
+if (hasCCompiler) {
+    tasks.named<Test>("jvmTest") {
+        dependsOn(buildJvmKernels)
+        inputs.file(kernelsLibrary)
+        systemProperty("trikeshed.libkernels", kernelsLibrary.get().asFile.absolutePath)
+    }
+    tasks.matching { it.name.startsWith("jvmBench") && it is JavaExec }.configureEach {
+        this as JavaExec
+        dependsOn(buildJvmKernels)
+        jvmArgs("-Dtrikeshed.libkernels=" + kernelsLibrary.get().asFile.absolutePath)
+    }
 }
 
 // ── Uring benchmarks through kotlinx-benchmark (JMH on the JVM) ──────────────────────────────────────────────────────
@@ -2098,10 +1316,21 @@ benchmark {
         named("main") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "emulated")
+            exclude("TpchShapeBench")
         }
         register("native") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "native")
+            exclude("TpchShapeBench")
+        }
+        // The DuckDB-parity run: TPC-H Q1 and Q6 from SQL text over 1,000,000 generated lineitem rows, on each execution
+        // path (closure / generated class on boxed rows; Kotlin / native kernels on a column-major source).
+        // `./gradlew jvmBenchTpchBenchmark`
+        register("tpch") {
+            warmups = 3; iterations = 5; iterationTime = 2; iterationTimeUnit = "s"
+            include("TpchShapeBench")
+            param("rows", "1000000")
+            param("path", "rows", "jit", "dense", "ffi")
         }
     }
     targets { kotlin.targets.matching { it.name in benchTargetNames }.all { register("${this.name}Bench") } }

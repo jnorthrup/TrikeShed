@@ -45,7 +45,7 @@ class OroborosLauncherTest {
         val root = Files.createTempDirectory("oroboros-launcher-test").toFile()
         try {
             File(root, "bin").mkdirs()
-            File("bin/oroboros").copyTo(File(root, "bin/oroboros"))
+            File("utils/oroboros").copyTo(File(root, "utils/oroboros"))
             File(root, "build/libs").mkdirs(); File(root, "build/staging/lib").mkdirs()
             File(root, "build/libs/TrikeShed-jvm-0.1.0-SNAPSHOT.jar").writeText("application")
             File(root, "build/staging/lib/dependency.jar").writeText("dependency")
@@ -78,7 +78,7 @@ class OroborosLauncherTest {
     }
 
     private fun launch(root: File, java: File, code: String): Process =
-        ProcessBuilder("bash", File(root, "bin/oroboros").absolutePath).directory(root).apply {
+        ProcessBuilder("bash", File(root, "utils/oroboros").absolutePath).directory(root).apply {
             environment()["JAVA_HOME"] = java.absolutePath
             environment()["TMPDIR"] = root.absolutePath
             environment()["EXIT_CODE"] = code

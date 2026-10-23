@@ -128,7 +128,7 @@ object LcncContracts {
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
-    fun all(): List<LcncPortContract> = HeadhunterWorkflow.contracts() + listOf(
+    fun all(): List<LcncPortContract> = SqlGraph.contracts() + HeadhunterWorkflow.contracts() + listOf(
         // ── §4: concentric scope — the call, the binding, the return ──
         // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
         // names); the generic args?/returns pair is the declared wire spelling —

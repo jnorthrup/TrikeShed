@@ -30,6 +30,8 @@ sealed class ConfixIndexK<out R> : OpK<R>() {
     data object TreeCursor     : ConfixIndexK<Cursor>()
     data object KeyToChild     : ConfixIndexK<(CharSequence) -> Int?>()
     data object StructuralNodes : ConfixIndexK<Series<String?>>()
+    /** Typed columns over a root array of objects; see [confixColumns]. */
+    data object Columns        : ConfixIndexK<Cursor>()
 }
 
 /**
