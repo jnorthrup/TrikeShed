@@ -34,6 +34,25 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class HtxReactorElementTest {
+    @Test
+    fun responseByteLimitRejectsHeadersAndBodiesBeforeFurtherReadsAndClosesTheConnection() = runTest {
+        val operations = FakeChannelOperations(listOf(
+            listOf("HTTP/1.1 200 OK\r\nContent-Length: 1000000\r\n\r\n".encodeToByteArray()),
+            listOf("HTTP/1.1 200 OK\r\n\r\n".encodeToByteArray(), ByteArray(96)),
+        ))
+        val reactor = openHtxReactorElement(channelOperations = operations)
+        try {
+            repeat(2) {
+                val result = reactor.exchange(HtxExchangeState(), parseHtxRequest("http://example.com/").copy(maxResponseBytes = 64))
+                assertEquals(HtxExchangeLifecycle.FAILED, result.state.lifecycle)
+                assertTrue(result.state.failure.orEmpty().contains("response byte limit"))
+            }
+            assertEquals(2, operations.closedHandles)
+            assertEquals(2, operations.closedDescriptors.size)
+            assertFailsWith<IllegalArgumentException> { parseHtxRequest("http://example.com/").copy(maxResponseBytes = 0) }
+        } finally { reactor.drain() }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun ownerCancellationSettlesAnExchangeAdmittedBeforeTheWorkerStarts() = runTest {

@@ -63,11 +63,14 @@ data class HtxRequest(
     val body: HtxBody = emptyHtxBody(),
     /** Whole transport exchange budget, including TLS and the response body. */
     val timeoutMs: Long = DEFAULT_TIMEOUT_MS,
+    /** Maximum HTTP response bytes, including headers/framing; checked before accumulator growth. */
+    val maxResponseBytes: Int = Int.MAX_VALUE,
 ) {
     init {
         require(timeoutMs in 1..Int.MAX_VALUE.toLong()) {
             "HTX timeout must be between 1 and ${Int.MAX_VALUE} ms"
         }
+        require(maxResponseBytes > 0) { "HTX response byte limit must be positive" }
     }
 
     companion object {

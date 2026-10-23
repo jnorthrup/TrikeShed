@@ -127,6 +127,19 @@ internal object JvmSocketSyscalls {
     fun close(fd: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD.invokeExact(Close.at, state, fd) as Int) }
     fun shutdown(fd: Int, how: Int): Int { val state = errnoState.get(); return status(state, LibcDowncall.FD_INT.invokeExact(Shutdown.at, state, fd, how) as Int) }
 
+    /** SETSOCKOPT reads the submitted window without advancing it; portable constants map at this syscall boundary. */
+    fun setOption(fd: Int, buffer: ByteBuffer?, length: Int, level: Int, option: Int, flags: Int): Int {
+        if (buffer == null || length < 0 || length > buffer.remaining() || flags != 0) return -22
+        if (level != UringOp.SOL_SOCKET || option != UringOp.SO_REUSEADDR) return -92
+        return JvmFileSyscalls.native(maxOf(1, length)) { bytes ->
+            MemorySegment.copy(MemorySegment.ofArray(buffer.array()), (buffer.arrayOffset() + buffer.position()).toLong(),
+                bytes, 0, length.toLong())
+            val state = errnoState.get()
+            status(state, LibcDowncall.SETSOCKOPT.invokeExact(SetOption.at, state, fd,
+                if (darwin) 0xffff else level, if (darwin) 0x4 else option, bytes, length) as Int)
+        }
+    }
+
     /** GETSOCKNAME's borrowed output window, with the same Linux sockaddr framing as BIND/CONNECT. */
     fun name(fd: Int, buffer: ByteBuffer?, length: Int, peer: Int): Int {
         if (buffer == null || buffer.isReadOnly() || length < 0 || length > buffer.remaining() || peer !in 0..1) return -22
