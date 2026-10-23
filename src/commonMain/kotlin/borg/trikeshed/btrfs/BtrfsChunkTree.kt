@@ -4,76 +4,22 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 
 object BtrfsChunkTree {
-
-    private fun readULongLE(buf: ByteArray, offset: Int): ULong {
-        var result = 0uL
-        for (i in 0..7) {
-            result = result or ((buf[offset + i].toULong() and 0xFFuL) shl (i * 8))
-        }
-        return result
+    fun decode(bytes: ByteArray): BtrfsChunkItem {
+        BtrfsDisk.range(bytes, 0, 48)
+        val count = BtrfsDisk.u16(bytes, 44)
+        require(count > 0 && bytes.size == 48 + count * 32) { "Invalid Btrfs chunk stripe count" }
+        return BtrfsChunkItem(
+            BtrfsDisk.u64(bytes, 16), BtrfsDisk.u64(bytes, 24), count.toUShort(), BtrfsDisk.u16(bytes, 46).toUShort(),
+            List(count) { i ->
+                val p = 48 + i * 32
+                BtrfsStripe(BtrfsDisk.u64(bytes, p), BtrfsDisk.u64(bytes, p + 8), bytes.copyOfRange(p + 16, p + 32).map(Byte::toUByte))
+            },
+            BtrfsDisk.u64(bytes, 0), BtrfsDisk.u64(bytes, 8), BtrfsDisk.u32(bytes, 40),
+        )
     }
 
-    private fun readUIntLE(buf: ByteArray, offset: Int): UInt {
-        var result = 0u
-        for (i in 0..3) {
-            result = result or ((buf[offset + i].toUInt() and 0xFFu) shl (i * 8))
-        }
-        return result
-    }
-
-    private fun readUShortLE(buf: ByteArray, offset: Int): UShort {
-        val low = buf[offset].toUInt() and 0xFFu
-        val high = buf[offset + 1].toUInt() and 0xFFu
-        return (low or (high shl 8)).toUShort()
-    }
-
-    fun parse(bytes: ByteArray, offset: Int): List<Join<BtrfsKey, BtrfsChunkItem>> {
-        val result = mutableListOf<Join<BtrfsKey, BtrfsChunkItem>>()
-        
-        // nritems is at offset 96 within the btrfs_header
-        val nrItems = readUIntLE(bytes, offset + 96).toInt()
-
-        // item pointers start at offset 101
-        var itemPtrOffset = offset + 101
-        
-        for (i in 0 until nrItems) {
-            val keyObjectid = readULongLE(bytes, itemPtrOffset)
-            val keyType = bytes[itemPtrOffset + 8].toUByte()
-            val keyOffset = readULongLE(bytes, itemPtrOffset + 9)
-            val key = BtrfsKey(keyObjectid, keyType, keyOffset)
-            
-            require(key.type == BTRFS_KEY_TYPE_CHUNK_ITEM) {
-                "expected key.type = ${BTRFS_KEY_TYPE_CHUNK_ITEM}, got ${key.type}"
-            }
-            
-            // item pointers have 25 bytes total (17 byte key + 4 byte offset + 4 byte size)
-            val dataOffsetInNode = readUIntLE(bytes, itemPtrOffset + 17).toInt()
-            
-            // fix: data offset is relative to the start of the node (offset) + 101 byte header 
-            val payloadOffset = offset + 101 + dataOffsetInNode
-            
-            val stripeLength = readULongLE(bytes, payloadOffset)
-            val type = bytes[payloadOffset + 24].toUByte() // bitmask for single, raid0, raid1...
-            val numStripes = readUShortLE(bytes, payloadOffset + 44)
-            val subStripes = readUShortLE(bytes, payloadOffset + 46)
-            
-            val stripes = mutableListOf<BtrfsStripe>()
-            var stripeOffset = payloadOffset + 48 // btrfs_chunk is 48 bytes without stripes
-            
-            for (s in 0 until numStripes.toInt()) {
-                val devid = readULongLE(bytes, stripeOffset)
-                val stripeOff = readULongLE(bytes, stripeOffset + 8)
-                stripes.add(BtrfsStripe(devid, stripeOff))
-                // each btrfs_stripe is 32 bytes (devid 8, offset 8, dev_uuid 16)
-                stripeOffset += 32
-            }
-            
-            val chunkItem = BtrfsChunkItem(stripeLength, type, numStripes, subStripes, stripes)
-            result.add(key j chunkItem)
-            
-            itemPtrOffset += 25 // advance to next item pointer
-        }
-
-        return result
-    }
+    /** A chunk-tree leaf also contains device items; only chunk items are returned. */
+    fun parse(bytes: ByteArray, offset: Int): List<Join<BtrfsKey, BtrfsChunkItem>> =
+        BtrfsDisk.leaf(bytes, offset).filter { it.first.type == BTRFS_KEY_TYPE_CHUNK_ITEM }
+            .map { (key, value) -> key j decode(value) }
 }

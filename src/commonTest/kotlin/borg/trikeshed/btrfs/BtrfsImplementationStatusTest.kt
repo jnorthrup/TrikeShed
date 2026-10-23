@@ -35,10 +35,17 @@ class BtrfsImplementationStatusTest {
 
     @Test
     fun status_matrix_keeps_btrfs_progs_oracle_visible() {
-        val oracleGated = BtrfsImplementationStatus.offlineOracleRequired().map { it.capability }
-        assertTrue(BtrfsCapability.MKFS_IMAGE in oracleGated)
-        assertTrue(BtrfsCapability.CHECK_READ_ONLY in oracleGated)
-        assertEquals(BtrfsSupportStatus.SKELETON, BtrfsImplementationStatus.statusOf(BtrfsCapability.MKFS_IMAGE).status)
-        assertEquals(BtrfsSupportStatus.IMPLEMENTED, BtrfsImplementationStatus.statusOf(BtrfsCapability.URING_FILE_VOLUME).status)
+        val matrix = BtrfsImplementationStatus.matrix
+        assertEquals(BtrfsCapability.entries.toSet(), matrix.map { it.capability }.toSet())
+        assertEquals(BtrfsCapability.entries.size, matrix.size)
+        for (capability in listOf(BtrfsCapability.MKFS_IMAGE, BtrfsCapability.CHECK_READ_ONLY)) {
+            val status = BtrfsImplementationStatus.statusOf(capability)
+            assertEquals(BtrfsSupportStatus.IMPLEMENTED, status.status)
+            assertEquals(BtrfsOracleKind.BTRFS_PROGS_OFFLINE, status.oracle)
+            assertTrue(status.evidence.contains("BtrfsFilesystemOracleTest"))
+        }
+        assertEquals(BtrfsSupportStatus.MISSING, BtrfsImplementationStatus.statusOf(BtrfsCapability.BALANCE).status)
+        assertEquals(BtrfsSupportStatus.IMPLEMENTED, BtrfsImplementationStatus.statusOf(BtrfsCapability.USERSPACE_REBALANCE).status)
+        assertEquals(BtrfsSupportStatus.UNVERIFIED, BtrfsImplementationStatus.statusOf(BtrfsCapability.MACOS_FUSE_MOUNT).status)
     }
 }

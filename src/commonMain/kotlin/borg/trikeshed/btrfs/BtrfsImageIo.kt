@@ -57,14 +57,16 @@ object BtrfsSeedImageLayout {
     fun superblockBytes(bytenr: ULong, totalBytes: ULong): ByteArray {
         requireTotalBytes(totalBytes)
         val superBytes = ByteArray(NioBtrfsGraalBlobStore.SUPER_SIZE)
-        writeULongLE(superBytes, 0, bytenr)
-        writeULongLE(superBytes, 8, 0uL)
-        writeULongLE(superBytes, 16, BTRFS_MAGIC)
-        writeULongLE(superBytes, 24, 1uL)
-        writeULongLE(superBytes, 32, 0uL)
-        writeULongLE(superBytes, 40, 0uL)
-        writeULongLE(superBytes, 48, totalBytes)
-        writeULongLE(superBytes, 56, 0uL)
+        // Canonical superblock envelope only. Root/chunk pointers remain zero;
+        // this diagnostic seed is deliberately not a complete filesystem.
+        BtrfsDisk.put(superBytes, 48, bytenr)
+        BtrfsDisk.put(superBytes, 64, BTRFS_MAGIC)
+        BtrfsDisk.put(superBytes, 72, 1uL)
+        BtrfsDisk.put(superBytes, 112, totalBytes)
+        BtrfsDisk.put(superBytes, 136, 1uL)
+        BtrfsDisk.put(superBytes, 144, 4096uL, 4)
+        BtrfsDisk.put(superBytes, 148, 16384uL, 4)
+        BtrfsDisk.checksum(superBytes)
         return superBytes
     }
 

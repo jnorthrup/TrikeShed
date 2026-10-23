@@ -1,82 +1,50 @@
 package borg.trikeshed.btrfs
 
 import borg.trikeshed.userspace.volume.Volume
-import java.io.RandomAccessFile
-import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
+import borg.trikeshed.userspace.nio.file.Files
+import borg.trikeshed.userspace.nio.channels.UringChannels
+import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 
+/** Legacy synchronous opener; reads use the common canonical parser and owned userspace channels. */
 class BtrfsVolume(private val devicePath: String) : Volume {
     override val blockSize: Int = 4096
+    private val deviceBytes: Long = Files.open(devicePath, readOnly = true).let { file ->
+        try { file.size() } finally { file.close() }
+    }
     override val capacity: Long
 
-    private val chunkMap = sortedMapOf<ULong, BtrfsChunkItem>()
-
     init {
-        RandomAccessFile(devicePath, "r").use { raf ->
-            val buf = ByteArray(4096)
-            raf.seek(0)
-            raf.readFully(buf)
-            val sb = BtrfsSuperblock.parse(buf)
-            capacity = sb.totalBytes.toLong()
-
-            // read chunk tree
-            val chunkTreeBuf = ByteArray(4096)
-            raf.seek(sb.chunkRoot.toLong())
-            raf.readFully(chunkTreeBuf)
-            val chunkItems = BtrfsChunkTree.parse(chunkTreeBuf, 0)
-            
-            for ((key, item) in chunkItems) {
-                chunkMap[key.offset] = item
+        require(deviceBytes >= 65536L + 4096 && deviceBytes % blockSize == 0L) { "Truncated or unaligned Btrfs image" }
+        val sb = runBlocking {
+            withImage { image ->
+                val bytes = ByteArray(4096)
+                image.read(65536L / blockSize, 1).get(bytes)
+                BtrfsSuperblock.parse(bytes)
             }
+        }
+        require(sb.totalBytes <= deviceBytes.toULong() && sb.numDevices == 1uL) { "Unsupported Btrfs image geometry" }
+        capacity = sb.totalBytes.toLong() / blockSize
+    }
+
+    private suspend fun <T> withImage(action: suspend (BtrfsUringFileVolume) -> T): T = coroutineScope {
+        val channel = UringChannels.open(this, 8)
+        var volume: BtrfsUringFileVolume? = null
+        try {
+            volume = BtrfsUringFileVolume.open(channel, devicePath, blockSize, deviceBytes / blockSize,
+                create = false, resize = false, backendReport = currentNioCapabilityReport(), readOnly = true)
+            action(volume)
+        } finally {
+            try { volume?.drain() } finally { channel.drain() }
         }
     }
 
-    override suspend fun read(lba: Long, count: Int): ByteArray {
-        val logicalOffset = (lba * blockSize).toULong()
-        val readBytesCount = count * blockSize
-        
-        // Find chunk that contains this logical offset
-        // In sorted map, find the last entry whose key <= logicalOffset
-        var targetChunkOffset: ULong? = null
-        var targetChunk: BtrfsChunkItem? = null
-        
-        for ((offset, chunk) in chunkMap) {
-            if (offset <= logicalOffset) {
-                targetChunkOffset = offset
-                targetChunk = chunk
-            } else {
-                break
-            }
-        }
-        
-        requireNotNull(targetChunkOffset) { "No chunk found for logical offset $logicalOffset" }
-        requireNotNull(targetChunk) { "No chunk found for logical offset $logicalOffset" }
-        
-        // Only SINGLE or valid RAID0 logic provided per requirements (asserting numStripes == 1u || type == SINGLE (2))
-        require(targetChunk.numStripes == 1u.toUShort() || targetChunk.type == 2.toUByte()) {
-            "Only SINGLE or single-stripe chunks are supported for read"
-        }
-        
-        val stripe = targetChunk.stripes.first()
-        val offsetWithinChunk = logicalOffset - targetChunkOffset
-        val physicalOffset = stripe.offset + offsetWithinChunk
-        
-        val buf = ByteArray(readBytesCount)
-        RandomAccessFile(devicePath, "r").use { raf ->
-            raf.channel.position(physicalOffset.toLong())
-            val byteBuf = ByteBuffer.wrap(buf)
-            var bytesRead = 0
-            while (bytesRead < readBytesCount) {
-                val r = raf.channel.read(byteBuf)
-                if (r == -1) break
-                bytesRead += r
-            }
-        }
-        return buf
-    }
+    override suspend fun read(lba: Long, count: Int): ByteArray =
+        withImage { BtrfsFilesystemImage.readLogical(it, lba, count) }
 
     override suspend fun write(lba: Long, data: ByteArray): Nothing =
-        throw UnsupportedOperationException("BtrfsVolume is read-only; COW not in scope for this task")
+        throw UnsupportedOperationException("BtrfsVolume is read-only; publish a staged BtrfsFilesystemImage for writes")
 
     override suspend fun sync(): Unit = Unit
 }

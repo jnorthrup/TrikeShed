@@ -10,13 +10,17 @@ import borg.trikeshed.userspace.nio.Volume
 import borg.trikeshed.userspace.nio.channels.UringChannels
 import borg.trikeshed.userspace.nio.spi.currentNioCapabilityReport
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -78,12 +82,21 @@ class BtrfsRaidImage private constructor(
     private val owner: CompletableJob,
     private val entries: Int,
     private val channelFactory: (CoroutineScope, Int) -> FunctionalUringFacade,
+    parent: CoroutineScope,
 ) : Volume {
     val config: BtrfsRaidImageConfig get() = metadata.record.config
     override val blockSize: Int get() = volume.blockSize
     override val capacity: Long get() = volume.capacity
     private val admission = Mutex()
     private var closed = false
+    private var closeFailure: Throwable? = null
+    private val stopped = CompletableDeferred<Unit>()
+    // This watcher is outside the image owner: closing the image joins that
+    // owner, so a watcher under it would wait for its own completion.
+    private val cleanup = parent.launch(start = CoroutineStart.UNDISPATCHED) {
+        try { stopped.await() }
+        finally { closeOwned() }
+    }
 
     override suspend fun read(lba: Long, count: Int): ByteBuffer = admission.withLock {
         check(!closed) { "RAID image is closed" }
@@ -161,13 +174,20 @@ class BtrfsRaidImage private constructor(
                     if (closed) {
                         owner.complete()
                         owner.join()
+                        stopped.complete(Unit)
                     }
                 }
             }
         }
     }
 
-    suspend fun drain(): Unit = withContext(NonCancellable) { admission.withLock {
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        closeOwned()
+        cleanup.join()
+        closeFailure?.let { throw it }
+    }
+
+    private suspend fun closeOwned(): Unit = withContext(NonCancellable) { admission.withLock {
         if (closed) return@withLock
         closed = true
         var failure: Throwable? = null
@@ -180,7 +200,8 @@ class BtrfsRaidImage private constructor(
         for (resource in resources) if (resource != null) collect { resource.drain() }
         owner.complete()
         owner.join()
-        failure?.let { throw it }
+        closeFailure = failure
+        stopped.complete(Unit)
     } }
 
     companion object {
@@ -263,7 +284,7 @@ class BtrfsRaidImage private constructor(
                 }
                 volume = BtrfsRaidVolume.create(ownedScope, config.layout, members, config.stripeBlocks, failed, metadata)
                 currentCoroutineContext().ensureActive()
-                return BtrfsRaidImage(volume, resources, metadata, ownedScope, owner, entries, channelFactory)
+                return BtrfsRaidImage(volume, resources, metadata, ownedScope, owner, entries, channelFactory, scope)
             } catch (failure: Throwable) {
                 withContext(NonCancellable) {
                     volume?.let { runCatching { it.drain() }.exceptionOrNull()?.let { failure.addSuppressed(it) } }
@@ -286,14 +307,17 @@ class BtrfsRaidImage private constructor(
         ): BtrfsRaidImage {
             requireNotNull(scope.coroutineContext[Job]) { "RAID images require an owning Job" }.ensureActive()
             currentCoroutineContext().ensureActive()
-            val channel = UringChannels.open(scope, entries)
+            val lifetime = BtrfsRaidImageChannelLifetime(scope)
+            var channel: FunctionalUringFacade? = null
             var bootstrap: BtrfsUringFileVolume? = null
             val config: BtrfsRaidImageConfig
             try {
+                val openedChannel = UringChannels.open(lifetime.scope, entries)
+                channel = openedChannel
                 // This capacity is a read bound, not a resize. Slots are bounded
                 // at 64 MiB and aligned to 4 KiB, so a damaged first prefix can
                 // be bypassed by locating the second slot's own valid prefix.
-                bootstrap = BtrfsUringFileVolume.open(channel, imagePath, 4096, 32768, false, false, currentNioCapabilityReport())
+                bootstrap = BtrfsUringFileVolume.open(openedChannel, imagePath, 4096, 32768, false, false, currentNioCapabilityReport())
                 var slotBytes: Int? = null
                 var pageIndex = 0L
                 while (pageIndex <= 16384 && slotBytes == null) {
@@ -332,7 +356,8 @@ class BtrfsRaidImage private constructor(
                 require((0 until config.members.size).any { config.members[it].imagePath == imagePath }) { "Discovery path does not match stored member identity" }
             } finally {
                 withContext(NonCancellable) {
-                    try { bootstrap?.drain() } finally { channel.drain() }
+                    try { bootstrap?.drain() }
+                    finally { try { channel?.drain() } finally { lifetime.drain() } }
                 }
             }
             return open(scope, config, entries = entries, unavailable = unavailable)
@@ -349,25 +374,30 @@ class BtrfsRaidImage private constructor(
         ): BtrfsRaidImageResource {
             require(!resize || create)
             require(!create || resize)
+            requireNotNull(scope.coroutineContext[Job]).ensureActive()
             val reserved = BtrfsRaidMetadata.reservedBlocks(config)
             require(member.capacityBlocks <= Long.MAX_VALUE - reserved)
-            val channel = channelFactory(scope, entries)
+            val lifetime = BtrfsRaidImageChannelLifetime(scope)
+            var channel: FunctionalUringFacade? = null
             try {
+                val openedChannel = channelFactory(lifetime.scope, entries)
+                channel = openedChannel
                 val raw = BtrfsUringFileVolume.open(
-                    channel = channel,
+                    channel = openedChannel,
                     imagePath = member.imagePath,
                     blockSize = config.blockSize,
                     capacity = member.capacityBlocks + reserved,
                     create = create,
                     resize = resize,
                     backendReport = currentNioCapabilityReport(),
-                    channelReport = BtrfsUringChannelReport(channel.availability, channel.capabilities, channel.nativeCapabilities),
+                    channelReport = BtrfsUringChannelReport(openedChannel.availability, openedChannel.capabilities, openedChannel.nativeCapabilities),
                     exclusive = create,
                 )
-                return BtrfsRaidImageResource(raw, channel)
+                return BtrfsRaidImageResource(raw, openedChannel, lifetime)
             } catch (failure: Throwable) {
                 withContext(NonCancellable) {
-                    runCatching { channel.drain() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                    runCatching { channel?.drain() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                    lifetime.drain()
                 }
                 throw failure
             }
@@ -376,9 +406,39 @@ class BtrfsRaidImage private constructor(
     }
 }
 
-private class BtrfsRaidImageResource(val raw: BtrfsUringFileVolume, private val channel: FunctionalUringFacade) {
-    suspend fun drain() {
-        try { raw.drain() } finally { channel.drain() }
+/** Keep channel children alive until their raw descriptor CLOSE is acknowledged. */
+private class BtrfsRaidImageChannelLifetime(parent: CoroutineScope) {
+    private val released = CompletableDeferred<Unit>()
+    lateinit var scope: CoroutineScope
+        private set
+    private val host = parent.launch(start = CoroutineStart.UNDISPATCHED) {
+        withContext(NonCancellable) {
+            supervisorScope {
+                scope = this
+                released.await()
+            }
+        }
+    }
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        released.complete(Unit)
+        // A throwing channel factory can leave children without returning a
+        // facade. This runs only after every known descriptor/channel is closed.
+        scope.coroutineContext[Job]?.cancel()
+        host.join()
+    }
+}
+
+private class BtrfsRaidImageResource(
+    val raw: BtrfsUringFileVolume,
+    private val channel: FunctionalUringFacade,
+    private val lifetime: BtrfsRaidImageChannelLifetime,
+) {
+    suspend fun drain(): Unit = withContext(NonCancellable) {
+        try { raw.drain() }
+        finally {
+            try { channel.drain() }
+            finally { lifetime.drain() }
+        }
     }
 }
 

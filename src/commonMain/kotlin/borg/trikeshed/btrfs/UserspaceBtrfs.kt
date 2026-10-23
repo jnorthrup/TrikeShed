@@ -27,6 +27,7 @@ class UserspaceBtrfs(
     val rootDir: String,
     val fileOps: FileOperations,
     cas: CasStore? = null,
+    val metadataCompression: BtrfsMetadataCompression = BtrfsMetadataCompression.RAW,
     private val clock: () -> Instant = { Clock.System.now() },
 ) {
     private data class Entry(val extent: FileExtent?, val times: BtrfsFileTimes = BtrfsFileTimes.ZERO) {
@@ -366,10 +367,12 @@ class UserspaceBtrfs(
 
     private fun publishBytes(name: String, bytes: ByteArray) {
         val path = manifestPathOf(name)
+        val stored = if (metadataCompression == BtrfsMetadataCompression.RAW) bytes
+            else metadataCompression.encode(bytes)
         val before = if (fileOps.exists(path)) fileOps.readAllBytes(path).copyOf() else null
         try {
-            fileOps.writeAtomically(path, bytes)
-            check(fileOps.readAllBytes(path).contentEquals(bytes)) { "Manifest publication verification failed" }
+            fileOps.writeAtomically(path, stored)
+            check(fileOps.readAllBytes(path).contentEquals(stored)) { "Manifest publication verification failed" }
         } catch (failure: Throwable) {
             val unchanged = runCatching {
                 if (before == null) !fileOps.exists(path)
@@ -382,7 +385,8 @@ class UserspaceBtrfs(
         }
     }
 
-    private fun readManifest(bytes: ByteArray): Subvolume? {
+    private fun readManifest(stored: ByteArray): Subvolume? {
+        val bytes = BtrfsMetadataCompression.decode(stored)
         if (bytes.size >= MAGIC.length && bytes.decodeToString(0, MAGIC.length) == MAGIC) {
             val lines = bytes.decodeToString(throwOnInvalidSequence = true).split('\n')
             require(lines.size >= 3 && lines[0] == MAGIC && lines.last().isEmpty()) { "Invalid legacy manifest" }

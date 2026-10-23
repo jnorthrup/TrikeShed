@@ -9,14 +9,14 @@ import kotlin.test.assertTrue
 
 class NioBtrfsGraalBlobStoreTest {
 
-    // ── writeMountableImage → BtrfsSuperblock.parse seed round trip ─────────
+    // ── writeSeedImage → BtrfsSuperblock.parse seed round trip ───────────────
 
     @Test
     fun seedImageSuperblockRoundTrips() {
         val fileOps = InMemoryFileOperations()
         val img = "/mem/vol/btrfs.img"
         val total = 128uL * 1024uL * 1024uL // 128 MiB — big enough for the 64MiB mirror
-        assertTrue(NioBtrfsGraalBlobStore.writeMountableImage(img, total, fileOps))
+        assertTrue(NioBtrfsGraalBlobStore.writeSeedImage(img, total, fileOps))
 
         val bytes = fileOps.readAllBytes(img)
         assertEquals((NioBtrfsGraalBlobStore.SUPER_OFFSET_MIRRORS + NioBtrfsGraalBlobStore.SUPER_SIZE).toInt(), bytes.size)
@@ -45,7 +45,7 @@ class NioBtrfsGraalBlobStoreTest {
         val fileOps = InMemoryFileOperations()
         val img = "/mem/vol/small.img"
         val total = 1uL * 1024uL * 1024uL // 1 MiB — no room for the 64MiB mirror
-        assertTrue(NioBtrfsGraalBlobStore.writeMountableImage(img, total, fileOps))
+        assertTrue(NioBtrfsGraalBlobStore.writeSeedImage(img, total, fileOps))
         val bytes = fileOps.readAllBytes(img)
         assertEquals((NioBtrfsGraalBlobStore.SUPER_OFFSET_PRIMARY + NioBtrfsGraalBlobStore.SUPER_SIZE).toInt(), bytes.size)
         val sb = BtrfsSuperblock.parse(bytes.copyOfRange(
@@ -59,7 +59,7 @@ class NioBtrfsGraalBlobStoreTest {
     fun imageTooSmallForSuperblockFails() {
         val fileOps = InMemoryFileOperations()
         assertFailsWith<IllegalArgumentException> {
-            NioBtrfsGraalBlobStore.writeMountableImage("/mem/vol/tiny.img", 4096uL, fileOps)
+            NioBtrfsGraalBlobStore.writeSeedImage("/mem/vol/tiny.img", 4096uL, fileOps)
         }
     }
 
