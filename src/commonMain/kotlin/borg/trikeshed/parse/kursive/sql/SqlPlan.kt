@@ -78,6 +78,46 @@ fun SelectStmt.plan(
         stages += QueryK.Widen(filtered, pairs.toSeries(), clause.outer)
         for (c in residual) stages += QueryK.Filter(c)
     }
+    // Evoke's planner-native marker: each distinct `evoke_query(index, query[, k])` in the select list or
+    // ORDER BY scores the scan once, before WHERE, with corpus statistics over the whole table, and keeps
+    // only matching rows; the marker then reads as a column. The index names a text column of the scan.
+    val markers = LinkedHashMap<String, String>()
+    fun mark(e: Expr) {
+        when (e) {
+            is Call -> if (e.name == "evoke_query") markers.getOrPut(e.render()) {
+                val args = e.args.view.toList()
+                require(args.size in 2..3) { "evoke_query(index, query[, k]) takes two or three arguments" }
+                val index = constantText(args[0]) ?: error("evoke_query: the index must be a constant")
+                val query = constantText(args[1]) ?: error("evoke_query: the query must be a constant")
+                val k = args.getOrNull(2)?.let { (constant(it) as? Number)?.toInt() ?: error("evoke_query: k must be a number") } ?: -1
+                "#e${markers.size}".also { stages += QueryK.LexicalTopK(index, query, it, k) }
+            } else e.args.view.forEach(::mark)
+            is BinaryExpr -> { mark(e.left); mark(e.right) }
+            is Cast -> mark(e.expr)
+            is Path -> mark(e.cell)
+            is Not -> mark(e.expr)
+            is Is -> mark(e.expr)
+            is InList -> { mark(e.expr); e.items.view.forEach(::mark) }
+            is ColumnRef, is LitExpr, Star -> Unit
+        }
+    }
+    columns.view.forEach { mark(it.expr) }
+    orderBy.view.forEach { mark(it.expr) }
+    /**
+     * [e] with every marker read as its score column. Series are rebuilt through `map { }`, not
+     * `α ::lexical`: a reference to a local function inside an inline lambda compiles to a class that
+     * cannot reach the local function's private static form (IllegalAccessError at run time).
+     */
+    fun lexical(e: Expr): Expr = when (e) {
+        is Call -> markers[e.render()]?.let { ColumnRef(Identifier(it.toSeries())) } ?: Call(e.name, e.args.view.map { lexical(it) }.toSeries())
+        is BinaryExpr -> BinaryExpr(lexical(e.left), e.op, lexical(e.right))
+        is Cast -> Cast(lexical(e.expr), e.type)
+        is Path -> Path(lexical(e.cell), e.path, e.text)
+        is Not -> Not(lexical(e.expr))
+        is Is -> Is(lexical(e.expr), e.value, e.negated)
+        is InList -> InList(lexical(e.expr), e.items.view.map { lexical(it) }.toSeries(), e.negated)
+        is ColumnRef, is LitExpr, Star -> e
+    }
     where?.let { stages += QueryK.Filter(it) }
 
     val items = columns.view.toList()
@@ -114,10 +154,10 @@ fun SelectStmt.plan(
             e is Path -> Path(lift(e.cell), e.path, e.text)
             e is Not -> Not(lift(e.expr))
             e is Is -> Is(lift(e.expr), e.value, e.negated)
-            e is InList -> InList(lift(e.expr), e.items α ::lift, e.negated)
+            e is InList -> InList(lift(e.expr), e.items.view.map { lift(it) }.toSeries(), e.negated)
             else -> e
         }
-        val lifted = items.map { lift(it.expr) }
+        val lifted = items.map { lift(lexical(it.expr)) }
         residual = residual?.let(::lift)
         val grouped = groupBy.view.map { it.render() }
         stages += QueryK.Aggregate(axis.toSeries(), reductions.toSeries())
@@ -133,13 +173,13 @@ fun SelectStmt.plan(
     } else if (star) {
         sources += "*" j "*"
     } else for (item in items) {
-        val e = item.expr
+        val e = lexical(item.expr)
         sources += (if (e is ColumnRef) e.id.asString() else derive(e)) j displayName(item)
     }
     residual?.let { stages += QueryK.Filter(it) }
 
     if (orderBy.size > 0 || limit != null || offset != null) {
-        val axis = orderBy.view.map { order -> orderSource(order.expr, items, sources, ::derive) }
+        val axis = orderBy.view.map { order -> orderSource(order.expr, items, sources) { derive(lexical(it)) } }
         stages += QueryK.Order(
             axis.toSeries(),
             BooleanArray(orderBy.size) { orderBy[it].descending },
@@ -151,6 +191,15 @@ fun SelectStmt.plan(
     stages += QueryK.Project(sources.toSeries())
     return QueryCursor(source, stages.toSeries(), ops, compiler)
 }
+
+/** A literal's value, through a cast of a literal (`'idx'::regclass`); null for anything else. */
+fun constant(e: Expr): Any? = when (e) {
+    is LitExpr -> literal(e.lit)
+    is Cast -> if (e.expr is LitExpr) SqlRuntime.cast(literal(e.expr.lit), e.type) else null
+    else -> null
+}
+
+fun constantText(e: Expr): String? = constant(e)?.let { scalarText(it) }
 
 /** The AND-separated conjuncts of [e]. */
 fun conjuncts(e: Expr?): List<Expr> = when {

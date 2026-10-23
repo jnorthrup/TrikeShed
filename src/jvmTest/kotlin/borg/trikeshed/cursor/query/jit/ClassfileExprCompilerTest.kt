@@ -49,6 +49,7 @@ class ClassfileExprCompilerTest {
             "NOT n > 5", "n IS NULL", "x IS NOT NULL", "k > 1 IS TRUE", "n > 5 IS NOT FALSE", "x ILIKE 'GR%'",
             "x NOT LIKE 'gr%'", "x ILIKE x", "k IN (1, 3)", "n IN (10, NULL)", "k NOT IN (1, 3)",
             "n > 5 AND k = 9", "n > 5 OR k = 2", "NOT (n > 5 AND k = 2)", "n = NULL", "TRUE AND n > 5",
+            "x @@ 'red grey'", "x @@ x", "doc->>'t' @@ 'q z'",
         )) {
             val (expected, actual) = both(sql, jit)
             assertEquals(expected, actual, sql)

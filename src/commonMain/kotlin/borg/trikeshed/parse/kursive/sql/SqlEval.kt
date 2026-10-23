@@ -91,6 +91,7 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     ">=" -> { row -> SqlRuntime.ge(left(row), right(row)) }
     "LIKE" -> { row -> SqlRuntime.like(left(row), right(row)) }
     "ILIKE" -> { row -> SqlRuntime.ilike(left(row), right(row)) }
+    "@@" -> { row -> SqlRuntime.matches(left(row), right(row)) }
     "||" -> { row -> SqlRuntime.concat(left(row), right(row)) }
     "<=>" -> { row -> SqlRuntime.cosineDistance(left(row), right(row)) }
     "<->" -> { row -> SqlRuntime.l2Distance(left(row), right(row)) }
@@ -206,7 +207,7 @@ fun castTo(value: Any?, type: String): Any? {
             if (value is Number) value.toLong() else scalarText(value).trim().toLongOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
         "float", "float4", "float8", "real", "double", "numeric", "decimal" ->
             if (value is Number) value.toDouble() else scalarText(value).trim().toDoubleOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
-        "text", "varchar", "string", "char" -> scalarText(value)
+        "text", "varchar", "string", "char", "regclass" -> scalarText(value)
         "bool", "boolean" -> when (value) {
             is Boolean -> value
             is Number -> value.toDouble() != 0.0

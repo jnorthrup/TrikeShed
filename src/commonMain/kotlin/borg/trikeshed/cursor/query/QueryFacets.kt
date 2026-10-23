@@ -15,6 +15,8 @@ import borg.trikeshed.parse.kursive.sql.compile
 import borg.trikeshed.parse.kursive.sql.confixCellOf
 import borg.trikeshed.parse.kursive.sql.integral
 import borg.trikeshed.parse.kursive.sql.ordinalOf
+import borg.trikeshed.parse.kursive.sql.scalarText
+import borg.trikeshed.cas.TermPostings
 
 /**
  * The single executor of [QueryK] stages: one `when`, one cast. A [ColumnCursor] source runs the
@@ -36,6 +38,7 @@ fun <R> Cursor.facet(
         is QueryK.Aggregate -> columnar?.routeAggregate(key, ops) ?: aggregate(key)
         is QueryK.Order -> columnar?.routeOrder(key) ?: order(key)
         is QueryK.Unnest -> unnest(key)
+        is QueryK.LexicalTopK -> lexicalTopK(key)
     } as R
 }
 
@@ -59,6 +62,26 @@ fun Cursor.derive(stage: QueryK.Derive, compiler: ExprCompiler = ClosureExprComp
         val row = this[r]
         val values = row.values
         ReifiedSplitSeries2(width + 1 j { c: Int -> if (c < width) values[c] else expr(row) }, widened)
+    }
+}
+
+/** The postings are built over the column per statement (brute force, as the vector kernels are). */
+fun Cursor.lexicalTopK(stage: QueryK.LexicalTopK): Cursor {
+    if (size == 0) return this
+    val column = names.ordinalOf(stage.column)
+    val postings = TermPostings()
+    for (r in 0 until size) this[r].values[column]?.let { postings.upsert(r, scalarText(it)) }
+    val hits = postings.topK(stage.query, if (stage.k < 0) size else stage.k)
+    val picked = if (stage.k < 0) hits.sortedBy { it.key as Int } else hits
+    val scores = DoubleArray(picked.size) { picked[it].score }
+    val rows = IntArray(picked.size) { picked[it].key as Int }
+    val meta: `ColumnMeta↻` = { ColumnMeta(stage.name, IOMemento.IoDouble) }
+    val metas = this[0].metas
+    val width = metas.size
+    val widened: Series<`ColumnMeta↻`> = width + 1 j { c: Int -> if (c < width) metas[c] else meta }
+    return rows.size j { i: Int ->
+        val values = this[rows[i]].values
+        ReifiedSplitSeries2(width + 1 j { c: Int -> if (c < width) values[c] else scores[i] }, widened)
     }
 }
 

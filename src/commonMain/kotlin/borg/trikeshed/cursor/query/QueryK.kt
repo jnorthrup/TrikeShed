@@ -45,6 +45,13 @@ sealed class QueryK<out R> : OpK<R>() {
 
     /** One row per element of an array cell (Snowflake `FLATTEN`, pg / DuckDB `unnest`). */
     class Unnest(val column: String) : QueryK<Cursor>()
+
+    /**
+     * Evoke's `evoke_query(index, query[, k])`: exact BM25 of [query] over text column [column] with
+     * corpus statistics from every row of the input, keeping only matching rows (the best [k] when
+     * k >= 0, best first) and adding their score as column [name].
+     */
+    class LexicalTopK(val column: String, val query: String, val name: String, val k: Int = -1) : QueryK<Cursor>()
 }
 
 enum class Reduce { COUNT, SUM, MIN, MAX, AVG }

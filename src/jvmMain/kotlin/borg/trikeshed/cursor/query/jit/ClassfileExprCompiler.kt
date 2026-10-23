@@ -188,6 +188,7 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
         ">" -> "gt"
         ">=" -> "ge"
         "||" -> "concat"
+        "@@" -> "matches"
         "<=>" -> "cosineDistance"
         "<->" -> "l2Distance"
         "<#>" -> "negInnerProduct"

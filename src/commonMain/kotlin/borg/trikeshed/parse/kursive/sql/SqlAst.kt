@@ -404,7 +404,7 @@ class SqlParser(private val cs: CharSeries) {
         val left = parsePattern() ?: return null
         val save = cs.pos
         skipWs()
-        for (op in listOf("!=", "<>", ">=", "<=", "=", ">", "<")) {
+        for (op in listOf("!=", "<>", ">=", "<=", "=", ">", "<", "@@")) {
             if (!matchSymbol(op)) continue
             skipWs()
             val right = parsePattern() ?: run { cs.pos = save; return left }

@@ -1,5 +1,6 @@
 package borg.trikeshed.parse.kursive.sql
 
+import borg.trikeshed.cas.Analyzer
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.cursor.values
 import borg.trikeshed.lib.Series
@@ -75,6 +76,13 @@ object SqlRuntime {
     /** `ILIKE` (pg): `LIKE` ignoring case, with a pattern known at run time. */
     @JvmStatic fun ilike(subject: Any?, pattern: Any?): Any? =
         if (subject == null || pattern == null) null else likeRegex(pattern.toString(), ignoreCase = true).matches(subject.toString())
+
+    /** Evoke `document @@ 'query text'`: the document holds a query term (a local match, not a corpus score). */
+    @JvmStatic fun matches(document: Any?, query: Any?): Any? {
+        if (document == null || query == null) return null
+        val terms = Analyzer().tokens(scalarText(query)).toHashSet()
+        return Analyzer().tokens(scalarText(document)).any { it in terms }
+    }
 
     @JvmStatic fun concat(a: Any?, b: Any?): Any? = if (a == null || b == null) null else a.toString() + b.toString()
 
