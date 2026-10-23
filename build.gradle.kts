@@ -471,7 +471,7 @@ val kotlinJsBundlesJar = tasks.register<Jar>("kotlinJsBundlesJar") {
 
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
     // Purge what an earlier layout staged here: processedResources must not shadow the bundles jar.
-    doFirst { project.delete(destinationDir.resolve("web/kotlin")) }
+    doFirst { destinationDir.resolve("web/kotlin").deleteRecursively() }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -491,18 +491,21 @@ val prebuiltLiburing = providers.gradleProperty("uringLiburingBuildDir")
 val liburingBuild = layout.dir(prebuiltLiburing.map { project.file(it) })
     .orElse(layout.buildDirectory.dir("native/liburing"))
 val validatePrebuiltLiburing = tasks.register("validatePrebuiltLiburing") {
-    onlyIf { prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { prebuilt }
+    val build = liburingBuild
     doLast {
         val required = listOf("src/liburing.a", "src/include/liburing/compat.h", "src/include/liburing/io_uring_version.h")
-        val missing = required.filter { !liburingBuild.get().file(it).asFile.isFile }
+        val missing = required.filter { !build.get().file(it).asFile.isFile }
         check(missing.isEmpty()) {
-            "uringLiburingBuildDir=${liburingBuild.get().asFile} lacks required Linux build artifacts: ${missing.joinToString()}"
+            "uringLiburingBuildDir=${build.get().asFile} lacks required Linux build artifacts: ${missing.joinToString()}"
         }
     }
 }
 val configureLiburing = tasks.register<Exec>("configureLiburing") {
     dependsOn(validatePrebuiltLiburing)
-    onlyIf { !prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { !prebuilt }
     inputs.file(liburingSource.file("configure"))
     inputs.file(liburingSource.file("Makefile.common"))
     outputs.files(liburingBuild.map { it.file("config-host.mak") }, liburingBuild.map { it.file("config-host.h") },
@@ -511,14 +514,17 @@ val configureLiburing = tasks.register<Exec>("configureLiburing") {
     workingDir(liburingBuild)
     environment("CFLAGS", "-O3 -fPIC")
     commandLine("sh", liburingSource.file("configure").asFile.absolutePath, "--use-libc")
+    val linux = linuxHost
+    val buildDir = liburingBuild.get().asFile
     doFirst {
-        check(linuxHost) { "The liburing build requires a Linux host" }
-        liburingBuild.get().asFile.mkdirs()
+        check(linux) { "The liburing build requires a Linux host" }
+        buildDir.mkdirs()
     }
 }
 val buildLiburing = tasks.register<Exec>("buildLiburing") {
     dependsOn(configureLiburing)
-    onlyIf { !prebuiltLiburing.isPresent }
+    val prebuilt = prebuiltLiburing.isPresent
+    onlyIf { !prebuilt }
     inputs.dir(liburingSource.dir("src"))
     inputs.file(liburingSource.file("Makefile"))
     inputs.file(liburingSource.file("Makefile.common"))
@@ -722,24 +728,15 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
 val jdwpSpec: String? = providers.gradleProperty("jdwp").orNull
 
 fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
-    dependsOn("stageDaemonLib", "compileKotlinJvm")
+    dependsOn("stageDaemonLib", "compileKotlinJvm", "jvmProcessResources")
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()
         val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
         jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
     }
-    dependsOn("jvmProcessResources")
-    doFirst {
-        val classes = file("build/classes/kotlin/jvm/main")
-        val resources = file("build/processedResources/jvm/main")
-        val lib = file(stagingLibDir)
-        if (!classes.isDirectory) throw GradleException("missing $classes; run ./gradlew compileKotlinJvm")
-        if (!lib.isDirectory) throw GradleException("missing $lib; run ./gradlew stageDaemonLib")
-        // Resources (web/graal.html, futon.html, META-INF/services, openapi/*) must be on the
-        // classpath or the daemon serves /graal and /futon as 404 — the exact reason the gradle
-        // launch looked broken next to the hand-rolled java invocation.
-        classpath = files(classes, resources) + fileTree(lib) { include("*.jar") }
-    }
+    // Naked classes and processed resources (web/graal.html, futon.html, META-INF/services, openapi/*:
+    // without them the server answers /graal and /futon with 404) plus the staged runtime jars.
+    classpath = files("build/classes/kotlin/jvm/main", "build/processedResources/jvm/main") + fileTree(stagingLibDir) { include("*.jar") }
 }
 
 // The daemon on the classpath utils/oroboros uses: jvmJar plus the staged runtime jars (which carry the
@@ -847,8 +844,9 @@ tasks.register<Sync>("generateForgePages") {
     val stageStamp = forgePagesStages.sorted().joinToString("-")
     inputs.property("forgePagesStages", forgePagesStages.sorted())
 
+    val noJekyllFile = layout.projectDirectory.file("docs/.nojekyll").asFile
     doLast {
-        val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
+        val noJekyll = noJekyllFile
         if (!noJekyll.exists()) noJekyll.writeText("\n")
         println("Forge PWA published to docs/ (stages: $stageStamp). Live: utils/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
     }
@@ -927,7 +925,7 @@ val generateForgeAssets = tasks.register("generateForgeAssets") {
 
     doLast {
         val outDirFile = outputDir.get().asFile
-        project.delete(outDirFile)
+        outDirFile.deleteRecursively()
         outDirFile.mkdirs()
 
         fun createByteArray(name: String, bytes: ByteArray): String {
@@ -1004,12 +1002,13 @@ tasks.register("commonMainPurity") {
     // Scope to the Kotlin source dir: resources/ carries vendored data (subvm, tspy,
     // ingest) whose own jvmMain is legitimately JVM code, not commonMain sources.
     val sources = fileTree("src/commonMain/kotlin") { include("**/*.kt") }
+    val root = projectDir
     inputs.files(sources)
     doLast {
         val forbidden = Regex("^\\s*import\\s+(java\\.|javax\\.|sun\\.|com\\.sun\\.)")
         val violations = sources.files.sorted().flatMap { source ->
             source.readLines().mapIndexedNotNull { index, line ->
-                if (forbidden.containsMatchIn(line)) "${source.relativeTo(projectDir)}:${index + 1}: $line" else null
+                if (forbidden.containsMatchIn(line)) "${source.relativeTo(root)}:${index + 1}: $line" else null
             }
         }
         if (violations.isNotEmpty()) throw GradleException(violations.joinToString("\n"))
@@ -1077,17 +1076,20 @@ tasks.register("hotswapFeed") {
 tasks.register("scriptPolicy") {
     group = "verification"
     description = "Report remaining non-Gradle operator scripts as policy violations."
+    val root = projectDir
     doLast {
         // `scripts` at the root is the owner's marker file that keeps a scripts/ directory from existing.
-        val violations = (if (file("scripts").isDirectory) fileTree("scripts").files else emptySet()) + fileTree("bin") {
-            include("*.sh", "oroboros-*", "mux", "modelmux-cli", "trikeshed-btrfs")
-        }.files
-        val shells = file("build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
+        val scriptsDir = File(root, "scripts")
+        val violations = (if (scriptsDir.isDirectory) scriptsDir.walkTopDown().filter { it.isFile }.toList() else emptyList()) +
+            File(root, "bin").listFiles().orEmpty().filter { f ->
+                f.name.endsWith(".sh") || f.name.startsWith("oroboros-") || f.name in setOf("mux", "modelmux-cli", "trikeshed-btrfs")
+            }
+        val shells = File(root, "build.gradle.kts").readLines().mapIndexedNotNull { index, line ->
             // The vendored liburing `configure` is third-party build plumbing, not an operator script.
             if (Regex("commandLine\\(\"(bash|sh|zsh)\"").containsMatchIn(line) && "liburingSource.file(\"configure\")" !in line)
                 "build.gradle.kts:${index + 1}: ${line.trim()}" else null
         }
-        val remaining = violations.sorted().map { it.relativeTo(projectDir).path } + shells
+        val remaining = violations.sorted().map { it.relativeTo(root).path } + shells
         if (remaining.isNotEmpty()) throw GradleException("Remaining script entrypoints:\n" + remaining.joinToString("\n"))
     }
 }
@@ -1109,6 +1111,9 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
     val outDir = layout.buildDirectory.dir(resourceDir)
     val cacheRoot = File(gradle.gradleUserHomeDir, "trikeshed/sumo")
     val strict = full || providers.gradleProperty("sumoStrict").isPresent
+    // Read at configuration time: the action must not reach back into the build script (configuration cache).
+    val offline = gradle.startParameter.isOffline
+    val root = rootDir
 
     inputs.file(pinFile)
     // Strictness participates in up-to-date checking: flipping it must re-run the
@@ -1166,7 +1171,7 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
 
             if (!cacheFile.isFile) {
                 val url = "https://raw.githubusercontent.com/ontologyportal/sumo/$ref/$repoPath"
-                val body = if (gradle.startParameter.isOffline) null else runCatching { URI(url).toURL().readBytes() }.getOrNull()
+                val body = if (offline) null else runCatching { URI(url).toURL().readBytes() }.getOrNull()
                 if (body == null) {
                     missing += "$repoPath (download failed, cold cache)"
                     continue
@@ -1203,7 +1208,7 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
         // A full loader never mistakes a partial or stale directory for a complete corpus.
         if (missing.isEmpty()) pinFile.copyTo(manifest, overwrite = true)
         logger.lifecycle(
-            "SUMO corpus @ $ref -> ${dest.relativeTo(rootDir)} " +
+            "SUMO corpus @ $ref -> ${dest.relativeTo(root)} " +
                 "(${pins.size - missing.size}/${pins.size} files; $fetched fetched, $cached cached)"
         )
     }
@@ -1256,7 +1261,8 @@ tasks.register<Exec>("buildJvmUring") {
         project.file("src/jvmMain/c/uring_jni.c").absolutePath,
         liburingBuild.get().file("src/liburing.a").asFile.absolutePath,
         "-o", layout.buildDirectory.file("native/jvm/libtrikeshed_uring.so").get().asFile.absolutePath)
-    doFirst { layout.buildDirectory.dir("native/jvm").get().asFile.mkdirs() }
+    val nativeDir = layout.buildDirectory.dir("native/jvm").get().asFile
+    doFirst { nativeDir.mkdirs() }
 }
 
 // The column-kernel library behind JvmColumnOperations (ColumnOperations.jvm.kt): the loops of lib/<primitive>p in C, built
@@ -1267,10 +1273,10 @@ val hasCCompiler = (System.getenv("PATH") ?: "").split(File.pathSeparator).any {
 val buildJvmKernels = tasks.register<Exec>("buildJvmKernels") {
     inputs.files("src/nativeInterop/c/trikeshed_kernels.c", "src/nativeInterop/c/trikeshed_kernels.h")
     outputs.file(kernelsLibrary)
+    val library = kernelsLibrary.get().asFile
     commandLine("cc", "-O3", "-ffp-contract=off", "-shared", "-fPIC", "-Wall", "-Wextra",
-        project.file("src/nativeInterop/c/trikeshed_kernels.c").absolutePath,
-        "-o", kernelsLibrary.get().asFile.absolutePath, "-lm")
-    doFirst { kernelsLibrary.get().asFile.parentFile.mkdirs() }
+        project.file("src/nativeInterop/c/trikeshed_kernels.c").absolutePath, "-o", library.absolutePath, "-lm")
+    doFirst { library.parentFile.mkdirs() }
 }
 if (hasCCompiler) {
     tasks.named<Test>("jvmTest") {
