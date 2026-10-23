@@ -1358,12 +1358,14 @@ benchmark {
             param("mode", "emulated")
             exclude("TpchShapeBench")
             exclude("LexicalShapeBench")
+            exclude("GraphShapeBench")
         }
         register("native") {
             warmups = 5; iterations = 10; iterationTime = 1; iterationTimeUnit = "s"
             param("mode", "native")
             exclude("TpchShapeBench")
             exclude("LexicalShapeBench")
+            exclude("GraphShapeBench")
         }
         // The DuckDB-parity run: TPC-H Q1 and Q6 from SQL text over 1,000,000 generated lineitem rows, on each execution
         // path (closure / generated class on boxed rows; Kotlin / native kernels on a column-major source).
@@ -1379,6 +1381,13 @@ benchmark {
             include("LexicalShapeBench")
             param("docs", "2557")
             param("k", "1000")
+        }
+        // The graph shape of S7: a three-pattern basic graph pattern over 100,000 quads, routed and closure paths, and the load.
+        // `./gradlew jvmBenchGraphBenchmark`
+        register("graph") {
+            warmups = 3; iterations = 5; iterationTime = 2; iterationTimeUnit = "s"
+            include("GraphShapeBench")
+            param("quads", "100000")
         }
     }
     targets { kotlin.targets.matching { it.name in benchTargetNames }.all { register("${this.name}Bench") } }

@@ -251,7 +251,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         runners[WIKI_READ] = wikiRead
         runners[ASK] = ask
         runners[SETTLE] = settle
-        runners[SELECT] = select
+        // rdf.select is commonMain (RdfSelectNode in PureNodes.registry), planned by SparqlQuery over a QuadStore.
         runners[BRIEF] = brief
     }
 
@@ -296,17 +296,6 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             File(wiki, rel).apply { parentFile.mkdirs() }.writeText("# Constellation $name\n\n$text")
         } else null
         mapOf("summary" to text, "cid" to borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value, "page" to page)
-    }
-
-    /** `rdf.select`: a SPARQL basic graph pattern over Turtle; rows of variable → term (Turtle form, literals bare). */
-    private val select = LcncNodeRunner { node, inputs ->
-        val turtle = ((inputs["turtle"] ?: inputs["turtle?"])?.toString() ?: node.params["turtle"]).orEmpty()
-        val sparql = ((inputs["sparql"] ?: inputs["sparql?"])?.toString() ?: node.params["sparql"])?.takeIf { it.isNotBlank() }
-            ?: error("rdf.select: no sparql")
-        val rows = TurtleRdf.select(TurtleRdf.parse(turtle), sparql).map { r ->
-            r.entries.associate { (k, v) -> k.removePrefix("?") to ((v as? RdfTerm.Literal)?.lexical ?: v.toTurtle()) }
-        }
-        mapOf("rows" to rows, "count" to rows.size)
     }
 
     /**

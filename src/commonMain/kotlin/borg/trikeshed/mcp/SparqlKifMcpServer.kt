@@ -7,8 +7,14 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.ontology.OpenCycOntology
 import borg.trikeshed.ontology.SumoOntology
+import borg.trikeshed.cursor.values
+import borg.trikeshed.lib.*
 import borg.trikeshed.rdf.ConfixRdfAdapter
+import borg.trikeshed.rdf.QuadStore
 import borg.trikeshed.rdf.RdfGraph
+import borg.trikeshed.rdf.SparqlError
+import borg.trikeshed.rdf.SparqlQuery
+import borg.trikeshed.rdf.SparqlResults
 import borg.trikeshed.rdf.TurtleRdf
 import borg.trikeshed.dag.DagBitTreeSkeleton
 
@@ -109,9 +115,15 @@ class SparqlKifMcpServer(
         else -> err("unknown tool $name")
     }
 
+    /** The SPARQL subset of [SparqlQuery] over the graph; bindings keep their `?v` keys and Turtle-form values. */
     private fun sparqlQuery(sparql: String): String {
         if (sparql.isBlank()) return err("sparql required")
-        val bindings = TurtleRdf.select(graph, sparql).map { r -> r.mapValues { it.value.toTurtle() } }
+        val query = try { SparqlQuery.parse(sparql) } catch (e: SparqlError) { return err(e.message ?: "sparql parse failed") }
+        val rows = query.plan(QuadStore().load(graph).scan())
+        val bindings = List(rows.size) { r ->
+            val cells = rows[r].values
+            query.variables.indices.mapNotNull { c -> cells[c]?.let { "?" + query.variables[c] to (SparqlResults.lexemeOf(it) ?: "") } }.toMap()
+        }
         return """{"bindings":${rowsToJson(bindings)}}"""
     }
 
