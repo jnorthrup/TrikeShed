@@ -4,8 +4,10 @@ import borg.trikeshed.cursor.*
 import borg.trikeshed.lib.*
 
 /**
- * `pg_catalog` derived from the [Catalog]: the rows psql's `\dt` / `\d` and a driver's type lookups
- * read, built with [rowsCursor] on each scan so a table created after connect is listed. Object ids:
+ * `pg_catalog` derived from the [Catalog]: the rows psql's `\dt`, `\d` (without a name), `\dn` and a driver's
+ * type lookups read, built with [rowsCursor] on each scan so a table created after connect is listed. psql's
+ * `\d <table>` is not served: its column query is a correlated scalar subselect, which the grammar does not
+ * take yet, and it reads pg_attrdef and pg_collation, which have no rows here. Object ids:
  * namespaces as pg numbers them (pg_catalog 11, information_schema 13, public 2200), the heap access
  * method 2 (views carry none), user tables by [Catalog.oid] of their names, types by their pg OIDs ([PG_TYPES]).
  */

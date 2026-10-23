@@ -102,6 +102,7 @@ class PgSessionTest {
         assertEquals("42703", error("SELECT nope FROM documents"))
         assertEquals("42P01", error("SELECT * FROM nothing"))
         assertEquals("42883", error("SELECT nope(1)"))
+        assertEquals("42702", error("SELECT id FROM documents d JOIN documents e ON d.id = e.id"), "an ambiguous column is pg's 42702, no longer an internal error")
         assertEquals("0A000", error("INSERT INTO documents VALUES (1)"))
         assertEquals("42601", error("SELEC 1"))
         assertEquals(listOf(listOf("<urn:ex:a>", "<urn:ex:b>")), rows("SPARQL SELECT ?s ?o WHERE { GRAPH <urn:ex:g1> { ?s <urn:ex:p> ?o } } ORDER BY ?s LIMIT 1"))
