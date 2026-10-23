@@ -77,7 +77,7 @@ if ! (java -version 2>&1 | grep -q GraalVM && java -version 2>&1 | grep -q '"25\
 fi
 [ -d TrikeShed ] || git clone --recurse-submodules https://github.com/jnorthrup/TrikeShed.git
 cd TrikeShed
-./gradlew runOroborosDaemon --args='--watch'  # builds the live feed and launches with HotSwapAgent
+./gradlew runOroborosDaemon  # stages jvmJar + build/staging/lib and launches the daemon, as bin/oroboros does
 ```
 
 Hermes source lives in the `utils/hermes-trikeshed-graalpy` submodule, pinned to
@@ -1978,13 +1978,11 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 ```
 
 **Common tasks registered** (`build.gradle.kts`):
-- `jmh`, `jmhJoin`, `jmhConfix`, `jmhWal` — JMH benches
-- `benchmarkJoin`, `benchmarkSequence`, `benchmarkVector`, `benchmarkMath`, `benchmarkConfix`
+- `jvmBenchBenchmark` (and the other `<target>BenchBenchmark` tasks) — kotlinx-benchmark over `src/commonBench`
 - `printForgeGallery` — JVM text grid of catalog + blackboard
 - `runForgeJvm` — Compose Desktop shell
 - `generateForgePages` — static documentation Sync task (stages `jvm`[,`js`,`wasm`] → docs/), not the live Panels runtime
-- `julesArtifact`, `julesSettle`, `julesReviewPatch`, `julesReviewReport` — Jules CAS bridges (`--args="…"`)
-- `runOroborosDaemon`, `runFlywheelTui`, `runKanbanHttpServerJvm` — staged-classpath launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
+- `runOroborosDaemon` (jvmJar + staged lib, like `bin/oroboros`), `runKanbanHttpServerJvm` (staged classpath) — launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
 - `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each). `ForgeApp.kt` fills the `{{SEED}}`, `{{STYLES}}`, `{{GALLERY}}` and `{{BUNDLES}}` slots; browser code is supplied by the compiled Kotlin bundles, not a generated `scriptJs` field.
 
 ---
