@@ -16,7 +16,6 @@ import modelmux.acp.providerTag
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.relaxfactory.CouchHttpSurface
-import modelmux.acp.providerTag
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex

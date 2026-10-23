@@ -2240,8 +2240,8 @@ java -version   # Oracle GraalVM 25.0.4+7.1 — verified working on Alpine aarch
 
 kotlin/gradle SDKMAN installs are unaffected by the feed outage; when SDKMAN
 itself is unreachable, pin them by hand the same way or use each project's
-official installer — the build only needs `JAVA_HOME` (gradlew) plus the
-versions in `gradle/libs.versions.toml` (kotlin comes from the build, not the
+official installer — the build only needs `JAVA_HOME` (gradlew); every other
+version is pinned in `build.gradle.kts` (kotlin comes from the build, not the
 toolchain).
 
 ## Build, in anger
