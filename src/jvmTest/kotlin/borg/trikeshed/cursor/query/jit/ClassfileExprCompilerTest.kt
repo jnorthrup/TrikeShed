@@ -46,10 +46,30 @@ class ClassfileExprCompilerTest {
             "doc->>'t' = 'q' AND k > 0",
             "doc->'a' <-> '[1,2]'", "'[1,2]'::vector <=> '[2,3]'::vector", "'[1,2]'::vector <#> '[2,3]'",
             "k::double / 2", "k::text || 'a'", "x::text", "n::int + 1", "f::int", "k::bool",
+            "NOT n > 5", "n IS NULL", "x IS NOT NULL", "k > 1 IS TRUE", "n > 5 IS NOT FALSE", "x ILIKE 'GR%'",
+            "x NOT LIKE 'gr%'", "x ILIKE x", "k IN (1, 3)", "n IN (10, NULL)", "k NOT IN (1, 3)",
+            "n > 5 AND k = 9", "n > 5 OR k = 2", "NOT (n > 5 AND k = 2)", "n = NULL", "TRUE AND n > 5",
         )) {
             val (expected, actual) = both(sql, jit)
             assertEquals(expected, actual, sql)
         }
+    }
+
+    @Test fun predicatesAreThreeValued() {
+        val jit = ClassfileExprCompiler()
+        // n is 10, null, 0, -7 and x is red, green, grey, null down the four rows.
+        for ((sql, rows) in listOf(
+            "NOT n > 5" to listOf(false, null, true, true),
+            "n > 5 AND k = 9" to listOf(false, false, false, false),
+            "n > 5 OR k = 2" to listOf(true, true, false, false),
+            "NOT (n > 5 AND k = 2)" to listOf(true, null, true, true),
+            "n IS NULL" to listOf(false, true, false, false),
+            "k > 1 IS TRUE" to listOf(false, true, true, true),
+            "x NOT LIKE 'gr%'" to listOf(true, false, false, null),
+            "x ILIKE 'GR%'" to listOf(false, true, true, null),
+            "n IN (10, NULL)" to listOf(true, null, null, null),
+            "k NOT IN (1, 3)" to listOf(false, true, false, true),
+        )) assertEquals(rows to rows, both(sql, jit), sql)
     }
 
     @Test fun andShortCircuitsPastAFaultingRightSide() {

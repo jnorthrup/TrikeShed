@@ -24,6 +24,12 @@ class StringLiteral(val value: Series<Char>) : SqlNode {
 
 class NumericLiteral(val value: Number) : SqlNode
 
+/** `TRUE` / `FALSE`. */
+data class BooleanLiteral(val value: Boolean) : SqlNode
+
+/** `NULL`. */
+data object NullLiteral : SqlNode
+
 sealed interface Expr : SqlNode
 
 class ColumnRef(val id: Identifier) : Expr
@@ -40,11 +46,18 @@ data class Cast(val expr: Expr, val type: String) : Expr
  * Snowflake `col:a.b[0]`. [text] is the `->>` / `#>>` form, which answers the scalar as text.
  */
 data class Path(val cell: Expr, val path: JsPath, val text: Boolean) : Expr
+/** `NOT expr`, three-valued: NOT NULL is NULL. */
+data class Not(val expr: Expr) : Expr
+/** `expr IS [NOT] NULL | TRUE | FALSE` ([value] null = NULL / UNKNOWN); never NULL itself. */
+data class Is(val expr: Expr, val value: Boolean?, val negated: Boolean = false) : Expr
+/** `expr [NOT] IN (items)`: true on a match, else NULL when an item is NULL, else false. */
+data class InList(val expr: Expr, val items: Series<Expr>, val negated: Boolean = false) : Expr
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
 data class TableRef(val name: Identifier, val alias: Identifier? = null) : SqlNode
 /** `[LEFT [OUTER] | INNER] JOIN table ON expr`. */
 data class JoinClause(val table: TableRef, val on: Expr?, val outer: Boolean) : SqlNode
-data class OrderItem(val expr: Expr, val descending: Boolean) : SqlNode
+/** [nullsFirst] null is pg's default: NULLS LAST ascending, NULLS FIRST descending. */
+data class OrderItem(val expr: Expr, val descending: Boolean, val nullsFirst: Boolean? = null) : SqlNode
 data class SelectStmt(
     val columns: Series<Column>,
     val from: TableRef?,
@@ -66,6 +79,7 @@ class SqlParser(private val cs: CharSeries) {
         val RESERVED = setOf(
             "FROM", "WHERE", "GROUP", "ORDER", "HAVING", "LIMIT", "OFFSET", "JOIN", "ON", "AS", "UNION", "DISTINCT",
             "LEFT", "RIGHT", "INNER", "OUTER", "FULL", "CROSS", "ASC", "DESC", "AND", "OR",
+            "NOT", "IN", "IS", "NULL", "TRUE", "FALSE", "LIKE", "ILIKE",
         )
 
         fun parse(src: Series<Char>): SelectStmt? = SqlParser(CharSeries(src).trim).parseSelect()
@@ -136,7 +150,7 @@ class SqlParser(private val cs: CharSeries) {
         val next = cs.pos + k.length
         if (next < cs.limit) {
             val nc = cs[next]
-            if (!nc.isWhitespace() && nc != ',' && nc != '(' && nc != ')' && nc != ';') {
+            if (nc.isLetterOrDigit() || nc == '_' || nc == '$' || nc == '.') {
                 cs.pos = save; return false
             }
         }
@@ -222,6 +236,9 @@ class SqlParser(private val cs: CharSeries) {
         }
         parseStringLiteral()?.let { return parsePostfix(LitExpr(it)) }
         parseNumberLit()?.let { return parsePostfix(LitExpr(it)) }
+        if (matchKeyword("NULL")) return parsePostfix(LitExpr(NullLiteral))
+        if (matchKeyword("TRUE")) return parsePostfix(LitExpr(BooleanLiteral(true)))
+        if (matchKeyword("FALSE")) return parsePostfix(LitExpr(BooleanLiteral(false)))
         val id = parseIdentifier() ?: return null
         skipWs()
         if (peek() == '(') {
@@ -354,41 +371,84 @@ class SqlParser(private val cs: CharSeries) {
         }
     }
 
-    fun parseComparison(): Expr? {
-        var left = parseVector() ?: return null
+    /** `[NOT] IN (list)`, `[NOT] LIKE` and `[NOT] ILIKE`: tighter than comparisons, as pg. */
+    fun parsePattern(): Expr? {
+        val left = parseVector() ?: return null
+        val save = cs.pos
         skipWs()
-        val ops = listOf("!=", "<>", ">=", "<=", "=", ">", "<", "LIKE")
-        for (op in ops) {
-            val save = cs.pos
-            var ok = true
-            for (ch in op) {
-                if (cs.pos >= cs.limit || cs[cs.pos].uppercaseChar() != ch.uppercaseChar()) {
-                    ok = false; break
-                }
-                cs.pos++
+        val negated = matchKeyword("NOT").also { skipWs() }
+        if (matchKeyword("IN")) {
+            skipWs()
+            if (peek() != '(') { cs.pos = save; return left }
+            cs.pos++
+            val items = mutableListOf<Expr>()
+            while (true) {
+                items += parseExpr() ?: run { cs.pos = save; return left }
+                skipWs()
+                if (peek() == ',') cs.pos++ else break
             }
-            if (!ok) {
-                cs.pos = save; continue
-            }
-            if (op == "LIKE" && cs.pos < cs.limit && !cs[cs.pos].isWhitespace() && cs[cs.pos] != '\'') {
-                cs.pos = save; continue
-            }
+            if (peek() != ')') { cs.pos = save; return left }
+            cs.pos++
+            return InList(left, items.toSeries(), negated)
+        }
+        for (op in listOf("ILIKE", "LIKE")) if (matchKeyword(op)) {
             skipWs()
             val right = parseVector() ?: run { cs.pos = save; return left }
-            left = BinaryExpr(left, op, right)
-            break
+            return BinaryExpr(left, op, right).let { if (negated) Not(it) else it }
         }
+        cs.pos = save
         return left
     }
 
-    fun parseAnd(): Expr? {
+    fun parseComparison(): Expr? {
+        val left = parsePattern() ?: return null
+        val save = cs.pos
+        skipWs()
+        for (op in listOf("!=", "<>", ">=", "<=", "=", ">", "<")) {
+            if (!matchSymbol(op)) continue
+            skipWs()
+            val right = parsePattern() ?: run { cs.pos = save; return left }
+            return BinaryExpr(left, op, right)
+        }
+        cs.pos = save
+        return left
+    }
+
+    /** `IS [NOT] NULL | UNKNOWN | TRUE | FALSE`: looser than comparisons, tighter than `NOT`, as pg. */
+    fun parseIs(): Expr? {
         var left = parseComparison() ?: return null
+        while (true) {
+            val save = cs.pos
+            skipWs()
+            if (!matchKeyword("IS")) { cs.pos = save; return left }
+            skipWs()
+            val negated = matchKeyword("NOT").also { skipWs() }
+            val value = when {
+                matchKeyword("NULL") || matchKeyword("UNKNOWN") -> null
+                matchKeyword("TRUE") -> true
+                matchKeyword("FALSE") -> false
+                else -> { cs.pos = save; return left }
+            }
+            left = Is(left, value, negated)
+        }
+    }
+
+    /** `NOT` binds looser than `IS` and tighter than `AND`. */
+    fun parseNot(): Expr? {
+        val save = cs.pos
+        skipWs()
+        if (!matchKeyword("NOT")) return parseIs()
+        return Not(parseNot() ?: run { cs.pos = save; return null })
+    }
+
+    fun parseAnd(): Expr? {
+        var left = parseNot() ?: return null
         while (true) {
             val save = cs.pos
             skipWs()
             if (matchKeyword("AND")) {
                 skipWs()
-                val right = parseComparison() ?: run { cs.pos = save; break }
+                val right = parseNot() ?: run { cs.pos = save; break }
                 left = BinaryExpr(left, "AND", right)
             } else {
                 cs.pos = save; break
@@ -538,7 +598,13 @@ class SqlParser(private val cs: CharSeries) {
                 skipWs()
                 val descending = matchKeyword("DESC")
                 if (!descending) matchKeyword("ASC")
-                orderBy += OrderItem(e, descending)
+                skipWs()
+                val save = cs.pos
+                val nullsFirst = if (!matchKeyword("NULLS")) null else {
+                    skipWs()
+                    if (matchKeyword("FIRST")) true else if (matchKeyword("LAST")) false else { cs.pos = save; null }
+                }
+                orderBy += OrderItem(e, descending, nullsFirst)
                 skipWs()
                 if (peek() != ',') break
                 cs.pos++

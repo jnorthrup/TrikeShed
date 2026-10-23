@@ -34,7 +34,14 @@ sealed class QueryK<out R> : OpK<R>() {
     class Aggregate(val axis: Series<String>, val reductions: Series<Reduction>) : QueryK<Cursor>()
 
     /** Stable sort on [axis] (nulls last ascending, first descending), then `OFFSET`/`LIMIT`. */
-    class Order(val axis: Series<String>, val descending: BooleanArray, val limit: Int = -1, val offset: Int = 0) : QueryK<Cursor>()
+    class Order(
+        val axis: Series<String>,
+        val descending: BooleanArray,
+        val limit: Int = -1,
+        val offset: Int = 0,
+        /** Per key, whether nulls sort first; pg's default is first exactly when descending. */
+        val nullsFirst: BooleanArray = descending.copyOf(),
+    ) : QueryK<Cursor>()
 
     /** One row per element of an array cell (Snowflake `FLATTEN`, pg / DuckDB `unnest`). */
     class Unnest(val column: String) : QueryK<Cursor>()

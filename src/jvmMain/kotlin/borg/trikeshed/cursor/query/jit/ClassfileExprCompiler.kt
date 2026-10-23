@@ -10,6 +10,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.parse.kursive.sql.*
 import java.lang.classfile.ClassFile
 import java.lang.classfile.CodeBuilder
+import java.lang.classfile.TypeKind
 import java.lang.constant.ClassDesc
 import java.lang.constant.ConstantDescs.*
 import java.lang.constant.MethodTypeDesc
@@ -124,6 +125,20 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
                     c.invokestatic(runtime, "cast", MethodTypeDesc.of(CD_Object, CD_Object, CD_String))
                 }
             is BinaryExpr -> binaryNode(c, e, names, constants)
+            is Not -> {
+                node(c, e.expr, names, constants)
+                c.invokestatic(runtime, "not", MethodTypeDesc.of(CD_Object, CD_Object))
+            }
+            is Is -> {
+                node(c, e.expr, names, constants)
+                when (val expected = e.value) {
+                    null -> c.invokestatic(runtime, "isNull", MethodTypeDesc.of(CD_Object, CD_Object))
+                    else -> c.loadConstant(if (expected) 1 else 0).invokestatic(runtime, "isBoolean", MethodTypeDesc.of(CD_Object, CD_Object, CD_boolean))
+                }
+                if (e.negated) c.invokestatic(runtime, "not", MethodTypeDesc.of(CD_Object, CD_Object))
+            }
+            // IN lists stay on the closure path (see the class comment).
+            is InList -> error("IN (...) has no emitted form")
             is Call -> error("function ${e.name}(...) has no scalar form")
             Star -> error("* is only an argument of COUNT")
         }
@@ -132,33 +147,29 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
     private fun binaryNode(c: CodeBuilder, e: BinaryExpr, names: Series<CharSequence>, constants: ArrayList<Any?>) {
         val isTrue = MethodTypeDesc.of(CD_boolean, CD_Object)
         when (val op = e.op.uppercase()) {
-            "AND" -> {
-                val no = c.newLabel()
+            // Three-valued: a false left decides AND and a true left decides OR without the right.
+            "AND", "OR" -> {
+                val decided = c.newLabel()
                 val end = c.newLabel()
-                node(c, e.left, names, constants); c.invokestatic(runtime, "isTrue", isTrue); c.ifeq(no)
-                node(c, e.right, names, constants); c.invokestatic(runtime, "isTrue", isTrue); c.ifeq(no)
-                c.getstatic(CD_Boolean, "TRUE", CD_Boolean).goto_(end)
-                c.labelBinding(no).getstatic(CD_Boolean, "FALSE", CD_Boolean)
+                val left = c.allocateLocal(TypeKind.REFERENCE)
+                node(c, e.left, names, constants); c.astore(left)
+                c.aload(left)
+                if (op == "AND") c.invokestatic(runtime, "isFalse", isTrue).ifne(decided)
+                else c.invokestatic(runtime, "isTrue", isTrue).ifne(decided)
+                c.aload(left); node(c, e.right, names, constants)
+                c.invokestatic(runtime, op.lowercase(), binary).goto_(end)
+                c.labelBinding(decided).getstatic(CD_Boolean, if (op == "AND") "FALSE" else "TRUE", CD_Boolean)
                 c.labelBinding(end)
             }
-            "OR" -> {
-                val yes = c.newLabel()
-                val end = c.newLabel()
-                node(c, e.left, names, constants); c.invokestatic(runtime, "isTrue", isTrue); c.ifne(yes)
-                node(c, e.right, names, constants); c.invokestatic(runtime, "isTrue", isTrue); c.ifne(yes)
-                c.getstatic(CD_Boolean, "FALSE", CD_Boolean).goto_(end)
-                c.labelBinding(yes).getstatic(CD_Boolean, "TRUE", CD_Boolean)
-                c.labelBinding(end)
-            }
-            "LIKE" -> {
+            "LIKE", "ILIKE" -> {
                 node(c, e.left, names, constants)
                 val pattern = e.right
                 if (pattern is LitExpr) {
-                    constant(c, constants, likeRegex(literal(pattern.lit).toString()))
+                    constant(c, constants, likeRegex(literal(pattern.lit).toString(), ignoreCase = op == "ILIKE"))
                     c.invokestatic(runtime, "likeCompiled", binary)
                 } else {
                     node(c, pattern, names, constants)
-                    c.invokestatic(runtime, "like", binary)
+                    c.invokestatic(runtime, op.lowercase(), binary)
                 }
             }
             else -> {
@@ -205,9 +216,11 @@ class ClassfileExprCompiler(val cas: CasStore = CasStore.inMemory()) : ExprCompi
             is BinaryExpr -> {
                 val op = expr.op.uppercase()
                 collect(expr.left, names, constants)
-                if (op == "LIKE" && expr.right is LitExpr) constants += likeRegex(literal(expr.right.lit).toString())
+                if ((op == "LIKE" || op == "ILIKE") && expr.right is LitExpr) constants += likeRegex(literal(expr.right.lit).toString(), ignoreCase = op == "ILIKE")
                 else collect(expr.right, names, constants)
             }
+            is Not -> collect(expr.expr, names, constants)
+            is Is -> collect(expr.expr, names, constants)
             else -> Unit
         }
     }

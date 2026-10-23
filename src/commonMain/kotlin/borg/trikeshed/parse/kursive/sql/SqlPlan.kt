@@ -17,6 +17,9 @@ fun Expr.aggregated(): Boolean = when (this) {
     is BinaryExpr -> left.aggregated() || right.aggregated()
     is Path -> cell.aggregated()
     is Cast -> expr.aggregated()
+    is Not -> expr.aggregated()
+    is Is -> expr.aggregated()
+    is InList -> expr.aggregated() || items.view.any { it.aggregated() }
     else -> false
 }
 
@@ -107,6 +110,11 @@ fun SelectStmt.plan(
         fun lift(e: Expr): Expr = when {
             e is Call && e.name in AGGREGATES -> ColumnRef(Identifier(reduction(e).toSeries()))
             e is BinaryExpr -> BinaryExpr(lift(e.left), e.op, lift(e.right))
+            e is Cast -> Cast(lift(e.expr), e.type)
+            e is Path -> Path(lift(e.cell), e.path, e.text)
+            e is Not -> Not(lift(e.expr))
+            e is Is -> Is(lift(e.expr), e.value, e.negated)
+            e is InList -> InList(lift(e.expr), e.items α ::lift, e.negated)
             else -> e
         }
         val lifted = items.map { lift(it.expr) }
@@ -137,6 +145,7 @@ fun SelectStmt.plan(
             BooleanArray(orderBy.size) { orderBy[it].descending },
             limit ?: -1,
             offset ?: 0,
+            BooleanArray(orderBy.size) { orderBy[it].nullsFirst ?: orderBy[it].descending },
         )
     }
     stages += QueryK.Project(sources.toSeries())
@@ -157,6 +166,9 @@ fun Expr.references(): List<String> = when (this) {
     is Path -> cell.references()
     is Cast -> expr.references()
     is Call -> args.view.flatMap { it.references() }
+    is Not -> expr.references()
+    is Is -> expr.references()
+    is InList -> expr.references() + items.view.flatMap { it.references() }
     else -> emptyList()
 }
 

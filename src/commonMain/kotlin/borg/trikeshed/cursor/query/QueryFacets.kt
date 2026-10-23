@@ -187,17 +187,18 @@ fun Cursor.order(stage: QueryK.Order): Cursor {
         val names = names
         val axis = IntArray(stage.axis.size) { names.ordinalOf(stage.axis[it]) }
         val descending = stage.descending
+        val nullsFirst = stage.nullsFirst
         ordered(axis, Comparator { left, right ->
             for (i in axis.indices) {
                 val l = left[i]
                 val r = right[i]
                 val c = when {
                     l == null && r == null -> 0
-                    l == null -> 1
-                    r == null -> -1
-                    else -> compareCells(l, r)
+                    l == null -> if (nullsFirst[i]) -1 else 1
+                    r == null -> if (nullsFirst[i]) 1 else -1
+                    else -> compareCells(l, r).let { if (descending[i]) -it else it }
                 }
-                if (c != 0) return@Comparator if (descending[i]) -c else c
+                if (c != 0) return@Comparator c
             }
             0
         })
