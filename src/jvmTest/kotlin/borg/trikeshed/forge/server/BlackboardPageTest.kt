@@ -62,7 +62,7 @@ class BlackboardPageTest {
                 assertEquals(200, panels.status)
                 assertTrue("<title>Construction Panels</title>" in panels.body)
                 assertTrue("id=\"viewport\"" in panels.body && "id=\"world\"" in panels.body)
-                assertTrue("./kotlin/spacegraph/spacegraph.js" in panels.body)
+                assertTrue("<script src=\"/kotlin/spacegraph/spacegraph.js\" defer></script>" in panels.body)
                 assertTrue("localTreeshake" !in panels.body && "program:G" !in panels.body)
                 assertTrue(panels.body != html, "$path must not serve the blackboard harness")
                 assertTrue("/patch-camera.css" in panels.body)

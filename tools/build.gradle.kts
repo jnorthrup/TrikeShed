@@ -71,7 +71,7 @@ kotlin {
     }
 }
 
-// The root's jvmJar runs stageKotlinJs and fetchSumoCorpus; take its class-directory variant instead.
+// The root's jvmJar runs fetchSumoCorpus; take its class-directory variant instead.
 for (classpath in listOf("jvmCompileClasspath", "jvmRuntimeClasspath", "jvmTestCompileClasspath", "jvmTestRuntimeClasspath")) {
     configurations.named(classpath) {
         attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))

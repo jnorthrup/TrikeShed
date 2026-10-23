@@ -459,7 +459,7 @@ kotlin {
 }
 
 // The JVM library as class directories, so :tools compiles, tests and runs against compileKotlinJvm
-// output: jvmJar and jvmMainClasses also run stageKotlinJs (the browser webpack builds) and fetchSumoCorpus.
+// output: jvmJar and jvmMainClasses also run fetchSumoCorpus (through jvmProcessResources).
 val jvmMainClassesDirs = kotlin.jvm().compilations.getByName("main").output.classesDirs
 for (elements in listOf("jvmApiElements", "jvmRuntimeElements")) configurations.named(elements) {
     outgoing.variants.create("classes") {
@@ -471,7 +471,12 @@ for (elements in listOf("jvmApiElements", "jvmRuntimeElements")) configurations.
     }
 }
 
-// Shared Kotlin -> app compilation -> webpack -> staging -> JVM resources.
+// The browser bundles are a downstream artifact of commonMain, built on their own schedule: the JVM
+// compiles, tests and packages without them (GWT's split between the compiled page and the server that
+// hosts it). Only what HOSTS pages consumes them: the daemon and page servers get them as one more jar on
+// the staged lib classpath (the AOT classpath is jars only), the Pages publisher reads the staged
+// directory, and the manual-browser tests (*_UI=1) add the jar to their own classpath.
+// Shared Kotlin -> app compilation -> webpack -> staging -> bundles jar -> hosts.
 val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
     group = "forge"
     description = "Package the Kotlin/JS browser apps selected by kotlinJsApps."
@@ -482,8 +487,15 @@ val stageKotlinJs = tasks.register<Sync>("stageKotlinJs") {
     into(layout.buildDirectory.dir("generated/kotlinJs/resources"))
 }
 
-tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
+val kotlinJsBundlesJar = tasks.register<Jar>("kotlinJsBundlesJar") {
+    group = "forge"
+    description = "Package the staged browser bundles (web/kotlin/<app>/) as the jar the daemon and page servers serve /kotlin/ from."
     from(stageKotlinJs)
+    archiveClassifier.set("web")
+}
+
+tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
+    // Purge what an earlier layout staged here: processedResources must not shadow the bundles jar.
     doFirst { project.delete(destinationDir.resolve("web/kotlin")) }
 }
 
@@ -622,6 +634,15 @@ tasks.withType<Test>().configureEach {
 }
 
 tasks.named<Test>("jvmTest") {
+    // The manual-browser tests (any *_UI=1 gate) serve the compiled bundles from the classpath; no other test
+    // reads one, so only an opted-in run depends on the JS build. -PkotlinJsBundles forces it.
+    val serveBundles = System.getenv().any { (name, value) -> name.endsWith("_UI") && value == "1" } ||
+        providers.gradleProperty("kotlinJsBundles").isPresent
+    inputs.property("serveKotlinJsBundles", serveBundles)
+    if (serveBundles) {
+        dependsOn(kotlinJsBundlesJar)
+        classpath += files(kotlinJsBundlesJar)
+    }
     // The same canonical-curation contract can explicitly exercise the operator's provider.
     // Keep fixture/live runs distinct in Gradle's up-to-date checks; none of these inputs is a credential.
     listOf("TRIKESHED_CURATION_PROFILE", "TRIKESHED_CURATION_BASE", "TRIKESHED_CURATION_MODEL").forEach { name ->
@@ -692,13 +713,6 @@ tasks.named("jsTest") {
 }
 tasks.named("wasmJsTest") {
     dependsOn("wasmJsBrowserTest")
-}
-
-// Ensure resources are copied before compilation
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    if (name.contains("Jvm")) {
-        dependsOn("jvmProcessResources")
-    }
 }
 
 // JMH Setup
@@ -885,6 +899,7 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     dependsOn("jvmJar")
     from(configurations.named("jvmRuntimeClasspath"))
     from(sumoFrozenJar)
+    from(kotlinJsBundlesJar)
     into(stagingLibDir)
 }
 
