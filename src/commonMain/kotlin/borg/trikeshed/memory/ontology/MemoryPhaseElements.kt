@@ -10,6 +10,10 @@ import borg.trikeshed.context.ElementState.OPEN
 import borg.trikeshed.context.ElementState.ACTIVE
 import borg.trikeshed.context.ElementState.DRAINING
 import borg.trikeshed.context.ElementState.CLOSED
+import borg.trikeshed.cursor.query.Candidate
+import borg.trikeshed.cursor.query.FusionMethod
+import borg.trikeshed.cursor.query.HybridHit
+import borg.trikeshed.cursor.query.fuseCandidates
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
@@ -45,7 +49,10 @@ import kotlin.coroutines.EmptyCoroutineContext
  * CCEK element for the Retrieval phase — "Calling Memory for the historical
  * information." Owns a fan-out channel that delivers retrieved memory traces
  * to subscribers. The phase anchor [Retrieval] is the marker this element
- * operationalizes.
+ * operationalizes. A retrieval asks every [candidates] source for its view of
+ * the query (lexical postings, vector distances, …) and fuses them Evoke's way
+ * ([fuseCandidates]); the trace carries the fused [HybridHit]s with each
+ * source's rank and score kept.
  *
  * Lifecycle:
  *   CREATED  ⇒ element exists, not wired.
@@ -57,6 +64,10 @@ import kotlin.coroutines.EmptyCoroutineContext
 class MemoryRetrievalElement(
     parentJob: Job? = null,
     override val reactorContext: CoroutineContext = EmptyCoroutineContext,
+    /** Each retrieval source's candidates for a query; none configured retrieves nothing. */
+    private val candidates: suspend (query: Any) -> List<Candidate> = { emptyList() },
+    private val k: Int = 10,
+    private val method: FusionMethod = FusionMethod.RRF,
 ) : AsyncContextElement(CREATED, parentJob), MemoryPhaseElement {
 
     companion object Key : AsyncContextKey<MemoryRetrievalElement>()
@@ -83,18 +94,19 @@ class MemoryRetrievalElement(
     }
 
     /**
-     * Submit a retrieval request. Returns a deferred that completes when the
-     * result is fanned out to subscribers. Requires ACTIVE state.
+     * Submit a retrieval request. Returns a deferred that completes with the fused
+     * hits once the trace is fanned out to subscribers. Requires ACTIVE state.
      */
     suspend fun retrieve(query: Any): CompletableDeferred<Any> {
         check(state == ACTIVE) { "MemoryRetrievalElement must be ACTIVE (was $state)" }
         val deferred = CompletableDeferred<Any>()
         requestMutex.withLock {
             subscriberScope.launch {
+                val hits: List<HybridHit> = fuseCandidates(candidates(query), k, method)
                 // Fan-out the retrieval trace to all subscribers via the channel.
-                val trace: Join<SubstratePhase, Any> = Retrieval j query
+                val trace: Join<SubstratePhase, Any> = Retrieval j hits
                 resultChannel.send(trace)
-                deferred.complete(query)
+                deferred.complete(hits)
             }
         }
         return deferred

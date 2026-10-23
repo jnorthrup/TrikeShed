@@ -52,6 +52,9 @@ sealed class QueryK<out R> : OpK<R>() {
      * k >= 0, best first) and adding their score as column [name].
      */
     class LexicalTopK(val column: String, val query: String, val name: String, val k: Int = -1) : QueryK<Cursor>()
+
+    /** Evoke's `evoke_hybrid_fuse_candidates(candidates, k, fusion, rrf_k, epsilon)` over a candidate table (see [fuseCandidates]). */
+    class Fuse(val k: Int = 10, val method: FusionMethod = FusionMethod.RRF, val rrfK: Double = 60.0, val epsilon: Double = 1e-6) : QueryK<Cursor>()
 }
 
 enum class Reduce { COUNT, SUM, MIN, MAX, AVG }

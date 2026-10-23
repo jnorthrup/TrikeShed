@@ -39,6 +39,7 @@ fun <R> Cursor.facet(
         is QueryK.Order -> columnar?.routeOrder(key) ?: order(key)
         is QueryK.Unnest -> unnest(key)
         is QueryK.LexicalTopK -> lexicalTopK(key)
+        is QueryK.Fuse -> fuse(key)
     } as R
 }
 
