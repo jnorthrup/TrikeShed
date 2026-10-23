@@ -458,19 +458,6 @@ kotlin {
     // here cannot resolve at configuration time.
 }
 
-// The JVM library as class directories, so :tools compiles, tests and runs against compileKotlinJvm
-// output: jvmJar and jvmMainClasses also run fetchSumoCorpus (through jvmProcessResources).
-val jvmMainClassesDirs = kotlin.jvm().compilations.getByName("main").output.classesDirs
-for (elements in listOf("jvmApiElements", "jvmRuntimeElements")) configurations.named(elements) {
-    outgoing.variants.create("classes") {
-        attributes.attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objects.named(LibraryElements.CLASSES))
-        for (dir in jvmMainClassesDirs.files) artifact(dir) {
-            type = ArtifactTypeDefinition.JVM_CLASS_DIRECTORY
-            builtBy("compileKotlinJvm", "compileJvmMainJava")
-        }
-    }
-}
-
 // The browser bundles are a downstream artifact of commonMain, built on their own schedule: the JVM
 // compiles, tests and packages without them (GWT's split between the compiled page and the server that
 // hosts it). Only what HOSTS pages consumes them: the daemon and page servers get them as one more jar on

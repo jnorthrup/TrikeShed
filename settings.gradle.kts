@@ -23,12 +23,12 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TrikeShed"
-include(":tools")
 
 // libs/ is forbidden. All code lives in src/ source sets. The historical
 // libs/ tree was deleted at 7afd1e055, deep-cleaned at e9d65f870, and purged
-// at eef1c40e4. Do not recreate it; restore historical code via
-// `git show <commit>:<path>` into the matching src/ source set.
+// at eef1c40e4. The loom experiments (borg.trikeshed.loom and the :tools loom
+// binaries) were last present at 744225f31. Do not recreate either; restore
+// historical code via `git show <commit>:<path>` into the matching src/ source set.
 
 // Support hybrid kotlin xvm build if ../xvm exists
 if (java.io.File("../xvm").exists()) {
