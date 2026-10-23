@@ -22,7 +22,26 @@ class StringLiteral(val value: Series<Char>) : SqlNode {
     val s: String get() = asString()
 }
 
-class NumericLiteral(val value: Number) : SqlNode
+/** A number; [text] is its canonical lexeme (see [numberText]) when it was parsed, the text a statement's receipt hashes. */
+class NumericLiteral(val value: Number, val text: String? = null) : SqlNode
+
+/**
+ * The canonical text of a decimal lexeme `[+-]digits[.digits]`: no `+`, no leading integer zeros,
+ * no trailing fraction zeros (one digit kept, so `2.0` stays fractional); null for any other spelling.
+ */
+fun numberText(lexeme: CharSequence): String? {
+    val s = lexeme.toString()
+    val signed = s.startsWith("-") || s.startsWith("+")
+    val dot = s.indexOf('.')
+    val int = if (dot < 0) s.substring(if (signed) 1 else 0) else s.substring(if (signed) 1 else 0, dot)
+    val frac = if (dot < 0) null else s.substring(dot + 1)
+    if (int.isEmpty() || int.any { it !in '0'..'9' }) return null
+    if (frac != null && (frac.isEmpty() || frac.any { it !in '0'..'9' })) return null
+    val intPart = int.trimStart('0').ifEmpty { "0" }
+    val fracPart = frac?.trimEnd('0')?.ifEmpty { "0" }
+    val zero = intPart == "0" && (fracPart == null || fracPart == "0")
+    return (if (s.startsWith("-") && !zero) "-" else "") + intPart + (fracPart?.let { ".$it" } ?: "")
+}
 
 /** `TRUE` / `FALSE`. */
 data class BooleanLiteral(val value: Boolean) : SqlNode
@@ -119,7 +138,7 @@ class SqlParser(private val cs: CharSeries) {
                         StringLiteral(litRaw.substring(1, litRaw.length - 1).toSeries())
                     } else {
                         val numStr = litRaw
-                        if (numStr.contains('.')) NumericLiteral(numStr.toDouble()) else NumericLiteral(numStr.toLong())
+                        if (numStr.contains('.')) NumericLiteral(numStr.toDouble(), numberText(numStr)) else NumericLiteral(numStr.toLong())
                     }
                     whereExpr = BinaryExpr(ColumnRef(Identifier(colName.toSeries())), op, LitExpr(litNode))
                 }
@@ -222,7 +241,7 @@ class SqlParser(private val cs: CharSeries) {
             is Double -> num
             else -> num
         }
-        return NumericLiteral(value as Number)
+        return NumericLiteral(value as Number, if (fraction) numberText(slice.asString()) else null)
     }
 
     fun parseTerm(): Expr? {

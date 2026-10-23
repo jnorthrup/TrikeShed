@@ -161,10 +161,11 @@ fun Expr.render(): String = when (this) {
     is ColumnRef -> id.asString()
     is LitExpr -> when (val lit = lit) {
         is StringLiteral -> "'" + lit.asString().replace("'", "''") + "'"
-        is NumericLiteral -> lit.value.toString()
+        is NumericLiteral -> lit.text ?: renderNumber(lit.value)
         is BooleanLiteral -> if (lit.value) "TRUE" else "FALSE"
         NullLiteral -> "NULL"
-        else -> lit.toString()
+        is Identifier -> lit.asString()
+        else -> error("no SQL text for literal ${lit::class.simpleName}")
     }
     is BinaryExpr -> "(${left.render()} $op ${right.render()})"
     is Not -> "(NOT ${expr.render()})"
@@ -176,6 +177,67 @@ fun Expr.render(): String = when (this) {
     }.joinToString("")
     is Cast -> "${expr.render()}::$type"
     Star -> "*"
+}
+
+/**
+ * A number's canonical text for a literal that was not parsed (the planner's and the surfaces' own):
+ * integral values print as integers; a fractional value prints as plain decimal with at least one
+ * fraction digit, so it agrees with [numberText] of the same value's lexeme on every target.
+ */
+fun renderNumber(n: Number): String = when (n) {
+    is Double, is Float -> plainDecimal(n.toDouble())
+    else -> n.toString()
+}
+
+/**
+ * A double as plain decimal text with at least one fraction digit: the shortest round-trip digits every
+ * target prints, with the exponent notation each target chooses differently (`1.0E-4` on the JVM,
+ * `0.0001` on JS) folded back into the digits.
+ */
+fun plainDecimal(d: Double): String {
+    if (!d.isFinite()) return d.toString()
+    if (d > -1e15 && d < 1e15 && d.toLong().toDouble() == d) return d.toLong().toString() + ".0"
+    val s = d.toString()
+    val neg = s.startsWith("-")
+    val body = if (neg) s.substring(1) else s
+    val e = body.indexOfFirst { it == 'E' || it == 'e' }
+    val mantissa = if (e < 0) body else body.substring(0, e)
+    val exponent = if (e < 0) 0 else body.substring(e + 1).removePrefix("+").toInt()
+    val dot = mantissa.indexOf('.')
+    val digits = mantissa.replace(".", "")
+    val intLen = (if (dot < 0) mantissa.length else dot) + exponent
+    val out = when {
+        intLen <= 0 -> "0." + "0".repeat(-intLen) + digits
+        intLen >= digits.length -> digits + "0".repeat(intLen - digits.length) + ".0"
+        else -> digits.substring(0, intLen) + "." + digits.substring(intLen)
+    }
+    val intPart = out.substringBefore('.').trimStart('0').ifEmpty { "0" }
+    val fracPart = out.substringAfter('.').trimEnd('0').ifEmpty { "0" }
+    return (if (neg) "-" else "") + intPart + "." + fracPart
+}
+
+/**
+ * The statement's canonical structural text, the identity a [borg.trikeshed.cursor.query.QueryReceipt]
+ * hashes: clause by clause over [Expr.render]. Not dialect SQL (identifiers are not quoted); the M2
+ * printer is.
+ */
+fun SelectStmt.render(): String = buildString {
+    append("SELECT ")
+    append(columns.view.joinToString(", ") { c -> c.expr.render() + (c.alias?.let { " AS " + it.asString() } ?: "") })
+    from?.let { t -> append(" FROM ").append(t.name.asString()); t.alias?.let { append(' ').append(it.asString()) } }
+    for (j in joins.view) {
+        append(if (j.outer) " LEFT JOIN " else " JOIN ").append(j.table.name.asString())
+        j.table.alias?.let { append(' ').append(it.asString()) }
+        j.on?.let { append(" ON ").append(it.render()) }
+    }
+    where?.let { append(" WHERE ").append(it.render()) }
+    if (groupBy.size > 0) append(" GROUP BY ").append(groupBy.view.joinToString(", ") { it.render() })
+    having?.let { append(" HAVING ").append(it.render()) }
+    if (orderBy.size > 0) append(" ORDER BY ").append(orderBy.view.joinToString(", ") { o ->
+        o.expr.render() + (if (o.descending) " DESC" else " ASC") + (o.nullsFirst?.let { if (it) " NULLS FIRST" else " NULLS LAST" } ?: "")
+    })
+    limit?.let { append(" LIMIT ").append(it) }
+    offset?.let { append(" OFFSET ").append(it) }
 }
 
 /** A vector cell as floats: a FloatArray / DoubleArray, a Confix array of numbers, or pgvector text `[1, 2.5, -3]`. */

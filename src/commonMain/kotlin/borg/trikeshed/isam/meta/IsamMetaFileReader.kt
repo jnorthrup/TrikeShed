@@ -292,6 +292,7 @@ class IsamMetaFileReader private constructor(
                         end = offset + len,
                         decoder = type.createDecoder(len),
                         encoder = type.createEncoder(len),
+                        provenance = (columnMeta as? RecordMeta)?.provenance,
                     ).also {
                         it.groupId = groupId
                         it.groupName = groupName

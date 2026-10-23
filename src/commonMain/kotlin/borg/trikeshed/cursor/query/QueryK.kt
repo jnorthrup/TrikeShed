@@ -55,7 +55,25 @@ sealed class QueryK<out R> : OpK<R>() {
 
     /** Evoke's `evoke_hybrid_fuse_candidates(candidates, k, fusion, rrf_k, epsilon)` over a candidate table (see [fuseCandidates]). */
     class Fuse(val k: Int = 10, val method: FusionMethod = FusionMethod.RRF, val rrfK: Double = 60.0, val epsilon: Double = 1e-6) : QueryK<Cursor>()
+
+    /** The provenance of a [QueryCursor]'s rows: its statement, sources and stages under one content id (see [QueryReceipt]). */
+    data object Receipt : QueryK<QueryReceipt>()
 }
+
+/** A stage's declared name, the identity a [QueryReceipt] hashes: not reflection, so it is the same on every target and survives a rename only on purpose. */
+val QueryK<*>.stageName: String
+    get() = when (this) {
+        is QueryK.Filter -> "Filter"
+        is QueryK.Derive -> "Derive"
+        is QueryK.Project -> "Project"
+        is QueryK.Widen -> "Widen"
+        is QueryK.Aggregate -> "Aggregate"
+        is QueryK.Order -> "Order"
+        is QueryK.Unnest -> "Unnest"
+        is QueryK.LexicalTopK -> "LexicalTopK"
+        is QueryK.Fuse -> "Fuse"
+        QueryK.Receipt -> "Receipt"
+    }
 
 enum class Reduce { COUNT, SUM, MIN, MAX, AVG }
 
@@ -75,14 +93,27 @@ fun QueryPlan.execute(
     return cursor
 }
 
-/** A Cursor that carries its plan and executes it on first read of its size or a row. */
+/**
+ * A Cursor that carries its plan and executes it on first read of its size or a row. When it knows
+ * its [statement] (the planner's canonical text) every result column carries the statement's
+ * content id as provenance and [receipt] describes the run.
+ */
 class QueryCursor(
     val source: Cursor,
     val plan: QueryPlan,
     val ops: ColumnOperations = KotlinColumnOperations,
     val compiler: ExprCompiler = ClosureExprCompiler,
+    val statement: String? = null,
+    /** Source table name → the content id of what was scanned, when the catalog knows one. */
+    val sources: Map<String, borg.trikeshed.job.ContentId?> = emptyMap(),
 ) : Join<Int, (Int) -> RowVec> {
-    val result: Cursor by lazy { plan.execute(source, ops, compiler) }
+    private val executed: Cursor by lazy { plan.execute(source, ops, compiler) }
+    /** The run's receipt; a plan without a statement has no identity to receipt, and says so. */
+    val receipt: QueryReceipt by lazy {
+        val text = requireNotNull(statement) { "a receipt needs the planner's statement; this QueryCursor was built from stages alone" }
+        QueryReceipt(text, sources, plan.view.map { it.stageName }, executed.size)
+    }
+    val result: Cursor by lazy { if (statement == null) executed else executed.withProvenance(receipt.statementCid) }
     override val a: Int get() = result.size
     override val b: (Int) -> RowVec get() = result.b
 }

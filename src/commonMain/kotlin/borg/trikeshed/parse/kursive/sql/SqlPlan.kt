@@ -29,7 +29,7 @@ fun Cursor.qualify(qualifier: String): Cursor {
     val exemplar = this[0].metas
     val metas = Array(exemplar.size) { c ->
         val meta = exemplar[c]()
-        ColumnMeta("$qualifier.${meta.name}", meta.type, meta.child)
+        meta.renamed("$qualifier.${meta.name}")
     }
     if (this is ColumnCursor) return renamed(metas)
     val metaSeries: Series<`ColumnMeta↻`> = metas.size j { c: Int -> { metas[c] } }
@@ -48,6 +48,8 @@ fun SelectStmt.plan(
     resolve: (String) -> Cursor,
     ops: ColumnOperations = KotlinColumnOperations,
     compiler: ExprCompiler = ClosureExprCompiler,
+    /** The content id of a source table's current content, when the catalog knows one; recorded on the receipt. */
+    provenance: (String) -> borg.trikeshed.job.ContentId? = { null },
 ): QueryCursor {
     val table = requireNotNull(from) { "SELECT without FROM" }
     val source = resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
@@ -189,7 +191,8 @@ fun SelectStmt.plan(
         )
     }
     stages += QueryK.Project(sources.toSeries())
-    return QueryCursor(source, stages.toSeries(), ops, compiler)
+    val tables = listOf(table.name.asString()) + joins.view.map { it.table.name.asString() }
+    return QueryCursor(source, stages.toSeries(), ops, compiler, render(), tables.associateWith(provenance))
 }
 
 /** A literal's value, through a cast of a literal (`'idx'::regclass`); null for anything else. */

@@ -40,6 +40,7 @@ fun <R> Cursor.facet(
         is QueryK.Unnest -> unnest(key)
         is QueryK.LexicalTopK -> lexicalTopK(key)
         is QueryK.Fuse -> fuse(key)
+        is QueryK.Receipt -> (this as? QueryCursor ?: error("a receipt belongs to a QueryCursor")).receipt
     } as R
 }
 
@@ -104,8 +105,7 @@ fun Cursor.project(stage: QueryK.Project): Cursor {
     }
     val exemplar = this[0].metas
     val metas = Array(ordinals.size) { i ->
-        val source = exemplar[ordinals[i]]()
-        ColumnMeta(outputs[i], source.type, source.child)
+        exemplar[ordinals[i]]().renamed(outputs[i])
     }
     val metaSeries: Series<`ColumnMeta↻`> = metas.size j { c: Int -> { metas[c] } }
     val picks = ordinals.toIntArray()

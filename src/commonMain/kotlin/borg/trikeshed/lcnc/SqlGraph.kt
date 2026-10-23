@@ -579,7 +579,7 @@ object SqlGraph {
                     val v = value.trim().toLongOrNull() ?: throw SqlGraphError(n.id, "bad-param", "int literal '$value'")
                     LitExpr(NumericLiteral(if (v in Int.MIN_VALUE..Int.MAX_VALUE) v.toInt() else v))
                 }
-                "double" -> LitExpr(NumericLiteral(value.trim().toDoubleOrNull() ?: throw SqlGraphError(n.id, "bad-param", "double literal '$value'")))
+                "double" -> LitExpr(NumericLiteral(value.trim().toDoubleOrNull() ?: throw SqlGraphError(n.id, "bad-param", "double literal '$value'"), numberText(value.trim())))
                 else -> throw SqlGraphError(n.id, "bad-param", "literal kind '$kind'")
             }
         }

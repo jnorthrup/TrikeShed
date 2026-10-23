@@ -52,6 +52,9 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
     private val entries = linkedMapOf<BreadcrumbId, BreadcrumbIndexed>()
 
     fun copy(): BreadcrumbIndex = BreadcrumbIndex(cas).also { it.entries.putAll(entries) }
+
+    /** Every entry, in insertion order: what a table over the index reads. */
+    fun all(): Series<BreadcrumbIndexed> = entries.values.toList().toSeries()
     fun restore(from: BreadcrumbIndex) { entries.clear(); entries.putAll(from.entries) }
     operator fun get(id: BreadcrumbId): BreadcrumbIndexed? = entries[id]
 

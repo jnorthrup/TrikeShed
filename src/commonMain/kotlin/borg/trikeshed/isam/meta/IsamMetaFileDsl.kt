@@ -174,6 +174,7 @@ class MetafileWriter(val config: MetafileWriteConfig) {
                         encoder = type.createEncoder(len),
                         groupId = groupId,
                         groupName = groupName,
+                        provenance = (col as? RecordMeta)?.provenance,
                     )
                     offset += len
                     recordMeta
@@ -215,7 +216,8 @@ fun RecordMeta(
     groupId: Int = 0,
     groupName: String = "0",
     child: ColumnMeta? = null,
-): RecordMeta = RecordMeta(name, type, begin, end, decoder, encoder, child).also {
+    provenance: borg.trikeshed.job.ContentId? = null,
+): RecordMeta = RecordMeta(name, type, begin, end, decoder, encoder, child, provenance).also {
     it.groupId = groupId
     it.groupName = groupName
 }

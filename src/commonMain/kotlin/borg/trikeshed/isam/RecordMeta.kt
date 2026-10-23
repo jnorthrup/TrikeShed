@@ -4,6 +4,7 @@ import borg.trikeshed.couch.isam.FileBackedStringpool
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.TypeMemento
 import borg.trikeshed.isam.meta.IOMemento
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.j
 
 
@@ -33,6 +34,12 @@ class RecordMeta(
     val encoder: (Any?) -> ByteArray = type.createEncoder(end - begin),
     /** open to interpretation, for instance, CSV conversion to ISAM might define two RecordMetas for two steps*/
     override var child: ColumnMeta? = null,
+    /**
+     * The content id of what produced this column (a query's statement, a derivation), or null for a
+     * source column. In-memory only: the metafile does not carry it, so a column read back from disk
+     * is a source column again.
+     */
+    val provenance: ContentId? = null,
 ) : ColumnMeta by ColumnMeta(name, type, child) {
     override val a: CharSequence get() = name
 

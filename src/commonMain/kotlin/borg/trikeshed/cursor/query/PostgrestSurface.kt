@@ -511,7 +511,7 @@ class PostgrestSurface(
                 meta == null -> text
                 meta.isVector -> Cast(text, "vector")
                 integral -> value.toLongOrNull()?.let { LitExpr(NumericLiteral(it)) } ?: Cast(text, "int8")
-                fractional -> value.toDoubleOrNull()?.let { LitExpr(NumericLiteral(it)) } ?: Cast(text, "float8")
+                fractional -> value.toDoubleOrNull()?.let { LitExpr(NumericLiteral(it, numberText(value))) } ?: Cast(text, "float8")
                 meta.type == IOMemento.IoBoolean -> Cast(text, "bool")
                 else -> text
             }
