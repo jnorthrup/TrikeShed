@@ -41,6 +41,7 @@ object GuestEnvironment {
         "KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH",
         "PRIVATE", "APIKEY", "ACCESS", "SESSION", "COOKIE", "CERT",
         "LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_", "PYTHONPATH", "NODE_OPTIONS",
+        "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "PERL5OPT", "RUBYOPT", "PROMPT_COMMAND",
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
