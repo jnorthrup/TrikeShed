@@ -189,6 +189,23 @@ enum class LcncNodeKey(val type: String) : CoroutineContext.Key<LcncNodeElement>
     COUNCIL_RECORD("council.record"),
     COUNCIL_CASE("council.case"),
     WIKI_CONSOLIDATE(LcncContracts.WIKI_CONSOLIDATE),
+    SQL_SELECT(SqlGraph.SELECT),
+    SQL_ITEM(SqlGraph.ITEM_EXPR),
+    SQL_ITEM_STAR(SqlGraph.ITEM_STAR),
+    SQL_SORT_KEY(SqlGraph.SORT_KEY),
+    SQL_TABLE(SqlGraph.TABLE_NAME),
+    SQL_JOIN(SqlGraph.JOIN),
+    SQL_COL(SqlGraph.COL),
+    SQL_LIT(SqlGraph.LIT),
+    SQL_CALL(SqlGraph.CALL),
+    SQL_PATH(SqlGraph.PATH),
+    SQL_CAST(SqlGraph.CAST),
+    SQL_ARITH(SqlGraph.ARITH),
+    SQL_CMP(SqlGraph.CMP),
+    SQL_LIKE(SqlGraph.LIKE),
+    SQL_LOGIC(SqlGraph.LOGIC),
+    SQL_AS_CONDITION(SqlGraph.AS_CONDITION),
+    SQL_AS_VALUE(SqlGraph.AS_VALUE),
     WIKI_PROPOSE(LcncContracts.WIKI_PROPOSE);
 
     fun construct(node: LcncNode, inputs: Map<String, Any?>, runner: LcncNodeRunner, parent: Job): LcncNodeElement {
