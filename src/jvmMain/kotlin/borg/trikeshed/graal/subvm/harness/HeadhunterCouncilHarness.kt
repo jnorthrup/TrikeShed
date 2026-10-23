@@ -13,7 +13,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
-import modelmux.acp.providerTag
 
 /**
  * Live smoke of the headhunter drafting council against the real roster: discovers the

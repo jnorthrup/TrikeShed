@@ -21,7 +21,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.net.URI
-import modelmux.acp.providerTag
 
 /** The app and its LCNC composition share the same records, source acquisition and preparation. */
 class HeadhunterWire private constructor(

@@ -2,6 +2,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.time.Duration
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -630,44 +631,12 @@ tasks.named<Test>("jvmTest") {
     }).withPropertyName("confixBoundarySources")
 }
 
-<<<<<<< HEAD
-||||||| febce3715
-tasks.register<Test>("btrfsStorageCheck") {
-    group = "verification"
-    description = "Verify userspace Btrfs storage, world replication, ISAM, and fresh-process crash recovery."
-    val jvmTests = tasks.named<Test>("jvmTest")
-    dependsOn("jvmTestClasses")
-    testClassesDirs = jvmTests.get().testClassesDirs
-    classpath = jvmTests.get().classpath
-    filter {
-        includeTestsMatching("borg.trikeshed.btrfs.*")
-        includeTestsMatching("borg.trikeshed.graal.subvm.BtrfsHostedVmWorldTest")
-        includeTestsMatching("borg.trikeshed.graal.subvm.TrikeShedGraalVfs*Test")
-        includeTestsMatching("borg.trikeshed.isam.*")
-        includeTestsMatching("borg.trikeshed.job.CanonicalCborTest")
-        includeTestsMatching("borg.trikeshed.job.ContentIdTest")
-        includeTestsMatching("borg.trikeshed.util.oroboros.Sha2CasBusTest")
-        includeTestsMatching("borg.trikeshed.userspace.nio.file.spi.DurableStoragePrimitivesTest")
-        includeTestsMatching("borg.trikeshed.userspace.JvmUserspaceChannelBackendTest")
-        includeTestsMatching("borg.trikeshed.userspace.FunctionalUringFacadeLifecycleTest")
-        includeTestsMatching("borg.trikeshed.couch.replicate.*")
-        includeTestsMatching("borg.trikeshed.couch.CouchReplicationTest")
-        includeTestsMatching("borg.trikeshed.couch.CouchWireRouterAttachmentTest")
-    }
-    timeout.set(Duration.ofSeconds(120))
-    outputs.upToDateWhen { false }
-    doFirst {
-        systemProperty("trikeshed.storage.classpath", classpath.asPath)
-    }
-}
-
-=======
 tasks.register<JavaExec>("btrfs") {
     group = "application"
     description = "Userspace Btrfs: create, file operations, add, balance, compression, native export, and macFUSE mount."
     dependsOn("jvmMainClasses")
     mainClass.set("borg.trikeshed.btrfs.BtrfsCli")
-    classpath(jvmMainClassesDirs, layout.buildDirectory.dir("processedResources/jvm/main"), configurations.getByName("jvmRuntimeClasspath"))
+    classpath(kotlin.jvm().compilations.getByName("main").output.classesDirs, layout.buildDirectory.dir("processedResources/jvm/main"), configurations.getByName("jvmRuntimeClasspath"))
     jvmArgs("--enable-native-access=ALL-UNNAMED")
     standardInput = System.`in`
 }
@@ -701,7 +670,6 @@ tasks.register<Test>("btrfsStorageCheck") {
     }
 }
 
->>>>>>> origin/work
 tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(
         listOf(
