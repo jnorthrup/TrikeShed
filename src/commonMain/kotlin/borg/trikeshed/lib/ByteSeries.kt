@@ -259,6 +259,8 @@ class ByteSeries(
      */
     fun toArray(): ByteArray = ByteArray(rem, ::get)
 
+    companion object
+
 }
 
 

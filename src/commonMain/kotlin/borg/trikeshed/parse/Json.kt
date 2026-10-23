@@ -167,13 +167,11 @@ object JsonParser {
                 }
             }
 
-            '"' -> {
-                val beg = src.pos
-                val seekTo = src.seekTo('"', '\\')
-                if (!seekTo) throw Exception("expected end of quoted string")
-                val end = src.pos - 1
-                src.lim(end).pos(beg).asString()
-            }
+'"' -> {
+    val beg = src.pos
+    if (!src.seekTo('"', '\\')) throw Exception("expected end of quoted string")
+    src.lim(src.pos - 1).pos(beg).asString()
+}
 
             't', 'f' -> 't' == c
 //            'n' -> null

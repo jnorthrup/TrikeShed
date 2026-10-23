@@ -1,24 +1,8 @@
 //which stanza do we add a linux64 cinteropdef for liburing below? (the linux64 stanza is the only one that has a cinterop block)
 
 plugins {
-    kotlin("multiplatform") version "1.8.10"
-////    id("org.jetbrains.intellij") version "3.1" apply true
-//
-//    id("org.jetbrains.dokka") version "1.7.0" apply false
-//    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
-//
-//    // support kotlinx-datetime
-//    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
-//
-//    // support for k2 compiler plugin
-//    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
-//    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
-//
-//    // gradle versions update plugin
-//    id("com.github.ben-manes.versions") version "0.42.0" apply false
-////    id("atomicfu-gradle-plugin") version "0.18.5"
-    `maven-publish`
+    kotlin("multiplatform") version "2.1.0"
+     `maven-publish`
 }
 
 group = "org.bereft"
@@ -41,10 +25,9 @@ publishing {
 }
 
 kotlin {
-    jvmToolchain(18)
+    jvmToolchain(21)
 
     jvm {
-
         withJava()
     }
 
@@ -52,8 +35,11 @@ kotlin {
     val hostOs = System.getProperty("os.name")
     val isMingwX64 = hostOs.startsWith("Windows")
     val nativeTarget = when {
-        hostOs == "Mac OS X" -> macosX64("native")
-        hostOs == "Linux" -> linuxX64("native")
+        //macos aarch and intel
+        hostOs.startsWith("Mac") && System.getProperty("os.arch") == "aarch64" -> macosArm64("native")
+        hostOs.startsWith("Mac") -> macosX64("native")
+        hostOs.startsWith("Linux") && System.getProperty("os.arch") == "aarch64" -> linuxArm64("native")
+        hostOs.startsWith("Linux") -> linuxX64("native")
         isMingwX64 -> mingwX64("native")
         else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
     }
