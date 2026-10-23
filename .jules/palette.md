@@ -13,3 +13,7 @@
 ## 2026-03-30 - Focus-Visible Ring Indicators for SpaceGraph Shadow Components
 **Learning:** Embedded web components and shadow stylesheets like `spacegraph-shadow.css` often omit `:focus-visible` keyboard focus indicators, making interactive commands, inputs, and mode toggles invisible during keyboard navigation.
 **Action:** Always inspect specialized web stylesheets (e.g., `spacegraph-shadow.css`) and ensure explicit `:focus-visible` rules are injected using the module's primary accent color (`#68c9a1`).
+
+## 2026-03-30 - Focus-Visible Indicators for Collapsible Summary Elements
+**Learning:** Collapsible `<details>`/`<summary>` elements in standalone HTML applications are natively focusable via keyboard tabbing but default browser focus outlines are inconsistent or invisible against custom web themes.
+**Action:** Always include `summary:focus-visible` and `summary:focus:not(:focus-visible)` alongside standard form controls (`button`, `input`, `textarea`, `a`) in custom CSS focus-visible rules.
