@@ -45,4 +45,19 @@ class BreadcrumbCursorTest {
         val replay = SqlParser.parse("SELECT id FROM heritage".toSeries())!!.plan({ heritage.index.facet(ConfixIndexK.Columns) })
         assertEquals(listOf(1L, 3L), List(replay.size) { replay[it].values[0] })
     }
+
+    @Test fun theElementPublishesEverySessionsBreadcrumbsAsOneCatalogTable() = runTest {
+        val cas = CasStore.inMemory()
+        val element = BreadcrumbElement({ BreadcrumbContext({ 7L }, index = BreadcrumbIndex(cas)) }, cas = cas)
+        assertEquals(0, element.table.size)
+        element.transact("a") { it.put(BreadcrumbId("n1"), "note", "first", title = "first") }
+        element.transact("b") { it.put(BreadcrumbId("n2"), "note", "second", title = "second"); it.put(BreadcrumbId("n3"), "note", "third", title = "third") }
+        // the catalog reads the published table with no transaction of its own
+        val catalog = borg.trikeshed.cursor.query.Catalog(borg.trikeshed.cursor.query.CursorTable("breadcrumbs") { element.table })
+        val rows = SqlParser.parse("SELECT session, title FROM breadcrumbs ORDER BY session, title".toSeries())!!.plan(catalog::resolve)
+        assertEquals(listOf(listOf("a", "first"), listOf("b", "second"), listOf("b", "third")), List(rows.size) { r -> rows[r].values.let { v -> listOf(v[0], v[1]) } })
+        assertEquals(listOf("session") + BreadcrumbCursor.COLUMNS, element.table.metas.map { it.name.toString() })
+        element.remove("b")
+        assertEquals(1, element.table.size, "a removed session leaves the table")
+    }
 }

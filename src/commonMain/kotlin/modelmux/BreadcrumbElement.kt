@@ -1,6 +1,7 @@
 package modelmux
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.cursor.ColumnCursor
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
@@ -41,6 +42,13 @@ class BreadcrumbElement(
     private val mutex = Mutex()
     private var loaded = false
 
+    /**
+     * Every context's breadcrumbs as the table `breadcrumbs` ([BreadcrumbCursor.union]), published by each
+     * transaction that may have written, so a catalog scan reads it without entering the transaction owner.
+     */
+    @kotlin.concurrent.Volatile
+    var table: ColumnCursor = BreadcrumbCursor.union(emptyMap())
+
     init { require(capacity > 0) }
 
     suspend fun <T> transact(id: String, create: Boolean = true, operation: (BreadcrumbContext) -> T): T {
@@ -61,6 +69,7 @@ class BreadcrumbElement(
                 }
                 if (existing == null) contexts[id] = context
                 if (state != null) states[id] = state
+                table = BreadcrumbCursor.union(contexts)
                 result
             } catch (failure: Throwable) {
                 if (before != null) context.restore(before)
@@ -91,6 +100,7 @@ class BreadcrumbElement(
         contexts.putAll(restored)
         states.putAll(encoded)
         loaded = true
+        table = BreadcrumbCursor.union(contexts)
     }
 
     private suspend fun <T> transact(operation: suspend BreadcrumbElement.() -> T): T = supervisorScope {
@@ -122,6 +132,7 @@ class BreadcrumbElement(
             store?.write(id, null)
             contexts.remove(id)
             states.remove(id)
+            table = BreadcrumbCursor.union(contexts)
         }
     }
 }

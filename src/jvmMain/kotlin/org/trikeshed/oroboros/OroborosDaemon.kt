@@ -2,6 +2,7 @@ package borg.trikeshed.daemon
 
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
+import borg.trikeshed.narsese.cursor
 import borg.trikeshed.narsese.ingestKg
 
 import borg.trikeshed.couch.CouchReportReactorElement
@@ -2088,8 +2089,13 @@ object OroborosDaemon {
                 )).scan()
             },
         )
-        // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query), plus DB.DBA.RDF_QUAD.
-        val postgrestWire = borg.trikeshed.forge.server.PostgrestWire(couchDb) { quadStore.tables() }
+        // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query), plus DB.DBA.RDF_QUAD,
+        // the breadcrumbs of every session and, when the belief bag runs, its beliefs; the pg wire reads the same catalog.
+        val postgrestWire = borg.trikeshed.forge.server.PostgrestWire(couchDb) {
+            quadStore.tables() +
+                borg.trikeshed.cursor.query.CursorTable("breadcrumbs") { breadcrumbContexts.table } +
+                listOfNotNull(beliefBag?.let { bag -> borg.trikeshed.cursor.query.CursorTable("nars_beliefs") { bag.cursor() } })
+        }
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,

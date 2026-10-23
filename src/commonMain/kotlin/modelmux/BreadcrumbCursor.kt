@@ -14,22 +14,26 @@ import borg.trikeshed.parse.confix.value
  * whose title is the statement and whose heritage holds its result.
  */
 class BreadcrumbCursor(val entries: Series<BreadcrumbIndexed>) {
-    fun cursor(): ColumnCursor = rowsCursor(
-        COLUMNS,
-        entries.view.map { e ->
-            mapOf(
-                "id" to e.id.value, "ref" to e.ref.value, "cid" to e.cid.value, "spineCid" to e.spine.value,
-                "title" to e.title, "source" to e.source,
-                "chars" to longOf(e.metadata.value("chars")),
-                "createdAt" to longOf(e.metadata.value("createdAt")),
-                "heritageCid" to e.metadata.value("heritageCid")?.toString(),
-            )
-        },
-        mapOf("chars" to "int8", "createdAt" to "int8", "heritageCid" to "text"),
-    )
+    fun cursor(): ColumnCursor = rowsCursor(COLUMNS, entries.view.map(::row), TYPES)
 
     companion object {
         val COLUMNS = listOf("id", "ref", "cid", "spineCid", "title", "source", "chars", "createdAt", "heritageCid")
+        val TYPES = mapOf("chars" to "int8", "createdAt" to "int8", "heritageCid" to "text")
+
+        fun row(e: BreadcrumbIndexed): Map<String, Any?> = mapOf(
+            "id" to e.id.value, "ref" to e.ref.value, "cid" to e.cid.value, "spineCid" to e.spine.value,
+            "title" to e.title, "source" to e.source,
+            "chars" to longOf(e.metadata.value("chars")),
+            "createdAt" to longOf(e.metadata.value("createdAt")),
+            "heritageCid" to e.metadata.value("heritageCid")?.toString(),
+        )
+
+        /** Every context's breadcrumbs as one table, `session` (the context id) first: what the daemon's catalog serves as `breadcrumbs`. */
+        fun union(contexts: Map<String, BreadcrumbContext>): ColumnCursor = rowsCursor(
+            listOf("session") + COLUMNS,
+            contexts.entries.flatMap { (session, context) -> context.index.all().view.map { e -> mapOf("session" to session) + row(e) } },
+            TYPES,
+        )
 
         /** The index writes `chars` as a number and `createdAt` as a decimal string; both read as int8. */
         fun longOf(value: Any?): Long? = when (value) {
