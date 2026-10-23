@@ -1,22 +1,39 @@
 /**
  * FeatureExtractor — main entry point for computing all technical indicators.
  *
- * Takes OHLCV as 5 Series<Double> columns, returns a named map of all
- * computed indicator Series.  This is the pandas DataFrame replacement:
+ * Takes close, high, low and volume as Series<Double> columns, or as a Cursor,
+ * and returns named indicator Series or a feature Cursor. This is the pandas DataFrame replacement:
  * instead of mutating a frame, we return lazy Series that can be
  * composed, indexed, or materialized on demand.
  */
 package borg.trikeshed.indicator
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.lib.get
+import borg.trikeshed.cursor.*
+import borg.trikeshed.cursor.CursorTensorReifier.toTensorDouble
+import borg.trikeshed.isam.meta.IOMemento
 
 object FeatureExtractor {
 
     /**
-     * Compute all 15 indicator families from OHLCV data.
-     *
-     * @return Map of indicator name to Series<Double>
+     * Project named OHLCV columns into the indicator algebra; output columns carry IoDouble metadata.
+     * Numeric cells follow the Cursor tensor conversion, including null as NaN. Empty input has no schema row.
      */
+    fun compute(cursor: Cursor): Cursor {
+        if (cursor.size == 0) return cursor
+        val source = cursor.select("close", "high", "low", "volume")
+        fun column(index: Int): Series<Double> {
+            val name = source.b(0).b(index).b().name
+            return source.size j { row: Int -> source.b(row).b(index).a.toTensorDouble(name, row, index) }
+        }
+        val features = compute(column(0), column(1), column(2), column(3)).entries.toSeries()
+        val metadata = features α { ColumnMeta(it.key, IOMemento.IoDouble).`↺` }
+        return cursor.size j { row: Int ->
+            features.size j { column: Int -> features[column].value[row] j metadata[column] }
+        }
+    }
+
     /**
      * Compute all 22 indicator families from OHLCV data.
      *
