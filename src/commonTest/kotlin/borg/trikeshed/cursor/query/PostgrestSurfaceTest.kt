@@ -15,6 +15,21 @@ class PostgrestSurfaceTest {
     private fun call(method: String, path: String, body: String = "", vararg headers: Pair<String, String>) =
         api.handle(method, path, mapOf("Accept-Profile" to "public", *headers), body)
 
+    @Test fun spasqlAndTheQuadTableAnswerThroughTheSqlEntryPoint() {
+        val store = borg.trikeshed.rdf.QuadStore().load(borg.trikeshed.rdf.SparqlQueryTest.FIXTURE)
+        val surface = PostgrestSurface(Catalog(listOf({ tables.tables() }, { store.tables() })), tables)
+        val spasql = surface.sql("SPARQL PREFIX ex: <urn:ex:> SELECT ?s ?o WHERE { GRAPH ex:g1 { ?s ex:p ?o } } ORDER BY ?s")
+        assertEquals(200, spasql.status, spasql.body)
+        assertEquals("""[{"s":"<urn:ex:a>","o":"<urn:ex:b>"},{"s":"<urn:ex:b>","o":"<urn:ex:c>"}]""", spasql.body)
+        val sql = surface.sql("SELECT S AS s, O AS o FROM db.dba.rdf_quad WHERE G = '<urn:ex:g1>' AND P = '<urn:ex:p>' ORDER BY S")
+        assertEquals(spasql.body, sql.body, "quads mode: SQL and SPARQL read one table")
+        assertEquals("""[{"ask":true}]""", surface.sql("SPARQL ASK { <urn:ex:a> <urn:ex:p> <urn:ex:b> }").body)
+        assertEquals("""[{"n":6}]""", surface.sql("SELECT COUNT(*) AS n FROM triples WHERE S = '<urn:ex:a>'").body)
+        val bad = surface.sql("SPARQL SELECT ?s WHERE { ?s ex:p ?o }")
+        assertEquals(400, bad.status)
+        assertTrue("ex" in bad.body, bad.body)
+    }
+
     private fun seed() {
         assertEquals("[]", api.sql("CREATE TABLE documents (id bigint primary key, title text, owner text, score float8, embedding vector(3))").body)
         val inserted = call(

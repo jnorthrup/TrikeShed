@@ -61,7 +61,7 @@ class Catalog(private val sources: List<() -> Iterable<CatalogTable>>) {
     fun table(name: String): CatalogTable? = when (name) {
         "information_schema.tables" -> CursorTable(name) { facet(CatalogK.Tables) }
         "information_schema.columns" -> CursorTable(name) { facet(CatalogK.Columns) }
-        else -> tables().firstOrNull { it.name == name }
+        else -> tables().let { all -> all.firstOrNull { it.name == name } ?: all.firstOrNull { it.name.equals(name, ignoreCase = true) } }
     }
 
     fun resolve(name: String): Cursor = (table(name) ?: throw UndefinedTable(name)).scan()

@@ -50,10 +50,15 @@ fun SelectStmt.plan(
     compiler: ExprCompiler = ClosureExprCompiler,
     /** The content id of a source table's current content, when the catalog knows one; recorded on the receipt. */
     provenance: (String) -> borg.trikeshed.job.ContentId? = { null },
+    /** Stages run on the source before this statement's own (a SPARQL front end's graph pattern). */
+    prelude: List<QueryK<Cursor>> = emptyList(),
+    /** The statement text the receipt hashes when this SELECT was lowered from another language; the rendered SQL otherwise. */
+    statement: String? = null,
 ): QueryCursor {
     val table = requireNotNull(from) { "SELECT without FROM" }
     val source = resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
     val stages = mutableListOf<QueryK<Cursor>>()
+    stages += prelude
 
     for (clause in joins.view) {
         val qualifier = (clause.table.alias ?: clause.table.name).asString()
@@ -192,7 +197,7 @@ fun SelectStmt.plan(
     }
     stages += QueryK.Project(sources.toSeries())
     val tables = listOf(table.name.asString()) + joins.view.map { it.table.name.asString() }
-    return QueryCursor(source, stages.toSeries(), ops, compiler, render(), tables.associateWith(provenance))
+    return QueryCursor(source, stages.toSeries(), ops, compiler, statement ?: render(), tables.associateWith(provenance))
 }
 
 /** A literal's value, through a cast of a literal (`'idx'::regclass`); null for anything else. */

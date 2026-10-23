@@ -91,6 +91,22 @@ object RouteManifest {
             RouteEntry("GET", "/api/facts/rdf", "the same selection projected through PlaneFacts.toTriples as Turtle (fact:/plane# prefixes); every partition when ?partition= is omitted"),
             RouteEntry("GET", "/api/rete/productions", "registered productions {count, productions:[{ruleId, salience, interests:[field=value]}]} — the row shape /api/lcnc/rdf/align prints"),
         ),
+        // -- PostgrestWire: Supabase's data API over the SQL catalog --
+        "PostgrestWire" to listOf(
+            RouteEntry("GET", "/rest/v1", "OpenAPI 2.0 of the SQL tables (PostgREST)"),
+            RouteEntry("GET", "/rest/v1/{table}", "PostgREST read: select, filters, order, limit, offset, Range, Prefer count"),
+            RouteEntry("POST", "/rest/v1/{table}", "PostgREST insert, upsert with on_conflict (Prefer return, resolution)"),
+            RouteEntry("PATCH", "/rest/v1/{table}", "PostgREST update of the filtered rows"),
+            RouteEntry("DELETE", "/rest/v1/{table}", "PostgREST delete of the filtered rows"),
+            RouteEntry("POST", "/rest/v1/rpc/{fn}", "a function call: match_documents, evoke_query, evoke_hybrid_fuse_candidates"),
+            RouteEntry("GET", "/rest/v1/rpc/{fn}", "a stable function called with its arguments in the query string"),
+            RouteEntry("POST", "/pg/query", "pg-meta raw SQL: SELECT, CREATE TABLE, DROP TABLE, and SPARQL … (SPASQL) over DB.DBA.RDF_QUAD"),
+        ),
+        // -- SparqlWire: Virtuoso's SPARQL endpoint over the quad store --
+        "SparqlWire" to listOf(
+            RouteEntry("GET", "/sparql", "SPARQL 1.1 protocol: query, default-graph-uri, named-graph-uri; format or Accept picks results JSON, CSV or TSV"),
+            RouteEntry("POST", "/sparql", "SPARQL 1.1 protocol by form or application/sparql-query; SPARQL Update INSERT DATA and DELETE DATA by update or application/sparql-update"),
+        ),
         "ModuleWire" to listOf(
             RouteEntry("GET", "/api/modules", "attached modules and claimed routes"),
             RouteEntry("POST", "/api/modules", "attach a module by FQCN"),

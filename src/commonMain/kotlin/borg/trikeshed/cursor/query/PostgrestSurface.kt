@@ -8,6 +8,9 @@ import borg.trikeshed.parse.confix.keyOf
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.kursive.sql.*
 import borg.trikeshed.parse.reify
+import borg.trikeshed.rdf.QuadStore
+import borg.trikeshed.rdf.SparqlError
+import borg.trikeshed.rdf.SparqlQuery
 
 /** One PostgREST reply: status, headers and body (empty for HEAD and minimal writes). */
 data class PostgrestReply(val status: Int, val body: String, val headers: Map<String, String> = emptyMap()) {
@@ -46,7 +49,7 @@ interface TableDdl {
  *   POST      /rest/v1/<table>[?on_conflict=id&columns=&select=]                   (Prefer: return=, resolution=)
  *   PATCH     /rest/v1/<table>?<filters>        DELETE /rest/v1/<table>?<filters>
  *   POST|GET  /rest/v1/rpc/<fn>                 GET /rest/v1/   (OpenAPI 2.0)
- *   POST      /pg/query {"query": "..."}        (pg-meta: SELECT, CREATE TABLE, DROP TABLE)
+ *   POST      /pg/query {"query": "..."}        (pg-meta: SELECT, CREATE TABLE, DROP TABLE, `SPARQL …` over DB.DBA.RDF_QUAD)
  *
  * Not built (answered with PGRST127 / PGRST123 / PGRST200): full-text, range and array operators,
  * `(any|all)` modifiers, aggregates and resource embedding. Writes are per row: a multi-row write that
@@ -88,6 +91,7 @@ class PostgrestSurface(
         when {
             words.take(2) == listOf("CREATE", "TABLE") -> createTable(statement)
             words.take(2) == listOf("DROP", "TABLE") -> dropTable(statement)
+            words.firstOrNull() == "SPARQL" -> spasql(statement.substring("SPARQL".length))
             else -> {
                 val stmt = SqlParser.parse(statement.toSeries())
                     ?: throw PostgrestError(400, "42601", "syntax error in \"${statement.take(80)}\"")
@@ -95,6 +99,15 @@ class PostgrestSurface(
                 ok(jsonRows(names(cursor, emptyList()), rows(cursor)))
             }
         }
+    }
+
+    /** Virtuoso's SPASQL: a SPARQL query inside the SQL entry point, planned over the catalog's `DB.DBA.RDF_QUAD`; ASK answers one `ask` row. */
+    fun spasql(text: String): PostgrestReply {
+        val query = try { SparqlQuery.parse(text) } catch (e: SparqlError) { throw PostgrestError(400, "42601", e.message ?: "SPARQL syntax error") }
+        val quads = catalog.resolve(QuadStore.RDF_QUAD)
+        if (query.ask) return ok("""[{"ask":${query.plan(quads, compiler = compiler).size > 0}}]""")
+        val cursor = query.plan(quads, compiler = compiler)
+        return ok(jsonRows(names(cursor, query.variables), rows(cursor)))
     }
 
     // ── errors and headers ───────────────────────────────────────────────────────────────────

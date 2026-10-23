@@ -99,7 +99,7 @@ object TurtleRdf {
         fun term(t: String): RdfTerm? = when {
             t.startsWith("?") -> null
             t == "a" -> RdfVocab.rdf("type")
-            else -> parseTerm(t.replace(Regex("""\^\^(\w*):(\w+)$""")) { "^^<" + (prefixes[it.groupValues[1]] ?: "") + it.groupValues[2] + ">" }, prefixes)
+            else -> parseTerm(t, prefixes)
         }
         val compiled = patterns.filter { it.size == 3 }.map { p -> p.map { if (it.startsWith("?")) it else null } to p.map(::term) }
         val triples = graph.allTriples()
@@ -123,7 +123,12 @@ object TurtleRdf {
         return if (head == null) rows else rows.map { r -> head.mapNotNull { v -> r[v]?.let { v to it } }.toMap() }
     }
 
-    private fun parseTerm(raw: String, prefixes: Map<String, String>): RdfTerm? {
+    /**
+     * One term from its Turtle / SPARQL spelling: `<iri>`, `_:b`, `"lex"`, `"lex"@lang`, `"lex"^^<dt>` or
+     * `"lex"^^prefix:local`, `prefix:local` (expanded through [prefixes], kept as written when the
+     * prefix is unknown), else a bare IRI. Null for an unterminated literal.
+     */
+    fun parseTerm(raw: String, prefixes: Map<String, String> = emptyMap()): RdfTerm? {
         val t = raw.trim()
         return when {
             t.startsWith("<") && t.endsWith(">") -> RdfTerm.Iri(t.removePrefix("<").removeSuffix(">"))
@@ -157,7 +162,13 @@ object TurtleRdf {
                 val rest = t.substring(i + 1).trim()
                 when {
                     rest.startsWith("@") -> RdfTerm.Literal(lex, lang = rest.removePrefix("@"))
-                    rest.startsWith("^^") -> RdfTerm.Literal(lex, datatype = rest.removePrefix("^^").removeSurrounding("<", ">"))
+                    rest.startsWith("^^") -> {
+                        val dt = rest.removePrefix("^^")
+                        val datatype = if (dt.startsWith("<")) dt.removeSurrounding("<", ">")
+                        else if (':' in dt) dt.split(":", limit = 2).let { (pfx, local) -> prefixes[pfx]?.let { ns -> ns + local } ?: dt }
+                        else dt
+                        RdfTerm.Literal(lex, datatype = datatype)
+                    }
                     else -> RdfTerm.Literal(lex)
                 }
             }

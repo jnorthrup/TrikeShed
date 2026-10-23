@@ -15,7 +15,7 @@ sealed class RdfTerm {
         is Iri -> "<$iri>"
         is BlankNode -> "_:$id"
         is Literal -> {
-            val esc = lexical.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+            val esc = lexical.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
             when {
                 lang != null -> "\"$esc\"@$lang"
                 datatype != null -> "\"$esc\"^^<$datatype>"

@@ -40,6 +40,7 @@ fun <R> Cursor.facet(
         is QueryK.Unnest -> unnest(key)
         is QueryK.LexicalTopK -> lexicalTopK(key)
         is QueryK.Fuse -> fuse(key)
+        is QueryK.Graph -> columnar?.routeGraph(key) ?: graph(key)
         is QueryK.Receipt -> (this as? QueryCursor ?: error("a receipt belongs to a QueryCursor")).receipt
     } as R
 }

@@ -105,11 +105,18 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
 }
 
 /** SQL `LIKE`: `%` any run, `_` any one character, everything else literal; `ILIKE` under [ignoreCase]. */
+/** `LIKE` as a regex: `%` any run, `_` any one character, and pg's default escape `\\` making the next character literal. */
 fun likeRegex(pattern: String, ignoreCase: Boolean = false): Regex = Regex(buildString {
-    for (c in pattern) when (c) {
-        '%' -> append("[\\s\\S]*")
-        '_' -> append("[\\s\\S]")
-        else -> append(Regex.escape(c.toString()))
+    var i = 0
+    while (i < pattern.length) {
+        val c = pattern[i]
+        when {
+            c == '\\' && i + 1 < pattern.length -> { append(Regex.escape(pattern[i + 1].toString())); i++ }
+            c == '%' -> append("[\\s\\S]*")
+            c == '_' -> append("[\\s\\S]")
+            else -> append(Regex.escape(c.toString()))
+        }
+        i++
     }
 }, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet())
 
@@ -260,15 +267,32 @@ fun vectorOf(value: Any?): FloatArray? = when (value) {
     }
 }
 
+/** An RDF term's spelling: a Turtle literal, an IRI in angle brackets or a blank node. A cast of one that is not a number is NULL, as SPARQL's type error is, not pg's syntax error. */
+fun isRdfTerm(text: String): Boolean = text.startsWith("\"") || text.startsWith("<") || text.startsWith("_:")
+
+/** A Turtle literal's lexical form — `"3.5"^^<dt>` and `"x"@en` read as `3.5` and `x` — else [text] itself. */
+fun lexicalOf(text: String): String {
+    if (!text.startsWith("\"")) return text
+    var i = 1
+    while (i < text.length) {
+        when (text[i]) {
+            '\\' -> i += 2
+            '"' -> return text.substring(1, i)
+            else -> i++
+        }
+    }
+    return text
+}
+
 /** `value::type`. Integral types answer Long and fractional types Double, as the arithmetic does. */
 fun castTo(value: Any?, type: String): Any? {
     if (value == null) return null
     return when (type) {
         "vector" -> vectorOf(value)
         "int", "integer", "int2", "int4", "int8", "smallint", "bigint" ->
-            if (value is Number) value.toLong() else scalarText(value).trim().toLongOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
+            if (value is Number) value.toLong() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toLongOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
         "float", "float4", "float8", "real", "double", "numeric", "decimal" ->
-            if (value is Number) value.toDouble() else scalarText(value).trim().toDoubleOrNull() ?: error("invalid input syntax for type $type: \"$value\"")
+            if (value is Number) value.toDouble() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toDoubleOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
         "text", "varchar", "string", "char", "regclass" -> scalarText(value)
         "bool", "boolean" -> when (value) {
             is Boolean -> value

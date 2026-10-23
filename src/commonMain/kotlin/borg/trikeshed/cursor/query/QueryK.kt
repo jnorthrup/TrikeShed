@@ -5,6 +5,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.kursive.sql.Expr
 import borg.trikeshed.userspace.nio.platform.spi.ColumnOperations
 import borg.trikeshed.userspace.nio.platform.spi.KotlinColumnOperations
+import kotlin.jvm.JvmInline
 
 /**
  * QueryK — plan stages as facet keys over a [Cursor].
@@ -56,8 +57,42 @@ sealed class QueryK<out R> : OpK<R>() {
     /** Evoke's `evoke_hybrid_fuse_candidates(candidates, k, fusion, rrf_k, epsilon)` over a candidate table (see [fuseCandidates]). */
     class Fuse(val k: Int = 10, val method: FusionMethod = FusionMethod.RRF, val rrfK: Double = 60.0, val epsilon: Double = 1e-6) : QueryK<Cursor>()
 
+    /**
+     * A basic graph pattern over a quad table — columns `G`, `S`, `P`, `O` holding term lexemes —
+     * every [patterns] match joined on shared variables, one `IoString` column per variable (its
+     * lexeme) in order of first appearance. A pattern without a graph slot reads [defaultGraphs]
+     * (null: the union of every graph, as Virtuoso reads an unnamed default graph); a `GRAPH ?g`
+     * slot ranges over [namedGraphs] (null: every graph but [DEFAULT_GRAPH]).
+     */
+    class Graph(
+        val patterns: Series<TriplePattern>,
+        val defaultGraphs: List<String>? = null,
+        val namedGraphs: List<String>? = null,
+    ) : QueryK<Cursor>() {
+        companion object {
+            /** The lexeme a quad table files a graph-less triple under. */
+            const val DEFAULT_GRAPH = "<urn:trikeshed:default-graph>"
+        }
+    }
+
     /** The provenance of a [QueryCursor]'s rows: its statement, sources and stages under one content id (see [QueryReceipt]). */
     data object Receipt : QueryK<QueryReceipt>()
+}
+
+/** One slot of a [TriplePattern]: a variable (`?name`) or a constant term as its lexeme (`<iri>`, `"lex"@en`, `"3"^^<dt>`, `_:b`). */
+@JvmInline
+value class PatternTerm(val text: String) {
+    val isVariable: Boolean get() = text.startsWith("?")
+    /** The variable's name without its `?`. */
+    val name: String get() = text.substring(1)
+    override fun toString(): String = text
+}
+
+/** One quad pattern of a [QueryK.Graph]: a null graph slot means the stage's default graphs. */
+class TriplePattern(val s: PatternTerm, val p: PatternTerm, val o: PatternTerm, val g: PatternTerm? = null) {
+    /** The slots in the quad table's column order: G, S, P, O. */
+    val slots: Array<PatternTerm?> get() = arrayOf(g, s, p, o)
+    override fun toString(): String = (g?.let { "GRAPH $it { " } ?: "") + "$s $p $o ." + (g?.let { " }" } ?: "")
 }
 
 /** A stage's declared name, the identity a [QueryReceipt] hashes: not reflection, so it is the same on every target and survives a rename only on purpose. */
@@ -72,6 +107,7 @@ val QueryK<*>.stageName: String
         is QueryK.Unnest -> "Unnest"
         is QueryK.LexicalTopK -> "LexicalTopK"
         is QueryK.Fuse -> "Fuse"
+        is QueryK.Graph -> "Graph"
         QueryK.Receipt -> "Receipt"
     }
 
