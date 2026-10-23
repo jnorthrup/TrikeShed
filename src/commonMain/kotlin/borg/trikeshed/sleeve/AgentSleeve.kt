@@ -6,7 +6,7 @@ import borg.trikeshed.pointcut.VmFacet
  * How a polyglot incompatibility was resolved at the import waist.
  *
  * The distinction is the whole ethos: a sandbox bound is not a missing module, and the two fail
- * differently. `graalpy-sleeve/hermes/README.md` records the measured case — withholding
+ * differently. `utils/graalpy-sleeve/hermes/README.md` records the measured case — withholding
  * `logging.handlers.QueueListener` alone let boot "succeed" while every record piled up in a queue
  * nobody drained, so that trap had to be PORTED rather than WITHHELD.
  */

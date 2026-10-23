@@ -2752,7 +2752,7 @@ object OroborosDaemon {
         root = java.nio.file.Paths.get(source),
         sleeve = java.nio.file.Paths.get(
             config.hermesSleeve ?: HostSystem.getenv("HERMES_GRAAL_SLEEVE")
-                ?: File(Files.resolvePath(repoDir, "graalpy-sleeve/hermes")).absolutePath
+                ?: File(Files.resolvePath(repoDir, "utils/graalpy-sleeve/hermes")).absolutePath
                 ?: error("no hermes sleeve"),
         ),
         blackboard = blackboard,
@@ -2765,7 +2765,7 @@ object OroborosDaemon {
             workingDirectory = repoDir.absolutePath,
             pythonPath = listOf(
                 source,
-                File(repoDir, "graalpy-sleeve/bridges").absolutePath,
+                File(repoDir, "utils/graalpy-sleeve/bridges").absolutePath,
             ),
             // The port's README builds its interpreter at <checkout>/.venv-graalpy.
             executable = File(runtime, "venv/bin/python").takeIf { it.isFile() }?.absolutePath

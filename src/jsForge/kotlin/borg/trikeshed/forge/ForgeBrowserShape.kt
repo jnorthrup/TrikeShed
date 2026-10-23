@@ -349,7 +349,7 @@ fun ForgeBrowser.tikaIngest(f: File, done: (ShapeDoc) -> Unit) {
             } catch (browserFailure: Throwable) {
                 ShapeDoc(
                     name = f.name, lines = emptyList(), runs = emptyList(), key = emptyList(), sep = "",
-                    kind = "unsupported here", unit = "lines", via = "bin/oroboros",
+                    kind = "unsupported here", unit = "lines", via = "utils/oroboros",
                 )
             }
         }

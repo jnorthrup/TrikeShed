@@ -22,7 +22,7 @@ object AgentSleeveRegistry {
         id = "hermes",
         facet = VmFacet.GRAAL_PYTHON,
         entryModule = "hermes_cli.main",
-        sleeveRoot = "graalpy-sleeve/hermes",
+        sleeveRoot = "utils/graalpy-sleeve/hermes",
         donorRoot = "utils/hermes-trikeshed-graalpy",
         traps = listOf(
             PolyglotTrap(
@@ -116,7 +116,7 @@ object AgentSleeveRegistry {
         id = "pi",
         facet = VmFacet.GRAAL_PYTHON,
         entryModule = "pi.main",
-        sleeveRoot = "graalpy-sleeve/pi",
+        sleeveRoot = "utils/graalpy-sleeve/pi",
         donorRoot = null,
         traps = boundTraps("pi"),
     )

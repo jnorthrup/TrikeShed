@@ -669,8 +669,8 @@ val freezeSumo = tasks.register<JavaExec>("freezeSumo") {
     mainClass.set("borg.trikeshed.ontology.SumoFrozen")
     classpath(tasks.named("jvmJar"), tasks.named("sumoFullCorpusJar"), configurations.getByName("jvmRuntimeClasspath"))
     val out = sumoFrozenDir.map { it.file("sumo/frozen.bin") }
-    inputs.file("gradle/sumo-full-corpus.pins")
-    inputs.file("gradle/sumo-corpus.pins")
+    inputs.file("utils/sumo/sumo-full-corpus.pins")
+    inputs.file("utils/sumo/sumo-corpus.pins")
     // The image's format is the code's: re-freeze when the writer or the lexicon parse changes.
     inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoFrozen.kt")
     inputs.file("src/jvmMain/kotlin/borg/trikeshed/ontology/SumoCorpus.kt")
@@ -742,11 +742,11 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
     }
 }
 
-// The daemon on the classpath bin/oroboros uses: jvmJar plus the staged runtime jars (which carry the
+// The daemon on the classpath utils/oroboros uses: jvmJar plus the staged runtime jars (which carry the
 // browser bundles and the frozen SUMO image). --args passes daemon arguments; -Pjdwp attaches a debugger.
 tasks.register<JavaExec>("runOroborosDaemon") {
     group = "oroboros"
-    description = "Launch OroborosDaemon on jvmJar + build/staging/lib, as bin/oroboros does."
+    description = "Launch OroborosDaemon on jvmJar + build/staging/lib, as utils/oroboros does."
     dependsOn(stageDaemonLib)
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     classpath(tasks.named("jvmJar"), fileTree(stagingLibDir) { include("*.jar") })
@@ -850,7 +850,7 @@ tasks.register<Sync>("generateForgePages") {
     doLast {
         val noJekyll = project.layout.projectDirectory.file("docs/.nojekyll").asFile
         if (!noJekyll.exists()) noJekyll.writeText("\n")
-        println("Forge PWA published to docs/ (stages: $stageStamp). Live: bin/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
+        println("Forge PWA published to docs/ (stages: $stageStamp). Live: utils/oroboros  |  Pages: https://jnorthrup.github.io/TrikeShed/  |  Now: git add docs && git commit && git push")
     }
 }
 
@@ -1100,7 +1100,7 @@ tasks.register("scriptPolicy") {
 // The middle fetch keeps its optional offline fallback (-PsumoStrict disables
 // it). Full is deferred/experimental and only fetched or packaged by explicit
 // tasks below. Its fetch always requires every pin. See doc/todo.md.
-val sumoPinFile = file("gradle/sumo-corpus.pins")
+val sumoPinFile = file("utils/sumo/sumo-corpus.pins")
 
 fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: Boolean = false) = tasks.register(taskName) {
     group = "data"
@@ -1210,7 +1210,7 @@ fun sumoCorpusTask(taskName: String, pinFile: File, resourceDir: String, full: B
 }
 
 val fetchSumoCorpus = sumoCorpusTask("fetchSumoCorpus", sumoPinFile, "generated/sumo/resources/sumo")
-val fetchSumoFullCorpus = sumoCorpusTask("fetchSumoFullCorpus", file("gradle/sumo-full-corpus.pins"), "generated/sumo-full/resources/sumo/full", full = true)
+val fetchSumoFullCorpus = sumoCorpusTask("fetchSumoFullCorpus", file("utils/sumo/sumo-full-corpus.pins"), "generated/sumo-full/resources/sumo/full", full = true)
 
 tasks.matching { it.name == "jvmProcessResources" }.configureEach {
     dependsOn(fetchSumoCorpus)

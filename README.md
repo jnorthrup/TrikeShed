@@ -77,7 +77,7 @@ if ! (java -version 2>&1 | grep -q GraalVM && java -version 2>&1 | grep -q '"25\
 fi
 [ -d TrikeShed ] || git clone --recurse-submodules https://github.com/jnorthrup/TrikeShed.git
 cd TrikeShed
-./gradlew runOroborosDaemon  # stages jvmJar + build/staging/lib and launches the daemon, as bin/oroboros does
+./gradlew runOroborosDaemon  # stages jvmJar + build/staging/lib and launches the daemon, as utils/oroboros does
 ```
 
 Hermes source lives in the `utils/hermes-trikeshed-graalpy` submodule, pinned to
@@ -88,7 +88,7 @@ the missing source with:
 git submodule update --init --recursive utils/hermes-trikeshed-graalpy
 ```
 
-The source pin is recorded in `graalpy-sleeve/hermes.lock.json`. The daemon and
+The source pin is recorded in `utils/graalpy-sleeve/hermes.lock.json`. The daemon and
 port CLIs use this checkout by default. GraalPy and its Python dependencies still
 require the [port runtime setup](utils/hermes-trikeshed-graalpy/graalpy/README.md).
 
@@ -1982,7 +1982,7 @@ gh api repos/jnorthrup/TrikeShed/pages/builds -X POST && gh api repos/jnorthrup/
 - `printForgeGallery` — JVM text grid of catalog + blackboard
 - `runForgeJvm` — Compose Desktop shell
 - `generateForgePages` — static documentation Sync task (stages `jvm`[,`js`,`wasm`] → docs/), not the live Panels runtime
-- `runOroborosDaemon` (jvmJar + staged lib, like `bin/oroboros`), `runKanbanHttpServerJvm` (staged classpath) — launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
+- `runOroborosDaemon` (jvmJar + staged lib, like `utils/oroboros`), `runKanbanHttpServerJvm` (staged classpath) — launchers; `-Pjdwp=PORT[,suspend]` attaches a debugger
 - `generateForgeAssets` — bakes `src/commonMain/resources/web/{index.html,styles.css}` into `borg.trikeshed.forge.generated.ForgeAssets` (ByteArray chunk objects, 5000 bytes each). `ForgeApp.kt` fills the `{{SEED}}`, `{{STYLES}}`, `{{GALLERY}}` and `{{BUNDLES}}` slots; browser code is supplied by the compiled Kotlin bundles, not a generated `scriptJs` field.
 
 ---
