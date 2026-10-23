@@ -308,6 +308,8 @@ class ByteSeries(
         }
     }
 
+    companion object
+
 }
 
 

@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
 import org.jetbrains.kotlin.gradle.targets.js.ir.WebpackConfigurator
 
 plugins {
+<<<<<<< HEAD
     kotlin("multiplatform") version "2.4.21"
     id("com.github.ben-manes.versions") version "0.54.0"
     `maven-publish`
@@ -84,6 +85,29 @@ allprojects {
             }
         }
     }
+||||||| aa79fc1f2
+    kotlin("multiplatform") version "1.8.10"
+////    id("org.jetbrains.intellij") version "3.1" apply true
+//
+//    id("org.jetbrains.dokka") version "1.7.0" apply false
+//    id("org.jlleitschuh.gradle.ktlint") version "11.0.0" apply false
+//
+//    // support kotlinx-datetime
+//    id("org.jetbrains.kotlin.plugin.serialization") version "1.8.10" apply false
+//
+//    // support for k2 compiler plugin
+//    id("org.jetbrains.kotlin.kapt") version "1.8.10" apply false
+//    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.10" apply false
+//    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.10" apply false
+//
+//    // gradle versions update plugin
+//    id("com.github.ben-manes.versions") version "0.42.0" apply false
+////    id("atomicfu-gradle-plugin") version "0.18.5"
+    `maven-publish`
+=======
+    kotlin("multiplatform") version "2.1.0"
+     `maven-publish`
+>>>>>>> refs/recovery/2026-10-22/dirty-triumverant
 }
 
 
@@ -97,6 +121,7 @@ repositories {
 }
 
 kotlin {
+<<<<<<< HEAD
     @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
         apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
         languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_4)
@@ -112,8 +137,14 @@ kotlin {
     }
 
     jvmToolchain(25)
+||||||| aa79fc1f2
+    jvmToolchain(18)
+=======
+    jvmToolchain(21)
+>>>>>>> refs/recovery/2026-10-22/dirty-triumverant
 
     jvm {
+<<<<<<< HEAD
         @OptIn(ExperimentalKotlinGradlePluginApi::class) compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
             freeCompilerArgs.addAll(
@@ -129,8 +160,15 @@ kotlin {
                 )
             )
         }
+||||||| aa79fc1f2
+
+        withJava()
+=======
+        withJava()
+>>>>>>> refs/recovery/2026-10-22/dirty-triumverant
     }
 
+<<<<<<< HEAD
     js {
         nodejs()
         browser {
@@ -159,6 +197,28 @@ kotlin {
             defaultSourceSet.kotlin.srcDir("src/jsBenchmark/kotlin")
         }
         binaries.executable(uringBenchmark)
+||||||| aa79fc1f2
+
+    val hostOs = System.getProperty("os.name")
+    val isMingwX64 = hostOs.startsWith("Windows")
+    val nativeTarget = when {
+        hostOs == "Mac OS X" -> macosX64("native")
+        hostOs == "Linux" -> linuxX64("native")
+        isMingwX64 -> mingwX64("native")
+        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+=======
+
+    val hostOs = System.getProperty("os.name")
+    val isMingwX64 = hostOs.startsWith("Windows")
+    val nativeTarget = when {
+        //macos aarch and intel
+        hostOs.startsWith("Mac") && System.getProperty("os.arch") == "aarch64" -> macosArm64("native")
+        hostOs.startsWith("Mac") -> macosX64("native")
+        hostOs.startsWith("Linux") && System.getProperty("os.arch") == "aarch64" -> linuxArm64("native")
+        hostOs.startsWith("Linux") -> linuxX64("native")
+        isMingwX64 -> mingwX64("native")
+        else -> throw GradleException("Host OS is not supported in Kotlin/Native.")
+>>>>>>> refs/recovery/2026-10-22/dirty-triumverant
     }
 
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
