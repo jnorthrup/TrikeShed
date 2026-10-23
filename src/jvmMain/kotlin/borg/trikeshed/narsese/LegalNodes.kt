@@ -315,7 +315,7 @@ object LegalNodes {
     internal fun runEyecite(text: String): List<Map<String, Any?>> {
         val python = resolveVenvPython() ?: return emptyList()
         return try {
-            val pb = ProcessBuilder(python, "-c", EYECITE_SCRIPT).redirectErrorStream(true)
+            val pb = borg.trikeshed.graal.subvm.GuestEnvironment.curate(ProcessBuilder(python, "-c", EYECITE_SCRIPT).redirectErrorStream(true))
             pb.environment().apply { clear(); putAll(borg.trikeshed.graal.subvm.GuestEnvironment.curated()) }
             val process = pb.start()
             val future = java.util.concurrent.CompletableFuture.supplyAsync {
