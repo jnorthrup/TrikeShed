@@ -116,7 +116,7 @@ internal class LinuxLiburingFacade : LiburingFacade {
     val submissionSpace: Int get() = ring?.let { zlinux_uring.io_uring_sq_space_left(it).toInt() } ?: 0
     val pendingSubmissions: Int get() = ring?.let { zlinux_uring.io_uring_sq_ready(it).toInt() } ?: 0
 
-    fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
+    override fun prepCancel(targetUserData: Long, userData: Long): Result<Unit> =
         prepare(userData) { sqe -> zlinux_uring.io_uring_prep_cancel64(sqe, targetUserData.toULong(), 0) }
 
     override fun prepRead(fd: Int, bufAddress: Long, len: Int, offset: Long, userData: Long): Result<Unit> =
