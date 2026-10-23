@@ -213,6 +213,7 @@ object SqlGraph {
             stmt.having?.let { feed(expr(it, COND), hub, "having") }
             for (i in 0 until stmt.orderBy.size) {
                 val order = stmt.orderBy[i]
+                if (order.nullsFirst != null) throw SqlGraphError("", "unsupported-in-ast", "NULLS FIRST / LAST is not part of this vocabulary yet")
                 val key = node(SORT_KEY, "direction" to if (order.descending) "DESC" else "ASC", "ord" to "$i")
                 feed(expr(order.expr, EXPR), key, "expr")
                 feed(key, hub, "orderBy")
@@ -245,6 +246,7 @@ object SqlGraph {
             Star -> throw SqlGraphError("", "unsupported-in-ast", "* outside COUNT(*)")
             is Cast -> node(CAST, "type" to e.type).also { feed(expr(e.expr, EXPR), it, "value") }
             is Path -> node(PATH, "steps" to stepsJson(e.path), "text" to e.text.toString()).also { feed(expr(e.cell, EXPR), it, "cell") }
+            is Not, is Is, is InList -> throw SqlGraphError("", "unsupported-in-ast", "NOT, IS and IN are not part of this vocabulary yet")
         }
 
         private fun binary(e: BinaryExpr): String {
@@ -329,6 +331,9 @@ object SqlGraph {
                     for (i in 0 until e.args.size) visit(e.args[i])
                 }
                 is Cast -> visit(e.expr)
+                is Not -> visit(e.expr)
+                is Is -> visit(e.expr)
+                is InList -> { visit(e.expr); for (i in 0 until e.items.size) visit(e.items[i]) }
                 is Path -> {
                     visit(e.cell)
                     if (e.path.size == 0) throw SqlGraphError("", "unsupported-in-ast", "an empty path")
@@ -622,7 +627,8 @@ object SqlGraph {
         if (stmt.groupBy.size > 0) append(" group by ").append((0 until stmt.groupBy.size).joinToString(", ") { sig(stmt.groupBy[it]) })
         stmt.having?.let { append(" having ").append(sig(it)) }
         if (stmt.orderBy.size > 0) append(" order by ").append((0 until stmt.orderBy.size).joinToString(", ") {
-            sig(stmt.orderBy[it].expr) + if (stmt.orderBy[it].descending) " desc" else " asc"
+            sig(stmt.orderBy[it].expr) + (if (stmt.orderBy[it].descending) " desc" else " asc") +
+                (stmt.orderBy[it].nullsFirst?.let { first -> if (first) " nulls first" else " nulls last" } ?: "")
         })
         stmt.limit?.let { append(" limit ").append(it) }
         stmt.offset?.let { append(" offset ").append(it) }
@@ -642,6 +648,9 @@ object SqlGraph {
         Star -> "*"
         is Cast -> "cast(" + sig(e.expr) + " as " + e.type + ")"
         is Path -> "path(" + sig(e.cell) + "," + stepsJson(e.path) + "," + e.text + ")"
+        is Not -> "not(" + sig(e.expr) + ")"
+        is Is -> "is(" + sig(e.expr) + "," + e.value + "," + e.negated + ")"
+        is InList -> "in(" + sig(e.expr) + "," + e.negated + (0 until e.items.size).joinToString("") { "," + sig(e.items[it]) } + ")"
     }
 
     private fun stepsJson(path: JsPath): String = buildString {

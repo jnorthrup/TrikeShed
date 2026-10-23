@@ -47,11 +47,22 @@ fun Series<CharSequence>.ordinalOf(name: CharSequence): Int {
 fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
     is ColumnRef -> names.ordinalOf(id.asString()).let { ordinal -> { row -> SqlRuntime.cell(row, ordinal) } }
     is LitExpr -> literal(lit).let { value -> { _ -> value } }
-    is BinaryExpr ->
-        if (op.uppercase() == "LIKE" && right is LitExpr) {
-            val regex = likeRegex(literal(right.lit).toString())
+    is BinaryExpr -> op.uppercase().let { op ->
+        if ((op == "LIKE" || op == "ILIKE") && right is LitExpr) {
+            val regex = likeRegex(literal(right.lit).toString(), ignoreCase = op == "ILIKE")
             left.compile(names).let { subject -> { row -> SqlRuntime.likeCompiled(subject(row), regex) } }
-        } else binary(op.uppercase(), left.compile(names), right.compile(names))
+        } else binary(op, left.compile(names), right.compile(names))
+    }
+    is Not -> expr.compile(names).let { e -> { row -> SqlRuntime.not(e(row)) } }
+    is Is -> expr.compile(names).let { e ->
+        val test: RowExpr = value?.let { expected -> { row -> SqlRuntime.isBoolean(e(row), expected) } } ?: { row -> SqlRuntime.isNull(e(row)) }
+        if (negated) { row -> SqlRuntime.not(test(row)) } else test
+    }
+    is InList -> expr.compile(names).let { e ->
+        val parts = Array(items.size) { items[it].compile(names) }
+        val test: RowExpr = { row -> SqlRuntime.inList(e(row), Array(parts.size) { parts[it](row) }) }
+        if (negated) { row -> SqlRuntime.not(test(row)) } else test
+    }
     is Path -> cell.compile(names).let { source -> { row -> SqlRuntime.path(source(row), path, text) } }
     is Cast ->
         if (expr is LitExpr) literal(expr.lit).let { SqlRuntime.cast(it, type) }.let { folded -> { _ -> folded } }
@@ -64,12 +75,14 @@ fun literal(lit: SqlNode): Any? = when (lit) {
     is StringLiteral -> lit.asString()
     is NumericLiteral -> lit.value
     is Identifier -> lit.asString()
+    is BooleanLiteral -> lit.value
+    NullLiteral -> null
     else -> error("literal $lit")
 }
 
 fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
-    "AND" -> { row -> left(row) == true && right(row) == true }
-    "OR" -> { row -> left(row) == true || right(row) == true }
+    "AND" -> { row -> left(row).let { l -> if (SqlRuntime.isFalse(l)) false else SqlRuntime.and(l, right(row)) } }
+    "OR" -> { row -> left(row).let { l -> if (SqlRuntime.isTrue(l)) true else SqlRuntime.or(l, right(row)) } }
     "=" -> { row -> SqlRuntime.eq(left(row), right(row)) }
     "!=", "<>" -> { row -> SqlRuntime.ne(left(row), right(row)) }
     "<" -> { row -> SqlRuntime.lt(left(row), right(row)) }
@@ -77,6 +90,7 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     ">" -> { row -> SqlRuntime.gt(left(row), right(row)) }
     ">=" -> { row -> SqlRuntime.ge(left(row), right(row)) }
     "LIKE" -> { row -> SqlRuntime.like(left(row), right(row)) }
+    "ILIKE" -> { row -> SqlRuntime.ilike(left(row), right(row)) }
     "||" -> { row -> SqlRuntime.concat(left(row), right(row)) }
     "<=>" -> { row -> SqlRuntime.cosineDistance(left(row), right(row)) }
     "<->" -> { row -> SqlRuntime.l2Distance(left(row), right(row)) }
@@ -89,14 +103,14 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     else -> error("operator $op")
 }
 
-/** SQL `LIKE`: `%` any run, `_` any one character, everything else literal. */
-fun likeRegex(pattern: String): Regex = Regex(buildString {
+/** SQL `LIKE`: `%` any run, `_` any one character, everything else literal; `ILIKE` under [ignoreCase]. */
+fun likeRegex(pattern: String, ignoreCase: Boolean = false): Regex = Regex(buildString {
     for (c in pattern) when (c) {
         '%' -> append("[\\s\\S]*")
         '_' -> append("[\\s\\S]")
         else -> append(Regex.escape(c.toString()))
     }
-})
+}, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet())
 
 fun integral(value: Any?): Boolean = value is Long || value is Int || value is Short || value is Byte
 
@@ -147,9 +161,14 @@ fun Expr.render(): String = when (this) {
     is LitExpr -> when (val lit = lit) {
         is StringLiteral -> "'" + lit.asString().replace("'", "''") + "'"
         is NumericLiteral -> lit.value.toString()
+        is BooleanLiteral -> if (lit.value) "TRUE" else "FALSE"
+        NullLiteral -> "NULL"
         else -> lit.toString()
     }
     is BinaryExpr -> "(${left.render()} $op ${right.render()})"
+    is Not -> "(NOT ${expr.render()})"
+    is Is -> "(${expr.render()} IS ${if (negated) "NOT " else ""}${when (value) { null -> "NULL"; true -> "TRUE"; false -> "FALSE" }})"
+    is InList -> "(${expr.render()} ${if (negated) "NOT " else ""}IN (${(items α { it.render() }).view.joinToString(", ")}))"
     is Call -> "$name(${(args α { it.render() }).view.joinToString(", ")})"
     is Path -> cell.render() + path.view.mapIndexed { i, step ->
         (if (text && i == path.size - 1) "->>" else "->") + (step.key?.let { "'$it'" } ?: step.idx.toString())

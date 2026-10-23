@@ -11,7 +11,8 @@ import kotlin.jvm.JvmStatic
  * The scalar semantics of every SQL operator, one static method each. The closure compiler
  * ([compile]) and any generated-bytecode compiler call these and nothing else, so a statement
  * means the same thing however it was compiled. All methods are null-in null-out except where
- * SQL says otherwise (`AND` / `OR` are decided by the caller's short-circuit on [isTrue]).
+ * SQL says otherwise: `AND` / `OR` / `NOT` are three-valued (null is unknown), `IS` never answers
+ * null, and the caller short-circuits `AND` on [isFalse] and `OR` on [isTrue].
  *
  * Statics, not closures: a generated class links to them directly and the JIT inlines them.
  */
@@ -21,6 +22,40 @@ object SqlRuntime {
 
     /** Only a true Boolean admits a row; null (unknown) and false both reject. */
     @JvmStatic fun isTrue(value: Any?): Boolean = value == true
+
+    /** The left operand that decides `AND` alone. */
+    @JvmStatic fun isFalse(value: Any?): Boolean = truth(value) == false
+
+    /** A predicate value as SQL truth: null is unknown, a non-Boolean is false. */
+    private fun truth(value: Any?): Boolean? = if (value == null) null else value == true
+
+    @JvmStatic fun and(a: Any?, b: Any?): Any? {
+        val x = truth(a)
+        val y = truth(b)
+        return if (x == false || y == false) false else if (x == null || y == null) null else true
+    }
+
+    @JvmStatic fun or(a: Any?, b: Any?): Any? {
+        val x = truth(a)
+        val y = truth(b)
+        return if (x == true || y == true) true else if (x == null || y == null) null else false
+    }
+
+    @JvmStatic fun not(a: Any?): Any? = truth(a)?.not()
+
+    /** `IS NULL`. */
+    @JvmStatic fun isNull(value: Any?): Any? = value == null
+
+    /** `IS TRUE` / `IS FALSE`. */
+    @JvmStatic fun isBoolean(value: Any?, expected: Boolean): Any? = truth(value) == expected
+
+    /** `IN (items)`: a match is true; otherwise a null item (or a null [value]) leaves it unknown. */
+    @JvmStatic fun inList(value: Any?, items: Array<Any?>): Any? {
+        if (value == null) return null
+        var unknown = false
+        for (item in items) if (item == null) unknown = true else if (compareCells(value, item) == 0) return true
+        return if (unknown) null else false
+    }
 
     @JvmStatic fun eq(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) == 0
     @JvmStatic fun ne(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) != 0
@@ -36,6 +71,10 @@ object SqlRuntime {
     /** `LIKE` against a pattern compiled once from a literal; [regex] is a [Regex]. */
     @JvmStatic fun likeCompiled(subject: Any?, regex: Any?): Any? =
         if (subject == null) null else (regex as Regex).matches(subject.toString())
+
+    /** `ILIKE` (pg): `LIKE` ignoring case, with a pattern known at run time. */
+    @JvmStatic fun ilike(subject: Any?, pattern: Any?): Any? =
+        if (subject == null || pattern == null) null else likeRegex(pattern.toString(), ignoreCase = true).matches(subject.toString())
 
     @JvmStatic fun concat(a: Any?, b: Any?): Any? = if (a == null || b == null) null else a.toString() + b.toString()
 

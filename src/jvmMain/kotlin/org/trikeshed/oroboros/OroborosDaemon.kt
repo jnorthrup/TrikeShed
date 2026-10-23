@@ -2067,10 +2067,12 @@ object OroborosDaemon {
             kif = { pattern -> curatorImpulse?.let { c -> runCatching { c.queryBank(pattern) }.getOrDefault(emptyList()) }.orEmpty() },
             productions = { reteProductions.all() },
         )
+        // Supabase's data API over SQL tables kept in the primary Couch (/rest/v1/*, /pg/query).
+        val postgrestWire = borg.trikeshed.forge.server.PostgrestWire(couchDb)
         val extraRouteList: List<borg.trikeshed.litebike.ExtraRoute> = listOfNotNull(
             graalWire::route, vmWire::route, hermesWire::route, beliefWire?.let { it::route },
             patchWire::route, moduleWire::route, webhookWire::route, blackboardWire::route, rdfWire::route,
-            reteWire::route, blipWire::route, agentWire::route, sleeveWire::route,
+            reteWire::route, blipWire::route, agentWire::route, sleeveWire::route, postgrestWire::route,
         )
         // ── the surface family: node types the canvas could only reach by fetch ──
         // blackboard.*, graal.vitals/heap, vms.list, panels.list … existed (board.get /
