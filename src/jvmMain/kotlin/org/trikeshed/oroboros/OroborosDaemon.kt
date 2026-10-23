@@ -2071,6 +2071,7 @@ object OroborosDaemon {
         val quadStore = borg.trikeshed.rdf.QuadStore()
         val sparqlWire = borg.trikeshed.forge.server.SparqlWire(
             borg.trikeshed.rdf.SparqlSurface(quadStore),
+            borg.trikeshed.rdf.CypherSurface(quadStore),
             live = {
                 borg.trikeshed.rdf.QuadStore().load(borg.trikeshed.rdf.RdfGraph(
                     rete.snapshot().view.flatMap { borg.trikeshed.dag.PlaneFacts.toTriples(it).view },

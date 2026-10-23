@@ -14,6 +14,21 @@ object SparqlResults {
     const val JSON = "application/sparql-results+json"
     const val CSV = "text/csv"
     const val TSV = "text/tab-separated-values"
+    const val TURTLE = "text/turtle"
+    const val NTRIPLES = "application/n-triples"
+
+    /** A graph result as N-Triples: one `s p o .` line per triple, the lexemes being N-Triples terms already. */
+    fun nTriples(triples: List<Triple<String, String, String>>): String = buildString {
+        for ((s, p, o) in triples) append(s).append(' ').append(p).append(' ').append(o).append(" .\n")
+    }
+
+    /** A graph result as Turtle, through [TurtleRdf.emit] with the default prefixes declared. */
+    fun turtle(triples: List<Triple<String, String, String>>): String = TurtleRdf.emit(RdfGraph(triples.mapNotNull { (s, p, o) ->
+        val subject = TurtleRdf.parseTerm(s) ?: return@mapNotNull null
+        val predicate = TurtleRdf.parseTerm(p) as? RdfTerm.Iri ?: return@mapNotNull null
+        val obj = TurtleRdf.parseTerm(o) ?: return@mapNotNull null
+        RdfTriple(subject, predicate, obj)
+    }))
 
     /** `{"head":{"vars":[…]},"results":{"bindings":[{v:{type,value,…}}]}}`. */
     fun json(rows: Cursor, variables: List<String> = names(rows)): String = buildString {

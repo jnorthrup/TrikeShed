@@ -15,20 +15,75 @@ class SparqlError(message: String, val line: Int = 0) : IllegalArgumentException
  * with `(aggregate AS ?v)` items, `ASK`, `FROM <g>` / `FROM NAMED <g>`, `WHERE { }` holding triple
  * patterns (`;` `,` `a`), `GRAPH ?g|<g> { }`, nested groups and `FILTER` (comparisons, `&&` `||` `!`,
  * arithmetic, `BOUND`, `CONTAINS`, `STRSTARTS`, `STRENDS`), `GROUP BY`, `HAVING`, `ORDER BY`, `LIMIT`,
- * `OFFSET`. `OPTIONAL`, `UNION`, `MINUS`, `BIND`, `VALUES`, property paths, `CONSTRUCT` and `DESCRIBE`
- * are refused by name. The basic graph pattern becomes one [QueryK.Graph] stage; everything after it
+ * `OFFSET`; `CONSTRUCT { template } WHERE`, `CONSTRUCT WHERE { }` and `DESCRIBE` answer graphs through
+ * [triples]. `OPTIONAL`, `UNION`, `MINUS`, `BIND`, `VALUES` and property paths are refused by name. The basic graph pattern becomes one [QueryK.Graph] stage; everything after it
  * is the SQL planner's own work over a [SelectStmt] whose columns are the variables, so a numeric
  * comparison casts the lexeme (`"0.9"^^<xsd:float>` reads as 0.9) and `COUNT`/`SUM`/`MIN`/`MAX`/`AVG`
  * are the one `Aggregate` stage. Term comparison is lexeme equality (a typed literal equals itself).
  */
 class SparqlQuery(
     val text: String,
-    val ask: Boolean,
+    val form: Form,
     val graph: QueryK.Graph,
     val select: SelectStmt,
     /** The projected variable names, in order: the result head even with no rows. */
     val variables: List<String>,
+    /** A CONSTRUCT template: triple patterns instantiated per solution. */
+    val template: List<TriplePattern> = emptyList(),
+    /** DESCRIBE's terms: variables of the pattern or constant IRIs. */
+    val described: List<PatternTerm> = emptyList(),
 ) {
+    enum class Form { SELECT, ASK, CONSTRUCT, DESCRIBE }
+
+    val ask: Boolean get() = form == Form.ASK
+
+    /** CONSTRUCT and DESCRIBE answer a graph, not a table. */
+    val graphResult: Boolean get() = form == Form.CONSTRUCT || form == Form.DESCRIBE
+
+    /**
+     * The graph a CONSTRUCT or DESCRIBE answers, as (s, p, o) lexemes without duplicates: the template
+     * instantiated per solution (a triple with an unbound variable, a literal subject or a non-IRI
+     * predicate is skipped), or for DESCRIBE every quad of [quads] whose subject or object is a described
+     * term (graph-blind, Virtuoso's default description).
+     */
+    fun triples(solutions: Cursor, quads: Cursor): List<Triple<String, String, String>> {
+        val out = LinkedHashSet<Triple<String, String, String>>()
+        val names = if (solutions.size == 0) emptyList() else solutions.columnNames.let { n -> List(n.size) { n[it].toString() } }
+        // a template's blank node is fresh per solution, as SPARQL instantiates it
+        fun bound(row: Int, slot: PatternTerm): String? = when {
+            slot.isVariable -> names.indexOf(slot.name).takeIf { it >= 0 }?.let { solutions[row].values[it]?.toString() }
+            slot.text.startsWith("_:") -> slot.text + "_r$row"
+            else -> slot.text
+        }
+        when (form) {
+            Form.CONSTRUCT -> for (r in 0 until solutions.size) for (t in template) {
+                val s = bound(r, t.s) ?: continue
+                val p = bound(r, t.p) ?: continue
+                val o = bound(r, t.o) ?: continue
+                if (s.startsWith("\"") || !p.startsWith("<")) continue
+                out += Triple(s, p, o)
+            }
+            Form.DESCRIBE -> {
+                val terms = HashSet<String>()
+                for (d in described) if (!d.isVariable) terms += d.text else for (r in 0 until solutions.size) bound(r, d)?.let(terms::add)
+                if (terms.isNotEmpty() && quads.size > 0) {
+                    val qn = quads.columnNames
+                    val si = (0 until qn.size).first { qn[it].contentEquals("S") || qn[it].endsWith(".S") }
+                    val pi = (0 until qn.size).first { qn[it].contentEquals("P") || qn[it].endsWith(".P") }
+                    val oi = (0 until qn.size).first { qn[it].contentEquals("O") || qn[it].endsWith(".O") }
+                    for (r in 0 until quads.size) {
+                        val v = quads[r].values
+                        val s = v[si]?.toString() ?: continue
+                        val o = v[oi]?.toString() ?: continue
+                        if (s in terms || o in terms) out += Triple(s, v[pi]?.toString() ?: continue, o)
+                    }
+                }
+            }
+            else -> Unit
+        }
+        return out.toList()
+    }
+
     fun plan(
         source: Cursor,
         ops: ColumnOperations = KotlinColumnOperations,
@@ -82,7 +137,7 @@ class SparqlUpdate(val text: String, val operations: List<Operation>) {
     }
 }
 
-val SPARQL_UNSUPPORTED = setOf("OPTIONAL", "UNION", "MINUS", "BIND", "VALUES", "SERVICE", "CONSTRUCT", "DESCRIBE", "INSERT", "DELETE", "LOAD", "CLEAR", "CREATE", "DROP")
+val SPARQL_UNSUPPORTED = setOf("OPTIONAL", "UNION", "MINUS", "BIND", "VALUES", "SERVICE", "INSERT", "DELETE", "LOAD", "CLEAR", "CREATE", "DROP")
 val SPARQL_AGGREGATES = setOf("COUNT", "SUM", "MIN", "MAX", "AVG")
 
 enum class SparqlTokenKind { IRI, PNAME, VAR, STRING, NUMBER, WORD, PUNCT, EOF }
@@ -118,18 +173,43 @@ class SparqlParser(val src: String) {
             if (iri.kind != SparqlTokenKind.IRI) fail("expected an IRI for prefix ${ns.text}, found $iri")
             prefixes[ns.text.dropLast(1)] = iri.text.removeSurrounding("<", ">")
         }
-        val form = next()
-        if (form.kind != SparqlTokenKind.WORD) fail("expected SELECT or ASK, found $form")
-        val ask = when (form.text.uppercase()) {
-            "SELECT" -> false
-            "ASK" -> true
-            in SPARQL_UNSUPPORTED -> fail("${form.text.uppercase()} is not supported; the subset is SELECT and ASK")
-            else -> fail("expected SELECT or ASK, found $form")
+        val formToken = next()
+        if (formToken.kind != SparqlTokenKind.WORD) fail("expected SELECT, ASK, CONSTRUCT or DESCRIBE, found $formToken")
+        val form = when (formToken.text.uppercase()) {
+            "SELECT" -> SparqlQuery.Form.SELECT
+            "ASK" -> SparqlQuery.Form.ASK
+            "CONSTRUCT" -> SparqlQuery.Form.CONSTRUCT
+            "DESCRIBE" -> SparqlQuery.Form.DESCRIBE
+            in SPARQL_UNSUPPORTED -> fail("${formToken.text.uppercase()} is not supported; the query forms are SELECT, ASK, CONSTRUCT and DESCRIBE")
+            else -> fail("expected SELECT, ASK, CONSTRUCT or DESCRIBE, found $formToken")
         }
+        val ask = form == SparqlQuery.Form.ASK
         var distinct = false
         val items = ArrayList<SparqlItem>()
         var star = false
-        if (!ask) {
+        var template: List<TriplePattern> = emptyList()
+        var constructWhere = false
+        val described = ArrayList<PatternTerm>()
+        when (form) {
+            SparqlQuery.Form.CONSTRUCT -> if (punct("{")) {
+                // the template is its own group: no GRAPH, no FILTER, variables bound by WHERE
+                val saved = ArrayList(patterns); patterns.clear()
+                group(null)
+                if (filters.isNotEmpty()) fail("a CONSTRUCT template takes no FILTER")
+                if (patterns.any { it.g != null }) fail("a CONSTRUCT template takes no GRAPH")
+                template = patterns.toList(); patterns.clear(); patterns += saved
+            } else constructWhere = true // CONSTRUCT WHERE { … }: the pattern is the template
+            SparqlQuery.Form.DESCRIBE -> {
+                while (true) {
+                    if (take("*")) { described += PatternTerm("?*"); continue }
+                    val t = term() ?: break
+                    if (t.isVariable || t.text.startsWith("<")) described += t else fail("DESCRIBE takes variables and IRIs, found ${t.text}")
+                }
+                if (described.isEmpty()) fail("DESCRIBE needs a variable or an IRI")
+            }
+            else -> Unit
+        }
+        if (form == SparqlQuery.Form.SELECT) {
             if (word("DISTINCT", "REDUCED")) { distinct = true; next() }
             while (!word("FROM", "WHERE") && !punct("{")) {
                 when {
@@ -158,7 +238,11 @@ class SparqlParser(val src: String) {
             (if (isNamed) named else from) += g.text
         }
         if (word("WHERE")) next()
-        group(null)
+        if (punct("{")) group(null) else if (form != SparqlQuery.Form.DESCRIBE) fail("expected '{', found ${peek()}")
+        if (constructWhere) {
+            if (filters.isNotEmpty()) fail("CONSTRUCT WHERE takes no FILTER")
+            template = patterns.toList()
+        }
         var groupBy = ArrayList<Expr>()
         var having: Expr? = null
         val orderBy = ArrayList<OrderItem>()
@@ -207,22 +291,29 @@ class SparqlParser(val src: String) {
         val bound = graphStage.variables()
         if (star && (groupBy.isNotEmpty() || items.any { it.aggregated })) fail("SELECT * with GROUP BY or an aggregate is not supported; name the variables")
         for (item in items) if (item.expr is ColumnRef && item.name !in bound) fail("variable ?${item.name} is not bound by the pattern")
-        val variables = if (star || ask) bound else items.map { it.name }
+        for (d in described) if (d.isVariable && d.name != "*" && d.name !in bound) fail("DESCRIBE ?${d.name} is not bound by the pattern")
+        val describedAll = described.map { if (it.text == "?*") bound.map { v -> PatternTerm("?$v") } else listOf(it) }.flatten()
+        val graphForm = form == SparqlQuery.Form.CONSTRUCT || form == SparqlQuery.Form.DESCRIBE
+        if (graphForm && (groupBy.isNotEmpty() || having != null)) fail("${form.name} takes no GROUP BY or HAVING")
+        val variables = if (star || ask || graphForm) bound else items.map { it.name }
         val where = filters.reduceOrNull { a, b -> BinaryExpr(a, "AND", b) }
         val columns: List<Column> = when {
-            ask || star -> listOf(Column(LitExpr(StringLiteral("*".toSeries()))))
+            ask || star || graphForm -> listOf(Column(LitExpr(StringLiteral("*".toSeries()))))
             else -> items.map { Column(it.expr, Identifier(it.name.toSeries())) }
         }
         if (distinct && groupBy.isEmpty() && items.none { it.aggregated }) {
             groupBy = ArrayList(variables.map { ColumnRef(Identifier(it.toSeries())) })
             if (star) fail("SELECT DISTINCT * is not supported; name the variables")
         }
+        // ORDER BY a pattern variable: numbers before text, numerically, then the lexeme — the key pair sorts both kinds;
+        // an alias of a select item (an aggregate) sorts as the planner's own column
+        val ordering = orderBy.flatMap { o -> if (o.expr is ColumnRef && o.expr.id.asString() in bound) listOf(OrderItem(Cast(o.expr, "float8"), o.descending), o) else listOf(o) }
         val select = SelectStmt(
             columns.toSeries(), TableRef(Identifier(QuadStore.RDF_QUAD.toSeries())), where,
-            groupBy = groupBy.toSeries(), having = having, orderBy = orderBy.toSeries(),
+            groupBy = groupBy.toSeries(), having = having, orderBy = ordering.toSeries(),
             limit = if (ask) 1 else limit, offset = offset,
         )
-        return SparqlQuery(src, ask, graphStage, select, variables)
+        return SparqlQuery(src, form, graphStage, select, variables, template, describedAll)
     }
 
     /** `INSERT DATA { … }` and `DELETE DATA { … }`, `;`-separated, after the prologue. */
@@ -361,8 +452,11 @@ class SparqlParser(val src: String) {
         next()
         val right = additive()
         val numeric = left.isNumeric() || right.isNumeric()
-        return BinaryExpr(if (numeric) numeric(left) else left, if (op == "!=") "<>" else op, if (numeric) numeric(right) else right)
+        return BinaryExpr(if (numeric) numeric(left) else stored(left), if (op == "!=") "<>" else op, if (numeric) numeric(right) else stored(right))
     }
+
+    /** A boolean literal compares as the lexeme the store holds. */
+    fun stored(e: Expr): Expr = if (e is LitExpr && e.lit is BooleanLiteral) LitExpr(StringLiteral("\"${(e.lit as BooleanLiteral).value}\"^^${SparqlQuery.XSD_BOOLEAN}".toSeries())) else e
 
     fun additive(): Expr {
         var e = multiplicative()

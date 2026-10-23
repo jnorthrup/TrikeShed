@@ -90,9 +90,27 @@ class SparqlQueryTest {
         assertEquals("{\"head\":{\"vars\":[\"x\"]},\"results\":{\"bindings\":[]}}", SparqlResults.json(SparqlQuery.parse("$PREFIX SELECT ?x WHERE { ?x ex:p ex:none }").let { it.plan(store.scan()) }, listOf("x")))
     }
 
+    @Test fun constructAndDescribeAnswerGraphs() {
+        val construct = SparqlQuery.parse("$PREFIX CONSTRUCT { ?x ex:knows ?y } WHERE { ?x ex:p ?y }")
+        assertEquals(SparqlQuery.Form.CONSTRUCT, construct.form)
+        val source = store.scan()
+        val knows = construct.triples(construct.plan(source), source)
+        assertEquals(listOf(Triple(iri("a"), iri("knows"), iri("b")), Triple(iri("b"), iri("knows"), iri("c")), Triple(iri("a"), iri("knows"), iri("d")), Triple(iri("d"), iri("knows"), iri("e"))), knows)
+        assertEquals("<urn:ex:a> <urn:ex:knows> <urn:ex:b> .\n<urn:ex:b> <urn:ex:knows> <urn:ex:c> .\n<urn:ex:a> <urn:ex:knows> <urn:ex:d> .\n<urn:ex:d> <urn:ex:knows> <urn:ex:e> .\n", SparqlResults.nTriples(knows))
+        assertTrue(SparqlResults.turtle(knows).contains("<urn:ex:a> <urn:ex:knows> <urn:ex:b> ."))
+        // CONSTRUCT WHERE: the pattern is the template; a literal subject or an unbound variable is skipped
+        val short = SparqlQuery.parse("$PREFIX CONSTRUCT WHERE { ?x ex:score ?s }")
+        assertEquals(2, short.triples(short.plan(source), source).size)
+        // DESCRIBE: every triple about the term, graph-blind, once
+        val describe = SparqlQuery.parse("$PREFIX DESCRIBE ex:a")
+        assertEquals(6, describe.triples(describe.plan(source), source).size)
+        val described = SparqlQuery.parse("$PREFIX DESCRIBE ?x WHERE { ?x ex:score ?s FILTER(?s > 0.5) }")
+        assertEquals(describe.triples(describe.plan(source), source).toSet(), described.triples(described.plan(source), source).toSet())
+        assertEquals(2, SparqlQuery.parse("$PREFIX DESCRIBE ex:e").let { it.triples(it.plan(source), source) }.size, "e: d knows e, e self e")
+    }
+
     @Test fun theSubsetRefusesByName() {
         assertTrue(assertFailsWith<SparqlError> { SparqlQuery.parse("$PREFIX SELECT ?x WHERE { ?x ex:p ?y OPTIONAL { ?y ex:q ?z } }") }.message!!.contains("OPTIONAL"))
-        assertTrue(assertFailsWith<SparqlError> { SparqlQuery.parse("$PREFIX CONSTRUCT { ?x ex:p ?y } WHERE { ?x ex:p ?y }") }.message!!.contains("CONSTRUCT"))
         assertTrue(assertFailsWith<SparqlError> { SparqlQuery.parse("SELECT ?x WHERE { ?x nope:p ?y }") }.message!!.contains("nope"))
         assertTrue(assertFailsWith<SparqlError> { SparqlQuery.parse("$PREFIX SELECT ?x WHERE { ?x ex:p ?y ") }.message!!.contains("'}'"))
         assertTrue(assertFailsWith<SparqlError> { SparqlQuery.parse("$PREFIX SELECT ?x WHERE { ?x ex:p ?y } LIMIT -1") }.message!!.contains("LIMIT"))

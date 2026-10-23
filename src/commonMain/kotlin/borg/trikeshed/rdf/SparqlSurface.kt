@@ -50,12 +50,15 @@ class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureEx
     }
 
     fun answer(text: String, defaults: List<String>, named: List<String>, format: String?, accept: String, live: Cursor? = null): PostgrestReply {
-        val media = mediaType(format, accept) ?: return refuse(406, "none of these media types are available: ${format ?: accept}")
         val query = try { SparqlQuery.parse(text, defaults, named) } catch (e: SparqlError) { return refuse(400, "Virtuoso 37000 Error SP030: SPARQL compiler, ${e.message}") }
+        val media = (if (query.graphResult) graphMediaType(format, accept) else mediaType(format, accept))
+            ?: return refuse(406, "none of these media types are available: ${format ?: accept}")
         // The plan and its rows are produced here, so a planner's or evaluator's refusal is this reply, never a dropped request.
         val body = try {
-            val rows = query.plan(quads(live), compiler = compiler)
+            val source = quads(live)
+            val rows = query.plan(source, compiler = compiler)
             when {
+                query.graphResult -> query.triples(rows, source).let { if (media == SparqlResults.NTRIPLES) SparqlResults.nTriples(it) else SparqlResults.turtle(it) }
                 query.ask -> when (media) {
                     SparqlResults.JSON -> SparqlResults.askJson(rows.size > 0)
                     else -> (rows.size > 0).toString()
@@ -95,6 +98,21 @@ class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureEx
             SparqlResults.TSV in a -> SparqlResults.TSV
             a.isBlank() || "*/*" in a -> SparqlResults.JSON
             "text/*" in a -> SparqlResults.CSV
+            else -> null
+        }
+    }
+
+    /** The media type of a CONSTRUCT or DESCRIBE answer: Turtle unless N-Triples is asked for; null for anything else named. */
+    fun graphMediaType(format: String?, accept: String): String? {
+        if (format != null) return when (format.lowercase().substringBefore(';').trim().replace(' ', '+')) {
+            "turtle", "ttl", "text/turtle" -> SparqlResults.TURTLE
+            "ntriples", "nt", "n-triples", "application/n-triples", "text/plain" -> SparqlResults.NTRIPLES
+            else -> null
+        }
+        val a = accept.lowercase()
+        return when {
+            SparqlResults.NTRIPLES in a || "text/plain" in a -> SparqlResults.NTRIPLES
+            SparqlResults.TURTLE in a || a.isBlank() || "*/*" in a || "text/*" in a -> SparqlResults.TURTLE
             else -> null
         }
     }

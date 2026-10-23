@@ -107,6 +107,7 @@ class PostgrestSurface(
         val quads = catalog.resolve(QuadStore.RDF_QUAD)
         if (query.ask) return ok("""[{"ask":${query.plan(quads, compiler = compiler).size > 0}}]""")
         val cursor = query.plan(quads, compiler = compiler)
+        if (query.graphResult) return ok(jsonRows(listOf("s", "p", "o"), query.triples(cursor, quads).map { (s, p, o) -> listOf(s, p, o) }))
         return ok(jsonRows(names(cursor, query.variables), rows(cursor)))
     }
 

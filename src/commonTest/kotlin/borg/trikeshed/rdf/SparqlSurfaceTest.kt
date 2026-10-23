@@ -69,6 +69,19 @@ class SparqlSurfaceTest {
         assertEquals(400, api.handle("POST", "/sparql", mapOf("Content-Type" to "application/sparql-update"), "INSERT { ?s ?p ?o } WHERE { ?s ?p ?o }").status)
     }
 
+    @Test fun graphFormsNegotiateTurtleOrNTriples() {
+        val construct = enc("PREFIX ex: <urn:ex:> CONSTRUCT { ?x ex:knows ?y } WHERE { GRAPH ex:g1 { ?x ex:p ?y } }")
+        val turtle = api.handle("GET", "/sparql?query=$construct", emptyMap(), "")
+        assertEquals("text/turtle; charset=utf-8", turtle.contentType)
+        assertTrue(turtle.body.startsWith("@prefix") && "<urn:ex:a> <urn:ex:knows> <urn:ex:b> ." in turtle.body, turtle.body)
+        val nt = api.handle("GET", "/sparql?query=$construct&format=nt", mapOf("Accept" to "text/turtle"), "")
+        assertEquals("application/n-triples; charset=utf-8", nt.contentType)
+        assertEquals("<urn:ex:a> <urn:ex:knows> <urn:ex:b> .\n<urn:ex:b> <urn:ex:knows> <urn:ex:c> .\n", nt.body)
+        assertEquals(406, api.handle("GET", "/sparql?query=$construct", mapOf("Accept" to "application/sparql-results+json"), "").status)
+        val describe = api.handle("GET", "/sparql?query=${enc("DESCRIBE <urn:ex:e>")}", mapOf("Accept" to "application/n-triples"), "")
+        assertEquals("<urn:ex:d> <urn:ex:p> <urn:ex:e> .\n<urn:ex:e> <urn:ex:self> <urn:ex:e> .\n", describe.body)
+    }
+
     @Test fun liveRowsAreSearchedBesideTheStore() {
         val live = QuadStore().add("<urn:ex:live>", "<urn:ex:p>", "<urn:ex:a>").scan()
         val reply = api.handle("GET", "/sparql?query=${enc("SELECT ?x WHERE { ?x <urn:ex:p> <urn:ex:a> }")}&format=csv", emptyMap(), "", live)

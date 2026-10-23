@@ -1,6 +1,8 @@
 package borg.trikeshed.forge.server
 
+import borg.trikeshed.rdf.CypherSurface
 import borg.trikeshed.rdf.QuadStore
+import borg.trikeshed.rdf.RdfVocab
 import borg.trikeshed.rdf.SparqlQueryTest
 import borg.trikeshed.rdf.SparqlSurface
 import kotlinx.coroutines.runBlocking
@@ -12,7 +14,7 @@ import kotlin.test.assertNull
 /** The /sparql wire end to end, with no daemon: the raw request text in, a negotiated reply out, the live rows beside the store. */
 class SparqlWireTest {
     private val store = QuadStore().load(SparqlQueryTest.FIXTURE)
-    private val wire = SparqlWire(SparqlSurface(store), live = { QuadStore().add("<urn:ex:live>", "<urn:ex:p>", "<urn:ex:a>").scan() })
+    private val wire = SparqlWire(SparqlSurface(store), CypherSurface(store), live = { QuadStore().add("<urn:ex:live>", "<urn:ex:p>", "<urn:ex:a>").scan() })
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
     private fun request(method: String, path: String, headers: String = "", body: String = "") = runBlocking {
@@ -38,6 +40,15 @@ class SparqlWireTest {
         val bad = request("GET", "/sparql?query=${enc("SELECT ?x WHERE { ?x ex:p ?o }")}")!!
         assertEquals(400, bad.status)
         assertEquals("text/plain; charset=utf-8", bad.contentType)
+    }
+
+    @Test fun cypherPostsATransactionAndReadsRows() {
+        val ns = RdfVocab.FORGE
+        store.add("<${ns}ann>", "<${ns}name>", "\"Ann\"").add("<${ns}ann>", "<${ns}KNOWS>", "<${ns}bob>").add("<${ns}bob>", "<${ns}name>", "\"Bob\"")
+        val reply = request("POST", "/db/neo4j/tx/commit", "Content-Type: application/json\r\n", """{"statements":[{"statement":"MATCH (a)-[:KNOWS]->(b) RETURN a.name, b.name"},{"statement":"MATCH (a)-[r]->(b) RETURN r"}]}""")!!
+        assertEquals(200, reply.status)
+        assertEquals("""{"results":[{"columns":["a.name","b.name"],"data":[{"row":["Ann","Bob"]}]}],"errors":[{"code":"Neo.ClientError.Statement.SyntaxError","message":"relationship variables have no identity in RDF; name the type: [:TYPE]"}]}""", reply.body)
+        assertEquals(405, request("GET", "/db/neo4j/tx/commit")!!.status)
     }
 
     @Test fun otherPathsAreNotThisWires() {
