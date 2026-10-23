@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -180,6 +181,10 @@ class BtrfsRaidVolume private constructor(
         try {
             input.send(request)
             return request.result.await()
+        } catch (closed: ClosedSendChannelException) {
+            // A closed send has no consumer or undelivered callback to settle it.
+            request.fail(closed)
+            throw closed
         } finally {
             withContext(NonCancellable) { request.settled.await() }
         }

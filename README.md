@@ -43,6 +43,7 @@ The goal is lawyer-quality analysis of text: adaptively formed, CLIPS/Rete-level
 - **Agent isolation harness:** AI agents, including the Python/Hermes sleeve, run as revocable guest processes with bounded, deadline-limited host calls. `council.seat` nodes put the same evidence to several models as separate parties and keep each model's identity and refusals. Model output stays a proposal and never becomes a command; `--airgap` keeps models local.
 - **Oroboros:** the daemon underneath absorbs worktree, git, agent-environment and runtime changes as content-addressed, peer-replicable history, and hot-swaps code while it runs.
 - **Durable job nexus:** jobs and a Kanban board on a write-ahead log. Kill the daemon mid-flight and restart without losing work; the board is open to any MCP client (`POST /api/mcp`).
+- **Userspace Btrfs:** common-Kotlin native image creation and file operations, file-backed volume growth/profile conversion, Zstd/LZ4 metadata storage, and a macFUSE adapter. See [commands, compatibility and current limits](docs/btrfs-userspace.md).
 - **Tests:** the old suite was deleted when it was holding the project back. AI coding agents have rebuilt it from about 20 `@Test` cases in February 2026 to about 4,400 in October 2026.
 
 ---

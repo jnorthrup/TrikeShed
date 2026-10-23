@@ -395,9 +395,12 @@ class BtrfsRaidImageTest {
                 assertFalse(writing.isCompleted, "The borrowed source remains owned until the data submission settles")
                 release.complete(Unit)
                 writing.await() // Cancellation may fail the logical call after its durable prepare.
-                runCatching { volume.drain() }
+                volume.drain()
                 owner.join()
-                backends.forEach { assertEquals(1, it.closes) }
+                backends.forEach {
+                    assertEquals(1, it.descriptorCloses)
+                    assertEquals(1, it.closes)
+                }
                 patch.copyInto(expected, 0)
                 val reopened = BtrfsRaidImage.open(this, config)
                 try {

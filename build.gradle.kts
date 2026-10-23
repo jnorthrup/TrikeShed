@@ -638,6 +638,16 @@ tasks.named<Test>("jvmTest") {
     }).withPropertyName("confixBoundarySources")
 }
 
+tasks.register<JavaExec>("btrfs") {
+    group = "application"
+    description = "Userspace Btrfs: create, file operations, add, balance, compression, native export, and macFUSE mount."
+    dependsOn("jvmMainClasses")
+    mainClass.set("borg.trikeshed.btrfs.BtrfsCli")
+    classpath(jvmMainClassesDirs, layout.buildDirectory.dir("processedResources/jvm/main"), configurations.getByName("jvmRuntimeClasspath"))
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+    standardInput = System.`in`
+}
+
 tasks.register<Test>("btrfsStorageCheck") {
     group = "verification"
     description = "Verify userspace Btrfs storage, world replication, ISAM, and fresh-process crash recovery."

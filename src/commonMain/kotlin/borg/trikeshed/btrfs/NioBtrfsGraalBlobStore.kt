@@ -10,8 +10,9 @@ import kotlinx.coroutines.CoroutineScope
  * Common userspace block-volume, Btrfs seed-image, and Graal blob entry points.
  *
  * [openRaidImage] and the configuration-based [spanMount] expose persistent
- * userspace block I/O. Canonical Btrfs filesystem serialization, exclusive
- * filesystem locking, ioctl reflinks, and Graal mounting remain incomplete.
+ * userspace block I/O. [BtrfsFilesystemImage] serializes canonical snapshots;
+ * [BtrfsFileSystemElement] publishes filesystem generations, and [BtrfsTool]
+ * exposes the image/mount workflow. The legacy Graal and ioctl entry points below remain incomplete.
  */
 object NioBtrfsGraalBlobStore {
 
@@ -52,9 +53,9 @@ object NioBtrfsGraalBlobStore {
         TODO("linuxMain: ioctl FICLONERANGE via zlinux_uring; js/wasm: TODO no reflink")
 
     /** Raidable per c userspace btrfs RAID code: chunk tree parity via BtrfsChunkItem type. */
-    fun allocateChunk(logical: ULong, length: ULong, raidType: UByte, stripes: List<BtrfsStripe>): BtrfsChunkItem {
-        // c parity type bits (btrfs_block_group_flags): SINGLE=0x0 DUP=0x01 RAID0=0x8
-        // RAID1=0x10 RAID10=0x20 RAID5=0x40 RAID6=0x80 — BtrfsChunkTree.parse verifies.
+    fun allocateChunk(logical: ULong, length: ULong, raidType: ULong, stripes: List<BtrfsStripe>): BtrfsChunkItem {
+        // Native profile bits are separate from DATA/SYSTEM/METADATA flags.
+        // ULong retains the full on-disk field, including RAID6 bit 8.
         require(stripes.isNotEmpty()) { "chunk needs at least one stripe" }
         val profile = BtrfsBlockGroupProfile.fromBits(raidType)
         profile.validate(stripes)
@@ -68,7 +69,7 @@ object NioBtrfsGraalBlobStore {
         )
     }
 
-    fun stripeForRaid(raidType: UByte, devids: List<ULong>): List<BtrfsStripe> {
+    fun stripeForRaid(raidType: ULong, devids: List<ULong>): List<BtrfsStripe> {
         require(devids.isNotEmpty()) { "need at least one devid" }
         val profile = BtrfsBlockGroupProfile.fromBits(raidType)
         require(devids.size >= if (profile == BtrfsBlockGroupProfile.DUP) 1 else profile.minStripes) {
@@ -86,8 +87,14 @@ object NioBtrfsGraalBlobStore {
         return stripes
     }
 
-    /** On-disk seed layout. It is not mountable until the offline btrfs-progs oracle passes. */
-    fun writeMountableImage(imagePath: String, totalBytes: ULong, fileOps: FileOperations): Boolean {
+    /** Source-compatible legacy name. This emits a diagnostic seed, never a mountable filesystem. */
+    @Deprecated("This is a diagnostic seed only. Use writeSeedImage, or BtrfsFilesystemImage for a complete native snapshot.",
+        ReplaceWith("writeSeedImage(imagePath, totalBytes, fileOps)"))
+    fun writeMountableImage(imagePath: String, totalBytes: ULong, fileOps: FileOperations): Boolean =
+        writeSeedImage(imagePath, totalBytes, fileOps)
+
+    /** Checksummed superblock fixture with no filesystem trees. Use [BtrfsFilesystemImage] for native images. */
+    fun writeSeedImage(imagePath: String, totalBytes: ULong, fileOps: FileOperations): Boolean {
         BtrfsSeedImageLayout.requireTotalBytes(totalBytes)
         val imgSize = BtrfsSeedImageLayout.requiredBytes(totalBytes).toLong()
         val img = ByteArray(imgSize.toInt())
@@ -99,7 +106,7 @@ object NioBtrfsGraalBlobStore {
         return true
     }
 
-    /** Compatibility uring path for disposable pre-sized image files; returns backend/completion receipts. */
+    /** Compatibility uring seed path for disposable pre-sized files; does not emit filesystem trees. */
     suspend fun writeImageViaUring(
         imagePath: String,
         totalBytes: ULong,
@@ -153,18 +160,20 @@ object NioBtrfsGraalBlobStore {
 
     /**
      * RAID/SPAN block volumes, directory-backed blobs, and seed-image fixtures
-     * are distinct consumers. A mountable filesystem still requires complete
-     * canonical trees and an offline Btrfs oracle.
+     * are distinct consumers. Canonical filesystem snapshots use [BtrfsFilesystemImage]
+     * and are independently checked by the offline Btrfs oracle tests.
      */
     fun wireInfo(): String = buildString {
         appendLine("NioBtrfsGraalBlobStore userspace wiring:")
         appendLine(" - openRaidImage / spanMount -> BtrfsRaidImage -> BtrfsRaidVolume -> owned uring image members")
+        appendLine(" - BtrfsFilesystemImage -> canonical native Btrfs trees, checksums, and regular files/directories")
+        appendLine(" - BtrfsFileSystemElement -> staged filesystem generations; BtrfsTool -> image and mount workflow")
         appendLine(" - userspace nio FileOperations (InMemoryFileOperations | PosixFileOperations | JvmFileOperations)")
-        appendLine(" - UserspaceBtrfs CoW extents + snapshot (O(entries) not bytes)")
+        appendLine(" - UserspaceBtrfs -> private directory-backed CAS blobs and manifests")
         appendLine(" - BtrfsReflinkStore models shared blobs; filesystem reflink ioctl wiring remains incomplete")
-        appendLine(" - BtrfsChunkTree/BtrfsStripe retain local profile metadata fixtures")
-        appendLine(" - exclusive filesystem locking and Graal mount entry points remain incomplete")
+        appendLine(" - BtrfsChunkTree/BtrfsStripe decode canonical chunk profiles")
+        appendLine(" - legacy acquireExclusive and graalFileSystem entry points remain incomplete")
         appendLine(" - BtrfsUringFileVolume: nonvolatile userspace.nio.Volume over selected uring channel")
-        appendLine(" - on-disk seed: superblock BTRFS_MAGIC=0x4D5F53665248425F at 64K; btrfs-progs oracle still required")
+        appendLine(" - writeSeedImage: diagnostic superblocks at native offsets, no filesystem trees; not mountable")
     }
 }
