@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compositional Density</title>
+<style>
+  @font-face { font-family: 'KaTeXMath'; src: url('fonts/KaTeX_Math-Italic.woff2') format('woff2'); }
+  :root { --bg:#0b0d12; --fg:#e8eaf0; }
+  html,body { margin:0; background:var(--bg); color:var(--fg); font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace; }
+  #stage { width:100vw; max-width:1920px; aspect-ratio:16/9; display:block; margin:0 auto; }
+  #bar { display:flex; gap:12px; align-items:center; padding:8px 16px; max-width:1920px; margin:0 auto; box-sizing:border-box; }
+  #bar input { flex:1; }
+  #bar button { font:inherit; background:#1b2030; color:var(--fg); border:1px solid #333a50; padding:4px 12px; border-radius:6px; }
+  body.capture #bar { display:none; }
+  body.capture #stage { width:1920px; height:1080px; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+<div id="bar"><button id="play">pause</button><input id="scrub" type="range" min="0" max="1000" value="0"><span id="clock">0.0s</span></div>
+<script src="scenes.js"></script>
+<script>
+  const svg = document.getElementById('stage');
+  window.renderAt = t => { svg.innerHTML = Film.frame(t); };
+  if (new URLSearchParams(location.search).has('capture')) {
+    document.body.classList.add('capture');
+  } else {
+    let playing = true, t0 = performance.now(), offset = 0;
+    const scrub = document.getElementById('scrub'), clock = document.getElementById('clock'), btn = document.getElementById('play');
+    const now = () => playing ? offset + (performance.now() - t0) / 1000 : offset;
+    btn.onclick = () => { offset = now(); playing = !playing; t0 = performance.now(); btn.textContent = playing ? 'pause' : 'play'; };
+    scrub.oninput = () => { offset = scrub.value / 1000 * Film.duration; t0 = performance.now(); };
+    (function loop() {
+      let t = now();
+      if (t > Film.duration) { offset = 0; t0 = performance.now(); t = 0; }
+      renderAt(t);
+      scrub.value = Math.round(t / Film.duration * 1000);
+      clock.textContent = t.toFixed(1) + 's';
+      requestAnimationFrame(loop);
+    })();
+  }
+</script>
+</body>
+</html>

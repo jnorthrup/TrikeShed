@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ascension</title>
+<style>
+  @font-face { font-family: 'KaTeXMath'; src: url('fonts/KaTeX_Math-Italic.woff2') format('woff2'); }
+  @font-face { font-family: 'KaTeXMain'; src: url('fonts/KaTeX_Main-Regular.woff2') format('woff2'); }
+  @font-face { font-family: 'KaTeXAMS'; src: url('fonts/KaTeX_AMS-Regular.woff2') format('woff2'); }
+  html, body { margin: 0; background: #000; color: #ddd; font: 14px 'JetBrains Mono', monospace; }
+  #cv { display: block; width: 100vw; max-width: 1920px; aspect-ratio: 16 / 9; margin: 0 auto; }
+  #bar { display: flex; gap: 12px; align-items: center; padding: 8px 16px; max-width: 1920px; margin: 0 auto; box-sizing: border-box; }
+  #bar input { flex: 1; }
+  #bar button { font: inherit; background: #1b2030; color: #ddd; border: 1px solid #333a50; padding: 4px 12px; border-radius: 6px; }
+  body.capture #bar { display: none; }
+  body.capture #cv { width: auto; max-width: none; }
+</style>
+</head>
+<body>
+<canvas id="cv" width="1920" height="1080"></canvas>
+<div id="bar"><button id="play">pause</button><input id="scrub" type="range" min="0" max="10000" value="0"><span id="clock">0.0s</span></div>
+<audio id="score" src="score.m4a" preload="auto"></audio>
+<script src="film.js"></script>
+<script>
+  const params = new URLSearchParams(location.search), cv = document.getElementById('cv');
+  if (params.has('w')) { cv.width = +params.get('w'); cv.height = Math.round(cv.width * 9 / 16); }
+  Film.bind(cv);
+  window.renderAt = t => Film.frame(t);
+  if (params.has('capture')) document.body.classList.add('capture');
+  else {
+    const audio = document.getElementById('score'), scrub = document.getElementById('scrub'), clock = document.getElementById('clock'), btn = document.getElementById('play');
+    let playing = true, t0 = performance.now(), offset = 0;
+    const now = () => playing ? offset + (performance.now() - t0) / 1000 : offset;
+    const sync = t => { try { audio.currentTime = t; if (playing) audio.play().catch(() => {}); else audio.pause(); } catch (e) {} };
+    btn.onclick = () => { offset = now(); playing = !playing; t0 = performance.now(); btn.textContent = playing ? 'pause' : 'play'; sync(offset); };
+    scrub.oninput = () => { offset = scrub.value / 10000 * Film.duration; t0 = performance.now(); sync(offset); };
+    document.fonts.ready.then(() => {
+      sync(0);
+      (function loop() {
+        let t = now();
+        if (t >= Film.duration) { offset = 0; t0 = performance.now(); t = 0; sync(0); }
+        renderAt(t); scrub.value = Math.round(t / Film.duration * 10000); clock.textContent = t.toFixed(1) + 's';
+        requestAnimationFrame(loop);
+      })();
+    });
+  }
+</script>
+</body>
+</html>
