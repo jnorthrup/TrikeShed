@@ -3,6 +3,7 @@ package borg.trikeshed.userspace
 import borg.trikeshed.userspace.UringOp.Companion.Submissions
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.file.Files as UserFiles
 import java.nio.file.Files
@@ -43,6 +44,32 @@ class JvmUserspaceChannelBackendTest {
         val result = submitBatch(listOf(submission)).single()
         assertEquals(submission.userData, result.userData)
         return result.res
+    }
+
+    @Test
+    fun socketReuseAddressCommandReadsItsWindowAndReturnsActualOptionErrors() {
+        val backend = JvmUserspaceChannelBackend()
+        val fd = backend.execute(Submissions.socket(2, 1, 0, 1))
+        assertTrue(fd > 0)
+        try {
+            for (enabled in listOf(0, 1)) {
+                val bytes = ByteArray(6) { 99 }.also { ByteBuffer(it).order(ByteOrder.nativeOrder()).putInt(1, enabled) }
+                val window = ByteBuffer.wrap(bytes, 1, 4).asReadOnlyBuffer()
+                val submission = Submissions.setsockopt(fd, UringOp.SOL_SOCKET, UringOp.SO_REUSEADDR, ByteArray(4), 2)
+                    .copy(buffer = window)
+                assertEquals(0, backend.execute(submission))
+                assertEquals(0, window.position())
+                assertEquals(99.toByte(), bytes.first())
+                assertEquals(99.toByte(), bytes.last())
+                assertEquals(-22, backend.execute(submission.copy(len = 3)))
+                assertEquals(-22, backend.execute(submission.copy(len = 5)))
+                assertEquals(-22, backend.execute(submission.copy(operationFlags = 1)))
+            }
+            assertEquals(-92, backend.execute(Submissions.setsockopt(fd, UringOp.SOL_SOCKET, 9999, ByteArray(4), 3)))
+        } finally {
+            assertEquals(0, backend.execute(Submissions.close(fd, 4)))
+            backend.close()
+        }
     }
 
     @Test

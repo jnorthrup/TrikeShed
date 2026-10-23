@@ -48,7 +48,8 @@ class CouchStorage private constructor(
         fun open(name: String, cas: CasStore, files: FileOperations, location: String,
                  format: CouchStorageFormat = CouchStorageFormat.COMMIT,
                  operations: IsamOperations? = null,
-                 synchronization: Synchronization = Synchronization.MONITOR): CouchStorage {
+                 synchronization: Synchronization = Synchronization.MONITOR,
+                 requireCompleteHistory: Boolean = false): CouchStorage {
             require(location.isNotBlank()) { "Couch storage location is empty" }
             if (cas.durability != StorageDurability.DURABLE) {
                 require(format == CouchStorageFormat.COMMIT) { "Dense Couch requires durable CAS and filesystem storage" }
@@ -101,7 +102,7 @@ class CouchStorage private constructor(
                     ConfixIsamCursorBridge(directory, files, cas, operations, synchronization).also { backing = it } else null
                 val couch = if (dense != null) dense.couch(name) else {
                     val commits = CouchCommitStore(cas, StorageDurability.DURABLE, files, directory,
-                        synchronization = synchronization).also { backing = it }
+                        requireCompleteHistory = requireCompleteHistory, synchronization = synchronization).also { backing = it }
                     Couch(name, CouchStoreFactory.durableCasBacked(cas, commits, synchronization), cas, commits.asLocalBacking())
                 }
                 return CouchStorage(couch, format, dense, {

@@ -172,7 +172,7 @@ class HtxReactorElement(
             if (request.body.rem > 0) {
                 writeAll(connection.handle, connection.fd, request.body, request.timeoutMs)
             }
-            parseHtxResponse(readAll(connection.handle, connection.fd, request.timeoutMs))
+            parseHtxResponse(readAll(connection.handle, connection.fd, request.timeoutMs, request.maxResponseBytes))
         } finally {
             closeConnection(connection)
         }
@@ -209,7 +209,7 @@ class HtxReactorElement(
                     request.timeoutMs,
                 )
                 parseHtxResponse(
-                    readTlsPlaintext(connection.handle, connection.fd, endpoint, request.timeoutMs),
+                    readTlsPlaintext(connection.handle, connection.fd, endpoint, request.timeoutMs, request.maxResponseBytes),
                 )
             } finally {
                 runCatching { flushTlsFrames(connection.handle, connection.fd, endpoint.close(), request.timeoutMs) }
@@ -297,8 +297,9 @@ class HtxReactorElement(
         handle: ChannelOperations.ChannelHandle,
         fd: Int,
         timeoutMs: Long,
+        maxResponseBytes: Int,
     ): ByteSeries {
-        val response = ResponseAccumulator()
+        val response = ResponseAccumulator(maxResponseBytes)
         while (true) {
             val chunk = readChunk(handle, fd, timeoutMs) ?: break
             response.append(chunk)
@@ -328,8 +329,9 @@ class HtxReactorElement(
         fd: Int,
         endpoint: TlsEndpoint,
         timeoutMs: Long,
+        maxResponseBytes: Int,
     ): ByteSeries {
-        val plaintext = ResponseAccumulator()
+        val plaintext = ResponseAccumulator(maxResponseBytes)
         while (true) {
             val chunk = readChunk(handle, fd, timeoutMs) ?: break
             val frames = endpoint.downstream(chunk)
@@ -348,8 +350,8 @@ class HtxReactorElement(
      * per response, which throttled replication pages and starved multi-megabyte
      * `_cas` blob fetches into the 30 s read deadline.
      */
-    private class ResponseAccumulator {
-        private var buf = ByteArray(32 * 1024)
+    private class ResponseAccumulator(private val maxBytes: Int) {
+        private var buf = ByteArray(minOf(32 * 1024, maxBytes))
         private var size = 0
         private var boundary = -1        // index of CRLFCRLF once seen
         private var contentLength = -2   // -2 unknown, -1 none declared
@@ -357,9 +359,10 @@ class HtxReactorElement(
 
         fun append(chunk: ByteSeries) {
             val n = chunk.rem
+            require(n <= maxBytes - size) { "HTX response byte limit exceeded" }
             if (size + n > buf.size) {
                 var cap = buf.size
-                while (cap < size + n) cap = cap shl 1
+                while (cap < size + n) cap = minOf(maxBytes.toLong(), cap.toLong() * 2).toInt()
                 buf = buf.copyOf(cap)
             }
             for (i in 0 until n) buf[size + i] = chunk[chunk.pos + i]
@@ -377,6 +380,9 @@ class HtxReactorElement(
                     contentLength = headerText.lineSequence()
                         .firstOrNull { it.startsWith("Content-Length:", ignoreCase = true) }
                         ?.substringAfter(":")?.trim()?.toIntOrNull() ?: -1
+                    require(contentLength < 0 || contentLength <= maxBytes - boundary - 4) {
+                        "HTX response byte limit exceeded"
+                    }
                     if (headerText.lineSequence()
                         .any { it.startsWith("Transfer-Encoding:", ignoreCase = true) && it.contains("chunked", ignoreCase = true) }
                     ) chunks = HtxChunkFraming(boundary + 4)

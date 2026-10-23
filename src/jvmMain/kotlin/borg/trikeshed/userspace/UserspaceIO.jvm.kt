@@ -508,6 +508,9 @@ internal class JvmUserspaceChannelBackend(
         UringOp.LISTEN -> JvmSocketSyscalls.listen(fd, sub.len)
         UringOp.SHUTDOWN -> JvmSocketSyscalls.shutdown(fd, sub.len)
         UringOp.URING_CMD -> when (sub.offset) {
+            UringOp.SOCKET_URING_OP_SETSOCKOPT.toLong() ->
+                JvmSocketSyscalls.setOption(fd, sub.buffer, sub.len, (sub.addr and 0xffffffffL).toInt(),
+                    (sub.addr ushr 32).toInt(), sub.operationFlags)
             UringOp.SOCKET_URING_OP_GETSOCKNAME.toLong() ->
                 JvmSocketSyscalls.name(fd, sub.buffer, sub.len, sub.operationFlags)
             else -> -95
