@@ -306,13 +306,19 @@ class CouchCommitStore(
         }
     }
 
+    /* ⚡ Bolt: Use HashSet iteration to check uniqueness and _id without intermediate List/Set allocations */
     private fun validateFrame(frame: CouchCommittedFrame) {
         require(frame.docId.isNotEmpty() && frame.rev.isNotEmpty()) { "Couch frame identity is empty" }
         require(frame.deleted == (frame.doc == null)) { "Couch frame body does not match its deletion flag" }
-        frame.doc?.let {
-            require(it.id == frame.docId) { "Couch frame document identity mismatch" }
-            require(it.fields.none { field -> field.name == "_id" } && it.fields.map { field -> field.name }.distinct().size == it.fields.size) {
-                "Couch body contains an ambiguous field identity"
+        frame.doc?.let { doc ->
+            require(doc.id == frame.docId) { "Couch frame document identity mismatch" }
+            val fields = doc.fields
+            val seen = HashSet<String>(fields.size)
+            for (i in fields.indices) {
+                val name = fields[i].name
+                require(name != "_id" && seen.add(name)) {
+                    "Couch body contains an ambiguous field identity"
+                }
             }
         }
     }
@@ -335,20 +341,32 @@ class CouchCommitStore(
      * An attachment's content must be named by the CAS; its bytes are not read back. A named source
      * edited since stands until the next reconcile supersedes it. Only a file tree is opened, for its extents.
      */
+    /* ⚡ Bolt: Search doc.fields directly to avoid intermediate Map and Pair allocations */
     private fun validateReferences(doc: Document) {
-        val fields = doc.fields.associate { it.name to it.value }
-        val reference = fields["contentId"] as? String ?: return
+        var contentId: String? = null
+        var contentType: Any? = null
+        var length: Any? = null
+        val docFields = doc.fields
+        for (i in docFields.indices) {
+            val f = docFields[i]
+            when (f.name) {
+                "contentId" -> contentId = f.value as? String
+                "contentType" -> contentType = f.value
+                "length" -> length = f.value
+            }
+        }
+        val reference = contentId ?: return
         if (!reference.startsWith("sha256:")) return
         val cid = ContentId(reference)
-        if (fields["contentType"] != FileTreeManifest.CONTENT_TYPE) {
+        if (contentType != FileTreeManifest.CONTENT_TYPE) {
             require(cas.holds(cid)) { "Missing Couch object $cid" }
             return
         }
         val bytes = readVerified(cid)
-        fields["length"]?.let { length ->
-            val size = when (length) {
-                is Number -> exactInteger(length)
-                is String -> length.toLongOrNull() ?: error("Invalid attachment length")
+        length?.let { lengthVal ->
+            val size = when (lengthVal) {
+                is Number -> exactInteger(lengthVal)
+                is String -> lengthVal.toLongOrNull() ?: error("Invalid attachment length")
                 else -> error("Invalid attachment length")
             }
             require(size == bytes.size.toLong()) { "Attachment length mismatch" }
