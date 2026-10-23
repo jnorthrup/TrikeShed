@@ -107,6 +107,11 @@ class SqlGraphTest {
         assertEquals("select col(\"a\"), col(\"b\"), col(\"c\") from \"t\"", SqlGraph.signature(SqlGraph.lower(grown)))
     }
 
+    @Test fun aTableFunctionInFromIsRefusedByName() {
+        assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError> { SqlGraph.lift(strict("SELECT * FROM evoke_query('docs', 'q', 3) h")) }.code)
+        assertEquals("unsupported-in-ast", assertFailsWith<SqlGraphError> { SqlGraph.parse("SELECT h.id FROM docs d JOIN evoke_query('docs', 'q', 3) h ON h.id = d.id") }.code)
+    }
+
     @Test fun graphsTheStatementCannotSayAreRefusedAtTheNode() {
         val base = SqlGraph.lift(strict("SELECT a FROM t"))
         val hub = nodesOf(base).single { it.type == SqlGraph.SELECT }

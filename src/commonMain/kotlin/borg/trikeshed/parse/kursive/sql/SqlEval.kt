@@ -263,10 +263,9 @@ fun plainDecimal(d: Double): String {
 fun SelectStmt.render(): String = buildString {
     append("SELECT ")
     append(columns.view.joinToString(", ") { c -> c.expr.render() + (c.alias?.let { " AS " + it.asString() } ?: "") })
-    from?.let { t -> append(" FROM ").append(t.name.asString()); t.alias?.let { append(' ').append(it.asString()) } }
+    from?.let { t -> append(" FROM ").append(t.render()) }
     for (j in joins.view) {
-        append(if (j.outer) " LEFT JOIN " else " JOIN ").append(j.table.name.asString())
-        j.table.alias?.let { append(' ').append(it.asString()) }
+        append(if (j.outer) " LEFT JOIN " else " JOIN ").append(j.table.render())
         j.on?.let { append(" ON ").append(it.render()) }
     }
     where?.let { append(" WHERE ").append(it.render()) }
@@ -277,6 +276,13 @@ fun SelectStmt.render(): String = buildString {
     })
     limit?.let { append(" LIMIT ").append(it) }
     offset?.let { append(" OFFSET ").append(it) }
+}
+
+/** A FROM item's text: `name`, or `name(args)` for a table function, then its alias. */
+fun TableRef.render(): String = buildString {
+    append(name.asString())
+    args?.let { a -> append('(').append((a α { it.render() }).view.joinToString(", ")).append(')') }
+    alias?.let { append(' ').append(it.asString()) }
 }
 
 /** A vector cell as floats: a FloatArray / DoubleArray, a Confix array of numbers, or pgvector text `[1, 2.5, -3]`. */

@@ -107,6 +107,7 @@ class PgSessionTest {
         assertEquals("42601", error("SELEC 1"))
         assertEquals(listOf(listOf("<urn:ex:a>", "<urn:ex:b>")), rows("SPARQL SELECT ?s ?o WHERE { GRAPH <urn:ex:g1> { ?s <urn:ex:p> ?o } } ORDER BY ?s LIMIT 1"))
         assertEquals(listOf(listOf("t")), rows("SPARQL ASK { <urn:ex:a> <urn:ex:p> <urn:ex:b> }"))
+        assertEquals(listOf("1"), rows("SELECT h.id FROM evoke_query('documents', 'rust', 2) h ORDER BY h.id").map { it[0] }, "Evoke's explicit-hit form on the wire: one title holds the term")
     }
 
     @Test fun sessionParametersAndTransactionsAreBookkeeping() {

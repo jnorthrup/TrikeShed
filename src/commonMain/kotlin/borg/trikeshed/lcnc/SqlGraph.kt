@@ -221,8 +221,10 @@ object SqlGraph {
             return hub
         }
 
-        private fun tableRef(ref: TableRef): String =
-            node(TABLE_NAME, "name" to ref.name.asString(), "alias" to ref.alias?.asString())
+        fun tableRef(ref: TableRef): String {
+            if (ref.args != null) throw SqlGraphError("", "unsupported-in-ast", "a table function in FROM (${ref.name.asString()}(…)) is not part of this vocabulary yet")
+            return node(TABLE_NAME, "name" to ref.name.asString(), "alias" to ref.alias?.asString())
+        }
 
         /** The node for [e] in a slot that wants [want]; a bridge is added where the natural kind differs. */
         fun expr(e: Expr, want: String): String {
@@ -348,6 +350,7 @@ object SqlGraph {
             }
         }
         fun table(ref: TableRef) {
+            if (ref.args != null) throw SqlGraphError("", "unsupported-in-ast", "a table function in FROM (${ref.name.asString()}(…)) is not part of this vocabulary yet")
             identifier(ref.name.asString(), "table")
             ref.alias?.let { identifier(it.asString(), "alias") }
         }
@@ -634,7 +637,9 @@ object SqlGraph {
         stmt.offset?.let { append(" offset ").append(it) }
     }
 
-    private fun sig(t: TableRef): String = jsonString(t.name.asString()) + (t.alias?.let { " " + jsonString(it.asString()) } ?: "")
+    fun sig(t: TableRef): String = jsonString(t.name.asString()) +
+        (t.args?.let { a -> "(" + (0 until a.size).joinToString(",") { sig(a[it]) } + ")" } ?: "") +
+        (t.alias?.let { " " + jsonString(it.asString()) } ?: "")
 
     private fun sig(e: Expr): String = when (e) {
         is ColumnRef -> "col(" + jsonString(e.id.asString()) + ")"

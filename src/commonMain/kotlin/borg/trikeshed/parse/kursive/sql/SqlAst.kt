@@ -72,7 +72,8 @@ data class Is(val expr: Expr, val value: Boolean?, val negated: Boolean = false)
 /** `expr [NOT] IN (items)`: true on a match, else NULL when an item is NULL, else false. */
 data class InList(val expr: Expr, val items: Series<Expr>, val negated: Boolean = false) : Expr
 data class Column(val expr: Expr, val alias: Identifier? = null) : SqlNode
-data class TableRef(val name: Identifier, val alias: Identifier? = null) : SqlNode
+/** A FROM item: a table, or with [args] a table function `name(args) [AS] alias` (pg's shape; `evoke_query(index, query, k)` here). */
+data class TableRef(val name: Identifier, val alias: Identifier? = null, val args: Series<Expr>? = null) : SqlNode
 /** `[LEFT [OUTER] | INNER] JOIN table ON expr`. */
 data class JoinClause(val table: TableRef, val on: Expr?, val outer: Boolean) : SqlNode
 /** [nullsFirst] null is pg's default: NULLS LAST ascending, NULLS FIRST descending. */
@@ -282,27 +283,30 @@ class SqlParser(private val cs: CharSeries) {
         val quoted = peek() == '"'
         val id = parseIdentifier() ?: return null
         skipWs()
-        if (peek() == '(') {
-            cs.pos++
-            skipWs()
-            val args = mutableListOf<Expr>()
-            if (peek() == '*') { cs.pos++; args += Star }
-            else while (peek() != ')') {
-                args += parseExpr() ?: return null
-                skipWs()
-                if (peek() == ',') { cs.pos++; skipWs() } else break
-            }
-            skipWs()
-            if (peek() != ')') return null
-            cs.pos++
-            return parsePostfix(Call(id.asString().lowercase().removePrefix(PG_CATALOG), args.toSeries()))
-        }
+        if (peek() == '(') return parsePostfix(Call(id.asString().lowercase().removePrefix(PG_CATALOG), parseArgs() ?: return null))
         if (!quoted) id.asString().lowercase().let { word -> if (word in SESSION_WORDS) return parsePostfix(Call(word, emptySeriesOf())) }
         if (peek() == ':' && !(cs.pos + 1 < cs.limit && cs[cs.pos + 1] == ':')) {
             cs.pos++
             return parsePostfix(Path(ColumnRef(id), parseColonPath(), text = false))
         }
         return parsePostfix(ColumnRef(id))
+    }
+
+    /** `(expr, …)` after a name, the cursor on `(`: a call's arguments; `(*)` is COUNT's star. Null when malformed. */
+    fun parseArgs(): Series<Expr>? {
+        cs.pos++
+        skipWs()
+        val args = mutableListOf<Expr>()
+        if (peek() == '*') { cs.pos++; args += Star }
+        else while (peek() != ')') {
+            args += parseExpr() ?: return null
+            skipWs()
+            if (peek() == ',') { cs.pos++; skipWs() } else break
+        }
+        skipWs()
+        if (peek() != ')') return null
+        cs.pos++
+        return args.toSeries()
     }
 
     /**
@@ -620,9 +624,12 @@ class SqlParser(private val cs: CharSeries) {
         return cols.toSeries()
     }
 
+    /** `table [[AS] alias]` or the table function `name(args) [[AS] alias]`. */
     fun parseTableRef(): TableRef? {
         skipWs()
         val name = parseIdentifier() ?: return null
+        skipWs()
+        val args = if (peek() == '(') parseArgs() ?: return null else null
         skipWs()
         var alias: Identifier? = null
         val save = cs.pos
@@ -642,7 +649,7 @@ class SqlParser(private val cs: CharSeries) {
                 }
             } else cs.pos = save
         }
-        return TableRef(name, alias)
+        return TableRef(name, alias, args)
     }
 
     fun parseSelect(): SelectStmt? {
@@ -654,7 +661,8 @@ class SqlParser(private val cs: CharSeries) {
         var from: TableRef? = null
         if (matchKeyword("FROM")) {
             skipWs()
-            from = parseTableRef()
+            // FROM names a table or a table function; a malformed one (an unclosed argument list eats the rest) fails the statement
+            from = parseTableRef() ?: return null
         }
         val joins = mutableListOf<JoinClause>()
         while (true) {

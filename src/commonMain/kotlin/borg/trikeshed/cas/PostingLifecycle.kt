@@ -18,6 +18,12 @@ import borg.trikeshed.lib.intp.*
  * frontiers − retirements, scored with live statistics; it equals a fresh [TermPostings] over the
  * live rows after every action, and a reader that [pin]s a root blocks page reuse until released.
  */
+/** The bytes of an L0 record without atoms: a RETIRE, or an UPSERT's header. */
+const val RETIRE_BYTES = 112L
+
+/** Evoke's 8 KiB pages a byte count occupies. */
+fun l0Pages(bytes: Long): Int = ((bytes + 8_191) / 8_192).toInt()
+
 class PostingLifecycle(
     val analyzer: Analyzer = Analyzer(),
     val params: Bm25Params = Bm25Params(),
@@ -48,14 +54,14 @@ class PostingLifecycle(
 
     /** One linked-L0 record: a document version (its atoms and frequencies) or a retirement. */
     class L0Record(val kind: RecordKind, val sequence: Long, val slot: Int, val docLen: Int, val atoms: IntArray, val tfs: IntArray) {
-        val bytes: Long get() = 112L + 8L * atoms.size
+        val bytes: Long get() = RETIRE_BYTES + 8L * atoms.size
     }
 
     /** A frontier of records; [pages] follows the record bytes. */
     class Frontier(val segmentId: Int) {
         val records = ArrayList<L0Record>()
         var bytes = 0L
-        val pages: Int get() = ((bytes + 8_191) / 8_192).toInt()
+        val pages: Int get() = l0Pages(bytes)
         val minSequence: Long get() = records.firstOrNull()?.sequence ?: -1
         val maxSequence: Long get() = records.lastOrNull()?.sequence ?: -1
     }
@@ -157,13 +163,25 @@ class PostingLifecycle(
     fun retire(key: Any?): Boolean = slotOfKey[key]?.let { admit(1); retireSlot(it); true } ?: false
 
     /**
-     * Refuses [records] more appends while the pending frontier is unsealed and the active one is at
-     * its hard limit, before any state changes (Evoke's "active L0 hard frontier is exhausted").
+     * Refuses the [records] appends a write is about to make while they would meet the hard limit of
+     * the active frontier with the pending one unsealed (Evoke's "active L0 hard frontier is exhausted"),
+     * before any state changes: [append]'s own check is reached only after [retireSlot] has flipped the
+     * directory. The appends are replayed against [append]'s rule, a RETIRE record (then the UPSERT)
+     * when the key is live, so an inline rotation inside the sequence and the RETIRE's bytes count.
      */
-    private fun admit(records: Int) {
-        val a = active
-        if (pending != null && a.records.size + records > limits.l0MaxRecords)
-            throw IllegalStateException("evoke active L0 hard frontier is exhausted while pending L0 is unsealed")
+    fun admit(records: Int) {
+        var size = active.records.size
+        var bytes = active.bytes
+        var rotated = pending != null
+        repeat(records) { i ->
+            if (size > 0 && (size >= limits.l0RotationRecords || l0Pages(bytes) >= limits.l0RotationPages)) {
+                if (!rotated) { rotated = true; size = 0; bytes = 0L }
+                else if (size >= limits.l0MaxRecords || l0Pages(bytes) >= limits.l0MaxPages)
+                    throw IllegalStateException("evoke active L0 hard frontier is exhausted while pending L0 is unsealed")
+            }
+            size++
+            if (i < records - 1) bytes += RETIRE_BYTES
+        }
     }
 
     private fun retireSlot(slot: Int) {
@@ -203,7 +221,23 @@ class PostingLifecycle(
 
     /** Exact BM25 scores by key over the read plan: folds + uncovered extents + visible L0 − retirements. */
     fun scores(query: CharSequence): Map<Any?, Double> {
-        if (documents == 0) return emptyMap()
+        val (hits, count, acc) = accumulate(query) ?: return emptyMap()
+        return HashMap<Any?, Double>(count * 2).apply { for (i in 0 until count) put(slotKeys[hits[i]], acc[hits[i]]) }
+    }
+
+    /** The [k] best hits (every hit when k < 0): score descending, then slot ascending, Evoke's order and [TermPostings.topKTokens]'s rule. */
+    fun topK(query: CharSequence, k: Int): List<PostingHit> {
+        val (hits, count, acc) = accumulate(query) ?: return emptyList()
+        hits.sort(0, count)
+        val scores = DoubleArray(count) { acc[hits[it]] }
+        return borg.trikeshed.lib.doublep.topK(scores, count, if (k < 0) count else k, descending = true).map { i ->
+            hits[i].let { slot -> PostingHit(slot, slotKeys[slot], scores[i]) }
+        }
+    }
+
+    /** The read plan's accumulation for [query]: the hit slots, their count and every slot's score; null while the index is empty. */
+    fun accumulate(query: CharSequence): Triple<IntArray, Int, DoubleArray>? {
+        if (documents == 0) return null
         val weights = LinkedHashMap<Int, Int>()
         for (t in analyzer.tokens(query)) lexicon.find(t)?.let { weights[it.id] = (weights[it.id] ?: 0) + 1 }
         val n = documents.toDouble()
@@ -220,7 +254,7 @@ class PostingLifecycle(
             val idf = bm25Idf(params.idfMethod, df.toDouble(), n)
             count = bm25Accumulate(slots, tfs, slots.size, slotLen, lavg, idf, weight.toDouble(), params, slotLive, acc, touched, hits, count)
         }
-        return HashMap<Any?, Double>(count * 2).apply { for (i in 0 until count) put(slotKeys[hits[i]], acc[hits[i]]) }
+        return Triple(hits, count, acc)
     }
 
     /** One term's postings as the read plan assembles them (retired slots included; readers skip them). */

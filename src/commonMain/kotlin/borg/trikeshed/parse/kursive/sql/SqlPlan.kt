@@ -57,13 +57,16 @@ fun SelectStmt.plan(
 ): QueryCursor {
     val table = from
     // A FROM-less SELECT (`SELECT 1`, `SELECT version()`) reads the one-row, no-column relation, as pg's Result node does.
-    val source = if (table == null) UNIT else resolve(table.name.asString()).qualify((table.alias ?: table.name).asString())
+    val (source, itemPlan) = if (table == null) UNIT j emptySeriesOf<QueryK<Cursor>>() else fromItem(table, resolve)
     val stages = mutableListOf<QueryK<Cursor>>()
+    // a table function's stages come first: they make the relation the rest of the statement reads, and the receipt lists them
+    stages += itemPlan.view
     stages += prelude
 
     for (clause in joins.view) {
         val qualifier = (clause.table.alias ?: clause.table.name).asString()
-        val right = resolve(clause.table.name.asString()).qualify(qualifier)
+        val (rightScan, rightPlan) = fromItem(clause.table, resolve)
+        val right = if (rightPlan.size == 0) rightScan else QueryCursor(rightScan, rightPlan, ops, compiler)
         val pairs = mutableListOf<Twin<String>>()
         val rightOnly = mutableListOf<Expr>()
         val residual = mutableListOf<Expr>()
@@ -92,12 +95,8 @@ fun SelectStmt.plan(
     val markers = LinkedHashMap<String, String>()
     fun mark(e: Expr) {
         when (e) {
-            is Call -> if (e.name == "evoke_query") markers.getOrPut(e.render()) {
-                val args = e.args.view.toList()
-                require(args.size in 2..3) { "evoke_query(index, query[, k]) takes two or three arguments" }
-                val index = constantText(args[0]) ?: error("evoke_query: the index must be a constant")
-                val query = constantText(args[1]) ?: error("evoke_query: the query must be a constant")
-                val k = args.getOrNull(2)?.let { (constant(it) as? Number)?.toInt() ?: error("evoke_query: k must be a number") } ?: -1
+            is Call -> if (e.name == EVOKE_QUERY) markers.getOrPut(e.render()) {
+                val (index, query, k) = evokeArgs(e.args)
                 "#e${markers.size}".also { stages += QueryK.LexicalTopK(index, query, it, k) }
             } else e.args.view.forEach(::mark)
             is BinaryExpr -> { mark(e.left); mark(e.right) }
@@ -198,8 +197,63 @@ fun SelectStmt.plan(
         )
     }
     stages += QueryK.Project(sources.toSeries())
-    val tables = listOfNotNull(table?.name?.asString()) + joins.view.map { it.table.name.asString() }
+    val tables = listOfNotNull(table?.scanName()) + joins.view.map { it.table.scanName() }
     return QueryCursor(source, stages.toSeries(), ops, compiler, statement ?: render(), tables.associateWith(provenance))
+}
+
+/** Evoke's marker and the one function a FROM item may call. */
+const val EVOKE_QUERY = "evoke_query"
+
+/** `evoke_query(index, query[, k])`'s constant arguments, the one reading for the marker and the FROM form; k is -1 when absent. */
+fun evokeArgs(args: Series<Expr>): Triple<String, String, Int> {
+    require(args.size in 2..3) { "$EVOKE_QUERY(index, query[, k]) takes two or three arguments" }
+    val index = constantText(args[0]) ?: error("$EVOKE_QUERY: the index must be a constant")
+    val query = constantText(args[1]) ?: error("$EVOKE_QUERY: the query must be a constant")
+    val k = if (args.size == 3) (constant(args[2]) as? Number)?.toInt() ?: error("$EVOKE_QUERY: k must be a number") else -1
+    return Triple(index, query, k)
+}
+
+/**
+ * `evoke_query`'s index text as (table, column): a leading `public.` names the one schema, as
+ * [Catalog.table] reads it; the column is empty when the index names only the table.
+ */
+fun evokeIndex(index: String): Twin<String> {
+    val bare = index.removePrefix("public.").removePrefix("PUBLIC.")
+    return bare.substringBefore('.') j bare.substringAfter('.', "")
+}
+
+/** The table a FROM item scans: its own name, or the index's table of `evoke_query(index, …)`. */
+fun TableRef.scanName(): String = args?.let { a -> constantText(a[0])?.let { evokeIndex(it).a } } ?: name.asString()
+
+/**
+ * A FROM item as the scan qualified by its alias and the stages that make the item's relation: none
+ * for a table; for the table function `evoke_query(index, query, k)`, Evoke's explicit-hit form, the
+ * same [QueryK.LexicalTopK] stage the select-list marker uses and a projection to `(id, score)`, the
+ * best [k] documents first. `index` is a table or `table.column` (the first text column that is not
+ * `id` when unnamed) and the qualifier is the alias or, as pg names an unaliased function's columns,
+ * the function; a `JOIN t ON t.id = h.id` reads the rows back. An empty table answers itself: no hits,
+ * and no row to type its columns by.
+ */
+fun fromItem(ref: TableRef, resolve: (String) -> Cursor): Join<Cursor, QueryPlan> {
+    val qualifier = (ref.alias ?: ref.name).asString()
+    val args = ref.args ?: return resolve(ref.name.asString()).qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
+    val function = ref.name.asString().lowercase().removePrefix(SqlParser.PG_CATALOG)
+    if (function != EVOKE_QUERY) error("function $function(...) does not exist as a table function")
+    require(args.size == 3) { "$EVOKE_QUERY(index, query, k) in FROM takes three arguments; the two-argument form is a scalar" }
+    val (index, query, k) = evokeArgs(args)
+    require(k > 0) { "$EVOKE_QUERY: k must be positive" }
+    val (tableName, named) = evokeIndex(index)
+    val raw = resolve(tableName)
+    if (raw.size == 0) return raw.qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
+    val column = named.ifEmpty { lexicalColumn(raw) ?: error("$EVOKE_QUERY: $tableName has no text column to index") }
+    val hits: QueryPlan = s_[QueryK.LexicalTopK("$qualifier.$column", query, "#f", k), QueryK.Project(s_["$qualifier.id" j "$qualifier.id", "#f" j "$qualifier.score"])]
+    return raw.qualify(qualifier) j hits
+}
+
+/** The column `evoke_query` indexes when the index names only a table: the first text column that is not `id`; [scan] has a row. */
+fun lexicalColumn(scan: Cursor): String? {
+    val metas: Series<ColumnMeta> = if (scan is ColumnCursor) scan.metas.toSeries() else scan[0].metas α { it() }
+    return metas.view.firstOrNull { it.type == IOMemento.IoString && it.name.toString() != "id" }?.name?.toString()
 }
 
 /** The one-row relation with no columns: what a SELECT without FROM scans. */

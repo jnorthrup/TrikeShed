@@ -50,6 +50,31 @@ class PostingLifecycleTest {
         assertEquals("evoke_maintenance_result(maintained=true, reason=pending_l0_sealed, mode=segment_seal, compaction_required=false)", sealed.toString())
     }
 
+    @Test fun aPageLimitRefusalLeavesTheDirectoryUntouched() {
+        // one record is one page: the second write rotates, the third meets the hard page limit while pending is unsealed
+        val index = PostingLifecycle(limits = small.copy(l0MaxPages = 1, l0RotationPages = 1))
+        val live = LinkedHashMap<Any?, String>()
+        for (i in 0 until 2) { index.upsert(i, corpus[i]); live[i] = corpus[i] }
+        assertNotNull(index.pending)
+        assertFailsWith<IllegalStateException> { index.upsert(2, corpus[2]) }
+        assertFailsWith<IllegalStateException> { index.upsert(0, "cursor again") }
+        assertEquals(2, index.documents, "a refused write, new key or re-index, changes nothing")
+        assertExact(index, live, "page limit")
+        assertEquals("pending_l0_sealed", index.tryMaintain().reason)
+        index.upsert(2, corpus[2]); live[2] = corpus[2]
+        assertExact(index, live, "after seal")
+        // a re-index appends a RETIRE before its UPSERT: refused whole, with pending unsealed and after the seal rotates inline
+        assertFailsWith<IllegalStateException> { index.upsert(0, "cursor again") }
+        assertEquals("pending_l0_sealed", index.tryMaintain().reason)
+        assertFailsWith<IllegalStateException> { index.upsert(0, "cursor again") }
+        assertEquals(3, index.documents); assertExact(index, live, "re-index refused")
+        // ranked reads follow Evoke's order: score descending, then slot ascending; k < 0 reads every hit
+        val ranked = index.topK("cursor algebra", -1)
+        assertEquals(index.scores("cursor algebra").keys, ranked.map { it.key }.toSet())
+        assertTrue(ranked.zipWithNext().all { (x, y) -> x.score > y.score || (x.score == y.score && x.slot < y.slot) })
+        assertEquals(ranked.take(1), index.topK("cursor algebra", 1))
+    }
+
     @Test fun theSelectorTakesOneActionInTheCOrderAndEveryStateReadsExactly() {
         val index = PostingLifecycle(limits = small)
         val live = LinkedHashMap<Any?, String>()
