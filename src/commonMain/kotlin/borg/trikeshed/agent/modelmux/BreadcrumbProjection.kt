@@ -161,23 +161,17 @@ object BreadcrumbProjector {
     }
 
     /**
-     * Answers [question] about [snapshot]. [facets] is rebuildable memory of what earlier questions already computed
-     * (line structure, line features, the snapshot's inverted index); it changes the cost of an answer and never the
-     * answer, which is checked against the plain algorithm. The default is a private instance, so nothing is retained.
+     * What a question makes of an index: which distinct lines contain one of its terms ([scored], each once) and what
+     * each is worth ([scoreOfLine], by distinct line number). The one place a line is scored: [project] selects from
+     * it and [rank] summarizes it, so what a document is worth can never disagree with what is shown from it.
      */
-    fun project(
-        snapshot: ContextSnapshot,
-        question: String,
-        budget: ProjectionBudget = ProjectionBudget(),
-        facets: ProjectionFacets = ProjectionFacets(),
-    ): Projection {
-        require(facets.policy == POLICY) { "facets were built for policy '${facets.policy}', this projector is '$POLICY'" }
-        val query = tokens(question).distinct()
-        val index = facets.index(snapshot)
-        val docs = List(snapshot.documents.size) { d -> DocView(snapshot.documents[d], index.documents[d]) }
+    internal class LineScores(val scored: IntBuf, val scoreOfLine: DoubleArray)
 
-        // Corpus statistics are over DISTINCT line contents and live in the index, so only the postings of the
-        // question's own terms are read: a line that contains none of them is never looked at.
+    /**
+     * Corpus statistics are over DISTINCT line contents and live in the index, so only the postings of the question's
+     * own terms are read: a line that contains none of them is never looked at.
+     */
+    private fun scoreLines(index: SnapshotIndex, query: List<String>, facets: ProjectionFacets): LineScores {
         val n = index.distinct
         val weights = DoubleArray(query.size) { qi ->
             val dq = index.postings[query[qi]]?.size ?: 0
@@ -206,6 +200,50 @@ object BreadcrumbProjector {
             if (s > 0.0 && toks.isNotEmpty() && line.action) s *= 1.1
             scoreOfLine[id] = s
         }
+        return LineScores(scored, scoreOfLine)
+    }
+
+    /**
+     * How well each document of [index] answers [question]: the score of its best line, 0.0 for a document none of
+     * whose lines matched. A line several documents share counts for each of them; [project] shows it once, but a
+     * document is still about what it says. Reads only the postings of the question's own terms and the positions of
+     * the lines they score, never a document's text.
+     */
+    internal fun rank(index: SnapshotIndex, question: String, facets: ProjectionFacets): DoubleArray {
+        require(facets.policy == POLICY) { "facets were built for policy '${facets.policy}', this projector is '$POLICY'" }
+        val lines = scoreLines(index, tokens(question).distinct(), facets)
+        val best = DoubleArray(index.documents.size)
+        for (k in 0 until lines.scored.size) {
+            val id = lines.scored[k]
+            val s = lines.scoreOfLine[id]
+            if (s <= 0.0) continue
+            for (o in index.occStart[id] until index.occStart[id + 1]) {
+                val d = index.occDocument[o]
+                if (s > best[d]) best[d] = s
+            }
+        }
+        return best
+    }
+
+    /**
+     * Answers [question] about [snapshot]. [facets] is rebuildable memory of what earlier questions already computed
+     * (line structure, line features, the snapshot's inverted index); it changes the cost of an answer and never the
+     * answer, which is checked against the plain algorithm. The default is a private instance, so nothing is retained.
+     */
+    fun project(
+        snapshot: ContextSnapshot,
+        question: String,
+        budget: ProjectionBudget = ProjectionBudget(),
+        facets: ProjectionFacets = ProjectionFacets(),
+    ): Projection {
+        require(facets.policy == POLICY) { "facets were built for policy '${facets.policy}', this projector is '$POLICY'" }
+        val query = tokens(question).distinct()
+        val index = facets.index(snapshot)
+        val docs = List(snapshot.documents.size) { d -> DocView(snapshot.documents[d], index.documents[d]) }
+
+        val lines = scoreLines(index, query, facets)
+        val scored = lines.scored
+        val scoreOfLine = lines.scoreOfLine
 
         class Candidate(val doc: Int, val ordinal: Int, val score: Double)
 
