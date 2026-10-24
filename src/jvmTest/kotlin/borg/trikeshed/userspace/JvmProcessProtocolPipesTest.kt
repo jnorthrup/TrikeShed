@@ -137,7 +137,7 @@ class JvmProcessProtocolPipesTest {
                 pipes.closeInput()
                 pipes.closeProtocolInput()
                 val result = bytes(pipes::readProtocol).decodeToString()
-                assertEquals("OWN_VAR=explicit-fixture\nMY_API_KEY=null\nmIxEd_Secret=null", result)
+                assertEquals("OWN_VAR=explicit-fixture\nMY_API_KEY=null\nmIxEd_Secret=null\nTERM=xterm-256color", result)
                 assertEquals(0, pipes.awaitExit())
             } finally { pipes.close() }
         }
@@ -179,7 +179,7 @@ class JvmProcessProtocolPipesTest {
                 pipes.closeInput()
                 pipes.closeProtocolInput()
                 val response = bytes(pipes::readProtocol).decodeToString()
-                assertEquals("OWN_VAR=declared-value\nMY_API_KEY=null\nmIxEd_Secret=null", response)
+                assertEquals("OWN_VAR=declared-value\nMY_API_KEY=null\nmIxEd_Secret=null\nTERM=xterm-256color", response)
                 assertEquals(0, pipes.awaitExit())
             } finally { pipes.close() }
         }
@@ -260,7 +260,7 @@ object JvmProcessProtocolChild {
                 val terminal = System.`in`.readAllBytes().decodeToString()
                 val protocol = socket.getInputStream().readAllBytes().decodeToString()
                 val response = if (args[0] == "environment") {
-                    listOf("OWN_VAR", "MY_API_KEY", "mIxEd_Secret").joinToString("\n") { "$it=${System.getenv(it)}" }
+                    listOf("OWN_VAR", "MY_API_KEY", "mIxEd_Secret", "TERM").joinToString("\n") { "$it=${System.getenv(it)}" }
                 } else "$terminal|${System.getenv("OWN_VAR")}|$protocol"
                 socket.getOutputStream().apply {
                     write(response.encodeToByteArray())
