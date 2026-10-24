@@ -3,9 +3,11 @@ package borg.trikeshed.userspace.nio.file.spi
 import borg.trikeshed.common.createTempDirectory
 import kotlinx.cinterop.convert
 import platform.posix.chmod
+import platform.posix.symlink
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import kotlin.test.assertFailsWith
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class LinuxFileOperationsTest {
@@ -72,5 +74,60 @@ class LinuxFileOperationsTest {
             ops.write("/dev/full", ByteArray(10) { 1 })
         }
         assertTrue(exception.message!!.startsWith("short write on /dev/full:"))
+    }
+
+    // What the commonMain stores (FileCasStore, MissionJournal, the Couch, btrfs and mesh volumes) require of this adapter.
+    // Reads and plain writes ride the ring; publication, directories, leases and canonical paths are the POSIX sequence.
+
+    private inline fun inTempDir(body: (LinuxFileOperations, String) -> Unit) {
+        val files = LinuxFileOperations()
+        val dir = files.createTempDir("trikeshed-linux-ops-")
+        try { body(files, dir) } finally { files.deleteRecursively(dir) }
+    }
+
+    @Test
+    fun writeAtomicallyCreatesMissingAncestorsAndLeavesOnlyTheTarget() = inTempDir { files, dir ->
+        val target = "$dir/a/b/c/blob.bin"
+        val first = ByteArray(300_000) { (it * 31).toByte() }
+        files.writeAtomically(target, first)
+        assertContentEquals(first, files.readAllBytes(target), "the ring-based reader sees what the atomic publisher wrote")
+        val second = byteArrayOf(1, 2, 3)
+        files.writeAtomically(target, second)
+        assertContentEquals(second, files.readAllBytes(target), "a replacement is whole, never a prefix of the old bytes")
+        assertEquals(listOf("blob.bin"), files.listDir("$dir/a/b/c"), "no temporary file is left behind")
+    }
+
+    @Test
+    fun mkdirsCreatesEveryMissingAncestorAndRefusesThroughAFile() = inTempDir { files, dir ->
+        files.mkdirs("$dir/x/y/z")
+        assertTrue(files.isDir("$dir/x/y/z"))
+        files.mkdirs("$dir/x/y/z")
+        files.write("$dir/blocker", "not a directory")
+        assertFailsWith<IllegalStateException> { files.mkdirs("$dir/blocker/q") }
+    }
+
+    @Test
+    fun durabilityIsDurableBecauseWriteAtomicallyIs() {
+        assertEquals(StorageDurability.DURABLE, LinuxFileOperations().durability)
+    }
+
+    @Test
+    fun canonicalPathResolvesSymlinksIncludingAncestorsOfANewPath() = inTempDir { files, dir ->
+        files.mkdirs("$dir/real")
+        assertEquals(0, symlink("$dir/real", "$dir/link"))
+        val root = files.canonicalPath(dir)
+        assertEquals("$root/real/new/child", files.canonicalPath("$dir/link/new/child"))
+    }
+
+    @Test
+    fun anExclusiveLeaseRefusesASecondHolderUntilTheFirstCloses() = inTempDir { files, dir ->
+        val path = "$dir/journal.lock"
+        val first = files.acquireExclusiveLease(path)
+        try {
+            assertFailsWith<IllegalStateException> { files.acquireExclusiveLease(path) }
+        } finally {
+            first.close()
+        }
+        files.acquireExclusiveLease(path).close()
     }
 }
