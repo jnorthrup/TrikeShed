@@ -48,4 +48,30 @@ class PijulChannelTest {
 
         assertEquals(0, channel.appliedPatches().size)
     }
+
+    // seedFile must reproduce the base exactly: later patches anchor to base CHARACTER offsets, so a
+    // seed that re-splits lines (dropping CR, adding a phantom line) shifts every anchor after it.
+    @Test
+    fun unequalLinesAndFinalNewlineSeedExactly() {
+        val base = "alpha\nbe\n\ngamma-long-line\n"
+        val channel = PijulChannel()
+        channel.seedFile("f.txt", base)
+        assertEquals(base, channel.renderFile("f.txt"))
+    }
+
+    @Test
+    fun baseWithoutFinalNewlineSeedsExactly() {
+        val base = "alpha\nbeta"
+        val channel = PijulChannel()
+        channel.seedFile("f.txt", base)
+        assertEquals(base, channel.renderFile("f.txt"))
+    }
+
+    @Test
+    fun crlfBaseIsPreservedByteForByte() {
+        val base = "a\r\nbb\r\nccc"
+        val channel = PijulChannel()
+        channel.seedFile("f.txt", base)
+        assertEquals(base, channel.renderFile("f.txt"))
+    }
 }

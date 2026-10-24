@@ -25,7 +25,7 @@ import borg.trikeshed.rdf.RdfVocab
 import borg.trikeshed.rdf.TurtleRdf
 import java.io.File
 import java.lang.System
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 /**
  * `book.curate` and `constellation.join`: a book's text becomes a frozen [Book] (sections, statements,

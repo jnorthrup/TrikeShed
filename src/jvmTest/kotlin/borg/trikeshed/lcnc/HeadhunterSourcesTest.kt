@@ -21,7 +21,7 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
-import keymux.CouchKeyStore
+import borg.trikeshed.agent.keymux.CouchKeyStore
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test

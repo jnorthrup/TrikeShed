@@ -1,4 +1,4 @@
-package org.trikeshed.oroboros.forge
+package borg.trikeshed.oroboros.forge
 
 import borg.trikeshed.parse.reify
 

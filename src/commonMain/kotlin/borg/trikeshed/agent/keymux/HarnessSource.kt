@@ -1,4 +1,4 @@
-package keymux
+package borg.trikeshed.agent.keymux
 
 import borg.trikeshed.parse.reify
 
@@ -56,36 +56,130 @@ data class HarnessProvider(
  * is a new row, never a code change elsewhere.
  */
 object HarnessRegistry {
-    val providers: Series<HarnessProvider> = s_[
-        HarnessProvider("openai", s_["OPENAI_API_KEY"], "https://api.openai.com/v1", "gpt-4o-mini", baseUrlEnvVar = "OPENAI_BASE_URL"),
+    val providers: Series<borg.trikeshed.agent.keymux.HarnessProvider> = s_[
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "openai",
+            s_["OPENAI_API_KEY"],
+            "https://api.openai.com/v1",
+            "gpt-4o-mini",
+            baseUrlEnvVar = "OPENAI_BASE_URL"
+        ),
         // No defaultBaseUrl and no probeModel: anthropic's wire protocol is
         // /v1/messages, which the ModelMux /chat/completions lane does not speak.
-        HarnessProvider("anthropic", s_["ANTHROPIC_API_KEY"]),
-        HarnessProvider("xai", s_["XAI_API_KEY"], "https://api.x.ai/v1", "grok-3-mini", baseUrlEnvVar = "XAI_BASE_URL"),
-        HarnessProvider("google", s_["GOOGLE_API_KEY", "GEMINI_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
-        HarnessProvider("gemini", s_["GEMINI_API_KEY", "GOOGLE_API_KEY"], "https://generativelanguage.googleapis.com/v1beta"),
-        HarnessProvider("deepseek", s_["DEEPSEEK_API_KEY"], "https://api.deepseek.com/v1", "deepseek-chat", baseUrlEnvVar = "DEEPSEEK_BASE_URL"),
-        HarnessProvider("nvidia", s_["NVIDIA_API_KEY", "NGC_API_KEY"], "https://integrate.api.nvidia.com/v1", "nvidia/nemotron-3-super-120b-a12b"),
-        HarnessProvider("openrouter", s_["OPENROUTER_API_KEY"], "https://openrouter.ai/api/v1", "openai/gpt-4o-mini", baseUrlEnvVar = "OPENROUTER_BASE_URL"),
-        HarnessProvider("groq", s_["GROQ_API_KEY"], "https://api.groq.com/openai/v1", "llama-3.1-8b-instant"),
-        HarnessProvider("mistral", s_["MISTRAL_API_KEY"], "https://api.mistral.ai/v1", "mistral-small-latest"),
-        HarnessProvider("cerebras", s_["CEREBRAS_API_KEY"], "https://api.cerebras.ai/v1", "gpt-oss-120b"),
-        HarnessProvider("moonshot", s_["MOONSHOT_API_KEY", "KIMI_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k", baseUrlEnvVar = "KIMI_BASE_URL"),
-        HarnessProvider("kimi", s_["KIMI_API_KEY", "MOONSHOT_API_KEY"], "https://api.moonshot.ai/v1", "moonshot-v1-8k", baseUrlEnvVar = "KIMI_BASE_URL"),
-        HarnessProvider("glm", s_["GLM_API_KEY", "ZHIPU_API_KEY"]),
-        HarnessProvider("zhipu", s_["ZHIPU_API_KEY", "GLM_API_KEY"]),
-        HarnessProvider("zai", s_["ZAI_API_KEY", "GLM_API_KEY"], "https://api.z.ai/api/paas/v4", "glm-4.5-air", baseUrlEnvVar = "GLM_BASE_URL"),
-        HarnessProvider("perplexity", s_["PERPLEXITY_API_KEY"], "https://api.perplexity.ai", "sonar"),
-        HarnessProvider("minimax", s_["MINIMAX_API_KEY"], "https://api.minimax.chat/v1", baseUrlEnvVar = "MINIMAX_BASE_URL"),
+        borg.trikeshed.agent.keymux.HarnessProvider("anthropic", s_["ANTHROPIC_API_KEY"]),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "xai",
+            s_["XAI_API_KEY"],
+            "https://api.x.ai/v1",
+            "grok-3-mini",
+            baseUrlEnvVar = "XAI_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "google",
+            s_["GOOGLE_API_KEY", "GEMINI_API_KEY"],
+            "https://generativelanguage.googleapis.com/v1beta"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "gemini",
+            s_["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+            "https://generativelanguage.googleapis.com/v1beta"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "deepseek",
+            s_["DEEPSEEK_API_KEY"],
+            "https://api.deepseek.com/v1",
+            "deepseek-chat",
+            baseUrlEnvVar = "DEEPSEEK_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "nvidia",
+            s_["NVIDIA_API_KEY", "NGC_API_KEY"],
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "openrouter",
+            s_["OPENROUTER_API_KEY"],
+            "https://openrouter.ai/api/v1",
+            "openai/gpt-4o-mini",
+            baseUrlEnvVar = "OPENROUTER_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "groq",
+            s_["GROQ_API_KEY"],
+            "https://api.groq.com/openai/v1",
+            "llama-3.1-8b-instant"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "mistral",
+            s_["MISTRAL_API_KEY"],
+            "https://api.mistral.ai/v1",
+            "mistral-small-latest"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "cerebras",
+            s_["CEREBRAS_API_KEY"],
+            "https://api.cerebras.ai/v1",
+            "gpt-oss-120b"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "moonshot",
+            s_["MOONSHOT_API_KEY", "KIMI_API_KEY"],
+            "https://api.moonshot.ai/v1",
+            "moonshot-v1-8k",
+            baseUrlEnvVar = "KIMI_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "kimi",
+            s_["KIMI_API_KEY", "MOONSHOT_API_KEY"],
+            "https://api.moonshot.ai/v1",
+            "moonshot-v1-8k",
+            baseUrlEnvVar = "KIMI_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider("glm", s_["GLM_API_KEY", "ZHIPU_API_KEY"]),
+        borg.trikeshed.agent.keymux.HarnessProvider("zhipu", s_["ZHIPU_API_KEY", "GLM_API_KEY"]),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "zai",
+            s_["ZAI_API_KEY", "GLM_API_KEY"],
+            "https://api.z.ai/api/paas/v4",
+            "glm-4.5-air",
+            baseUrlEnvVar = "GLM_BASE_URL"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "perplexity",
+            s_["PERPLEXITY_API_KEY"],
+            "https://api.perplexity.ai",
+            "sonar"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "minimax",
+            s_["MINIMAX_API_KEY"],
+            "https://api.minimax.chat/v1",
+            baseUrlEnvVar = "MINIMAX_BASE_URL"
+        ),
         // jules/brain are dispatch identities, not chat endpoints.
-        HarnessProvider("jules", s_["JULES_API_KEY"]),
-        HarnessProvider("brain", s_["BRAIN_API_KEY"]),
-        HarnessProvider("synthetic", s_["SYNTHETIC_API_KEY"], "https://api.synthetic.new/v1"),
-        HarnessProvider("opencode", s_["OPENCODE_API_KEY"], "https://api.opencode.ai/v1"),
-        HarnessProvider("hermes", s_["HERMES_API_KEY", "NOUS_API_KEY"], "https://inference-api.nousresearch.com/v1", "nousresearch/hermes-3-llama-3.1-405b", baseUrlEnvVar = "HERMES_BASE_URL"),
+        borg.trikeshed.agent.keymux.HarnessProvider("jules", s_["JULES_API_KEY"]),
+        borg.trikeshed.agent.keymux.HarnessProvider("brain", s_["BRAIN_API_KEY"]),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "synthetic",
+            s_["SYNTHETIC_API_KEY"],
+            "https://api.synthetic.new/v1"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "opencode",
+            s_["OPENCODE_API_KEY"],
+            "https://api.opencode.ai/v1"
+        ),
+        borg.trikeshed.agent.keymux.HarnessProvider(
+            "hermes",
+            s_["HERMES_API_KEY", "NOUS_API_KEY"],
+            "https://inference-api.nousresearch.com/v1",
+            "nousresearch/hermes-3-llama-3.1-405b",
+            baseUrlEnvVar = "HERMES_BASE_URL"
+        ),
     ]
 
-    fun byId(id: String): HarnessProvider? {
+    fun byId(id: String): borg.trikeshed.agent.keymux.HarnessProvider? {
         for (i in 0 until providers.size) if (providers[i].id == id) return providers[i]
         return null
     }
@@ -123,13 +217,13 @@ class HarnessSource(
     private val homeDirOverride: String? = null,
     /** Explicit process overrides can precede a live pool without bypassing its file-backed status. */
     private val processEnvOnly: Boolean = false,
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "harness"
 
     private val fileLock = Mutex()
     private val dotenvMemo = mutableMapOf<String, Map<String, String>>()
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("harness source is read-only — edit the harness's own store")
     }
 
@@ -137,7 +231,7 @@ class HarnessSource(
         fileLock.withLock { dotenvMemo.clear() }
     }
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val segs = path.size
         if (segs == 3 && path[0] == "llm" && path[2] == "key") return providerKey(path[1])
         if (segs == 3 && path[0] == "llm" && path[2] == "base_url") return providerBaseUrl(path[1])
@@ -154,7 +248,7 @@ class HarnessSource(
     // ── provider keys ────────────────────────────────────────────────
 
     private suspend fun providerKey(provider: String): String? {
-        val entry = HarnessRegistry.byId(provider)
+        val entry = borg.trikeshed.agent.keymux.HarnessRegistry.byId(provider)
         if (entry != null) {
             for (i in 0 until entry.envVars.size) {
                 val v = entry.envVars[i]
@@ -180,14 +274,14 @@ class HarnessSource(
         // Hermes' own override variable for this provider wins outright — the
         // same rule its _resolve_*_base_url helpers apply ("if the user has
         // explicitly set GLM_BASE_URL, that always wins").
-        HarnessRegistry.byId(provider)?.baseUrlEnvVar?.let { hermesVar ->
+        borg.trikeshed.agent.keymux.HarnessRegistry.byId(provider)?.baseUrlEnvVar?.let { hermesVar ->
             getenv(hermesVar)?.takeIf { it.isNotBlank() }?.let { return it }
             dotenvValue(hermesVar)?.let { return it }
         }
         val varName = provider.uppercase().replace('.', '_').replace('-', '_') + "_BASE_URL"
         getenv(varName)?.takeIf { it.isNotBlank() }?.let { return it }
         dotenvValue(varName)?.let { return it }
-        if (!processEnvOnly) HarnessRegistry.byId(provider)?.defaultBaseUrl?.let { return it }
+        if (!processEnvOnly) borg.trikeshed.agent.keymux.HarnessRegistry.byId(provider)?.defaultBaseUrl?.let { return it }
         // Custom integrations pair their key with HERMES_CUSTOM_<ID>_BASE_URL.
         val customVar = "HERMES_CUSTOM_" + provider.uppercase().replace('-', '_') + "_BASE_URL"
         getenv(customVar)?.takeIf { it.isNotBlank() }?.let { return it }
@@ -234,14 +328,17 @@ class HarnessSource(
     private suspend fun dotenv(ops: FileOperations, file: String): Map<String, String>? {
         fileLock.withLock { dotenvMemo[file] }?.let { return it }
         if (!runCatching { ops.isFile(file) }.getOrDefault(false)) return null
-        val parsed = parseDotenv(runCatching { ops.readString(file) }.getOrNull() ?: return null)
+        val parsed =
+            borg.trikeshed.agent.keymux.parseDotenv(
+                runCatching { ops.readString(file) }.getOrNull() ?: return null
+            )
         fileLock.withLock { dotenvMemo[file] = parsed }
         return parsed
     }
 
     // ── harness credential files ─────────────────────────────────────
 
-    private suspend fun harnessFileKey(provider: String, entry: HarnessProvider): String? {
+    private suspend fun harnessFileKey(provider: String, entry: borg.trikeshed.agent.keymux.HarnessProvider): String? {
         val ops = fileOpsOrNull() ?: return null
         val home = homeDirOverride ?: getenv("HOME") ?: return null
         val hermesHome = hermesHomeOverride ?: getenv("HERMES_HOME") ?: "$home/.hermes"
@@ -290,7 +387,7 @@ class HarnessSource(
         explicitFileOps ?: currentCoroutineContext()[FileOperations.Key]
 }
 
-/** Hermes dotenv parser — shared by [HarnessSource] and [HermesCredentialSource]
+/** Hermes dotenv parser — shared by [borg.trikeshed.agent.keymux.HarnessSource] and [borg.trikeshed.agent.keymux.HermesCredentialSource]
  *  (both walk the same $HERMES_HOME/.env → ~/.hermes/.env → profiles chain). */
 internal fun parseDotenv(text: String): Map<String, String> {
     val out = LinkedHashMap<String, String>()
@@ -310,6 +407,6 @@ internal fun parseDotenv(text: String): Map<String, String> {
 }
 
 /** Builder arm: keys from environment AND the popular harnesses' credential stores. */
-fun KeyMuxBuilder.harness(fileOps: FileOperations? = null): KeyMuxBuilder = apply {
-    bind("*", HarnessSource(explicitFileOps = fileOps))
+fun borg.trikeshed.agent.keymux.KeyMuxBuilder.harness(fileOps: FileOperations? = null): borg.trikeshed.agent.keymux.KeyMuxBuilder = apply {
+    bind("*", borg.trikeshed.agent.keymux.HarnessSource(explicitFileOps = fileOps))
 }

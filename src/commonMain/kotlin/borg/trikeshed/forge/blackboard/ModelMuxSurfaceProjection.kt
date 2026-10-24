@@ -4,8 +4,8 @@ import borg.trikeshed.lib.α
 import borg.trikeshed.lib.plus
 import borg.trikeshed.lib.toList
 import kotlinx.datetime.Clock
-import modelmux.ModelSelectionEvent
-import modelmux.QuotaSnapshot
+import borg.trikeshed.agent.modelmux.ModelSelectionEvent
+import borg.trikeshed.agent.modelmux.QuotaSnapshot
 
 /**
  * Payload union for the modelmux ring's `gallery` tiles.

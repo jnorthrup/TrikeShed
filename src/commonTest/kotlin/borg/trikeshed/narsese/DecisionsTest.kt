@@ -5,7 +5,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import kotlin.test.*
 
 class DecisionsTest {

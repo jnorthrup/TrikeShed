@@ -1,12 +1,10 @@
-package forge.doc
+package borg.trikeshed.forge.doc
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kanban.SessionCause
 import borg.trikeshed.util.oroboros.LexicalMemory
 import borg.trikeshed.util.oroboros.MergeReceipt
-import borg.trikeshed.utils.kanban.*
 import borg.trikeshed.utils.kanban.SessionBoardStore
-import kotlinx.datetime.Clock
 
 suspend fun drainReadmeDagReteRefraction(store: SessionBoardStore) {
     store.appendWork("readme-dag-rete-refraction", SessionCause.WorkDrained(

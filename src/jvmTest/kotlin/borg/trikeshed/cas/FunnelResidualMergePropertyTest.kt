@@ -241,4 +241,40 @@ class FunnelResidualMergePropertyTest {
         ).mergedText
         assertEquals(fwd, rev, "merged text must not depend on source order")
     }
+
+    // ── Blank lines. The spine drops them, so a residual atom's ordinal is a NORMALIZED ordinal; the raw
+    // line list and the master's raw offsets must be reached THROUGH that mapping, not by using the
+    // ordinal as a raw index. These are metamorphic: padding a document with blank lines (which the spine
+    // ignores) must not change which lines are merged, nor their order.
+
+    private fun mergeOne(masterText: String, sourceText: String): String =
+        FunnelResidualMerge.pijulMerge(
+            1 j { _: Int -> LineCas.spine(sourceText) },
+            baselineOf(masterText),
+            masterText,
+            1 j { _: Int -> sourceText },
+        ).mergedText
+
+    private fun nonBlank(text: String): List<String> = text.lineSequence().filter { it.isNotBlank() }.toList()
+
+    private fun keys(text: String): List<String> =
+        LineCas.spine(text).let { s -> (0 until s.size).map { i -> s[i].linkedKey } }
+
+    @Test
+    fun blankLinesInASourceDoNotChangeWhatIsMerged() {
+        val master = "A\nB\nC\nD"
+        val clean = "A\nB\nX\nC\nD"
+        val padded = "A\n\nB\n   \nX\n\nC\nD"
+        assertEquals(keys(clean), keys(padded), "precondition: blank lines are invisible to the spine")
+        assertEquals(mergeOne(master, clean), mergeOne(master, padded))
+    }
+
+    @Test
+    fun blankLinesInTheMasterDoNotMoveTheInsertionLocus() {
+        val source = "A\nB\nX\nC\nD"
+        val master = "A\nB\nC\nD"
+        val paddedMaster = "A\n\nB\n\n\nC\nD"
+        assertEquals(keys(master), keys(paddedMaster), "precondition: blank lines are invisible to the spine")
+        assertEquals(nonBlank(mergeOne(master, source)), nonBlank(mergeOne(paddedMaster, source)))
+    }
 }

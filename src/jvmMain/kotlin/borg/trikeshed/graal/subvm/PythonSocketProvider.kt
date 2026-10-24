@@ -10,7 +10,7 @@ import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 /** A VM-local socket ABI. Resolution checks existing policy; guest input never adds an egress permit. */
 class PythonSocketProvider(

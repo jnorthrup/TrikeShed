@@ -1,7 +1,8 @@
 @file:OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
 
-package modelmux
+package borg.trikeshed.agent.modelmux
 
+import borg.trikeshed.agent.modelmux.breadcrumbPrefix
 import borg.trikeshed.cas.LineCas
 import borg.trikeshed.cursor.*
 import borg.trikeshed.cursor.Cursor
@@ -32,13 +33,13 @@ data class BreadcrumbBudget(
 }
 
 data class BreadcrumbIndexed(
-    val id: BreadcrumbId,
+    val id: borg.trikeshed.agent.modelmux.BreadcrumbId,
     val cid: ContentId,
     val spine: ContentId,
-    val ref: BreadcrumbRef,
+    val ref: borg.trikeshed.agent.modelmux.BreadcrumbRef,
     val title: String,
     val source: String,
-    val children: Series<BreadcrumbId>,
+    val children: Series<borg.trikeshed.agent.modelmux.BreadcrumbId>,
     val spans: Series<Twin<Int>>,
     val metadata: ConfixDoc,
     val heritage: ConfixDoc?,
@@ -49,14 +50,14 @@ data class BreadcrumbIndexed(
  * The 16-bit alias is a bucket only; a collision can never select another full CAS identity.
  */
 class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
-    private val entries = linkedMapOf<BreadcrumbId, BreadcrumbIndexed>()
+    private val entries = linkedMapOf<borg.trikeshed.agent.modelmux.BreadcrumbId, borg.trikeshed.agent.modelmux.BreadcrumbIndexed>()
 
     fun copy(): BreadcrumbIndex = BreadcrumbIndex(cas).also { it.entries.putAll(entries) }
     fun restore(from: BreadcrumbIndex) { entries.clear(); entries.putAll(from.entries) }
-    operator fun get(id: BreadcrumbId): BreadcrumbIndexed? = entries[id]
+    operator fun get(id: borg.trikeshed.agent.modelmux.BreadcrumbId): borg.trikeshed.agent.modelmux.BreadcrumbIndexed? = entries[id]
 
-    fun put(record: BreadcrumbRecord, title: String = if (record.source.startsWith("summary:")) record.content else record.source,
-            heritage: ConfixDoc? = null): BreadcrumbIndexed {
+    fun put(record: borg.trikeshed.agent.modelmux.BreadcrumbRecord, title: String = if (record.source.startsWith("summary:")) record.content else record.source,
+            heritage: ConfixDoc? = null): borg.trikeshed.agent.modelmux.BreadcrumbIndexed {
         entries[record.id]?.let { return it }
         val bytes = record.content.encodeToByteArray()
         val cid = ContentId.of(bytes)
@@ -77,8 +78,10 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
             "createdAt" to record.createdAt.value.toString(),
             "children" to children.view.map { it.value }, "heritageCid" to heritageCid?.value,
         )))
-        return BreadcrumbIndexed(record.id, cid, spine, ref, title, record.source, children,
-            spans.toTypedArray().toSeries(), metadata, heritage).also { entries[record.id] = it }
+        return borg.trikeshed.agent.modelmux.BreadcrumbIndexed(
+            record.id, cid, spine, ref, title, record.source, children,
+            spans.toTypedArray().toSeries(), metadata, heritage
+        ).also { entries[record.id] = it }
     }
 
     /** Metadata trees retain Confix's typed spans, tags and children; no content tree is copied. */
@@ -87,7 +90,7 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
         return rows.size j { rows[it].metadata.root!! }
     }
 
-    fun <T> facet(id: BreadcrumbId, key: ConfixIndexK<T>): T? = entries[id]?.metadata?.index?.facet(key)
+    fun <T> facet(id: borg.trikeshed.agent.modelmux.BreadcrumbId, key: ConfixIndexK<T>): T? = entries[id]?.metadata?.index?.facet(key)
 
     /** Titles and typed non-text provenance survive the ordinary breadcrumb store checkpoint. */
     fun metadataState(): List<Map<String, Any?>> = entries.values.map { entry ->
@@ -97,16 +100,18 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
 
     fun restoreMetadata(value: Any?) {
         val rows = value as? List<*> ?: throw IllegalArgumentException("breadcrumb index array required")
-        require(rows.size <= BreadcrumbContext.RECORD_LIMIT)
-        val seen = mutableSetOf<BreadcrumbId>()
+        require(rows.size <= borg.trikeshed.agent.modelmux.BreadcrumbContext.RECORD_LIMIT)
+        val seen = mutableSetOf<borg.trikeshed.agent.modelmux.BreadcrumbId>()
         for (value in rows) {
             val row = value as? Map<*, *> ?: throw IllegalArgumentException("breadcrumb index metadata required")
             require(row.keys == setOf("id", "title", "heritage"))
-            val id = BreadcrumbId(row["id"] as? String ?: throw IllegalArgumentException("breadcrumb index id required"))
+            val id = borg.trikeshed.agent.modelmux.BreadcrumbId(
+                row["id"] as? String ?: throw IllegalArgumentException("breadcrumb index id required")
+            )
             require(seen.add(id))
             val entry = requireNotNull(entries[id]) { "breadcrumb index record missing" }
             val title = row["title"] as? String ?: throw IllegalArgumentException("breadcrumb title required")
-            require(title.length <= BreadcrumbContext.CONTENT_LIMIT)
+            require(title.length <= borg.trikeshed.agent.modelmux.BreadcrumbContext.CONTENT_LIMIT)
             val heritage = row["heritage"]?.let {
                 val encoded = it as? String ?: throw IllegalArgumentException("breadcrumb heritage encoding required")
                 confixDoc(Base64.decode(encoded), Syntax.CBOR)
@@ -122,7 +127,7 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
         }
     }
 
-    fun search(query: String, budget: BreadcrumbBudget, limit: Int = 8): String {
+    fun search(query: String, budget: borg.trikeshed.agent.modelmux.BreadcrumbBudget, limit: Int = 8): String {
         require(query.length <= 256 && limit in 1..32)
         val words = query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
         val matches = entries.values.map { entry ->
@@ -132,7 +137,7 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
                     (if (word in entry.source.lowercase()) 2 else 0) + (if (word in text) 1 else 0)
             }
         }.filter { words.isEmpty() || it.b > 0 }.sortedWith(
-            compareByDescending<Join<BreadcrumbIndexed, Int>> { it.b }.thenByDescending { it.a.metadata.value("createdAt").toString() })
+            compareByDescending<Join<borg.trikeshed.agent.modelmux.BreadcrumbIndexed, Int>> { it.b }.thenByDescending { it.a.metadata.value("createdAt").toString() })
         val rows = mutableListOf<Map<String, Any?>>()
         for ((entry, _) in matches.take(limit)) {
             val next = descriptor(entry)
@@ -144,8 +149,8 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
         return bounded(mapOf("matches" to rows, "total" to matches.size, "omitted" to matches.size - rows.size), budget)
     }
 
-    fun recall(ref: BreadcrumbRef, cid: ContentId?, presence: BreadcrumbPresence,
-               budget: BreadcrumbBudget, query: String = ""): String {
+    fun recall(ref: borg.trikeshed.agent.modelmux.BreadcrumbRef, cid: ContentId?, presence: borg.trikeshed.agent.modelmux.BreadcrumbPresence,
+               budget: borg.trikeshed.agent.modelmux.BreadcrumbBudget, query: String = ""): String {
         require(query.length <= 256)
         val candidates = entries.values.filter { it.ref == ref && (cid == null || it.cid == cid) }
         if (candidates.isEmpty()) return bounded(mapOf("error" to "unknown breadcrumb reference"), budget)
@@ -153,9 +158,9 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
         if (distinct.size > 1) return bounded(mapOf("error" to "ambiguous 16-bit reference; supply cid",
             "candidates" to distinct.map { descriptor(it) }), budget)
         val entry = candidates.last()
-        val visited = mutableSetOf<BreadcrumbId>()
-        val leaves = linkedMapOf<ContentId, BreadcrumbIndexed>()
-        fun lineage(node: BreadcrumbIndexed) {
+        val visited = mutableSetOf<borg.trikeshed.agent.modelmux.BreadcrumbId>()
+        val leaves = linkedMapOf<ContentId, borg.trikeshed.agent.modelmux.BreadcrumbIndexed>()
+        fun lineage(node: borg.trikeshed.agent.modelmux.BreadcrumbIndexed) {
             if (!visited.add(node.id)) return
             val children = node.children.view.mapNotNull { entries[it] }
             if (children.isEmpty()) {
@@ -229,7 +234,7 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
         return bounded(envelope(low), budget)
     }
 
-    fun descriptor(entry: BreadcrumbIndexed): Map<String, Any?> = mapOf(
+    fun descriptor(entry: borg.trikeshed.agent.modelmux.BreadcrumbIndexed): Map<String, Any?> = mapOf(
         "id" to entry.id.value, "ref" to entry.ref.value, "cid" to entry.cid.value,
         "spineCid" to entry.spine.value, "title" to entry.title.breadcrumbPrefix(600),
         "source" to entry.source.breadcrumbPrefix(160), "children" to entry.children.view.map { child ->
@@ -239,10 +244,14 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
     )
 
     companion object {
-        fun reference(cid: ContentId): BreadcrumbRef =
-            BreadcrumbRef(ContentId.of(cid.value.encodeToByteArray()).hex.take(4))
+        fun reference(cid: ContentId): borg.trikeshed.agent.modelmux.BreadcrumbRef =
+            borg.trikeshed.agent.modelmux.BreadcrumbRef(
+                ContentId.of(cid.value.encodeToByteArray()).hex.take(
+                    4
+                )
+            )
 
-        fun bounded(value: Map<String, Any?>, budget: BreadcrumbBudget): String {
+        fun bounded(value: Map<String, Any?>, budget: borg.trikeshed.agent.modelmux.BreadcrumbBudget): String {
             val json = jsonOf(value)
             if (json.length <= budget.chars) return json
             val error = "{\"error\":\"insufficient context budget for reference metadata\"}"

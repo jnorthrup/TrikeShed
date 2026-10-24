@@ -1,4 +1,4 @@
-package modelmux.acp
+package borg.trikeshed.agent.modelmux.acp
 
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get

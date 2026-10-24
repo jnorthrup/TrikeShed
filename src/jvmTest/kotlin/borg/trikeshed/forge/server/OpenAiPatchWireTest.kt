@@ -10,9 +10,9 @@ import borg.trikeshed.parse.confix.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import keymux.*
+import borg.trikeshed.agent.keymux.*
 import kotlinx.coroutines.test.runTest
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlin.test.*
 
 class OpenAiPatchWireTest {

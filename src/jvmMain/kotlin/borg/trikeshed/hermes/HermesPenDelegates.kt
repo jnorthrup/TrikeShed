@@ -26,8 +26,8 @@ import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import modelmux.*
-import modelmux.acp.*
+import borg.trikeshed.agent.modelmux.*
+import borg.trikeshed.agent.modelmux.acp.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.CoroutineContext

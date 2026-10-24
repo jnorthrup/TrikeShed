@@ -26,20 +26,20 @@ import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import borg.trikeshed.userspace.reactor.MuxReactorConfig
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import keymux.HarnessProvider
-import keymux.HarnessRegistry
-import keymux.KeyMux
-import modelmux.Airgap
-import keymux.defaultHermesHome
-import keymux.operatorKeyMux
+import borg.trikeshed.agent.keymux.HarnessProvider
+import borg.trikeshed.agent.keymux.HarnessRegistry
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.Airgap
+import borg.trikeshed.agent.keymux.defaultHermesHome
+import borg.trikeshed.agent.keymux.operatorKeyMux
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import modelmux.ModelMux
-import modelmux.acp.AcpMessage
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
 import kotlin.system.exitProcess
 
 /**

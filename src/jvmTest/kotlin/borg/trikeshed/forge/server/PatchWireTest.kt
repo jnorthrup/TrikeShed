@@ -19,10 +19,10 @@ import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import keymux.KeyMux
-import keymux.FixedKeySource
-import modelmux.ModelMux
-import modelmux.MuxCallContext
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.FixedKeySource
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.MuxCallContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.*
 import java.io.File

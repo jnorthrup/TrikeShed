@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 /**
  * The context cleaner of onegood1 (`breadcrumbs.py` ErrorRateTracker + HorizonManager, `token_allocator.py`):
@@ -27,8 +27,9 @@ class BreadcrumbOverflow(val window: Int = WINDOW) {
         return hits.toDouble() / count
     }
 
-    val band: BreadcrumbBand get() = rate.let {
-        if (it > HIGH) BreadcrumbBand.SCALE_BACK else if (it < LOW) BreadcrumbBand.SCALE_UP else BreadcrumbBand.HOLD
+    val band: borg.trikeshed.agent.modelmux.BreadcrumbBand
+        get() = rate.let {
+        if (it > HIGH) borg.trikeshed.agent.modelmux.BreadcrumbBand.SCALE_BACK else if (it < LOW) borg.trikeshed.agent.modelmux.BreadcrumbBand.SCALE_UP else borg.trikeshed.agent.modelmux.BreadcrumbBand.HOLD
     }
 
     fun restore(from: BreadcrumbOverflow) {

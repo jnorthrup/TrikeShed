@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.HtxHeaders

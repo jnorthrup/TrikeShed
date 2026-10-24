@@ -22,13 +22,13 @@ import borg.trikeshed.nlp.NlpToken
 import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import keymux.KeyMux
-import keymux.TestKeySource
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.TestKeySource
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -1,16 +1,16 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import modelmux.acp.AcpMessage
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
 
 /**
  * How a request becomes a CACHE IDENTITY.
  *
  * The mux had exactly one answer: sha256 of the canonical request bytes
- * ([ExactContentId], the M3 invariant). That is the right DEFAULT and it stays
+ * ([borg.trikeshed.agent.modelmux.ExactContentId], the M3 invariant). That is the right DEFAULT and it stays
  * the default — it is the only identity that can never produce a wrong reply,
  * and it is what the repair contract pins. But byte-exactness is also brutally
  * literal: re-indent a system prompt, re-wrap a paragraph, let an editor add a
@@ -18,14 +18,14 @@ import modelmux.acp.AcpMessage
  * is paid for again at full price.
  *
  * So identity becomes a strategy, and several can be consulted in order
- * ([CacheCascade]). Each strategy is a *deliberate* statement about which
+ * ([borg.trikeshed.agent.modelmux.CacheCascade]). Each strategy is a *deliberate* statement about which
  * differences between two requests are allowed to be considered the same
  * request. That is a correctness trade, never a free optimisation, which is why
  * every relaxed strategy is opt-in and why the boundaries below exist.
  *
- * @see WhitespaceRelaxed for the relaxation itself
- * @see WhitespacePolicy for where relaxation must STOP
- * @see prefixLadder for the content-addressed prefix chain
+ * @see borg.trikeshed.agent.modelmux.WhitespaceRelaxed for the relaxation itself
+ * @see borg.trikeshed.agent.modelmux.WhitespacePolicy for where relaxation must STOP
+ * @see borg.trikeshed.agent.modelmux.prefixLadder for the content-addressed prefix chain
  */
 interface CacheKeyStrategy {
     /** Stable label — appears in telemetry so a hit can be attributed to a strategy. */
@@ -47,7 +47,7 @@ interface CacheKeyStrategy {
  * This strategy can never yield a wrong reply, so it is always first in a
  * cascade and is the only one enabled unless an owner opts into more.
  */
-object ExactContentId : CacheKeyStrategy {
+object ExactContentId : borg.trikeshed.agent.modelmux.CacheKeyStrategy {
     override val name = "exact"
     override fun identity(canonicalJson: String): String =
         ContentId.of(canonicalJson.encodeToByteArray()).value
@@ -124,7 +124,7 @@ data class WhitespacePolicy(
  */
 object WhitespaceNormalizer {
 
-    fun normalize(input: String, policy: WhitespacePolicy): String {
+    fun normalize(input: String, policy: borg.trikeshed.agent.modelmux.WhitespacePolicy): String {
         val src = if (policy.normalizeLineEndings) {
             input.replace("\r\n", "\n").replace('\r', '\n')
         } else {
@@ -247,20 +247,20 @@ object WhitespaceNormalizer {
  * The trade this makes, stated plainly: two requests that differ ONLY in
  * whitespace outside the preserved regions will share a reply. That is the
  * intent. It is wrong for any caller whose prompts encode meaning in spacing
- * without fencing it — which is what [WhitespacePolicy.preserveIndentation] and
- * [WhitespacePolicy.LINE_ENDINGS_ONLY] exist to accommodate.
+ * without fencing it — which is what [borg.trikeshed.agent.modelmux.WhitespacePolicy.preserveIndentation] and
+ * [borg.trikeshed.agent.modelmux.WhitespacePolicy.LINE_ENDINGS_ONLY] exist to accommodate.
  *
  * The identity is namespaced by the policy, so changing the policy cannot
  * silently inherit entries written under the old one — a cache poisoned across
  * a policy change would be indistinguishable from a correctness bug.
  */
 class WhitespaceRelaxed(
-    private val policy: WhitespacePolicy = WhitespacePolicy.PROSE,
-) : CacheKeyStrategy {
+    private val policy: borg.trikeshed.agent.modelmux.WhitespacePolicy = borg.trikeshed.agent.modelmux.WhitespacePolicy.PROSE,
+) : borg.trikeshed.agent.modelmux.CacheKeyStrategy {
     override val name = "ws-relaxed"
 
     override fun identity(canonicalJson: String): String {
-        val normalized = WhitespaceNormalizer.normalize(canonicalJson, policy)
+        val normalized = borg.trikeshed.agent.modelmux.WhitespaceNormalizer.normalize(canonicalJson, policy)
         // Namespace: identity is (policy, normalized bytes), never bytes alone.
         val stamped = "${policyTag()}\u0000$normalized"
         return ContentId.of(stamped.encodeToByteArray()).value
@@ -288,14 +288,14 @@ class WhitespaceRelaxed(
  * warms the exact entry and each relaxed entry at once, and a later request that
  * differs only in formatting hits without a second purchase.
  *
- * [ExactContentId] is forced to the head whether or not the caller listed it.
+ * [borg.trikeshed.agent.modelmux.ExactContentId] is forced to the head whether or not the caller listed it.
  * A cascade whose first strategy is relaxed would answer a byte-identical repeat
  * from a relaxed bucket, making M3 unobservable and its guarantee untestable.
  */
-class CacheCascade(strategies: List<CacheKeyStrategy>) {
+class CacheCascade(strategies: List<borg.trikeshed.agent.modelmux.CacheKeyStrategy>) {
 
-    val strategies: List<CacheKeyStrategy> =
-        (listOf(ExactContentId) + strategies.filter { it !is ExactContentId })
+    val strategies: List<borg.trikeshed.agent.modelmux.CacheKeyStrategy> =
+        (listOf(borg.trikeshed.agent.modelmux.ExactContentId) + strategies.filter { it !is borg.trikeshed.agent.modelmux.ExactContentId })
             .distinctBy { it.name }
 
     /** Identities to try on lookup, cheapest-and-safest first. */
@@ -303,18 +303,22 @@ class CacheCascade(strategies: List<CacheKeyStrategy>) {
         strategies.map { it.name to it.identity(canonicalJson) }
 
     /** The identity a receipt is attributed to: always the exact one. */
-    fun primary(canonicalJson: String): String = ExactContentId.identity(canonicalJson)
+    fun primary(canonicalJson: String): String = borg.trikeshed.agent.modelmux.ExactContentId.identity(canonicalJson)
 
     companion object {
         /** Exact only — the mux's behaviour before strategies existed. */
         val EXACT_ONLY = CacheCascade(emptyList())
 
         /** Exact, then prose-shaped whitespace relaxation. The usual choice. */
-        val RELAXED = CacheCascade(listOf(WhitespaceRelaxed(WhitespacePolicy.PROSE)))
+        val RELAXED = CacheCascade(listOf(
+            borg.trikeshed.agent.modelmux.WhitespaceRelaxed(
+                borg.trikeshed.agent.modelmux.WhitespacePolicy.PROSE
+            )
+        ))
 
         /** Exact, then relaxation that keeps leading whitespace significant. */
         val RELAXED_INDENT_SAFE =
-            CacheCascade(listOf(WhitespaceRelaxed(WhitespacePolicy.INDENT_SENSITIVE)))
+            CacheCascade(listOf(borg.trikeshed.agent.modelmux.WhitespaceRelaxed(borg.trikeshed.agent.modelmux.WhitespacePolicy.INDENT_SENSITIVE)))
     }
 }
 
@@ -340,14 +344,14 @@ class CacheCascade(strategies: List<CacheKeyStrategy>) {
  * shared prefix is still recognised as shared after a re-wrap.
  */
 fun prefixLadder(
-    messages: Series<AcpMessage>,
-    policy: WhitespacePolicy? = null,
+    messages: Series<borg.trikeshed.agent.modelmux.acp.AcpMessage>,
+    policy: borg.trikeshed.agent.modelmux.WhitespacePolicy? = null,
 ): List<String> {
     val out = ArrayList<String>(messages.size)
     val acc = StringBuilder()
     for (i in 0 until messages.size) {
         val m = messages[i]
-        val text = policy?.let { WhitespaceNormalizer.normalize(m.b, it) } ?: m.b
+        val text = policy?.let { borg.trikeshed.agent.modelmux.WhitespaceNormalizer.normalize(m.b, it) } ?: m.b
         // NUL-delimited so no role/text pair can be forged by concatenation:
         // ("ab","c") and ("a","bc") must not produce one identity.
         acc.append(m.a).append('\u0000').append(text).append('\u0001')

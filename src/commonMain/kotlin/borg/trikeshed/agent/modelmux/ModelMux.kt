@@ -1,7 +1,12 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
-import keymux.*
-import modelmux.acp.*
+import borg.trikeshed.agent.keymux.iterable
+import borg.trikeshed.agent.modelmux.acp.caps
+import borg.trikeshed.agent.modelmux.acp.id
+import borg.trikeshed.agent.modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.wireName
+import borg.trikeshed.agent.keymux.*
+import borg.trikeshed.agent.modelmux.acp.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
 import borg.trikeshed.job.ContentId
@@ -19,13 +24,13 @@ import kotlin.uuid.Uuid
 // ═══════════════════════════════════════════
 
 /** Model entry: id j card */
-typealias ModelEntry = Join<String, AcpModelCard>
+typealias ModelEntry = Join<String, borg.trikeshed.agent.modelmux.acp.AcpModelCard>
 
 /** Router decision: selected entries in precedence order */
-typealias RouteResult = Join<Series<ModelEntry>, AcpAction>
+typealias RouteResult = Join<Series<borg.trikeshed.agent.modelmux.ModelEntry>, borg.trikeshed.agent.modelmux.acp.AcpAction>
 
 /** The mux: models j router */
-typealias ModelMuxCore = Join<Series<ModelEntry>, ModelRouter>
+typealias ModelMuxCore = Join<Series<borg.trikeshed.agent.modelmux.ModelEntry>, borg.trikeshed.agent.modelmux.ModelRouter>
 
 /** Resolved credential identity and admission from observed quota; null identity is explicit auth NONE. */
 typealias ModelAdmission = Join<String?, Boolean>
@@ -40,17 +45,22 @@ private fun loomEndpoint(baseUrl: String): Boolean = baseUrl.trimEnd('/') in set
 
 /** LOOM commits HTTP 200 before inference; its failure envelope retains the actual status. */
 private fun loomStatus(doc: ConfixDoc, baseUrl: String): Int? =
-    if (loomEndpoint(baseUrl) && doc.getAt("error") != null)
+    if (borg.trikeshed.agent.modelmux.loomEndpoint(baseUrl) && doc.getAt("error") != null)
         (doc.scalar("loom", "status") as? Number)?.toInt()?.takeIf { it in 100..599 }
     else null
 
 private fun completedResponse(raw: String, baseUrl: String): ConfixDoc {
     val doc = confixDoc(raw)
     if (doc.getAt("error") != null) {
-        throw ModelHttpFailure(loomStatus(doc, baseUrl) ?: 502, "Provider returned an error envelope")
+        throw borg.trikeshed.agent.modelmux.ModelHttpFailure(
+            borg.trikeshed.agent.modelmux.loomStatus(
+                doc,
+                baseUrl
+            ) ?: 502, "Provider returned an error envelope"
+        )
     }
-    AcpCodec.parseCompletion(raw)
-    if (loomEndpoint(baseUrl)) {
+    borg.trikeshed.agent.modelmux.acp.AcpCodec.parseCompletion(raw)
+    if (borg.trikeshed.agent.modelmux.loomEndpoint(baseUrl)) {
         val text = doc.scalar("choices", 0, "message", "content") as? String ?: ""
         // This reserved prefix is also stripped by LOOM's assistant-history parser.
         // Billing can remain pending after real inference, so billing metadata is not a signal.
@@ -58,7 +68,10 @@ private fun completedResponse(raw: String, baseUrl: String): ConfixDoc {
         val notice = rest.startsWith("⏳ LOOM: ")
         while (rest.startsWith("⏳ LOOM: ")) rest = rest.substringAfter('\n', "").trimStart()
         if (notice && rest.isEmpty() && doc.getAt("choices", 0, "message", "tool_calls")?.kids?.size.let { it == null || it == 0 }) {
-            throw ModelHttpFailure(202, "LOOM completion pending; received only provider waiting notices")
+            throw borg.trikeshed.agent.modelmux.ModelHttpFailure(
+                202,
+                "LOOM completion pending; received only provider waiting notices"
+            )
         }
     }
     return doc
@@ -69,27 +82,27 @@ private fun completedResponse(raw: String, baseUrl: String): ConfixDoc {
 // ═══════════════════════════════════════════
 
 interface ModelRouter {
-    fun route(models: Series<ModelEntry>, action: AcpAction, requiredCaps: Series<String>): RouteResult
+    fun route(models: Series<borg.trikeshed.agent.modelmux.ModelEntry>, action: borg.trikeshed.agent.modelmux.acp.AcpAction, requiredCaps: Series<String>): borg.trikeshed.agent.modelmux.RouteResult
 }
 
-object CapabilityRouter : ModelRouter {
+object CapabilityRouter : borg.trikeshed.agent.modelmux.ModelRouter {
     override fun route(
-        models: Series<ModelEntry>,
-        action: AcpAction,
+        models: Series<borg.trikeshed.agent.modelmux.ModelEntry>,
+        action: borg.trikeshed.agent.modelmux.acp.AcpAction,
         requiredCaps: Series<String>
-    ): RouteResult {
+    ): borg.trikeshed.agent.modelmux.RouteResult {
         val matching = (0 until models.size)
             .filter { i -> hasCaps(models[i].b, requiredCaps) && supportsAction(models[i].b, action) }
             .map { models[it] }
         return matching.toSeries() j action
     }
 
-    private fun hasCaps(card: AcpModelCard, required: Series<String>): Boolean =
+    private fun hasCaps(card: borg.trikeshed.agent.modelmux.acp.AcpModelCard, required: Series<String>): Boolean =
         (0 until required.size).all { r ->
             (0 until card.caps.size).any { card.caps[it] == required[r] }
         }
 
-    private fun supportsAction(card: AcpModelCard, action: AcpAction): Boolean =
+    private fun supportsAction(card: borg.trikeshed.agent.modelmux.acp.AcpModelCard, action: borg.trikeshed.agent.modelmux.acp.AcpAction): Boolean =
         action in card.caps.iterable() || card.b.b.b.a == action
 }
 
@@ -101,16 +114,16 @@ enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 
 @OptIn(ExperimentalUuidApi::class)
 class LlmSession(
-    val model: ModelEntry,
+    val model: borg.trikeshed.agent.modelmux.ModelEntry,
     private val authKey: String?,
     val baseUrl: String,
     /** Session id — stamped on every [ModelResponseReceipt] minted from this session. */
-    val sessionId: String = defaultSecureIdGenerator.generateHexId("sess", 16),
+    val sessionId: String = borg.trikeshed.agent.modelmux.defaultSecureIdGenerator.generateHexId("sess", 16),
     /** The binding path resolved with this session's credential and destination. */
     val keyId: String? = null,
 ) {
-    private var _state = SessionState.CREATED
-    val state: SessionState get() = _state
+    private var _state = borg.trikeshed.agent.modelmux.SessionState.CREATED
+    val state: borg.trikeshed.agent.modelmux.SessionState get() = _state
 
     /** Most recent receipt produced by this session (chat/stream/embed). */
     var lastReceipt: ModelResponseReceipt? = null
@@ -118,12 +131,12 @@ class LlmSession(
 
     fun recordReceipt(receipt: ModelResponseReceipt) { lastReceipt = receipt }
 
-    fun open() { if (_state == SessionState.CREATED) _state = SessionState.OPEN }
-    fun activate() { if (_state == SessionState.OPEN) _state = SessionState.ACTIVE }
-    fun drain() { _state = SessionState.DRAINING }
-    fun close() { _state = SessionState.CLOSED }
+    fun open() { if (_state == borg.trikeshed.agent.modelmux.SessionState.CREATED) _state = borg.trikeshed.agent.modelmux.SessionState.OPEN }
+    fun activate() { if (_state == borg.trikeshed.agent.modelmux.SessionState.OPEN) _state = borg.trikeshed.agent.modelmux.SessionState.ACTIVE }
+    fun drain() { _state = borg.trikeshed.agent.modelmux.SessionState.DRAINING }
+    fun close() { _state = borg.trikeshed.agent.modelmux.SessionState.CLOSED }
 
-    fun isUsable(): Boolean = _state in listOf(SessionState.OPEN, SessionState.ACTIVE)
+    fun isUsable(): Boolean = _state in listOf(borg.trikeshed.agent.modelmux.SessionState.OPEN, borg.trikeshed.agent.modelmux.SessionState.ACTIVE)
 
     /** Build HTTP headers with auth */
     fun authHeaders(): Series<Join<String, String>> {
@@ -146,8 +159,8 @@ class LlmSession(
 // ═══════════════════════════════════════════
 
 class ModelMux internal constructor(
-    private val core: ModelMuxCore,
-    internal val keyMux: KeyMux,
+    private val core: borg.trikeshed.agent.modelmux.ModelMuxCore,
+    internal val keyMux: borg.trikeshed.agent.keymux.KeyMux,
     private val configuredBaseUrls: Map<String, String>,
     /**
      * Optional quota legion metering every chat receipt. Null = standalone
@@ -155,40 +168,40 @@ class ModelMux internal constructor(
      * legion under the resolved key id, and a 429 exhausts the key — the
      * provider's word outranks the ledger.
      */
-    private val quotaLegion: QuotaLegion? = null,
+    private val quotaLegion: borg.trikeshed.agent.modelmux.QuotaLegion? = null,
     /**
      * Which cache identities this mux will answer from, in order.
      *
-     * Defaults to [CacheCascade.EXACT_ONLY] — byte-exact sha256, the M3
+     * Defaults to [borg.trikeshed.agent.modelmux.CacheCascade.EXACT_ONLY] — byte-exact sha256, the M3
      * invariant and the only identity that can never return a wrong reply. An
-     * owner opts into relaxation explicitly via [ModelMuxBuilder.cacheStrategy],
+     * owner opts into relaxation explicitly via [borg.trikeshed.agent.modelmux.ModelMuxBuilder.cacheStrategy],
      * because every relaxed strategy trades a correctness guarantee for a hit
      * rate and that trade belongs to whoever owns the traffic.
      */
-    private val cacheCascade: CacheCascade = CacheCascade.EXACT_ONLY,
+    private val cacheCascade: borg.trikeshed.agent.modelmux.CacheCascade = borg.trikeshed.agent.modelmux.CacheCascade.EXACT_ONLY,
     /** Configured selection, independent of catalog order and previous responses. */
     val defaultModel: String? = null,
-    private val configuredAuth: Map<String, LlmAuth> = emptyMap(),
-    private val configuredKeys: Map<String, KeyMux> = emptyMap(),
-    val activity: MuxActivity = MuxActivity(),
+    private val configuredAuth: Map<String, borg.trikeshed.agent.keymux.LlmAuth> = emptyMap(),
+    private val configuredKeys: Map<String, borg.trikeshed.agent.keymux.KeyMux> = emptyMap(),
+    val activity: borg.trikeshed.agent.modelmux.MuxActivity = borg.trikeshed.agent.modelmux.MuxActivity(),
 ) {
-    private val models: Series<ModelEntry> get() = core.a
-    private val router: ModelRouter get() = core.b
+    private val models: Series<borg.trikeshed.agent.modelmux.ModelEntry> get() = core.a
+    private val router: borg.trikeshed.agent.modelmux.ModelRouter get() = core.b
 
     /**
-     * Observer sink for [ModelSelectionEvent]. Null by default. Single-writer: set once, before
+     * Observer sink for [borg.trikeshed.agent.modelmux.ModelSelectionEvent]. Null by default. Single-writer: set once, before
      * routing. The sink is called inline on the routing path but is isolated from it — a sink
      * that throws must not fail the route it is merely observing.
      */
-    var selectionObserver: ((ModelSelectionEvent) -> Unit)? = null
+    var selectionObserver: ((borg.trikeshed.agent.modelmux.ModelSelectionEvent) -> Unit)? = null
 
     /**
-     * The most recent [ModelSelectionEvent.ModelSelected] this mux emitted, or null before the
+     * The most recent [borg.trikeshed.agent.modelmux.ModelSelectionEvent.ModelSelected] this mux emitted, or null before the
      * first non-empty route. Recorded because [route] does not return the event's `requestId`
      * — a caller that wants to reconcile a downstream [ModelResponseReceipt] against the
      * selection that produced it reads the id from here.
      */
-    var lastSelection: ModelSelectionEvent.ModelSelected? = null
+    var lastSelection: borg.trikeshed.agent.modelmux.ModelSelectionEvent.ModelSelected? = null
         private set
 
     /**
@@ -203,26 +216,26 @@ class ModelMux internal constructor(
 
     /**
      * Label naming the ranking discipline behind a selection; stamped onto
-     * [ModelSelectionEvent.ModelSelected.strategy].
+     * [borg.trikeshed.agent.modelmux.ModelSelectionEvent.ModelSelected.strategy].
      *
      * This is a declaration, not a derivation: nothing verifies it. It defaults to
-     * `"capability"`, which is what [CapabilityRouter] — the router [ModelMuxBuilder] installs
+     * `"capability"`, which is what [borg.trikeshed.agent.modelmux.CapabilityRouter] — the router [borg.trikeshed.agent.modelmux.ModelMuxBuilder] installs
      * — actually does, namely filter by capability and preserve catalog order. An owner that
-     * ranks the route result through a [RoutingStrategy] should set this to that strategy's
-     * [RoutingStrategy.strategyName]; setting it to a discipline that did not run makes the
+     * ranks the route result through a [borg.trikeshed.agent.modelmux.RoutingStrategy] should set this to that strategy's
+     * [borg.trikeshed.agent.modelmux.RoutingStrategy.strategyName]; setting it to a discipline that did not run makes the
      * event stream lie.
      */
     var strategyName: String = "capability"
 
     companion object {
-        operator fun invoke(keyMux: KeyMux, block: ModelMuxBuilder.() -> Unit): ModelMux =
-            ModelMuxBuilder(keyMux).apply(block).build()
+        operator fun invoke(keyMux: borg.trikeshed.agent.keymux.KeyMux, block: borg.trikeshed.agent.modelmux.ModelMuxBuilder.() -> Unit): ModelMux =
+            borg.trikeshed.agent.modelmux.ModelMuxBuilder(keyMux).apply(block).build()
     }
 
     /** Create a session for a specific model by ID */
-    suspend fun session(modelId: String): Result<LlmSession> {
+    suspend fun session(modelId: String): Result<borg.trikeshed.agent.modelmux.LlmSession> {
         borg.trikeshed.kernel.KernelExecution.require(borg.trikeshed.kernel.KernelCapability.MODEL)
-        runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
+        runCatching { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val entry = (0 until models.size).firstOrNull { models[it].a == modelId }?.let { models[it] }
             ?: return Result.failure(NoSuchElementException("need(model): model not found: $modelId"))
         val card = entry.b
@@ -232,7 +245,12 @@ class ModelMux internal constructor(
         val binding = credentialMux(modelId).resolveLlm(card.id, card.providerTag,
             configuredBaseUrls[modelId] ?: "https://api.openai.com/v1", auth(modelId))
             ?: return Result.failure(IllegalStateException("need(key): no auth key for model: $modelId"))
-        val session = LlmSession(entry, binding.authKey, binding.baseUrl, keyId = binding.keyId)
+        val session = borg.trikeshed.agent.modelmux.LlmSession(
+            entry,
+            binding.authKey,
+            binding.baseUrl,
+            keyId = binding.keyId
+        )
         session.open()
         return Result.success(session)
     }
@@ -245,7 +263,7 @@ class ModelMux internal constructor(
      * the ledger identity quota metering keys on. Null means no binding resolves,
      * or the model explicitly uses credential-free authentication.
      */
-    private suspend fun resolveKeyId(card: AcpModelCard): String? {
+    private suspend fun resolveKeyId(card: borg.trikeshed.agent.modelmux.acp.AcpModelCard): String? {
         return credentialMux(card.id).resolveLlm(card.id, card.providerTag,
             configuredBaseUrls[card.id] ?: "https://api.openai.com/v1", auth(card.id))?.keyId
     }
@@ -254,7 +272,7 @@ class ModelMux internal constructor(
      * Route to the best model for a given action + capabilities.
      *
      * This is the selection point. The result is a ranked candidate list, and its head is the
-     * selection this mux is reporting: on a non-empty route a [ModelSelectionEvent.ModelSelected]
+     * selection this mux is reporting: on a non-empty route a [borg.trikeshed.agent.modelmux.ModelSelectionEvent.ModelSelected]
      * naming `result.a[0]` is recorded as [lastSelection] and handed to [selectionObserver].
      * An empty route selects nothing and emits nothing.
      *
@@ -262,15 +280,15 @@ class ModelMux internal constructor(
      * the event stream disagreeing with what it did; the event describes the head of the
      * ranking, which is the only selection this method makes.
      */
-    fun route(action: AcpAction, vararg requiredCaps: String): RouteResult {
+    fun route(action: borg.trikeshed.agent.modelmux.acp.AcpAction, vararg requiredCaps: String): borg.trikeshed.agent.modelmux.RouteResult {
         val result = router.route(models, action, requiredCaps.toSeries())
         if (result.a.size > 0) {
             val chosen = result.a[0]
-            val event = ModelSelectionEvent.ModelSelected(
+            val event = borg.trikeshed.agent.modelmux.ModelSelectionEvent.ModelSelected(
                 provider = chosen.b.providerTag ?: chosen.b.id,
                 model = chosen.a,
                 strategy = strategyName,
-                requestId = defaultSecureIdGenerator.generateHexId("req", 8),
+                requestId = borg.trikeshed.agent.modelmux.defaultSecureIdGenerator.generateHexId("req", 8),
                 at = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
             )
             lastSelection = event
@@ -290,8 +308,8 @@ class ModelMux internal constructor(
     /** Non-streaming chat completion */
     suspend fun chat(
         modelId: String,
-        messages: Series<AcpMessage>,
-        tools: Series<AcpTool> = 0 j { error("no tools") },
+        messages: Series<borg.trikeshed.agent.modelmux.acp.AcpMessage>,
+        tools: Series<borg.trikeshed.agent.modelmux.acp.AcpTool> = 0 j { error("no tools") },
         assessmentId: String? = null,
         maxTokens: Int? = null,
         temperature: Double? = null,
@@ -307,13 +325,13 @@ class ModelMux internal constructor(
         expectedBaseUrl: String? = null,
         jsonOutput: Boolean = false,
         thinking: Boolean? = null,
-    ): Result<AcpResponse> = chatRequest(
+    ): Result<borg.trikeshed.agent.modelmux.acp.AcpResponse> = chatRequest(
         modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl,
         encode = { wireModel ->
-            val meta: AcpMeta = wireModel j ("chat" j emptySeriesOf())
-            AcpCodec.encodeRequest(meta j (messages j tools), maxTokens, temperature, jsonOutput, thinking)
+            val meta: borg.trikeshed.agent.modelmux.acp.AcpMeta = wireModel j ("chat" j emptySeriesOf())
+            borg.trikeshed.agent.modelmux.acp.AcpCodec.encodeRequest(meta j (messages j tools), maxTokens, temperature, jsonOutput, thinking)
         },
-        decode = AcpCodec::parseResponse,
+        decode = borg.trikeshed.agent.modelmux.acp.AcpCodec::parseResponse,
     )
 
     /** Structured, non-streaming chat: preserve tool calls, history and provider metadata. */
@@ -329,12 +347,12 @@ class ModelMux internal constructor(
         // a guest-supplied model field, owns the wire model and credential binding.
         val wireModel = models.view.firstOrNull { it.a == modelId }?.b?.wireName ?: modelId
         val json = runCatching {
-            Airgap.requireRemote()
-            AcpCodec.encodeCompletion(request, wireModel)
+            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
+            borg.trikeshed.agent.modelmux.acp.AcpCodec.encodeCompletion(request, wireModel)
         }
             .getOrElse { return Result.failure(it) }
         return chatRequest(modelId, assessmentId, contextId, timeoutMs, expectedBaseUrl,
-            encode = { json }, decode = AcpCodec::parseCompletion)
+            encode = { json }, decode = borg.trikeshed.agent.modelmux.acp.AcpCodec::parseCompletion)
     }
 
     private suspend fun <T> chatRequest(
@@ -346,12 +364,12 @@ class ModelMux internal constructor(
         encode: (String) -> String,
         decode: (String) -> T,
     ): Result<T> {
-        val attribution = currentCoroutineContext()[MuxCallContext]
+        val attribution = currentCoroutineContext()[borg.trikeshed.agent.modelmux.MuxCallContext]
         val sessionContext = contextId ?: attribution?.conversationId?.toString()
-        val breadcrumbs = currentCoroutineContext()[BreadcrumbElement]
+        val breadcrumbs = currentCoroutineContext()[borg.trikeshed.agent.modelmux.BreadcrumbElement]
         val breadcrumbId = sessionContext?.takeIf { it.isNotBlank() && it.length <= 128 }
-        val admission = currentCoroutineContext()[BreadcrumbAdmission]?.takeIf { it.owner === breadcrumbs && it.id == breadcrumbId }
-        var breadcrumb: BreadcrumbContext? = admission?.context
+        val admission = currentCoroutineContext()[borg.trikeshed.agent.modelmux.BreadcrumbAdmission]?.takeIf { it.owner === breadcrumbs && it.id == breadcrumbId }
+        var breadcrumb: borg.trikeshed.agent.modelmux.BreadcrumbContext? = admission?.context
         val callActivity = attribution?.activity ?: activity
         val provider = models.view.firstOrNull { it.a == modelId }?.b?.providerTag ?: modelId
         val callId = callActivity.start(modelId, provider, attribution, assessmentId ?: contextId, sessionContext)
@@ -361,12 +379,12 @@ class ModelMux internal constructor(
         var failure: Throwable? = null
         try {
             currentCoroutineContext().ensureActive()
-            Airgap.requireRemote()
+            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
             if (breadcrumbs != null && breadcrumbId != null && admission == null) {
                 try {
                     withContext(NonCancellable) { breadcrumb = breadcrumbs.transact(breadcrumbId) { it } }
                 }
-                catch (_: BreadcrumbCapacityException) { /* Observation cannot block an admitted model call. */ }
+                catch (_: borg.trikeshed.agent.modelmux.BreadcrumbCapacityException) { /* Observation cannot block an admitted model call. */ }
             }
             currentCoroutineContext().ensureActive()
             val result = chatCall(modelId, assessmentId ?: contextId, sessionContext, breadcrumb, timeoutMs, expectedBaseUrl, encode, decode) { r, k ->
@@ -406,7 +424,7 @@ class ModelMux internal constructor(
                             breadcrumbs.transact(breadcrumbId, create = false) {
                                 if (it === breadcrumb) it.record(finished)
                             }
-                        } catch (_: BreadcrumbContextNotFoundException) { /* Deleted while the provider was answering. */ }
+                        } catch (_: borg.trikeshed.agent.modelmux.BreadcrumbContextNotFoundException) { /* Deleted while the provider was answering. */ }
                     }
                 }
             }
@@ -417,7 +435,7 @@ class ModelMux internal constructor(
         modelId: String,
         assessmentId: String?,
         contextId: String?,
-        breadcrumb: BreadcrumbContext?,
+        breadcrumb: borg.trikeshed.agent.modelmux.BreadcrumbContext?,
         timeoutMs: Long,
         expectedBaseUrl: String?,
         encode: (String) -> String,

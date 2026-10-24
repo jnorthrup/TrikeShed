@@ -122,8 +122,8 @@ class BertModelTest {
     }
 
     @Test fun airgapRetainsLocalInferenceAndItsNumericalResult() = runTest {
-        withContext(modelmux.Airgap()) {
-            assertFailsWith<modelmux.Airgap.Rejection> { modelmux.Airgap.requireRemote() }
+        withContext(borg.trikeshed.agent.modelmux.Airgap()) {
+            assertFailsWith<borg.trikeshed.agent.modelmux.Airgap.Rejection> { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }
             val parameters = weights()
             val model = BertModel(this, parameters, BertWordPiece(vocabulary, 16), "fixture-airgap")
             try {

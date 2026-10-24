@@ -1,4 +1,4 @@
-package keymux
+package borg.trikeshed.agent.keymux
 
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
@@ -12,17 +12,17 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
  * resolves through a DIFFERENT chain than the thing it is diagnosing reports
  * nothing at all; that is the defect this function exists to make impossible.
  *
- * Lane order is precedence order (first wins, [FirstWinsResolver]):
+ * Lane order is precedence order (first wins, [borg.trikeshed.agent.keymux.FirstWinsResolver]):
  *
- *  1. [HarnessSource] — conventional process env names (`OPENAI_API_KEY`, …).
- *  2. [EnvSource] — the legacy raw-env lane (`LLM_OPENAI_KEY` shape).
- *  3. [HermesCredentialSource] — hermes' OWN pool (`credential_pool`:
+ *  1. [borg.trikeshed.agent.keymux.HarnessSource] — conventional process env names (`OPENAI_API_KEY`, …).
+ *  2. [borg.trikeshed.agent.keymux.EnvSource] — the legacy raw-env lane (`LLM_OPENAI_KEY` shape).
+ *  3. [borg.trikeshed.agent.keymux.HermesCredentialSource] — hermes' OWN pool (`credential_pool`:
  *     priority-ordered, with cooldowns, following its `env:<VAR>` indirection).
- *  4. [HarnessSource] — remaining dotenv and harness credentials. A pool's
+ *  4. [borg.trikeshed.agent.keymux.HarnessSource] — remaining dotenv and harness credentials. A pool's
  *     HTTP exhaustion cannot be bypassed by rereading its same dotenv token.
  *
  * The pool is read on every resolution. Remaining harness files carry [ttlMs];
- * process env uses [CachedKeySource]'s default.
+ * process env uses [borg.trikeshed.agent.keymux.CachedKeySource]'s default.
  *
  * [fileOps] must be passed explicitly. Both file lanes degrade SILENTLY to
  * env-only when no [FileOperations] rides the coroutine context, and the boot
@@ -30,15 +30,22 @@ import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
  */
 fun operatorKeyMux(
     fileOps: FileOperations,
-    hermesHome: String = defaultHermesHome(),
+    hermesHome: String = borg.trikeshed.agent.keymux.defaultHermesHome(),
     ttlMs: Long = 5 * 60_000L,
-): KeyMux = KeyMux {
-    cached("*", HarnessSource(processEnvOnly = true))
-    cached("*", EnvSource())
+): borg.trikeshed.agent.keymux.KeyMux = borg.trikeshed.agent.keymux.KeyMux {
+    cached("*", borg.trikeshed.agent.keymux.HarnessSource(processEnvOnly = true))
+    cached("*", borg.trikeshed.agent.keymux.EnvSource())
     // Uncached on purpose: a key rotated in auth.json or .env is used on the
     // very next call. The source itself re-reads its files per call.
-    bind("llm.*.*", HermesCredentialSource(hermesHome, fileOps))
-    cached("*", HarnessSource(explicitFileOps = fileOps, hermesHomeOverride = hermesHome), ttlMs = ttlMs)
+    bind("llm.*.*", borg.trikeshed.agent.keymux.HermesCredentialSource(hermesHome, fileOps))
+    cached(
+        "*",
+        borg.trikeshed.agent.keymux.HarnessSource(
+            explicitFileOps = fileOps,
+            hermesHomeOverride = hermesHome
+        ),
+        ttlMs = ttlMs
+    )
 }
 
 /**

@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import kotlinx.coroutines.sync.Mutex

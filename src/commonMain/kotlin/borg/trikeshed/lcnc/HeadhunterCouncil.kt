@@ -4,12 +4,12 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.parse.jsonOf
-import modelmux.BreadcrumbElement
-import modelmux.ModelMux
-import modelmux.MuxAgentRequest
-import modelmux.MuxAgentResult
-import modelmux.defaultSecureIdGenerator
-import modelmux.swarm
+import borg.trikeshed.agent.modelmux.BreadcrumbElement
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.MuxAgentRequest
+import borg.trikeshed.agent.modelmux.MuxAgentResult
+import borg.trikeshed.agent.modelmux.defaultSecureIdGenerator
+import borg.trikeshed.agent.modelmux.swarm
 
 /** The council's wiring constants; the lone drafting seat shares [SEAT_SYSTEM] when no council fields. */
 object HeadhunterCouncil {

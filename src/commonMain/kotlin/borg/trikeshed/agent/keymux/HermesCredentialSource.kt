@@ -1,5 +1,6 @@
-package keymux
+package borg.trikeshed.agent.keymux
 
+import borg.trikeshed.agent.keymux.toKeyPath
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.yaml.YamlParser
 import borg.trikeshed.lib.*
@@ -26,11 +27,11 @@ data class HermesModelConfig(
 internal class HermesCredential(val keyId: String, val key: String, val baseUrl: String?)
 
 internal class HermesCredentialSnapshot(
-    val credentials: Map<String, HermesCredential>,
+    val credentials: Map<String, borg.trikeshed.agent.keymux.HermesCredential>,
     override val name: String,
     val exhausted: Set<String> = emptySet(),
-) : KeySource() {
-    override suspend fun read(path: KeyPath): String? {
+) : borg.trikeshed.agent.keymux.KeySource() {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         if (path.size != 3 || path[0] != "llm") return null
         check(path[2] != "key" || path[1] !in exhausted) { "Hermes provider quota exhausted: ${path[1]}" }
         val entry = credentials[path[1]] ?: return null
@@ -40,7 +41,7 @@ internal class HermesCredentialSnapshot(
             else -> null
         }
     }
-    override suspend fun write(path: KeyPath, value: String): Unit =
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String): Unit =
         throw UnsupportedOperationException("Hermes snapshot is read-only")
 }
 
@@ -51,7 +52,7 @@ internal class HermesCredentialSnapshot(
  * Hermes' pool is keyed by PROVIDER (`credential_pool.<provider>[]`, each entry a
  * `PooledCredential` — provider, id, label, priority, status, access_token,
  * base_url, request_count, cooldown fields), not by model. [ModelMux] resolves
- * keys by MODEL id (`llm.${'$'}{card.id}.key`) — [modelmux.acp.AcpModelCard.providerTag]
+ * keys by MODEL id (`llm.${'$'}{card.id}.key`) — [borg.trikeshed.agent.modelmux.acp.AcpModelCard.providerTag]
  * is the bridge: a model card tagged with its provider makes `ModelMux.session()`
  * try `llm.<provider>.key` first, landing here.
  *
@@ -72,8 +73,8 @@ internal class HermesCredentialSnapshot(
  * carries a different provider set; merging is what makes "everything hermes
  * can reach" one source.
  *
- * Follows [PersistSource]'s pattern — file IO through the [FileOperations] SPI
- * from the coroutine context, so this stays a legal commonMain [KeySource]
+ * Follows [borg.trikeshed.agent.keymux.PersistSource]'s pattern — file IO through the [FileOperations] SPI
+ * from the coroutine context, so this stays a legal commonMain [borg.trikeshed.agent.keymux.KeySource]
  * subclass (a jvmMain subclass of a commonMain `sealed class` does not compile:
  * "Extending sealed classes or interfaces from a different module is prohibited").
  *
@@ -81,11 +82,11 @@ internal class HermesCredentialSnapshot(
  * live in the Python side). This source never writes.
  */
 class HermesCredentialSource(
-    private val hermesHome: String = defaultHermesHome(),
+    private val hermesHome: String = borg.trikeshed.agent.keymux.defaultHermesHome(),
     private val explicitFileOps: FileOperations? = null,
     /** Test seam: pin env lookup instead of the real process env. */
     private val getenv: (String) -> String? = { SystemOperations.default.getenv(it) },
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "hermes-credential-pool"
 
     private val cooldownLock = Mutex()
@@ -99,7 +100,7 @@ class HermesCredentialSource(
     private suspend fun fileOpsOrNull(): FileOperations? =
         explicitFileOps ?: currentCoroutineContext()[FileOperations.Key]
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         if (path.size != 3 || path[0] != "llm") return null
         val provider = path[1]
         val field = path[2]
@@ -152,14 +153,14 @@ class HermesCredentialSource(
         return str(entry["access_token"])?.takeIf { it.isNotBlank() }
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("hermes credential pool is read-only from this source")
     }
 
     override suspend fun invalidate() {} // Files are read on each resolution; local backoff survives refresh.
 
-    internal suspend fun snapshot(): HermesCredentialSnapshot {
-        val resolved = linkedMapOf<String, HermesCredential>()
+    internal suspend fun snapshot(): borg.trikeshed.agent.keymux.HermesCredentialSnapshot {
+        val resolved = linkedMapOf<String, borg.trikeshed.agent.keymux.HermesCredential>()
         val exhausted = mutableSetOf<String>()
         for ((provider, entries) in loadPool()) {
             val entry = bestEntry(provider, entries)
@@ -168,9 +169,13 @@ class HermesCredentialSource(
                 continue
             }
             val key = keyFor(entry) ?: continue
-            resolved[provider] = HermesCredential(keyId(provider, entry), key, baseUrl(entry))
+            resolved[provider] = borg.trikeshed.agent.keymux.HermesCredential(
+                keyId(provider, entry),
+                key,
+                baseUrl(entry)
+            )
         }
-        return HermesCredentialSnapshot(resolved, name, exhausted)
+        return borg.trikeshed.agent.keymux.HermesCredentialSnapshot(resolved, name, exhausted)
     }
 
     /** A failed call excludes its actual pool row until the provider's reset. */
@@ -190,33 +195,41 @@ class HermesCredentialSource(
         return null
     }
 
-    suspend fun providers(): Series<HermesProviderInfo> {
+    suspend fun providers(): Series<borg.trikeshed.agent.keymux.HermesProviderInfo> {
         val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-        val out = mutableListOf<HermesProviderInfo>()
+        val out = mutableListOf<borg.trikeshed.agent.keymux.HermesProviderInfo>()
         for ((provider, rows) in loadPool()) {
             val available = rows.count { isUsableNow(provider, it, now, rows.size == 1) && keyFor(it) != null }
-            out += HermesProviderInfo(provider, bestEntry(provider, rows)?.let { baseUrl(it) }
-                ?: rows.firstNotNullOfOrNull { baseUrl(it) }, rows.size, available)
+            out += borg.trikeshed.agent.keymux.HermesProviderInfo(
+                provider,
+                bestEntry(provider, rows)?.let { baseUrl(it) }
+                    ?: rows.firstNotNullOfOrNull { baseUrl(it) },
+                rows.size,
+                available
+            )
         }
         return out.toSeries()
     }
 
     /** Hermes' selected model, read through the same commonMain file boundary as its pool. */
-    suspend fun modelConfig(): HermesModelConfig? {
+    suspend fun modelConfig(): borg.trikeshed.agent.keymux.HermesModelConfig? {
         val config = loadConfig() ?: return null
         val model = str(config["default"]) ?: str(config["model"]) ?: return null
         val provider = str(config["provider"])?.takeUnless { it == "auto" } ?: return null
         val base = str(config["base_url"])?.let { expandEnv(it) }
             ?: read("llm.$provider.base_url".toKeyPath())
-            ?: HarnessRegistry.byId(provider)?.defaultBaseUrl ?: ""
-        return HermesModelConfig(provider, model, base, str(config["api_mode"]) ?:
-            if (provider == "anthropic") "anthropic_messages" else "chat_completions",
+            ?: borg.trikeshed.agent.keymux.HarnessRegistry.byId(provider)?.defaultBaseUrl ?: ""
+        return borg.trikeshed.agent.keymux.HermesModelConfig(
+            provider,
+            model,
+            base,
+            str(config["api_mode"]) ?: if (provider == "anthropic") "anthropic_messages" else "chat_completions",
             int(config["context_length"]).takeIf { it > 0 } ?: int(config["context_window"]))
     }
 
     /** Selected model followed by Hermes' configured custom endpoints. Unsupported modes remain explicit. */
-    suspend fun configuredModels(): Series<HermesModelConfig> {
-        val out = mutableListOf<HermesModelConfig>()
+    suspend fun configuredModels(): Series<borg.trikeshed.agent.keymux.HermesModelConfig> {
+        val out = mutableListOf<borg.trikeshed.agent.keymux.HermesModelConfig>()
         modelConfig()?.let { out += it }
         val pool = loadPool()
         val configured = loadConfigRoot()?.get("custom_providers") as? List<*> ?: return out.toSeries()
@@ -234,7 +247,13 @@ class HermesCredentialSource(
                 val window = int(metadata?.get("context_length")).takeIf { it > 0 }
                     ?: int(metadata?.get("context_window")).takeIf { it > 0 }
                     ?: int(config["context_length"]).takeIf { it > 0 } ?: int(config["context_window"])
-                val row = HermesModelConfig(provider, model, base, str(config["api_mode"]) ?: "chat_completions", window)
+                val row = borg.trikeshed.agent.keymux.HermesModelConfig(
+                    provider,
+                    model,
+                    base,
+                    str(config["api_mode"]) ?: "chat_completions",
+                    window
+                )
                 if (out.none { it.provider == provider && it.model == model }) out += row
             }
         }
@@ -244,7 +263,7 @@ class HermesCredentialSource(
     /**
      * Quota-facing projection: every pool entry across every provider, as
      * [MuxKeyEntry] rows for [borg.trikeshed.userspace.reactor.MuxReactorElement]
-     * / [modelmux.QuotaLegion]. Unlike [read], this surfaces the whole pool —
+     * / [borg.trikeshed.agent.modelmux.QuotaLegion]. Unlike [read], this surfaces the whole pool —
      * QuotaLegion needs every key's standing, not just the one that would win.
      */
     suspend fun keyEntries(): Series<MuxKeyEntry> {
@@ -435,7 +454,9 @@ class HermesCredentialSource(
 
     private suspend fun dotenv(ops: FileOperations, file: String): Map<String, String>? {
         if (!runCatching { ops.isFile(file) }.getOrDefault(false)) return null
-        return parseDotenv(runCatching { ops.readString(file) }.getOrNull() ?: return null)
+        return borg.trikeshed.agent.keymux.parseDotenv(
+            runCatching { ops.readString(file) }.getOrNull() ?: return null
+        )
     }
 
     // ── boundary coercions — JSON minting is never trusted to be one type ──
@@ -471,8 +492,8 @@ class HermesCredentialSource(
  *  (the daemon's KeyMux reads from non-coroutine boot paths), so the daemon
  *  passes its JvmFileOperations — without it the pool silently degrades to
  *  nothing. */
-fun KeyMuxBuilder.hermes(
-    hermesHome: String = defaultHermesHome(),
+fun borg.trikeshed.agent.keymux.KeyMuxBuilder.hermes(
+    hermesHome: String = borg.trikeshed.agent.keymux.defaultHermesHome(),
     fileOps: FileOperations? = null,
-): KeyMuxBuilder =
-    bind("llm.*.*", HermesCredentialSource(hermesHome, fileOps))
+): borg.trikeshed.agent.keymux.KeyMuxBuilder =
+    bind("llm.*.*", borg.trikeshed.agent.keymux.HermesCredentialSource(hermesHome, fileOps))

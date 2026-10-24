@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.*
@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
 class BreadcrumbFileStore(
     val files: FileOperations,
     val directory: String,
-) : BreadcrumbStore {
+) : borg.trikeshed.agent.modelmux.BreadcrumbStore {
     init {
         require(files.durability == StorageDurability.DURABLE) { "Breadcrumb storage requires durable file publication" }
         require(directory.isNotBlank()) { "Breadcrumb storage directory is required" }

@@ -1,8 +1,8 @@
 package borg.trikeshed.kanban
 
-import modelmux.*
-import modelmux.acp.*
-import keymux.*
+import borg.trikeshed.agent.modelmux.*
+import borg.trikeshed.agent.modelmux.acp.*
+import borg.trikeshed.agent.keymux.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.htx.*
 import borg.trikeshed.userspace.FanoutEvent

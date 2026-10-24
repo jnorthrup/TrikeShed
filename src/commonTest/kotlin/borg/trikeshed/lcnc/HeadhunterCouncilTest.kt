@@ -4,10 +4,10 @@ import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.parse.jsonOf
-import keymux.KeyMux
-import keymux.TestKeySource
-import modelmux.BreadcrumbElement
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.TestKeySource
+import borg.trikeshed.agent.modelmux.BreadcrumbElement
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runTest
 import kotlin.test.*
@@ -39,7 +39,7 @@ class HeadhunterCouncilTest {
     }
 
     @Test fun seatsOpenCritiqueAndSynthesizeWithRetainedTrailsAndReleasedMemory() = runTest {
-        val memory = modelmux.BreadcrumbElement()
+        val memory = borg.trikeshed.agent.modelmux.BreadcrumbElement()
         val sent = mutableListOf<ConfixDoc>()
         val htx = openHtxElement(routeService = object : HtxRouteService {
             override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
@@ -87,7 +87,7 @@ class HeadhunterCouncilTest {
     }
 
     @Test fun aRefusedSeatStaysOnTheTrailAndTheRemainingSeatsCarryTheCouncil() = runTest {
-        val memory = modelmux.BreadcrumbElement()
+        val memory = borg.trikeshed.agent.modelmux.BreadcrumbElement()
         val sent = mutableListOf<ConfixDoc>()
         val htx = openHtxElement(routeService = object : HtxRouteService {
             override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
@@ -146,10 +146,10 @@ class HeadhunterCouncilTest {
 
     @Test fun aCouncilDemandsDistinctSeats() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            mux().council(modelmux.BreadcrumbElement(), s_["fixture-a"], "grounded drafting request")
+            mux().council(borg.trikeshed.agent.modelmux.BreadcrumbElement(), s_["fixture-a"], "grounded drafting request")
         }
         assertFailsWith<IllegalArgumentException> {
-            mux().council(modelmux.BreadcrumbElement(), s_["fixture-a", "fixture-a"], "grounded drafting request")
+            mux().council(borg.trikeshed.agent.modelmux.BreadcrumbElement(), s_["fixture-a", "fixture-a"], "grounded drafting request")
         }
     }
 }

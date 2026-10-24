@@ -3,15 +3,15 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
 
-import keymux.CouchKeyStore
-import keymux.KeyMux
-import modelmux.ModelMux
-import modelmux.Airgap
-import modelmux.MuxCallContext
-import modelmux.MuxCallRecord
-import modelmux.acp.AcpMessage
-import modelmux.acp.providerTag
-import modelmux.acp.modelVersion
+import borg.trikeshed.agent.keymux.CouchKeyStore
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.Airgap
+import borg.trikeshed.agent.modelmux.MuxCallContext
+import borg.trikeshed.agent.modelmux.MuxCallRecord
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
+import borg.trikeshed.agent.modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.modelVersion
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -72,8 +72,8 @@ object BrainMuxNodes {
             val keyMux = KeyMuxProviderKey.require().invoke()
             if (keyMux == null) return@LcncNodeRunner mapOf("roster" to emptyList<Any>())
             val roster = ArrayList<Map<String, Any?>>()
-            for (i in 0 until keymux.HarnessRegistry.providers.size) {
-                val p = keymux.HarnessRegistry.providers[i]
+            for (i in 0 until borg.trikeshed.agent.keymux.HarnessRegistry.providers.size) {
+                val p = borg.trikeshed.agent.keymux.HarnessRegistry.providers[i]
                 val keyPresent = runCatching {
                     keyMux.get("llm.${p.id}.key")
                 }.getOrNull()?.isNotBlank() == true

@@ -4,20 +4,20 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.memory.MemoryStore
-import modelmux.acp.MEM_CREATE
-import modelmux.acp.MEM_DELETE
-import modelmux.acp.MEM_GREP
-import modelmux.acp.MEM_INSERT
-import modelmux.acp.MEM_RENAME
-import modelmux.acp.MEM_STR_REPLACE
-import modelmux.acp.MEM_VIEW
-import modelmux.acp.TOOL_CREATE
-import modelmux.acp.TOOL_DELETE
-import modelmux.acp.TOOL_GREP
-import modelmux.acp.TOOL_INSERT
-import modelmux.acp.TOOL_RENAME
-import modelmux.acp.TOOL_STR_REPLACE
-import modelmux.acp.TOOL_VIEW
+import borg.trikeshed.agent.modelmux.acp.MEM_CREATE
+import borg.trikeshed.agent.modelmux.acp.MEM_DELETE
+import borg.trikeshed.agent.modelmux.acp.MEM_GREP
+import borg.trikeshed.agent.modelmux.acp.MEM_INSERT
+import borg.trikeshed.agent.modelmux.acp.MEM_RENAME
+import borg.trikeshed.agent.modelmux.acp.MEM_STR_REPLACE
+import borg.trikeshed.agent.modelmux.acp.MEM_VIEW
+import borg.trikeshed.agent.modelmux.acp.TOOL_CREATE
+import borg.trikeshed.agent.modelmux.acp.TOOL_DELETE
+import borg.trikeshed.agent.modelmux.acp.TOOL_GREP
+import borg.trikeshed.agent.modelmux.acp.TOOL_INSERT
+import borg.trikeshed.agent.modelmux.acp.TOOL_RENAME
+import borg.trikeshed.agent.modelmux.acp.TOOL_STR_REPLACE
+import borg.trikeshed.agent.modelmux.acp.TOOL_VIEW
 
 /**
  * Dispatches ACP memory tool calls to [MemoryStore] operations.

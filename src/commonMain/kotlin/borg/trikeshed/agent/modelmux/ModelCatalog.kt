@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.cursor.ColumnMeta
 import borg.trikeshed.cursor.Cursor
@@ -29,7 +29,7 @@ data class ModelCatalogEntry(
     val quotaAvailable: Boolean get() = quotaRemaining != 0
 }
 
-class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
+class ModelCatalog(val entries: Series<borg.trikeshed.agent.modelmux.ModelCatalogEntry>) : Cursor {
     override val a: Int
         get() = entries.a
 
@@ -58,12 +58,12 @@ class ModelCatalog(val entries: Series<ModelCatalogEntry>) : Cursor {
             }
         }
 
-    fun cacheHits(predicate: (ModelCatalogEntry) -> Boolean): Cursor {
+    fun cacheHits(predicate: (borg.trikeshed.agent.modelmux.ModelCatalogEntry) -> Boolean): Cursor {
         val hits = (0 until entries.a).filter { predicate(entries.b(it)) }
         return ModelCatalog(hits.size j { i -> entries.b(hits[i]) })
     }
 
-    fun cacheMisses(predicate: (ModelCatalogEntry) -> Boolean): Cursor {
+    fun cacheMisses(predicate: (borg.trikeshed.agent.modelmux.ModelCatalogEntry) -> Boolean): Cursor {
         val misses = (0 until entries.a).filter { !predicate(entries.b(it)) }
         return ModelCatalog(misses.size j { i -> entries.b(misses[i]) })
     }

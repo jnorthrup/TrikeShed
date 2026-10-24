@@ -2,7 +2,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import keymux.HarnessRegistry
+import borg.trikeshed.agent.keymux.HarnessRegistry
 import java.util.concurrent.ConcurrentHashMap
 
 /**

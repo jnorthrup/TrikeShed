@@ -1,10 +1,10 @@
 package borg.trikeshed.kernel
 
 import borg.trikeshed.lib.*
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlin.test.*
 
 class KernelElementTest {

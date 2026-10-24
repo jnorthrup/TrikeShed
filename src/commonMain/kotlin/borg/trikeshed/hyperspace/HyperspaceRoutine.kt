@@ -1,7 +1,7 @@
 package borg.trikeshed.hyperspace
 
-import modelmux.acp.AcpMessage
-import modelmux.acp.AcpResponse
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
+import borg.trikeshed.agent.modelmux.acp.AcpResponse
 import borg.trikeshed.lib.Series
 
 /**

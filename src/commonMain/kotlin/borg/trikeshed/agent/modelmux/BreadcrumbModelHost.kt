@@ -1,5 +1,9 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
+import borg.trikeshed.agent.modelmux.BreadcrumbId
+import borg.trikeshed.agent.modelmux.breadcrumbJson
+import borg.trikeshed.agent.modelmux.project
+import borg.trikeshed.agent.modelmux.toWire
 import borg.trikeshed.htx.*
 import borg.trikeshed.cursor.IOMemento
 import borg.trikeshed.cursor.RowVec
@@ -8,7 +12,7 @@ import borg.trikeshed.parse.*
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.relaxfactory.CouchHttpSurface
 import kotlinx.coroutines.*
-import modelmux.acp.*
+import borg.trikeshed.agent.modelmux.acp.*
 
 /**
  * Opt in with `breadcrumb_context` on a completion. Only tool-result content is
@@ -24,8 +28,9 @@ import modelmux.acp.*
  * A configured BreadcrumbStore retains originals and receipts across restarts.
  * Text-part arrays are retained as exact JSON and projected into string tool content.
  */
-class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
-    private val host = OpenAiModelHost(mux,
+class BreadcrumbModelHost(val mux: borg.trikeshed.agent.modelmux.ModelMux, val contexts: borg.trikeshed.agent.modelmux.BreadcrumbElement) {
+    private val host = borg.trikeshed.agent.modelmux.OpenAiModelHost(
+        mux,
         completion = { model, request -> completion(model, request) },
         routes = { route(it) },
     )
@@ -50,8 +55,8 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
             mux.completion(model, request, assessmentId = assessmentId, contextId = id, timeoutMs = timeoutMs)
         }
         requireNotNull(id)
-        val emissions = mutableSetOf<BreadcrumbId>()
-        var reserved: BreadcrumbContext? = null
+        val emissions = mutableSetOf<borg.trikeshed.agent.modelmux.BreadcrumbId>()
+        var reserved: borg.trikeshed.agent.modelmux.BreadcrumbContext? = null
         var successful = false
         try {
             currentCoroutineContext().ensureActive()
@@ -63,7 +68,12 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                     projected j it
                 }.also { reserved = it.b }.a
             }
-            return withContext(contexts + BreadcrumbAdmission(contexts, id, requireNotNull(reserved))) {
+            return withContext(contexts + borg.trikeshed.agent.modelmux.BreadcrumbAdmission(
+                contexts,
+                id,
+                requireNotNull(reserved)
+            )
+            ) {
                 mux.completion(model, outgoing, assessmentId = assessmentId, contextId = id, timeoutMs = timeoutMs)
             }.also { successful = it.isSuccess }
         } finally {
@@ -74,14 +84,14 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                     contexts.transact(id, create = false) {
                         if (it === admitted) it.completeEmissions(emissions, successful)
                     }
-                } catch (_: BreadcrumbContextNotFoundException) { /* Session was released. */ }
+                } catch (_: borg.trikeshed.agent.modelmux.BreadcrumbContextNotFoundException) { /* Session was released. */ }
                 catch (failure: Throwable) {
                     // A failed durable completion rolls back the reservation; release it without marking an emission.
                     try {
                         contexts.transact(id, create = false) {
                             if (it === admitted) it.completeEmissions(emissions, successful = false)
                         }
-                    } catch (_: BreadcrumbContextNotFoundException) { /* Session was released. */ }
+                    } catch (_: borg.trikeshed.agent.modelmux.BreadcrumbContextNotFoundException) { /* Session was released. */ }
                     catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
                     throw failure
                 }
@@ -103,7 +113,8 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                             "submitted" -> it.submittedJson(id)
                             "horizon" -> it.horizonJson(id)
                             "routing" -> jsonOf(mapOf("context" to id, "calls" to it.receipts().view.map { call -> call.toWire() }))
-                            "index" -> it.index.search(query["q"] ?: "", BreadcrumbBudget(16_384), 32)
+                            "index" -> it.index.search(query["q"] ?: "",
+                                borg.trikeshed.agent.modelmux.BreadcrumbBudget(16_384), 32)
                             else -> throw IllegalArgumentException("unknown breadcrumb view")
                         }
                     }
@@ -116,20 +127,27 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                         ?: throw IllegalArgumentException("JSON object required")
                     val context = req["context"] as? String ?: throw IllegalArgumentException("context is required")
                     val tool = req["tool"] as? String
-                    if (tool == TOOL_SEARCH || tool == TOOL_RECALL) {
+                    if (tool == borg.trikeshed.agent.modelmux.acp.TOOL_SEARCH || tool == borg.trikeshed.agent.modelmux.acp.TOOL_RECALL) {
                         val result = contexts.transact(context, create = false) {
                             val ceiling = it.submission?.model?.let(mux::contextWindow)?.takeIf { length -> length > 0 } ?: 2048
-                            val budget = BreadcrumbBudget(ceiling,
-                                currentTokens = it.lastTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
-                            BreadcrumbToolDispatcher(it, budget).dispatch(tool, req.entries
+                            val budget = borg.trikeshed.agent.modelmux.BreadcrumbBudget(
+                                ceiling,
+                                currentTokens = it.lastTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                            )
+                            borg.trikeshed.agent.modelmux.acp.BreadcrumbToolDispatcher(it, budget)
+                                .dispatch(tool, req.entries
                                 .filter { row -> row.key != "context" && row.key != "tool" }
                                 .associate { row -> row.key.toString() to row.value.toString() })!!
                         }
                         return HtxResponse(200, ByteSeries(result.encodeToByteArray()), host.jsonHeaders())
                     }
-                    val id = BreadcrumbId(req["id"] as? String ?: throw IllegalArgumentException("id is required"))
-                    val presence = BreadcrumbPresence((req["presence"] as? Number)?.toDouble()
-                        ?: throw IllegalArgumentException("presence must be a number from 0 to 1"))
+                    val id = borg.trikeshed.agent.modelmux.BreadcrumbId(
+                        req["id"] as? String ?: throw IllegalArgumentException("id is required")
+                    )
+                    val presence = borg.trikeshed.agent.modelmux.BreadcrumbPresence(
+                        (req["presence"] as? Number)?.toDouble()
+                            ?: throw IllegalArgumentException("presence must be a number from 0 to 1")
+                    )
                     val result = contexts.transact(context, create = false) {
                         require(it.resize(id, presence)) { "breadcrumb not found" }
                         it.nextToolResult().breadcrumbJson()
@@ -165,11 +183,11 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                     chars += (call.getAt("function", "arguments", src = src)?.reify(src) as? String)?.length ?: 0
                 }
             }
-            return chars / BreadcrumbOverflow.CHARS_PER_TOKEN
+            return chars / borg.trikeshed.agent.modelmux.BreadcrumbOverflow.CHARS_PER_TOKEN
         }
 
         /** Preserve only exact tool content and identity; inspection never retains prompt instructions. */
-        fun submission(model: String, request: ConfixDoc, at: BreadcrumbTimestamp): BreadcrumbSubmission {
+        fun submission(model: String, request: ConfixDoc, at: borg.trikeshed.agent.modelmux.BreadcrumbTimestamp): borg.trikeshed.agent.modelmux.BreadcrumbSubmission {
             val messages = request.getAt("messages")?.kids ?: emptySeriesOf<RowVec>()
             val tools = messages.view.filter { it.step("role", request.src)?.reify(request.src) == "tool" }
             val rows = mutableListOf<String>()
@@ -187,16 +205,22 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                     (id?.let { raw(request, it) } ?: "null") + ",\"content\":" +
                     (content?.let { raw(request, it) } ?: "null") + "}")
             }
-            return BreadcrumbSubmission(model, at, if (exact) rows.toSeries() else emptySeriesOf(), tools.size, exact)
+            return borg.trikeshed.agent.modelmux.BreadcrumbSubmission(
+                model,
+                at,
+                if (exact) rows.toSeries() else emptySeriesOf(),
+                tools.size,
+                exact
+            )
         }
 
         /** Repeated history must never refresh age or overwrite the retained original. */
         fun project(
             request: ConfixDoc,
-            context: BreadcrumbContext,
-            emissions: MutableSet<BreadcrumbId> = mutableSetOf(),
+            context: borg.trikeshed.agent.modelmux.BreadcrumbContext,
+            emissions: MutableSet<borg.trikeshed.agent.modelmux.BreadcrumbId> = mutableSetOf(),
         ): ConfixDoc {
-            val at = BreadcrumbTimestamp(context.clock())
+            val at = borg.trikeshed.agent.modelmux.BreadcrumbTimestamp(context.clock())
             val root = requireNotNull(request.root) { "JSON object required" }
             require(root.tag == IOMemento.IoObject) { "JSON object required" }
             val messages = requireNotNull(request.getAt("messages")) { "messages are required" }
@@ -204,22 +228,24 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
             val tools = request.getAt("tools")
             require(tools == null || tools.tag == IOMemento.IoArray) { "tools must be an array" }
             require(tools == null || tools.kids.view.none {
-                it.getAt("function", "name", src = request.src)?.reify(request.src) in BREADCRUMB_TOOLS_NAMES
+                it.getAt("function", "name", src = request.src)?.reify(request.src) in borg.trikeshed.agent.modelmux.acp.BREADCRUMB_TOOLS_NAMES
             }) { "breadcrumb, recall and search tools are reserved when breadcrumb_context is supplied" }
 
-            val records = mutableMapOf<BreadcrumbId, String>()
-            val retrievals = mutableMapOf<BreadcrumbId, BreadcrumbId?>()
+            val records = mutableMapOf<borg.trikeshed.agent.modelmux.BreadcrumbId, String>()
+            val retrievals = mutableMapOf<borg.trikeshed.agent.modelmux.BreadcrumbId, borg.trikeshed.agent.modelmux.BreadcrumbId?>()
             for (row in messages.kids.view) {
                 val calls = row.step("tool_calls", request.src) ?: continue
                 if (row.step("role", request.src)?.reify(request.src) != "assistant") continue
                 for (call in calls.kids.view) {
-                    if (call.getAt("function", "name", src = request.src)?.reify(request.src) in BREADCRUMB_TOOLS_NAMES) {
+                    if (call.getAt("function", "name", src = request.src)?.reify(request.src) in borg.trikeshed.agent.modelmux.acp.BREADCRUMB_TOOLS_NAMES) {
                         val id = call.step("id", request.src)?.reify(request.src) as? String
                             ?: throw IllegalArgumentException("breadcrumb tool call id required")
                         val args = call.getAt("function", "arguments", src = request.src)?.reify(request.src) as? String
                         val target = args?.let { runCatching { reifyStrict(it) as? Map<*, *> }.getOrNull() }
                             ?.get("id") as? String
-                        retrievals[BreadcrumbId(id)] = target?.takeIf { it.isNotBlank() && it.length <= 256 }?.let(::BreadcrumbId)
+                        retrievals[borg.trikeshed.agent.modelmux.BreadcrumbId(id)] = target?.takeIf { it.isNotBlank() && it.length <= 256 }?.let(
+                            ::BreadcrumbId
+                        )
                     }
                 }
             }
@@ -228,8 +254,10 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
                 objectProjection(request, row, emptyMap()) // validate field uniqueness before admitting evidence
                 if (row.step("role", request.src)?.reify(request.src) != "tool") continue
                 val content = toolContent(request, row)
-                val id = BreadcrumbId(row.step("tool_call_id", request.src)?.reify(request.src) as? String
-                    ?: throw IllegalArgumentException("tool_call_id is required"))
+                val id = borg.trikeshed.agent.modelmux.BreadcrumbId(
+                    row.step("tool_call_id", request.src)?.reify(request.src) as? String
+                        ?: throw IllegalArgumentException("tool_call_id is required")
+                )
                 if (id in retrievals) continue
                 require(records.put(id, content).let { it == null || it == content }) { "conflicting tool results" }
                 require(context.lookup(id).let { it == null || it.content == content }) { "tool result differs from retained original" }
@@ -244,19 +272,28 @@ class BreadcrumbModelHost(val mux: ModelMux, val contexts: BreadcrumbElement) {
             val projections = context.snapshot(at).view.associateBy { it.id }
             val projectedMessages = messages.kids.view.joinToString(",", "[", "]") { row ->
                 if (row.step("role", request.src)?.reify(request.src) == "tool") {
-                    val id = BreadcrumbId(row.step("tool_call_id", request.src)!!.reify(request.src) as String)
+                    val id = borg.trikeshed.agent.modelmux.BreadcrumbId(
+                        row.step(
+                            "tool_call_id",
+                            request.src
+                        )!!.reify(request.src) as String
+                    )
                     if (id in retrievals && !context.emitted(id) && emissions.add(id)) raw(request, row)
                     else objectProjection(request, row, mapOf("content" to jsonOf(
                         if (id in retrievals) {
-                            retrievals[id]?.let { context.lookup(it)?.project(BreadcrumbPresence(0.0)) }?.render()
-                                ?: jsonOf(mapOf("skill" to BREADCRUMB_SKILL, "retrieval" to id.value, "presence" to 0))
+                            retrievals[id]?.let { context.lookup(it)?.project(
+                                borg.trikeshed.agent.modelmux.BreadcrumbPresence(
+                                    0.0
+                                )
+                            ) }?.render()
+                                ?: jsonOf(mapOf("skill" to borg.trikeshed.agent.modelmux.acp.BREADCRUMB_SKILL, "retrieval" to id.value, "presence" to 0))
                         } else projections.getValue(id).render())))
                 } else raw(request, row)
             }
             val projectedTools = buildString {
                 append('[')
                 tools?.kids?.view?.forEach { append(raw(request, it)).append(',') }
-                append(BREADCRUMB_TOOL_DEFINITIONS).append(']')
+                append(borg.trikeshed.agent.modelmux.acp.BREADCRUMB_TOOL_DEFINITIONS).append(']')
             }
             return confixDoc(objectProjection(request, root,
                 mapOf("messages" to projectedMessages, "tools" to projectedTools), setOf("breadcrumb_context")))

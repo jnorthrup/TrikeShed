@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.job.CasStore
@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
-typealias BreadcrumbTransaction<T> = Join<suspend BreadcrumbElement.() -> T, CompletableDeferred<T>>
+typealias BreadcrumbTransaction<T> = Join<suspend borg.trikeshed.agent.modelmux.BreadcrumbElement.() -> T, CompletableDeferred<T>>
 
 /** One owner writes complete session states; null durably removes a session. */
 interface BreadcrumbStore {
@@ -21,35 +21,39 @@ class BreadcrumbCapacityException : IllegalArgumentException("breadcrumb context
 class BreadcrumbContextNotFoundException : IllegalArgumentException("breadcrumb context not found")
 
 /** Explicit projection carries its admitted instance through dispatch without recreating deleted sessions. */
-class BreadcrumbAdmission(val owner: BreadcrumbElement, val id: String, val context: BreadcrumbContext) :
+class BreadcrumbAdmission(val owner: borg.trikeshed.agent.modelmux.BreadcrumbElement, val id: String, val context: borg.trikeshed.agent.modelmux.BreadcrumbContext) :
     AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<BreadcrumbAdmission>
 }
 
 /** Session-local context transactions; admitted work drains before its caller's scope exits. */
 class BreadcrumbElement(
-    factory: (() -> BreadcrumbContext)? = null,
+    factory: (() -> borg.trikeshed.agent.modelmux.BreadcrumbContext)? = null,
     val capacity: Int = 250,
-    val store: BreadcrumbStore? = null,
+    val store: borg.trikeshed.agent.modelmux.BreadcrumbStore? = null,
     val cas: CasStore = CasStore.inMemory(),
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<BreadcrumbElement>
-    val factory: () -> BreadcrumbContext = factory ?: { BreadcrumbContext(index = BreadcrumbIndex(cas)) }
+    val factory: () -> borg.trikeshed.agent.modelmux.BreadcrumbContext = factory ?: {
+        borg.trikeshed.agent.modelmux.BreadcrumbContext(
+            index = borg.trikeshed.agent.modelmux.BreadcrumbIndex(cas)
+        )
+    }
 
-    private val contexts = mutableMapOf<String, BreadcrumbContext>()
+    private val contexts = mutableMapOf<String, borg.trikeshed.agent.modelmux.BreadcrumbContext>()
     private val states = mutableMapOf<String, String>()
     private val mutex = Mutex()
     private var loaded = false
 
     init { require(capacity > 0) }
 
-    suspend fun <T> transact(id: String, create: Boolean = true, operation: (BreadcrumbContext) -> T): T {
+    suspend fun <T> transact(id: String, create: Boolean = true, operation: (borg.trikeshed.agent.modelmux.BreadcrumbContext) -> T): T {
         require(id.isNotBlank() && id.length <= 128) { "breadcrumb context must contain 1-128 characters" }
         return transact {
             val existing = contexts[id]
             val context = existing ?: run {
-                if (!create) throw BreadcrumbContextNotFoundException()
-                if (contexts.size >= capacity) throw BreadcrumbCapacityException()
+                if (!create) throw borg.trikeshed.agent.modelmux.BreadcrumbContextNotFoundException()
+                if (contexts.size >= capacity) throw borg.trikeshed.agent.modelmux.BreadcrumbCapacityException()
                 factory()
             }
             val before = existing?.copy()
@@ -76,7 +80,7 @@ class BreadcrumbElement(
 
     private suspend fun hydrate() {
         if (loaded) return
-        val restored = mutableMapOf<String, BreadcrumbContext>()
+        val restored = mutableMapOf<String, borg.trikeshed.agent.modelmux.BreadcrumbContext>()
         val encoded = mutableMapOf<String, String>()
         store?.load()?.view?.forEach { entry ->
             val id = entry.a
@@ -84,7 +88,7 @@ class BreadcrumbElement(
             require(id !in restored) { "duplicate stored breadcrumb context" }
             require(restored.size < capacity) { "stored breadcrumb context capacity exceeded" }
             val template = factory()
-            val context = BreadcrumbContext.restore(entry.b, template.clock, template.index.cas)
+            val context = borg.trikeshed.agent.modelmux.BreadcrumbContext.restore(entry.b, template.clock, template.index.cas)
             restored[id] = context
             encoded[id] = context.state()
         }
@@ -95,7 +99,7 @@ class BreadcrumbElement(
 
     private suspend fun <T> transact(operation: suspend BreadcrumbElement.() -> T): T = supervisorScope {
         currentCoroutineContext().ensureActive()
-        val requests = Channel.buffered<BreadcrumbTransaction<T>>(1)
+        val requests = Channel.buffered<borg.trikeshed.agent.modelmux.BreadcrumbTransaction<T>>(1)
         val result = CompletableDeferred<T>()
         val worker = launch(this@BreadcrumbElement, start = CoroutineStart.UNDISPATCHED) {
             withContext(NonCancellable) {
@@ -118,7 +122,7 @@ class BreadcrumbElement(
     suspend fun remove(id: String) {
         require(id.isNotBlank() && id.length <= 128) { "breadcrumb context must contain 1-128 characters" }
         transact {
-            if (id !in contexts) throw BreadcrumbContextNotFoundException()
+            if (id !in contexts) throw borg.trikeshed.agent.modelmux.BreadcrumbContextNotFoundException()
             store?.write(id, null)
             contexts.remove(id)
             states.remove(id)

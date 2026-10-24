@@ -14,7 +14,7 @@ import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.userspace.nio.process.*
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.*
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import java.io.File
 
 /**

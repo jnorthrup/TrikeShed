@@ -5,13 +5,13 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import modelmux.ModelCatalogEntry
-import modelmux.ModelEntry
-import modelmux.ModelMux
-import modelmux.RouteResult
-import modelmux.RoutingStrategy
-import modelmux.acp.AcpAction
-import modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.ModelCatalogEntry
+import borg.trikeshed.agent.modelmux.ModelEntry
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.RouteResult
+import borg.trikeshed.agent.modelmux.RoutingStrategy
+import borg.trikeshed.agent.modelmux.acp.AcpAction
+import borg.trikeshed.agent.modelmux.acp.providerTag
 
 data class Seat(
     val laneId: String,

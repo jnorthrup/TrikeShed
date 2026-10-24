@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
@@ -20,7 +20,7 @@ typealias BreadcrumbReelTransaction<T> = Join<suspend () -> T, CompletableDeferr
  * Retention pins and curation are independent: declining a summary never deletes evidence.
  */
 class BreadcrumbReelStore(
-    val store: BreadcrumbStore,
+    val store: borg.trikeshed.agent.modelmux.BreadcrumbStore,
     val cas: CasStore,
     val clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
 ) : AbstractCoroutineContextElement(Key) {
@@ -31,12 +31,12 @@ class BreadcrumbReelStore(
     }
 
     val mutex = Mutex()
-    val states = linkedMapOf<String, BreadcrumbReelState>()
+    val states = linkedMapOf<String, borg.trikeshed.agent.modelmux.BreadcrumbReelState>()
     var loaded = false
 
     suspend fun hydrate() {
         if (loaded) return
-        val restored = linkedMapOf<String, BreadcrumbReelState>()
+        val restored = linkedMapOf<String, borg.trikeshed.agent.modelmux.BreadcrumbReelState>()
         for (entry in store.load().view) {
             val state = objectState(reifyStrict(entry.b))
             require((state["version"] as? Number)?.toInt() == 1 && state["id"] == entry.a) {
@@ -62,7 +62,7 @@ class BreadcrumbReelStore(
 
     suspend fun <T> transact(operation: suspend () -> T): T = supervisorScope {
         currentCoroutineContext().ensureActive()
-        val requests = Channel.buffered<BreadcrumbReelTransaction<T>>(1)
+        val requests = Channel.buffered<borg.trikeshed.agent.modelmux.BreadcrumbReelTransaction<T>>(1)
         val result = CompletableDeferred<T>()
         val worker = launch(this@BreadcrumbReelStore, start = CoroutineStart.UNDISPATCHED) {
             withContext(NonCancellable) {
@@ -77,12 +77,12 @@ class BreadcrumbReelStore(
         try { result.await() } finally { withContext(NonCancellable) { worker.join() } }
     }
 
-    suspend fun publish(id: String, state: BreadcrumbReelState) {
+    suspend fun publish(id: String, state: borg.trikeshed.agent.modelmux.BreadcrumbReelState) {
         store.write(id, jsonOf(state))
         states[id] = state
     }
 
-    suspend fun save(run: BreadcrumbReelState) = transact {
+    suspend fun save(run: borg.trikeshed.agent.modelmux.BreadcrumbReelState) = transact {
         val id = run["id"] as? String ?: error("Run identity required")
         require(id.matches(Regex("[A-Za-z0-9_-]{1,64}")))
         val state = states[id] ?: mapOf("version" to 1, "id" to id,
@@ -104,7 +104,7 @@ class BreadcrumbReelStore(
         cid
     }
 
-    suspend fun history(): Series<BreadcrumbReelState> = transact {
+    suspend fun history(): Series<borg.trikeshed.agent.modelmux.BreadcrumbReelState> = transact {
         states.values.sortedByDescending { (objectState(it["run"])["startedAt"] as? Number)?.toLong() ?: 0L }
             .map { state ->
                 val run = objectState(state["run"])
@@ -114,7 +114,7 @@ class BreadcrumbReelStore(
             }.toSeries()
     }
 
-    suspend fun read(id: String): BreadcrumbReelState? = transact {
+    suspend fun read(id: String): borg.trikeshed.agent.modelmux.BreadcrumbReelState? = transact {
         states[id]?.let { state ->
             val captures = rows(state["captures"])
             val missing = captures.filterNot(::available)
@@ -150,8 +150,8 @@ class BreadcrumbReelStore(
         require(run["status"] in setOf("completed", "partial", "interrupted", "failed")) {
             "Wait for the comparison to finish"
         }
-        require(winner in BreadcrumbLane.entries.map { it.id } + "tie")
-        val completed = BreadcrumbLane.entries.filter { lane ->
+        require(winner in borg.trikeshed.agent.modelmux.BreadcrumbLane.entries.map { it.id } + "tie")
+        val completed = borg.trikeshed.agent.modelmux.BreadcrumbLane.entries.filter { lane ->
             rows(run["lanes"]).any { it["id"] == lane.id && it["status"] == "completed" &&
                 (it["output"] as? String)?.isNotBlank() == true && (it["resultId"] as? String)?.isNotBlank() == true }
         }
@@ -163,8 +163,8 @@ class BreadcrumbReelStore(
             mapOf("winner" to winner, "note" to note, "atMs" to clock(), "actor" to "human"))))
     }
 
-    suspend fun review(id: String, lane: String, correctness: ModelCorrectness, disposition: ModelDisposition,
-                       note: String, concept: String, correction: String = ""): BreadcrumbReelState = transact {
+    suspend fun review(id: String, lane: String, correctness: borg.trikeshed.agent.modelmux.ModelCorrectness, disposition: borg.trikeshed.agent.modelmux.ModelDisposition,
+                       note: String, concept: String, correction: String = ""): borg.trikeshed.agent.modelmux.BreadcrumbReelState = transact {
         val state = requireNotNull(states[id]) { "Unknown reel" }
         val run = objectState(state["run"])
         val output = rows(run["lanes"]).firstOrNull { it["id"] == lane && it["resultId"] is String }
@@ -172,6 +172,10 @@ class BreadcrumbReelStore(
         require(note.length <= 2000 && concept.length <= 500 && correction.length <= 4000)
         val models = objectState(run["models"])
         val versions = run["modelVersions"]?.let(::objectState).orEmpty()
+        val micro = lane == borg.trikeshed.agent.modelmux.BreadcrumbLane.MICRO.id
+        // A heuristic lane has no model: its review is a label on a policy's output, never a model generation grade.
+        // Archives written before the heuristic lane still name the summarizer model and keep that attribution.
+        val heuristic = micro && models["micro"] is String
         val reviews = rows(state["reviews"])
         val at = clock()
         val correctionCid = correction.takeIf { it.isNotBlank() }?.let {
@@ -186,10 +190,11 @@ class BreadcrumbReelStore(
         val review = mapOf(
             "runId" to id, "lane" to lane, "contextId" to "$id-$lane",
             "breadcrumbId" to output["resultId"], "attemptId" to "$id-$lane",
-            "model" to models[if (lane == BreadcrumbLane.MICRO.id) "summarizer" else "main"],
-            "modelVersion" to versions[if (lane == BreadcrumbLane.MICRO.id) "summarizer" else "main"],
+            "model" to if (heuristic) null else models[if (micro) "summarizer" else "main"],
+            "modelVersion" to if (heuristic) null else versions[if (micro) "summarizer" else "main"],
+            "generator" to if (heuristic) models["micro"] else "model",
             "harness" to (run["harness"] as? String ?: "breadcrumb-reel-v1"), "taskKind" to TASK,
-            "basis" to ModelGradeBasis.CORRECTNESS, "score" to null,
+            "basis" to borg.trikeshed.agent.modelmux.ModelGradeBasis.CORRECTNESS, "score" to null,
             "correctness" to correctness.name, "disposition" to disposition.name,
             "actor" to "human", "note" to note, "concept" to concept,
             "sequence" to reviews.size + 1, "atMs" to at, "correctionCid" to correctionCid?.value,
@@ -203,9 +208,9 @@ class BreadcrumbReelStore(
      * Pin a deterministic, byte-counted selection in [fromMs, untilMs). This never unlinks
      * other captured payloads. The watermark fixes the population; future captures need a new pin.
      */
-    suspend fun retain(fromMs: Long, untilMs: Long, fraction: Double): Series<BreadcrumbReelState> = transact {
+    suspend fun retain(fromMs: Long, untilMs: Long, fraction: Double): Series<borg.trikeshed.agent.modelmux.BreadcrumbReelState> = transact {
         require(fromMs >= 0 && untilMs > fromMs && fraction.isFinite() && fraction in 0.0..1.0)
-        val results = mutableListOf<BreadcrumbReelState>()
+        val results = mutableListOf<borg.trikeshed.agent.modelmux.BreadcrumbReelState>()
         for ((id, state) in states.toMap()) {
             val captures = rows(state["captures"]).filter {
                 (it["atMs"] as Number).toLong() in fromMs until untilMs
@@ -231,16 +236,22 @@ class BreadcrumbReelStore(
         results.toSeries()
     }
 
-    suspend fun grades(): Series<ModelGrade> = transact {
+    suspend fun grades(): Series<borg.trikeshed.agent.modelmux.ModelGrade> = transact {
         states.values.flatMap { rows(it["reviews"]) }
-            .mapNotNull { modelGrade(it, (it["sequence"] as Number).toLong()) }.toSeries()
+            .filter { (it["generator"] as? String)?.startsWith("heuristic:") != true }
+            .mapNotNull {
+                borg.trikeshed.agent.modelmux.modelGrade(
+                    it,
+                    (it["sequence"] as Number).toLong()
+                )
+            }.toSeries()
     }
 
-    suspend fun selections(): Series<BreadcrumbReelState> = transact {
+    suspend fun selections(): Series<borg.trikeshed.agent.modelmux.BreadcrumbReelState> = transact {
         states.values.flatMap { rows(it["reviews"]) }.groupBy { it["attemptId"] }.values
             .map { it.last() }.filter {
-                it["disposition"] == ModelDisposition.SELECTED.name &&
-                    (it["correctness"] != ModelCorrectness.INACCURATE.name || it["correctionCid"] is String)
+                it["disposition"] == borg.trikeshed.agent.modelmux.ModelDisposition.SELECTED.name &&
+                    (it["correctness"] != borg.trikeshed.agent.modelmux.ModelCorrectness.INACCURATE.name || it["correctionCid"] is String)
             }.map { review ->
                 val run = objectState(states.getValue(review["runId"] as String)["run"])
                 val output = rows(run["lanes"]).first { it["id"] == review["lane"] }
@@ -276,17 +287,17 @@ class BreadcrumbReelStore(
         }
     }
 
-    fun objectState(value: Any?): BreadcrumbReelState {
+    fun objectState(value: Any?): borg.trikeshed.agent.modelmux.BreadcrumbReelState {
         val source = value as? Map<*, *> ?: throw IllegalArgumentException("Reel object required")
         require(source.keys.all { it is String })
         @Suppress("UNCHECKED_CAST")
-        return source as BreadcrumbReelState
+        return source as borg.trikeshed.agent.modelmux.BreadcrumbReelState
     }
 
-    fun rows(value: Any?): List<BreadcrumbReelState> =
+    fun rows(value: Any?): List<borg.trikeshed.agent.modelmux.BreadcrumbReelState> =
         (value as? List<*> ?: throw IllegalArgumentException("Reel array required")).map(::objectState)
 
-    fun available(record: BreadcrumbReelState): Boolean {
+    fun available(record: borg.trikeshed.agent.modelmux.BreadcrumbReelState): Boolean {
         val cid = ContentId(record["cid"] as String)
         val bytes = cas.get(cid) ?: return false
         return bytes.size.toLong() == (record["bytes"] as Number).toLong() && ContentId.of(bytes) == cid

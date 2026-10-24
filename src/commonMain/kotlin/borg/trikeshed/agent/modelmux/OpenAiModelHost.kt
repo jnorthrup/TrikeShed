@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
@@ -6,7 +6,7 @@ import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.confix.*
 import kotlinx.coroutines.CancellationException
-import modelmux.acp.*
+import borg.trikeshed.agent.modelmux.acp.*
 
 /** OpenAI wire routes; transport and admitted exchanges remain owned by the existing HTX runtime. */
 class OpenAiModelHost(

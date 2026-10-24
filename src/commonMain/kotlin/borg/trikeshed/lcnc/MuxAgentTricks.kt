@@ -3,7 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toSeries
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -15,10 +15,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.datetime.Clock
-import modelmux.ModelMux
-import modelmux.MuxCallContext
-import modelmux.MuxCallRecord
-import modelmux.defaultSecureIdGenerator
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.MuxCallContext
+import borg.trikeshed.agent.modelmux.MuxCallRecord
+import borg.trikeshed.agent.modelmux.defaultSecureIdGenerator
 
 /** A bounded live relay over one reusable LCNC macro, with invocation-local evidence. */
 object MuxAgentTricks {

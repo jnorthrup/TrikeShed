@@ -1,9 +1,9 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.modelmux.BrainClient
-import keymux.CouchKeyStore
-import keymux.KeyMux
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.CouchKeyStore
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlin.coroutines.CoroutineContext
 
 object BrainClientKey : LcncServiceKey<BrainClient>("BrainClientKey")

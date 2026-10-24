@@ -15,8 +15,8 @@ import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import keymux.KeyMux
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.test.Test

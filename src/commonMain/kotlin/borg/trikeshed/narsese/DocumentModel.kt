@@ -15,7 +15,7 @@ import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
-import modelmux.MuxCallContext
+import borg.trikeshed.agent.modelmux.MuxCallContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 

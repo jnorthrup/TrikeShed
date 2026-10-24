@@ -531,7 +531,7 @@ class PatchWire(
     private val mountScope: kotlinx.coroutines.CoroutineScope? = null,
     /** Tika/OCR mining over project dbs; extracts land as `.extract.md` citizens + belief mints. */
     private val miner: ProjectMiner? = null,
-    private val catalogProvider: (suspend () -> modelmux.ModelMux)? = null,
+    private val catalogProvider: (suspend () -> borg.trikeshed.agent.modelmux.ModelMux)? = null,
     private val sessionSnapshot: File? = null,
     /** The stored set of prompts (Forge genesis, Cut P): read, save, history — each version a CAS citizen. */
     private val prompts: borg.trikeshed.lcnc.PromptStore? = null,
@@ -550,9 +550,9 @@ class PatchWire(
     private val pointcuts: borg.trikeshed.pointcut.PointcutBlackboardAdapter? = null,
 ) {
     private suspend fun modelCatalog() = hostedCatalog(catalogProvider?.invoke() ?: brain.modelMux())
-    private val breadcrumbContexts = muxContext[modelmux.BreadcrumbElement] ?: modelmux.BreadcrumbElement(
+    private val breadcrumbContexts = muxContext[borg.trikeshed.agent.modelmux.BreadcrumbElement] ?: borg.trikeshed.agent.modelmux.BreadcrumbElement(
         store = sessionSnapshot?.let { snapshot ->
-            modelmux.BreadcrumbFileStore(JvmFileOperations(),
+            borg.trikeshed.agent.modelmux.BreadcrumbFileStore(JvmFileOperations(),
                 File(snapshot.absoluteFile.parentFile, "breadcrumbs").path)
         },
     )
@@ -561,8 +561,8 @@ class PatchWire(
         BreadcrumbReelService(mountScope, muxContext + breadcrumbContexts, blackboard, repository, ::modelCatalog,
             pointcuts = pointcuts ?: borg.trikeshed.pointcut.PointcutBlackboardAdapter(blackboard),
             archive = sessionSnapshot?.let { snapshot ->
-                modelmux.BreadcrumbReelStore(
-                    modelmux.BreadcrumbFileStore(JvmFileOperations(),
+                borg.trikeshed.agent.modelmux.BreadcrumbReelStore(
+                    borg.trikeshed.agent.modelmux.BreadcrumbFileStore(JvmFileOperations(),
                         File(snapshot.absoluteFile.parentFile, "reels").path),
                     breadcrumbContexts.cas,
                 )
@@ -583,7 +583,7 @@ class PatchWire(
             val body = if (text.startsWith("$method ")) text.substringAfter("\r\n\r\n", text.substringAfter("\n\n", "")) else text
             val response = withContext(muxContext.minusKey(kotlinx.coroutines.Job) + kotlinx.coroutines.currentCoroutineContext()) {
                 val mux = modelCatalog()
-                modelmux.BreadcrumbModelHost(mux, breadcrumbContexts).handle(borg.trikeshed.htx.parseHtxRequest(
+                borg.trikeshed.agent.modelmux.BreadcrumbModelHost(mux, breadcrumbContexts).handle(borg.trikeshed.htx.parseHtxRequest(
                     "http://localhost$path", method = httpMethod,
                     body = borg.trikeshed.lib.ByteSeries(body.encodeToByteArray()),
                 ))
@@ -1149,12 +1149,12 @@ class PatchWire(
         } ?: emptyList()
 
     /** Dynamic registry hosts are credential-free; authenticated destinations come from the operator catalog. */
-    private fun hostedCatalog(base: modelmux.ModelMux): modelmux.ModelMux {
+    private fun hostedCatalog(base: borg.trikeshed.agent.modelmux.ModelMux): borg.trikeshed.agent.modelmux.ModelMux {
         val entries = attachments?.let(::loadEndpointRegistry).orEmpty().filter {
             it["auth"] == "none" && (it["flags"] as? Map<*, *>)?.get("enabled") != false
         }
         if (entries.isEmpty()) return base
-        return base.withModels(keymux.KeyMux {}) {
+        return base.withModels(borg.trikeshed.agent.keymux.KeyMux {}) {
             for (entry in entries) {
                 val name = entry["name"] as? String ?: continue
                 val id = entry["model"] as? String ?: continue
@@ -1162,7 +1162,7 @@ class PatchWire(
                 if (name.isBlank() || id.isBlank() || url.isBlank()) continue
                 borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist.allowUrl(url)
                 model("host/$name/$id", setOf("chat", "tools"), baseUrl = url,
-                    provider = "host:$name", wireModel = id, auth = keymux.LlmAuth.NONE)
+                    provider = "host:$name", wireModel = id, auth = borg.trikeshed.agent.keymux.LlmAuth.NONE)
             }
         }
     }

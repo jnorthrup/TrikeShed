@@ -17,7 +17,7 @@ import borg.trikeshed.userspace.nio.channels.FileChannel
 import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermission
 import borg.trikeshed.userspace.nio.file.attribute.PosixFilePermissions
-import keymux.CouchKeyStore
+import borg.trikeshed.agent.keymux.CouchKeyStore
 
 /** Private credential CAS and revision log. The host must not attach this database to public surfaces. */
 class HeadhunterCredentials private constructor(

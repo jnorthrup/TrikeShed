@@ -1,10 +1,10 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.parse.reify
 
-import keymux.KeyMux
-import keymux.LlmAuth
-import keymux.HermesModelConfig
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.LlmAuth
+import borg.trikeshed.agent.keymux.HermesModelConfig
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
 import borg.trikeshed.htx.emptyHtxHeaders
@@ -15,7 +15,7 @@ import kotlinx.coroutines.currentCoroutineContext
 
 /**
  * One discovered model as neutral facts: identity + context window + tier.
- * Quota is NOT a discovery fact — it is metered by [QuotaLegion]; discovery
+ * Quota is NOT a discovery fact — it is metered by [borg.trikeshed.agent.modelmux.QuotaLegion]; discovery
  * never fabricates headroom it cannot see.
  */
 data class DiscoveredModel(
@@ -41,23 +41,32 @@ data class DiscoveredModel(
  */
 object ModelDiscovery {
     /** Config and observed Hermes models retain their provider identity without assuming quota. */
-    fun fromHermes(config: HermesModelConfig?, rows: Series<LedgerRow>): Series<DiscoveredModel> {
-        val models = linkedMapOf<borg.trikeshed.lib.Join<String, String>, DiscoveredModel>()
+    fun fromHermes(config: borg.trikeshed.agent.keymux.HermesModelConfig?, rows: Series<borg.trikeshed.agent.modelmux.LedgerRow>): Series<borg.trikeshed.agent.modelmux.DiscoveredModel> {
+        val models = linkedMapOf<borg.trikeshed.lib.Join<String, String>, borg.trikeshed.agent.modelmux.DiscoveredModel>()
         if (config != null) models[config.provider j config.model] =
-            DiscoveredModel(config.provider, config.model, config.contextWindow)
+            borg.trikeshed.agent.modelmux.DiscoveredModel(
+                config.provider,
+                config.model,
+                config.contextWindow
+            )
         for (row in rows.view) {
             if (row.provider.isBlank() || row.model.isBlank()) continue
-            models.getOrPut(row.provider j row.model) { DiscoveredModel(row.provider, row.model) }
+            models.getOrPut(row.provider j row.model) {
+                borg.trikeshed.agent.modelmux.DiscoveredModel(
+                    row.provider,
+                    row.model
+                )
+            }
         }
         return models.values.toSeries()
     }
 
     /** Parse one provider `/models` payload into discovered models. */
-    fun parseModels(provider: String, json: String): Series<DiscoveredModel> {
+    fun parseModels(provider: String, json: String): Series<borg.trikeshed.agent.modelmux.DiscoveredModel> {
         val root = runCatching { reify(json) }.getOrNull() as? Map<*, *>
             ?: return emptySeriesOf()
         val data = root["data"] as? List<*> ?: return emptySeriesOf()
-        val out = ArrayList<DiscoveredModel>()
+        val out = ArrayList<borg.trikeshed.agent.modelmux.DiscoveredModel>()
         for (item in data) {
             val m = item as? Map<*, *> ?: continue
             val id = m["id"]?.toString()?.trim() ?: continue
@@ -69,7 +78,7 @@ object ModelDiscovery {
             val pricing = m["pricing"] as? Map<*, *>
             val promptPrice = pricing?.get("prompt")?.toString()?.toDoubleOrNull()
             out.add(
-                DiscoveredModel(
+                borg.trikeshed.agent.modelmux.DiscoveredModel(
                     provider, id, contextWindow, isFree(id, pricing),
                     pricePerPromptToken = promptPrice,
                 )
@@ -95,18 +104,18 @@ object ModelDiscovery {
     suspend fun discover(
         provider: String,
         baseUrl: String,
-        keyMux: KeyMux? = null,
-        auth: LlmAuth = LlmAuth.REQUIRED,
-    ): Result<Series<DiscoveredModel>> {
-        runCatching { Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
+        keyMux: borg.trikeshed.agent.keymux.KeyMux? = null,
+        auth: borg.trikeshed.agent.keymux.LlmAuth = borg.trikeshed.agent.keymux.LlmAuth.REQUIRED,
+    ): Result<Series<borg.trikeshed.agent.modelmux.DiscoveredModel>> {
+        runCatching { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }.getOrElse { return Result.failure(it) }
         val htx = currentCoroutineContext()[HtxKey]
             ?: return Result.failure(IllegalStateException("No HtxKey found in coroutine context"))
-        val key = if (auth == LlmAuth.NONE) null
+        val key = if (auth == borg.trikeshed.agent.keymux.LlmAuth.NONE) null
             else keyMux?.get("llm.$provider.key") ?: keyMux?.get("llm.default.key")
         val headers = if (key != null) htxHeaders("Authorization" j "Bearer $key") else emptyHtxHeaders()
         val req = parseHtxRequest(url = "${baseUrl.trimEnd('/')}/models", method = HtxMethod.GET).copy(headers = headers)
         return try {
-            Airgap.requireRemote()
+            borg.trikeshed.agent.modelmux.Airgap.requireRemote()
             val resp = htx.request(req)
             if (resp.status !in 200..299) {
                 Result.failure(IllegalStateException("ModelDiscovery failed with HTTP ${resp.status}"))
@@ -121,13 +130,13 @@ object ModelDiscovery {
     /**
      * Bridge discoveries into the neutral catalog the routing strategies rank.
      * [quotaOf] supplies quota (default: none known) — discovery refuses to
-     * invent headroom; wire a [QuotaLegion] standing here when one exists.
+     * invent headroom; wire a [borg.trikeshed.agent.modelmux.QuotaLegion] standing here when one exists.
      */
     fun toCatalog(
-        models: Series<DiscoveredModel>,
-        quotaOf: (DiscoveredModel) -> Int = { -1 },
-    ): Series<ModelCatalogEntry> = models α { d ->
-        ModelCatalogEntry(
+        models: Series<borg.trikeshed.agent.modelmux.DiscoveredModel>,
+        quotaOf: (borg.trikeshed.agent.modelmux.DiscoveredModel) -> Int = { -1 },
+    ): Series<borg.trikeshed.agent.modelmux.ModelCatalogEntry> = models α { d ->
+        borg.trikeshed.agent.modelmux.ModelCatalogEntry(
             provider = d.provider,
             model = d.modelId,
             freeTier = d.freeTier,

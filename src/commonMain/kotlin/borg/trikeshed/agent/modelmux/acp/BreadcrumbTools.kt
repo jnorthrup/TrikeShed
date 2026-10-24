@@ -1,10 +1,10 @@
-package modelmux.acp
+package borg.trikeshed.agent.modelmux.acp
 
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.job.ContentId
-import modelmux.*
+import borg.trikeshed.agent.modelmux.*
 
 const val TOOL_BREADCRUMB = "breadcrumb"
 const val TOOL_RECALL = "recall"

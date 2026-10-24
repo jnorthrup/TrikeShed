@@ -8,14 +8,14 @@ import borg.trikeshed.lcnc.ccek.LcncCcekAssembly
 import borg.trikeshed.lib.s_
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import com.sun.net.httpserver.HttpServer
-import keymux.ApiSource
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.ApiSource
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import java.net.InetSocketAddress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test

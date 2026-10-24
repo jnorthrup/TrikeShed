@@ -11,9 +11,9 @@ import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.memory.content
 import borg.trikeshed.memory.description
 import borg.trikeshed.memory.memoryFile
-import modelmux.acp.MemoryHarnessProfile
-import modelmux.acp.MemoryRole
-import modelmux.acp.toolNames
+import borg.trikeshed.agent.modelmux.acp.MemoryHarnessProfile
+import borg.trikeshed.agent.modelmux.acp.MemoryRole
+import borg.trikeshed.agent.modelmux.acp.toolNames
 
 /**
  * MCP server surface for citation-backed search (Prong 5).

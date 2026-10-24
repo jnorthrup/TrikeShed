@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.cursor.Cursor
 import borg.trikeshed.cursor.ColumnMeta
@@ -22,12 +22,12 @@ object AutoFallbackRule {
      * Evaluates a fallback strategy based on the given signal and candidates cursor projection.
      */
     fun evaluate(
-        signal: ExhaustionSignal,
+        signal: borg.trikeshed.agent.modelmux.ExhaustionSignal,
         candidatesProjection: Cursor,
         leaseId: String,
         currentAttempt: Int,
         lastAttemptedModelId: String?
-    ): FallbackRequestDescriptor? {
+    ): borg.trikeshed.agent.modelmux.FallbackRequestDescriptor? {
         if (currentAttempt >= MAX_RETRIES) return null
 
         var modelIdCol = -1
@@ -50,7 +50,7 @@ object AutoFallbackRule {
             val modelId = row.b(modelIdCol).a as String
             
             if (foundLast) {
-                return FallbackRequestDescriptor(
+                return borg.trikeshed.agent.modelmux.FallbackRequestDescriptor(
                     modelId = modelId,
                     leaseId = leaseId,
                     retryAttempt = currentAttempt + 1

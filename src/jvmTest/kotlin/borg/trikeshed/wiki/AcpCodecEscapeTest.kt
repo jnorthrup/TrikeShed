@@ -4,7 +4,7 @@ import borg.trikeshed.parse.reify
 
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.emptySeriesOf
-import modelmux.acp.AcpCodec
+import borg.trikeshed.agent.modelmux.acp.AcpCodec
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -43,10 +43,10 @@ class AcpCodecEscapeTest {
     @Test
     fun requestEncodingEscapesEveryControlCharacter() {
         val msgs = listOf("user" to "tab\there\r\nand a \u0007 bell")
-        val headers: borg.trikeshed.lib.Series<modelmux.acp.AcpMessage> = emptySeriesOf()
-        val tools: borg.trikeshed.lib.Series<modelmux.acp.AcpTool> = emptySeriesOf()
-        val meta: modelmux.acp.AcpMeta = "glm-4.7-flash" j ("chat" j headers)
-        val body: modelmux.acp.AcpRequestBody =
+        val headers: borg.trikeshed.lib.Series<borg.trikeshed.agent.modelmux.acp.AcpMessage> = emptySeriesOf()
+        val tools: borg.trikeshed.lib.Series<borg.trikeshed.agent.modelmux.acp.AcpTool> = emptySeriesOf()
+        val meta: borg.trikeshed.agent.modelmux.acp.AcpMeta = "glm-4.7-flash" j ("chat" j headers)
+        val body: borg.trikeshed.agent.modelmux.acp.AcpRequestBody =
             (msgs.size j { i: Int -> msgs[i].first j msgs[i].second }) j tools
         val json = AcpCodec.encodeRequest(meta j body, maxTokens = 8, temperature = 0.0)
         assertTrue("\\t" in json && "\\r" in json && "\\n" in json && "\\u0007" in json, json)

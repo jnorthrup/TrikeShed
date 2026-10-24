@@ -8,9 +8,9 @@ import borg.trikeshed.htx.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.confix.*
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import keymux.KeyMux
-import keymux.TestKeySource
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.TestKeySource
+import borg.trikeshed.agent.modelmux.ModelMux
 import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

@@ -481,8 +481,8 @@ class BoardStoreElement(
                 "claim-admission" -> if (id != "$attemptId/admission") return "invalid claim admission identity"
                 "claim" -> if (id != "$attemptId/result") return "invalid claim result identity"
                 "grade" -> {
-                    val grade = modelmux.modelGrade(value, sequence + 1) ?: return "invalid model grade"
-                    if (grade.basis != modelmux.ModelGradeBasis.CORRECTNESS) return "external grade requires human-correctness-v1"
+                    val grade = borg.trikeshed.agent.modelmux.modelGrade(value, sequence + 1) ?: return "invalid model grade"
+                    if (grade.basis != borg.trikeshed.agent.modelmux.ModelGradeBasis.CORRECTNESS) return "external grade requires human-correctness-v1"
                     val ref = receipts["$attemptId/result"] ?: return "grade requires retained claim result"
                     if (ref.jobId != cmd.jobId.value) return "grade belongs to another card"
                     val result = withContext(Dispatchers.Unconfined) {

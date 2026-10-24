@@ -31,8 +31,8 @@ import borg.trikeshed.lib.j
 class MuxReactorElement(
     parentJob: Job? = null,
     initialConfig: MuxReactorConfig = MuxReactorConfig(),
-    private val keyMux: keymux.KeyMux? = null,
-    private val modelMuxProvider: (suspend () -> modelmux.ModelMux)? = null,
+    private val keyMux: borg.trikeshed.agent.keymux.KeyMux? = null,
+    private val modelMuxProvider: (suspend () -> borg.trikeshed.agent.modelmux.ModelMux)? = null,
 ) : AsyncContextElement(ElementState.CREATED, parentJob) {
     companion object Key : AsyncContextKey<MuxReactorElement>()
 
@@ -42,13 +42,13 @@ class MuxReactorElement(
         require(modelMuxProvider == null || keyMux != null) { "ModelMux binding requires KeyMux" }
     }
 
-    fun keyMux(): keymux.KeyMux? {
+    fun keyMux(): borg.trikeshed.agent.keymux.KeyMux? {
         if (keyMux != null) requireMuxOpen()
         return keyMux
     }
 
     /** Resolve on every invocation so inherited contexts observe catalog refreshes. */
-    suspend fun modelMux(): modelmux.ModelMux? {
+    suspend fun modelMux(): borg.trikeshed.agent.modelmux.ModelMux? {
         val provider = modelMuxProvider ?: return null
         requireMuxOpen()
         val mux = provider()
@@ -72,8 +72,8 @@ class MuxReactorElement(
     private val _flowState = MutableStateFlow(emptyState(initialConfig))
     val flowState: StateFlow<MuxReactorState> = _flowState.asStateFlow()
 
-    private val providerHealthMap = mutableMapOf<String, modelmux.ProviderHealth>()
-    val providerHealth: Series<modelmux.ProviderHealth>
+    private val providerHealthMap = mutableMapOf<String, borg.trikeshed.agent.modelmux.ProviderHealth>()
+    val providerHealth: Series<borg.trikeshed.agent.modelmux.ProviderHealth>
         get() = providerHealthMap.size j { i: Int ->
             providerHealthMap.values.elementAt(i)
         }
@@ -84,7 +84,7 @@ class MuxReactorElement(
         val currentRate = existing?.successRate ?: if (success) 1.0 else 0.0
         val newRate = if (existing == null) currentRate else currentRate * 0.9 + (if (success) 1.0 else 0.0) * 0.1
         
-        providerHealthMap[provider] = modelmux.ProviderHealth(
+        providerHealthMap[provider] = borg.trikeshed.agent.modelmux.ProviderHealth(
             provider = provider,
             successRate = newRate,
             recentLatencyMs = latencyMs,

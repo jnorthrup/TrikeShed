@@ -14,7 +14,7 @@ import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import org.junit.jupiter.api.Assumptions.assumeFalse
 import org.junit.jupiter.api.io.TempDir
 import org.junit.jupiter.api.parallel.ResourceLock

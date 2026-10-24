@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.cursor.RowVec
 import borg.trikeshed.lib.*
@@ -8,7 +8,7 @@ import borg.trikeshed.parse.confix.*
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
-import modelmux.acp.*
+import borg.trikeshed.agent.modelmux.acp.*
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 

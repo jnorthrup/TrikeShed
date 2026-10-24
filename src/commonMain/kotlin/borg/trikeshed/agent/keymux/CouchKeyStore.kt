@@ -1,4 +1,4 @@
-package keymux
+package borg.trikeshed.agent.keymux
 
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.lib.get
@@ -29,14 +29,14 @@ import kotlinx.coroutines.sync.withLock
  */
 class CouchKeyStore(
     private val db: Couch,
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "couch-credential"
     private val sourceLock = Mutex()
 
     /**
      * Resolve `llm.<provider>.key` or `llm.<provider>.base_url` from CouchDB.
      */
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         if (path.size != 3 || path[0] != "llm") return null
         val provider = path[1]
         val field = path[2]
@@ -54,7 +54,7 @@ class CouchKeyStore(
      * The path's field selects which value to update; the whole document is
      * upserted so all three fields are always present.
      */
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         if (path.size != 3 || path[0] != "llm") return
         val provider = path[1]
         val field = path[2]

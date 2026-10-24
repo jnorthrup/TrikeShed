@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 /**
  * One endpoint's identity as the roster knows it: which provider serves it, and

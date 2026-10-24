@@ -2,12 +2,12 @@ package borg.trikeshed.ccek
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import keymux.KeyMux
-import modelmux.ModelMux
-import modelmux.acp.AcpAction
-import modelmux.autoOf
-import modelmux.costOptimizedOf
-import modelmux.priorityOf
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.acp.AcpAction
+import borg.trikeshed.agent.modelmux.autoOf
+import borg.trikeshed.agent.modelmux.costOptimizedOf
+import borg.trikeshed.agent.modelmux.priorityOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -25,7 +25,7 @@ class SeatSelectionTest {
         }
     }
 
-    private fun names(result: modelmux.RouteResult): List<String> =
+    private fun names(result: borg.trikeshed.agent.modelmux.RouteResult): List<String> =
         (0 until result.a.size).map { result.a[it].a }
 
     @Test

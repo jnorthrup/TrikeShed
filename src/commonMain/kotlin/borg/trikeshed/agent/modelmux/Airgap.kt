@@ -1,4 +1,4 @@
-package modelmux
+package borg.trikeshed.agent.modelmux
 
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import kotlinx.coroutines.currentCoroutineContext

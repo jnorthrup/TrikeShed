@@ -3,10 +3,10 @@ package borg.trikeshed.modelmux
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.reify
-import keymux.*
+import borg.trikeshed.agent.keymux.*
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
-import modelmux.*
+import borg.trikeshed.agent.modelmux.*
 import kotlin.test.*
 
 class BrainChatOptionsTest {

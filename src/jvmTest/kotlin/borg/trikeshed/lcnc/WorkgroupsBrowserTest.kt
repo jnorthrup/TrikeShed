@@ -11,8 +11,8 @@ import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.parse.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
-import keymux.KeyMux
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlinx.coroutines.*
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList

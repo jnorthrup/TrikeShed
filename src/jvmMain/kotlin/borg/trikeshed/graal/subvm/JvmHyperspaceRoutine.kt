@@ -5,11 +5,11 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.vm.Teleported
-import keymux.KeyMux
-import modelmux.Airgap
-import modelmux.acp.AcpCodec
-import modelmux.acp.AcpMessage
-import modelmux.acp.AcpResponse
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.Airgap
+import borg.trikeshed.agent.modelmux.acp.AcpCodec
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
+import borg.trikeshed.agent.modelmux.acp.AcpResponse
 import borg.trikeshed.lib.Series
 import borg.trikeshed.pointcut.VmFacet
 import borg.trikeshed.htx.HtxKey

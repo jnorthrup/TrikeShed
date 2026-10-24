@@ -62,7 +62,7 @@ import borg.trikeshed.utils.kanban.SessionBoardStore
 import borg.trikeshed.userspace.nio.file.spi.JvmAppendWal
 import borg.trikeshed.kanban.SessionCause
 import kotlinx.coroutines.withContext
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 /** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
 private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
@@ -339,6 +339,16 @@ object OroborosDaemon {
         return fd
     }
 
+    /**
+     * The one shared-context owner this root hands to every child that reads evidence. LOCAL (nothing is fetched from anyone)
+     * unless OROBOROS_CONTEXT_KUBO_REPO names a node; the settings can express no publication at all. Kept outside mainImpl's
+     * JVM-sized coroutine state machine.
+     */
+    private suspend fun openSharedContext(cas: borg.trikeshed.job.CasStore): borg.trikeshed.agent.modelmux.SharedContextElement =
+        borg.trikeshed.agent.modelmux.SharedContextRoot.open("shared-context", cas,
+            borg.trikeshed.agent.modelmux.SharedContextRoot.settings { HostSystem.getenv(it) },
+            borg.trikeshed.userspace.nio.channels.spi.JvmProcessOperations())
+
     /** Keep curation drain ordering outside mainImpl's JVM-sized coroutine state machine. */
     private suspend fun drainCuration(
         follow: kotlinx.coroutines.Job?,
@@ -588,13 +598,13 @@ object OroborosDaemon {
         // and KeyMux.withBinding() returns a NEW instance. The Hermes default-model
         // pin is therefore refreshed by mutating this overlay's snapshot
         // (PinOverlaySource.setPin/clearPin), not by rebinding the mux.
-        val hermesPinOverlay = keymux.PinOverlaySource()
+        val hermesPinOverlay = borg.trikeshed.agent.keymux.PinOverlaySource()
         // baseKeyMux excludes the overlay — buildBrain's own pin resolution
         // reads THIS, not keyMux, so a repin never resolves through its own
         // previous pin (self-referential freeze). keyMux (reactor/catalog
         // identity) is the one wrapper, built once, on top of it.
-        val baseKeyMux = keymux.operatorKeyMux(fileOps = fileOps, hermesHome = keymux.defaultHermesHome())
-        val hermesCredentials = keymux.HermesCredentialSource(keymux.defaultHermesHome(), fileOps)
+        val baseKeyMux = borg.trikeshed.agent.keymux.operatorKeyMux(fileOps = fileOps, hermesHome = borg.trikeshed.agent.keymux.defaultHermesHome())
+        val hermesCredentials = borg.trikeshed.agent.keymux.HermesCredentialSource(borg.trikeshed.agent.keymux.defaultHermesHome(), fileOps)
         val keyMux = baseKeyMux.withBinding("*", hermesPinOverlay)
         // Probe early so a missing key aborts before opening the HTX reactor.
         val apiKeyPresent = kotlinx.coroutines.withContext(Dispatchers.IO) { keyMux.get("JULES_API_KEY") }
@@ -752,7 +762,7 @@ object OroborosDaemon {
         // ReactorSource and ModelMux lease/release calls were unreachable:
         // no MuxReactorElement.Key was ever present in any coroutine context,
         // so every quota edge was dead code in production.
-        val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> modelmux.ModelMux>(coroutineContext[kotlinx.coroutines.Job])
+        val operatorMux = kotlinx.coroutines.CompletableDeferred<suspend () -> borg.trikeshed.agent.modelmux.ModelMux>(coroutineContext[kotlinx.coroutines.Job])
         val muxReactor = MuxReactorElement(
             initialConfig = MuxReactorConfig(),
             parentJob = coroutineContext[kotlinx.coroutines.Job],
@@ -854,12 +864,13 @@ object OroborosDaemon {
                     "TRIKESHED_CAS=$casSelection fstype=${casBacking?.first ?: "<undeterminable>"} " +
                     "source=${casBacking?.second ?: "<undeterminable>"}"
         )
-        val breadcrumbContexts = modelmux.BreadcrumbElement(
-            store = modelmux.BreadcrumbFileStore(
+        val breadcrumbContexts = borg.trikeshed.agent.modelmux.BreadcrumbElement(
+            store = borg.trikeshed.agent.modelmux.BreadcrumbFileStore(
                 fileOps, fileOps.resolvePath(forgeHome.absolutePath, "modelmux", "breadcrumbs"),
             ),
             cas = casStore,
         )
+        val sharedContext = openSharedContext(casStore)
         // The D13 MATERIALIZE surface exists only when the btrfs store is live: reflinkReorganize
         // is a BtrfsReflinkStore member, absent from the CasStore base class.
         val casReflinkWire = btrfsCasStore?.let {
@@ -1265,7 +1276,7 @@ object OroborosDaemon {
         val hermesWatch = borg.trikeshed.hermes.HermesWatch.default()
         // One meter for every mux. Hermes history contributes usage; only provider HTTP
         // observations can establish exhausted capacity.
-        val quotaLegion = modelmux.QuotaLegion(windowMs = modelmux.QuotaLegion.DAY_MS)
+        val quotaLegion = borg.trikeshed.agent.modelmux.QuotaLegion(windowMs = borg.trikeshed.agent.modelmux.QuotaLegion.DAY_MS)
         fun refreshQuotaLegion() {
             val now = HostSystem.currentTimeMillis()
             borg.trikeshed.hermes.HermesModelUsageJdbc.install()
@@ -1368,7 +1379,7 @@ object OroborosDaemon {
                         model = it.model, provider = it.provider, contextWindow = it.contextWindow,
                     )
                 }
-                val importedMux = modelmux.ModelMux(baseKeyMux) {
+                val importedMux = borg.trikeshed.agent.modelmux.ModelMux(baseKeyMux) {
                     quota(quotaLegion)
                     defaultModel(specs.first().model)
                     for (spec in specs) model(spec.model, setOf("chat", "tools"), baseUrl = spec.base,
@@ -1444,7 +1455,7 @@ object OroborosDaemon {
             corpus = projectCorpus,
             snapshots = snapshotService,
             programs = programLedger,
-            muxContext = htxElement + muxReactor + breadcrumbContexts,
+            muxContext = htxElement + muxReactor + breadcrumbContexts + sharedContext,
             mountScope = wireScope,
             miner = projectMiner,
             catalogProvider = { requireNotNull(muxReactor.modelMux()) },
@@ -1749,7 +1760,7 @@ object OroborosDaemon {
         // keeps the bare id for the first claimant and qualifies the rest.
         // LIVE: cards are rebuilt on the first mux call after Hermes' files
         // change, so the picklist shows a `/model` switch on its next open.
-        suspend fun buildLcncMux(): modelmux.ModelMux {
+        suspend fun buildLcncMux(): borg.trikeshed.agent.modelmux.ModelMux {
             val liveBrain = brainClient.live()
             val pin = brainClient.pin["pin"] as? Map<*, *>
             val pinnedModel = pin?.get("model") as? String
@@ -1766,7 +1777,7 @@ object OroborosDaemon {
             // secret is resolved inside PinOverlaySource.read, from pinMux's
             // OWN keyMux — never fetched here.
             val pinnedSpec = if (pinnedModel != null && pinnedProvider != null && pinnedBase != null) {
-                val pinLookup: Pair<modelmux.ModelMux, String>? = runCatching {
+                val pinLookup: Pair<borg.trikeshed.agent.modelmux.ModelMux, String>? = runCatching {
                     val pinMux = liveBrain.modelMux()
                     val pinKeyId = requireNotNull(pinMux.modelKeyId(pinnedModel)) { "Configured model has no key binding" }
                     pinMux to pinKeyId
@@ -1779,7 +1790,7 @@ object OroborosDaemon {
                 val pinKeyId = pinLookup?.second
                 if (pinKeyMux != null && pinKeyId != null && pinKeyMux !== keyMux) {
                     hermesPinOverlay.setPin(
-                        keymux.PinBinding(
+                        borg.trikeshed.agent.keymux.PinBinding(
                             provider = pinnedProvider,
                             baseUrl = pinnedBase,
                             keyDelegate = pinKeyMux,
@@ -1843,10 +1854,10 @@ object OroborosDaemon {
                             ?.joinToString(prefix = "; hermes providers with no key here (not offered): ", separator = ", ").orEmpty(),
             )
             val lcncRosterEntries = lcncRoster.map {
-                modelmux.RosterEntry(provider = it.provider ?: it.name, model = it.model)
+                borg.trikeshed.agent.modelmux.RosterEntry(provider = it.provider ?: it.name, model = it.model)
             }
-            val lcncCardIds = modelmux.disambiguateModelIds(lcncRosterEntries)
-            modelmux.shadowedEntries(lcncRosterEntries).forEach { (entry, id) ->
+            val lcncCardIds = borg.trikeshed.agent.modelmux.disambiguateModelIds(lcncRosterEntries)
+            borg.trikeshed.agent.modelmux.shadowedEntries(lcncRosterEntries).forEach { (entry, id) ->
                 HostSystem.err(
                     "[OROBOROS] roster collision: ${entry.provider} serves '${entry.model}', " +
                             "already claimed — routable as '$id' (previously unreachable)",
@@ -1854,7 +1865,7 @@ object OroborosDaemon {
             }
             // Preserve usage history and HTTP quota observations across catalog rebuilds.
             refreshQuotaLegion()
-            return modelmux.ModelMux(catalogKeys) {
+            return borg.trikeshed.agent.modelmux.ModelMux(catalogKeys) {
                 quota(quotaLegion)
                 if (pinnedSpec != null) defaultModel(lcncCardIds.first())
                 lcncRoster.forEachIndexed { i, ep ->
@@ -2510,6 +2521,10 @@ object OroborosDaemon {
                 runCatching { couchWire.requestFactory?.drain() }.onFailure {
                     HostSystem.err("[OROBOROS] RequestFactory drain failed: ${it.message}")
                 }
+                // Admitted shared-context transfers settle while the stores they read and write are still open.
+                runCatching { sharedContext.drain() }.onFailure {
+                    HostSystem.err("[OROBOROS] Shared context drain failed: ${it.message}")
+                }
                 // Stop job-agent admission and await accepted writes/model work before their stores close.
                 runCatching { headhunterWire.drain() }
                 runCatching { documentReviewWire.stopAdmission() }
@@ -2649,13 +2664,13 @@ object OroborosDaemon {
         )
     }
 
-    private suspend fun couchKeyStore(couchDb: borg.trikeshed.couch.Couch, keyMux: keymux.KeyMux): keymux.CouchKeyStore {
-        val couchKeyStore = keymux.CouchKeyStore(couchDb)
+    private suspend fun couchKeyStore(couchDb: borg.trikeshed.couch.Couch, keyMux: borg.trikeshed.agent.keymux.KeyMux): borg.trikeshed.agent.keymux.CouchKeyStore {
+        val couchKeyStore = borg.trikeshed.agent.keymux.CouchKeyStore(couchDb)
         // Seed CouchKeyStore from the daemon's KeyMux so the prefill
         // dropdown resolves real keys from env/hermes/harness stores.
         runCatching {
-            for (i in 0 until keymux.HarnessRegistry.providers.size) {
-                val p = keymux.HarnessRegistry.providers[i]
+            for (i in 0 until borg.trikeshed.agent.keymux.HarnessRegistry.providers.size) {
+                val p = borg.trikeshed.agent.keymux.HarnessRegistry.providers[i]
                 val k = kotlinx.coroutines.withContext(Dispatchers.IO) {
                     keyMux.get("llm.${p.id}.key")
                 }
@@ -2715,7 +2730,7 @@ object OroborosDaemon {
         socketScope: CoroutineScope,
         world: borg.trikeshed.btrfs.BtrfsWorldStore,
         fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
-        breadcrumbContexts: modelmux.BreadcrumbElement,
+        breadcrumbContexts: borg.trikeshed.agent.modelmux.BreadcrumbElement,
     ): borg.trikeshed.forge.server.HermesConsoleWire {
         val console = hermesConsole(config, home, repoDir, forgeHome, blackboard,
             htxElement, muxReactor, socketScope, world, fileOps, breadcrumbContexts)
@@ -2739,7 +2754,7 @@ object OroborosDaemon {
         socketScope: CoroutineScope,
         world: borg.trikeshed.btrfs.BtrfsWorldStore,
         fileOps: borg.trikeshed.userspace.nio.file.spi.FileOperations,
-        breadcrumbContexts: modelmux.BreadcrumbElement,
+        breadcrumbContexts: borg.trikeshed.agent.modelmux.BreadcrumbElement,
         panelId: String = "default",
     ): borg.trikeshed.hermes.HermesVmConsole {
         val runtime = File(forgeHome, "python/graalpy-25.3.4.1")
@@ -2807,7 +2822,7 @@ object OroborosDaemon {
     /** The redacted mux working set, published to the board on every reactor state publication. */
     private fun kotlinx.coroutines.CoroutineScope.launchMuxBlackboardHome(
         muxReactor: borg.trikeshed.userspace.reactor.MuxReactorElement,
-        quotaLegion: modelmux.QuotaLegion,
+        quotaLegion: borg.trikeshed.agent.modelmux.QuotaLegion,
         daemonBlackboard: borg.trikeshed.graal.ConfixBlackboard,
     ) = launch {
         muxReactor.flowState.collect { state ->

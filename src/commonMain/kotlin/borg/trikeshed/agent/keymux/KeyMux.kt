@@ -1,5 +1,9 @@
-package keymux
+package borg.trikeshed.agent.keymux
 
+import borg.trikeshed.agent.keymux.asString
+import borg.trikeshed.agent.keymux.isFreeTier
+import borg.trikeshed.agent.keymux.iterable
+import borg.trikeshed.agent.keymux.toKeyPath
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.jsonOf
 
@@ -33,19 +37,19 @@ typealias KeyPath = Series<String>
 typealias KeyResult = Join<String?, String>   // value j sourceName
 
 /** A binding: path joined to a lazy source */
-typealias KeyBinding = Join<KeyPath, KeySource>
+typealias KeyBinding = Join<borg.trikeshed.agent.keymux.KeyPath, borg.trikeshed.agent.keymux.KeySource>
 
-/** One consistent key/base_url answer from [KeyMux.resolveLlm] — never a mix of two different snapshots. */
+/** One consistent key/base_url answer from [borg.trikeshed.agent.keymux.KeyMux.resolveLlm] — never a mix of two different snapshots. */
 internal class LlmResolution(val keyId: String?, val authKey: String?, val baseUrl: String)
 
 /** NONE is an explicit endpoint policy: no credential source or default key is consulted. */
 enum class LlmAuth { REQUIRED, NONE }
 
 /** The mux itself: ordered bindings + resolver strategy */
-typealias KeyMuxCore = Join<Series<KeyBinding>, KeyResolver>
+typealias KeyMuxCore = Join<Series<borg.trikeshed.agent.keymux.KeyBinding>, borg.trikeshed.agent.keymux.KeyResolver>
 
-fun KeyPath.asString(): String = view.joinToString(".")
-fun String.toKeyPath(): KeyPath {
+fun borg.trikeshed.agent.keymux.KeyPath.asString(): String = view.joinToString(".")
+fun String.toKeyPath(): borg.trikeshed.agent.keymux.KeyPath {
     // Provider/model identifiers are opaque: custom:api.loom.example and glm-5.3 are single identities.
     val field = substringAfterLast('.')
     if (startsWith("llm.") && field in setOf("key", "base_url") && lastIndexOf('.') > 4) {
@@ -60,29 +64,29 @@ fun String.toKeyPath(): KeyPath {
 
 sealed class KeySource {
     abstract val name: String
-    abstract suspend fun read(path: KeyPath): String?
-    abstract suspend fun write(path: KeyPath, value: String)
+    abstract suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String?
+    abstract suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String)
     open suspend fun invalidate() {}
 }
 
 // ── ENV source ──
 
-class EnvSource(private val prefix: String = "") : KeySource() {
+class EnvSource(private val prefix: String = "") : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "env"
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val key = (if (prefix.isNotEmpty()) "$prefix." else "") + path.asString()
         return SystemOperations.default.getenv(key.uppercase().replace('.', '_'))
     }
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("env source is read-only")
     }
 }
 
 /** Resolve one exact environment variable for an explicitly bound key path. */
-class EnvVarSource(private val variable: String) : KeySource() {
+class EnvVarSource(private val variable: String) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "env:$variable"
-    override suspend fun read(path: KeyPath): String? = SystemOperations.default.getenv(variable)
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? = SystemOperations.default.getenv(variable)
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("env source is read-only")
     }
 }
@@ -99,7 +103,7 @@ class PersistSource(
     private val encode: (Map<String, String>) -> ByteArray = { m ->
         jsonOf(m).encodeToByteArray()
     }
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "persist"
 
     private var cache: Map<String, String>? = null
@@ -130,12 +134,12 @@ class PersistSource(
         ops.write(file, encode(m))
     }
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val ops = getFileOps()
         return load(ops)[path.asString()]
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         val ops = getFileOps()
         flush(ops, load(ops) + (path.asString() to value))
     }
@@ -170,7 +174,7 @@ class ApiSource(
     private val baseUrl: String,
     private val headers: Series<Twin<String>> = 0 j { throw IndexOutOfBoundsException() },
     private val explicitHtx: HtxElement? = null
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "api"
 
     private suspend fun getHtx(): HtxElement {
@@ -179,7 +183,7 @@ class ApiSource(
             ?: error("No HtxKey found in coroutine context for ApiSource")
     }
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val htx = getHtx()
         val url = "$baseUrl/${path.asString()}"
         val htxHeaders = htxHeaders(*headers.toArray())
@@ -189,7 +193,7 @@ class ApiSource(
         return resp.body.toArray().decodeToString().trim().ifEmpty { null }
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         val htx = getHtx()
         val url = "$baseUrl/${path.asString()}"
         val htxHeaders = htxHeaders(*headers.toArray())
@@ -206,7 +210,7 @@ class ApiSource(
 
 class ReactorSource(
     private val explicitReactor: MuxReactorElement? = null
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     override val name = "reactor"
 
     private suspend fun getReactor(): MuxReactorElement {
@@ -215,7 +219,7 @@ class ReactorSource(
             ?: error("No MuxReactorElement found in coroutine context for ReactorSource")
     }
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val r = getReactor()
         val keyStr = path.asString()
         if (!keyStr.startsWith("llm.") || !keyStr.endsWith(".key")) return null
@@ -229,7 +233,7 @@ class ReactorSource(
         return match?.keyId
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("reactor source is read-only")
     }
 }
@@ -239,9 +243,9 @@ class ReactorSource(
 class FixedKeySource(
     private val fixedValue: String,
     override val name: String = "fixed",
-) : KeySource() {
-    override suspend fun read(path: KeyPath): String? = fixedValue
-    override suspend fun write(path: KeyPath, value: String) {
+) : borg.trikeshed.agent.keymux.KeySource() {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? = fixedValue
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("fixed source is read-only")
     }
 }
@@ -250,21 +254,21 @@ class FixedKeySource(
 
 /**
  * A pin's provider/base_url plus WHERE to resolve its secret — never the
- * secret itself. [keyDelegate] must not be the [KeyMux] this overlay is
- * bound into (would recurse through [PinOverlaySource.read]).
+ * secret itself. [keyDelegate] must not be the [borg.trikeshed.agent.keymux.KeyMux] this overlay is
+ * bound into (would recurse through [borg.trikeshed.agent.keymux.PinOverlaySource.read]).
  */
 data class PinBinding(
     val provider: String,
     val baseUrl: String,
-    val keyDelegate: KeyMux,
+    val keyDelegate: borg.trikeshed.agent.keymux.KeyMux,
     val keyId: String,
 )
 
 private class PinSnapshotSource(
-    private val pin: PinBinding?,
+    private val pin: borg.trikeshed.agent.keymux.PinBinding?,
     override val name: String,
-) : KeySource() {
-    override suspend fun read(path: KeyPath): String? {
+) : borg.trikeshed.agent.keymux.KeySource() {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val binding = pin ?: return null
         return when (path.asString()) {
             "llm.${binding.provider}.key" -> binding.keyDelegate.get(binding.keyId)
@@ -273,24 +277,24 @@ private class PinSnapshotSource(
         }
     }
 
-    override suspend fun write(path: KeyPath, value: String) =
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) =
         throw UnsupportedOperationException("session binding is read-only")
 }
 
 /**
- * Holds one atomically-replaceable [PinBinding] (e.g. the Hermes default
- * provider) so it can be refreshed without ever constructing a new [KeyMux]
- * — [KeyMux.withBinding] returns a new instance, which breaks the
+ * Holds one atomically-replaceable [borg.trikeshed.agent.keymux.PinBinding] (e.g. the Hermes default
+ * provider) so it can be refreshed without ever constructing a new [borg.trikeshed.agent.keymux.KeyMux]
+ * — [borg.trikeshed.agent.keymux.KeyMux.withBinding] returns a new instance, which breaks the
  * `mux.keyMux === element.keyMux()` identity [MuxReactorElement.modelMux]
  * requires. The secret is resolved lazily in [read], from [keyDelegate]; no
  * caller ever holds the raw value. [setPin] replaces the whole binding, so
  * switching the pinned provider cannot leave a stale entry behind.
  */
-class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
+class PinOverlaySource(override val name: String = "hermes-pin") : borg.trikeshed.agent.keymux.KeySource() {
     private val lock = kotlinx.coroutines.sync.Mutex()
-    private var binding: PinBinding? = null
+    private var binding: borg.trikeshed.agent.keymux.PinBinding? = null
 
-    suspend fun setPin(binding: PinBinding) {
+    suspend fun setPin(binding: borg.trikeshed.agent.keymux.PinBinding) {
         lock.withLock { this.binding = binding }
     }
 
@@ -299,9 +303,9 @@ class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
     }
 
     /** One atomic read of the current binding — the caller must reuse it for every field it needs. */
-    suspend fun snapshotPin(): PinBinding? = lock.withLock { binding }
+    suspend fun snapshotPin(): borg.trikeshed.agent.keymux.PinBinding? = lock.withLock { binding }
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val b = lock.withLock { binding } ?: return null
         return when (path.asString()) {
             "llm.${b.provider}.key" -> b.keyDelegate.get(b.keyId)
@@ -310,7 +314,7 @@ class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
         }
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         throw UnsupportedOperationException("pin overlay source is read-only")
     }
 
@@ -323,7 +327,7 @@ class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
 // ── CACHED source — TTL-based cache wrapping any other source ──
 
 /**
- * Wraps any [KeySource] with TTL-based in-memory caching.
+ * Wraps any [borg.trikeshed.agent.keymux.KeySource] with TTL-based in-memory caching.
  * Model listings and provider keys change infrequently — caching for [ttlMs]
  * (default 24 hours) avoids re-resolving env/persist/API on every chat call.
  *
@@ -332,10 +336,10 @@ class PinOverlaySource(override val name: String = "hermes-pin") : KeySource() {
  * `KeySource`, compiling for JVM, JS, and Wasm from one source.
  */
 class CachedKeySource(
-    private val delegate: KeySource,
+    private val delegate: borg.trikeshed.agent.keymux.KeySource,
     override val name: String = "cached:${delegate.name}",
     private val ttlMs: Long = 24 * 60 * 60 * 1000L, // 24 hours
-) : KeySource() {
+) : borg.trikeshed.agent.keymux.KeySource() {
     private data class Entry(val value: String?, val resolvedAt: Long)
 
     private val lock = kotlinx.coroutines.sync.Mutex()
@@ -343,7 +347,7 @@ class CachedKeySource(
 
     private fun nowMs(): Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
 
-    override suspend fun read(path: KeyPath): String? {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? {
         val key = path.asString()
         val now = nowMs()
         lock.withLock { cache[key] }?.let { entry ->
@@ -354,7 +358,7 @@ class CachedKeySource(
         return value
     }
 
-    override suspend fun write(path: KeyPath, value: String) {
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         delegate.write(path, value)
         lock.withLock { cache.remove(path.asString()) }
     }
@@ -376,9 +380,9 @@ class CachedKeySource(
 class TestKeySource(
     override val name: String = "test",
     var value: String? = "sk-test"
-) : KeySource() {
-    override suspend fun read(path: KeyPath): String? = value
-    override suspend fun write(path: KeyPath, value: String) {
+) : borg.trikeshed.agent.keymux.KeySource() {
+    override suspend fun read(path: borg.trikeshed.agent.keymux.KeyPath): String? = value
+    override suspend fun write(path: borg.trikeshed.agent.keymux.KeyPath, value: String) {
         this.value = value
     }
 }
@@ -464,18 +468,19 @@ class FreeTierKeyProjection(private val base: Series<MuxKeyEntry>) : Sequence<Mu
     }
 }
 
-fun Series<MuxKeyEntry>.freeTierProjection(): FreeTierKeyProjection = FreeTierKeyProjection(this)
+fun Series<MuxKeyEntry>.freeTierProjection(): borg.trikeshed.agent.keymux.FreeTierKeyProjection =
+    borg.trikeshed.agent.keymux.FreeTierKeyProjection(this)
 
 // ═══════════════════════════════════════════
 // Resolver — first-wins precedence across sources
 // ═══════════════════════════════════════════
 
 interface KeyResolver {
-    suspend fun resolve(bindings: Series<KeyBinding>, path: KeyPath): KeyResult
+    suspend fun resolve(bindings: Series<borg.trikeshed.agent.keymux.KeyBinding>, path: borg.trikeshed.agent.keymux.KeyPath): borg.trikeshed.agent.keymux.KeyResult
 }
 
-object FirstWinsResolver : KeyResolver {
-    override suspend fun resolve(bindings: Series<KeyBinding>, path: KeyPath): KeyResult =
+object FirstWinsResolver : borg.trikeshed.agent.keymux.KeyResolver {
+    override suspend fun resolve(bindings: Series<borg.trikeshed.agent.keymux.KeyBinding>, path: borg.trikeshed.agent.keymux.KeyPath): borg.trikeshed.agent.keymux.KeyResult =
         (0 until bindings.size).firstNotNullOfOrNull { i ->
             val (p, src) = bindings[i]
             if (pathMatch(p, path)) src.read(path)?.let { it j src.name } else null
@@ -493,7 +498,7 @@ object FirstWinsResolver : KeyResolver {
      * - `pathMatch("api.users".toKeyPath(), "API.users".toKeyPath())` returns `false` (case-sensitive)
      * - `pathMatch("users.*.profile".toKeyPath(), "users.123.profile".toKeyPath())` returns `true`
      */
-    private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
+    private fun pathMatch(binding: borg.trikeshed.agent.keymux.KeyPath, query: borg.trikeshed.agent.keymux.KeyPath): Boolean {
         // A bare "*" binding is the global fallback — env()/persist()/api()/reactor()/
         // harness() all bind it. Before this arm, ["*"] only matched single-segment
         // queries, so `KeyMux { env() }` never answered "llm.<provider>.key" and the
@@ -511,51 +516,51 @@ object FirstWinsResolver : KeyResolver {
 // ═══════════════════════════════════════════
 
 class KeyMux constructor(
-    private val core: KeyMuxCore
+    private val core: borg.trikeshed.agent.keymux.KeyMuxCore
 ) {
-    private val bindings: Series<KeyBinding> get() = core.a
-    private val resolver: KeyResolver get() = core.b
+    private val bindings: Series<borg.trikeshed.agent.keymux.KeyBinding> get() = core.a
+    private val resolver: borg.trikeshed.agent.keymux.KeyResolver get() = core.b
 
     // Single-writer invariant: mutable map stays as private backing, modified by reactor/test
-    private val leaseBacking = mutableMapOf<KeyId, LeaseMetadata>()
+    private val leaseBacking = mutableMapOf<borg.trikeshed.agent.keymux.KeyId, borg.trikeshed.agent.keymux.LeaseMetadata>()
     
     // Visit counter to verify laziness in tests
     internal var leaseVisits = 0
 
     // Test-only setter since reactor mutation is not fully mocked here
-    internal fun setLeaseForTest(keyId: KeyId, metadata: LeaseMetadata) {
+    internal fun setLeaseForTest(keyId: borg.trikeshed.agent.keymux.KeyId, metadata: borg.trikeshed.agent.keymux.LeaseMetadata) {
         leaseBacking[keyId] = metadata
     }
 
     /** Lease-view API returning Series2<KeyId, LeaseMetadata> — lazy, no copying, Join not Pair. */
-    val activeLeases: Series2<KeyId, LeaseMetadata> get() = leaseBacking.size j { i ->
+    val activeLeases: Series2<borg.trikeshed.agent.keymux.KeyId, borg.trikeshed.agent.keymux.LeaseMetadata> get() = leaseBacking.size j { i ->
         leaseVisits++
         val entry = leaseBacking.entries.elementAt(i)
         entry.key j entry.value
     }
 
     companion object {
-        operator fun invoke(block: KeyMuxBuilder.() -> Unit): KeyMux =
-            KeyMuxBuilder().apply(block).build()
+        operator fun invoke(block: borg.trikeshed.agent.keymux.KeyMuxBuilder.() -> Unit): KeyMux =
+            borg.trikeshed.agent.keymux.KeyMuxBuilder().apply(block).build()
     }
 
     suspend fun get(key: String): String? {
         if (!key.startsWith("llm.") && ':' in key) {
-            for ((_, source) in bindings.view) if (source is HermesCredentialSource) {
+            for ((_, source) in bindings.view) if (source is borg.trikeshed.agent.keymux.HermesCredentialSource) {
                 source.credential(key)?.let { return it }
             }
         }
         return resolver.resolve(bindings, key.toKeyPath()).a
     }
 
-    suspend fun getWithSource(key: String): KeyResult = resolver.resolve(bindings, key.toKeyPath())
+    suspend fun getWithSource(key: String): borg.trikeshed.agent.keymux.KeyResult = resolver.resolve(bindings, key.toKeyPath())
 
     /**
      * One chat call's key + base_url, resolved from a SINGLE immutable pin
-     * snapshot — [PinOverlaySource.read] answers key and base_url as two
-     * independent calls, and a [PinOverlaySource.setPin] racing between them
+     * snapshot — [borg.trikeshed.agent.keymux.PinOverlaySource.read] answers key and base_url as two
+     * independent calls, and a [borg.trikeshed.agent.keymux.PinOverlaySource.setPin] racing between them
      * can pair an old secret with a new destination. [resolveLlm] takes the
-     * overlay's binding once via [PinOverlaySource.snapshotPin] and reuses it
+     * overlay's binding once via [borg.trikeshed.agent.keymux.PinOverlaySource.snapshotPin] and reuses it
      * for both fields; everything else falls through the ordinary
      * first-wins precedence [get] uses. REQUIRED returns null when no key resolves;
      * NONE uses only the explicit destination and never touches credential sources.
@@ -564,19 +569,26 @@ class KeyMux constructor(
         modelId: String,
         providerTag: String?,
         fallbackBaseUrl: String,
-        auth: LlmAuth = LlmAuth.REQUIRED,
-    ): LlmResolution? {
-        if (auth == LlmAuth.NONE) return LlmResolution(null, null, fallbackBaseUrl)
-        val pins = mutableMapOf<PinOverlaySource, PinBinding?>()
-        val pools = mutableMapOf<HermesCredentialSource, HermesCredentialSnapshot>()
+        auth: borg.trikeshed.agent.keymux.LlmAuth = borg.trikeshed.agent.keymux.LlmAuth.REQUIRED,
+    ): borg.trikeshed.agent.keymux.LlmResolution? {
+        if (auth == borg.trikeshed.agent.keymux.LlmAuth.NONE) return borg.trikeshed.agent.keymux.LlmResolution(
+            null,
+            null,
+            fallbackBaseUrl
+        )
+        val pins = mutableMapOf<borg.trikeshed.agent.keymux.PinOverlaySource, borg.trikeshed.agent.keymux.PinBinding?>()
+        val pools = mutableMapOf<borg.trikeshed.agent.keymux.HermesCredentialSource, borg.trikeshed.agent.keymux.HermesCredentialSnapshot>()
         val snapshot = bindings.view.map { binding ->
             val source = binding.b
             when (source) {
-                is PinOverlaySource -> {
+                is borg.trikeshed.agent.keymux.PinOverlaySource -> {
                     if (!pins.containsKey(source)) pins[source] = source.snapshotPin()
-                    binding.a j PinSnapshotSource(pins[source], source.name)
+                    binding.a j borg.trikeshed.agent.keymux.PinSnapshotSource(
+                        pins[source],
+                        source.name
+                    )
                 }
-                is HermesCredentialSource -> {
+                is borg.trikeshed.agent.keymux.HermesCredentialSource -> {
                     val pool = pools[source] ?: source.snapshot().also { pools[source] = it }
                     binding.a j pool
                 }
@@ -597,14 +609,18 @@ class KeyMux constructor(
         }
             ?: return null
         val base = key.b.b ?: prefixes.firstNotNullOfOrNull { read("$it.base_url") } ?: fallbackBaseUrl
-        return LlmResolution(keyId = key.a, authKey = key.b.a, baseUrl = base)
+        return borg.trikeshed.agent.keymux.LlmResolution(
+            keyId = key.a,
+            authKey = key.b.a,
+            baseUrl = base
+        )
     }
 
     /** Prepend one binding without copying or mutating the inherited source chain. */
-    fun withBinding(path: String, source: KeySource): KeyMux {
+    fun withBinding(path: String, source: borg.trikeshed.agent.keymux.KeySource): KeyMux {
         val binding = path.toKeyPath() j source
         val inherited = bindings
-        val expanded: Series<KeyBinding> = (inherited.size + 1) j { i: Int ->
+        val expanded: Series<borg.trikeshed.agent.keymux.KeyBinding> = (inherited.size + 1) j { i: Int ->
             if (i == 0) binding else inherited[i - 1]
         }
         return KeyMux(expanded j resolver)
@@ -635,14 +651,14 @@ class KeyMux constructor(
         resetAtMs: Long = kotlinx.datetime.Clock.System.now().toEpochMilliseconds() + 60_000L,
     ): String? {
         for ((_, source) in bindings.view) {
-            if (source is HermesCredentialSource && source.exhaust(key, resetAtMs)) return null
+            if (source is borg.trikeshed.agent.keymux.HermesCredentialSource && source.exhaust(key, resetAtMs)) return null
         }
         val path = key.toKeyPath()
         val keyStr = key
         // Find all PersistSource instances that have this key
-        val candidates = mutableListOf<Pair<PersistSource, String>>()
+        val candidates = mutableListOf<Pair<borg.trikeshed.agent.keymux.PersistSource, String>>()
         for ((p, src) in bindings.view) {
-            if (src is PersistSource && pathMatch(p, path)) {
+            if (src is borg.trikeshed.agent.keymux.PersistSource && pathMatch(p, path)) {
                 val ops = src.explicitFileOps
                     ?: currentCoroutineContext()[FileOperations.Key]
                     ?: continue
@@ -662,7 +678,7 @@ class KeyMux constructor(
             src.invalidate()
         }
         for ((p, src) in bindings.view) {
-            if (src is PersistSource && pathMatch(p, path)) {
+            if (src is borg.trikeshed.agent.keymux.PersistSource && pathMatch(p, path)) {
                 try {
                     src.write(path, nextValue)
                     src.invalidate()
@@ -697,7 +713,7 @@ class KeyMux constructor(
      * - `pathMatch("api.users.*".toKeyPath(), "api.users".toKeyPath())` returns `false` (binding is longer)
      * - `pathMatch("api".toKeyPath(), "api".toKeyPath())` returns `true`
      */
-    private fun pathMatch(binding: KeyPath, query: KeyPath): Boolean {
+    private fun pathMatch(binding: borg.trikeshed.agent.keymux.KeyPath, query: borg.trikeshed.agent.keymux.KeyPath): Boolean {
         if (binding.size > query.size) return false
         return binding.view.withIndex().all { (i, seg) -> seg == "*" || seg == query[i] }
     }
@@ -705,7 +721,7 @@ class KeyMux constructor(
     private suspend fun listRaw(prefix: String): Series<Join<String, String?>> {
         val results = mutableListOf<Join<String, String?>>()
         for ((_, src) in bindings.view) {
-            if (src is PersistSource) {
+            if (src is borg.trikeshed.agent.keymux.PersistSource) {
                 val fileOps = src.explicitFileOps
                     ?: currentCoroutineContext()[FileOperations.Key]
                     ?: continue
@@ -726,36 +742,40 @@ class KeyMux constructor(
 }
 
 class KeyMuxBuilder {
-    private val sources = mutableListOf<Join<KeyPath, KeySource>>()
+    private val sources = mutableListOf<Join<borg.trikeshed.agent.keymux.KeyPath, borg.trikeshed.agent.keymux.KeySource>>()
 
     fun env(prefix: String = ""): KeyMuxBuilder = apply {
-        sources.add("*".toKeyPath() j EnvSource(prefix))
+        sources.add("*".toKeyPath() j borg.trikeshed.agent.keymux.EnvSource(prefix))
     }
 
     fun persist(root: String): KeyMuxBuilder = apply {
-        sources.add("*".toKeyPath() j PersistSource(root))
+        sources.add("*".toKeyPath() j borg.trikeshed.agent.keymux.PersistSource(root))
     }
 
     fun api(baseUrl: String, vararg hdrs: Pair<String, String>): KeyMuxBuilder = apply {
         val h = hdrs.size j { i: Int -> hdrs[i].first j hdrs[i].second }
-        sources.add("*".toKeyPath() j ApiSource(baseUrl, h))
+        sources.add("*".toKeyPath() j borg.trikeshed.agent.keymux.ApiSource(baseUrl, h))
     }
 
     fun reactor(): KeyMuxBuilder = apply {
-        sources.add("*".toKeyPath() j ReactorSource())
+        sources.add("*".toKeyPath() j borg.trikeshed.agent.keymux.ReactorSource())
     }
 
-    fun bind(prefix: String, source: KeySource): KeyMuxBuilder = apply {
+    fun bind(prefix: String, source: borg.trikeshed.agent.keymux.KeySource): KeyMuxBuilder = apply {
         sources.add(prefix.toKeyPath() j source)
     }
 
-    /** Wrap the next-added source with [CachedKeySource] for24-hour TTL caching. */
-    fun cached(prefix: String, source: KeySource, ttlMs: Long = 24 * 60 * 60 * 1000L): KeyMuxBuilder = apply {
-        sources.add(prefix.toKeyPath() j CachedKeySource(source, ttlMs = ttlMs))
+    /** Wrap the next-added source with [borg.trikeshed.agent.keymux.CachedKeySource] for24-hour TTL caching. */
+    fun cached(prefix: String, source: borg.trikeshed.agent.keymux.KeySource, ttlMs: Long = 24 * 60 * 60 * 1000L): KeyMuxBuilder = apply {
+        sources.add(prefix.toKeyPath() j borg.trikeshed.agent.keymux.CachedKeySource(
+            source,
+            ttlMs = ttlMs
+        )
+        )
     }
 
-    fun build(): KeyMux {
-        val bindings: Series<KeyBinding> = sources.toSeries()
-        return KeyMux(bindings j FirstWinsResolver)
+    fun build(): borg.trikeshed.agent.keymux.KeyMux {
+        val bindings: Series<borg.trikeshed.agent.keymux.KeyBinding> = sources.toSeries()
+        return borg.trikeshed.agent.keymux.KeyMux(bindings j borg.trikeshed.agent.keymux.FirstWinsResolver)
     }
 }

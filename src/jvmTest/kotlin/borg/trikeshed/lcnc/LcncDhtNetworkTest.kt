@@ -26,9 +26,9 @@ import java.net.ServerSocket
 import java.nio.file.Files
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
-import keymux.*
+import borg.trikeshed.agent.keymux.*
 import kotlinx.coroutines.*
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import kotlin.test.*
 
 /** Independent Kubo peers authenticate and store the real Amino DHT traffic, never an in-memory dialer. */

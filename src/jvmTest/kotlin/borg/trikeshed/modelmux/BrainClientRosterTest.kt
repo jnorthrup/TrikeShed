@@ -1,7 +1,7 @@
 package borg.trikeshed.modelmux
 
-import keymux.KeyMux
-import keymux.harness
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.harness
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

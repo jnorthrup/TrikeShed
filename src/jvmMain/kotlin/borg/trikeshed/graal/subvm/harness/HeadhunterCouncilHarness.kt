@@ -7,7 +7,7 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.lib.view
 import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
-import modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.providerTag
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
@@ -57,7 +57,7 @@ object HeadhunterCouncilHarness {
         val supervisor = NioSupervisor()
         val htx = openHtxElement(nioSupervisor = supervisor, parentJob = currentCoroutineContext()[Job])
         try {
-            val answer = withContext(htx) { mux.council(modelmux.BreadcrumbElement(), seats.toSeries(), PROBE.trimIndent()) }
+            val answer = withContext(htx) { mux.council(borg.trikeshed.agent.modelmux.BreadcrumbElement(), seats.toSeries(), PROBE.trimIndent()) }
             println("── trail (${answer.trail.size} turns, chaired by ${answer.chair})")
             for ((index, turn) in answer.trail.withIndex())
                 println("  [${index + 1}] ${turn.phase} · ${turn.model}\n${turn.statement.prependIndent("      ")}")
