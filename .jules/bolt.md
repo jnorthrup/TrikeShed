@@ -9,3 +9,7 @@
 ## 2026-03-31 - Zero-allocation Series Header Lookup in HTX
 **Learning:** Calling `headers.toList().firstOrNull { ... }` on `Series<Join<String, String>>` allocates an intermediate `List` and an `Iterator` for every HTTP header lookup.
 **Action:** Always use zero-allocation index iteration `for (i in 0 until size)` over `Series` for lookups instead of converting to Kotlin `List`.
+
+## 2026-03-31 - Zero-Allocation SceneProjection Rendering
+**Learning:** In frame-by-frame 2D canvas/graph rendering (`SceneProjection`), repeatedly converting helper shapes (rectangles, ellipses, arrows, path parts) via `listOf(...).toSeries()` causes high per-frame heap allocations. Using `size j { i: Int -> ... }` constructs zero-allocation lazy Series views for geometry paths and frame items.
+**Action:** In render loops and geometry projection functions returning `Series<PathPart>` or `Series<DrawItem>`, replace `listOf(...).toSeries()` and `items.toSeries()` with index-based `size j { i: Int -> ... }` lazy views.

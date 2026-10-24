@@ -1,6 +1,7 @@
 package narchy.spacegraph
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.reduction.j
 import narchy.spacegraph.graphics.spi.*
 import kotlin.math.*
 
@@ -30,14 +31,15 @@ object SceneProjection {
             val a = boxes[e.source] ?: continue; val b = boxes[e.target] ?: continue
             val start = boundary(a, b.center); val end = boundary(b, a.center)
             val color = Rgba.parse(e.data.string("color", "#64748b"))
-            val parts = mutableListOf<PathPart>(PathPart.Move(start))
             val curved = e.kind in setOf(EdgeKind.CurvedEdge, EdgeKind.FlowEdge, EdgeKind.BundledEdge, EdgeKind.Wire)
             val bend = (end.x - start.x) / 2
-            if (curved) parts.add(PathPart.Cubic(Vec3(start.x + bend, start.y), Vec3(end.x - bend, end.y), end)) else parts.add(PathPart.Line(end))
+            /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocation */
+            val parts = 2 j { i: Int -> if (i == 0) PathPart.Move(start) else if (curved) PathPart.Cubic(Vec3(start.x + bend, start.y), Vec3(end.x - bend, end.y), end) else PathPart.Line(end) }
             val dashed = e.data.flag("dashed") || e.kind in setOf(EdgeKind.DottedEdge, EdgeKind.FlowEdge, EdgeKind.AnimatedEdge)
             val width = e.data.number("thickness", if (e.kind == EdgeKind.DynamicThicknessEdge) 1 + 3 * (sin(time) + 1) / 2 else 1.5).coerceAtLeast(0.1)
-            val dash = if (dashed) listOf(e.data.number("dashSize", 5.0), e.data.number("gapSize", 4.0)).toSeries() else emptySeriesOf()
-            items.add(DrawItem.Path(e.id, parts.toSeries(), stroke = color, width = width, dash = dash,
+            /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocation */
+            val dash = if (dashed) 2 j { i: Int -> if (i == 0) e.data.number("dashSize", 5.0) else e.data.number("gapSize", 4.0) } else emptySeriesOf()
+            items.add(DrawItem.Path(e.id, parts, stroke = color, width = width, dash = dash,
                 dashOffset = if (e.kind in setOf(EdgeKind.FlowEdge, EdgeKind.AnimatedEdge)) -time * 24 else 0.0, clip = viewport.bounds))
             val arrow = e.data.string("arrowhead")
             if (arrow == "true" || arrow == "target" || arrow == "both") items.add(arrow(e.id, end, if (curved) Vec3(end.x - bend, end.y) else start, color, e.data.number("arrowheadSize", 8.0)))
@@ -84,19 +86,36 @@ object SceneProjection {
                 else -> Unit
             }
         }
-        return FramePlan(viewport, items.toSeries(), revision = graph.revision)
+        /* ⚡ Bolt: Use zero-allocation j constructor for items Series view */
+        return FramePlan(viewport, items.size j { i: Int -> items[i] }, revision = graph.revision)
     }
 
-    fun rectangle(r: Rect): Series<PathPart> = listOf(PathPart.Move(Vec3(r.x, r.y)), PathPart.Line(Vec3(r.right, r.y)),
-        PathPart.Line(Vec3(r.right, r.bottom)), PathPart.Line(Vec3(r.x, r.bottom)), PathPart.Close).toSeries()
+    /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocation via listOf(...).toSeries() */
+    fun rectangle(r: Rect): Series<PathPart> = 5 j { i: Int ->
+        when (i) {
+            0 -> PathPart.Move(Vec3(r.x, r.y))
+            1 -> PathPart.Line(Vec3(r.right, r.y))
+            2 -> PathPart.Line(Vec3(r.right, r.bottom))
+            3 -> PathPart.Line(Vec3(r.x, r.bottom))
+            else -> PathPart.Close
+        }
+    }
+
+    /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocation via listOf(...).toSeries() */
     fun ellipse(r: Rect): Series<PathPart> {
         val rx = r.width / 2; val ry = r.height / 2; val cx = r.center.x; val cy = r.center.y; val k = 0.5522847498307936
-        return listOf(PathPart.Move(Vec3(cx + rx, cy)),
-            PathPart.Cubic(Vec3(cx + rx, cy + ry * k), Vec3(cx + rx * k, cy + ry), Vec3(cx, cy + ry)),
-            PathPart.Cubic(Vec3(cx - rx * k, cy + ry), Vec3(cx - rx, cy + ry * k), Vec3(cx - rx, cy)),
-            PathPart.Cubic(Vec3(cx - rx, cy - ry * k), Vec3(cx - rx * k, cy - ry), Vec3(cx, cy - ry)),
-            PathPart.Cubic(Vec3(cx + rx * k, cy - ry), Vec3(cx + rx, cy - ry * k), Vec3(cx + rx, cy)), PathPart.Close).toSeries()
+        return 6 j { i: Int ->
+            when (i) {
+                0 -> PathPart.Move(Vec3(cx + rx, cy))
+                1 -> PathPart.Cubic(Vec3(cx + rx, cy + ry * k), Vec3(cx + rx * k, cy + ry), Vec3(cx, cy + ry))
+                2 -> PathPart.Cubic(Vec3(cx - rx * k, cy + ry), Vec3(cx - rx, cy + ry * k), Vec3(cx - rx, cy))
+                3 -> PathPart.Cubic(Vec3(cx - rx, cy - ry * k), Vec3(cx - rx * k, cy - ry), Vec3(cx, cy - ry))
+                4 -> PathPart.Cubic(Vec3(cx + rx * k, cy - ry), Vec3(cx + rx, cy - ry * k), Vec3(cx + rx, cy))
+                else -> PathPart.Close
+            }
+        }
     }
+
     private fun boundary(r: Rect, target: Vec3): Vec3 {
         val d = target - r.center
         if (d.length < 1e-12) return r.center
@@ -104,9 +123,18 @@ object SceneProjection {
             if (abs(d.y) < 1e-12) Double.POSITIVE_INFINITY else r.height / 2 / abs(d.y))
         return r.center + d * t
     }
+
+    /* ⚡ Bolt: Use zero-allocation j constructor instead of intermediate List allocation via listOf(...).toSeries() */
     private fun arrow(id: String, tip: Vec3, previous: Vec3, color: Rgba, size: Double): DrawItem.Path {
         val d = (tip - previous).normalized(); val perpendicular = Vec3(-d.y, d.x)
-        return DrawItem.Path(id, listOf(PathPart.Move(tip), PathPart.Line(tip - d * size + perpendicular * size * 0.5),
-            PathPart.Line(tip - d * size - perpendicular * size * 0.5), PathPart.Close).toSeries(), color)
+        val parts = 4 j { i: Int ->
+            when (i) {
+                0 -> PathPart.Move(tip)
+                1 -> PathPart.Line(tip - d * size + perpendicular * size * 0.5)
+                2 -> PathPart.Line(tip - d * size - perpendicular * size * 0.5)
+                else -> PathPart.Close
+            }
+        }
+        return DrawItem.Path(id, parts, color)
     }
 }
