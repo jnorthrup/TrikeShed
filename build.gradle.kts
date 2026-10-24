@@ -796,6 +796,23 @@ val stageDaemonLib = tasks.register<Sync>("stageDaemonLib") {
     into(stagingLibDir)
 }
 
+// The runtime classpath for scripts/mux and scripts/mcp-stdio, which run the JVM entry points without a Gradle round-trip per call.
+// Build it once, offline: ./gradlew --offline muxClasspath -PkotlinJsApps=   → build/mux/classpath.txt
+// The build simplification removed this as dead; those two launchers (and test_mux_launcher / test_mcp_launcher) are its callers.
+tasks.register("muxClasspath") {
+    group = "oroboros"
+    description = "Write the JVM runtime classpath to build/mux/classpath.txt for scripts/mux and scripts/mcp-stdio."
+    dependsOn("jvmJar")
+    val outFile = layout.buildDirectory.file("mux/classpath.txt")
+    val cp = files(tasks.named("jvmJar"), configurations.getByName("jvmRuntimeClasspath"))
+    outputs.file(outFile)
+    doLast {
+        val f = outFile.get().asFile
+        f.parentFile.mkdirs()
+        f.writeText(cp.joinToString(":") { it.absolutePath })
+    }
+}
+
 // `-Pjdwp=5005` attaches a JDWP listener (suspend=n); `-Pjdwp=5005,suspend` waits for the debugger
 // before main runs. Replaces the --debug/--suspend flags the old bin/* wrappers parsed.
 val jdwpSpec: String? = providers.gradleProperty("jdwp").orNull
