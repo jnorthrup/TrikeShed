@@ -148,7 +148,10 @@ class BreadcrumbIndexTest {
         assertEquals(listOf("bysource", "bytitle", "bycontent"), context.foundIds("quokka"))
     }
 
-    @Test fun forQueriesOfWholeWordsRankingChangesTheOrderAndNotTheMatches() {
+    @Test fun forWholeContentWordsRankingChangesTheOrderAndNotTheMatches() {
+        // Every query word below is one the lexical policy keeps and occurs in the corpus only as a whole token,
+        // which is the case where the two rankings agree on which records match. The tests around this one pin
+        // the cases where they do not.
         val ranked = ranking()
         val scanned = BreadcrumbContext({ 0L })
         val corpus = listOf(
@@ -177,12 +180,40 @@ class BreadcrumbIndexTest {
             context.put(BreadcrumbId("body"), "tool:read", "the identifiers are listed here\n", BreadcrumbTimestamp(1_000))
             context.put(BreadcrumbId("titled"), "tool:read", "unrelated text\n", BreadcrumbTimestamp(1_001), title = "Identifiers")
             context.put(BreadcrumbId("camel"), "tool:read", "call getUserName once\n", BreadcrumbTimestamp(1_002))
+            context.put(BreadcrumbId("cached"), "tool:bash", "the build was cached\n", BreadcrumbTimestamp(1_003))
         }
         assertEquals(setOf("body", "titled"), scanned.foundIds("ident").toSet(), "a scan finds a fragment anywhere")
         assertEquals(listOf("titled"), ranked.foundIds("ident"), "a fragment still finds a title, but no longer a line of content")
         assertEquals(listOf("titled", "body"), ranked.foundIds("identifiers"), "and the title that was chosen outranks the line")
         assertEquals(emptyList(), scanned.foundIds("get_user"), "a scan needs the exact characters")
         assertEquals(listOf("camel"), ranked.foundIds("get_user"), "a query word is tokenized into the pieces a line is")
+        assertEquals(listOf("cached"), scanned.foundIds("cache"), "a scan finds a word inside another form of it")
+        assertEquals(emptyList(), ranked.foundIds("cache"), "a line answers only to its own tokens, not to a prefix of one")
+    }
+
+    @Test fun wordsTheLexicalPolicyDropsSelectNoContentButStillMatchTitlesAndSources() {
+        val ranked = ranking()
+        val scanned = BreadcrumbContext({ 0L })
+        for (context in listOf(ranked, scanned)) {
+            context.put(BreadcrumbId("plain"), "tool:read", "the quokka was seen at the lake\n", BreadcrumbTimestamp(1_000))
+            // "the" is not a word of this line, only letters inside two of its words.
+            context.put(BreadcrumbId("mother"), "tool:read", "mother and father came\n", BreadcrumbTimestamp(1_001))
+            context.put(BreadcrumbId("other"), "tool:read", "nothing to report\n", BreadcrumbTimestamp(1_002))
+            // The title holds "the" inside "Another"; titles and sources are matched by substring with every word.
+            context.put(BreadcrumbId("titled"), "tool:read", "unrelated text\n", BreadcrumbTimestamp(1_003), title = "Another handbook")
+        }
+        assertEquals(setOf("titled", "plain", "mother"), scanned.foundIds("the").toSet(), "a scan finds the letters wherever they are")
+        assertEquals(listOf("titled"), ranked.foundIds("the"), "a stopword selects no content, only the title and source it is a substring of")
+        assertEquals(setOf("titled", "plain", "mother"), scanned.foundIds("the quokka").toSet())
+        assertEquals(listOf("titled", "plain"), ranked.foundIds("the quokka"),
+            "in a longer query the dropped word adds nothing from content, and the word that is kept selects its line")
+        assertEquals(setOf("plain"), ranked.foundIds("quokka").toSet())
+    }
+
+    @Test fun searchingAnIndexWithNoRecordsFindsNothing() {
+        val context = ranking()
+        assertEquals(emptyList(), context.foundIds("quokka"))
+        assertEquals(emptyList(), context.foundIds(""))
     }
 
     @Test fun aSearchOverUnchangedRecordsReadsNoBlobAndANewRecordCostsOne() {

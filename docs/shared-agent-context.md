@@ -124,9 +124,10 @@ by the ordered content ids, so a list of records is the same index as a snapshot
 order (the records are ordered by id, a snapshot by document name); otherwise it is a different index over the same facets.
 
 What changes for a model that searches: content is matched by lexical token, as a peer's revision is. A fragment of a
-word (`ident` for `identifiers`) still finds a title or source but no longer a line of content; a query word is tokenized,
-so `get_user` finds `getUserName`. For whole words the matches are the same and only their order differs. To go back,
-construct the root's `BreadcrumbElement` without `facets`; nothing else needs to change.
+word (`ident` for `identifiers`, `cache` for `cached`) still finds a title or source but no longer a line of content; a
+query word is tokenized, so `get_user` finds `getUserName`; and a word the policy drops (`the`, `and`) selects no content
+line, though it still matches the letters of a title or source. For whole words the matches are the same and only their
+order differs. To go back, construct the root's `BreadcrumbElement` without `facets`; nothing else needs to change.
 
 What does not change: `recall`, the 16-bit alias protections (a colliding reference is ambiguous until the full cid is
 given), the originals in the CAS, and scope. Only the agent's own records are searched; nothing is added from a peer and

@@ -171,8 +171,9 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory(), val facets: Proje
      * Content is matched by lexical token, the way a peer's pinned revision is, not by substring. A fragment of a word
      * (`ident` for `identifiers`) matches a title or source, as it always has, but no longer a line of content; and a
      * query word is tokenized, so `retry,` and `getUserName` match their pieces where the scan needed the exact
-     * characters. Which records match can therefore differ from the scan's in both directions for such queries; for
-     * whole words it does not, and the order is all that changes.
+     * characters. A word the policy drops (`the`, `and`) selects no content at all, though it still matches the
+     * letters of a title or source. Which records match can therefore differ from the scan's in both directions for
+     * such queries; for whole words it does not, and the order is all that changes.
      *
      * Every distinct blob is named to the facets by content id and read only when the facets do not already know it,
      * so a search over unchanged records reads nothing and a new record costs the read of that one blob.
