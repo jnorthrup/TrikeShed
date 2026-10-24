@@ -120,6 +120,24 @@ class LinuxFileOperationsTest {
     }
 
     @Test
+    fun resolvePathNormalizesDotDotSoAWalkToTheFirstExistingAncestorTerminates() = inTempDir { files, dir ->
+        // BoardFileWal's walk, bounded: an adapter that only joins "..", as this one once did, never reaches an existing path,
+        // and the unbounded form of this loop is what ran a whole test binary to 6 GB. A test must fail, not spin.
+        var ancestor = files.resolvePath(dir, "new", "board")
+        var steps = 0
+        while (!files.exists(ancestor)) {
+            val parent = files.resolvePath(ancestor, "..")
+            assertTrue(parent != ancestor && parent.length < ancestor.length, "the walk must shrink: $ancestor -> $parent")
+            ancestor = parent
+            assertTrue(++steps <= 8, "the walk is not converging: $ancestor")
+        }
+        assertEquals(files.resolvePath(dir), ancestor)
+        assertEquals("/a", files.resolvePath("/a/b", ".."))
+        assertEquals("/", files.resolvePath("/", ".."))
+        assertEquals("/a/c", files.resolvePath("/a", "./b", "..", "c"))
+    }
+
+    @Test
     fun anExclusiveLeaseRefusesASecondHolderUntilTheFirstCloses() = inTempDir { files, dir ->
         val path = "$dir/journal.lock"
         val first = files.acquireExclusiveLease(path)
