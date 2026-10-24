@@ -875,13 +875,15 @@ object OroborosDaemon {
                     "TRIKESHED_CAS=$casSelection fstype=${casBacking?.first ?: "<undeterminable>"} " +
                     "source=${casBacking?.second ?: "<undeterminable>"}"
         )
-        val breadcrumbContexts = borg.trikeshed.agent.modelmux.BreadcrumbElement(
-            store = borg.trikeshed.agent.modelmux.BreadcrumbFileStore(
+        val sharedContext = openSharedContext(casStore)
+        // The agent's own breadcrumb index ranks through the facet memory the shared context answers projections
+        // with: a record it kept and a document a peer pinned with the same bytes are one document facet.
+        val breadcrumbContexts = borg.trikeshed.agent.modelmux.SharedContextRoot.breadcrumbs(
+            sharedContext, casStore,
+            borg.trikeshed.agent.modelmux.BreadcrumbFileStore(
                 fileOps, fileOps.resolvePath(forgeHome.absolutePath, "modelmux", "breadcrumbs"),
             ),
-            cas = casStore,
         )
-        val sharedContext = openSharedContext(casStore)
         // The D13 MATERIALIZE surface exists only when the btrfs store is live: reflinkReorganize
         // is a BtrfsReflinkStore member, absent from the CasStore base class.
         val casReflinkWire = btrfsCasStore?.let {
