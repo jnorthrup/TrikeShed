@@ -20,6 +20,16 @@ import platform.posix.*
 
 class LinuxFileOperations : FileOperations {
 
+    // Reads and plain writes ride the ring below. Atomic publication, directories, exclusive leases and canonical paths are the
+    // POSIX adapter's sequences, forwarded rather than re-implemented. The five go together: FileOperations.canonicalPath throws
+    // for an adapter that claims DURABLE without supplying its own.
+    private val posix = PosixFileOperations()
+    override val durability: StorageDurability get() = posix.durability
+    override fun writeAtomically(filename: String, bytes: ByteArray) = posix.writeAtomically(filename, bytes)
+    override fun acquireExclusiveLease(path: String): FileLease = posix.acquireExclusiveLease(path)
+    override fun canonicalPath(path: String): String = posix.canonicalPath(path)
+    override fun mkdirs(path: String) = posix.mkdirs(path)
+
     override fun readAllLines(filename: String): List<String> =
         readString(filename).replace("\r\n", "\n").split('\n').let {
             if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it
@@ -127,7 +137,6 @@ class LinuxFileOperations : FileOperations {
         stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.convert()) }
     override fun deleteRecursively(path: String) {
         memScoped {
             val st = alloc<stat>()
