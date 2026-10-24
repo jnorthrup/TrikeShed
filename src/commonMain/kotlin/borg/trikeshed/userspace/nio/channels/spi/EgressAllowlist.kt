@@ -3,7 +3,9 @@ package borg.trikeshed.userspace.nio.channels.spi
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.agent.keymux.HarnessRegistry
-import java.util.concurrent.ConcurrentHashMap
+import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 
 /**
  * The HTX substrate's egress policy: deny by default, permit deliberately.
@@ -52,8 +54,9 @@ object EgressAllowlist {
         "github.com", "jules.googleapis.com",
     )
 
-    /** Runtime additions: [allow] / [allowUrl]. Concurrent — connect() is on IO workers. */
-    private val registered: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    /** Runtime additions: [allow] / [allowUrl]. Guarded by [gate]: connect() is on IO workers. */
+    private val gate = SynchronizedObject()
+    private val registered = LinkedHashSet<String>()
 
     /**
      * Hosts of every provider base_url in the registry. Lazy so the registry is
@@ -68,7 +71,7 @@ object EgressAllowlist {
     }
 
     private val envHosts: Set<String> by lazy {
-        System.getenv("TRIKESHED_EGRESS_ALLOWLIST")
+        SystemOperations.default.getenv("TRIKESHED_EGRESS_ALLOWLIST")
             ?.split(',')
             ?.map { it.trim() }
             ?.filter { it.isNotEmpty() }
@@ -93,7 +96,7 @@ object EgressAllowlist {
 
     /** Permit [host] for the life of this process. Idempotent. */
     fun allow(host: String) {
-        host.trim().takeIf { it.isNotEmpty() }?.let { registered.add(it) }
+        host.trim().takeIf { it.isNotEmpty() }?.let { synchronized(gate) { registered.add(it) } }
     }
 
     /**
@@ -107,11 +110,11 @@ object EgressAllowlist {
     }
 
     fun permits(host: String): Boolean =
-        host in baseline || host in registered || host in registryHosts || host in envHosts
+        host in baseline || synchronized(gate) { host in registered } || host in registryHosts || host in envHosts
 
     /** Every permitted host, for diagnostics. Sorted for stable output. */
     fun snapshot(): List<String> =
-        (baseline + registryHosts + envHosts + registered).sorted()
+        (baseline + registryHosts + envHosts + synchronized(gate) { registered.toSet() }).sorted()
 
     /**
      * The message a refusal carries. It names the knob, because the previous one
