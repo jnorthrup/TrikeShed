@@ -225,6 +225,11 @@ kotlin {
                 executable("ledger") {
                     entryPoint = "borg.trikeshed.userspace.benchmark.ledgerBenchmarkMain"
                 }
+                // ModelMux + Zenith as an MCP server over stdio: McpStdio (commonMain) with posixMain's descriptors under it.
+                // ./gradlew linkMcpStdioReleaseExecutableMacos → build/bin/macos/mcpStdioReleaseExecutable/mcpStdio.kexe
+                executable("mcpStdio") {
+                    entryPoint = "borg.trikeshed.mux.mcpStdioMain"
+                }
                 // K/N 2.4.20/2.4.21 ship macos_arm64 system caches tagged iOS (LC_BUILD_VERSION platform 2,
                 // e.g. CoreFoundationBase); Xcode 26 ld refuses to link them into a macOS binary, the test binary too.
                 configureEach {
@@ -547,6 +552,11 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
         }
         binaries.executable("ledger") {
             entryPoint = "borg.trikeshed.userspace.benchmark.ledgerBenchmarkMain"
+        }
+        // ModelMux + Zenith over stdio, as on macOS. ./gradlew linkMcpStdioReleaseExecutableLinuxX64
+        // → build/bin/linuxX64/mcpStdioReleaseExecutable/mcpStdio.kexe (linkMcpStdioDebugExecutableLinuxX64 links faster).
+        binaries.executable("mcpStdio") {
+            entryPoint = "borg.trikeshed.mux.mcpStdioMain"
         }
         compilations.getByName("main").cinterops.create("zlinux_uring") {
             defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
