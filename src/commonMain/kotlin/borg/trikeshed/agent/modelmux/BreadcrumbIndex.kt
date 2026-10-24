@@ -48,11 +48,16 @@ data class BreadcrumbIndexed(
 /**
  * Full blobs in the existing CAS, line-spine fingerprints and a once-scanned Confix metadata trie.
  * The 16-bit alias is a bucket only; a collision can never select another full CAS identity.
+ *
+ * [facets] chooses how [search] ranks. Absent, it scans every blob for substrings, as it always has. Present, the
+ * content of every record is ranked by [BreadcrumbProjector], the very scoring a peer's pinned revision is answered
+ * with, over this memory: a record and a peer's document with the same bytes share one document facet and one set of
+ * line features, and a search that finds the records unchanged reads no blob at all.
  */
-class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
+class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory(), val facets: ProjectionFacets? = null) {
     private val entries = linkedMapOf<borg.trikeshed.agent.modelmux.BreadcrumbId, borg.trikeshed.agent.modelmux.BreadcrumbIndexed>()
 
-    fun copy(): BreadcrumbIndex = BreadcrumbIndex(cas).also { it.entries.putAll(entries) }
+    fun copy(): BreadcrumbIndex = BreadcrumbIndex(cas, facets).also { it.entries.putAll(entries) }
 
     /** Every entry, in insertion order: what a table over the index reads. */
     fun all(): Series<BreadcrumbIndexed> = entries.values.toList().toSeries()
@@ -133,16 +138,9 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
     fun search(query: String, budget: borg.trikeshed.agent.modelmux.BreadcrumbBudget, limit: Int = 8): String {
         require(query.length <= 256 && limit in 1..32)
         val words = query.lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
-        val matches = entries.values.map { entry ->
-            val text = if (words.isEmpty()) "" else cas.get(entry.cid)!!.decodeToString().lowercase()
-            entry j words.sumOf { word ->
-                (if (word in entry.title.lowercase()) 4 else 0) +
-                    (if (word in entry.source.lowercase()) 2 else 0) + (if (word in text) 1 else 0)
-            }
-        }.filter { words.isEmpty() || it.b > 0 }.sortedWith(
-            compareByDescending<Join<borg.trikeshed.agent.modelmux.BreadcrumbIndexed, Int>> { it.b }.thenByDescending { it.a.metadata.value("createdAt").toString() })
+        val matches = if (facets != null && words.isNotEmpty()) ranked(query, words, facets) else scanned(words)
         val rows = mutableListOf<Map<String, Any?>>()
-        for ((entry, _) in matches.take(limit)) {
+        for (entry in matches.take(limit)) {
             val next = descriptor(entry)
             rows += next
             if (jsonOf(mapOf("matches" to rows, "total" to matches.size, "omitted" to matches.size - rows.size)).length > budget.chars) {
@@ -150,6 +148,55 @@ class BreadcrumbIndex(val cas: CasStore = CasStore.inMemory()) {
             }
         }
         return bounded(mapOf("matches" to rows, "total" to matches.size, "omitted" to matches.size - rows.size), budget)
+    }
+
+    /** The matches by substring: a word in the title scores 4, in the source 2, in the content 1; ties go to the newest. */
+    private fun scanned(words: List<String>): List<borg.trikeshed.agent.modelmux.BreadcrumbIndexed> =
+        entries.values.map { entry ->
+            val text = if (words.isEmpty()) "" else cas.get(entry.cid)!!.decodeToString().lowercase()
+            entry j words.sumOf { word ->
+                (if (word in entry.title.lowercase()) 4 else 0) +
+                    (if (word in entry.source.lowercase()) 2 else 0) + (if (word in text) 1 else 0)
+            }
+        }.filter { words.isEmpty() || it.b > 0 }.sortedWith(
+            compareByDescending<Join<borg.trikeshed.agent.modelmux.BreadcrumbIndexed, Int>> { it.b }.thenByDescending { it.a.metadata.value("createdAt").toString() })
+            .map { it.a }
+
+    /**
+     * The matches when the index has [facets]. A record matches if a query word is in its title or source, as always,
+     * or if a line of its content answers the query. They are ordered by title and source first, with the weights the
+     * scan gives them, so a handle the agent chose still outranks a coincidence in the text; then by the score of the
+     * record's best line, which is [BreadcrumbProjector]'s own, so a rare word outweighs a common one; then newest.
+     *
+     * Content is matched by lexical token, the way a peer's pinned revision is, not by substring. A fragment of a word
+     * (`ident` for `identifiers`) matches a title or source, as it always has, but no longer a line of content; and a
+     * query word is tokenized, so `retry,` and `getUserName` match their pieces where the scan needed the exact
+     * characters. Which records match can therefore differ from the scan's in both directions for such queries; for
+     * whole words it does not, and the order is all that changes.
+     *
+     * Every distinct blob is named to the facets by content id and read only when the facets do not already know it,
+     * so a search over unchanged records reads nothing and a new record costs the read of that one blob.
+     */
+    private fun ranked(query: String, words: List<String>, facets: ProjectionFacets): List<borg.trikeshed.agent.modelmux.BreadcrumbIndexed> {
+        val cids = entries.values.map { it.cid }.distinct().sortedBy { it.value }
+        val decoded = arrayOfNulls<String>(cids.size)
+        val index = facets.index(cids) { d ->
+            decoded[d] ?: (cas.get(cids[d]) ?: error("Breadcrumb CAS blob is unavailable")).decodeToString().also { decoded[d] = it }
+        }
+        val scores = BreadcrumbProjector.rank(index, query, facets)
+        val relevance = HashMap<ContentId, Double>(cids.size * 2)
+        for (d in cids.indices) relevance[cids[d]] = scores[d]
+
+        class Hit(val entry: borg.trikeshed.agent.modelmux.BreadcrumbIndexed, val field: Int, val relevance: Double, val createdAt: Long)
+        return entries.values.mapNotNull { entry ->
+            val title = entry.title.lowercase()
+            val source = entry.source.lowercase()
+            val field = words.sumOf { word -> (if (word in title) 4 else 0) + (if (word in source) 2 else 0) }
+            val line = relevance.getValue(entry.cid)
+            if (field == 0 && line <= 0.0) null
+            else Hit(entry, field, line, entry.metadata.value("createdAt").toString().toLongOrNull() ?: 0L)
+        }.sortedWith(compareByDescending<Hit> { it.field }.thenByDescending { it.relevance }.thenByDescending { it.createdAt })
+            .map { it.entry }
     }
 
     fun recall(ref: borg.trikeshed.agent.modelmux.BreadcrumbRef, cid: ContentId?, presence: borg.trikeshed.agent.modelmux.BreadcrumbPresence,
