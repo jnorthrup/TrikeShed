@@ -1,0 +1,63 @@
+1
+00:00:00,400 --> 00:00:08,600
+Three small laws — idempotence, projection, and lambdas without bounds checks. Every layer that follows is a composition of them, and nothing more.
+
+2
+00:00:09,400 --> 00:00:17,600
+Join: a product with two properties and nothing else. "a j b" is the one constructor the whole system needs.
+
+3
+00:00:18,400 --> 00:00:27,600
+Series: a length joined to a lambda. Reading index i calls the function — the size travels as data beside it, so the hot path carries no array and no bounds check.
+
+4
+00:00:28,400 --> 00:00:37,600
+Projection: α maps without materializing. Chains of α fuse into one lambda, and index views — s[ix], s[range] — project the domain instead of copying the data.
+
+5
+00:00:38,400 --> 00:00:47,600
+Idempotence: asking twice is free. Meta suppliers, decoded leaves, revisions and replays can all be re-run without changing the answer — so any lambda may be called anywhere, at any time.
+
+6
+00:00:48,400 --> 00:00:57,600
+Cursor: a Series of rows, each row a Series of value ⋈ meta. A table is three Joins and two lambdas deep — and the child slot lets any cell be a whole document.
+
+7
+00:00:58,400 --> 00:01:07,600
+ISAM Cursors: fixed-width records on memory-mapped files. The row lambda becomes an offset computation — the same Cursor algebra, now zero-copy over disk.
+
+8
+00:01:08,400 --> 00:01:18,600
+Confix: one parser for JSON, YAML and CBOR. Its index is faceted — spans, tags, depths, children — and the parse geometry is itself an ISAM Cursor. Document ⇄ table is an isomorphism, not an import.
+
+9
+00:01:19,400 --> 00:01:28,600
+The fortress: a Couch over Confix documents, a write-ahead log and a copy-on-write B+tree. Its wire speaks CouchDB — and every block is also a content address.
+
+10
+00:01:29,400 --> 00:01:39,600
+CCEK reactors on every side: each service is a CoroutineContext Element found by its Key. No god object — the coroutine context is the registry, and every reactor runs as its own SupervisorJob.
+
+11
+00:01:40,400 --> 00:01:51,600
+Transparency: SQL, PostgREST, facet search and graph walks are not separate databases. They are projections of the same Cursor — one AST, one planner, the same column kernels.
+
+12
+00:01:52,400 --> 00:02:01,600
+Unified I/O: io_uring shot through every layer. ISAM pages, the userspace Btrfs volume and the network transport submit through one liburing seam; completions arrive as values the lambdas above simply read.
+
+13
+00:02:02,400 --> 00:02:12,600
+Agents on a blackboard, in concentric networks. Models only propose; the Rete agenda decides; every conclusion links back to the sentence it came from.
+
+14
+00:02:13,400 --> 00:02:23,600
+Ouroboros: the system’s own code, worktree and history become content-addressed blocks — replicated peer to peer over IPNS, and hot-swapped into the running daemon.
+
+15
+00:02:24,400 --> 00:02:33,600
+And the payoff: AI models served from this fabric. Weights are content-addressed blocks, requests are reactor events, output is a stream — and the latest master is ready to release.
+
+16
+00:02:34,400 --> 00:02:44,600
+Compositional density: each layer is the layer below joined with a lambda. Idempotence makes it safe, projection makes it free, and lambdas without bounds checks keep it fast.
