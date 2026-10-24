@@ -14,7 +14,7 @@ import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
-import keymux.CouchKeyStore
+import borg.trikeshed.agent.keymux.CouchKeyStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withTimeoutOrNull

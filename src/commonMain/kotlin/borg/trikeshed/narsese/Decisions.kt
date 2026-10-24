@@ -7,7 +7,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyStrict
 import kotlinx.coroutines.delay
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 /**
  * OpenAI Decisions, `POST /v1/decisions` (gpt-6-luna): [Jev]'s contract on another wire. [Jev] questions go out

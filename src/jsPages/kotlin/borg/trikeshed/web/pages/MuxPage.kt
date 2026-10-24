@@ -807,8 +807,8 @@ object MuxPage {
         html(modelSelect, "<option value=\"\">${esc(if (configured.isEmpty()) "Configured main model" else configured + " · configured")}</option>" +
             list(models).joinToString("") { "<option value=\"${esc(it.model)}\">${esc(it.model)}</option>" })
         if (list(models).any { it.model == chosen }) modelSelect.value = chosen
-        qq("#reelLocalModel").textContent = if (config == null) "Waiting for configuration" else strOrEmpty(config.summarizerModel)
-        qq("#reelLocalModel").title = strOrEmpty(config?.summarizerUrl)
+        qq("#reelLocalModel").textContent = if (config == null) "Waiting for configuration" else strOrEmpty(config.heuristic?.generator)
+        qq("#reelLocalModel").title = "No model call: deterministic lexical selection of whole source lines, with optional System1 review"
         if (!reelDefaults && config != null) {
             val input = qq("#reelSources") as HTMLTextAreaElement
             if (input.value.isBlank()) input.value = list(config.sources).joinToString("\n") { str(it) }
@@ -863,7 +863,7 @@ object MuxPage {
         html("#reelLanes", if (lanes.isEmpty()) empty(
             if (errors.containsKey("Evolution reel")) "Comparison service unavailable" else "Run the current source to collect actual model outputs", "git-branch"
         ) else lanes.joinToString("") { lane ->
-            val model: dynamic = if (lane.id == "micro") reel?.run?.models?.summarizer else reel?.run?.models?.main
+            val model: dynamic = if (lane.id == "micro") reel?.run?.models?.micro else reel?.run?.models?.main
             "<article class=\"reel-lane\" data-lane=\"${esc(lane.id)}\"><header><h3>${esc(lane.title)}</h3>${badge(lane.status)}</header>" +
                 "<span class=\"reel-model mono\">${esc(model)}</span>" +
                 (if (truthy(lane.error)) "<p class=\"reel-error\">${esc(lane.error)}</p>" else "") +
@@ -874,7 +874,7 @@ object MuxPage {
         val reasoning = if (run?.mainRequestOptions?.chat_template_kwargs?.enable_thinking == false)
             " Main model reasoning is disabled for summaries and assessment." else ""
         val allowance = if (limits == null) "" else
-            "<p class=\"reel-measure-note\">${esc(run.harness)} · output-token limits: main ${count(limits.main)}, local ${count(limits.micro)}, assessment ${count(limits.assessment)}. Reasoning, when enabled, uses the same output allowance.$reasoning</p>"
+            "<p class=\"reel-measure-note\">${esc(run.harness)} · output-token limits: main ${count(limits.main)}, assessment ${count(limits.assessment)}; heuristic lane: no tokens, ${count(limits.microProjectionChars)} characters. Reasoning, when enabled, uses the same output allowance.$reasoning</p>"
         html("#reelMeasurements", if (lanes.isEmpty()) "" else
             "<div class=\"table-wrap reel-meters\"><table><thead><tr><th>Measured work</th><th>Calls / cached</th><th>Input tokens</th><th>Output tokens</th><th>Elapsed</th><th>Summary characters</th><th>Summary / source</th></tr></thead><tbody>" +
                 lanes.joinToString("") { lane ->

@@ -71,9 +71,9 @@ class LiveBrainClient(
     override fun hasEndpoints(): Boolean = last.hasEndpoints()
     override fun endpointSummaries(): List<EndpointSpec> = last.endpointSummaries()
     override fun lastModel(): String? = last.lastModel()
-    override fun modelMux(): modelmux.ModelMux = last.modelMux()
+    override fun modelMux(): borg.trikeshed.agent.modelmux.ModelMux = last.modelMux()
     override fun providerRoster(): List<EndpointSpec> = last.providerRoster()
-    override suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> = live().quotaStandings(nowMs)
+    override suspend fun quotaStandings(nowMs: Long): List<borg.trikeshed.agent.modelmux.QuotaStanding> = live().quotaStandings(nowMs)
     override suspend fun rosterStatus(): List<Map<String, Any>> = live().rosterStatus()
     override suspend fun chat(
         options: BrainChatOptions,

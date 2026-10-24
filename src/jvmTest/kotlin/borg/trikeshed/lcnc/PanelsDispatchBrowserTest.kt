@@ -9,7 +9,7 @@ import borg.trikeshed.narsese.BeliefBagElement
 import borg.trikeshed.narsese.ingestKg
 import borg.trikeshed.parse.reify
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
-import keymux.*
+import borg.trikeshed.agent.keymux.*
 import kotlinx.coroutines.*
 import kotlin.test.*
 

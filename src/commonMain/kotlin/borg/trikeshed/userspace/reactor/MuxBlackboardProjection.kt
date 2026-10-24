@@ -6,8 +6,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.j
-import modelmux.ProviderHealth
-import modelmux.QuotaStanding
+import borg.trikeshed.agent.modelmux.ProviderHealth
+import borg.trikeshed.agent.modelmux.QuotaStanding
 
 /**
  * The mux's working set as REDACTED blackboard entries — the open home for

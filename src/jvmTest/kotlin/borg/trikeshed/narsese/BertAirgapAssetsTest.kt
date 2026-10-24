@@ -1,7 +1,7 @@
 package borg.trikeshed.narsese
 
 import kotlinx.coroutines.runBlocking
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 import kotlin.test.*

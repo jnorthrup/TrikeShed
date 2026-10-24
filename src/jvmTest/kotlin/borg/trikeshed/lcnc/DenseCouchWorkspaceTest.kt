@@ -19,9 +19,9 @@ import borg.trikeshed.parse.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.util.oroboros.*
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.*
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import java.nio.file.Path
 import kotlin.test.*
 

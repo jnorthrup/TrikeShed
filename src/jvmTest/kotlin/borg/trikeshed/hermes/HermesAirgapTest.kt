@@ -5,7 +5,7 @@ import borg.trikeshed.userspace.nio.channels.spi.ChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.JvmChannelOperations
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.*
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import org.junit.jupiter.api.parallel.ResourceLock
 import org.junit.jupiter.api.parallel.Resources
 import kotlin.test.*

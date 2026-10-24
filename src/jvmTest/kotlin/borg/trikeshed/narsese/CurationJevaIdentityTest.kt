@@ -4,7 +4,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 import kotlinx.coroutines.*
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path

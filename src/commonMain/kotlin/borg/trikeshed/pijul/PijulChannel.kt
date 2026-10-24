@@ -85,9 +85,17 @@ class PijulChannel(
      */
     fun seedFile(path: String, baseContent: String) {
         val crdt = files.getOrPut(path) { PijulCrdt() }
-        val lines = baseContent.lineSequence().toList()
-        val seedChanges = lines.mapIndexed { idx, line ->
-            Change.Insert(idx, line + "\n")
+        // Positions are CHARACTER offsets into the growing document (the CRDT's coordinate space), the same
+        // convention FunnelResidualMerge.pijulMerge seeds with. Each segment keeps its own terminator, so the
+        // seed renders byte-for-byte: CR, blank lines and a missing final newline all survive, and later
+        // patches anchored to base offsets land where their authors saw them.
+        val seedChanges = ArrayList<Change>()
+        var offset = 0
+        while (offset < baseContent.length) {
+            val newline = baseContent.indexOf('\n', offset)
+            val end = if (newline < 0) baseContent.length else newline + 1
+            seedChanges.add(Change.Insert(offset, baseContent.substring(offset, end)))
+            offset = end
         }
         if (seedChanges.isNotEmpty()) {
             val seedId = Blake3Hash.hash("seed:$path".encodeToByteArray())

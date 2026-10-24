@@ -12,9 +12,9 @@ import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.*
-import keymux.FixedKeySource
-import keymux.KeyMux
-import modelmux.*
+import borg.trikeshed.agent.keymux.FixedKeySource
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.*
 import kotlin.test.*
 
 class MuxSessionServiceTest {

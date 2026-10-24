@@ -5,8 +5,8 @@ import borg.trikeshed.dht.net.NetMask
 import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.sctp.SctpElement
-import keymux.*
-import modelmux.*
+import borg.trikeshed.agent.keymux.*
+import borg.trikeshed.agent.modelmux.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

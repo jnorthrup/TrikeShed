@@ -11,7 +11,7 @@ import borg.trikeshed.lcnc.LcncNodeRunner
 import borg.trikeshed.lib.*
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.jsonOf
-import modelmux.*
+import borg.trikeshed.agent.modelmux.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope

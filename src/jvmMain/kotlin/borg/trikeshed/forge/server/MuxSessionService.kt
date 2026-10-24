@@ -15,9 +15,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
-import modelmux.*
-import modelmux.acp.providerTag
-import modelmux.acp.wireName
+import borg.trikeshed.agent.modelmux.*
+import borg.trikeshed.agent.modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.wireName
 import kotlin.coroutines.CoroutineContext
 import java.io.File
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
@@ -58,14 +58,14 @@ class MuxSessionService(
      */
     private suspend fun discover(mux: ModelMux): Map<String, Any?> = withContext(muxContext) {
         val roster = mux.listModels("chat").view.mapTo(HashSet()) { (it.providerTag ?: it.a) to it.wireName }
-        val hermes = keymux.HermesCredentialSource(keymux.defaultHermesHome(), JvmFileOperations())
+        val hermes = borg.trikeshed.agent.keymux.HermesCredentialSource(borg.trikeshed.agent.keymux.defaultHermesHome(), JvmFileOperations())
         val hermesProviders = hermes.providers()
         val configured = hermes.configuredModels()
         val historical = ModelDiscovery.fromHermes(hermes.modelConfig(),
             borg.trikeshed.hermes.HermesModelUsage.ledgerRows().toSeries())
         val probes = Semaphore(4)
-        val providerCatalog = (keymux.HarnessRegistry.providers.view.toList() +
-            hermesProviders.view.map { keymux.HarnessProvider(it.provider, emptySeriesOf(), it.baseUrl) }).distinctBy { it.id }
+        val providerCatalog = (borg.trikeshed.agent.keymux.HarnessRegistry.providers.view.toList() +
+            hermesProviders.view.map { borg.trikeshed.agent.keymux.HarnessProvider(it.provider, emptySeriesOf(), it.baseUrl) }).distinctBy { it.id }
         val providers = providerCatalog.map { provider ->
             async {
                 probes.withPermit {
@@ -291,7 +291,7 @@ class MuxSessionService(
     private suspend fun execute(id: Long, maxTokens: Int, temperature: Double, overridePrompt: String? = null): String? = permits.withPermit {
         update(id) { it.copy(status = if (overridePrompt == null) "running" else "joining") }
         val session = mutex.withLock { sessions.getValue(id) }
-        val receipts = mutableListOf<modelmux.MuxCallRecord>()
+        val receipts = mutableListOf<borg.trikeshed.agent.modelmux.MuxCallRecord>()
         try {
             val messages = session.messages.map { it.role to it.content } +
                 (overridePrompt?.let { listOf("user" to it) } ?: emptyList())

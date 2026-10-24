@@ -2,8 +2,8 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.lcnc.LcncContracts
 import borg.trikeshed.lib.*
-import modelmux.acp.MemoryHarnessProfile
-import modelmux.acp.toolNames
+import borg.trikeshed.agent.modelmux.acp.MemoryHarnessProfile
+import borg.trikeshed.agent.modelmux.acp.toolNames
 
 /**
  * The read-only capability vocabulary given to language curation.

@@ -7,8 +7,8 @@ import borg.trikeshed.graph.CausalGraphNodeIndex
 import borg.trikeshed.graph.causalGraphNode
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeoutOrNull
-import modelmux.ModelSelectionEvent
-import modelmux.QuotaSnapshot
+import borg.trikeshed.agent.modelmux.ModelSelectionEvent
+import borg.trikeshed.agent.modelmux.QuotaSnapshot
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

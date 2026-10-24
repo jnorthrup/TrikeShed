@@ -23,7 +23,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
-import modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.providerTag
 
 /** One daemon-owned curator, shared by document HTTP, LCNC, and applicant projections. */
 class DocumentCurationWire private constructor(

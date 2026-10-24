@@ -8,14 +8,14 @@ import borg.trikeshed.lib.α
 import borg.trikeshed.lib.view
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
-import keymux.EnvVarSource
-import keymux.FixedKeySource
-import keymux.HarnessRegistry
-import keymux.KeyMux
-import modelmux.Airgap
-import modelmux.ModelEntry
-import modelmux.ModelMux
-import modelmux.acp.AcpMessage
+import borg.trikeshed.agent.keymux.EnvVarSource
+import borg.trikeshed.agent.keymux.FixedKeySource
+import borg.trikeshed.agent.keymux.HarnessRegistry
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.Airgap
+import borg.trikeshed.agent.modelmux.ModelEntry
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.acp.AcpMessage
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -83,7 +83,7 @@ open class BrainClient(
      */
     private val modelMux: ModelMux? = null,
     /** Quota legion for the internal mux — the daemon passes its ledger-fed legion so every mux meters one pool. */
-    private val quotaLegion: modelmux.QuotaLegion? = null,
+    private val quotaLegion: borg.trikeshed.agent.modelmux.QuotaLegion? = null,
     /** Operator-imported endpoints participate in the same failover loop as the built-in roster. */
     endpointSpecs: List<EndpointSpec>? = null,
 ) {
@@ -253,14 +253,14 @@ open class BrainClient(
      * Quota-legion standings from the mux (usable-first). Call under the mux
      * reactor context — without it the roster is unknowable and this is empty.
      */
-    open suspend fun quotaStandings(nowMs: Long): List<modelmux.QuotaStanding> =
+    open suspend fun quotaStandings(nowMs: Long): List<borg.trikeshed.agent.modelmux.QuotaStanding> =
         internalModelMux.quotaStandings(nowMs)
 
     /**
      * The ModelMux this client chats through — provider-tagged cards over the
      * full roster (external-keyMux mode) or the discovered subset (standalone).
      */
-    open fun modelMux(): modelmux.ModelMux = internalModelMux
+    open fun modelMux(): borg.trikeshed.agent.modelmux.ModelMux = internalModelMux
 
     /**
      * The machine's full provider capability set — the static [rosterInto]

@@ -541,6 +541,7 @@ object FunnelResidualMerge {
         // each line lands after the previous one and the seed renders
         // line-for-line.
         val masterLines = masterText.lineSequence().toList()
+        val masterSpineLines = LineCasSourceRanges.of(masterText)
         var seedCharOffset = 0
         val seedChanges = masterLines.map { line ->
             val change = borg.trikeshed.pijul.Change.Insert(seedCharOffset, line + "\n")
@@ -562,6 +563,10 @@ object FunnelResidualMerge {
             val spine = sources[s]
             val text = sourceTexts[s]
             val lines = text.lineSequence().toList()
+            val sourceSpineLines = LineCasSourceRanges.of(text)
+            require(sourceSpineLines.size == spine.size) {
+                "source $s: spine holds ${spine.size} lines but its text has ${sourceSpineLines.size} non-blank lines"
+            }
             val sourceResiduals = residuals[s]
 
             // Line ordinals → char offsets in the master document: the CRDT
@@ -577,9 +582,13 @@ object FunnelResidualMerge {
             val changes = mutableListOf<borg.trikeshed.pijul.Change>()
             for (i in 0 until sourceResiduals.size) {
                 val atom = sourceResiduals[i]
-                val lineIdx = atom.ordinal.raw
-                val content = if (lineIdx < lines.size) lines[lineIdx] else ""
-                val charOffset = lineCharOffset[lineIdx.coerceAtMost(masterLines.size)]
+                // A spine ordinal counts NON-BLANK lines. `lines` and `lineCharOffset` are indexed by RAW line,
+                // so cross through the mapping; using the ordinal directly picks the wrong line and the wrong
+                // locus as soon as either document has a blank line.
+                val ordinal = atom.ordinal.raw
+                val content = if (ordinal < sourceSpineLines.size) lines[sourceSpineLines[ordinal].index] else ""
+                val masterLine = if (ordinal < masterSpineLines.size) masterSpineLines[ordinal].index else masterLines.size
+                val charOffset = lineCharOffset[masterLine]
                 changes.add(borg.trikeshed.pijul.Change.Insert(charOffset, content + "\n"))
             }
 

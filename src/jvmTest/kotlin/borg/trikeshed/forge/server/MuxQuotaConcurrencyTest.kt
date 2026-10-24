@@ -4,7 +4,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.modelmux.ModelResponseReceipt
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import kotlinx.coroutines.*
-import modelmux.QuotaLegion
+import borg.trikeshed.agent.modelmux.QuotaLegion
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

@@ -2,7 +2,7 @@ package borg.trikeshed.daemon
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 class OroborosDaemonArgsTest {
 

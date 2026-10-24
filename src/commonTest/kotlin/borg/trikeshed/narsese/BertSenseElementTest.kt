@@ -49,7 +49,7 @@ class BertSenseElementTest {
         lane.drain()
     }
     @Test fun airgapMissingAssetsAbstainsWithoutRemoteFallback() = runTest {
-        withContext(modelmux.Airgap()) {
+        withContext(borg.trikeshed.agent.modelmux.Airgap()) {
             var loads = 0
             val lane = BertSenseElement(this, { loads++; error("local weights missing") })
             try {
@@ -58,7 +58,7 @@ class BertSenseElementTest {
                 assertEquals(BertSenseStatus.Unavailable, result.results[0].status)
                 assertEquals("local weights missing", result.error)
                 assertNull(result.results[0].sense)
-                assertFailsWith<modelmux.Airgap.Rejection> { modelmux.Airgap.requireRemote() }
+                assertFailsWith<borg.trikeshed.agent.modelmux.Airgap.Rejection> { borg.trikeshed.agent.modelmux.Airgap.requireRemote() }
             } finally { lane.drain() }
         }
     }

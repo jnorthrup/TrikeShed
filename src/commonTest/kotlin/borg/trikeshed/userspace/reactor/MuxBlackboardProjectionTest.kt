@@ -3,8 +3,8 @@ package borg.trikeshed.userspace.reactor
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import modelmux.ProviderHealth
-import modelmux.QuotaStanding
+import borg.trikeshed.agent.modelmux.ProviderHealth
+import borg.trikeshed.agent.modelmux.QuotaStanding
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

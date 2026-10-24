@@ -7,15 +7,12 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.*
 import borg.trikeshed.pointcut.PointcutBlackboardAdapter
-import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import borg.trikeshed.userspace.nio.file.spi.*
-import keymux.LlmAuth
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import modelmux.*
-import modelmux.acp.*
-import borg.trikeshed.platform.HostSystem
+import borg.trikeshed.agent.modelmux.*
+import borg.trikeshed.agent.modelmux.acp.*
 import kotlin.coroutines.CoroutineContext
 
 /** One admitted reel per wire scope. The same board serves Graal and faceted Cursor sheets. */
@@ -34,6 +31,19 @@ class BreadcrumbReelService(
     var job: Job? = null
     val breadcrumbs = context[BreadcrumbElement] ?: BreadcrumbElement()
     val restoration = scope.async(context.minusKey(Job) + files + fileIoContext) { archive?.restore(board) }
+
+    /**
+     * The evidence context for one run's MICRO lane. When the root supplied a [SharedContextElement] that serves this run's
+     * scope over the archive's own store, every run reads through that one owner; otherwise the run gets a private context
+     * over the archive, exactly as before. The service borrows the element and never drains it.
+     */
+    internal fun contextFor(runId: String): SharedContext? {
+        val store = archive ?: return null
+        val scope = "reel/$runId"
+        val shared = context[SharedContextElement]?.context
+        return if (shared != null && shared.policy.serves(scope) && shared.usesStore(store.cas)) shared
+        else SharedContext(store.cas, null, ContextReadPolicy(allowedScopes = setOf(scope)))
+    }
 
     suspend fun route(method: String, path: String, text: String): JvmKanbanServer.HttpResponse? {
         val route = path.substringBefore('?')
@@ -60,7 +70,8 @@ class BreadcrumbReelService(
                     "activeRunId" to active?.takeIf { job?.isCompleted == false }?.id, "defaults" to mapOf(
                     "mainModel" to rankedModel(mux), "selectionBasis" to ModelGradeBasis.CORRECTNESS,
                     "selectionQualification" to "Explicit human accuracy grades for this task and matching known model revision; unknown revisions remain ungraded.",
-                    "summarizerModel" to LOCAL_MODEL, "summarizerUrl" to LOCAL_URL,
+                    "heuristic" to mapOf("policy" to BreadcrumbProjector.POLICY, "generator" to BreadcrumbReel.HEURISTIC_LABEL,
+                        "budgetChars" to BreadcrumbReel.MICRO_PROJECTION_CHARS),
                     "sources" to SOURCES,
                 )))
             }
@@ -100,7 +111,7 @@ class BreadcrumbReelService(
                 val base = withContext(context.minusKey(Job)) { catalog() }
                 val main = request["mainModel"] as? String ?: rankedModel(base)
                     ?: throw IllegalArgumentException("Choose a main model from the catalog")
-                require(main != LOCAL_MODEL && base.listModels("chat").view.any { it.a == main }) { "Main model must be in the catalog" }
+                require(base.listModels("chat").view.any { it.a == main }) { "Main model must be in the catalog" }
                 val sources = (request["sources"] as? List<*>)?.map {
                     it as? String ?: throw IllegalArgumentException("Source paths must be strings")
                 } ?: SOURCES
@@ -125,12 +136,6 @@ class BreadcrumbReelService(
                         name j content
                     }.toTypedArray().toSeries()
                 }
-                EgressAllowlist.allowUrl(LOCAL_URL)
-                val revision = localRevision()
-                val mux = base.withModels {
-                    model(LOCAL_MODEL, setOf("chat"), baseUrl = LOCAL_URL, provider = "llama.cpp",
-                        auth = LlmAuth.NONE, contextWindow = 2048, modelVersion = revision)
-                }
                 val selectedIds = (request["selectionIds"] as? List<*>)?.map {
                     it as? String ?: throw IllegalArgumentException("Selection identities must be strings")
                 }.orEmpty()
@@ -138,20 +143,22 @@ class BreadcrumbReelService(
                 val selected = (archive?.selections() ?: emptySeriesOf<BreadcrumbReelState>())
                     .filter { it["attemptId"] in selectedIds }
                 require(selected.size == selectedIds.size) { "Selected summary is no longer eligible" }
-                val run = BreadcrumbReel(defaultSecureIdGenerator.generateHexId("ace", 8), mux, breadcrumbs, board,
-                    main, LOCAL_MODEL, evidence, archive, selected)
+                val runId = defaultSecureIdGenerator.generateHexId("ace", 8)
+                // MICRO reads its evidence through shared context over the CAS the archive already captures sources into.
+                val sharedContext = contextFor(runId)
+                val run = BreadcrumbReel(runId, base, breadcrumbs, board, main, evidence, archive, selected, sharedContext)
                 archive?.save(run.snapshot())
                 reel = run
                 // The wire scope owns the run; the kernel owns and drains every admitted model task.
                 job = scope.launch(context.minusKey(Job) + files + breadcrumbs) {
                     val kernel = KernelElement(currentCoroutineContext(), KernelId(run.id))
                     try {
-                        val seats = BreadcrumbLane.entries.associateWith { lane ->
+                        // Only the model lanes get a seat: MICRO is heuristic and admits no model work.
+                        val seats = BreadcrumbLane.entries.filter { it != BreadcrumbLane.MICRO }.associateWith { lane ->
                             val pointcut = GraalKernelPointcut("${run.id}-${lane.id}", pointcuts)
                             try {
                                 kernel.seat(KernelId(lane.id), KernelCapability.MODEL,
-                                    parallelism = if (lane == BreadcrumbLane.MICRO) 1 else 2,
-                                    capacity = 2, pointcut = pointcut)
+                                    parallelism = 2, capacity = 2, pointcut = pointcut)
                             } catch (failure: Throwable) {
                                 pointcut.close()
                                 throw failure
@@ -178,7 +185,7 @@ class BreadcrumbReelService(
     suspend fun rankedModel(mux: ModelMux): String? {
         val admitted = mutableListOf<AcpModelCard>()
         for (candidate in mux.listModels("chat").view) {
-            if (candidate.id != LOCAL_MODEL && mux.modelAdmission(candidate.id)?.b == true) admitted += candidate
+            if (mux.modelAdmission(candidate.id)?.b == true) admitted += candidate
         }
         val candidates = admitted.sortedBy { if (it.id == mux.defaultModel) 0 else 1 }.toSeries()
         val grades = archive?.grades() ?: return candidates.view.firstOrNull()?.id
@@ -187,33 +194,13 @@ class BreadcrumbReelService(
             ModelGradeBasis.CORRECTNESS) { it.id j it.modelVersion }.view.firstOrNull()?.id
     }
 
-    /** The local launcher records its verified GGUF digest; never infer a revision from its mutable alias. */
-    suspend fun localRevision(): String? = withContext(files + fileIoContext) {
-        val home = HostSystem.getProperty("user.home") ?: return@withContext null
-        val path = files.resolvePath(home, ".cache", "trikeshed", "breadcrumb", "model.json")
-        if (!files.isFile(path)) return@withContext null
-        val metadata = reifyStrict(files.readString(path)) as? Map<*, *> ?: return@withContext null
-        if (metadata["sha256_verified"] != true || metadata["runtime_alias"] != LOCAL_MODEL ||
-            metadata["runtime_base_url"] != LOCAL_URL) return@withContext null
-        val sha = metadata["sha256"] as? String ?: return@withContext null
-        if (!sha.matches(Regex("[0-9a-f]{64}"))) return@withContext null
-        val modelPath = metadata["model_path"] as? String ?: return@withContext null
-        if (!files.isFile(modelPath)) return@withContext null
-        val fd = files.open(modelPath, readOnly = true)
-        val size = try { files.size(fd) } finally { files.close(fd) }
-        if (size != (metadata["bytes"] as? Number)?.toLong()) return@withContext null
-        "sha256:$sha"
-    }
-
     fun response(value: Any?, status: Int = 200) = JvmKanbanServer.HttpResponse(status, jsonOf(value))
 
     companion object {
-        const val LOCAL_MODEL = "breadcrumb-local"
-        const val LOCAL_URL = "http://127.0.0.1:18080/v1"
         val SOURCES = listOf(
             "src/commonMain/kotlin/borg/trikeshed/kernel/KernelTaxonomy.kt",
-            "src/commonMain/kotlin/keymux/OperatorKeyMux.kt",
-            "src/commonMain/kotlin/modelmux/BreadcrumbHorizon.kt",
+            "src/commonMain/kotlin/borg/trikeshed/agent/keymux/OperatorKeyMux.kt",
+            "src/commonMain/kotlin/borg/trikeshed/agent/modelmux/BreadcrumbHorizon.kt",
         )
     }
 }

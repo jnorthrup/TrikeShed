@@ -2,8 +2,8 @@ package borg.trikeshed.hermes
 
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.vm.Teleported
-import keymux.KeyMux
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals

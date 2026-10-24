@@ -2,7 +2,7 @@ package borg.trikeshed.hermes
 
 import borg.trikeshed.common.File
 import borg.trikeshed.platform.HostSystem
-import modelmux.LedgerRow
+import borg.trikeshed.agent.modelmux.LedgerRow
 import kotlin.concurrent.Volatile
 
 /**

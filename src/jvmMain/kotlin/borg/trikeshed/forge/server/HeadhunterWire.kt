@@ -12,7 +12,7 @@ import borg.trikeshed.lib.size
 import borg.trikeshed.lib.toList
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.view
-import modelmux.acp.providerTag
+import borg.trikeshed.agent.modelmux.acp.providerTag
 import borg.trikeshed.litebike.WireHttpResponse
 import borg.trikeshed.module.ModuleContext
 import borg.trikeshed.relaxfactory.CouchHttpSurface
@@ -76,7 +76,7 @@ class HeadhunterWire private constructor(
                     // a narrower roster drafts through the lone seat below. Seats prefer distinct providers so
                     // one provider's outage cannot kill every position; a sparse roster fills from any provider.
                     val mux = brain.modelMux()
-                    val breadcrumbs = ctx.muxContext[modelmux.BreadcrumbElement] ?: modelmux.BreadcrumbElement()
+                    val breadcrumbs = ctx.muxContext[borg.trikeshed.agent.modelmux.BreadcrumbElement] ?: borg.trikeshed.agent.modelmux.BreadcrumbElement()
                     val admitted = mutableListOf<String>()
                     val seats = borg.trikeshed.collections.SeriesBuffer<String>()
                     val providers = mutableSetOf<String>()

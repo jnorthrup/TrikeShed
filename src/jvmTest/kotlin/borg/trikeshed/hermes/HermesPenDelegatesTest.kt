@@ -17,9 +17,9 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import keymux.KeyMux
-import keymux.TestKeySource
-import modelmux.*
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.TestKeySource
+import borg.trikeshed.agent.modelmux.*
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

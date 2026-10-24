@@ -1,6 +1,6 @@
 package borg.trikeshed.modelmux
 
-import modelmux.defaultSecureIdGenerator
+import borg.trikeshed.agent.modelmux.defaultSecureIdGenerator
 import kotlin.jvm.JvmOverloads
 
 data class ModelResponse @JvmOverloads constructor(

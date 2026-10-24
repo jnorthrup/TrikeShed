@@ -3,7 +3,7 @@ package borg.trikeshed.graal.subvm
 import borg.trikeshed.hyperspace.HyperspaceRoutine
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.coroutineScope
 
 /**

@@ -2,7 +2,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
-import keymux.HarnessRegistry
+import borg.trikeshed.agent.keymux.HarnessRegistry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

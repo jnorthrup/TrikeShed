@@ -21,11 +21,11 @@ import borg.trikeshed.userspace.nio.channels.spi.EgressAllowlist
 import borg.trikeshed.userspace.nio.platform.spi.SystemOperations
 import borg.trikeshed.userspace.reactor.MuxReactorElement
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
-import keymux.KeyMux
+import borg.trikeshed.agent.keymux.KeyMux
 import kotlinx.coroutines.*
-import modelmux.ModelMux
-import modelmux.MuxActivity
-import modelmux.MuxCallContext
+import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.MuxActivity
+import borg.trikeshed.agent.modelmux.MuxCallContext
 import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.coroutines.CoroutineContext
@@ -152,7 +152,7 @@ class DocumentCurationWireTest {
         val expectedModel = requireNotNull(SystemOperations.default.getenv("TRIKESHED_CURATION_MODEL")) {
             "Set TRIKESHED_CURATION_MODEL explicitly before live verification"
         }
-        val keys = keymux.operatorKeyMux(JvmFileOperations(), hermesHome = profile)
+        val keys = borg.trikeshed.agent.keymux.operatorKeyMux(JvmFileOperations(), hermesHome = profile)
         val resolved = HermesConfigDefault.resolve(profile, keyLane = { provider, field ->
             keys.get("llm.$provider.$field")
         })
@@ -290,7 +290,7 @@ class DocumentCurationWireTest {
                     response = borg.trikeshed.htx.HtxResponse(503, body = ByteSeries("{}".encodeToByteArray()))))
             }
         })
-        val keys = KeyMux { bind("llm.fixture.key", keymux.TestKeySource()) }
+        val keys = KeyMux { bind("llm.fixture.key", borg.trikeshed.agent.keymux.TestKeySource()) }
         val mux = ModelMux(keys) { model("fixture", caps = setOf("chat")); defaultModel("fixture") }
         val reactor = MuxReactorElement(parentJob = owner, keyMux = keys, modelMuxProvider = { mux })
         val rig = Rig(CoroutineScope(coroutineContext + owner), directory.toFile(), true, mux, htx + reactor)

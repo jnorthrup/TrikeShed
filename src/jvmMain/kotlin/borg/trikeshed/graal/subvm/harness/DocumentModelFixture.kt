@@ -18,10 +18,10 @@ import borg.trikeshed.modelmux.Prompt
 import borg.trikeshed.modelmux.PromptMessage
 import borg.trikeshed.narsese.DocumentModel
 import borg.trikeshed.userspace.reactor.MuxReactorElement
-import keymux.KeyMux
-import keymux.TestKeySource
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.keymux.TestKeySource
 import kotlin.coroutines.coroutineContext
-import modelmux.ModelMux
+import borg.trikeshed.agent.modelmux.ModelMux
 
 /**
  * The ONLY HTX provider fixture in the harness tree. Its route service decodes

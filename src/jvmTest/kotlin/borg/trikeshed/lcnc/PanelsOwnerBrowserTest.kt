@@ -6,8 +6,8 @@ import borg.trikeshed.job.ContentId
 import borg.trikeshed.memory.*
 import borg.trikeshed.modelmux.BrainClient
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
-import keymux.KeyMux
-import modelmux.ModelMux
+import borg.trikeshed.agent.keymux.KeyMux
+import borg.trikeshed.agent.modelmux.ModelMux
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer.HttpResponse
 import borg.trikeshed.parse.*

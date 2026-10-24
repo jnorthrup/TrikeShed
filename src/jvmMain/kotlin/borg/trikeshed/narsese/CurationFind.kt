@@ -2,7 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.parse.*
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 import kotlin.math.*
 
 /**

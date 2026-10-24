@@ -6,7 +6,7 @@ import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
-import modelmux.*
+import borg.trikeshed.agent.modelmux.*
 import kotlin.test.*
 
 class BoardClaimProficiencyTest {

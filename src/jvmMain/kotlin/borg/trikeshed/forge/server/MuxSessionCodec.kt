@@ -1,9 +1,9 @@
 package borg.trikeshed.forge.server
 
-import modelmux.MuxCallRecord
-import modelmux.MuxConversation
-import modelmux.MuxMessage
-import modelmux.toWire
+import borg.trikeshed.agent.modelmux.MuxCallRecord
+import borg.trikeshed.agent.modelmux.MuxConversation
+import borg.trikeshed.agent.modelmux.MuxMessage
+import borg.trikeshed.agent.modelmux.toWire
 
 /** Explicit JSON boundary over the repository's Confix parser. */
 internal fun MuxConversation.toWire(): Map<String, Any?> = mapOf(

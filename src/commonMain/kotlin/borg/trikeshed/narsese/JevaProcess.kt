@@ -63,7 +63,7 @@ def status():
     with (path / 'config.yaml').open(encoding='utf-8') as handle:
         saved = yaml.safe_load(handle)
     cfg = saved['model']
-    backbone = path / ('backbone_full' if (path / 'backbone_full').is_dir() else cfg.get('backbone', 'backbone'))
+    backbone = path / ('backbone_mlx' if device == 'mlx' else 'backbone_full' if (path / 'backbone_full').is_dir() else cfg.get('backbone', 'backbone'))
     if not backbone.is_dir() or not any(backbone.glob('*.safetensors')):
         raise FileNotFoundError('Jeva local backbone weights are missing: ' + str(backbone))
     if not (backbone / 'config.json').is_file():
@@ -75,7 +75,7 @@ def status():
     tokenizer = path / 'tokenizer' if (path / 'tokenizer').is_dir() else path / (cfg.get('tokenizer_path') or str(backbone))
     if not (tokenizer / 'tokenizer_config.json').is_file() or not any((tokenizer / name).is_file() for name in ('tokenizer.json', 'tokenizer.model', 'vocab.json')):
         raise FileNotFoundError('Jeva local tokenizer files are missing: ' + str(tokenizer))
-    if cfg.get('tune_mode', 'lora') == 'lora' and not (path / 'backbone_full').is_dir():
+    if device != 'mlx' and cfg.get('tune_mode', 'lora') == 'lora' and not (path / 'backbone_full').is_dir():
         adapter = path / 'backbone_adapter' / 'adapter_model.safetensors'
         if not adapter.is_file():
             raise FileNotFoundError('Jeva local LoRA weights are missing: ' + str(adapter))
@@ -199,9 +199,13 @@ def infer(request):
         status()
     if model is None:
         from jeva import Jeva
-        candidate = Jeva.from_pretrained(checkpoint, device=config['device'], local_files_only=True,
-            trust_remote_code=False, max_state_length=config['max_state_length'],
-            max_option_length=config['max_option_length'], truncation='error')
+        if config['device'] == 'mlx':
+            candidate = Jeva.from_mlx(checkpoint, max_state_length=config['max_state_length'],
+                max_option_length=config['max_option_length'], truncation='error')
+        else:
+            candidate = Jeva.from_pretrained(checkpoint, device=config['device'], local_files_only=True,
+                trust_remote_code=False, max_state_length=config['max_state_length'],
+                max_option_length=config['max_option_length'], truncation='error')
         try:
             configure(candidate)
         except Exception:

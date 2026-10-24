@@ -1,0 +1,70 @@
+package borg.trikeshed.agent.modelmux
+
+import borg.trikeshed.cursor.ColumnMeta
+import borg.trikeshed.cursor.Cursor
+import borg.trikeshed.cursor.IOMemento
+import borg.trikeshed.cursor.RowVec
+import borg.trikeshed.lib.Series
+import borg.trikeshed.lib.j
+
+data class ModelCatalogEntry(
+    val provider: String,
+    val model: String,
+    val freeTier: Boolean,
+    /** -1 = unobserved; zero is an explicit provider exhaustion report. */
+    val quotaRemaining: Int,
+    val latencyEstimateMs: Int,
+    /** Prompt-token price the provider quoted; null = unknown (discovery refuses to invent). */
+    val pricePerMillionPromptTokens: Double? = null,
+    /**
+     * Cache-affinity fact for THIS request: how much of the candidate's
+     * context is already warm for the conversation (plan step 6). Computed
+     * OUTSIDE the strategies — the provider-blind invariant forbids a
+     * strategy from reading provider identity, but affinity is not identity,
+     * it is a neutral fact about prefix reuse, so the catalog carries it the
+     * same way it carries quotaRemaining. 0 = cold lane.
+     */
+    val affinityScore: Double = 0.0,
+) {
+    val quotaAvailable: Boolean get() = quotaRemaining != 0
+}
+
+class ModelCatalog(val entries: Series<borg.trikeshed.agent.modelmux.ModelCatalogEntry>) : Cursor {
+    override val a: Int
+        get() = entries.a
+
+    private val providerMeta = ColumnMeta("provider", IOMemento.IoString, null)
+    private val modelMeta = ColumnMeta("model", IOMemento.IoString, null)
+    private val freeTierMeta = ColumnMeta("freeTier", IOMemento.IoBoolean, null)
+    private val quotaMeta = ColumnMeta("quotaRemaining", IOMemento.IoInt, null)
+    private val latencyMeta = ColumnMeta("latencyEstimateMs", IOMemento.IoInt, null)
+    private val priceMeta = ColumnMeta("pricePerMillionPromptTokens", IOMemento.IoDouble, null)
+    private val affinityMeta = ColumnMeta("affinityScore", IOMemento.IoDouble, null)
+
+    override val b: (Int) -> RowVec
+        get() = { rowIdx ->
+            val entry = entries.b(rowIdx)
+            7 j { colIdx ->
+                when (colIdx) {
+                    0 -> entry.provider j { providerMeta }
+                    1 -> entry.model j { modelMeta }
+                    2 -> entry.freeTier j { freeTierMeta }
+                    3 -> entry.quotaRemaining j { quotaMeta }
+                    4 -> entry.latencyEstimateMs j { latencyMeta }
+                    5 -> (entry.pricePerMillionPromptTokens ?: 0.0) j { priceMeta }
+                    6 -> entry.affinityScore j { affinityMeta }
+                    else -> error("Invalid column index: $colIdx")
+                }
+            }
+        }
+
+    fun cacheHits(predicate: (borg.trikeshed.agent.modelmux.ModelCatalogEntry) -> Boolean): Cursor {
+        val hits = (0 until entries.a).filter { predicate(entries.b(it)) }
+        return ModelCatalog(hits.size j { i -> entries.b(hits[i]) })
+    }
+
+    fun cacheMisses(predicate: (borg.trikeshed.agent.modelmux.ModelCatalogEntry) -> Boolean): Cursor {
+        val misses = (0 until entries.a).filter { !predicate(entries.b(it)) }
+        return ModelCatalog(misses.size j { i -> entries.b(misses[i]) })
+    }
+}

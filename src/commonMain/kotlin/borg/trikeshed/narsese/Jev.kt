@@ -7,7 +7,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.reifyMap
 import kotlinx.coroutines.delay
-import modelmux.Airgap
+import borg.trikeshed.agent.modelmux.Airgap
 
 /**
  * TypeSafe Jev, a System One model: one `POST /v1/systemone` carries a state and a map of typed
