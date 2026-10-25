@@ -159,3 +159,13 @@ nal_projection.txt
 /.cache/
 /.konan/
 /corpora/
+
+# Merge and patch leftovers.
+*.orig
+*.rej
+
+# Written by HarnessBaselineTest and HarnessMain on every run. They record the JVM vendor and the probe timings, so they differ
+# by machine and by run, and nothing reads them. `git add -f` one to publish it.
+/docs/subvm/capabilities-*.json
+/docs/subvm/capability-matrix.md
+.jules

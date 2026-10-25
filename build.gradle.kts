@@ -15,11 +15,11 @@ import org.jetbrains.kotlin.gradle.targets.js.ir.WebpackConfigurator
 
 plugins {
     kotlin("multiplatform") version "2.4.21"
-    id("com.github.ben-manes.versions") version "0.54.0"
+    id("com.github.ben-manes.versions") version "0.66.0"
     `maven-publish`
     kotlin("plugin.serialization") version "2.4.21"
     kotlin("plugin.compose") version "2.4.21"
-    id("org.jetbrains.compose") version "1.11.1"
+    id("org.jetbrains.compose") version "1.12.2"
     kotlin("plugin.allopen") version "2.4.21"
     id("org.jetbrains.kotlinx.benchmark") version "0.5.0"
 }
@@ -49,12 +49,12 @@ val enableLinuxArm64Target = (linuxHost && arm64Host) || providers.gradlePropert
 // ── Locked versions ───────────────────────────────────────────────────────
 // GraalVM CE 25.3.4.1 is the locked runtime (matches the JDK toolchain's bundled Truffle/JVMCI); JDK 25 toolchain.
 val graalVersion = "25.3.4.1"
-val requestFactoryVersion = "2.13.0"
+val requestFactoryVersion = "2.13.1"
 
 extra["versions.kotlinx-coroutines-core"] = "1.11.0"
 extra["versions.kotlinx-coroutines-test"] = "1.11.0"
 extra["versions.kotlinx-datetime"] = "0.8.0-0.6.x-compat"
-extra["versions.kotlinx-serialization"] = "1.11.0"
+extra["versions.kotlinx-serialization"] = "1.12.0"
 
 val coroutinesVersion = extra["versions.kotlinx-coroutines-core"] as String
 val coroutinesTestVersion = extra["versions.kotlinx-coroutines-test"] as String
@@ -275,7 +275,7 @@ kotlin {
         val commonMain = getByName("commonMain") {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-                api("org.jetbrains.kotlinx:atomicfu:0.28.0")
+                api("org.jetbrains.kotlinx:atomicfu:0.33.0")
                 // Core supplies annotations, descriptors and generated serializer contracts.
                 // Confix owns formats on every target; no kotlinx JSON/CBOR frontend.
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:$serializationVersion")
@@ -307,8 +307,8 @@ kotlin {
                 implementation("org.openjdk.jmh:jmh-generator-annprocess:1.37")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
                 
-                implementation("org.ow2.asm:asm:9.7")
-                implementation("org.ow2.asm:asm-tree:9.7")
+                implementation("org.ow2.asm:asm:9.11.1")
+                implementation("org.ow2.asm:asm-tree:9.11.1")
 
                 // TruffleRuby 40.0.0 uses the same Truffle 25.3.4.1 as graalVersion.
                 implementation("org.graalvm.polyglot:polyglot:$graalVersion")
@@ -329,9 +329,9 @@ kotlin {
 
                 // Tika is loaded from the managed utils/subvm/tika module by TikaRuntime.
                 implementation("org.xerial:sqlite-jdbc:3.53.4.0")
-                implementation("org.slf4j:slf4j-api:2.0.16")
+                implementation("org.slf4j:slf4j-api:2.0.20")
                 // Opt-in compression dictionaries; ISAM framing and all file I/O remain commonMain.
-                implementation("com.github.luben:zstd-jni:1.5.7-23")
+                implementation("com.github.luben:zstd-jni:1.5.7-24")
 
                 // Stanford CoreNLP is deliberately NOT here any more. It has no compile-time
                 // reference anywhere in src/ — the vm.corenlp/vm.corenlp.extract legos reach it
@@ -360,9 +360,9 @@ kotlin {
 
         val jvmTest = getByName("jvmTest") {
             dependencies {
-                implementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-                implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
-                implementation("org.junit.vintage:junit-vintage-engine:5.10.2")
+                implementation("org.junit.jupiter:junit-jupiter-api:5.14.4")
+                implementation("org.junit.jupiter:junit-jupiter-engine:5.14.4")
+                implementation("org.junit.vintage:junit-vintage-engine:5.14.4")
                 implementation("org.jetbrains.kotlin:kotlin-test-junit5")
                 implementation("junit:junit:4.13.2")
             }
@@ -1337,7 +1337,7 @@ val sumoFullCompilation = sumoJvm.compilations.create("sumoFullTest") {
     associateWith(sumoJvm.compilations.getByName("main"))
     defaultSourceSet.dependencies {
         implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-        implementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+        implementation("org.junit.jupiter:junit-jupiter-engine:5.14.4")
     }
 }
 tasks.register<Test>("sumoFullTest") {

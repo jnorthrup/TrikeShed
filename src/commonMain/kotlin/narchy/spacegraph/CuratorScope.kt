@@ -16,6 +16,8 @@ import kotlin.math.*
  * folder, so a document's references stand inside it rather than beside it; the shared SUMO concept pool is its own unit, a circle of class
  * circles holding concept stars sized by how much of the text rests on them. A book opens toward the
  * camera and fans its sections out as pages carrying what curation read; it closes back onto its shelf.
+ * The wood of the shelves never hides a book: the books stand flush with the front of their bay and the wood is painted
+ * before everything else (see [Bay]).
  * Relations are thin bundles routed through the hierarchy (Holten's hierarchical edge bundling): between
  * shelves as aggregates, per statement only for the node in hand, past the snap depth, or while fresh.
  *
@@ -346,11 +348,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
     /** Per node: its center, relative to its container's (absolute for a top circle), and its radius. */
     private var ox = DoubleArray(0); private var oy = DoubleArray(0); private var oz = DoubleArray(0); private var rad = DoubleArray(0)
     private var kidStart = IntArray(1); private var kidList = IntArray(0)
-    /** A shelving bay (one per project, one for the concept pool): its extent (x0..x1, 0..h, z..z+d), shelf board tops, and the top circles it holds. */
-    private class Bay(val name: String, val discs: IntArray) {
-        var x0 = 0.0; var x1 = 0.0; var h = 0.0; var z = 0.0; var d = 0.0; var post = 0.0; var board = 0.0
-        val boards = ArrayList<Double>()
-    }
+    /** One shelving bay per project, and one for the concept pool. */
     private val units = ArrayList<Bay>()
     private var unitOf = HashMap<Int, Int>()
     /** The median book's radius and its sections' mean radius: the reference the snap depth speaks of. */
@@ -421,21 +419,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         var left = 0.0
         for ((name, discs) in byUnit) {
             val u = Bay(name, discs.toIntArray()); val k = units.size
-            val big = discs.maxOf { rad[it] }
-            u.post = big * .05 + 2; u.board = big * .03 + 1.5; u.d = big * .9
-            val gap = big * .15 + PAD * 4
-            u.x0 = left; u.z = -k * maxR * 2.2
-            val ladder = u.post * 4
-            var y = u.board; var width = 0.0
-            u.boards.add(u.board)
-            for (row in discs.chunked(ROW)) {
-                val rowH = row.maxOf { rad[it] } * 2 + gap
-                var x = u.x0 + ladder + u.post + gap
-                for (b in row) { ox[b] = x + rad[b]; oy[b] = y + rad[b]; oz[b] = u.z + u.d * .5; x += rad[b] * 2 + gap; unitOf[b] = k }
-                width = max(width, x - u.x0)
-                y += rowH + u.board; u.boards.add(y)
-            }
-            u.x1 = u.x0 + width + u.post; u.h = y
+            val at = u.stand({ rad[discs[it]] }, left, -k * maxR * 2.2)
+            for ((j, b) in discs.withIndex()) { ox[b] = at[j].x; oy[b] = at[j].y; oz[b] = at[j].z; unitOf[b] = k }
             units.add(u); left = u.x1 + maxR * .6
         }
         apex = Vec3(left / 2, (units.maxOfOrNull { it.h } ?: 0.0) * 1.35, units.map { it.z }.average().takeIf { it.isFinite() } ?: 0.0)
@@ -754,6 +739,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val cam = camera(); val eye = cam.position; val f = focal()
         val vp = viewport.bounds
         val items = ArrayList<Join<Double, DrawItem>>()
+        /** The shelves' wood: painted before everything else of the scene (see [Bay]). */
+        val timber = ArrayList<Join<Double, DrawItem>>()
         val over = ArrayList<DrawItem>()
         val labels = ArrayList<DrawItem>()
         /** Loom bands: over every path of the scene, open pages included, under all text. */
@@ -801,18 +788,8 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
         val light = Vec3(-.35, .8, .5).normalized()
         for ((k, u) in units.withIndex()) {
             val wood = if (u.name == "concepts") Rgba(52, 64, 86) else Rgba(92, 64, 40)
-            val ladder = u.post * 4
-            val solids = ArrayList<Bounds3>()
-            solids.add(Bounds3(Vec3(u.x0, 0.0, u.z), Vec3(u.x1, u.h, u.z + u.post * .4)))
-            solids.add(Bounds3(Vec3(u.x0 + ladder, 0.0, u.z), Vec3(u.x0 + ladder + u.post, u.h, u.z + u.d)))
-            solids.add(Bounds3(Vec3(u.x1 - u.post, 0.0, u.z), Vec3(u.x1, u.h, u.z + u.d)))
-            for (y in u.boards) solids.add(Bounds3(Vec3(u.x0 + ladder, y - u.board, u.z), Vec3(u.x1, y, u.z + u.d)))
-            val rail = u.post * .5; val front = u.z + u.d + u.post * 2
-            solids.add(Bounds3(Vec3(u.x0, 0.0, front), Vec3(u.x0 + rail, u.h + ladder, front + rail)))
-            solids.add(Bounds3(Vec3(u.x0 + ladder - rail, 0.0, front), Vec3(u.x0 + ladder, u.h + ladder, front + rail)))
-            val rungs = max(2, (u.h / (ladder * .9)).toInt())
-            for (r in 1..rungs) { val y = r * (u.h + ladder) / (rungs + 1); solids.add(Bounds3(Vec3(u.x0 + rail, y, front), Vec3(u.x0 + ladder - rail, y + rail * .6, front + rail))) }
-            for ((si, b) in solids.withIndex()) for (fi in 0..5) {
+            val ladder = u.ladder
+            for ((si, b) in u.solids().withIndex()) for (fi in 0..5) {
                 val n = ExtrudedSceneProjection.faceNormals[fi]
                 val fc = b.center + Vec3(n.x * b.size.x, n.y * b.size.y, n.z * b.size.z) * .5
                 if (n.dot(eye - fc) <= 0) continue
@@ -820,7 +797,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 val span = Rect(p.minOf { it.x }, p.minOf { it.y }, p.maxOf { it.x } - p.minOf { it.x }, p.maxOf { it.y } - p.minOf { it.y })
                 if (span.intersection(vp) == null || (span.width < .5 && span.height < .5)) continue
                 val shade = .45 + .55 * max(0.0, n.dot(light))
-                items.add(p.sumOf { it.z } / 4 j DrawItem.Path("shelf-$k-$si-$fi", s_[PathPart.Move(p[0]), PathPart.Line(p[1]), PathPart.Line(p[2]), PathPart.Line(p[3]), PathPart.Close],
+                timber.add(p.sumOf { it.z } / 4 j DrawItem.Path("shelf-$k-$si-$fi", s_[PathPart.Move(p[0]), PathPart.Line(p[1]), PathPart.Line(p[2]), PathPart.Line(p[3]), PathPart.Close],
                     fill = Rgba((wood.red * shade).roundToInt(), (wood.green * shade).roundToInt(), (wood.blue * shade).roundToInt())))
             }
             val title = if (u.name == "concepts") "SUMO concepts · ${u.discs.sumOf { kidCount(it) }} classes" else "${u.name} · ${u.discs.size} book" + if (u.discs.size == 1) "" else "s"
@@ -1046,7 +1023,7 @@ class CuratorScope(var viewport: Viewport = Viewport(1, 1)) {
                 stroke = Rgba(255, 214, 120, (0.7 * (1 - age)).coerceIn(.06, .7)), width = 1.2))
         }
         spikes(over, labels)
-        return FramePlan(viewport, (items.sortedByDescending { it.a }.map { it.b } + over + plates + labels).toSeries(), Rgba(11, 14, 20))
+        return FramePlan(viewport, (timber.sortedByDescending { it.a }.map { it.b } + items.sortedByDescending { it.a }.map { it.b } + over + plates + labels).toSeries(), Rgba(11, 14, 20))
     }
 
     // ── the looms: every strand drawn between two places passes a [WireLoom] band, one per predicate ──
