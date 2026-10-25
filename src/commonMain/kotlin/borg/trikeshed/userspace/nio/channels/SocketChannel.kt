@@ -9,6 +9,7 @@ import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.execute
 import borg.trikeshed.userspace.nio.file.File
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.IOException
 import borg.trikeshed.userspace.nio.channels.spi.AbstractSelectableChannel
 import borg.trikeshed.userspace.nio.channels.spi.SelectorProvider
@@ -114,9 +115,16 @@ internal class UringSocketChannel(
         if (bound < 0) throw IOException("bind $address: $bound")
         return this
     }
-    override fun <T> setOption(option: String, value: T): SocketChannel = throw UnsupportedOperationException("'$option' not supported")
+    /** TCP_NODELAY, a boolean, through the SETSOCKOPT socket command. */
+    override fun <T> setOption(option: String, value: T): SocketChannel {
+        if (option != "TCP_NODELAY") throw UnsupportedOperationException("'$option' not supported")
+        val flag = ByteBuffer(4).order(ByteOrder.nativeOrder()).putInt(0, if (value == true) 1 else 0).array()
+        val set = io(Submissions.setsockopt(file.id, UringOp.IPPROTO_TCP, UringOp.TCP_NODELAY, flag, 0))
+        if (set < 0) throw IOException("setsockopt $option: $set")
+        return this
+    }
     override fun <T> getOption(option: String): T = throw UnsupportedOperationException("options not supported")
-    override fun supportedOptions(): Set<String> = emptySet()
+    override fun supportedOptions(): Set<String> = setOf("TCP_NODELAY")
 
     override fun shutdownInput(): SocketChannel = shutdown(0)
     override fun shutdownOutput(): SocketChannel = shutdown(1)

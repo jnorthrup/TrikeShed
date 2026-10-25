@@ -130,6 +130,9 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val POLLOUT: Int = 0x4
         const val SOL_SOCKET: Int = 1
         const val SO_REUSEADDR: Int = 2
+        /** IPPROTO_TCP and TCP_NODELAY are the same numbers on Linux and Darwin. */
+        const val IPPROTO_TCP: Int = 6
+        const val TCP_NODELAY: Int = 1
         const val SOCKET_URING_OP_SETSOCKOPT: Int = 3
         const val SOCKET_URING_OP_GETSOCKNAME: Int = 5
 

@@ -200,6 +200,8 @@ class MeshListener private constructor(
                 pause = 1
                 try {
                     client.configureBlocking(false)
+                    // Replies leave in two writes (head, body); without NODELAY the body waits on the peer's delayed ACK.
+                    runCatching { client.setOption("TCP_NODELAY", true) }
                     // Refusal is immediate: never create a coroutine or read a body for a full queue.
                     if (clients.trySend(client).isFailure) client.close()
                 } catch (failure: Throwable) {

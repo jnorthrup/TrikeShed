@@ -192,6 +192,33 @@ class PosixFileOperations : FileOperations {
         syncDirectory(directory)
         syncDirectory(parent)
     }
+
+    /** mkdir(2) of one absent directory: an existing leaf, a symlink included, answers EEXIST and refuses. */
+    override fun createDirectory(path: String) {
+        require(path.isNotEmpty() && '\u0000' !in path) { "Invalid directory path" }
+        val directory = path.trimEnd('/').ifEmpty { "/" }
+        check(mkdir(directory, 0x1FFu.convert()) == 0) { posixFailure("mkdir: $directory") }
+        syncDirectory(directory.substringBeforeLast('/', ".").ifEmpty { "/" })
+    }
+
+    /**
+     * Move without replacing. A file moves by link(2) then unlink(2), so an existing destination refuses atomically
+     * (EEXIST); a directory, which link(2) cannot name, is checked absent and renamed.
+     */
+    override fun move(source: String, destination: String) {
+        require('\u0000' !in source && '\u0000' !in destination) { "Invalid move path" }
+        val parent = destination.trimEnd('/').substringBeforeLast('/', ".").ifEmpty { "/" }
+        if (isDir(source)) {
+            check(!exists(destination)) { "move: $destination exists" }
+            check(rename(source, destination) == 0) { posixFailure("rename: $source -> $destination") }
+        } else {
+            check(link(source, destination) == 0) { posixFailure("link: $source -> $destination") }
+            check(unlink(source) == 0) { posixFailure("unlink: $source") }
+        }
+        syncDirectory(parent)
+        val origin = source.trimEnd('/').substringBeforeLast('/', ".").ifEmpty { "/" }
+        if (origin != parent) syncDirectory(origin)
+    }
     override fun deleteRecursively(path: String): Unit = memScoped {
         val st = alloc<stat>()
         if (stat(path, st.ptr) != 0) return // Does not exist

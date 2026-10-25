@@ -564,9 +564,11 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             UringOp.SOCKET_URING_OP_SETSOCKOPT.toLong() -> {
                 val level = (sub.addr and 0xffffffffL).toInt()
                 val name = (sub.addr ushr 32).toInt()
-                if (level != UringOp.SOL_SOCKET || name != UringOp.SO_REUSEADDR) return -92
+                val noDelay = level == UringOp.IPPROTO_TCP && name == UringOp.TCP_NODELAY
+                if (!noDelay && (level != UringOp.SOL_SOCKET || name != UringOp.SO_REUSEADDR)) return -92
                 buffer.array().usePinned {
-                    posixCompletion(setsockopt(sub.fd, SOL_SOCKET, SO_REUSEADDR, if (sub.len == 0) null else it.addressOf(start), sub.len.convert()))
+                    posixCompletion(setsockopt(sub.fd, if (noDelay) level else SOL_SOCKET, if (noDelay) name else SO_REUSEADDR,
+                        if (sub.len == 0) null else it.addressOf(start), sub.len.convert()))
                 }
             }
             UringOp.SOCKET_URING_OP_GETSOCKNAME.toLong() -> memScoped {

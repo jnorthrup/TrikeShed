@@ -31,6 +31,8 @@ class LinuxFileOperations : FileOperations {
     override fun canonicalPath(path: String): String = posix.canonicalPath(path)
     override fun resolvePath(vararg parts: String): String = posix.resolvePath(*parts)
     override fun mkdirs(path: String) = posix.mkdirs(path)
+    override fun createDirectory(path: String) = posix.createDirectory(path)
+    override fun move(source: String, destination: String) = posix.move(source, destination)
 
     override fun readAllLines(filename: String): List<String> =
         readString(filename).replace("\r\n", "\n").split('\n').let {

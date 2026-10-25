@@ -72,6 +72,7 @@ class MeshDataSurface(
                 path == CHANGES -> changes(method, grant, query)
                 path == TWINS || path.startsWith("$TWINS/") || path in TWIN_READS -> twins(method, path, grant, query, h, body)
                 path.startsWith("/storage/v1/object/") -> objects(method, path, grant, query, h, body)
+                path.startsWith(RPC) -> coordination(method, path.removePrefix(RPC), grant, query, h, body)
                 else -> rows(method, path, grant, query, h, body)
             }
         } catch (cancelled: CancellationException) {
@@ -119,6 +120,8 @@ class MeshDataSurface(
         headers: Map<String, String>, body: ByteArray): WireHttpResponse {
         val collection = identifier(decode(path.removePrefix("/rest/v1/")))
         if (collection in MeshNode.reservedCollections) throw MeshHttpException(403, "Reserved mesh collection")
+        // Lock and semaphore rows change only through the coordination functions, never as plain rows.
+        if (collection == MeshCoordination.COLLECTION && method !in setOf("GET", "HEAD")) throw MeshHttpException(403, "Coordination rows are written by rpc")
         require(query.keys.all { it in setOf("id", "limit", "after", "select") }) { "Unsupported row filter" }
         require(query["select"] == null || query["select"] == "*") { "Only full rows are selected" }
         val id = query["id"]?.let { require(it.startsWith("eq.")); identifier(it.removePrefix("eq.")) }
@@ -375,6 +378,51 @@ class MeshDataSurface(
         catch (_: Exception) { throw MeshHttpException(400, "Invalid URL encoding") }
     }
 
+    /**
+     * PostgREST-style functions over [MeshCoordination] in the credential's namespace, each a POST with a JSON object:
+     *   lock {name, holder, leaseMs}               -> {granted, fence, leaseUntilMs} | {granted: false}
+     *   unlock {name, holder, fence}               -> {released}
+     *   acquire {name, holder, permits, leaseMs}   -> {granted, fence, leaseUntilMs} | {granted: false, position, enteredMs, inceptionMs}
+     *   release {name, holder}                     -> {released}
+     */
+    private suspend fun coordination(method: String, function: String, grant: MeshApiKey, query: Map<String, String>,
+        headers: Map<String, String>, body: ByteArray): WireHttpResponse {
+        if (method != "POST") throw MeshHttpException(405, "Coordination functions are POST")
+        require(query.isEmpty()) { "Coordination query unsupported" }
+        require(headers["content-type"]?.substringBefore(';')?.lowercase() == "application/json") { "JSON required" }
+        val args = stringMap(inputJson(body, ROW_BYTES))
+        fun text(name: String): String = args[name] as? String ?: bad("String $name required")
+        fun whole(name: String): Long = args[name] as? Long ?: bad("Integer $name required")
+        val grid = MeshCoordination(grant.namespace, submit)
+        val reply: Map<String, Any?> = when (function) {
+            "lock" -> {
+                require(args.keys == setOf("name", "holder", "leaseMs")) { "lock fields" }
+                grid.tryLock(text("name"), text("holder"), whole("leaseMs"))?.let {
+                    mapOf("granted" to true, "fence" to it.fence, "leaseUntilMs" to it.leaseUntilMillis)
+                } ?: mapOf("granted" to false)
+            }
+            "unlock" -> {
+                require(args.keys == setOf("name", "holder", "fence")) { "unlock fields" }
+                mapOf("released" to grid.unlock(MeshLockGrant(text("name"), text("holder"), whole("fence"), 0)))
+            }
+            "acquire" -> {
+                require(args.keys == setOf("name", "holder", "permits", "leaseMs")) { "acquire fields" }
+                val permits = whole("permits").also { require(it in 1..MeshCoordination.MAX_HOLDERS.toLong()) }
+                when (val seat = grid.acquire(text("name"), text("holder"), permits.toInt(), whole("leaseMs"))) {
+                    is MeshSeat.Granted -> mapOf("granted" to true, "fence" to seat.fence, "leaseUntilMs" to seat.leaseUntilMillis)
+                    is MeshSeat.Waiting -> mapOf("granted" to false, "position" to seat.position.toLong(),
+                        "enteredMs" to seat.enteredMillis, "inceptionMs" to seat.inceptionMillis)
+                }
+            }
+            "release" -> {
+                require(args.keys == setOf("name", "holder")) { "release fields" }
+                mapOf("released" to grid.release(text("name"), text("holder")))
+            }
+            else -> throw MeshHttpException(404, "Unknown coordination function")
+        }
+        return json(reply)
+    }
+
     private fun stringMap(value: Any?): Map<String, Any?> {
         val map = value as? Map<*, *> ?: throw IllegalArgumentException("JSON object required")
         require(map.keys.all { it is String })
@@ -397,6 +445,7 @@ class MeshDataSurface(
 
     companion object {
         const val CHANGES: String = "/v1/skinnerbox/changes"
+        const val RPC: String = "/rest/v1/rpc/"
         const val TWINS: String = "/v1/skinnerbox/twins"
         const val TWIN_RESIDUAL: String = "/v1/skinnerbox/twin-residual"
         const val TWIN_REFERENCES: String = "/v1/skinnerbox/twin-references"
