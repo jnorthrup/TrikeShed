@@ -42,12 +42,17 @@ object HeadhunterCouncilHarness {
         for (row in brain.rosterStatus())
             println("  ${if (row["keyPresent"] == true) "keyed    " else "no key   "}${row["model"]}")
         val seats = mutableListOf<String>()
+        val admitted = mutableListOf<String>()
         val providers = mutableSetOf<String>()
         for (card in mux.listModels("chat").view) {
             if (seats.size == HeadhunterCouncil.SEATS) break
-            if (mux.modelAdmission(card.a) == null) continue
+            if (mux.modelAdmission(card.a)?.takeIf { it.b } == null) continue
+            admitted.add(card.a)
             if (providers.add(card.providerTag ?: card.a)) seats.add(card.a)
-            else if (seats.size < 2 && card.a !in seats) seats.add(card.a)
+        }
+        for (model in admitted) {
+            if (seats.size == HeadhunterCouncil.SEATS) break
+            if (model !in seats) seats.add(model)
         }
         if (seats.size < 2) {
             println("── the roster cannot field a council (${seats.size} admitted); the lone drafting seat is the fallback")

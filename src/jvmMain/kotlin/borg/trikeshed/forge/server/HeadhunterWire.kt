@@ -82,7 +82,7 @@ class HeadhunterWire private constructor(
                     val providers = mutableSetOf<String>()
                     for (card in mux.listModels("chat").view) {
                         if (seats.size == HeadhunterCouncil.SEATS) break
-                        if (mux.modelAdmission(card.a) == null) continue
+                        if (mux.modelAdmission(card.a)?.takeIf { it.b } == null) continue
                         admitted.add(card.a)
                         if (providers.add(card.providerTag ?: card.a)) seats.add(card.a)
                     }
