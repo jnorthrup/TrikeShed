@@ -37,7 +37,12 @@ class JvmProcessOperationsTest {
 
     @Test
     fun deliberateBlocksToxicDynamicLoaderAndInterpreterVars() {
-        listOf("LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES", "PYTHONPATH", "NODE_OPTIONS", "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "PERL5OPT", "RUBYOPT", "PROMPT_COMMAND").forEach { key ->
+        listOf(
+            "LD_PRELOAD", "LD_LIBRARY_PATH", "LD_AUDIT", "LD_PROFILE", "GLIBC_TUNABLES",
+            "DYLD_INSERT_LIBRARIES", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
+            "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC_foo",
+            "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND"
+        ).forEach { key ->
             assertEquals(GuestEnvironment.Disposition.BLOCKED, GuestEnvironment.deliberate(key))
         }
     }
