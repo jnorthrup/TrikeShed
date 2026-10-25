@@ -2,8 +2,7 @@ name: Deploy docs to Pages
 
 # The legacy Pages queue stopped serving this repo (builds list frozen at
 # July, deployments at September, queued requests never start), so the site
-# builds and deploys through Actions instead. jekyll-build-pages is the same
-# builder the legacy pipeline ran; docs/ is the site, master is the branch.
+# deploys through Actions instead: docs/ on master, as committed.
 on:
   push:
     branches: ["master"]
@@ -25,17 +24,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        # No LFS: the films stay pointers on Pages; docs/video/index.md
-        # supplies them through media.githubusercontent.com instead.
       - name: Setup Pages
         uses: actions/configure-pages@v5
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./docs
-          destination: ./_site
+      # docs/.nojekyll: the site is served as committed, with no Jekyll build.
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs
 
   deploy:
     environment:

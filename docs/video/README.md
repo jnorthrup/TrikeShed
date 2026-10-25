@@ -24,7 +24,6 @@ Chromium; ffmpeg encodes the frames, and the ascension score is synthesized by `
 | `render.mjs` | builds `score.m4a` and the film |
 | `qa.py` | finds single-frame pops in a rendered film |
 | `fonts/` | KaTeX 0.16.11 fonts (MIT, `LICENSE-KaTeX`) |
-| `ascension.mp4` | the rendered film (Git LFS) |
 | `score.m4a` | the soundtrack, for the player page |
 
     node render.mjs ascension.mp4 60 4 1920    # output, fps, browser workers, width
@@ -39,7 +38,7 @@ Chromium; ffmpeg encodes the frames, and the ascension score is synthesized by `
 | `index.html` | player page; `?capture` for rendering |
 | `render.mjs` | renders the film and its `.srt` captions |
 | `fonts/` | KaTeX math italic, for α and λ |
-| `compositional-density.mp4`, `.srt` | the rendered film (Git LFS) and its captions |
+| `compositional-density.srt` | captions of the rendered film |
 
     node render.mjs compositional-density.mp4 30 4    # output, fps, browser workers
     node render.mjs --stills stills 34
