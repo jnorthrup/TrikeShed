@@ -1,11 +1,13 @@
-// Renders the film in headless Chromium, frames piped in order straight into ffmpeg.
-//   node render.mjs --stills dir t1 t2 …            PNG stills for review
-//   node render.mjs --meta out.json                 score data (events, ascent curve)
-//   node render.mjs out.mp4 [fps=60] [workers=4] [width=1920]
+// Builds the film: the score from the film's own clock, then every frame rendered in headless Chromium and piped
+// in order into ffmpeg with the score as its soundtrack.
+//   node render.mjs out.mp4 [fps=60] [workers=4] [width=1920]   the film, and score.m4a for the player page
+//   node render.mjs --stills dir t1 t2 …                        PNG stills for review
+//   node render.mjs --meta out.json                             score data alone (events, ascent curve)
 import { createRequire } from 'node:module';
 import { execFileSync, spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
+import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -29,6 +31,7 @@ async function page(browser) {
   return pg;
 }
 const grab = (pg, t, type = 'image/jpeg') => pg.evaluate(([t, type]) => { renderAt(t); return document.getElementById('cv').toDataURL(type, 0.94).split(',')[1]; }, [t, type]).then(b => Buffer.from(b, 'base64'));
+const meta = pg => pg.evaluate(() => ({ duration: Film.duration, events: Film.events, curve: Film.curve(100), levels: Film.levels }));
 
 const browser = await chromium.launch();
 if (args[0] === '--stills') {
@@ -36,15 +39,18 @@ if (args[0] === '--stills') {
   const pg = await page(browser);
   for (const t of args.slice(2)) writeFileSync(join(dir, `a-${t}.png`), await grab(pg, Number(t), 'image/png'));
 } else if (args[0] === '--meta') {
-  const pg = await page(browser);
-  writeFileSync(resolve(args[1]), JSON.stringify(await pg.evaluate(() => ({ duration: Film.duration, events: Film.events, curve: Film.curve(100), levels: Film.levels }))));
+  writeFileSync(resolve(args[1]), JSON.stringify(await meta(await page(browser))));
 } else {
   const out = resolve(args[0] ?? 'ascension.mp4'), fps = Number(args[1] ?? 60), workers = Number(args[2] ?? 4);
-  const first = await page(browser);
-  const duration = await first.evaluate(() => Film.duration), total = Math.round(duration * fps);
+  const first = await page(browser), tmp = mkdtempSync(join(tmpdir(), 'ascension-'));
+  const film = await meta(first), wav = join(tmp, 'score.wav'), total = Math.round(film.duration * fps);
+  writeFileSync(join(tmp, 'meta.json'), JSON.stringify(film));
+  execFileSync('python3', [join(here, 'score.py'), join(tmp, 'meta.json'), wav], { stdio: 'inherit' });
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', wav, '-c:a', 'aac', '-b:a', '160k', join(here, 'score.m4a')]);
   const pages = [first, ...await Promise.all(Array.from({ length: workers - 1 }, () => page(browser)))];
-  const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'medium', '-movflags', '+faststart', out], { stdio: ['pipe', 'inherit', 'inherit'] });
+  const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-', '-i', wav,
+    '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'medium', '-c:a', 'aac', '-b:a', '192k',
+    '-shortest', '-movflags', '+faststart', out], { stdio: ['pipe', 'inherit', 'inherit'] });
   const pending = new Map(); let next = 0, written = 0, writing = false;
   const flush = async () => {
     if (writing) return; writing = true;
@@ -61,6 +67,7 @@ if (args[0] === '--stills') {
     }
   }));
   await flush(); ff.stdin.end(); await once(ff, 'close');
-  console.log(`wrote ${out} (${total} frames, ${duration.toFixed(2)}s)`);
+  rmSync(tmp, { recursive: true, force: true });
+  console.log(`wrote ${out} (${total} frames, ${film.duration.toFixed(2)}s)`);
 }
 await browser.close();
