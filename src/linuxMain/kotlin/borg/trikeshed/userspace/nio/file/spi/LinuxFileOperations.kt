@@ -20,6 +20,18 @@ import platform.posix.*
 
 class LinuxFileOperations : FileOperations {
 
+    // Reads and plain writes ride the ring below. Atomic publication, directories, exclusive leases, canonical paths and the path algebra
+    // are the POSIX adapter's, forwarded rather than re-implemented. The six go together: FileOperations.canonicalPath throws for an
+    // adapter that claims DURABLE without supplying its own, and BoardFileWal walks up with resolvePath(x, "..") once the adapter claims
+    // DURABLE, so resolvePath must normalize or that walk never reaches an existing ancestor.
+    private val posix = PosixFileOperations()
+    override val durability: StorageDurability get() = posix.durability
+    override fun writeAtomically(filename: String, bytes: ByteArray) = posix.writeAtomically(filename, bytes)
+    override fun acquireExclusiveLease(path: String): FileLease = posix.acquireExclusiveLease(path)
+    override fun canonicalPath(path: String): String = posix.canonicalPath(path)
+    override fun resolvePath(vararg parts: String): String = posix.resolvePath(*parts)
+    override fun mkdirs(path: String) = posix.mkdirs(path)
+
     override fun readAllLines(filename: String): List<String> =
         readString(filename).replace("\r\n", "\n").split('\n').let {
             if (it.isNotEmpty() && it.last().isEmpty()) it.dropLast(1) else it
@@ -127,7 +139,6 @@ class LinuxFileOperations : FileOperations {
         stat(path, st.ptr) == 0 && (st.st_mode.toInt() and S_IFMT) == S_IFREG
     }
 
-    override fun mkdirs(path: String) { mkdir(path, 0x1FFu.convert()) }
     override fun deleteRecursively(path: String) {
         memScoped {
             val st = alloc<stat>()
@@ -154,7 +165,6 @@ class LinuxFileOperations : FileOperations {
             }
         }
     }
-    override fun resolvePath(vararg parts: String): String = parts.joinToString("/")
     override fun readZip(path: String): List<Join<String, ByteArray>> = throw UnsupportedOperationException("readZip unsupported")
     override fun createTempDir(prefix: String): String = createTempDirectory(prefix)
 

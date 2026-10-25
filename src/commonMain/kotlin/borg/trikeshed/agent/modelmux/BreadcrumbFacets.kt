@@ -203,14 +203,20 @@ class ProjectionFacets(
     }
 
     /** The index of [snapshot], built from its documents' facets on first use and then reused for any question. */
-    internal fun index(snapshot: ContextSnapshot): SnapshotIndex {
-        val key = StringBuilder(policy).also { sb -> for (i in 0 until snapshot.documents.size) sb.append('\n').append(snapshot.documents[i].cid.value) }
+    internal fun index(snapshot: ContextSnapshot): SnapshotIndex =
+        index(List(snapshot.documents.size) { d -> snapshot.documents[d].cid }) { d -> snapshot.documents[d].text }
+
+    /**
+     * The index of the documents named by [cids], in that order. [text] reads document `d` and is called only for a
+     * document whose facet or whose lines' features are not already held, so a warm index costs no read at all. A
+     * snapshot is one way to name documents; anything that holds verified bytes under a content id is another, and
+     * the same ids give the same index whichever of them asked.
+     */
+    internal fun index(cids: List<ContentId>, text: (Int) -> String): SnapshotIndex {
+        val key = StringBuilder(policy).also { sb -> for (cid in cids) sb.append('\n').append(cid.value) }
         return indexes.get(ContentId.of(key.toString().encodeToByteArray())) {
-            val facets = List(snapshot.documents.size) { d ->
-                val doc = snapshot.documents[d]
-                document(doc.cid) { doc.text }
-            }
-            build(facets) { d -> snapshot.documents[d].text }
+            val facets = List(cids.size) { d -> document(cids[d]) { text(d) } }
+            build(facets, text)
         }
     }
 

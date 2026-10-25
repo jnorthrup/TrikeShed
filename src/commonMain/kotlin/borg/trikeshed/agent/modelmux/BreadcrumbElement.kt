@@ -27,17 +27,21 @@ class BreadcrumbAdmission(val owner: borg.trikeshed.agent.modelmux.BreadcrumbEle
     companion object Key : CoroutineContext.Key<BreadcrumbAdmission>
 }
 
-/** Session-local context transactions; admitted work drains before its caller's scope exits. */
+/**
+ * Session-local context transactions; admitted work drains before its caller's scope exits. [facets], when given, is
+ * handed to the index of every context this element creates or restores, so their searches rank through it.
+ */
 class BreadcrumbElement(
     factory: (() -> borg.trikeshed.agent.modelmux.BreadcrumbContext)? = null,
     val capacity: Int = 250,
     val store: borg.trikeshed.agent.modelmux.BreadcrumbStore? = null,
     val cas: CasStore = CasStore.inMemory(),
+    val facets: ProjectionFacets? = null,
 ) : AbstractCoroutineContextElement(Key) {
     companion object Key : CoroutineContext.Key<BreadcrumbElement>
     val factory: () -> borg.trikeshed.agent.modelmux.BreadcrumbContext = factory ?: {
         borg.trikeshed.agent.modelmux.BreadcrumbContext(
-            index = borg.trikeshed.agent.modelmux.BreadcrumbIndex(cas)
+            index = borg.trikeshed.agent.modelmux.BreadcrumbIndex(cas, facets)
         )
     }
 
@@ -97,7 +101,7 @@ class BreadcrumbElement(
             require(id !in restored) { "duplicate stored breadcrumb context" }
             require(restored.size < capacity) { "stored breadcrumb context capacity exceeded" }
             val template = factory()
-            val context = borg.trikeshed.agent.modelmux.BreadcrumbContext.restore(entry.b, template.clock, template.index.cas)
+            val context = borg.trikeshed.agent.modelmux.BreadcrumbContext.restore(entry.b, template.clock, template.index.cas, template.index.facets)
             restored[id] = context
             encoded[id] = context.state()
         }

@@ -85,6 +85,15 @@ object SharedContextRoot {
         return SharedContextSettings(scopes, peer)
     }
 
+    /**
+     * The breadcrumb contexts of a root. Their searches rank through the facet memory this root's shared context answers
+     * projections with, so a record the agent kept and a document a peer pinned that have the same bytes are one document
+     * facet and one set of line features. [store] persists the sessions; [cas] holds their originals and stays the
+     * caller's. Ranking is by `search` over the agent's own records only: nothing is added from a peer and nothing leaves.
+     */
+    fun breadcrumbs(shared: SharedContextElement, cas: CasStore, store: BreadcrumbStore? = null): BreadcrumbElement =
+        BreadcrumbElement(store = store, cas = cas, facets = shared.context.facets)
+
     /** Opens the element owned by the calling coroutine's Job over [cas], which stays the caller's to close. */
     suspend fun open(id: String, cas: CasStore, settings: SharedContextSettings, process: ProcessOperations): SharedContextElement {
         val exchange = settings.peer?.let { KuboContextBlockExchange(process, KuboNode(it.repo, it.api), it.binary, it.timeoutSeconds) }

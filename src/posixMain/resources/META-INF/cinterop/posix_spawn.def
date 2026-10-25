@@ -29,6 +29,11 @@ static inline int trikeshed_open(char *path, int flags, int mode) {
 // OFD record locks conflict with ordinary fcntl locks (including JVM FileLock),
 // but belong to this descriptor, not every descriptor opened by this process.
 // Closing a rejected contender therefore cannot release the active writer.
+#if defined(__linux__) && !defined(F_OFD_SETLK)
+// The Kotlin/Native Linux sysroot is glibc 2.19, whose <fcntl.h> predates F_OFD_SETLK (glibc 2.20) although its kernel headers
+// and every kernel since 3.15 have it. Without this the lease below compiled to its ENOTSUP branch on every Linux native build.
+#define F_OFD_SETLK 37
+#endif
 static inline int trikeshed_file_lease(const char *path) {
 #ifdef F_OFD_SETLK
     int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0600);

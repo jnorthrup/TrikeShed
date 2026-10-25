@@ -441,7 +441,7 @@ class BreadcrumbContext(
 
         /** Decode before admission. Reads retain original time and queued overrides without exercising them. */
         fun restore(state: String, clock: () -> Long = { Clock.System.now().toEpochMilliseconds() },
-                    cas: CasStore = CasStore.inMemory()): BreadcrumbContext {
+                    cas: CasStore = CasStore.inMemory(), facets: ProjectionFacets? = null): BreadcrumbContext {
             require(state.length <= STATE_LIMIT) { "breadcrumb state capacity reached" }
             val fields = setOf("version", "retention", "sequence", "records", "pending", "emissions", "submission")
             val parsed = reifyStrict(state)
@@ -455,7 +455,7 @@ class BreadcrumbContext(
                 presenceState(policy["threshold"])
             )
             val context = BreadcrumbContext(clock, retention,
-                borg.trikeshed.agent.modelmux.BreadcrumbIndex(cas)
+                borg.trikeshed.agent.modelmux.BreadcrumbIndex(cas, facets)
             )
             context.sequence = longState(root["sequence"]).also { require(it in 0 until Long.MAX_VALUE) { "invalid breadcrumb sequence" } }
             var size = 0L

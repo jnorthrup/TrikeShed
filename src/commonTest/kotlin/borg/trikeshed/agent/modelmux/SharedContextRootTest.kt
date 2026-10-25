@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -80,6 +81,20 @@ class SharedContextRootTest {
             assertEquals(SharedContextMode.PEER, peer.context.policy.mode)
         } finally {
             peer.drain()
+        }
+    }
+
+    @Test
+    fun theBreadcrumbsOfARootRankThroughTheMemoryItsSharedContextAnswersWith() = runTest {
+        val cas = CasStore.inMemory()
+        val shared = SharedContextRoot.open("root-breadcrumbs", cas, SharedContextSettings(setOf("reel/*")), NoProcess)
+        try {
+            val breadcrumbs = SharedContextRoot.breadcrumbs(shared, cas)
+            assertSame(shared.context.facets, breadcrumbs.facets)
+            assertSame(cas, breadcrumbs.cas, "originals live in the root's store")
+            assertSame(shared.context.facets, breadcrumbs.transact("session") { it.index.facets }, "and so does every session it creates")
+        } finally {
+            shared.drain()
         }
     }
 }

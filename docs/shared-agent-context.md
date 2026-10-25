@@ -94,7 +94,7 @@ memoized. Losing or evicting any of it costs time and never changes an answer.
 | document facet | the document's exact content id | LineCas line structure: spine ordinal to original range, and each line's LineCas content id |
 | spine id | content id | the normalized spine id, so a verified document is not normalized and hashed again on every acquire |
 | line features | the line's LineCas content id | tokens (terms interned), whether the line opens with an action verb, whether it carries a protected constraint |
-| snapshot index | the ordered content ids of the snapshot's documents | the distinct lines, term postings (a posting's size is the term's document frequency), every position of each distinct line, the mean line length |
+| snapshot index | the ordered content ids of the documents (a snapshot's, or the agent's own index's) | the distinct lines, term postings (a posting's size is the term's document frequency), every position of each distinct line, the mean line length |
 
 A question reads only the postings of its own terms, so its work is proportional to the lines that contain them, not to
 the corpus. Scores, order, `omittedCandidates` and `droppedConstraints` are bit for bit those of the plain algorithm that
@@ -104,6 +104,34 @@ wait for it. An entry heavier than its bound is built for the request and not re
 the per-entry comparison with the manifest and is keyed by digest-verified content, so it cannot make a wrong spine pass.
 Facets are bound to one policy revision and the projector refuses a mismatch. `SharedContext.facets` is the instance the
 element, the stdio tools and the reel use, so every projection over one context shares them.
+
+### the agent's own index (`BreadcrumbIndex`)
+
+What an agent keeps of its own work, tool results and summaries, is not a revision: it is records in a
+`BreadcrumbIndex` (the full blob in the CAS, a spine fingerprint, and a 16-bit alias that is only a bucket). Its `search`
+has two rankings, chosen by whether the index was given `ProjectionFacets`. Without them it is the scan it always was.
+
+| | scan (no facets; the default) | facets (the daemon's root passes `SharedContext.facets`) |
+|---|---|---|
+| a record matches | a query word is a substring of its title, source or content | a query word is a substring of its title or source, or a line of its content answers the query |
+| order | title word 4, source word 2, content word 1; ties newest first | title and source words as before, then the score of the record's best line, then newest |
+| cost of a search | one CAS read of every record, every time | no read of any record when none changed; one read for each new record |
+
+The line score is `BreadcrumbProjector`'s own: `rank` and `project` read one `scoreLines`, so what a record is worth can
+never disagree with what a projection would show from it. The records are named to the facets by content id, so a record
+and a peer's document with the same bytes are one document facet and one set of line features. The snapshot index is keyed
+by the ordered content ids, so a list of records is the same index as a snapshot whose documents have those ids in that
+order (the records are ordered by id, a snapshot by document name); otherwise it is a different index over the same facets.
+
+What changes for a model that searches: content is matched by lexical token, as a peer's revision is. A fragment of a
+word (`ident` for `identifiers`, `cache` for `cached`) still finds a title or source but no longer a line of content; a
+query word is tokenized, so `get_user` finds `getUserName`; and a word the policy drops (`the`, `and`) selects no content
+line, though it still matches the letters of a title or source. For whole words the matches are the same and only their
+order differs. To go back, construct the root's `BreadcrumbElement` without `facets`; nothing else needs to change.
+
+What does not change: `recall`, the 16-bit alias protections (a colliding reference is ambiguous until the full cid is
+given), the originals in the CAS, and scope. Only the agent's own records are searched; nothing is added from a peer and
+nothing is exported.
 
 ### oversight (System1)
 

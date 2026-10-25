@@ -10,8 +10,10 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -164,5 +166,79 @@ class ProjectionFacetsTest {
         for ((q, rendered) in answers) assertEquals(ReferenceProjector.project(snap, q).render(), rendered, q)
         assertEquals(1, synchronized(lock) { arrivals }, "one builder for one key")
         assertEquals(1, facets.counters().indexesBuilt)
+    }
+
+    @Test
+    fun aDocumentsRankIsTheScoreOfItsBestLineAsTheOracleScoresIt() {
+        // No two matching lines are adjacent and nothing is shared between documents, so every excerpt the oracle
+        // makes is one line and its score is that line's.
+        val snap = snapshotOf(
+            "a.md" to "retry policy is documented here\nfiller one\nretry\nfiller two\n",
+            "b.md" to "filler three\nthe rareterm must be kept\nfiller four\n",
+            "c.md" to "nothing relevant\nat all\n",
+        )
+        val facets = ProjectionFacets()
+        val everything = ProjectionBudget(maxChars = 100_000, maxLines = 1_000, neighborLines = 0)
+        val scoring = mutableListOf<Double>()
+        for (question in listOf("retry policy", "rareterm", "retry rareterm kept", "Retry, POLICY!", "absent term", "")) {
+            val oracle = ReferenceProjector.project(snap, question, everything)
+            val best = DoubleArray(snap.documents.size)
+            for (i in 0 until oracle.excerpts.size) {
+                val excerpt = oracle.excerpts[i]
+                val d = (0 until snap.documents.size).first { snap.documents[it].name == excerpt.document }
+                best[d] = maxOf(best[d], excerpt.score)
+            }
+            val ranked = BreadcrumbProjector.rank(facets.index(snap), question, facets)
+            assertContentEquals(best, ranked, "'$question'")
+            scoring += ranked.filter { it > 0.0 }
+        }
+        assertTrue(scoring.size >= 5, "the questions really matched something: $scoring")
+    }
+
+    @Test
+    fun aLineSeveralDocumentsShareCountsForEachOfThem() {
+        // The oracle shows an identical line once, under the first document. A document is still about what it says.
+        val snap = snapshotOf("one.md" to "rotate the signing key\n", "two.md" to "rotate the signing key\n", "three.md" to "unrelated\n")
+        val facets = ProjectionFacets()
+        val ranked = BreadcrumbProjector.rank(facets.index(snap), "signing key", facets)
+        fun scoreOf(name: String) = ranked[(0 until snap.documents.size).first { snap.documents[it].name == name }]
+        assertTrue(scoreOf("one.md") > 0.0, "carries it: ${ranked.toList()}")
+        assertEquals(scoreOf("one.md"), scoreOf("two.md"), "the second copy counts as much as the first")
+        assertEquals(0.0, scoreOf("three.md"))
+    }
+
+    @Test
+    fun rankingScoresOnlyTheLinesTheQuestionNamesAndTouchesNoText() {
+        val snap = snapshotOf(*corpus(10, 100))
+        val facets = ProjectionFacets()
+        val cids = List(snap.documents.size) { snap.documents[it].cid }
+        facets.index(cids) { snap.documents[it].text }
+        val built = facets.counters()
+        var reads = 0
+        val index = facets.index(cids) { reads++; snap.documents[it].text }
+        val ranked = BreadcrumbProjector.rank(index, "rareterm", facets)
+        assertEquals(0, reads, "a warm index is asked for no bytes")
+        assertEquals(1L, facets.counters().linesScored - built.linesScored, "1000 distinct lines, one of which contains the term")
+        assertEquals(listOf(1), ranked.indices.filter { ranked[it] > 0.0 }, "only the document that carries the term")
+    }
+
+    @Test
+    fun documentsNamedByContentIdsAreTheSameIndexAsTheSnapshotThatHoldsThem() {
+        val snap = snapshotOf(*corpus(4, 25))
+        val facets = ProjectionFacets()
+        val cids = List(snap.documents.size) { snap.documents[it].cid }
+        var reads = 0
+        val byIds = facets.index(cids) { reads++; snap.documents[it].text }
+        assertTrue(reads > 0, "a cold index reads what it indexes")
+        assertSame(byIds, facets.index(snap), "naming the same documents through a snapshot finds the same index")
+        assertEquals(1, facets.counters().indexesBuilt)
+        assertEquals(1, facets.counters().indexHits)
+    }
+
+    @Test
+    fun rankingRefusesFacetsBuiltForAnotherPolicy() {
+        val snap = snapshotOf(*corpus(1, 3))
+        val own = ProjectionFacets()
+        assertFailsWith<IllegalArgumentException> { BreadcrumbProjector.rank(own.index(snap), "common", ProjectionFacets(policy = "lexical-0")) }
     }
 }
