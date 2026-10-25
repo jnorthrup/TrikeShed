@@ -136,9 +136,8 @@ data class LcncProgram(
 
 /** Wires whose target is [nodeId] — the inputs one node actually receives. */
 fun LcncProgram.inputsOf(nodeId: String): Series<LcncWire> {
-    val hits = ArrayList<LcncWire>()
-    for (i in 0 until wires.size) if (wires[i].toNode == nodeId) hits.add(wires[i])
-    return hits.toSeries()
+    /* ⚡ Bolt: Use zero-allocation Series.filter lazy view instead of intermediate ArrayList allocation and .toSeries() */
+    return wires.filter { it.toNode == nodeId }
 }
 
 class LcncCycleException(val nodeId: String) : Exception("cycle at $nodeId")
