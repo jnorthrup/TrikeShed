@@ -230,6 +230,11 @@ kotlin {
                 executable("mcpStdio") {
                     entryPoint = "borg.trikeshed.mux.mcpStdioMain"
                 }
+                // The skinnerbox mesh node (MeshTool: identity, plan, serve, snapshot, restore) with no JVM.
+                // ./gradlew linkSkinnerboxReleaseExecutableMacos → build/bin/macos/skinnerboxReleaseExecutable/skinnerbox.kexe
+                executable("skinnerbox") {
+                    entryPoint = "borg.trikeshed.skinnerbox.skinnerboxMain"
+                }
                 // K/N 2.4.20/2.4.21 ship macos_arm64 system caches tagged iOS (LC_BUILD_VERSION platform 2,
                 // e.g. CoreFoundationBase); Xcode 26 ld refuses to link them into a macOS binary, the test binary too.
                 configureEach {
@@ -557,6 +562,11 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
         // → build/bin/linuxX64/mcpStdioReleaseExecutable/mcpStdio.kexe (linkMcpStdioDebugExecutableLinuxX64 links faster).
         binaries.executable("mcpStdio") {
             entryPoint = "borg.trikeshed.mux.mcpStdioMain"
+        }
+        // The skinnerbox mesh node, as on macOS. ./gradlew linkSkinnerboxReleaseExecutableLinuxX64
+        // → build/bin/linuxX64/skinnerboxReleaseExecutable/skinnerbox.kexe, the CPU node image's mesh executable.
+        binaries.executable("skinnerbox") {
+            entryPoint = "borg.trikeshed.skinnerbox.skinnerboxMain"
         }
         compilations.getByName("main").cinterops.create("zlinux_uring") {
             defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")

@@ -130,13 +130,14 @@ internal object JvmSocketSyscalls {
     /** SETSOCKOPT reads the submitted window without advancing it; portable constants map at this syscall boundary. */
     fun setOption(fd: Int, buffer: ByteBuffer?, length: Int, level: Int, option: Int, flags: Int): Int {
         if (buffer == null || length < 0 || length > buffer.remaining() || flags != 0) return -22
-        if (level != UringOp.SOL_SOCKET || option != UringOp.SO_REUSEADDR) return -92
+        val reuse = level == UringOp.SOL_SOCKET && option == UringOp.SO_REUSEADDR
+        if (!reuse && (level != UringOp.IPPROTO_TCP || option != UringOp.TCP_NODELAY)) return -92
         return JvmFileSyscalls.native(maxOf(1, length)) { bytes ->
             MemorySegment.copy(MemorySegment.ofArray(buffer.array()), (buffer.arrayOffset() + buffer.position()).toLong(),
                 bytes, 0, length.toLong())
             val state = errnoState.get()
             status(state, LibcDowncall.SETSOCKOPT.invokeExact(SetOption.at, state, fd,
-                if (darwin) 0xffff else level, if (darwin) 0x4 else option, bytes, length) as Int)
+                if (darwin && reuse) 0xffff else level, if (darwin && reuse) 0x4 else option, bytes, length) as Int)
         }
     }
 
