@@ -136,7 +136,6 @@ data class LcncProgram(
 
 /** Wires whose target is [nodeId] — the inputs one node actually receives. */
 fun LcncProgram.inputsOf(nodeId: String): Series<LcncWire> {
-    /* ⚡ Bolt: Use zero-allocation Series.filter lazy view instead of intermediate ArrayList allocation and .toSeries() */
     return wires.filter { it.toNode == nodeId }
 }
 
