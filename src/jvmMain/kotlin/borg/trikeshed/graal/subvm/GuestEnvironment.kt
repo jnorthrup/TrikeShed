@@ -44,6 +44,7 @@ object GuestEnvironment {
         "DYLD_", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
         "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC",
         "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
+        "PROXY", "HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT", "TLS_CERT",
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
