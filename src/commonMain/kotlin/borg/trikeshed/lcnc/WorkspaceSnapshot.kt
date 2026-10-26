@@ -51,7 +51,7 @@ data class WorkspaceSnapshot(
     val cid: String get() = ContentId.of(bytes).value
 
     /** Key order without java.util.TreeMap: the same on every target. */
-    private fun <V> Map<String, V>.sorted(): Map<String, V> = entries.sortedBy { it.key }.associateBy({ it.key }, { it.value })
+    private fun <V> Map<String, V>.sorted(): Map<String, V> = entries.sortedBy { it.key }.toMap()
 
     private fun normalize(v: Any?): Any? = when (v) {
         is Map<*, *> -> v.entries.associateBy({ it.key.toString() }, { normalize(it.value) })
