@@ -59,7 +59,7 @@ class JevaWeights private constructor(
             manifest += mapOf("path" to relative, "bytes" to size, "blocks" to blocks)
         }
         val value = mapOf("kind" to "safetensors-block-sha256-v1", "block_bytes" to BLOCK_BYTES,
-            "weights" to manifest, "texts" to texts.entries.sortedBy { it.key }.associate { it.key to it.value })
+            "weights" to manifest, "texts" to texts.entries.sortedBy { it.key }.toMap())
         return ContentId.of(jsonOf(value).encodeToByteArray()).hex.also { check(); content = it }
     }
 
