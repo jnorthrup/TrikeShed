@@ -58,7 +58,7 @@ class GwtRequestFactorySocketTest {
         val db = Couch("rf", CouchStoreFactory.casBacked(cas), cas)
         db.put("_design/items", mapOf("views" to mapOf("qty" to mapOf(
             "map" to mapOf("key" to "type", "value" to "qty"), "reduce" to "_sum"))), null)
-        val report = CouchReportReactorElement(parentJob = coroutineContext[Job]).also { it.open() }
+        val report = CouchReportReactorElement(parentJob = coroutineContext[Job])
         val bridge = ConfixDynInvoke().also {
             it.registerScript("increment", "js", "(doc, amount) => { doc.qty += amount; return {qty: doc.qty}; }")
         }
@@ -130,7 +130,6 @@ class GwtRequestFactorySocketTest {
                 reactor.close()
                 server.cancelAndJoin()
                 owner.cancelAndJoin()
-                report.close()
                 state.deleteRecursively()
             }
         }

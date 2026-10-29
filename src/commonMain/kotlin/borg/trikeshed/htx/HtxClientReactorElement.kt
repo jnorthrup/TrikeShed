@@ -1,15 +1,16 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toArray
 import borg.trikeshed.userspace.FanoutEvent
 import borg.trikeshed.userspace.FanoutEventSubscriber
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
-object HtxClientKey : AsyncContextKey<HtxClientReactorElement>()
+object HtxClientKey : CoroutineContext.Key<HtxClientReactorElement>
 
 /** Non-2xx HTTP error — carries status + body snippet for Result.failure. */
 class HtxHttpError(val status: Int, val body: String) :
@@ -90,21 +91,17 @@ open class HtxClientReactorElement(
     private val workerContext: CoroutineContext = Dispatchers.Default,
     parentJob: Job? = null,
     private val ownedSupervisor: NioSupervisor? = null,
-    override val fanoutSubscribers: List<AsyncContextElement> = emptyList(),
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    val fanoutSubscribers: List<CoroutineContext.Element> = emptyList(),
+) : CoroutineContext.Element, Drain {
     override val key: CoroutineContext.Key<*> get() = HtxClientKey
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes when drain or close begins; dispatch refuses after it. */
+    val admission: CompletableJob = Job()
 
     private val ordinalMutex = Mutex()
     private val fanoutMutex = Mutex()
     private var nextClientOrdinal = 1L
     private var nextTransferOrdinal = 1L
-
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
-        }
-    }
 
     suspend fun request(
         url: String,
@@ -202,11 +199,19 @@ open class HtxClientReactorElement(
         return ByteSeries(joined)
     }
 
-    override suspend fun close() {
-        if (ownedSupervisor != null && ownedSupervisor.state.isLessThan(ElementState.CLOSED)) {
-            ownedSupervisor.close()
+    /** Refuses new dispatch, waits for in-flight transfers and workers, then closes. */
+    override suspend fun drain() {
+        if (admission.complete()) {
+            supervisor.complete()
+            supervisor.join()
         }
-        super.close()
+        close()
+    }
+
+    suspend fun close() {
+        admission.complete()
+        ownedSupervisor?.close()
+        supervisor.cancelAndJoin()
     }
 
     internal suspend fun exchangeFollowingRedirects(
@@ -339,13 +344,13 @@ open class HtxClientReactorElement(
         ordinalMutex.withLock { nextTransferOrdinal++ }
 
     private fun ensureActive() {
-        check(state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.DRAINING)) {
-            "HTX client reactor must be open before dispatch."
+        check(admission.isActive) {
+            "HTX client reactor is draining or closed."
         }
     }
 }
 
-object HtxTransferKey : AsyncContextKey<HtxTransferElement>()
+object HtxTransferKey : CoroutineContext.Key<HtxTransferElement>
 
 class HtxTransferElement(
     private val client: HtxClientReactorElement,
@@ -354,14 +359,12 @@ class HtxTransferElement(
     private val channelOrdinal: Int?,
     private val request: HtxRequest,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
     override val key: CoroutineContext.Key<*> get() = HtxTransferKey
+    /** Child of the client's supervisor while the transfer runs, so the client's drain waits for it. */
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     suspend fun execute(): HtxTransferResult {
-        if (state == ElementState.CREATED) {
-            open()
-        }
-        state = ElementState.ACTIVE
         client.channelize(
             HtxClientFrame(
                 clientOrdinal = clientOrdinal,
@@ -411,29 +414,27 @@ class HtxTransferElement(
                     request = request,
                 ),
             )
-            close()
+            supervisor.cancelAndJoin()
         }
     }
 }
 
-object HtxChannelWorkerKey : AsyncContextKey<HtxChannelWorkerElement>()
+object HtxChannelWorkerKey : CoroutineContext.Key<HtxChannelWorkerElement>
 
 class HtxChannelWorkerElement(
     private val clientOrdinal: Long,
     private val workerOrdinal: Int,
     parentJob: Job? = null,
     private val frameSink: suspend (HtxClientFrame) -> Unit,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
     override val key: CoroutineContext.Key<*> get() = HtxChannelWorkerKey
+    /** Child of the client's supervisor while the worker runs, so the client's drain waits for it. */
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     suspend fun run(
         transfers: Channel<HtxTransferElement>,
         resultSink: suspend (HtxTransferResult) -> Unit,
     ) {
-        if (state == ElementState.CREATED) {
-            open()
-        }
-        state = ElementState.ACTIVE
         frameSink(
             HtxClientFrame(
                 clientOrdinal = clientOrdinal,
@@ -454,7 +455,7 @@ class HtxChannelWorkerElement(
                     stage = HtxClientStage.WORKER_CLOSED,
                 ),
             )
-            close()
+            supervisor.cancelAndJoin()
         }
     }
 }
@@ -464,14 +465,14 @@ suspend fun openHtxClientReactorElement(
     nioSupervisor: NioSupervisor? = null,
     options: HtxClientOptions = HtxClientOptions(),
     parentJob: Job? = null,
-    subscribers: List<AsyncContextElement> = emptyList(),
+    subscribers: List<CoroutineContext.Element> = emptyList(),
 ): HtxClientReactorElement {
     val contextRouteService = currentCoroutineContext()[HtxRouteService.Key]
     val contextSupervisor = currentCoroutineContext()[NioSupervisor.Key]
     val activeSupervisor = nioSupervisor ?: contextSupervisor ?: NioSupervisor()
     val ownsSupervisor = nioSupervisor == null && contextSupervisor == null
 
-    if (activeSupervisor.state == ElementState.CREATED) {
+    if (!activeSupervisor.opened.isCompleted && activeSupervisor.admission.isActive) {
         activeSupervisor.open()
     }
 
@@ -486,7 +487,7 @@ suspend fun openHtxClientReactorElement(
         parentJob = parentJob,
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
         fanoutSubscribers = subscribers,
-    ).also { it.open() }
+    )
 }
 
 private fun planBlobChannels(

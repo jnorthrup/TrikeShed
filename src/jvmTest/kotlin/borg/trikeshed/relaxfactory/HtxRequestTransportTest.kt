@@ -28,7 +28,7 @@ class HtxRequestTransportTest {
             }
         }
         val client = HtxClientReactorElement(route, options = HtxClientOptions(maxRedirects = 0),
-            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job]).also { it.open() }
+            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job])
         val element = RequestFactoryClientElement("http://example.test/gwtRequest", client)
         element.open()
         val transport = HtxRequestTransport(element)
@@ -94,7 +94,7 @@ class HtxRequestTransportTest {
             }
         }
         val http = HtxClientReactorElement(route, options = HtxClientOptions(maxRedirects = 0),
-            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job]).also { it.open() }
+            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job])
         val client = HtxRequestFactoryClient.open("http://example.test/gwtRequest", http)
         try {
             for (body in invalid) {
@@ -126,7 +126,7 @@ class HtxRequestTransportTest {
             }
         }
         val http = HtxClientReactorElement(route, options = HtxClientOptions(maxRedirects = 0),
-            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job]).also { it.open() }
+            workerContext = coroutineContext.minusKey(Job), parentJob = coroutineContext[Job])
         val client = HtxRequestFactoryClient.open("http://example.test/gwtRequest", http)
         val completion = CompletableDeferred<Unit>()
         var callbacks = 0

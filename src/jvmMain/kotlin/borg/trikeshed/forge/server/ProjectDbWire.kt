@@ -7,7 +7,7 @@ import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.couch.CouchWireRouter
 import borg.trikeshed.couch.CouchChangesFactElement
 import borg.trikeshed.couch.CouchReportReactorElement
-import borg.trikeshed.context.AsyncContextElement
+import borg.trikeshed.context.Drain
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
@@ -47,7 +47,7 @@ class ProjectDb(
  */
 class ProjectDbRegistry(val primaryDbName: String) {
     private val dbs = ConcurrentHashMap<String, ProjectDb>()
-    private val owners = ConcurrentHashMap<String, Join<Job, AsyncContextElement>>()
+    private val owners = ConcurrentHashMap<String, Join<Job, Drain>>()
     private val retiring = ConcurrentHashMap.newKeySet<String>()
     private val lifecycle = Any()
 

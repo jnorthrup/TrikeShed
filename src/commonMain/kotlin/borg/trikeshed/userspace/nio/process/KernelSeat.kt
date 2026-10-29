@@ -6,9 +6,6 @@ import borg.trikeshed.kernel.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicLong
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -34,7 +31,6 @@ class KernelSeat internal constructor(
     val execution = KernelExecution(kernel, parent, id, capability)
     private val supervisor = SupervisorJob(requireNotNull(context[Job]).also { it.ensureActive() })
     private val scope = CoroutineScope(context + supervisor + this + execution)
-    private val accepting = AtomicBoolean(true)
     private val sequence = AtomicLong(0)
     private val input = Channel.buffered<KernelRequest>(capacity)
     private val admission = run {
@@ -44,16 +40,16 @@ class KernelSeat internal constructor(
         permits
     }
     private val output = Channel.buffered<KernelCompletion>(capacity)
-    private val closing = Mutex()
-    private var closed = false
     private var closeFailure: Throwable? = null
 
+    // The collector is the pointcut's last user: it closes the pointcut once output is exhausted.
     private val collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
         withContext(NonCancellable) {
             for ((receipt, settle) in output.kChannel) {
                 val failure = try { pointcut?.complete(receipt); null } catch (cause: Throwable) { cause }
                 settle(failure)
             }
+            try { pointcut?.close() } catch (cause: Throwable) { closeFailure = cause }
         }
     }
     private val workers = (0 until parallelism).map {
@@ -70,7 +66,7 @@ class KernelSeat internal constructor(
     suspend fun <T> submit(name: String, operation: suspend () -> T): Deferred<Result<T>> {
         currentCoroutineContext().ensureActive()
         require(name.isNotBlank() && name.length <= 256)
-        check(accepting.load() && supervisor.isActive) { "Kernel seat is draining" }
+        check(supervisor.isActive && !input.isClosed()) { "Kernel seat is draining" }
         val turn = KernelTurn(execution.kernel, execution.parent, id, sequence.fetchAndAdd(1), name, execution.capability)
         val result = CompletableDeferred<Result<T>>()
         val request: KernelRequest = {
@@ -91,7 +87,7 @@ class KernelSeat internal constructor(
         // rejects unadmitted callers while retaining every item already in the work channel.
         admission.kChannel.receive()
         try {
-            check(accepting.load() && supervisor.isActive) { "Kernel seat is draining" }
+            check(supervisor.isActive) { "Kernel seat is draining" }
             input.kChannel.trySend(request).getOrThrow()
         } catch (failure: Throwable) {
             admission.kChannel.trySend(Unit)
@@ -104,20 +100,13 @@ class KernelSeat internal constructor(
 
     /** Close admission, await every admitted result and its pointcut, then close the guest and owner. */
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        accepting.store(false)
-        admission.close()
         input.close()
-        closing.withLock {
-            if (!closed) {
-                workers.joinAll()
-                output.close()
-                collector.join()
-                try { pointcut?.close() } catch (cause: Throwable) { closeFailure = cause }
-                supervisor.complete()
-                supervisor.join()
-                closed = true
-            }
-            closeFailure?.let { throw it }
-        }
+        admission.close()
+        workers.joinAll()
+        output.close()
+        collector.join()
+        supervisor.complete()
+        supervisor.join()
+        closeFailure?.let { throw it }
     }
 }

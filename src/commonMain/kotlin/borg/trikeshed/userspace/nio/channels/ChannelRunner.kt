@@ -5,7 +5,6 @@ import borg.trikeshed.userspace.nio.channels.spi.ReactorOperations
 import borg.trikeshed.userspace.nio.channels.spi.ReactorSignal
 import borg.trikeshed.userspace.reactor.Interest
 import borg.trikeshed.userspace.nio.ByteBuffer
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -48,7 +47,8 @@ class ChannelRunner(
     /** The ring this runner creates sockets on; one handle, one CQE per SQE. */
     private val socketRing = channelOps.openChannel(16)
     private val descriptors = mutableSetOf<Int>()
-    private var state = ElementState.OPEN
+    /** Completes at [stop]; sockets, reads and writes refuse after it. */
+    private val admission: CompletableJob = Job()
     private var supervisor: CompletableJob? = null
     private var polling: Job? = null
     private var dispatching: Job? = null
@@ -76,7 +76,7 @@ class ChannelRunner(
 
     /** socket(2) as an SQE: prep, submit, wait for the fd CQE. */
     private fun tcpSocket(configure: (Int) -> Int): Int {
-        check(state < ElementState.DRAINING) { "Channel runner is draining or closed" }
+        check(admission.isActive) { "Channel runner is draining or closed" }
         val fd = settle(socketRing.prepSocket(SocketDomain.AF_INET.posix, SocketType.SOCK_STREAM.mask, SocketProtocol.IPPROTO_TCP.posix))
         if (fd < 0) return fd
         descriptors.add(fd)
@@ -110,7 +110,7 @@ class ChannelRunner(
      *  Deferred is emplaced BEFORE the OP_READ register call so a
      *  same-tick poll cannot fire on an empty slot. */
     suspend fun readAsync(fd: Int, timeoutMs: Long = 60_000L): Int? {
-        check(state < ElementState.DRAINING) { "Channel runner is draining or closed" }
+        check(admission.isActive) { "Channel runner is draining or closed" }
         check(fd !in readers) { "A read is already pending for fd=$fd" }
         check(readers.size < 63) { "Read readiness capacity exceeded" }
         val deferred = CompletableDeferred<Int>()
@@ -128,7 +128,7 @@ class ChannelRunner(
      *  Enqueues a deferred; reactor completes head on each OP_WRITE.
      *  Level-triggered Selector re-fires OP_WRITE while socket writable. */
     suspend fun writeAsync(fd: Int, timeoutMs: Long = 60_000L): Unit? {
-        check(state < ElementState.DRAINING) { "Channel runner is draining or closed" }
+        check(admission.isActive) { "Channel runner is draining or closed" }
         val deferred = CompletableDeferred<Unit>()
         check(fd in writers || writers.size < 63) { "Write readiness capacity exceeded" }
         val queue = writers.getOrPut(fd) { mutableListOf() }
@@ -148,7 +148,7 @@ class ChannelRunner(
         val interests = mutableSetOf<Interest>()
         if (fd in readers) interests.add(Interest.READ)
         if (writers[fd]?.isNotEmpty() == true) interests.add(Interest.WRITE)
-        if (interests.isEmpty() || state >= ElementState.DRAINING) reactorOps.deregister(fd)
+        if (interests.isEmpty() || !admission.isActive) reactorOps.deregister(fd)
         else reactorOps.register(fd, interests)
     }
 
@@ -162,10 +162,9 @@ class ChannelRunner(
         pollTimeout: Duration = Duration.INFINITE,
         onSignal: suspend (ReactorSignal) -> Unit = {},
     ): Job {
-        check(state == ElementState.OPEN) { "Channel runner is already running or closed" }
+        check(supervisor == null && admission.isActive) { "Channel runner is already running or closed" }
         val owner = SupervisorJob(requireNotNull(scope.coroutineContext[Job]) { "Channel runner requires an owning Job" })
         supervisor = owner
-        state = ElementState.ACTIVE
         val signals = Channel<ReactorSignal>(16)
         val ownedScope = CoroutineScope(scope.coroutineContext + owner + channelOps + reactorOps)
         dispatching = ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -191,7 +190,7 @@ class ChannelRunner(
         }
         return ownedScope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
-                while (isActive && state == ElementState.ACTIVE) {
+                while (isActive && admission.isActive) {
                     var ready: List<ReactorSignal>? = null
                     coroutineScope {
                         val reactor = requireNotNull(currentCoroutineContext()[ReactorOperations])
@@ -220,12 +219,12 @@ class ChannelRunner(
     }
 
     fun stop() {
-        if (state < ElementState.DRAINING) state = ElementState.DRAINING
+        admission.complete()
         control.trySend(Unit)
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        if (state == ElementState.CLOSED) return@withContext
+        if (control.isClosedForSend) return@withContext
         stop()
         polling?.join()
         dispatching?.join()
@@ -247,7 +246,6 @@ class ChannelRunner(
                 supervisor?.complete()
                 supervisor?.join()
                 control.close()
-                state = ElementState.CLOSED
             }
         }
         dispatchFailure?.let { throw it }

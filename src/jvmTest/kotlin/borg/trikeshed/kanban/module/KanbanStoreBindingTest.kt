@@ -1,6 +1,7 @@
 package borg.trikeshed.kanban.module
 
-import borg.trikeshed.context.ElementState
+import kotlin.test.assertTrue
+import kotlinx.coroutines.cancelAndJoin
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.dag.ReteNetwork
@@ -87,15 +88,15 @@ class KanbanStoreBindingTest {
                     }
                 }
                 assertEquals(listOf("host"), attention.run(node, emptyMap())["ordered"])
-                assertEquals(ElementState.ACTIVE, caller.state)
-                assertEquals(ElementState.ACTIVE, bag.state)
+                assertTrue(caller.supervisor.isActive)
+                assertTrue(bag.worker != null && bag.supervisor.isActive)
                 assertEquals(true, withContext(caller) { submit("caller-after") }["accepted"])
             }
         } finally {
             handle?.drain()
             handle?.close()
             caller.close()
-            bag.close()
+            bag.supervisor.cancelAndJoin()
             scope.cancel()
             stateDir.deleteRecursively()
         }

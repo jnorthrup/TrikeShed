@@ -226,7 +226,6 @@ class LcncDhtNetworkTest {
         var consumer: Host? = null
         try {
             transport.open()
-            htx.open()
             first.open()
             second.open()
             val seeds = first.address + "," + second.address

@@ -3,8 +3,6 @@ package borg.trikeshed.userspace.nio.process
 import borg.trikeshed.userspace.concurrency.Channel
 import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /** Bounded UTF-8 line exchanges with one owned child; one response per admitted request. */
@@ -30,8 +28,6 @@ class ProcessLineChannel private constructor(
     override val key: CoroutineContext.Key<ProcessLineChannel> get() = Key
     private class Exchange(val bytes: ByteArray, val reply: CompletableDeferred<String>)
     private val input = Channel.buffered<Exchange>(capacity)
-    private val admission = Mutex()
-    private var accepting = true
     private val supervisor = SupervisorJob(parent.coroutineContext[Job])
     private val scope = CoroutineScope(parent.coroutineContext + this + supervisor)
     private val completion = CompletableDeferred<Result<Unit>>()
@@ -101,16 +97,13 @@ class ProcessLineChannel private constructor(
         val bytes = line.encodeToByteArray()
         require(bytes.size <= frameBytes) { "Request exceeds $frameBytes bytes" }
         val reply = CompletableDeferred<String>()
-        admission.withLock {
-            check(accepting) { "Process channel is draining" }
-            input.send(Exchange(bytes + byteArrayOf(10), reply)).getOrThrow()
-        }
+        input.send(Exchange(bytes + byteArrayOf(10), reply)).getOrThrow()
         // Cancelling a caller does not discard a request already admitted to the process.
         return reply.await()
     }
 
     suspend fun drain() = withContext(NonCancellable) {
-        admission.withLock { accepting = false; input.close() }
+        input.close()
         worker.join()
         supervisor.join()
         completion.await().getOrThrow()

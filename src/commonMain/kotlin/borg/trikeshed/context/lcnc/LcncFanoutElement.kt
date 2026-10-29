@@ -1,8 +1,6 @@
 package borg.trikeshed.context.lcnc
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.context.nuid.Capability
 import borg.trikeshed.context.nuid.Nuid
 import borg.trikeshed.context.nuid.NuidFanoutElement
@@ -20,10 +18,10 @@ class LcncFanoutElement(
         "wireproto" to LcncReductions.crmsFold()
     ),
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
 
-    companion object Key : AsyncContextKey<LcncFanoutElement>()
-    override val key: AsyncContextKey<LcncFanoutElement> = Key
+    companion object Key : CoroutineContext.Key<LcncFanoutElement>
+    override val key: CoroutineContext.Key<LcncFanoutElement> = Key
 
     suspend fun dispatch(nuid: Nuid, payload: Any?): Any? {
         val winningCapability = nuidFanout.claimWinnerCapability(nuid, payload)

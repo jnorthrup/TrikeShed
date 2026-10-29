@@ -210,6 +210,10 @@ kotlin {
                     val posixSpawn = create("posixSpawn") {
                         defFile = project.file("src/posixMain/resources/META-INF/cinterop/posix_spawn.def")
                     }
+                    // MLX through mlx-c (Homebrew): the macOS native tensor core, see docs/mlx-tensor-core.md.
+                    create("mlx") {
+                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/mlx.def")
+                    }
                 }
             }
             // The POSIX non-Linux canary (Jim, 2026-09-06): one native executable that runs
@@ -229,11 +233,6 @@ kotlin {
                 // ./gradlew linkMcpStdioReleaseExecutableMacos → build/bin/macos/mcpStdioReleaseExecutable/mcpStdio.kexe
                 executable("mcpStdio") {
                     entryPoint = "borg.trikeshed.mux.mcpStdioMain"
-                }
-                // The skinnerbox mesh node (MeshTool: identity, plan, serve, snapshot, restore) with no JVM.
-                // ./gradlew linkSkinnerboxReleaseExecutableMacos → build/bin/macos/skinnerboxReleaseExecutable/skinnerbox.kexe
-                executable("skinnerbox") {
-                    entryPoint = "borg.trikeshed.skinnerbox.skinnerboxMain"
                 }
                 // K/N 2.4.20/2.4.21 ship macos_arm64 system caches tagged iOS (LC_BUILD_VERSION platform 2,
                 // e.g. CoreFoundationBase); Xcode 26 ld refuses to link them into a macOS binary, the test binary too.
@@ -563,11 +562,6 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
         binaries.executable("mcpStdio") {
             entryPoint = "borg.trikeshed.mux.mcpStdioMain"
         }
-        // The skinnerbox mesh node, as on macOS. ./gradlew linkSkinnerboxReleaseExecutableLinuxX64
-        // → build/bin/linuxX64/skinnerboxReleaseExecutable/skinnerbox.kexe, the CPU node image's mesh executable.
-        binaries.executable("skinnerbox") {
-            entryPoint = "borg.trikeshed.skinnerbox.skinnerboxMain"
-        }
         compilations.getByName("main").cinterops.create("zlinux_uring") {
             defFile = project.file("src/linuxMain/resources/META-INF/cinterop/liburing.def")
             packageName("zlinux_uring")
@@ -688,39 +682,6 @@ tasks.register<Test>("btrfsStorageCheck") {
     doFirst {
         systemProperty("trikeshed.storage.classpath", classpath.asPath)
     }
-}
-
-tasks.register<JavaExec>("skinnerbox") {
-    group = "application"
-    description = "Skinnerbox common-Kotlin peer mesh: identity, priced placement, and durable N=3 service."
-    dependsOn("jvmMainClasses")
-    mainClass.set("borg.trikeshed.skinnerbox.SkinnerboxCli")
-    classpath(kotlin.jvm().compilations.getByName("main").output.classesDirs,
-        layout.buildDirectory.dir("processedResources/jvm/main"), configurations.getByName("jvmRuntimeClasspath"))
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
-    standardInput = System.`in`
-}
-
-tasks.register<Test>("skinnerboxCheck") {
-    group = "verification"
-    description = "Verify the Skinnerbox mesh, durable recovery, twins, placement, and affected HTTP/storage contracts."
-    val jvmTests = tasks.named<Test>("jvmTest")
-    dependsOn("jvmTestClasses")
-    testClassesDirs = jvmTests.get().testClassesDirs
-    classpath = jvmTests.get().classpath
-    filter {
-        includeTestsMatching("borg.trikeshed.skinnerbox.*")
-        includeTestsMatching("borg.trikeshed.htx.HtxReactorElementTest")
-        includeTestsMatching("borg.trikeshed.couch.CouchStorage*Test")
-        includeTestsMatching("borg.trikeshed.job.CanonicalCborTest")
-        includeTestsMatching("borg.trikeshed.job.ContentIdTest")
-        includeTestsMatching("borg.trikeshed.util.oroboros.Sha2CasBusTest")
-        includeTestsMatching("borg.trikeshed.context.nuid.*")
-        includeTestsMatching("borg.trikeshed.userspace.JvmUserspaceChannelBackendTest")
-        includeTestsMatching("borg.trikeshed.userspace.FunctionalUringFacadeLifecycleTest")
-    }
-    timeout.set(Duration.ofSeconds(240))
-    outputs.upToDateWhen { false }
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -850,20 +811,42 @@ fun org.gradle.api.tasks.JavaExec.useStagedJvmClasspath() {
 }
 
 // The daemon on the classpath utils/oroboros uses: jvmJar plus the staged runtime jars (which carry the
-// browser bundles and the frozen SUMO image). --args passes daemon arguments; -Pjdwp attaches a debugger.
-tasks.register<JavaExec>("runOroborosDaemon") {
+// browser bundles and the frozen SUMO image), on a 24 GB heap. --args passes daemon arguments; -Pjdwp attaches a debugger.
+fun org.gradle.api.tasks.JavaExec.useOroborosDaemon() {
     group = "oroboros"
-    description = "Launch OroborosDaemon on jvmJar + build/staging/lib, as utils/oroboros does."
     dependsOn(stageDaemonLib)
     mainClass.set("borg.trikeshed.daemon.OroborosDaemon")
     classpath(tasks.named("jvmJar"), fileTree(stagingLibDir) { include("*.jar") })
-    jvmArgs("-Xmx8g", "--add-modules=jdk.internal.vm.ci", "--enable-native-access=ALL-UNNAMED")
+    jvmArgs("-Xmx24g", "--add-modules=jdk.internal.vm.ci", "--enable-native-access=ALL-UNNAMED")
     jdwpSpec?.let { spec ->
         val port = spec.substringBefore(',').trim()
         val suspend = if (spec.substringAfter(',', "").trim() == "suspend") "y" else "n"
         jvmArgs("-agentlib:jdwp=transport=dt_socket,server=y,suspend=$suspend,address=*:$port")
     }
     standardInput = System.`in`
+}
+
+tasks.register<JavaExec>("runOroborosDaemon") {
+    description = "Launch OroborosDaemon (24 GB heap) on jvmJar + build/staging/lib, as utils/oroboros does."
+    useOroborosDaemon()
+}
+
+// The same launch on the HotSpot AOT cache build/staging/oroboros.aot (JEP 483/514). With no cache, or one older
+// than a classpath jar, the run trains: the JVM writes the cache as the daemon exits (Ctrl-C included), and the
+// next run starts from it.
+tasks.register<JavaExec>("runOroborosDaemonAot") {
+    description = "runOroborosDaemon on the AOT cache build/staging/oroboros.aot; a missing or stale cache is trained by the run."
+    useOroborosDaemon()
+    val cache = layout.buildDirectory.file("staging/oroboros.aot")
+    doFirst {
+        val run = this as JavaExec
+        val aot = cache.get().asFile
+        if (aot.isFile && run.classpath.all { it.lastModified() < aot.lastModified() }) run.jvmArgs("-XX:AOTCache=$aot")
+        else {
+            aot.delete()
+            run.jvmArgs("-XX:AOTCacheOutput=$aot")
+        }
+    }
 }
 
 // Kanban HTTP server for the modelmux CLI.

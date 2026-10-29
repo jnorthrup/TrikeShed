@@ -84,10 +84,7 @@ class DocumentCuratorElement private constructor(
     private val parsed = Channel.buffered<Parsed>(capacity)
     private val output = Channel.buffered<Completion>(capacity)
     private val jobs = mutableListOf<Job>()
-    private val admission = Mutex()
-    private val draining = Mutex()
     private val ledgerGate = Mutex()
-    private var accepting = true
     private var sequence = 0L
     private val history = linkedSetOf<ContentId>()
     private val reserved = mutableSetOf<ContentId>()
@@ -138,10 +135,8 @@ class DocumentCuratorElement private constructor(
         }
         val reply = CompletableDeferred<Result<DocumentCurationResult>>(supervisor)
         try {
-            admission.withLock {
-                check(accepting && supervisor.isActive) { "document curator is not accepting work" }
-                input.send(Work(source, instructions, reply)).getOrThrow()
-            }
+            check(supervisor.isActive) { "document curator is not accepting work" }
+            input.send(Work(source, instructions, reply)).getOrThrow()
         } catch (e: CancellationException) {
             reply.cancel(); throw e
         } catch (e: Exception) {
@@ -181,8 +176,8 @@ class DocumentCuratorElement private constructor(
         return DocumentCuratorCodec.decode(bytes)
     }
 
-    suspend fun drain() = draining.withLock {
-        admission.withLock { accepting = false; input.close() }
+    suspend fun drain() {
+        input.close()
         jobs.joinAll()
         supervisor.complete()
         supervisor.join()

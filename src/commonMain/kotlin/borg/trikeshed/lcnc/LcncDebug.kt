@@ -26,7 +26,6 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     private val commands = Channel<Resume>(1)
     private var stepping = stepping
     private var detached = false
-    private var closed = false
     private var cancellation = false
     private var pauseRequested = false
     private var state = "running"
@@ -54,7 +53,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     var intervened: Boolean = false
         private set
 
-    private fun active(): Boolean = !closed && !detached && state !in setOf("completed", "failed", "cancelled")
+    private fun active(): Boolean = !commands.isClosedForSend && !detached && state !in setOf("completed", "failed", "cancelled")
 
     private fun selected(nodeId: String, path: List<String>): Boolean =
         (nodeIds.isEmpty() || nodeId in nodeIds) &&
@@ -134,7 +133,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
                            inputs: Map<String, Any?>, sourceDebugging: Boolean = false,
                            frame: LcncScopeFrame? = null, apply: ((Patch) -> Unit)? = null) = checkpoints.withLock {
         val paused = gate.withLock {
-            check(!closed) { "Debug controller is closed" }
+            check(!commands.isClosedForSend) { "Debug controller is closed" }
             if (cancellation) cancelled()
             val fields = location(at, node, path, parent, iteration, inputs, frame)
             fields["phase"] = "before"
@@ -187,7 +186,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     suspend fun completed(at: Int, node: LcncNode, path: List<String>, parent: Int?, iteration: Int?,
                           status: String, reason: String?, outputs: Map<String, Any?>?, frame: LcncScopeFrame) = checkpoints.withLock {
         val paused = gate.withLock {
-            if (closed) return@withLock false
+            if (commands.isClosedForSend) return@withLock false
             val fields = location(at, node, path, parent, iteration, emptyMap(), frame)
             fields["phase"] = "after"
             fields["status"] = status
@@ -228,7 +227,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     /** The same channel controls a source callback; only copied, bounded data cross the VM boundary. */
     suspend fun sourceCheckpoint(at: Int, nodeId: String, observation: Map<String, Any?>): VmDebugAction = checkpoints.withLock {
         val paused = gate.withLock {
-            check(!closed) { "Debug controller is closed" }
+            check(!commands.isClosedForSend) { "Debug controller is closed" }
             if (cancellation) cancelled()
             writable = false
             if ((!stepping && !pauseRequested) || detached) false else {
@@ -386,7 +385,7 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
     /** An ordinal admits exactly one command; delayed/double clicks cannot advance another pause. */
     suspend fun command(expected: Int, command: Command, line: Int? = null,
                         coordinates: VmSourceCoordinates = VmSourceCoordinates.GENERATED): Boolean = gate.withLock {
-        if (state != "paused" || ordinal != expected || detached || closed || cancellation || command !in actions) false
+        if (state != "paused" || ordinal != expected || detached || commands.isClosedForSend || cancellation || command !in actions) false
         else {
             val generated = if (command != Command.SOURCE_LINE) line else when (coordinates) {
                 VmSourceCoordinates.GENERATED -> {
@@ -429,11 +428,10 @@ class LcncDebug(stepping: Boolean = true, private val allowInterventions: Boolea
         controlStatus(pauseSequence, "not_applied")
         pauseSequence = null
         if (state == "paused") check(commands.trySend(Resume(Command.CONTINUE, null)).isSuccess)
-        if (!closed && state !in setOf("completed", "failed", "cancelled")) state = "running"
+        if (!commands.isClosedForSend && state !in setOf("completed", "failed", "cancelled")) state = "running"
     }
 
     suspend fun close() = gate.withLock {
-        closed = true
         if (state !in setOf("completed", "failed", "cancelled")) {
             state = "closed"
             site = null

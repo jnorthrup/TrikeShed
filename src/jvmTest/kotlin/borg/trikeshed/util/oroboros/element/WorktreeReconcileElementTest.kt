@@ -1,7 +1,6 @@
 package borg.trikeshed.util.oroboros.element
 
 import borg.trikeshed.cas.IpfsBridge
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.lib.*
@@ -31,7 +30,7 @@ class WorktreeReconcileElementTest {
             assertIs<CancellationException>(outcome.exceptionOrNull())
             withTimeout(5_000) { element.drain() }
             assertEquals(0, scans)
-            assertEquals(ElementState.CLOSED, element.state)
+            assertTrue(element.supervisor.isCompleted)
             assertTrue(element.worktreeDirty.trySend(Unit).isFailure)
         } finally {
             element.drain()
@@ -89,7 +88,7 @@ class WorktreeReconcileElementTest {
                 assertEquals("head", first.await().revision)
                 assertEquals("head", second.await().revision)
                 closing.await()
-                assertEquals(ElementState.CLOSED, element.state)
+                assertTrue(element.supervisor.isCompleted)
                 assertEquals(3, scans)
                 assertTrue(element.worktreeDirty.trySend(Unit).isFailure)
             }

@@ -2,7 +2,6 @@ package borg.trikeshed.ipns
 
 import borg.trikeshed.parse.reify
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.couch.Couch
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchWireRouter
@@ -28,7 +27,7 @@ class IpnsNodeTest {
         owner.cancel()
         try {
             assertFailsWith<CancellationException> { node.open() }
-            assertEquals(ElementState.CLOSED, node.lifecycleState)
+            assertTrue(node.supervisor.isCompleted)
             assertFalse(Files.exists(path))
         } finally { node.close(); owner.join(); Files.delete(directory) }
     }
@@ -59,7 +58,7 @@ class IpnsNodeTest {
             proceed.complete(Unit)
             withTimeout(5000) { closing.await() }
             assertTrue(completed)
-            assertEquals(ElementState.CLOSED, node.lifecycleState)
+            assertTrue(node.supervisor.isCompleted)
             assertFalse(Files.exists(directory.resolve("identity.lock")))
         } finally {
             proceed.complete(Unit)
@@ -78,7 +77,7 @@ class IpnsNodeTest {
         val node = IpnsNode(path.toString(), crypto, peers, { error("TLS factory failure") }, coroutineContext)
         try {
             assertFailsWith<IllegalStateException> { node.open() }
-            assertEquals(ElementState.CLOSED, node.lifecycleState)
+            assertTrue(node.supervisor.isCompleted)
             assertFalse(Files.exists(directory.resolve("identity.lock")))
             IpnsJournal.open(path.toString(), crypto).close()
         } finally { node.close(); Files.deleteIfExists(path); Files.delete(directory) }

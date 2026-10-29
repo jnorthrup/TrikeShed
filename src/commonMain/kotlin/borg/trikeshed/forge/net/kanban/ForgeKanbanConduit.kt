@@ -1,8 +1,5 @@
 package borg.trikeshed.forge.net.kanban
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.FanoutEvent
 import borg.trikeshed.userspace.FanoutEventSubscriber
 import kotlinx.coroutines.Job
@@ -16,18 +13,11 @@ class ForgeKanbanConduit(
     private val projector: ForgeKanbanSignalProjector = ForgeKanbanSignalProjector(),
     private val sink: ForgeKanbanSignalSink,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob), FanoutEventSubscriber {
+) : CoroutineContext.Element, FanoutEventSubscriber {
 
-    companion object Key : AsyncContextKey<ForgeKanbanConduit>()
+    companion object Key : CoroutineContext.Key<ForgeKanbanConduit>
 
     override val key: CoroutineContext.Key<*> get() = Key
-
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
-        }
-    }
 
     override suspend fun onFanoutEvent(event: FanoutEvent) {
         onEvent(event)
@@ -40,10 +30,6 @@ class ForgeKanbanConduit(
 
     suspend fun accept(signal: ForgeKanbanSignal): Boolean =
         sink.accept(signal)
-
-    override suspend fun close() {
-        super.close()
-    }
 }
 
 suspend fun openForgeKanbanConduit(
@@ -55,4 +41,4 @@ suspend fun openForgeKanbanConduit(
         projector = projector,
         sink = sink,
         parentJob = parentJob,
-    ).also { it.open() }
+    )

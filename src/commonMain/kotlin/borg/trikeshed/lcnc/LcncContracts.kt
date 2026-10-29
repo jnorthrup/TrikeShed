@@ -268,10 +268,10 @@ object LcncContracts {
         // rete query, polyglot facts, prediction and its table test, the graphical
         // flow, the spreadsheet veneer, paradigm adaptation, and scope validation.
         LcncPortContract("ccek.vitals", "ccek node vitals (alive?)",
-            listOf("handle"), listOf("active", "childScopes", "markdownProjections", "lifecycle", "subscribers"),
+            listOf("handle"), listOf("active", "childScopes", "markdownProjections", "closed", "subscribers"),
             inputKinds = mapOf("handle" to "id"),
             outputKinds = mapOf("active" to "json", "childScopes" to "json", "markdownProjections" to "json",
-                "lifecycle" to "text", "subscribers" to "num")),
+                "closed" to "json", "subscribers" to "num")),
         LcncPortContract("ccek.choreograph", "ccek choreograph (a node the context asserts against)",
             listOf("contextId", "title?"), listOf("handle", "bound"),
             inputKinds = mapOf("contextId" to "id", "title" to "text"),

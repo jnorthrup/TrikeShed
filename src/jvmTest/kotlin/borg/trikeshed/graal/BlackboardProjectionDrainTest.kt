@@ -1,6 +1,5 @@
 package borg.trikeshed.graal
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.dag.*
 import borg.trikeshed.lib.*
 import java.util.concurrent.CountDownLatch
@@ -83,7 +82,6 @@ class BlackboardProjectionDrainTest {
             val facts = rete.snapshot()
             assertEquals(1, facts.size)
             assertEquals("stopped", facts[0].fields["status"])
-            assertEquals(ElementState.CLOSED, element.state)
             assertTrue(element.supervisor.isCompleted)
         } finally {
             release.countDown()

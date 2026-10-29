@@ -41,7 +41,7 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
     suspend fun rmRoute(other: borg.trikeshed.dht.include.Route<TNum>, context: kotlin.coroutines.CoroutineContext? = null): Join<borg.trikeshed.dht.id.NUID<TNum>, borg.trikeshed.dht.include.Address>? = other.let { (g: borg.trikeshed.dht.id.NUID<TNum>) ->
         agentNUID.netmask.distance(agentNUID.id!!, g.id!!).let { origDistance ->
             if (origDistance > 0) {
-                val res = buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance.dec()))?.remove(g.id!!)
+                val res = buckets.takeIf { it.isNotEmpty() }?.get(min(bucketCount, origDistance).dec())?.remove(g.id!!)
                 if (context != null && res != null) publishRoutingEvent(context, RoutingEvent.RouteEvicted(other))
                 res
             }
@@ -70,6 +70,7 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
 
     /** Get K closest nodes to target from routing table */
     fun getClosest(target: TNum, k: Int): List<Join<borg.trikeshed.dht.id.NUID<TNum>, Address>> {
+        require(k >= 0) { "Negative routing result count" }
         val allRoutes = mutableListOf<Join<borg.trikeshed.dht.id.NUID<TNum>, Address>>()
         for (bucket in buckets) {
             for ((_, value) in bucket.entries) {
@@ -79,7 +80,7 @@ open class RoutingTable<TNum : Comparable<TNum>, Sz : borg.trikeshed.dht.net.Net
         // Sort by XOR distance to the *target*, not to this agent — otherwise
         // every lookup returns the identical peer list regardless of key and
         // the Kademlia dispersion collapses onto whichever peers sort first.
-        allRoutes.sortBy { agentNUID.netmask.distance(target, it.a.id!!) }
+        allRoutes.sortWith { a, b -> agentNUID.netmask.compareDistance(target, a.a.id!!, b.a.id!!) }
         return allRoutes.take(k)
     }
 }

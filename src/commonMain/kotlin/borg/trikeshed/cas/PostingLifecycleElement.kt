@@ -54,8 +54,10 @@ class PostingLifecycleElement(
     val analyzer: Analyzer = Analyzer(),
     capacity: Int = 256,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<PostingLifecycleElement>() {
+) : CoroutineContext.Element, Drain {
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+
+    companion object Key : CoroutineContext.Key<PostingLifecycleElement> {
         const val STOPPED = "posting lifecycle element stopped"
     }
     override val key: CoroutineContext.Key<*> get() = Key
@@ -71,10 +73,8 @@ class PostingLifecycleElement(
     @Volatile var lastBurstActions: Int = 0
     @Volatile var bursts: Long = 0
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
-        state = ElementState.ACTIVE
+    suspend fun open() {
+        if (worker != null || stop.isCompleted) return
         // The caller's dispatcher is inherited: a test's virtual clock then drives the ticker and the worker.
         val scope = CoroutineScope(currentCoroutineContext() + supervisor + this)
         worker = scope.launch {
@@ -154,7 +154,7 @@ class PostingLifecycleElement(
     // ── callers' suspend forms: admission then completion ───────────────────────────────────────
 
     suspend fun <T> send(message: PostingIntake, reply: CompletableDeferred<T>): T {
-        check(state == ElementState.ACTIVE) { "posting lifecycle element is not accepting work: $state" }
+        check(worker != null && !stop.isCompleted) { "posting lifecycle element is not accepting work" }
         intake.send(message)
         return reply.await()
     }
@@ -168,18 +168,15 @@ class PostingLifecycleElement(
     suspend fun status(index: String): Map<String, Any?> = PostingIntake.Status(index).let { send(it, it.reply) }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        if (state == ElementState.CLOSED) return@withContext
-        state = ElementState.DRAINING
         stop.complete(Unit)
         ticker?.join()
         intake.close()
         worker?.join()
         supervisor.complete()
         supervisor.join()
-        state = ElementState.CLOSED
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }
 
 /** Milliseconds since the first reading, on the monotonic source: the element's production clock. */

@@ -1,13 +1,14 @@
 package borg.trikeshed.couch.persistence
 
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.couch.CouchPersistence
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.emptySeries
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -38,9 +39,10 @@ class DurableCouchPersistence(
     private val fileOps: FileOperations,
     val directoryPath: String,
     private val flushIntervalMs: Long = 100L,
-) : AsyncContextElement(), CouchPersistence {
-    companion object Key : AsyncContextKey<DurableCouchPersistence>()
+) : CoroutineContext.Element, CouchPersistence {
+    companion object Key : CoroutineContext.Key<DurableCouchPersistence>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob()
 
     private sealed interface Cmd {
         data class Persist(val key: String, val value: ByteArray) : Cmd
@@ -53,8 +55,7 @@ class DurableCouchPersistence(
     private val batchMutex = Mutex()
     private var flushedDir = false
 
-    override suspend fun open() {
-        super.open()
+    suspend fun open() {
         walLog.replay { seqNum, payload ->
             if (seqNum > seq) {
                 seq = seqNum
@@ -154,7 +155,10 @@ class DurableCouchPersistence(
         // Channel close signals the processor loop to finish the remaining buffered items
         channel.close()
         // Wait for all in-flight jobs in the supervisor to complete
-        super.drain()
+        supervisor.complete()
+        supervisor.join()
         return emptySeries()
     }
+
+    override suspend fun close() = supervisor.cancelAndJoin()
 }

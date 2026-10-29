@@ -1,6 +1,5 @@
 package borg.trikeshed.kanban
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.job.CasStore
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
@@ -34,7 +33,6 @@ class BoardObservationElementTest {
     }
 
     private fun closed(element: BoardObservationElement) {
-        assertEquals(ElementState.CLOSED, element.state)
         assertTrue(element.supervisor.isCompleted)
         assertTrue(element.supervisor.children.none(), "Every owned producer and consumer is joined")
     }
@@ -62,7 +60,7 @@ class BoardObservationElementTest {
             release.complete(Unit)
             opening.await()
             assertEquals(listOf("seeded"), seeded)
-            assertEquals(ElementState.ACTIVE, element.state)
+            assertTrue(element.supervisor.isActive)
             element.awaitSequence(prefix.sequence)
             element.drain()
             closed(element)

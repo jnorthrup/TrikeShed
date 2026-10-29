@@ -1,7 +1,6 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
@@ -24,9 +23,11 @@ import borg.trikeshed.userspace.nio.spi.NioSupervisor
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -42,18 +43,17 @@ class HtxReactorElement(
     ),
     parentJob: kotlinx.coroutines.Job? = null,
     private val ownedSupervisor: NioSupervisor? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob), HtxRouteService {
+) : HtxRouteService, Drain {
     override val key get() = HtxRouteService.Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val requests = Channel<HtxDispatch>(16, onUndeliveredElement = { dispatch ->
         dispatch.b.completeExceptionally(CancellationException("HTX exchange was not dispatched"))
     })
     private var worker: Job? = null
 
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
+    suspend fun open() {
+        if (worker == null && !requests.isClosedForSend) {
             worker = CoroutineScope(currentCoroutineContext() + supervisor + this + channelOperations).launch {
                 // Each exchange owns its connection, ring and TLS engine, so exchanges run side by side:
                 // a slow upstream never holds the requests queued behind it past their callers' deadlines.
@@ -81,7 +81,7 @@ class HtxReactorElement(
         state: HtxExchangeState,
         request: HtxRequest,
     ): HtxExchangeResult {
-        check(this.state == ElementState.ACTIVE) { "HTX reactor is not accepting exchanges" }
+        check(worker != null && !requests.isClosedForSend) { "HTX reactor is not accepting exchanges" }
         val completion = CompletableDeferred<HtxExchangeResult>()
         requests.send((state j request) j completion)
         val result = withContext(NonCancellable) { completion.await() }
@@ -148,20 +148,14 @@ class HtxReactorElement(
         }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        if (state == ElementState.CLOSED) return@withContext
-        state = ElementState.DRAINING
         requests.close()
         worker?.join()
         supervisor.complete()
         supervisor.join()
-        try {
-            ownedSupervisor?.drain()
-        } finally {
-            state = ElementState.CLOSED
-        }
+        ownedSupervisor?.drain()
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 
     private suspend fun exchangePlain(request: HtxRequest): HtxResponse {
         val connection = openConnection(request)
@@ -567,7 +561,7 @@ suspend fun openHtxReactorElement(
     val activeSupervisor = nioSupervisor ?: contextSupervisor ?: NioSupervisor()
     val ownsSupervisor = nioSupervisor == null && contextSupervisor == null
 
-    if (activeSupervisor.state == ElementState.CREATED) {
+    if (!activeSupervisor.opened.isCompleted && activeSupervisor.admission.isActive) {
         activeSupervisor.open()
     }
 

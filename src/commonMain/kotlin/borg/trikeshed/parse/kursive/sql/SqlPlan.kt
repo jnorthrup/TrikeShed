@@ -66,7 +66,7 @@ fun SelectStmt.plan(
     stages += prelude
 
     for (clause in joins.view) {
-        val qualifier = (clause.table.alias ?: clause.table.name).asString()
+        val qualifier = (clause.table.alias ?: clause.table.name).name
         val (rightScan, rightPlan) = fromItem(clause.table, resolve)
         val right = if (rightPlan.size == 0) rightScan else QueryCursor(rightScan, rightPlan, ops, compiler)
         // CROSS JOIN and the comma form: the Cartesian product, a widen on no keys
@@ -74,20 +74,21 @@ fun SelectStmt.plan(
         val pairs = mutableListOf<Twin<String>>()
         val rightOnly = mutableListOf<Expr>()
         val residual = mutableListOf<Expr>()
-        val prefix = "$qualifier."
         for (c in conjuncts(clause.on)) {
-            val l = ((c as? BinaryExpr)?.left as? ColumnRef)?.id?.asString()
-            val r = ((c as? BinaryExpr)?.right as? ColumnRef)?.id?.asString()
-            val names = c.references()
+            val l = ((c as? BinaryExpr)?.left as? ColumnRef)?.id?.name
+            val r = ((c as? BinaryExpr)?.right as? ColumnRef)?.id?.name
+            var any = false
+            var all = true
+            c.forEachReference { any = true; if (!it.qualifiedBy(qualifier)) all = false }
             when {
-                c is BinaryExpr && c.op == "=" && l != null && r != null && r.startsWith(prefix) != l.startsWith(prefix) ->
-                    pairs += if (r.startsWith(prefix)) l j r else r j l
-                names.isNotEmpty() && names.all { it.startsWith(prefix) } -> rightOnly += c
+                c is BinaryExpr && c.op == "=" && l != null && r != null && r.qualifiedBy(qualifier) != l.qualifiedBy(qualifier) ->
+                    pairs += if (r.qualifiedBy(qualifier)) l.asString() j r.asString() else r.asString() j l.asString()
+                any && all -> rightOnly += c
                 !clause.outer -> residual += c
-                else -> error("LEFT JOIN $qualifier ON ${c.render()}: only column equalities and $qualifier-only predicates")
+                else -> error("LEFT JOIN ${qualifier.asString()} ON ${c.render()}: only column equalities and ${qualifier.asString()}-only predicates")
             }
         }
-        require(pairs.isNotEmpty()) { "JOIN $qualifier needs ON column equalities" }
+        require(pairs.isNotEmpty()) { "JOIN ${qualifier.asString()} needs ON column equalities" }
         val filtered = if (rightOnly.isEmpty()) right
         else QueryCursor(right, s_[QueryK.Filter(rightOnly.reduce { x, y -> BinaryExpr(x, "AND", y) })])
         stages += QueryK.Widen(filtered, pairs.toSeries(), clause.outer)
@@ -141,8 +142,8 @@ fun SelectStmt.plan(
     }
     where?.let { stages += QueryK.Filter(lexical(it)) }
 
-    val items = columns.view.toList()
-    val star = items.size == 1 && (items[0].expr as? LitExpr)?.lit.let { it is StringLiteral && it.asString() == "*" }
+    val items = columns
+    val star = items.size == 1 && items[0].isStar()
     /** Per select item: the pre-projection source column and its display name. */
     val sources = ArrayList<Twin<String>>()
     var derived = 0
@@ -153,7 +154,7 @@ fun SelectStmt.plan(
     }
 
     var residual = having
-    if (groupBy.size > 0 || items.any { it.expr.aggregated() } || residual?.aggregated() == true) {
+    if (groupBy.size > 0 || items.view.any { it.expr.aggregated() } || residual?.aggregated() == true) {
         val axis = groupBy.view.map { e -> (e as? ColumnRef)?.id?.asString() ?: derive(e) }
         val reductions = mutableListOf<Reduction>()
         val byText = linkedMapOf<String, String>()
@@ -179,7 +180,7 @@ fun SelectStmt.plan(
             e is InList -> InList(lift(e.expr), e.items.view.map { lift(it) }.toSeries(), e.negated)
             else -> e
         }
-        val lifted = items.map { lift(lexical(it.expr)) }
+        val lifted = items.view.map { lift(lexical(it.expr)) }
         residual = residual?.let(::lift)
         val grouped = groupBy.view.map { it.render() }
         stages += QueryK.Aggregate(axis.toSeries(), reductions.toSeries())
@@ -229,7 +230,7 @@ fun SelectStmt.planUnion(
 ): QueryCursor {
     val head = copy(orderBy = emptySeriesOf(), limit = null, offset = null, union = emptySeriesOf()).plan(resolve, ops, compiler, provenance, prelude)
     val arms = union.view.map { it.b.plan(resolve, ops, compiler, provenance) }
-    val star = columns.size == 1 && (columns[0].expr as? LitExpr)?.lit.let { it is StringLiteral && it.asString() == "*" }
+    val star = columns.size == 1 && columns[0].isStar()
     // the head's output names: its display names, or for `SELECT *` the columns the head answers
     val outputs: List<String> by lazy { if (star) head.names.view.map { it.toString() } else columns.view.map(::displayName) }
     val stages = mutableListOf<QueryK<Cursor>>(QueryK.Combine(arms.toSeries()))
@@ -276,9 +277,29 @@ fun Expr.transform(f: (Expr) -> Expr): Expr = f(
     },
 )
 
-/** The FROM items' names as references qualify them: the alias, else the table's name. */
-fun SelectStmt.scopes(): List<String> =
-    listOfNotNull(from?.let { (it.alias ?: it.name).asString() }) + joins.view.map { (it.table.alias ?: it.table.name).asString() }
+/** The FROM items' names as references qualify them: the alias, else the table's name; windows of the identifiers, not copies. */
+fun SelectStmt.scopes(): List<Series<Char>> =
+    listOfNotNull(from?.let { (it.alias ?: it.name).name }) + joins.view.map { (it.table.alias ?: it.table.name).name }
+
+/** The index of the last '.' in these chars, -1 when there is none. */
+private fun Series<Char>.lastDot(): Int {
+    var i = size
+    while (--i >= 0) if (this[i] == '.') break
+    return i
+}
+
+/** The window before the last '.': a reference's qualifier, empty when unqualified. */
+private fun Series<Char>.qualifier(): Series<Char> = slice(0, lastDot().coerceAtLeast(0))
+
+private fun Series<Char>.sameChars(o: Series<Char>): Boolean = size == o.size && (0 until size).all { this[it] == o[it] }
+
+/** Whether these chars read `q.` then a name, compared in place. */
+private fun Series<Char>.qualifiedBy(q: Series<Char>): Boolean = size > q.size && this[q.size] == '.' && (0 until q.size).all { this[it] == q[it] }
+
+private fun Series<Char>.equalsIgnoreCase(s: String): Boolean = size == s.length && (0 until size).all { this[it].equals(s[it], ignoreCase = true) }
+
+/** A select item that is the literal `*`. */
+private fun Column.isStar(): Boolean = (expr as? LitExpr)?.lit.let { it is StringLiteral && it.value.size == 1 && it.value[0] == '*' }
 
 /** Every expression of the statement: select list, WHERE, HAVING, FROM item arguments, ON, GROUP BY, ORDER BY, and the union arms'. */
 fun SelectStmt.expressions(): List<Expr> =
@@ -287,11 +308,11 @@ fun SelectStmt.expressions(): List<Expr> =
         orderBy.view.map { it.expr } + union.view.flatMap { it.b.expressions() }
 
 /** Whether a reference qualified by one of [outer]'s names and none of [inner]'s occurs anywhere, nested subselects included. */
-fun SelectStmt.correlated(outer: List<String>, inner: List<String> = scopes()): Boolean {
+fun SelectStmt.correlated(outer: List<Series<Char>>, inner: List<Series<Char>> = scopes()): Boolean {
     var found = false
     for (e in expressions()) e.transform { n ->
         when (n) {
-            is ColumnRef -> n.id.asString().substringBeforeLast('.', "").let { q -> if (q.isNotEmpty() && q !in inner && q in outer) found = true }
+            is ColumnRef -> n.id.name.qualifier().let { q -> if (q.size > 0 && inner.none { it.sameChars(q) } && outer.any { it.sameChars(q) }) found = true }
             is Subselect -> if (n.select.correlated(outer, inner + n.select.scopes())) found = true
             else -> Unit
         }
@@ -301,16 +322,17 @@ fun SelectStmt.correlated(outer: List<String>, inner: List<String> = scopes()): 
 }
 
 /** The statement with every reference to one of [row]'s columns, qualified by a name outside [inner], replaced by that cell. */
-fun SelectStmt.bind(row: RowVec, inner: List<String> = scopes()): SelectStmt {
-    val names = row.metas α { it().name.toString() }
-    fun cell(ref: String): Expr? {
-        if (ref.substringBeforeLast('.', "") in inner) return null
-        val c = (0 until names.size).firstOrNull { names[it] == ref } ?: return null
+fun SelectStmt.bind(row: RowVec, inner: List<Series<Char>> = scopes()): SelectStmt {
+    val metas = row.metas
+    fun cell(ref: Series<Char>): Expr? {
+        val q = ref.qualifier()
+        if (inner.any { it.sameChars(q) }) return null
+        val c = (0 until metas.size).firstOrNull { m -> metas[m]().name.let { n -> n.length == ref.size && (0 until n.length).all { i -> n[i] == ref[i] } } } ?: return null
         return LitExpr(CellLiteral(row.values[c]))
     }
     fun g(e: Expr): Expr = e.transform { n ->
         when (n) {
-            is ColumnRef -> cell(n.id.asString()) ?: n
+            is ColumnRef -> cell(n.id.name) ?: n
             is Subselect -> Subselect(n.select.bind(row, inner + n.select.scopes()), n.array)
             else -> n
         }
@@ -333,7 +355,7 @@ fun SelectStmt.bind(row: RowVec, inner: List<String> = scopes()): SelectStmt {
  * qualified by one of the [outer] FROM items): that row's cells bound as literals, then planned, on the closure
  * compiler (a class per row would cost more than it saves): O(outer × inner), the catalog's sizes.
  */
-fun SelectStmt.subqueryRows(resolve: (String) -> Cursor, ops: ColumnOperations, compiler: ExprCompiler, outer: List<String>): (RowVec) -> Cursor {
+fun SelectStmt.subqueryRows(resolve: (String) -> Cursor, ops: ColumnOperations, compiler: ExprCompiler, outer: List<Series<Char>>): (RowVec) -> Cursor {
     if (!correlated(outer)) {
         val once by lazy { plan(resolve, ops, compiler) }
         return { once }
@@ -359,15 +381,25 @@ fun evokeArgs(args: Series<Expr>): Triple<String, String, Int> {
  * [Catalog.table] reads it; the column is empty when the index names only the table.
  */
 fun evokeIndex(index: String): Twin<String> {
-    val bare = index.removePrefix("public.").removePrefix("PUBLIC.")
-    return bare.substringBefore('.') j bare.substringAfter('.', "")
+    var from = 0
+    if (index.startsWith("public.")) from = 7
+    if (index.startsWith("PUBLIC.", from)) from += 7
+    val dot = index.indexOf('.', from)
+    return if (dot < 0) index.substring(from) j "" else index.substring(from, dot) j index.substring(dot + 1)
 }
 
 /** The table a FROM item scans: its own name, or the index's table of `evoke_query(index, …)`; `unnest` scans none. */
 fun TableRef.scanName(): String? = when {
     args == null -> name.asString()
-    name.asString().lowercase().removePrefix(SqlParser.PG_CATALOG) == UNNEST -> null
+    function().equalsIgnoreCase(UNNEST) -> null
     else -> constantText(args[0])?.let { evokeIndex(it).a }
+}
+
+/** The name of a table function with pg's `pg_catalog.` schema dropped, as a window of the identifier. */
+private fun TableRef.function(): Series<Char> {
+    val n = name.name
+    val schema = SqlParser.PG_CATALOG
+    return if (n.size >= schema.length && (0 until schema.length).all { n[it].equals(schema[it], ignoreCase = true) }) n.drop(schema.length) else n
 }
 
 /**
@@ -382,8 +414,8 @@ fun TableRef.scanName(): String? = when {
 fun fromItem(ref: TableRef, resolve: (String) -> Cursor): Join<Cursor, QueryPlan> {
     val qualifier = (ref.alias ?: ref.name).asString()
     val args = ref.args ?: return resolve(ref.name.asString()).qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
-    val function = ref.name.asString().lowercase().removePrefix(SqlParser.PG_CATALOG)
-    if (function == UNNEST) {
+    val function = ref.function()
+    if (function.equalsIgnoreCase(UNNEST)) {
         // pg's `unnest(array) [AS] alias`: one row per element in the column the alias names; the array is a literal or an
         // outer row's cell the planner bound, since no expression is evaluated while planning
         require(args.size == 1) { "$UNNEST(array) in FROM takes one argument" }
@@ -393,7 +425,7 @@ fun fromItem(ref: TableRef, resolve: (String) -> Cursor): Join<Cursor, QueryPlan
         val elements = cell?.let(SqlFunctions::elementsOf) ?: emptyList()
         return rowsCursor(listOf(column), elements.map { mapOf(column to it) }).qualify(qualifier) j emptySeriesOf<QueryK<Cursor>>()
     }
-    if (function != EVOKE_QUERY) error("function $function(...) does not exist as a table function")
+    if (!function.equalsIgnoreCase(EVOKE_QUERY)) error("function ${function.asString().lowercase()}(...) does not exist as a table function")
     require(args.size == 3) { "$EVOKE_QUERY(index, query, k) in FROM takes three arguments; the two-argument form is a scalar" }
     val (index, query, k) = evokeArgs(args)
     require(k > 0) { "$EVOKE_QUERY: k must be positive" }
@@ -408,7 +440,7 @@ fun fromItem(ref: TableRef, resolve: (String) -> Cursor): Join<Cursor, QueryPlan
 /** The column `evoke_query` indexes when the index names only a table: the first text column that is not `id`; [scan] has a row. */
 fun lexicalColumn(scan: Cursor): String? {
     val metas: Series<ColumnMeta> = if (scan is ColumnCursor) scan.metas.toSeries() else scan[0].metas α { it() }
-    return metas.view.firstOrNull { it.type == IOMemento.IoString && it.name.toString() != "id" }?.name?.toString()
+    return metas.view.firstOrNull { it.type == IOMemento.IoString && !(it.name.length == 2 && it.name[0] == 'i' && it.name[1] == 'd') }?.name?.toString()
 }
 
 /** The one-row relation with no columns: what a SELECT without FROM scans. */
@@ -426,27 +458,29 @@ fun constantText(e: Expr): String? = constant(e)?.let { scalarText(it) }
 /** The AND-separated conjuncts of [e]. */
 fun conjuncts(e: Expr?): List<Expr> = when {
     e == null -> emptyList()
-    e is BinaryExpr && e.op.uppercase() == "AND" -> conjuncts(e.left) + conjuncts(e.right)
+    e is BinaryExpr && e.op.equals("AND", ignoreCase = true) -> conjuncts(e.left) + conjuncts(e.right)
     else -> listOf(e)
 }
 
-/** The column names an expression reads. */
-fun Expr.references(): List<String> = when (this) {
-    is ColumnRef -> listOf(id.asString())
-    is BinaryExpr -> left.references() + right.references()
-    is Path -> cell.references()
-    is Cast -> expr.references()
-    is Call -> args.view.flatMap { it.references() }
-    is Not -> expr.references()
-    is Is -> expr.references()
-    is InList -> expr.references() + items.view.flatMap { it.references() }
-    is Quantified -> left.references() + right.references()
-    else -> emptyList()
+/** [f] applied to the name window of every column an expression reads. */
+fun Expr.forEachReference(f: (Series<Char>) -> Unit) {
+    when (this) {
+        is ColumnRef -> f(id.name)
+        is BinaryExpr -> { left.forEachReference(f); right.forEachReference(f) }
+        is Path -> cell.forEachReference(f)
+        is Cast -> expr.forEachReference(f)
+        is Call -> args.view.forEach { it.forEachReference(f) }
+        is Not -> expr.forEachReference(f)
+        is Is -> expr.forEachReference(f)
+        is InList -> { expr.forEachReference(f); items.view.forEach { it.forEachReference(f) } }
+        is Quantified -> { left.forEachReference(f); right.forEachReference(f) }
+        else -> Unit
+    }
 }
 
 /** pg naming: the alias, else a column's last segment, else the function name, a scalar subselect's one column, `array` for ARRAY(…), else `?column?`. */
 fun displayName(item: Column): String = item.alias?.asString() ?: when (val e = item.expr) {
-    is ColumnRef -> e.id.asString().substringAfterLast('.')
+    is ColumnRef -> e.id.name.let { n -> n.slice(n.lastDot() + 1, n.size).asString() }
     is Call -> if (e.name == SqlParser.CASE_WHEN) SqlParser.CASE else e.name
     is Subselect -> if (e.array) "array" else e.select.columns.view.singleOrNull()?.let(::displayName) ?: "?column?"
     else -> "?column?"
@@ -456,7 +490,7 @@ fun displayName(item: Column): String = item.alias?.asString() ?: when (val e = 
  * An ORDER BY item: a 1-based select ordinal, a select alias, a select expression, or a column. Any other
  * expression (`ORDER BY embedding <=> '[1,0,0]'`) becomes a hidden derived column through [derive].
  */
-fun orderSource(expr: Expr, items: List<Column>, sources: List<Twin<String>>, derive: (Expr) -> String): String {
+fun orderSource(expr: Expr, items: Series<Column>, sources: List<Twin<String>>, derive: (Expr) -> String): String {
     val lit = (expr as? LitExpr)?.lit
     if (lit is NumericLiteral) {
         val k = lit.value.toInt()
@@ -464,7 +498,9 @@ fun orderSource(expr: Expr, items: List<Column>, sources: List<Twin<String>>, de
         return sources[k - 1].a
     }
     val text = expr.render()
-    items.indexOfFirst { it.alias?.asString() == text || it.expr.render() == text }.takeIf { it >= 0 }
-        ?.let { return sources[it].a }
+    for (i in 0 until items.size) {
+        val item = items[i]
+        if (item.alias?.name?.matches(text) == true || item.expr.render() == text) return sources[i].a
+    }
     return if (expr is ColumnRef) expr.id.asString() else derive(expr)
 }

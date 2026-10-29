@@ -1,8 +1,8 @@
 package borg.trikeshed.util.oroboros
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,9 +53,10 @@ class JvmFileWatchReactorElement(
     private val walkerBlockedSegments: Set<String> = DEFAULT_WALKER_BLOCKED_SEGMENTS,
     /** Root-relative subtrees pruned during the walk (e.g. `.claude/worktrees`). */
     private val walkerBlockedRelativePrefixes: Set<String> = emptySet(),
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<JvmFileWatchReactorElement>()
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<JvmFileWatchReactorElement>
     override val key: CoroutineContext.Key<*> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val rootPath = Path.of(root).toAbsolutePath().normalize()
     private val eventChannel = Channel<FileEvent>(capacity)
@@ -68,18 +69,15 @@ class JvmFileWatchReactorElement(
 
     val events: ReceiveChannel<FileEvent> get() = eventChannel
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
+    suspend fun open() {
+        if (fsEvents != null || watchService != null || supervisor.isCompleted) return
         if (FsEventStream.available && Files.isDirectory(rootPath)) {
             openFsEvents()
-            state = ElementState.ACTIVE
             return
         }
         val service = FileSystems.getDefault().newWatchService()
         watchService = service
         registerTree(rootPath, service)
-        state = ElementState.ACTIVE
         watchJob = CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor + Dispatchers.IO).launch {
             watchLoop(service)
         }
@@ -124,16 +122,15 @@ class JvmFileWatchReactorElement(
     }
 
     override suspend fun drain() {
-        if (state.isLessThan(ElementState.OPEN) || state.isAtLeast(ElementState.CLOSED)) return
-        state = ElementState.DRAINING
+        if (fsEvents == null && watchService == null) return
         fsEvents?.let { fsEvents = null; eventChannel.close(); it.close() }
         watchService?.close()
         watchJob?.cancelAndJoin()
         eventChannel.close()
-        super.close()
+        supervisor.cancelAndJoin()
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 
     private suspend fun watchLoop(service: WatchService) {
         try {
@@ -298,15 +295,15 @@ actual class FileWatchReactorElement actual constructor(
     excludeGlobs: List<String>,
     walkerBlockedSegments: Set<String>,
     walkerBlockedRelativePrefixes: Set<String>,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    actual companion object Key : AsyncContextKey<FileWatchReactorElement>()
+) : CoroutineContext.Element, Drain {
+    actual companion object Key : CoroutineContext.Key<FileWatchReactorElement>
     private val delegate = JvmFileWatchReactorElement(
         root, parentJob, capacity, includeGlobs, excludeGlobs,
         walkerBlockedSegments, walkerBlockedRelativePrefixes,
     )
     actual val events: kotlinx.coroutines.channels.ReceiveChannel<FileEvent> get() = delegate.events
     actual override val key: CoroutineContext.Key<*> get() = Key
-    actual override suspend fun open() = delegate.open()
+    actual suspend fun open() = delegate.open()
     actual override suspend fun drain() = delegate.drain()
-    actual override suspend fun close() = delegate.close()
+    actual suspend fun close() = delegate.close()
 }

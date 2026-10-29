@@ -1,8 +1,9 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -30,9 +31,10 @@ class IncrementalViewRegistry(
     private val db: Couch,
     parentJob: kotlinx.coroutines.Job? = null,
     private val log: (String) -> Unit = {},
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<IncrementalViewRegistry>()
+) : kotlin.coroutines.CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<IncrementalViewRegistry>
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val elements = ConcurrentHashMap<String, IncrementalViewElement>()
     private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -41,9 +43,8 @@ class IncrementalViewRegistry(
     /** The [CouchWireRouter] hook: the live tendon for a marked view, or null (eager path). */
     fun lookup(ddoc: String, view: String): IncrementalViewElement? = elements[viewKey(ddoc, view)]
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
+    suspend fun open() {
+        if (cancelSubscription != null || supervisor.isCompleted) return
         scanDesignDocs()
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
         CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
@@ -52,7 +53,6 @@ class IncrementalViewRegistry(
             } catch (_: kotlinx.coroutines.CancellationException) {
             }
         }
-        state = ElementState.ACTIVE
     }
 
     /** Open a tendon for every design-doc view marked incremental that lacks one. Idempotent. */
@@ -136,6 +136,8 @@ class IncrementalViewRegistry(
         runCatching { close() }
         Unit
     }
+
+    suspend fun close() = supervisor.cancelAndJoin()
 }
 
 /** The bounded reducer set [IncrementalViewElement] accepts — nothing else is incremental. */

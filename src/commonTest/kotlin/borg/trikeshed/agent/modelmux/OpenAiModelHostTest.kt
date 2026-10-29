@@ -84,7 +84,6 @@ class OpenAiModelHostTest {
         assertNull(extended.modelKeyId("host/private"))
         val inherited = extended.session("operator").getOrThrow()
         assertEquals("Bearer operator-secret", inherited.authHeaders().headerValue("Authorization"))
-        inherited.close()
         assertFailsWith<IllegalArgumentException> {
             ModelMux(KeyMux {}) { model("missing-destination", setOf("chat"), auth = LlmAuth.NONE) }
         }

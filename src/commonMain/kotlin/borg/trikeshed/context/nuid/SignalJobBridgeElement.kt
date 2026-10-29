@@ -1,8 +1,10 @@
 package borg.trikeshed.context.nuid
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.job.JobCommand
 import borg.trikeshed.job.JobId
 import borg.trikeshed.job.JobSupervisorElement
@@ -59,11 +61,8 @@ import kotlinx.coroutines.sync.withLock
  *
  * ### Lifecycle
  *
- *   CREATED  ⇒ constructed; [bridge] rejects.
- *   OPEN     ⇒ [bridge] accepted; [run] may start.
- *   ACTIVE   ⇒ the collect loop is attached to the event flow.
- *   DRAINING ⇒ no new submissions accepted by [bridge].
- *   CLOSED   ⇒ [supervisor] cancelled.
+ * [bridge] accepts until [admission] completes at [drain] or [close]; [close]
+ * cancels [supervisor].
  *
  * A collector launched on [supervisor] (as [wireSignalFacetsToJobs] does) is
  * cancelled by [close]. It is *not* stopped by [drain]: `drain` completes the
@@ -76,11 +75,14 @@ class SignalJobBridgeElement(
     private val events: SharedFlow<KanbanEvent> = KanbanFSM.kanbanEvents,
     private val jobIdOf: (KanbanEvent.SignalFacetReduced) -> JobId = { signalFacetJobId(it) },
     private val idempotencyKeyOf: (KanbanEvent.SignalFacetReduced) -> String = { signalOccurrenceKey(it) },
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<SignalJobBridgeElement>()
+    companion object Key : CoroutineContext.Key<SignalJobBridgeElement>
 
-    override val key: AsyncContextKey<SignalJobBridgeElement> = Key
+    override val key: CoroutineContext.Key<SignalJobBridgeElement> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at [drain] or [close]; [bridge] refuses after it. */
+    val admission: CompletableJob = Job()
 
     /** The flow [run] attaches to. Defaults to [KanbanFSM.kanbanEvents]. */
     val eventSource: SharedFlow<KanbanEvent> get() = events
@@ -99,16 +101,11 @@ class SignalJobBridgeElement(
      */
     val submitted: Int get() = submitCount
 
-    /** Promote OPEN → ACTIVE. Idempotent. */
-    suspend fun activate() {
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-    }
-
     /**
      * Hand one reduced signal facet to the job nexus as a [JobCommand.Submit].
      *
      * Returns the [JobId] that was submitted, or null when the bridge is not
-     * accepting (outside OPEN/ACTIVE) or the occurrence key was already handed
+     * accepting (after drain or close) or the occurrence key was already handed
      * off. A non-null return means the command reached the nexus command
      * channel — the committed/rejected verdict arrives separately on
      * `JobSupervisorElement.committed`.
@@ -117,7 +114,7 @@ class SignalJobBridgeElement(
      * tools, the daemon — can commit without going through the flow.
      */
     suspend fun bridge(event: KanbanEvent.SignalFacetReduced): JobId? {
-        if (state != ElementState.OPEN && state != ElementState.ACTIVE) return null
+        if (!admission.isActive) return null
         val idempotencyKey = idempotencyKeyOf(event)
         val fresh = ledgerMutex.withLock { handedOffKeys.add(idempotencyKey) }
         if (!fresh) return null
@@ -145,7 +142,6 @@ class SignalJobBridgeElement(
      * here; cancellation still propagates.
      */
     suspend fun run() {
-        activate()
         events.collect { event ->
             if (event is KanbanEvent.SignalFacetReduced) {
                 try {
@@ -159,6 +155,18 @@ class SignalJobBridgeElement(
                 }
             }
         }
+    }
+
+    override suspend fun drain() {
+        admission.complete()
+        supervisor.complete()
+        supervisor.join()
+        close()
+    }
+
+    suspend fun close() {
+        admission.complete()
+        supervisor.cancelAndJoin()
     }
 }
 
@@ -206,7 +214,6 @@ suspend fun wireSignalFacetsToJobs(
         parentJob = scope.coroutineContext[Job],
         events = events,
     )
-    bridge.open()
     val collector = scope.launch(bridge.supervisor) { bridge.run() }
     return workgroup j (bridge j collector)
 }

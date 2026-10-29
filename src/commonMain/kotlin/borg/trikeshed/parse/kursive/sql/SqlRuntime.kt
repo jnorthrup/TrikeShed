@@ -94,25 +94,34 @@ object SqlRuntime {
     @JvmStatic fun gt(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) > 0
     @JvmStatic fun ge(a: Any?, b: Any?): Any? = if (a == null || b == null) null else compareCells(a, b) >= 0
 
+    /** A cell as characters: a String or CharSeries window is matched in place, anything else by its [scalarText]. */
+    private fun chars(value: Any?): CharSequence = value as? CharSequence ?: scalarText(value)
+
+    /** Run-time patterns compiled once per (pattern, flags); a literal pattern never gets here, see [likeCompiled]. */
+    private val regexes = HashMap<String, Regex>()
+    private fun cached(key: String, build: () -> Regex): Regex =
+        regexes[key] ?: build().also { if (regexes.size >= 256) regexes.clear(); regexes[key] = it }
+
     /** `LIKE` with a pattern known at run time. */
     @JvmStatic fun like(subject: Any?, pattern: Any?): Any? =
-        if (subject == null || pattern == null) null else likeRegex(pattern.toString()).matches(subject.toString())
+        if (subject == null || pattern == null) null
+        else cached("l" + pattern) { likeRegex(pattern.toString()) }.matches(chars(subject))
 
     /** `LIKE` against a pattern compiled once from a literal; [regex] is a [Regex]. */
     @JvmStatic fun likeCompiled(subject: Any?, regex: Any?): Any? =
-        if (subject == null) null else (regex as Regex).matches(subject.toString())
+        if (subject == null) null else (regex as Regex).matches(chars(subject))
 
     /** `ILIKE` (pg): `LIKE` ignoring case, with a pattern known at run time. */
     @JvmStatic fun ilike(subject: Any?, pattern: Any?): Any? =
-        if (subject == null || pattern == null) null else likeRegex(pattern.toString(), ignoreCase = true).matches(subject.toString())
+        if (subject == null || pattern == null) null else cached("i" + pattern) { likeRegex(pattern.toString(), ignoreCase = true) }.matches(chars(subject))
 
     /** pg `~` / `~*` (`!~` / `!~*` negate): the pattern is found somewhere in the subject, a POSIX regex search. */
     @JvmStatic fun regexMatch(subject: Any?, pattern: Any?, ignoreCase: Boolean, negated: Boolean): Any? =
-        if (subject == null || pattern == null) null else regexCompiled(subject, regexOf(scalarText(pattern), ignoreCase), negated)
+        if (subject == null || pattern == null) null else regexCompiled(subject, cached((if (ignoreCase) "r*" else "r") + chars(pattern)) { regexOf(chars(pattern).toString(), ignoreCase) }, negated)
 
     /** `~` against a pattern compiled once from a literal; [regex] is a [Regex]. */
     @JvmStatic fun regexCompiled(subject: Any?, regex: Any?, negated: Boolean): Any? =
-        if (subject == null) null else (regex as Regex).containsMatchIn(scalarText(subject)) != negated
+        if (subject == null) null else (regex as Regex).containsMatchIn(chars(subject)) != negated
 
     /** `CASE` over its parsed arguments: `operand, when1, then1, …, else`, read lazily; see [SqlParser.parseCase]. */
     @JvmStatic fun case(operand: Any?, searched: Boolean, arms: Array<() -> Any?>): Any? {
@@ -128,11 +137,13 @@ object SqlRuntime {
     /** A scalar function by [name] over its evaluated [args]; the table is [SqlFunctions]. */
     @JvmStatic fun call(name: String, args: Array<Any?>): Any? = SqlFunctions.call(name, args)
 
+    private val analyzer = Analyzer()
+
     /** Evoke `document @@ 'query text'`: the document holds a query term (a local match, not a corpus score). */
     @JvmStatic fun matches(document: Any?, query: Any?): Any? {
         if (document == null || query == null) return null
-        val terms = Analyzer().tokens(scalarText(query)).toHashSet()
-        return Analyzer().tokens(scalarText(document)).any { it in terms }
+        val terms = analyzer.tokens(chars(query)).toHashSet()
+        return analyzer.tokens(chars(document)).any { it in terms }
     }
 
     @JvmStatic fun concat(a: Any?, b: Any?): Any? = if (a == null || b == null) null else a.toString() + b.toString()

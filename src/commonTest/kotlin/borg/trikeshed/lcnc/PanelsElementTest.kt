@@ -1,6 +1,5 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -25,7 +24,7 @@ class PanelsElementTest {
             release.complete(Unit)
             drained.await()
             assertTrue(finished)
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
             assertNull(owner.submit { error("Closed page cannot admit work") })
         } finally { release.complete(Unit); owner.close() }
@@ -128,7 +127,7 @@ class PanelsElementTest {
             }
             assertNotNull(owner.submit {}).await()
             owner.drain()
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
         } finally { owner.close() }
     }
@@ -151,7 +150,7 @@ class PanelsElementTest {
             assertTrue(generateSequence<Throwable>(failure) { it.cause }.any {
                 it is IllegalArgumentException && it.message == "picklist unavailable"
             })
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
         } finally { runCatching { owner.close() } }
     }
@@ -180,7 +179,7 @@ class PanelsElementTest {
             cancelled.await()
             assertTrue(waiter.isCompleted)
             assertFailsWith<IllegalStateException> { owner.drain() }
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(parent.children.any())
             assertFalse(owner.supervisor.children.any())
         } finally { release.complete(Unit); parent.cancelAndJoin(); runCatching { owner.close() } }

@@ -1,6 +1,5 @@
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -14,10 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -37,25 +33,22 @@ class RequestFactoryReactorElement(
 
     init { require(capacity > 0) { "RequestFactory capacity must be positive" } }
 
-    private val lifecycle = MutableStateFlow(ElementState.CREATED)
-    var state: ElementState
-        get() = lifecycle.value
-        private set(value) { lifecycle.value = value }
+    /** Completes when the first [drain] begins; the processor closes once, after it. */
+    val stopped: CompletableJob = Job()
+    /** Completes once [drain] has closed the processor. */
+    val closed: CompletableJob = Job()
     lateinit var supervisor: CompletableJob
         private set
     val requests = Channel<RequestFactoryDispatch>(capacity)
-    val admission = Mutex()
-    val termination = Mutex()
     var worker: Job? = null
         private set
 
-    suspend fun open() = admission.withLock {
-        check(state == ElementState.CREATED) { "RequestFactory processor already opened" }
+    suspend fun open() {
+        check(worker == null && !requests.isClosedForSend) { "RequestFactory processor already opened" }
         val context = currentCoroutineContext()
         context.ensureActive()
         supervisor = SupervisorJob(parentJob ?: context[Job])
         supervisor.ensureActive()
-        state = ElementState.ACTIVE
         worker = CoroutineScope(context + supervisor + this).launch(start = CoroutineStart.UNDISPATCHED) {
             var failure: Throwable? = null
             try {
@@ -74,15 +67,11 @@ class RequestFactoryReactorElement(
             } finally {
                 requests.close(failure)
                 withContext(NonCancellable) {
-                    // close() preserves already suspended sends. Receive and settle those claims
-                    // before locking admission, which a bounded sender can still own.
+                    // close() preserves already suspended sends. Receive and settle those claims.
                     val cause = failure ?: CancellationException("RequestFactory processor stopped")
                     while (true) {
                         val dispatch = requests.tryReceive().getOrNull() ?: break
                         dispatch.b.completeExceptionally(cause)
-                    }
-                    admission.withLock {
-                        if (state != ElementState.CLOSED) state = ElementState.DRAINING
                     }
                 }
             }
@@ -90,12 +79,10 @@ class RequestFactoryReactorElement(
     }
 
     override suspend fun processRequest(payload: String): String {
+        check(worker != null) { "RequestFactory processor is not accepting requests" }
+        if (supervisor.isCancelled) supervisor.ensureActive()
         val receipt = CompletableDeferred<String>()
-        admission.withLock {
-            check(state == ElementState.ACTIVE) { "RequestFactory processor is not accepting requests" }
-            supervisor.ensureActive()
-            requests.send(payload j receipt)
-        }
+        requests.send(payload j receipt)
         // Caller cancellation propagates, while every queued effect remains owned by the worker.
         return receipt.await()
     }
@@ -103,7 +90,7 @@ class RequestFactoryReactorElement(
     /** Original RF transports cannot suspend admission; a full queue returns a settled refusal. */
     fun tryProcessRequest(payload: String, receipt: CompletableDeferred<String> = CompletableDeferred()): Deferred<String> {
         when {
-            state != ElementState.ACTIVE -> receipt.completeExceptionally(
+            worker == null || requests.isClosedForSend -> receipt.completeExceptionally(
                 IllegalStateException("RequestFactory processor is not accepting requests"),
             )
             !supervisor.isActive -> receipt.completeExceptionally(
@@ -120,19 +107,14 @@ class RequestFactoryReactorElement(
     }
 
     suspend fun drain() = withContext(NonCancellable) {
-        termination.withLock {
-            if (state == ElementState.CLOSED) return@withLock
-            admission.withLock {
-                requests.close()
-                state = ElementState.DRAINING
-            }
-            worker?.join()
-            if (::supervisor.isInitialized) {
-                supervisor.complete()
-                supervisor.join()
-            }
-            try { closeProcessor() } finally { state = ElementState.CLOSED }
+        if (!stopped.complete()) return@withContext closed.join()
+        requests.close()
+        worker?.join()
+        if (::supervisor.isInitialized) {
+            supervisor.complete()
+            supervisor.join()
         }
+        try { closeProcessor() } finally { closed.complete() }
     }
 
     suspend fun close() = drain()

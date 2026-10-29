@@ -2,9 +2,7 @@
 
 package borg.trikeshed.context.nuid
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.get
@@ -296,7 +294,7 @@ data class Workgroup(
 class NuidElement(
     parentJob: Job? = null,
     val nuid: Nuid,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<NuidElement>()
-    override val key: AsyncContextKey<NuidElement> = Key
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<NuidElement>
+    override val key: CoroutineContext.Key<NuidElement> = Key
 }

@@ -1,0 +1,4 @@
+package = mlxc
+headers = mlx/c/mlx.h
+compilerOpts = -I/opt/homebrew/include
+linkerOpts = -L/opt/homebrew/lib -lmlxc -rpath /opt/homebrew/lib

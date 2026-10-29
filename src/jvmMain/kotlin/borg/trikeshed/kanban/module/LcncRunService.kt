@@ -52,7 +52,8 @@ internal class LcncRunService(
     private val permits = mutableMapOf<RunPermit, PermitFamily>()
     private val drained = CompletableDeferred<Unit>()
     private var admittedRuns = 0
-    private var draining = false
+    /** Completes at [stopAdmission]; [drain] then awaits the admitted runs. */
+    val stopped: CompletableJob = Job()
     private var recoveredQueue: Series<LcncRunQueueEntry> = emptySeriesOf()
 
     private fun response(status: Int, body: Map<String, Any?>) = HttpResponse(status, jsonOf(body))
@@ -617,7 +618,7 @@ internal class LcncRunService(
             admission.withLock {
                 if (token != null && debuggers.containsKey(token)) throw QueueFailure(409, "debug_token_active")
                 val family = inherited?.let { permits[it] }
-                if (family == null && draining && !ownedPreparation) throw QueueFailure(429, "execution_capacity")
+                if (family == null && stopped.isCompleted && !ownedPreparation) throw QueueFailure(429, "execution_capacity")
                 if (family != null) {
                     reservation = RunPermit(runId, checkNotNull(inherited).runId, family, queued = true, preparation = true)
                     family.references++
@@ -688,7 +689,7 @@ internal class LcncRunService(
             val family = permits.remove(permit) ?: return@withLock
             if (--family.references == 0) slots.release()
             admittedRuns--
-            if (draining && admittedRuns == 0) drained.complete(Unit)
+            if (stopped.isCompleted && admittedRuns == 0) drained.complete(Unit)
         }
     }
 
@@ -873,7 +874,7 @@ internal class LcncRunService(
 
     suspend fun stopAdmission() = withContext(NonCancellable) {
         admission.withLock {
-            draining = true
+            stopped.complete()
             for (run in oroboros.executions.values) run.control.drain()
             if (admittedRuns == 0) drained.complete(Unit)
         }
@@ -890,7 +891,7 @@ internal class LcncRunService(
         var acquired = false
         var registered = false
         suspend fun register(family: PermitFamily, parentRunId: String? = null): RunPermit {
-            if (draining) debug?.drain()
+            if (stopped.isCompleted) debug?.drain()
             val permit = RunPermit(runId, parentRunId, family)
             family.references++
             permits[permit] = family
@@ -909,7 +910,7 @@ internal class LcncRunService(
                         family != null -> 200 j register(family,
                             if (queued && inherited?.queued == true && inherited.runId == runId) inherited.parentRunId else inherited?.runId)
                         queued -> throw QueueFailure(409, "queue_not_reserved")
-                        (!routed && draining) || !slots.tryAcquire() -> 429 j null
+                        (!routed && stopped.isCompleted) || !slots.tryAcquire() -> 429 j null
                         else -> {
                             acquired = true
                             200 j register(PermitFamily(runId))
@@ -947,7 +948,7 @@ internal class LcncRunService(
         try {
             admission.withLock {
                 oroboros.attach(runId, program, debug)
-                if (draining) debug.drain()
+                if (stopped.isCompleted) debug.drain()
             }
             return withContext(checkNotNull(permit)) { coroutineScope {
                 executionJob = currentCoroutineContext().job
@@ -1210,7 +1211,7 @@ internal class LcncRunService(
                     val family = checkNotNull(permits.remove(checkNotNull(permit)))
                     if (--family.references == 0) slots.release()
                     admittedRuns--
-                    if (draining && admittedRuns == 0) drained.complete(Unit)
+                    if (stopped.isCompleted && admittedRuns == 0) drained.complete(Unit)
                 }
             }
         }

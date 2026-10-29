@@ -8,28 +8,23 @@ import borg.trikeshed.lib.*
 // CCEK is the algebra that binds Families 1-3 to execution scope.
 
 /**
- * Ordered lifecycle labels used by element admission and cleanup checks.
- * Each owner implements its transitions and synchronization.
- */
-enum class ElementState(override val mask: UInt) : BitMasked<UInt> {
-    CREATED(1u shl 0),
-    OPEN(1u shl 1),
-    ACTIVE(1u shl 2),
-    DRAINING(1u shl 3),
-    CLOSED(1u shl 4);
-}
-
-/**
  * LifeK — lifecycle facet keys under OpK.
  */
 sealed class LifeK<out R> : OpK<R>() {
-    data object State  : LifeK<ElementState>()
     data object FanOut : LifeK<Series<Any?>>()
+}
+
+/**
+ * Drain stops admission, finishes in-flight work, joins children and closes channels.
+ * The one lifecycle contract a holder of mixed elements calls.
+ */
+fun interface Drain {
+    suspend fun drain()
 }
 
 // ── Interest BitMask ────────────────────────────────────────────
 
-/** IO readiness interests — BitMasked<UInt> like ElementState. */
+/** IO readiness interests — BitMasked<UInt>. */
 enum class Interest(override val mask: UInt) : BitMasked<UInt> {
     READ(1u shl 0),
     WRITE(1u shl 1),

@@ -42,8 +42,6 @@ class TorrentSession internal constructor(
     private val pieces = mutableMapOf<Int, CID>()
     private val storeMutex = Mutex()
     private val priorities = MutableStateFlow<Map<Int, Int>>(emptyMap())
-    private val admission = Mutex()
-    private val termination = Mutex()
     private data class PieceWork(val index: Int, val reply: CompletableDeferred<ByteArray>)
     private val work = Channel<PieceWork>(16)
     private var worker: Job? = null
@@ -54,7 +52,6 @@ class TorrentSession internal constructor(
     private var downloaded = 0L
     private var uploaded = 0L
     @kotlin.concurrent.Volatile private var paused = false
-    @kotlin.concurrent.Volatile private var closed = false
     private val failures = MutableStateFlow<String?>(null)
     val lastFailure: StateFlow<String?> = failures.asStateFlow()
     private val observations = MutableStateFlow(TorrentStats(infoHash, TorrentState.CHECKING, 0, 0, 0, 0, 0, 0, 0, 0))
@@ -98,7 +95,7 @@ class TorrentSession internal constructor(
         if (urls.isNotEmpty()) tracker = scope.launch {
             var event = TrackerEvent.STARTED
             var completionAnnounced = false
-            while (isActive && !closed) {
+            while (isActive) {
                 var interval = 30000L
                 for (url in urls) {
                     try {
@@ -133,7 +130,7 @@ class TorrentSession internal constructor(
         require(peers.size <= 4096)
         val admitted = mutableListOf<Deferred<Unit>>()
         peerMutex.withLock {
-            check(!closed) { "Torrent session closed" }
+            check(!work.isClosedForSend) { "Torrent session closed" }
             connections.entries.removeAll { it.value.isCompleted && it.value.isCancelled }
             for (address in peers.distinct()) {
                 val existing = connections[address]
@@ -161,7 +158,7 @@ class TorrentSession internal constructor(
     }
 
     internal suspend fun accept(stream: PeerStream, handshake: ByteArray) {
-        check(!closed)
+        check(!work.isClosedForSend)
         peerMutex.withLock { check(peers.value.size < 64) { "Torrent peer limit" } }
         attach(stream, handshake)
     }
@@ -198,7 +195,7 @@ class TorrentSession internal constructor(
                 peer.handler.send(PeerWireMessage.Unchoke)
                 peer.handler.send(PeerWireMessage.Interested)
                 peerMutex.withLock {
-                    check(!closed); check(peers.value.size < 64) { "Torrent peer limit" }
+                    check(!work.isClosedForSend); check(peers.value.size < 64) { "Torrent peer limit" }
                     peers.value = peers.value + peer
                 }
                 observationMutex.withLock { observe() }
@@ -233,7 +230,7 @@ class TorrentSession internal constructor(
         val file = awaitMetadata()
         require(pieceIndex in 0 until file.numPieces)
         val reply = CompletableDeferred<ByteArray>()
-        admission.withLock { check(!closed); work.send(PieceWork(pieceIndex, reply)) }
+        work.send(PieceWork(pieceIndex, reply))
         return reply.await()
     }
     private suspend fun fetchPiece(index: Int): ByteArray = withTimeout(120000) {
@@ -341,7 +338,8 @@ class TorrentSession internal constructor(
     }
     override suspend fun setPiecePriority(pieceIndex: Int, priority: Int) {
         require(pieceIndex in 0 until numPieces && priority in 0..2)
-        admission.withLock { check(!closed); priorities.value = priorities.value + (pieceIndex to priority) }
+        check(!work.isClosedForSend) { "Torrent session closed" }
+        priorities.update { it + (pieceIndex to priority) }
     }
     fun pause() { paused = true }
     fun resume() { paused = false }
@@ -354,31 +352,30 @@ class TorrentSession internal constructor(
         val seconds = maxOf(1L, started.elapsedNow().inWholeSeconds)
         val connected = peers.value
         observations.value = TorrentStats(infoHash,
-            if (closed) TorrentState.STOPPED else if (metadata.value == null) TorrentState.CHECKING
+            if (work.isClosedForSend) TorrentState.STOPPED else if (metadata.value == null) TorrentState.CHECKING
             else if (local == numPieces) TorrentState.SEEDING else TorrentState.DOWNLOADING,
             connected.size, connected.size, downloaded, uploaded, downloaded / seconds, uploaded / seconds,
             if (metadata.value == null) 0 else if (numPieces == 0) 1000 else (local.toLong() * 1000 / numPieces).toInt(),
             connected.count { peer -> (0 until numPieces).all { peer.handler.peerState.value.hasPiece(it) } })
         onObservation()
     }
+    /** Repeatable: peers, uTP and the owner each close once. */
     suspend fun close() = withContext(NonCancellable) {
-        termination.withLock {
-            admission.withLock { if (closed) return@withContext; closed = true; work.close() }
-            tracker?.cancelAndJoin(); discovery?.join()
-            peerMutex.withLock { connections.values.toList() }.joinAll()
-            worker?.join()
-            var failure: Throwable? = null
-            for (peer in peers.value) try { peer.close() } catch (error: Throwable) {
-                if (failure == null) failure = error else failure.addSuppressed(error)
-            }
-            peers.value = emptyList()
-            try { utp.close() } catch (error: Throwable) {
-                if (failure == null) failure = error else failure.addSuppressed(error)
-            }
-            owner.complete(); owner.join()
-            observationMutex.withLock { observe() }
-            failure?.let { throw it }
+        work.close()
+        tracker?.cancelAndJoin(); discovery?.join()
+        peerMutex.withLock { connections.values.toList() }.joinAll()
+        worker?.join()
+        var failure: Throwable? = null
+        for (peer in peers.value) try { peer.close() } catch (error: Throwable) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
         }
+        peers.value = emptyList()
+        try { utp.close() } catch (error: Throwable) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
+        }
+        owner.complete(); owner.join()
+        observationMutex.withLock { observe() }
+        failure?.let { throw it }
     }
 }
 
@@ -398,9 +395,9 @@ internal class TorrentPeer(
     val handler = PeerWireHandler(hash, file?.numPieces ?: 0, { requireNotNull(file).pieceLength(it) },
         stream::write, scope, metadata = file?.infoBytes(), serveBlock = serveBlock, serveHashes = serveHashes)
     private var reader: Job? = null
-    private val termination = Mutex()
+    /** Completes when the reader or [close] claims cleanup; [stopped] settles once that cleanup ends. */
+    val closing: CompletableJob = Job()
     private val stopped = CompletableDeferred<Unit>()
-    private var closing = false
     @kotlin.concurrent.Volatile var failure: Throwable? = null
         private set
 
@@ -426,7 +423,7 @@ internal class TorrentPeer(
                 if (cause !is CancellationException) failure = cause
             } finally {
                 withContext(NonCancellable) {
-                    if (claimClose()) finish(fromReader = true)
+                    if (closing.complete()) finish(fromReader = true)
                 }
             }
         }
@@ -439,10 +436,6 @@ internal class TorrentPeer(
         handler.installMetadata(file.infoBytes())
         if (file.numPieces > 0) handler.configurePieces(file.numPieces, file::pieceLength)
         if (handler.peerState.value.handshake?.extensions == true) handler.send(PeerExtensions.handshake(file.infoBytes().size))
-    }
-
-    private suspend fun claimClose(): Boolean = termination.withLock {
-        if (closing) false else { closing = true; true }
     }
 
     /** Reader-owned cleanup cannot join its own owner; an external close joins after settlement. */
@@ -466,7 +459,7 @@ internal class TorrentPeer(
     }
 
     suspend fun close() = withContext(NonCancellable) {
-        if (claimClose()) finish(fromReader = false)
+        if (closing.complete()) finish(fromReader = false)
         try { stopped.await() } finally { owner.complete(); owner.join() }
     }
 }

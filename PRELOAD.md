@@ -330,6 +330,15 @@ completion. This file is the implementation contract.
 - do not invent paradigm -- first-time nouns/verbs are typeo's when no intro is specific
 - conversational verbs /nouns/adjectives have no place in code naming
 
+## Lifecycle — the Job and the Channel are the lifecycle
+- An element is `CoroutineContext.Element` with `companion object Key : CoroutineContext.Key<T>`; the Key is the factory and returns only an opened element. `AsyncContextKey` and `AsyncContextElement` are retired: never extend, import, recreate or rename them.
+- No lifecycle enum or flag (`ElementState`, CREATED/OPEN/ACTIVE/DRAINING/CLOSED, `started`, `running`) and no Mutex guarding one. Admission stopped is `input.isClosedForSend`; completion is the supervisor `Job`. A renamed, sealed or `final` wrapper over the same states is the same violation.
+- Admission is the channel send. Never check a state and then act on it.
+- Drain: close the input, the worker empties it, join the worker, complete and join the supervisor. Hard cancellation is the parent-failure path only.
+- A submitted uring op is a child Job of the supervisor, completed by its CQE, so join waits on the kernel.
+- Enums remain only where their values decide domain outcomes.
+- Existing users of the retired types are debt being paid down, not precedent to copy.
+
 ## Build hygiene — no rug pull
 - The debt-ratchet exclusion files (`gradle/*-target-debt.excludes`) are the
   rug pull: hiding code from a compile is forbidden. No excluded compiles, no

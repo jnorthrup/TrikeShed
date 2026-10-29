@@ -6,7 +6,10 @@ import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.UringOp.Companion.UringSubmission
 import borg.trikeshed.userspace.openUserspaceChannelBackend
 import borg.trikeshed.userspace.reactor.Interest
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
@@ -14,8 +17,11 @@ import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 /** Readiness is a one-shot POLL_ADD CQE; persistent interests rearm after delivery. */
-class JvmReactorOperations(val synchronization: Synchronization = Synchronization.MONITOR) : AsyncContextElement(), ReactorOperations {
+class JvmReactorOperations(val synchronization: Synchronization = Synchronization.MONITOR) : ReactorOperations, Drain {
     override val key get() = ReactorOperations.Key
+    val supervisor: CompletableJob = SupervisorJob()
+    /** Completes when drain begins; register and poll refuse after it. */
+    val admission: CompletableJob = Job(supervisor)
     private val lock = synchronization.lock()
 
     private val watchFacade = FunctionalUringFacade(64, openUserspaceChannelBackend(64))
@@ -35,7 +41,7 @@ class JvmReactorOperations(val synchronization: Synchronization = Synchronizatio
     }
 
     override fun register(fd: Int, interests: Set<Interest>, userData: Long) = synchronize(lock) {
-        check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+        check(admission.isActive) { "Reactor is draining or closed" }
         if (interests.isEmpty()) {
             deregister(fd)
             return@synchronize
@@ -98,11 +104,11 @@ class JvmReactorOperations(val synchronization: Synchronization = Synchronizatio
     }
 
     override suspend fun poll(timeout: Duration): List<ReactorSignal> {
-        check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+        check(admission.isActive) { "Reactor is draining or closed" }
         val started = TimeSource.Monotonic.markNow()
         while (true) {
             val (ready, change) = synchronize(lock) {
-                check(state < ElementState.DRAINING) { "Reactor is draining or closed" }
+                check(admission.isActive) { "Reactor is draining or closed" }
                 collect()
                 if (signals.isEmpty()) {
                     for (fd in watches.keys) if (fd !in tokens.values) submitWatch(fd)
@@ -127,12 +133,8 @@ class JvmReactorOperations(val synchronization: Synchronization = Synchronizatio
     }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        synchronize(lock) {
-            if (state == ElementState.CLOSED) return@withContext
-            state = ElementState.DRAINING
-            changed()
-        }
-        try {
+        // The first caller owns the teardown; any later caller joins its completion.
+        if (synchronize(lock) { admission.complete().also { if (it) changed() } }) try {
             for (fd in synchronize(lock) { watches.keys.toIntArray() }) deregister(fd)
             watchFacade.closeNow()
         } finally {
@@ -142,10 +144,9 @@ class JvmReactorOperations(val synchronization: Synchronization = Synchronizatio
                 signals.clear()
             }
             supervisor.complete()
-            supervisor.join()
-            synchronize(lock) { state = ElementState.CLOSED }
         }
+        supervisor.join()
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

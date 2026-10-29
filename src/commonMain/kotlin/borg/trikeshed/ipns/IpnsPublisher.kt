@@ -1,7 +1,8 @@
 package borg.trikeshed.ipns
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -16,8 +17,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.selects.onTimeout
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.coroutines.CoroutineContext
@@ -50,9 +49,12 @@ class IpnsPublisher(
     private val context: CoroutineContext,
     val policy: IpnsPublicationPolicy = IpnsPublicationPolicy(),
     private val now: () -> Instant = { Clock.System.now() },
-) : AsyncContextElement(parentJob = context[Job]) {
+) : CoroutineContext.Element, Drain {
     companion object Key : CoroutineContext.Key<IpnsPublisher>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(context[Job])
+    /** Completes once [drain] has closed the journal. */
+    val closed: CompletableJob = Job()
     val name: IpnsName get() = journal.identity.name
     val identity: IpnsKeyPair get() = journal.identity
     val latest: IpnsRecord? get() = journal.latest
@@ -62,14 +64,12 @@ class IpnsPublisher(
         private set
     private class Request(val value: String?, val reply: CompletableDeferred<IpnsPublishReport>)
     private val requests = Channel<Request>(16)
+    /** Closed once, by the first [drain]; the worker stops its schedule when it closes. */
     private val stop = Channel<Unit>(Channel.CONFLATED)
-    private val admission = Mutex()
-    private val termination = Mutex()
     private var worker: Job? = null
 
-    override suspend fun open() = admission.withLock {
-        check(state == ElementState.CREATED) { "IPNS publisher already opened" }
-        state = ElementState.OPEN
+    suspend fun open() {
+        check(worker == null && !requests.isClosedForSend) { "IPNS publisher already opened" }
         worker = CoroutineScope(context + supervisor + this + crypto).launch(start = CoroutineStart.UNDISPATCHED) {
             var interval = if (journal.latest == null) policy.republishInterval else 1.milliseconds
             try {
@@ -79,7 +79,7 @@ class IpnsPublisher(
                     onTimeout(interval.inWholeMilliseconds) {
                         Request(null, CompletableDeferred())
                     }
-                    stop.onReceive { null }
+                    stop.onReceiveCatching { null }
                 } ?: break
                 try {
                     val report = execute(request.value)
@@ -109,7 +109,6 @@ class IpnsPublisher(
                 }
             }
         }
-        state = ElementState.ACTIVE
     }
 
     suspend fun publish(value: String): IpnsPublishReport = submit(value)
@@ -117,11 +116,9 @@ class IpnsPublisher(
     suspend fun republish(): IpnsPublishReport = submit(null)
 
     private suspend fun submit(value: String?): IpnsPublishReport {
+        check(worker != null) { "IPNS publisher is not accepting work" }
         val reply = CompletableDeferred<IpnsPublishReport>()
-        admission.withLock {
-            check(state == ElementState.ACTIVE) { "IPNS publisher is not accepting work" }
-            requests.send(Request(value, reply))
-        }
+        requests.send(Request(value, reply))
         return reply.await()
     }
 
@@ -143,19 +140,13 @@ class IpnsPublisher(
     }
 
     override suspend fun drain() = withContext(NonCancellable) {
-        termination.withLock {
-            if (state == ElementState.CLOSED) return@withLock
-            admission.withLock {
-                state = ElementState.DRAINING
-                requests.close()
-                stop.trySend(Unit)
-            }
-            worker?.join()
-            supervisor.complete()
-            supervisor.join()
-            try { journal.close() } finally { state = ElementState.CLOSED }
-        }
+        if (!stop.close()) return@withContext closed.join()
+        requests.close()
+        worker?.join()
+        supervisor.complete()
+        supervisor.join()
+        try { journal.close() } finally { closed.complete() }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

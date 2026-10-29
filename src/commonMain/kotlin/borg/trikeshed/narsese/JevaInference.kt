@@ -7,6 +7,7 @@
 package borg.trikeshed.narsese
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.common.Files
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.parse.jsonOf
 import borg.trikeshed.parse.yaml.parse as yamlOf
@@ -31,9 +32,9 @@ class JevaDeadline(val timeoutMs: Long, val phase: String, clock: TimeSource = T
 
 /** One serial inference owner: mapped checkpoint, causal text backbone and factorized decision memory. */
 class JevaInference(
-    val weights: JevaWeights,
+    val weights: JevaTensors,
     val tokenizer: JevaTokenizer,
-    val backbone: JevaBackbone,
+    val backbone: JevaEncoder,
     val model: JevaModel,
     val config: JevaConfig,
     val identity: String,
@@ -106,8 +107,39 @@ class JevaInference(
         failure?.let { throw it }
     }
 
+    /** Releases the head and the device session together. */
+    private class DeviceTensors(val head: JevaHeadTensors, val session: EncoderSession) : JevaTensors by head {
+        override fun close() { try { head.close() } finally { session.close() } }
+    }
+
     companion object {
         const val VERSION = "kotlin-common-f32-2"
+        const val DEVICE_VERSION = "device-f32-1"
+
+        /** The device lane: backbone from [encoders], head from `head.pt`, tokenizer beside the device weights, no Python. */
+        fun loadDevice(config: JevaConfig, encoders: EncoderOperations): JevaInference {
+            val directory = config.model
+            val configuration = Files.readString("$directory/config.yaml")
+            val settings = requireNotNull(yamlOf(configuration)["model"] as? Map<*, *>) { "Jeva config requires model mapping" }
+            val tokenizerText = Files.readString("$directory/backbone_mlx/tokenizer.json")
+            val headBytes = Files.readAllBytes("$directory/head.pt")
+            val session = encoders.open("$directory/backbone_mlx")
+            try {
+                val tokenizer = JevaTokenizer.parse(tokenizerText)
+                val head = JevaHeadTensors(JevaHead.parse(headBytes))
+                val decision = JevaDecision(JevaDecisionConfig.from(settings), head::get, JevaMatrix(session.matrix))
+                val model = JevaModel(session.hiddenSize, JevaPooling.of(settings["pooling"] as? String ?: "last"), decision, head::get)
+                val identity = config.model + "@" + DEVICE_VERSION + ":" + ContentId.of(jsonOf(mapOf(
+                    "runtime" to session.identity, "config" to ContentId.of(configuration.encodeToByteArray()).hex,
+                    "head" to ContentId.of(headBytes).hex, "tokenizer" to ContentId.of(tokenizerText.encodeToByteArray()).hex,
+                    "state_limit" to config.maxStateLength, "option_limit" to config.maxOptionLength,
+                )).encodeToByteArray()).hex
+                return JevaInference(DeviceTensors(head, session), tokenizer, session, model, config, identity)
+            } catch (failure: Throwable) {
+                try { session.close() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
+                throw failure
+            }
+        }
 
         fun load(config: JevaConfig, files: FileOperations, matrices: MatrixOperations? = null,
                  channels: (String) -> FileChannel): JevaInference {

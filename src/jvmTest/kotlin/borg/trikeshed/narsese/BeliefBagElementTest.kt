@@ -1,6 +1,5 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.couch.isam.JvmDurableAppendLog
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
@@ -79,7 +78,7 @@ class BeliefBagElementTest {
     fun mintReviseSupersedeFold() = runBlocking {
         val bag = BeliefBagElement(capacity = 16)
         bag.open()
-        assertEquals(ElementState.ACTIVE, bag.state)
+        assertTrue(bag.worker != null && bag.supervisor.isActive)
         bag.intake.send(BeliefIntake.Mint(signal(42L), BudgetCoord(0.8f, 0.5f, 0.5f)))
         bag.intake.send(BeliefIntake.Mint(signal(42L), BudgetCoord(0.8f, 0.5f, 0.5f)))
         bag.settle()
@@ -87,7 +86,7 @@ class BeliefBagElementTest {
         val entry = bag.snapshot().values.single()
         assertEquals(Nal.UNIT, entry.evidence.positive, "one observation minted twice counts once")
         bag.drain()
-        assertEquals(ElementState.CLOSED, bag.state, "full lifecycle must reach CLOSED")
+        assertTrue(bag.supervisor.isCompleted, "full lifecycle must reach CLOSED")
     }
 
     @Test

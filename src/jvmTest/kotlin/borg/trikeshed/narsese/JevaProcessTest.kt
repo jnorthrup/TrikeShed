@@ -210,7 +210,7 @@ class JevaProcessTest {
             assertEquals(first["answers"], reloaded["answers"])
             assertNotNull(element.process)
             assertEquals(listOf("load", "load"), File(config.source, "loads.log").readLines())
-            assertTrue(element.accepting)
+            assertTrue(element.admission.isActive)
         } finally { element.drain() }
         assertNull(element.process)
         assertTrue(element.supervisor.isCompleted)

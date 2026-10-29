@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.concurrent.atomics.ExperimentalAtomicApi::class)
-
 package borg.trikeshed.kernel
 
 import borg.trikeshed.lib.*
@@ -7,7 +5,6 @@ import borg.trikeshed.userspace.nio.process.KernelSeat
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -24,7 +21,6 @@ class KernelElement(
 
     private val supervisor = SupervisorJob(requireNotNull(context[Job]) { "Kernel requires an owning Job" }.also { it.ensureActive() })
     private val context = context + supervisor + this
-    private val accepting = AtomicBoolean(true)
     private val admission = Mutex()
     private val handles = mutableMapOf<KernelId, KernelLifecycle>()
 
@@ -35,7 +31,7 @@ class KernelElement(
         capacity: Int = parallelism,
         pointcut: KernelPointcut? = null,
     ): KernelSeat = admission.withLock {
-        check(accepting.load() && supervisor.isActive) { "Kernel is draining" }
+        check(supervisor.isActive) { "Kernel is draining" }
         check(id !in handles) { "Kernel lifecycle identity already seated: ${id.value}" }
         require(parentId == null || capability == KernelCapability.COMPUTE) {
             "A child kernel cannot seat $capability"
@@ -45,7 +41,7 @@ class KernelElement(
     }
 
     suspend fun child(id: KernelId): KernelElement = admission.withLock {
-        check(accepting.load() && supervisor.isActive) { "Kernel is draining" }
+        check(supervisor.isActive) { "Kernel is draining" }
         check(id !in handles) { "Kernel lifecycle identity already seated: ${id.value}" }
         KernelElement(context, id, this.id).also { handles[id] = it }
     }
@@ -61,7 +57,6 @@ class KernelElement(
     }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        accepting.store(false)
         var failure: Throwable? = null
         admission.withLock {
             for (handle in handles.values) {
@@ -71,9 +66,10 @@ class KernelElement(
                 }
             }
             handles.clear()
+            // A completing supervisor is still active: join it before seat and child observe the refusal.
+            supervisor.complete()
+            supervisor.join()
         }
-        supervisor.complete()
-        supervisor.join()
         failure?.let { throw it }
     }
 }

@@ -12,6 +12,7 @@ import borg.trikeshed.userspace.nio.ebpf.UringEbpfContext
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfPhase
 import borg.trikeshed.userspace.nio.ebpf.UringEbpfProgram
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -127,20 +128,22 @@ public class FunctionalUringFacade(
     private val completions = ArrayDeque<SelectionResult>()
     private val submitPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.SUBMIT }
     private val completionPrograms = ebpfPrograms.filter { it.phase == UringEbpfPhase.COMPLETE }
-    private var closed = false
-    private var closing = false
+    /** Completes when the backend has closed; a failed backend close leaves it active for a later drain. */
+    private val closed: CompletableJob = Job()
     private var closeFailure: Throwable? = null
     private val batches = HashMap<Long, Batch>()
     private val admission = Mutex()
     private val execution = Mutex()
     // The bound counts SQEs across batches, submitted effects and unreaped CQEs.
+    // Closing it stops admission for scoped and compatibility rings alike.
     private val input = Queue<Batch>(entries)
     private var capacityChanged = CompletableDeferred<Unit>()
     private val outstanding = HashSet<Long>()
     private var active = 0
     private val drained = CompletableDeferred<Unit>()
     private var termination = CompletableDeferred<Result<Unit>>()
-    private var cleanupStarted = false
+    /** Claimed by the first drain of a compatibility ring, which performs its cleanup. */
+    private val cleanup: CompletableJob = Job()
     private var abortFailure: Throwable? = null
     private val supervisor = scope?.let { SupervisorJob(it.coroutineContext[Job]) }
 
@@ -287,7 +290,7 @@ public class FunctionalUringFacade(
      * Throws if the queue is full or if the op is a rejected xattr channel.
      */
     fun enqueue(submission: UringSubmission) = synchronous {
-        check(!closing) { "Uring is draining or closed" }
+        check(!input.isClosedForSend) { "Uring is draining or closed" }
         check(supervisor == null) { "Use batchEnqueue on a scoped uring" }
         require(submission.opcode !in REJECTED_OPS) {
             "xattr ops are deterministically rejected to close covert signaling channels: ${submission.opcode}"
@@ -361,7 +364,7 @@ public class FunctionalUringFacade(
         val batchSubmissions = Array(submissions.size) { submissions[it] }.toSeries()
         currentCoroutineContext().ensureActive()
         if (batchSubmissions.size == 0) {
-            admission.withLock { check(!closing) { "Uring is draining or closed" } }
+            check(!input.isClosedForSend) { "Uring is draining or closed" }
             return 0 j { error("empty completion queue") }
         }
         if (supervisor == null) {
@@ -376,7 +379,7 @@ public class FunctionalUringFacade(
                 withContext(NonCancellable) {
                     admission.withLock {
                         active--
-                        if (closing && active == 0) drained.complete(Unit)
+                        if (input.isClosedForSend && active == 0) drained.complete(Unit)
                     }
                 }
             }
@@ -421,7 +424,6 @@ public class FunctionalUringFacade(
             admission.withLock {
                 if (inFlight.isNotEmpty()) {
                     abortFailure = failure
-                    closing = true
                     input.close()
                     capacityChanged.complete(Unit)
                 }
@@ -434,7 +436,7 @@ public class FunctionalUringFacade(
     suspend fun awaitCompletions() {
         val waiting = admission.withLock {
             check(supervisor == null) { "A scoped uring owns its completion waiter" }
-            !closed && completions.isEmpty() && inFlight.isNotEmpty()
+            !closed.isCompleted && completions.isEmpty() && inFlight.isNotEmpty()
         }
         if (waiting) backend.awaitCompletions()
     }
@@ -442,7 +444,7 @@ public class FunctionalUringFacade(
     /** Submit the prepared queue and suspend until every entry has completed. */
     suspend fun submitAwait(): Series<UringCompletion> {
         val batch = synchronous {
-            check(!closing) { "Uring is draining or closed" }
+            check(!input.isClosedForSend) { "Uring is draining or closed" }
             pending.toTypedArray().toSeries().also { submissions ->
                 pending.clear()
                 for (i in 0 until submissions.size) outstanding.add(submissions[i].userData)
@@ -459,14 +461,14 @@ public class FunctionalUringFacade(
             withContext(NonCancellable) {
                 admission.withLock {
                     active--
-                    if (closing && active == 0) drained.complete(Unit)
+                    if (input.isClosedForSend && active == 0) drained.complete(Unit)
                 }
             }
         }
     }
 
     fun submit(): Int = synchronous {
-        check(!closing) { "Uring is draining or closed" }
+        check(!input.isClosedForSend) { "Uring is draining or closed" }
         submitPending()
     }
 
@@ -492,7 +494,6 @@ public class FunctionalUringFacade(
             // already received and account for each remaining admission exactly once.
             // Deferred effects still need cancellation/reaping during failed-ring cleanup.
             abortFailure = failure
-            closing = true
             input.close()
             capacityChanged.complete(Unit)
             for (submission in submissions) {
@@ -564,7 +565,6 @@ public class FunctionalUringFacade(
 
     fun closeNow() = synchronous {
         check(supervisor == null && active == 0) { "suspend drain() is required for active or scoped uring" }
-        closing = true
         input.close()
         capacityChanged.complete(Unit)
         try {
@@ -575,7 +575,7 @@ public class FunctionalUringFacade(
     }
 
     private fun closeBackend() {
-        if (!closed) {
+        if (!closed.isCompleted) {
             if (inFlight.isNotEmpty()) {
                 if (abortFailure != null) backend.cancelPending()
                 while (inFlight.isNotEmpty()) {
@@ -584,7 +584,7 @@ public class FunctionalUringFacade(
             }
             try {
                 backend.close()
-                closed = true
+                closed.complete()
                 closeFailure = null
             } catch (failure: Throwable) {
                 closeFailure = failure
@@ -594,22 +594,19 @@ public class FunctionalUringFacade(
     }
 
     private suspend fun stopAdmission() = admission.withLock {
-        closing = true
         input.close()
         capacityChanged.complete(Unit)
         if (active == 0) drained.complete(Unit)
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        val (outcome, cleanup) = admission.withLock {
-            val retry = termination.isCompleted && !closed
+        val (outcome, perform) = admission.withLock {
+            val retry = termination.isCompleted && !closed.isCompleted
             if (retry) termination = CompletableDeferred()
-            val perform = retry || (consumer == null && !cleanupStarted)
-            cleanupStarted = true
-            termination to perform
+            termination to (retry || (consumer == null && cleanup.complete()))
         }
         stopAdmission()
-        if (cleanup) {
+        if (perform) {
             if (consumer != null) finish(outcome, cancel = true)
             else {
                 val result = runCatching {
@@ -695,7 +692,7 @@ public class FunctionalUringFacade(
         while (true) {
             val changed = admission.withLock {
                 currentCoroutineContext().ensureActive()
-                check(!closing && supervisor?.isActive != false) { "Uring is draining or closed" }
+                check(!input.isClosedForSend && supervisor?.isActive != false) { "Uring is draining or closed" }
                 checkIdentities(submissions)
                 if (occupancy() + submissions.size <= entries) {
                     reserve(submissions)

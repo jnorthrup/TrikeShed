@@ -165,8 +165,8 @@ class JevaInferenceTest {
             assertEquals(released, element.release())
             assertNull(element.inference)
             assertEquals(mapped, mappings.mapped)
-            assertTrue(element.accepting && element.supervisor.isActive)
-            assertTrue(curator.accepting && curator.supervisor.isActive)
+            assertTrue(element.admission.isActive && element.supervisor.isActive)
+            assertTrue(!curator.input.isClosed() && curator.supervisor.isActive)
             assertTrue(curator in element.dependents)
 
             val answer = CompletableDeferred<Map<String, Any?>>()

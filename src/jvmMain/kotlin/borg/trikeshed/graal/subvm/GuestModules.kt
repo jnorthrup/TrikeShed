@@ -1,6 +1,7 @@
 package borg.trikeshed.graal.subvm
 
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import borg.trikeshed.vm.GuestModuleEntry
 import borg.trikeshed.vm.GuestModuleLayout
 import borg.trikeshed.vm.GuestModuleManifest
@@ -53,11 +54,11 @@ object GuestModules {
     /** Module names currently mounted in this process. */
     fun mounted(): List<String> = mounts.mounted()
 
-    /** Lifecycle of the mount table: OPEN until [closeAll], then DRAINING and CLOSED. */
-    fun lifecycle(): ElementState = mounts.lifecycle()
+    /** Completes once [closeAll] has closed every mounted classpath. */
+    val closed: Job get() = mounts.closed
 
     /**
-     * Release every mounted classpath. After this the mount table is CLOSED, so a later mount is
+     * Release every mounted classpath. After this the mount table is closed, so a later mount is
      * refused rather than silently retained; mounting during shutdown is a leak.
      */
     fun closeAll() = mounts.closeAll()
@@ -209,16 +210,14 @@ object GuestModules {
         private val lock = Any()
         private val loaders = LinkedHashMap<String, URLClassLoader>()
 
-        @Volatile
-        private var state: ElementState = ElementState.OPEN
+        /** Completes after [closeAll] has closed every loader; mounts refuse after it. */
+        val closed: CompletableJob = Job()
 
         fun mounted(): List<String> = synchronized(lock) { loaders.keys.sorted() }
 
-        fun lifecycle(): ElementState = state
-
         fun loader(module: String, create: () -> URLClassLoader): URLClassLoader = synchronized(lock) {
-            check(state == ElementState.OPEN) {
-                "guest module mounts are ${state.name.lowercase()} - restart before mounting '$module'"
+            check(!closed.isCompleted) {
+                "guest module mounts are closed - restart before mounting '$module'"
             }
             loaders[module]?.let { return it }
             val loader = create()
@@ -227,12 +226,11 @@ object GuestModules {
         }
 
         fun closeAll(): Unit = synchronized(lock) {
-            if (state == ElementState.CLOSED) return
-            state = ElementState.DRAINING
+            if (closed.isCompleted) return
             val current = loaders.values.toList().asReversed()
             loaders.clear()
             for (loader in current) runCatching { loader.close() }
-            state = ElementState.CLOSED
+            closed.complete()
         }
     }
 }

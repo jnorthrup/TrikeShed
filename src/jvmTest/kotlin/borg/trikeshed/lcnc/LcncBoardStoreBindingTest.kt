@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.context.ElementState
+import kotlin.test.assertTrue
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.kanban.BoardApply
 import borg.trikeshed.kanban.BoardCol
@@ -91,8 +91,8 @@ class LcncBoardStoreBindingTest {
             assertSheets("caller", withContext(caller) { sheets.run(node, emptyMap()) })
             assertSheets("host", sheets.run(node, emptyMap()))
             assertNull(currentCoroutineContext()[BoardStoreElement.Key])
-            assertEquals(ElementState.ACTIVE, host.state)
-            assertEquals(ElementState.ACTIVE, caller.state)
+            assertTrue(host.supervisor.isActive)
+            assertTrue(caller.supervisor.isActive)
         }
     }
 
@@ -147,8 +147,8 @@ class LcncBoardStoreBindingTest {
             assertEquals(1, run("kanban.import", mapOf("text" to "- Imported host card"))["imported"])
             assertEquals(2, host.cards().size)
             assertEquals(2, caller.cards().size)
-            assertEquals(ElementState.ACTIVE, host.state)
-            assertEquals(ElementState.ACTIVE, caller.state)
+            assertTrue(host.supervisor.isActive)
+            assertTrue(caller.supervisor.isActive)
             submit(host, "host-after")
             submit(caller, "caller-after")
         }

@@ -1,7 +1,6 @@
 package borg.trikeshed.torrent
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.view
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -9,6 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.selects.selectUnbiased
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
@@ -78,14 +78,15 @@ class PeerWireHandler(
     metadata: ByteArray? = null,
     private val serveBlock: (suspend (PeerWireMessage.Request) -> ByteArray?)? = null,
     private val serveHashes: (suspend (PeerHashRange) -> ByteArray?)? = null,
-) : AsyncContextElement(parentJob = peerHandlerParent(scope, expectedInfoHash, pieceCount, expectedPeerId, metadata)) {
+) : CoroutineContext.Element, Drain {
     companion object Key : CoroutineContext.Key<PeerWireHandler>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(peerHandlerParent(scope, expectedInfoHash, pieceCount, expectedPeerId, metadata))
     private val context = scope.coroutineContext + supervisor + this
-    private val admission = Mutex()
-    private val termination = Mutex()
     private val metadataRequest = Mutex()
     private val commands = Channel<Command<*>>(32)
+    /** Upload completions; the worker serves them until every upload admitted before [commands] closed finishes. */
+    private val uploadCommands = Channel<Command<*>>(32)
     private var worker: Job? = null
     private val framer = PeerWireFramer(expectedInfoHash.wireBytes, expectedPeerId)
     private val handshakeReply = CompletableDeferred<PeerHandshake>()
@@ -118,26 +119,37 @@ class PeerWireHandler(
             }
         }
     }
-    override suspend fun open() = admission.withLock {
-        check(state == ElementState.CREATED)
+    suspend fun open() {
+        check(worker == null && !commands.isClosedForSend)
         supervisor.ensureActive()
-        state = ElementState.OPEN
         worker = CoroutineScope(context).launch(start = CoroutineStart.UNDISPATCHED) {
-            try { for (command in commands) command.execute() }
-            finally {
+            try {
+                while (true) {
+                    val command = selectUnbiased<Command<*>?> {
+                        commands.onReceiveCatching { it.getOrNull() }
+                        uploadCommands.onReceive { it }
+                    } ?: break
+                    command.execute()
+                }
+                // Admission is closed: uploads admitted before it still transmit through this worker.
+                val admitted = uploads.values.toList() + hashUploads
+                launch { admitted.joinAll(); uploadCommands.close() }
+                for (command in uploadCommands) command.execute()
+            } finally {
                 val failure = CancellationException("Peer wire closed")
                 commands.close(failure)
+                uploadCommands.close(failure)
                 failPending(failure)
                 while (true) (commands.tryReceive().getOrNull() ?: break).reply.completeExceptionally(failure)
+                while (true) (uploadCommands.tryReceive().getOrNull() ?: break).reply.completeExceptionally(failure)
             }
         }
-        state = ElementState.ACTIVE
     }
     private suspend fun <T> call(internal: Boolean = false, action: suspend () -> T): T {
         val reply = CompletableDeferred<T>()
-        if (internal) commands.send(Command(action, reply))
-        else admission.withLock {
-            check(state == ElementState.ACTIVE) { "Peer wire is not accepting work" }
+        if (internal) uploadCommands.send(Command(action, reply))
+        else {
+            check(worker != null) { "Peer wire is not accepting work" }
             commands.send(Command(action, reply))
         }
         return reply.await()
@@ -211,7 +223,7 @@ class PeerWireHandler(
             }
         } finally {
             withContext(NonCancellable) {
-                if (state == ElementState.ACTIVE) runCatching { call {
+                runCatching { call {
                     if (pending[block] === reply) {
                         pending.remove(block)
                         rememberCancelled(block)
@@ -237,7 +249,7 @@ class PeerWireHandler(
                     accumulator.accept(piece, reply.await())
                 } finally {
                     withContext(NonCancellable) {
-                        if (state == ElementState.ACTIVE) runCatching { call { if (metadataPending[piece] === reply) metadataPending.remove(piece) } }
+                        runCatching { call { if (metadataPending[piece] === reply) metadataPending.remove(piece) } }
                     }
                 }
             }
@@ -257,7 +269,7 @@ class PeerWireHandler(
                 reply.await()
             }
         } finally {
-            withContext(NonCancellable) { if (state == ElementState.ACTIVE) runCatching { call { hashPending.removeAll { it.second === reply } } } }
+            withContext(NonCancellable) { runCatching { call { hashPending.removeAll { it.second === reply } } } }
         }
     }
     private fun validateIndex(index: Int) { require(count > 0 && index in 0 until count) { "Peer piece index out of range" } }
@@ -432,22 +444,10 @@ class PeerWireHandler(
         }
     }
     override suspend fun drain() = withContext(NonCancellable) {
-        termination.withLock {
-            if (state == ElementState.CLOSED) return@withLock
-            admission.withLock { state = ElementState.DRAINING }
-            try {
-                if (worker?.isActive == true) {
-                    val active = call(internal = true) { uploads.values.toList() + hashUploads.toList() }
-                    active.joinAll()
-                }
-            } finally {
-                commands.close()
-                worker?.join()
-                failPending(CancellationException("Peer wire drained"))
-                supervisor.complete(); supervisor.join()
-                state = ElementState.CLOSED
-            }
-        }
+        commands.close()
+        worker?.join()
+        failPending(CancellationException("Peer wire drained"))
+        supervisor.complete(); supervisor.join()
     }
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

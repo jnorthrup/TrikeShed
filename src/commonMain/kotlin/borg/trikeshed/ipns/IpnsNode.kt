@@ -1,13 +1,12 @@
 package borg.trikeshed.ipns
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.Series
 import borg.trikeshed.reactor.TlsCodecBackend
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /** Daemon-owned IPNS request admission, durable publisher and uring transport. */
@@ -20,17 +19,18 @@ class IpnsNode(
     private val limits: IpnsDhtLimits = IpnsDhtLimits(),
     private val policy: IpnsPublicationPolicy = IpnsPublicationPolicy(),
     private val leaseOwner: IpnsLeaseOwner? = null,
-) : AsyncContextElement(parentJob = context[Job]) {
+) : CoroutineContext.Element, Drain {
     init { requireNotNull(context[Job]) { "IPNS node requires an owning Job" } }
     companion object Key : CoroutineContext.Key<IpnsNode>
+    val supervisor: CompletableJob = SupervisorJob(context[Job])
     override val key: CoroutineContext.Key<*> get() = Key
-    private val admission = Mutex()
-    private val termination = Mutex()
     private val requests = Channel<Request<*>>(16)
     private var journal: IpnsJournal? = null
     private var dialer: UringLibp2pDialer? = null
     private var publisher: IpnsPublisher? = null
     private var worker: Job? = null
+    /** True from [open] until [drain] closes request admission. */
+    val accepting: Boolean get() = worker != null && !requests.isClosedForSend
 
     private class Request<T>(val action: suspend () -> T, val result: CompletableDeferred<T>) {
         suspend fun execute() {
@@ -42,9 +42,8 @@ class IpnsNode(
         }
     }
 
-    override suspend fun open() = termination.withLock {
-        check(state == ElementState.CREATED) { "IPNS node already opened" }
-        state = ElementState.OPEN
+    suspend fun open() {
+        check(worker == null && !requests.isClosedForSend) { "IPNS node already opened" }
         try {
             supervisor.ensureActive()
             val store = IpnsJournal.open(journalPath, crypto, leaseOwner).also { journal = it }
@@ -67,7 +66,6 @@ class IpnsNode(
                     }
                 }
             supervisor.ensureActive()
-            state = ElementState.ACTIVE
         } catch (failure: Throwable) {
             try { release() } catch (cleanup: Throwable) { failure.addSuppressed(cleanup) }
             throw failure
@@ -77,23 +75,17 @@ class IpnsNode(
     /** Accepted requests finish under the node owner even if the HTTP client disconnects. */
     suspend fun <T> request(action: suspend () -> T): T {
         currentCoroutineContext().ensureActive()
+        check(worker != null) { "IPNS node is not accepting requests" }
         val result = CompletableDeferred<T>()
-        admission.withLock {
-            check(state == ElementState.ACTIVE) { "IPNS node is not accepting requests" }
-            requests.send(Request(action, result))
-        }
+        requests.send(Request(action, result))
         return result.await()
     }
 
-    override suspend fun drain() = withContext(NonCancellable) {
-        termination.withLock { if (state != ElementState.CLOSED) release() }
-    }
+    /** Repeatable: the publisher, journal and dialer each release once. */
+    override suspend fun drain() { release() }
 
     private suspend fun release() = withContext(NonCancellable) {
-        admission.withLock {
-            state = ElementState.DRAINING
-            requests.close()
-        }
+        requests.close()
         var failure: Throwable? = null
         suspend fun finish(action: suspend () -> Unit) {
             try { action() } catch (next: Throwable) {
@@ -105,9 +97,8 @@ class IpnsNode(
         finish { dialer?.close() }
         supervisor.complete()
         supervisor.join()
-        state = ElementState.CLOSED
         failure?.let { throw it }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

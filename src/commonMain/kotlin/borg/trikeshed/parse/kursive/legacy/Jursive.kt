@@ -182,13 +182,21 @@ infix fun <A, B> KursiveParser<A>.then(other: KursiveParser<B>): KursiveParser<J
     }
 
 /** Line-chunking: split input into lines, apply parser to each, return Series of results */
-fun <T> KursiveParser<T>.parseLines(text: String): Series<Join<T, NarsiveTrace>> {
-    val lines = text.lineSequence().filter { it.isNotBlank() }.toList()
-    return lines.size j { index -> parse(lines[index])!! }
+fun <T> KursiveParser<T>.parseLines(text: Series<Char>): Series<Join<T, NarsiveTrace>> {
+    val rows = text / '\n'
+    fun line(i: Int): Series<Char> = rows[i].let { if (it.size > 0 && it[it.size - 1] == '\r') it[0 until it.size - 1] else it }
+    val kept = IntArray(rows.size)
+    var n = 0
+    for (i in 0 until rows.size) {
+        val l = line(i)
+        var k = 0
+        while (k < l.size && l[k].isWhitespace()) k++
+        if (k < l.size) kept[n++] = i
+    }
+    return n j { index -> parse(line(kept[index]))!! }
 }
 
-fun <T> KursiveParser<T>.parseLines(text: Series<Char>): Series<Join<T, NarsiveTrace>> =
-    parseLines(text.asString())
+fun <T> KursiveParser<T>.parseLines(text: String): Series<Join<T, NarsiveTrace>> = parseLines(text.toSeries())
 
 fun <T> KursiveParser<T>.parse(input: String): Join<T, NarsiveTrace>? = parse(JursiveCharSeries(input))
 

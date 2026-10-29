@@ -1,5 +1,8 @@
 package borg.trikeshed.kanban
 
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.parse.reify
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.parse.jsonOf
@@ -8,9 +11,7 @@ import borg.trikeshed.causal.CausalEdgeKind
 import borg.trikeshed.causal.CausalGraph
 import borg.trikeshed.causal.CausalGraphBuilder
 import borg.trikeshed.causal.EventPayload
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.JobCommand
@@ -183,9 +184,10 @@ class BoardStoreElement(
     private val cas: CasStore,
     private val clock: () -> Long = { 0L },
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
-    companion object Key : AsyncContextKey<BoardStoreElement>() {
+    companion object Key : CoroutineContext.Key<BoardStoreElement> {
         /** Owner prefix that marks a card as claimed by the daemon's brain (`claim:brain`). */
         const val CLAIM_OWNER_PREFIX: String = "claim:"
 
@@ -270,9 +272,8 @@ class BoardStoreElement(
 
     // ── lifecycle ─────────────────────────────────────────────────────
 
-    override suspend fun open() {
+    suspend fun open() {
         check(failure == null) { "Board store failed; create a new owner before reopening" }
-        super.open()
         try {
             wal?.replay { seq, record ->
                 check(seq > sequence) { "Non-monotonic board WAL sequence: $seq after $sequence" }
@@ -304,7 +305,6 @@ class BoardStoreElement(
             throw caught
         }
         published = Published(rows, sequence, receipts)
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
         consumer = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             for (first in intake) {
                 // Group commit: drain whatever queued behind the first, ONE flush for the batch.
@@ -342,13 +342,16 @@ class BoardStoreElement(
     override suspend fun drain() {
         intake.close()
         consumer?.join()
-        super.drain()
+        if (supervisor.complete()) {
+            supervisor.join()
+            close()
+        } else supervisor.join()
     }
 
-    override suspend fun close() {
+    suspend fun close() {
         intake.close()
         consumer?.join()
-        try { wal?.close() } finally { super.close() }
+        try { wal?.close() } finally { supervisor.cancelAndJoin() }
     }
 
     // ── the spine (single consumer; also the replay path with durable=false) ──

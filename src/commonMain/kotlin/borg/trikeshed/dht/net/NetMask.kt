@@ -46,6 +46,17 @@ interface NetMask<P : Comparable<P>> {
         }
     }
 
+    /** Unsigned numeric XOR order. Population count is a bucket coordinate, not proximity. */
+    fun compareDistance(target: P, left: P, right: P): Int = ops.run {
+        val a = xor(target, left)
+        val b = xor(target, right)
+        val high = shl(one, bits - 1)
+        val zero = xor(one, one)
+        val aHigh = and(a, high).compareTo(zero) != 0
+        val bHigh = and(b, high).compareTo(zero) != 0
+        if (aHigh != bHigh) { if (aHigh) 1 else -1 } else a.compareTo(b)
+    }
+
     companion object {
         /**
          * for federating data, you want an unbounded DHT full of volunteers.

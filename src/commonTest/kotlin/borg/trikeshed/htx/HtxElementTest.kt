@@ -1,6 +1,5 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.toList
 import borg.trikeshed.userspace.FanoutEvent
@@ -49,7 +48,7 @@ class HtxElementTest {
     }
 }
 
-private class RecordingHtxFrameSubscriber : AsyncContextElement(), HtxFrameSubscriber {
+private class RecordingHtxFrameSubscriber : kotlin.coroutines.CoroutineContext.Element, HtxFrameSubscriber {
     companion object Key : kotlin.coroutines.CoroutineContext.Key<RecordingHtxFrameSubscriber>
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
 
@@ -60,7 +59,7 @@ private class RecordingHtxFrameSubscriber : AsyncContextElement(), HtxFrameSubsc
     }
 }
 
-private class RecordingHtxFanoutSubscriber : AsyncContextElement(), FanoutEventSubscriber {
+private class RecordingHtxFanoutSubscriber : kotlin.coroutines.CoroutineContext.Element, FanoutEventSubscriber {
     companion object Key : kotlin.coroutines.CoroutineContext.Key<RecordingHtxFanoutSubscriber>
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
 

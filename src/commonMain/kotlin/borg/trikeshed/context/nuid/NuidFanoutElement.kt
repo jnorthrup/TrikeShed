@@ -1,8 +1,6 @@
 package borg.trikeshed.context.nuid
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlin.concurrent.Volatile
@@ -58,9 +56,12 @@ class NuidFanoutElement(
     parentJob: Job? = null,
     val escalationBudget: Int = 3,
     private val capacity: Int = 64,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<NuidFanoutElement>()
-    override val key: AsyncContextKey<NuidFanoutElement> = Key
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<NuidFanoutElement>
+    override val key: CoroutineContext.Key<NuidFanoutElement> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at [stopAdmission]; afterwards only live invocations register or claim. */
+    val stopped: CompletableJob = Job()
 
     class WorkgroupSlot(val workgroup: Workgroup, capacity: Int = 64) {
         private data class Admission(val claim: Claim, val completion: CompletableDeferred<Any?>?)
@@ -191,7 +192,7 @@ class NuidFanoutElement(
     private val invocations = mutableMapOf<Long, NuidInvocation>()
     private val dependencies = mutableMapOf<Long, Join<Claim, Twin<String>>>()
     @Volatile private var registry: Series<WorkgroupSlot> = emptySeriesOf()
-    private val mutableSubscribers = mutableListOf<AsyncContextElement>()
+    private val mutableSubscribers = mutableListOf<CoroutineContext.Element>()
     private val dispatches = Channel.buffered<Dispatch>(capacity)
     private var executionScope: CoroutineScope? = null
     private var dispatcher: Job? = null
@@ -199,9 +200,9 @@ class NuidFanoutElement(
 
     init { require(escalationBudget >= 0); require(capacity > 0) }
 
-    override val fanoutSubscribers: List<AsyncContextElement> get() = mutableSubscribers.toList()
-    fun subscribe(observer: AsyncContextElement) { mutableSubscribers.add(observer) }
-    fun unsubscribe(observer: AsyncContextElement) { mutableSubscribers.remove(observer) }
+    val fanoutSubscribers: List<CoroutineContext.Element> get() = mutableSubscribers.toList()
+    fun subscribe(observer: CoroutineContext.Element) { mutableSubscribers.add(observer) }
+    fun unsubscribe(observer: CoroutineContext.Element) { mutableSubscribers.remove(observer) }
 
     /** Admission registrations are idempotent by name. Handler registration never replaces a binding. */
     suspend fun register(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)? = null) =
@@ -214,7 +215,7 @@ class NuidFanoutElement(
     private suspend fun registerSlot(workgroup: Workgroup, execute: (suspend (Claim) -> Any?)?, cleanup: suspend (Claim) -> Unit) {
         val invocation = currentCoroutineContext()[NuidAuthority]?.invocation
         registryMutex.withLock {
-            if (state == ElementState.DRAINING && invocation != null && invocations[invocation.value.b.claimId] === invocation)
+            if (stopped.isCompleted && invocation != null && invocations[invocation.value.b.claimId] === invocation)
                 check(supervisor.isActive && !dispatches.isClosed()) { "NUID workgroup owner is closed" }
             else checkAccepting()
             check(workgroup.name !in retiring) { "${workgroup.name}: workgroup is draining" }
@@ -264,11 +265,10 @@ class NuidFanoutElement(
         }
     }
 
-    override suspend fun open() {
+    suspend fun open() {
         registryMutex.withLock {
-            if (state != ElementState.CREATED) return
+            if (executionScope != null || stopped.isCompleted) return
             supervisor.ensureActive()
-            state = ElementState.OPEN
             val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
             executionScope = scope
             dispatcher = scope.launch(CoroutineName("nuid-dispatch"), start = CoroutineStart.UNDISPATCHED) {
@@ -318,14 +318,10 @@ class NuidFanoutElement(
         }
     }
 
-    suspend fun activate() = registryMutex.withLock {
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-    }
-
     /** Stop external ingress; accepted handlers retain dependency admission until they finish. */
     suspend fun stopAdmission(): Unit = withContext(NonCancellable) {
         registryMutex.withLock {
-            if (state < ElementState.DRAINING) state = ElementState.DRAINING
+            stopped.complete()
             if (ownedClaims.isEmpty()) dispatches.close()
             if (dispatcher == null) supervisor.complete()
         }
@@ -348,11 +344,10 @@ class NuidFanoutElement(
             invocations.clear()
             dependencies.clear()
             mutableSubscribers.clear()
-            state = ElementState.CLOSED
         }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 
     /**
      * Prefix containment determines eligibility. The deepest eligible prefix is nearest;
@@ -366,7 +361,7 @@ class NuidFanoutElement(
         val dispatch = registryMutex.withLock {
             val parent = invocation?.takeIf { invocations[it.value.b.claimId] === it }
             if (parent == null) checkAccepting()
-            else check(state < ElementState.CLOSED && supervisor.isActive) { "NUID workgroup owner is closed" }
+            else check(supervisor.isActive) { "NUID workgroup owner is closed" }
             do { claimCounter = if (claimCounter == Long.MAX_VALUE) 0L else claimCounter + 1L }
             while (claimCounter in ownedClaims)
             val candidates = workgroups.filter {
@@ -393,7 +388,7 @@ class NuidFanoutElement(
             invocations.remove(claim.claimId)
             dependencies.remove(claim.claimId)
             dependencies.entries.removeAll { it.value.a === claim }
-            if (state == ElementState.DRAINING && ownedClaims.isEmpty()) dispatches.close()
+            if (stopped.isCompleted && ownedClaims.isEmpty()) dispatches.close()
         }
     }
 
@@ -441,8 +436,8 @@ class NuidFanoutElement(
     }
 
     private fun checkAccepting() {
-        check((state == ElementState.OPEN || state == ElementState.ACTIVE) && supervisor.isActive) {
-            "NuidFanoutElement must be OPEN/ACTIVE (was $state)"
+        check(executionScope != null && !stopped.isCompleted && supervisor.isActive) {
+            "NuidFanoutElement is not accepting"
         }
     }
 

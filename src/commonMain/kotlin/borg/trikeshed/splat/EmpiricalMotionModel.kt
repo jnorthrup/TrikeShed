@@ -33,15 +33,4 @@ class EmpiricalMotionModel<Context, T> : SplatModel<Context, T> {
     }
 
     fun emptySplat(): Splat<T> = 0.j { _ -> error("empty") }
-
-    fun asStateAdapter(): SplatModel<borg.trikeshed.context.ElementState, borg.trikeshed.context.ElementState> {
-        val self = this
-        return object : SplatModel<borg.trikeshed.context.ElementState, borg.trikeshed.context.ElementState> {
-            override fun predict(context: borg.trikeshed.context.ElementState): Splat<borg.trikeshed.context.ElementState> {
-                // Return an empty splat since the types don't necessarily match the generic context
-                // This is a bridge for the ChannelRunner to supply a model
-                return 0.j { _ -> error("empty") }
-            }
-        }
-    }
 }

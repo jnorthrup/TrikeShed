@@ -1,9 +1,9 @@
 package borg.trikeshed.couch
 
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.collections.mutableSeriesOf
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.cascade.Count
 import borg.trikeshed.lib.cascade.Trie
 import borg.trikeshed.lib.cascade.cascadeWorthCaching
@@ -35,9 +35,10 @@ class IncrementalViewElement(
     val definition: ViewDefinition,
     private val log: (String) -> Unit = {},
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<IncrementalViewElement>()
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<IncrementalViewElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private var cancelSubscription: (() -> Unit)? = null
@@ -65,9 +66,8 @@ class IncrementalViewElement(
     /** Cached emitted-row count beneath a string prefix. */
     fun cachedPrefixCount(prefix: String): Int = trie[prefix.length j { i: Int -> prefix[i] }]
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
+    suspend fun open() {
+        if (cancelSubscription != null || wake.isClosedForSend) return
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
         CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             try {
@@ -76,7 +76,6 @@ class IncrementalViewElement(
             } catch (_: kotlinx.coroutines.CancellationException) {
             }
         }
-        state = ElementState.ACTIVE
     }
 
     /** Pull only frames after the persisted checkpoint. Safe and idempotent. */
@@ -176,10 +175,10 @@ class IncrementalViewElement(
         }
     }
 
-    override suspend fun close() {
+    suspend fun close() {
         cancelSubscription?.invoke()
         cancelSubscription = null
         wake.close()
-        super.close()
+        supervisor.cancelAndJoin()
     }
 }

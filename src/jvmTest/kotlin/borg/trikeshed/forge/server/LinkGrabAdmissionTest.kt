@@ -39,7 +39,7 @@ class LinkGrabAdmissionTest {
                 return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request,
                     response = reply), htxFrames())
             }
-        }).also { it.open() }
+        })
         val admitted = mutableListOf<String>()
         scopes.onDocument = { project, id, _ -> admitted.add("$project/$id") }
         val links = LinkGrab(nodes, corpus, scopes, coroutineContext + htx)

@@ -2,9 +2,10 @@
 
 package borg.trikeshed.litebike
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import kotlin.coroutines.CoroutineContext
+import borg.trikeshed.context.Drain
 import borg.trikeshed.litebike.taxonomy.Protocol
 import borg.trikeshed.litebike.taxonomy.ProtocolMark
 import kotlinx.coroutines.Job
@@ -27,8 +28,8 @@ import kotlinx.coroutines.sync.withLock
  *   pub fn submit_batch(&self) -> io::Result<u64>
  *
  * The Kotlin shape, ported with the existing TrikeShed CCEK plumbing:
- *   - Lifecycle through `AsyncContextElement` like `NuidFanoutElement` and
- *     `HtxElement` (CREATED → OPEN → ACTIVE → DRAINING → CLOSED).
+ *   - Lifecycle through the fanout worker and channel: [open] launches the
+ *     worker, [close] closes the channel and cancels the supervisor.
  *   - Channel slots keyed by the byte-stable `Protocol.id` (Http=1,
  *     Socks5=2, ..., WebSocket=7).
  *   - `accept(bytes: ByteArray)` is the single inbound boundary.
@@ -42,10 +43,13 @@ import kotlinx.coroutines.sync.withLock
 class LitebikeListenerElement(
     parentJob: Job? = null,
     val maxBatch: Int = 64,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<LitebikeListenerElement>()
-    override val key: AsyncContextKey<LitebikeListenerElement> = Key
+    companion object Key : CoroutineContext.Key<LitebikeListenerElement>
+    override val key: CoroutineContext.Key<LitebikeListenerElement> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The fanout worker, launched at [open]. */
+    var worker: Job? = null
 
     /** Inbound wire-level message; the unit of fanout. */
     data class ChannelMessage(
@@ -100,14 +104,14 @@ class LitebikeListenerElement(
 
     /** Map: protocol id (UByte) → slot. One slot per protocol; deterministic IDs. */
     private val registry: MutableMap<UByte, ChannelWorkgroupSlot> = mutableMapOf()
-    private val mutableSubscribers: MutableList<AsyncContextElement> = mutableListOf()
+    private val mutableSubscribers: MutableList<CoroutineContext.Element> = mutableListOf()
     private val fanoutChannel = Channel<LitebikeFanoutEvent>(capacity = maxBatch)
 
-    override val fanoutSubscribers: List<AsyncContextElement>
+    val fanoutSubscribers: List<CoroutineContext.Element>
         get() = mutableSubscribers.toList()
 
-    fun subscribe(observer: AsyncContextElement) { mutableSubscribers.add(observer) }
-    fun unsubscribe(observer: AsyncContextElement) { mutableSubscribers.remove(observer) }
+    fun subscribe(observer: CoroutineContext.Element) { mutableSubscribers.add(observer) }
+    fun unsubscribe(observer: CoroutineContext.Element) { mutableSubscribers.remove(observer) }
 
     /**
      * Register a worker bound to a single protocol. Idempotent on
@@ -116,8 +120,8 @@ class LitebikeListenerElement(
      * `consume_each`).
      */
     suspend fun register(protocol: Protocol): ChannelWorkgroupSlot = registryMutex.withLock {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "LitebikeListenerElement must be OPEN before register() (was $state)"
+        check(worker != null && !fanoutChannel.isClosedForSend) {
+            "LitebikeListenerElement must be open before register()"
         }
         val existing = registry[protocol.id]
         if (existing != null) return@withLock existing
@@ -145,10 +149,9 @@ class LitebikeListenerElement(
 
     // ── lifecycle overrides ───────────────────────────────────────
 
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            state = ElementState.OPEN
-            CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
+    suspend fun open() {
+        if (worker == null && !fanoutChannel.isClosedForSend) {
+            worker = CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
                 for (event in fanoutChannel) {
                     for (subscriber in fanoutSubscribers.toList()) {
                         if (subscriber is LitebikeFanoutEventSink) {
@@ -160,17 +163,15 @@ class LitebikeListenerElement(
         }
     }
 
-    /** Promote OPEN → ACTIVE. */
+    /** Verify the registered slots of an open listener. */
     suspend fun activate() {
-        if (state == ElementState.OPEN) {
-            verifyRegistry()
-            state = ElementState.ACTIVE
-        }
+        if (worker != null && !fanoutChannel.isClosedForSend) verifyRegistry()
     }
 
-    override suspend fun close() {
-        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.CLOSED)) {
-            if (state < ElementState.DRAINING) state = ElementState.DRAINING
+    override suspend fun drain() = close()
+
+    suspend fun close() {
+        if (worker != null && !fanoutChannel.isClosedForSend) {
             supervisor.cancel()
             fanoutChannel.close()
             registryMutex.withLock {
@@ -178,7 +179,6 @@ class LitebikeListenerElement(
                 registry.clear()
                 mutableSubscribers.clear()
             }
-            state = ElementState.CLOSED
         }
     }
 
@@ -220,8 +220,8 @@ class LitebikeListenerElement(
         payload: ByteArray,
         sequenceId: Long,
     ): Boolean {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "LitebikeListenerElement must be OPEN/ACTIVE before accept() (was $state)"
+        check(worker != null && !fanoutChannel.isClosedForSend) {
+            "LitebikeListenerElement must be open before accept()"
         }
         val slot = registry[protocolId] ?: return false
         val proto = Protocol.fromId(protocolId)
@@ -250,8 +250,8 @@ class LitebikeListenerElement(
      * observe inbound protocol traffic.
      */
     suspend fun accept(protocolId: UByte, payload: ByteArray, respond: (suspend (ByteArray) -> Unit)? = null): Boolean {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "LitebikeListenerElement must be OPEN/ACTIVE before accept() (was $state)"
+        check(worker != null && !fanoutChannel.isClosedForSend) {
+            "LitebikeListenerElement must be open before accept()"
         }
         val slot = registry[protocolId] ?: return false
         val proto = Protocol.fromId(protocolId)
@@ -306,8 +306,8 @@ class LitebikeListenerElement(
      *  registered slot. Mirrors litebike's `consume_each` per channel and
      *  stops a slot consumer when [block] returns false or the slot closes. */
     suspend fun fanoutChannels(block: suspend (Protocol, ChannelMessage) -> Boolean) {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "LitebikeListenerElement must be OPEN/ACTIVE before fanoutChannels() (was $state)"
+        check(worker != null && !fanoutChannel.isClosedForSend) {
+            "LitebikeListenerElement must be open before fanoutChannels()"
         }
         val slots = registryMutex.withLock { registry.values.toList() }
         kotlinx.coroutines.coroutineScope {

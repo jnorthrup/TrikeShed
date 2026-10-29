@@ -89,7 +89,7 @@ object MissionCli {
                 bashMissionPlan(source, address, modelAddress)
             }
             if (tasks.view.any { it.payload is ModelWork }) {
-                val keys = borg.trikeshed.agent.keymux.KeyMux { bind("llm.beam.key", borg.trikeshed.agent.keymux.EnvVarSource("BEAM_KEY")) }
+                val keys = borg.trikeshed.agent.keymux.KeyMux { bind("llm.beam.key", borg.trikeshed.agent.keymux.EnvVarSource("REFLECTION_API_KEY")) }
                 val mux = ModelMux(keys) {
                     model("Beam-1.0-501B-A23B", setOf("chat", "tools"),
                         baseUrl = "https://api.reflection.ai/openai/v1", provider = "beam")

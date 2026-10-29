@@ -27,25 +27,39 @@ typealias RowExpr = (RowVec) -> Any?
  */
 fun Series<CharSequence>.ordinalOf(name: CharSequence): Int {
     for (i in 0 until size) if (this[i].contentEquals(name)) return i
-    val suffix = ".$name"
     var found = -1
-    for (i in 0 until size) if (this[i].endsWith(suffix)) {
+    for (i in 0 until size) if (this[i].endsWithDot(name)) {
         require(found < 0) { "column reference \"$name\" is ambiguous" }
         found = i
     }
     if (found >= 0) return found
-    val last = name.toString().substringAfterLast('.', "")
-    if (last.isNotEmpty() && last.length < name.length) for (i in 0 until size) if (this[i].contentEquals(last)) {
-        require(found < 0) { "column reference \"$name\" is ambiguous" }
-        found = i
+    var dot = name.length - 1
+    while (dot >= 0 && name[dot] != '.') dot--
+    if (dot >= 0 && dot + 1 < name.length) {
+        val last = name.window(dot + 1, name.length)
+        for (i in 0 until size) if (this[i].contentEquals(last)) {
+            require(found < 0) { "column reference \"$name\" is ambiguous" }
+            found = i
+        }
     }
     require(found >= 0) { "column \"$name\" does not exist among ${(this α { it.toString() }).view.toList()}" }
     return found
 }
 
+/** [from, to) of this text as a window, no copy. */
+private fun CharSequence.window(from: Int, to: Int): CharSequence = CharSeries(this).subSequence(from, to)
+
+/** Whether this column name ends in `.name`, compared in place. */
+private fun CharSequence.endsWithDot(name: CharSequence): Boolean {
+    val at = length - name.length - 1
+    if (at < 0 || this[at] != '.') return false
+    for (i in name.indices) if (this[at + 1 + i] != name[i]) return false
+    return true
+}
+
 /** Compile against the column [names] of the Cursor whose rows it will read. */
 fun Expr.compile(names: Series<CharSequence>): RowExpr = when (this) {
-    is ColumnRef -> names.ordinalOf(id.asString()).let { ordinal -> { row -> SqlRuntime.cell(row, ordinal) } }
+    is ColumnRef -> names.ordinalOf(CharSeries(id.name)).let { ordinal -> { row -> SqlRuntime.cell(row, ordinal) } }
     is LitExpr -> literal(lit).let { value -> { _ -> value } }
     is BinaryExpr -> op.uppercase().let { op ->
         // A string literal pattern compiles once; any other right side (a column, NULL, a number) takes the row path, which null-propagates.
@@ -140,21 +154,25 @@ fun binary(op: String, left: RowExpr, right: RowExpr): RowExpr = when (op) {
     else -> error("operator $op")
 }
 
-/** SQL `LIKE`: `%` any run, `_` any one character, everything else literal; `ILIKE` under [ignoreCase]. */
 /** `LIKE` as a regex: `%` any run, `_` any one character, and pg's default escape `\\` making the next character literal. */
-fun likeRegex(pattern: String, ignoreCase: Boolean = false): Regex = Regex(buildString {
+fun likeRegex(pattern: CharSequence, ignoreCase: Boolean = false): Regex = Regex(buildString {
     var i = 0
     while (i < pattern.length) {
         val c = pattern[i]
         when {
-            c == '\\' && i + 1 < pattern.length -> { append(Regex.escape(pattern[i + 1].toString())); i++ }
+            c == '\\' && i + 1 < pattern.length -> { appendLiteral(pattern[i + 1]); i++ }
             c == '%' -> append("[\\s\\S]*")
             c == '_' -> append("[\\s\\S]")
-            else -> append(Regex.escape(c.toString()))
+            else -> appendLiteral(c)
         }
         i++
     }
 }, if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet())
+
+private const val REGEX_META = "\\^$.|?*+()[]{}"
+
+/** [c] as a literal regex character: backslash-escaped when it is a metacharacter. */
+private fun StringBuilder.appendLiteral(c: Char) { if (c in REGEX_META) append('\\'); append(c) }
 
 fun integral(value: Any?): Boolean = value is Long || value is Int || value is Short || value is Byte
 
@@ -164,7 +182,14 @@ fun compareCells(left: Any, right: Any): Int = when {
     left is Number && right is Number -> left.toDouble().compareTo(right.toDouble())
     left is String && right is String -> left.compareTo(right)
     left is Boolean && right is Boolean -> left.compareTo(right)
-    else -> scalarText(left).compareTo(scalarText(right))
+    else -> compareText(scalarSpan(left), scalarSpan(right))
+}
+
+/** Lexicographic order of two texts by UTF-16 unit, read in place. */
+private fun compareText(a: CharSequence, b: CharSequence): Int {
+    val n = minOf(a.length, b.length)
+    for (i in 0 until n) if (a[i] != b[i]) return a[i].compareTo(b[i])
+    return a.length.compareTo(b.length)
 }
 
 /** The Confix cell inside [value], parsing JSON text when the cell holds a string. */
@@ -196,19 +221,37 @@ fun navigate(value: Any?, path: Series<borg.trikeshed.parse.confix.JsPathElement
 }
 
 /** A cell as text: Confix containers by their JSON source, scalars by `toString`. */
-fun scalarText(value: Any?): String = confixCellOf(value)?.takeIf { value !is String }
-    ?.let { it.src.spanStr(it.row.open, it.row.close) } ?: value.toString()
+fun scalarText(value: Any?): String = scalarSpan(value).toString()
+
+/** [scalarText] unreified: a container answers a window over its source bytes, anything else its own text. */
+private fun scalarSpan(value: Any?): CharSequence = confixCellOf(value)?.takeIf { value !is String }
+    ?.let { ByteSpan(it.src, it.row.open, it.row.close) } ?: value.toString()
+
+/** The bytes `open..close` of a Confix source read as characters, as [spanStr] reads them, without the copy. */
+private class ByteSpan(val src: Series<Byte>, val open: Int, val close: Int) : CharSequence {
+    override val length: Int get() = if (close < open) 0 else close - open + 1
+    override fun get(index: Int): Char = src[open + index].toInt().toChar()
+    override fun subSequence(startIndex: Int, endIndex: Int): CharSequence = ByteSpan(src, open + startIndex, open + endIndex - 1)
+    override fun toString(): String = src.spanStr(open, close)
+}
+
+/** [text] quoted as an SQL string literal, quotes doubled as it is read. */
+private fun quoted(text: CharSequence): String = buildString(text.length + 2) {
+    append('\'')
+    for (i in 0 until text.length) { if (text[i] == '\'') append('\''); append(text[i]) }
+    append('\'')
+}
 
 /** SQL text of an expression, used to match select-list expressions in ORDER BY and HAVING. */
 fun Expr.render(): String = when (this) {
     is ColumnRef -> id.asString()
     is LitExpr -> when (val lit = lit) {
-        is StringLiteral -> "'" + lit.asString().replace("'", "''") + "'"
+        is StringLiteral -> quoted(lit.value.cs)
         is NumericLiteral -> lit.text ?: renderNumber(lit.value)
         is BooleanLiteral -> if (lit.value) "TRUE" else "FALSE"
         NullLiteral -> "NULL"
         is Identifier -> lit.asString()
-        is CellLiteral -> lit.value?.let { "'" + scalarText(it).replace("'", "''") + "'" } ?: "NULL"
+        is CellLiteral -> lit.value?.let { quoted(scalarSpan(it)) } ?: "NULL"
         else -> error("no SQL text for literal ${lit::class.simpleName}")
     }
     is BinaryExpr -> "(${left.render()} $op ${right.render()})"
@@ -244,22 +287,33 @@ fun plainDecimal(d: Double): String {
     if (!d.isFinite()) return d.toString()
     if (d > -1e15 && d < 1e15 && d.toLong().toDouble() == d) return d.toLong().toString() + ".0"
     val s = d.toString()
-    val neg = s.startsWith("-")
-    val body = if (neg) s.substring(1) else s
-    val e = body.indexOfFirst { it == 'E' || it == 'e' }
-    val mantissa = if (e < 0) body else body.substring(0, e)
-    val exponent = if (e < 0) 0 else body.substring(e + 1).removePrefix("+").toInt()
-    val dot = mantissa.indexOf('.')
-    val digits = mantissa.replace(".", "")
-    val intLen = (if (dot < 0) mantissa.length else dot) + exponent
-    val out = when {
-        intLen <= 0 -> "0." + "0".repeat(-intLen) + digits
-        intLen >= digits.length -> digits + "0".repeat(intLen - digits.length) + ".0"
-        else -> digits.substring(0, intLen) + "." + digits.substring(intLen)
+    val neg = s[0] == '-'
+    val start = if (neg) 1 else 0
+    var e = s.length
+    for (i in start until s.length) if (s[i] == 'E' || s[i] == 'e') { e = i; break }
+    var exponent = 0
+    var j = e + 1
+    val minus = j < s.length && s[j] == '-'
+    if (j < s.length && (s[j] == '+' || minus)) j++
+    while (j < s.length) exponent = exponent * 10 + (s[j++] - '0')
+    if (minus) exponent = -exponent
+    var dot = -1
+    val digits = StringBuilder(e - start)
+    for (i in start until e) if (s[i] == '.') dot = i - start else digits.append(s[i])
+    val intLen = (if (dot < 0) e - start else dot) + exponent
+    val intEnd = maxOf(intLen, 0)
+    var k = 0
+    while (k < intEnd && (if (k < digits.length) digits[k] else '0') == '0') k++
+    // fraction digit f sits at digits[intLen + f]; before the digits it is a zero
+    fun frac(f: Int): Char = if (f + intLen < 0) '0' else digits[f + intLen]
+    var fracEnd = maxOf(digits.length - intLen, 0)
+    while (fracEnd > 0 && frac(fracEnd - 1) == '0') fracEnd--
+    return buildString {
+        if (neg) append('-')
+        if (k == intEnd) append('0') else while (k < intEnd) { append(if (k < digits.length) digits[k] else '0'); k++ }
+        append('.')
+        if (fracEnd == 0) append('0') else for (f in 0 until fracEnd) append(frac(f))
     }
-    val intPart = out.substringBefore('.').trimStart('0').ifEmpty { "0" }
-    val fracPart = out.substringAfter('.').trimEnd('0').ifEmpty { "0" }
-    return (if (neg) "-" else "") + intPart + "." + fracPart
 }
 
 /**
@@ -299,11 +353,11 @@ fun vectorOf(value: Any?): FloatArray? = when (value) {
     is FloatArray -> value
     is DoubleArray -> FloatArray(value.size) { value[it].toFloat() }
     is String -> {
-        val body = value.trim()
-        require(body.startsWith("[") && body.endsWith("]")) { "invalid input syntax for type vector: \"$value\"" }
-        val parts = body.substring(1, body.length - 1).split(',').map { it.trim() }
-        if (parts.size == 1 && parts[0].isEmpty()) FloatArray(0)
-        else FloatArray(parts.size) { i -> parts[i].toFloatOrNull() ?: error("invalid input syntax for type vector: \"$value\"") }
+        val body = trimmed(value)
+        require(body.length >= 2 && body[0] == '[' && body[body.length - 1] == ']') { "invalid input syntax for type vector: \"$value\"" }
+        val parts = body[1 j body.length - 1] / ','
+        if (parts.size == 1 && trimmed(parts[0].cs).length == 0) FloatArray(0)
+        else FloatArray(parts.size) { i -> trimmed(parts[i].cs).asString().toFloatOrNull() ?: error("invalid input syntax for type vector: \"$value\"") }
     }
     else -> {
         val cell = confixCellOf(value)?.takeIf { it.row.tag == IOMemento.IoArray }
@@ -314,21 +368,31 @@ fun vectorOf(value: Any?): FloatArray? = when (value) {
 }
 
 /** An RDF term's spelling: a Turtle literal, an IRI in angle brackets or a blank node. A cast of one that is not a number is NULL, as SPARQL's type error is, not pg's syntax error. */
-fun isRdfTerm(text: String): Boolean = text.startsWith("\"") || text.startsWith("<") || text.startsWith("_:")
+fun isRdfTerm(text: CharSequence): Boolean =
+    text.length > 0 && (text[0] == '"' || text[0] == '<' || (text.length > 1 && text[0] == '_' && text[1] == ':'))
 
-/** A Turtle literal's lexical form — `"3.5"^^<dt>` and `"x"@en` read as `3.5` and `x` — else [text] itself. */
-fun lexicalOf(text: String): String {
-    if (!text.startsWith("\"")) return text
+/** Where a Turtle literal's lexical form ends — the closing quote of `"3.5"^^<dt>` or `"x"@en` — or -1 when [text] is not one. */
+private fun lexicalEnd(text: CharSequence): Int {
+    if (text.length == 0 || text[0] != '"') return -1
     var i = 1
     while (i < text.length) {
         when (text[i]) {
             '\\' -> i += 2
-            '"' -> return text.substring(1, i)
+            '"' -> return i
             else -> i++
         }
     }
-    return text
+    return -1
 }
+
+/** A Turtle literal's lexical form as a window, else [text] itself. */
+fun lexicalOf(text: CharSequence): CharSequence = lexicalEnd(text).let { end -> if (end < 0) text else text.window(1, end) }
+
+/** The same for a String edge (the RDF query parsers want a String back): one substring, no window. */
+fun lexicalOf(text: String): String = lexicalEnd(text).let { end -> if (end < 0) text else text.substring(1, end) }
+
+/** [text] without surrounding whitespace, as a window. */
+private fun trimmed(text: CharSequence): CharSeries = CharSeries(text).trim.slice
 
 /** `value::type`. Integral types answer Long and fractional types Double, as the arithmetic does. */
 fun castTo(value: Any?, type: String): Any? {
@@ -336,19 +400,23 @@ fun castTo(value: Any?, type: String): Any? {
     return when (type) {
         "vector" -> vectorOf(value)
         "int", "integer", "int2", "int4", "int8", "smallint", "bigint", "oid" ->
-            if (value is Number) value.toLong() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toLongOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
+            if (value is Number) value.toLong() else trimmed(scalarSpan(value)).let { t -> trimmed(lexicalOf(t)).asString().toLongOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
         "float", "float4", "float8", "real", "double", "numeric", "decimal" ->
-            if (value is Number) value.toDouble() else scalarText(value).trim().let { t -> lexicalOf(t).trim().toDoubleOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
+            if (value is Number) value.toDouble() else trimmed(scalarSpan(value)).let { t -> trimmed(lexicalOf(t)).asString().toDoubleOrNull() ?: if (isRdfTerm(t)) null else error("invalid input syntax for type $type: \"$value\"") }
         "text", "varchar", "string", "char", "name", "regclass", "regtype", "regnamespace", "regproc" -> scalarText(value)
         "bool", "boolean" -> when (value) {
             is Boolean -> value
             is Number -> value.toDouble() != 0.0
-            else -> when (scalarText(value).trim().lowercase()) {
-                "t", "true", "y", "yes", "on", "1" -> true
-                "f", "false", "n", "no", "off", "0" -> false
-                else -> error("invalid input syntax for type boolean: \"$value\"")
+            else -> trimmed(scalarSpan(value)).let { t ->
+                when {
+                    t.isOneOf("t", "true", "y", "yes", "on", "1") -> true
+                    t.isOneOf("f", "false", "n", "no", "off", "0") -> false
+                    else -> error("invalid input syntax for type boolean: \"$value\"")
+                }
             }
         }
         else -> error("type \"$type\" does not exist")
     }
 }
+
+private fun CharSequence.isOneOf(vararg words: String): Boolean = words.any { it.contentEquals(this, ignoreCase = true) }

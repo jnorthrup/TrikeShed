@@ -1,6 +1,5 @@
 package borg.trikeshed.graal.subvm
 
-import borg.trikeshed.context.ElementState
 import java.io.IOException
 import java.net.URLClassLoader
 import java.nio.file.Files
@@ -33,7 +32,7 @@ class GuestModulesMountTableTest {
 
             assertSame(loader, mounted)
             assertEquals(listOf("probe"), table.mounted())
-            assertEquals(ElementState.OPEN, table.lifecycle())
+            assertTrue(!table.closed.isCompleted)
             assertNotNull(mounted.loadClass("probe.First").getConstructor().newInstance())
             val stream = assertNotNull(
                 mounted.getResourceAsStream("probe/Second.class"),
@@ -42,7 +41,7 @@ class GuestModulesMountTableTest {
 
             table.closeAll()
 
-            assertEquals(ElementState.CLOSED, table.lifecycle())
+            assertTrue(table.closed.isCompleted)
             assertEquals(emptyList(), table.mounted())
             assertFailsWith<IOException> { stream.read() }
             assertFailsWith<ClassNotFoundException> { mounted.loadClass("probe.Second") }
@@ -81,7 +80,7 @@ class GuestModulesMountTableTest {
         val first = Thread { table.closeAll() }
         first.start()
         assertTrue(enteredClose.await(5, TimeUnit.SECONDS), "first close did not enter loader.close")
-        assertEquals(ElementState.DRAINING, table.lifecycle())
+        assertTrue(!table.closed.isCompleted)
         assertTrue(!closeFinished.get(), "loader close finished before release")
 
         val secondFinished = AtomicBoolean(false)
@@ -91,7 +90,7 @@ class GuestModulesMountTableTest {
         }
         second.start()
         Thread.sleep(100)
-        assertEquals(ElementState.DRAINING, table.lifecycle(), "CLOSED published before loader.close completed")
+        assertTrue(!table.closed.isCompleted, "closed published before loader.close completed")
         assertTrue(!secondFinished.get(), "second close should wait for the owning close")
 
         releaseClose.countDown()
@@ -99,7 +98,7 @@ class GuestModulesMountTableTest {
         second.join(5_000)
         assertTrue(closeFinished.get(), "owning close did not finish")
         assertTrue(secondFinished.get(), "second close did not return")
-        assertEquals(ElementState.CLOSED, table.lifecycle())
+        assertTrue(table.closed.isCompleted)
     }
 
     private fun probeJar(root: Path): Path {

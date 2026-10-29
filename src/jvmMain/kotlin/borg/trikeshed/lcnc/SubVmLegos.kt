@@ -172,7 +172,7 @@ object SubVmLegos {
         }
         val root = borg.trikeshed.graal.subvm.GuestModules.root()?.absolutePath ?: ""
         val payload = "{\"root\":\"${root.replace("\\", "\\\\").replace("\"", "\\\"")}\"," +
-            "\"lifecycle\":\"${borg.trikeshed.graal.subvm.GuestModules.lifecycle()}\"," +
+            "\"closed\":${borg.trikeshed.graal.subvm.GuestModules.closed.isCompleted}," +
             "\"modules\":[${rows.joinToString(",")}]}"
         mapOf("modules" to payload, "count" to names.size)
     }

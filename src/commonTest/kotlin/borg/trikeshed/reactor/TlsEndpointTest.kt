@@ -1,6 +1,5 @@
 package borg.trikeshed.reactor
 
-import borg.trikeshed.context.AsyncContextElement
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.toList
@@ -54,7 +53,7 @@ class TlsEndpointTest {
     }
 }
 
-private class RecordingTlsSubscriber : AsyncContextElement(), TlsChannelSubscriber {
+private class RecordingTlsSubscriber : kotlin.coroutines.CoroutineContext.Element, TlsChannelSubscriber {
     companion object Key : kotlin.coroutines.CoroutineContext.Key<RecordingTlsSubscriber>
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
 
@@ -65,7 +64,7 @@ private class RecordingTlsSubscriber : AsyncContextElement(), TlsChannelSubscrib
     }
 }
 
-private class RecordingFanoutSubscriber : AsyncContextElement(), FanoutEventSubscriber {
+private class RecordingFanoutSubscriber : kotlin.coroutines.CoroutineContext.Element, FanoutEventSubscriber {
     companion object Key : kotlin.coroutines.CoroutineContext.Key<RecordingFanoutSubscriber>
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
 

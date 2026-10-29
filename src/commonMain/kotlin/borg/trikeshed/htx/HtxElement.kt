@@ -1,8 +1,6 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -12,7 +10,10 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.FanoutEvent
 import borg.trikeshed.userspace.FanoutEventSubscriber
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlin.coroutines.CoroutineContext
 
@@ -100,27 +101,24 @@ interface HtxRouteService : CoroutineContext.Element {
     ): HtxExchangeResult
 }
 
-object HtxKey : AsyncContextKey<HtxElement>()
+object HtxKey : CoroutineContext.Key<HtxElement>
 
 open class HtxElement(
     val baseUrl: String = "",
     private val routeService: HtxRouteService,
     parentJob: Job? = null,
     private val ownedSupervisor: NioSupervisor? = null,
-    private val ownedRouteService: AsyncContextElement? = null,
-    override val fanoutSubscribers: List<AsyncContextElement> = emptyList(),
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+    private val ownedRouteService: Drain? = null,
+    val fanoutSubscribers: List<CoroutineContext.Element> = emptyList(),
+) : CoroutineContext.Element, Drain {
     override val key: CoroutineContext.Key<*> get() = HtxKey
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private var nextExchangeOrdinal: Long = 1
 
     open suspend fun exchange(
         request: HtxRequest,
     ): HtxExchangeResult {
-        check(state.isAtLeast(ElementState.OPEN)) {
-            "HTX element must be open before request dispatch."
-        }
-
         val normalizedRequest = request.copy(
             target = request.target.copy(
                 requestPath = normalizePath(request.target.requestPath),
@@ -192,14 +190,17 @@ open class HtxElement(
         }
     }
 
-    override suspend fun close() {
-        if (ownedRouteService != null && ownedRouteService.state.isLessThan(ElementState.CLOSED)) {
-            ownedRouteService.close()
-        }
-        if (ownedSupervisor != null && ownedSupervisor.state.isLessThan(ElementState.CLOSED)) {
-            ownedSupervisor.close()
-        }
-        super.close()
+    /** Completes the supervisor once its children finish, then closes. */
+    override suspend fun drain() {
+        supervisor.complete()
+        supervisor.join()
+        close()
+    }
+
+    suspend fun close() {
+        ownedRouteService?.drain()
+        ownedSupervisor?.close()
+        supervisor.cancelAndJoin()
     }
 }
 
@@ -208,14 +209,14 @@ suspend fun openHtxElement(
     routeService: HtxRouteService? = null,
     nioSupervisor: NioSupervisor? = null,
     parentJob: Job? = null,
-    subscribers: List<AsyncContextElement> = emptyList(),
+    subscribers: List<CoroutineContext.Element> = emptyList(),
 ): HtxElement {
     val contextRouteService = currentCoroutineContext()[HtxRouteService.Key]
     val contextSupervisor = currentCoroutineContext()[NioSupervisor.Key]
     val activeSupervisor = nioSupervisor ?: contextSupervisor ?: NioSupervisor()
     val ownsSupervisor = nioSupervisor == null && contextSupervisor == null
 
-    if (activeSupervisor.state == ElementState.CREATED) {
+    if (!activeSupervisor.opened.isCompleted && activeSupervisor.admission.isActive) {
         activeSupervisor.open()
     }
 
@@ -230,7 +231,7 @@ suspend fun openHtxElement(
         parentJob = parentJob,
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
         fanoutSubscribers = subscribers,
-    ).also { it.open() }
+    )
 }
 
 private fun normalizePath(path: String): String =

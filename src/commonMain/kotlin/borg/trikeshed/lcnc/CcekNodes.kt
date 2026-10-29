@@ -251,7 +251,7 @@ data class CcekSeams(
                             "active" to node.isActive,
                             "childScopes" to node.childScopeCount,
                             "markdownProjections" to node.markdownProjectionCount,
-                            "lifecycle" to node.lifecycleState.name,
+                            "closed" to node.supervisor.isCompleted,
                             "subscribers" to node.agentCount,
                         )
                     }
@@ -344,7 +344,7 @@ data class CcekSeams(
             },
             send = { handle, signal ->
                 val n = store.nodes[handle]
-                if (n == null || n.drained) false else {
+                if (n == null || n.drained.isCompleted) false else {
                     if (n.record) n.recorded.add(signal)
                     n.pending.add(signal)
                     n.markdown = (n.markdown.orEmpty() + describe(signal) + "\n")
@@ -374,7 +374,7 @@ data class CcekSeams(
                 store.nodes[handle]?.agents?.map { linkedMapOf<String, Any?>("event" to "Started", "agent" to it) }
                     ?: emptyList()
             },
-            drain = { handle -> store.nodes[handle]?.let { it.drained = true; true } ?: false },
+            drain = { handle -> store.nodes[handle]?.let { it.drained.complete(); true } ?: false },
             forkContext = { parent, role ->
                 val id = "ctx-${store.contexts.size + 1}"
                 val ctx = InMemoryCcekStore.Context(id, role, parent)
@@ -389,9 +389,9 @@ data class CcekSeams(
             vitals = { handle ->
                 store.nodes[handle]?.let { n ->
                     linkedMapOf<String, Any?>(
-                        "active" to !n.drained, "childScopes" to 0,
+                        "active" to !n.drained.isCompleted, "childScopes" to 0,
                         "markdownProjections" to n.markdown.orEmpty().lines().count { it.isNotBlank() },
-                        "lifecycle" to if (n.drained) "CLOSED" else "ACTIVE",
+                        "closed" to n.drained.isCompleted,
                         "subscribers" to n.agents.size,
                     )
                 }
@@ -496,7 +496,8 @@ class InMemoryCcekStore {
         val pending = ArrayList<ForgeSignal>()
         val agents = LinkedHashSet<String>()
         var markdown: String? = null
-        var drained = false
+        /** Completes when ccek.drain reaches this node; sends are refused after it. */
+        val drained: CompletableJob = Job()
         /** The context whose causal-assertion agent this node was choreographed for, if any. */
         var choreographedBy: String? = null
     }
@@ -747,7 +748,7 @@ object CcekNodes {
         "ccek.vitals" to runner { seams, node, inputs ->
             val handle = inputs.port("handle")?.toString() ?: node.params["handle"].orEmpty()
             seams.vitals(handle) ?: mapOf("active" to false, "childScopes" to 0, "markdownProjections" to 0,
-                "lifecycle" to "UNKNOWN", "subscribers" to 0)
+                "closed" to null, "subscribers" to 0)
         },
 
         // Idempotent by title, like incarnate; the handle is the same handle space,

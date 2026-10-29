@@ -37,7 +37,6 @@ class CouchReportServerTest {
     @Test
     fun mapAndReduceBecomeFactsOnTheReportBus() = runTest {
         val report = CouchReportReactorElement()
-        report.open()
 
         ViewServer(report).execute(countView(ReduceFunction.Builtin("_sum")), widgets)
 
@@ -57,7 +56,6 @@ class CouchReportServerTest {
     @Test
     fun aMapOnlyViewReportsEmissionsAndNoReduction() = runTest {
         val report = CouchReportReactorElement()
-        report.open()
         ViewServer(report).execute(countView(), widgets)
         assertEquals(3L, report.reportState.value.mapEmissions)
         assertEquals(0L, report.reportState.value.reductions, "no reducer ⇒ no Reduced fact")
@@ -66,7 +64,6 @@ class CouchReportServerTest {
     @Test
     fun anUnobservedServerStaysSilentAndCostsNothing() = runTest {
         val report = CouchReportReactorElement()
-        report.open()
         // The default server has no element: the same view runs, the bus learns nothing.
         ViewServer().execute(countView(ReduceFunction.Builtin("_sum")), widgets)
         assertEquals(CouchReportState(), report.reportState.value)
@@ -75,7 +72,6 @@ class CouchReportServerTest {
     @Test
     fun bothAskersReportThroughTheRouterMountedElement() = runTest {
         val report = CouchReportReactorElement()
-        report.open()
         val cas = CasStore.inMemory()
         val db = Couch("trikeshed", CouchStoreFactory.casBacked(cas), cas)
         db.put("a", mapOf("type" to "widget", "qty" to 2), null)

@@ -77,7 +77,6 @@ class DocumentCurationWire private constructor(
                 val base = session.baseUrl.trimEnd('/')
                 val destination = mapOf("provider" to (session.model.b.providerTag ?: model),
                     "model" to model, "url" to "$base/chat/completions")
-                session.close()
                 val toolOntology = DocumentCurationToolset.all(
                     buildList {
                         add("available:forge.document.curate=/api/documents")

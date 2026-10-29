@@ -114,14 +114,15 @@ class HtxReactorElementTest {
         val release = CompletableDeferred<Unit>()
         val closed = mutableListOf<Int>()
         val failure = IllegalStateException("provider cleanup failed")
-        fun provider(id: Int) = object : borg.trikeshed.context.AsyncContextElement() {
+        fun provider(id: Int) = object : kotlin.coroutines.CoroutineContext.Element, borg.trikeshed.context.Drain {
             override val key = object : kotlin.coroutines.CoroutineContext.Key<kotlin.coroutines.CoroutineContext.Element> {}
             override suspend fun drain() {
-                if (id == 2) throw failure
-                entered.complete(Unit)
-                release.await()
+                try {
+                    if (id == 2) throw failure
+                    entered.complete(Unit)
+                    release.await()
+                } finally { closed.add(id) }
             }
-            override suspend fun close() { closed.add(id); super.close() }
         }
         val nio = NioSupervisor()
         nio.register(provider(1))
@@ -225,7 +226,7 @@ class HtxReactorElementTest {
         assertEquals(listOf(400), operations.closedDescriptors)
         assertEquals(1, operations.closedHandles)
         element.drain()
-        assertEquals(borg.trikeshed.context.ElementState.CLOSED, element.state)
+        assertTrue(element.supervisor.isCompleted)
     }
 
     @Test
@@ -254,7 +255,7 @@ class HtxReactorElementTest {
             parseHtxRequest("http://example.com/health"),
         )
 
-        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertTrue(routeService.supervisor.isActive)
         assertEquals(HtxExchangeLifecycle.RESPONDED, response.state.lifecycle)
         assertEquals(200, response.state.response?.status)
         assertTrue(channelOperations.recordedRequestText(0).startsWith("GET /health HTTP/1.1\r\n"))
@@ -284,7 +285,7 @@ class HtxReactorElementTest {
             parseHtxRequest("https://example.com/health"),
         )
 
-        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertTrue(routeService.supervisor.isActive)
         assertEquals(HtxExchangeLifecycle.RESPONDED, response.state.lifecycle)
         assertEquals(200, response.state.response?.status)
 
@@ -323,7 +324,7 @@ class HtxReactorElementTest {
         assertEquals(200, response.status)
         assertEquals("ok", response.body.asString())
         assertTrue(channelOperations.recordedRequestText(0).startsWith("GET /health HTTP/1.1\r\n"))
-        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertTrue(routeService.supervisor.isActive)
 
         element.close()
         supervisor.close()
@@ -368,7 +369,7 @@ class HtxReactorElementTest {
         assertTrue(wire.contains("client-hello"))
         assertTrue(wire.contains("enc:GET /health HTTP/1.1"))
         assertTrue(wire.contains("close-notify"))
-        assertEquals(borg.trikeshed.context.ElementState.ACTIVE, routeService.state)
+        assertTrue(routeService.supervisor.isActive)
 
         element.close()
         supervisor.close()

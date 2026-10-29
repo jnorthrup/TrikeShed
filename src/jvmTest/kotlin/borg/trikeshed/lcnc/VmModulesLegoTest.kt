@@ -94,7 +94,7 @@ class VmModulesLegoTest {
     fun theAuditNamesWhereItLookedAndTheMountLifecycle() {
         val obj = run(emptyMap())
         assertTrue(obj["root"].toString().endsWith("utils/subvm"), "root should name the modules dir: $obj")
-        assertEquals("OPEN", obj["lifecycle"], "mount supervisor should be OPEN while the daemon runs")
+        assertEquals(false, obj["closed"], "mount table should be open while the daemon runs")
     }
 
     private fun assertFalse(b: Boolean, m: String) = assertTrue(!b, m)

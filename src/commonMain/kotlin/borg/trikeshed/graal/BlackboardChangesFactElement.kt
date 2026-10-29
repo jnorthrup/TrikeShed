@@ -9,9 +9,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.Volatile
-import kotlin.concurrent.atomics.AtomicBoolean
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
@@ -62,7 +59,6 @@ import kotlin.coroutines.CoroutineContext
  * projection remains a failed barrier/close, never a successful watermark.
  * No clock (stamps come from the board), no sockets.
  */
-@OptIn(ExperimentalAtomicApi::class)
 class BlackboardChangesFactElement(
     private val blackboard: ConfixBlackboard,
     private val rete: ReteNetwork,
@@ -70,8 +66,10 @@ class BlackboardChangesFactElement(
     /** Only keys accepted here become facts (default: everything but the rule-firing outputs, see [BlackboardNamespaces]). */
     private val admit: (String) -> Boolean = BlackboardNamespaces::admitByDefault,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<BlackboardChangesFactElement>() {
+) : CoroutineContext.Element, Drain {
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+
+    companion object Key : CoroutineContext.Key<BlackboardChangesFactElement> {
         /** Field a scalar or opaque value lands in. */
         const val VALUE = "value"
         /** Prefix for a Map entry whose name collides with a reserved plane field. */
@@ -136,13 +134,10 @@ class BlackboardChangesFactElement(
     private data class Progress(val revision: Long = -1, val failure: Throwable? = null, val closed: Boolean = false)
 
     private val wake = Channel.buffered<Unit>(1)
-    private val lifecycle = Mutex()
     private val projection = Mutex()
     private val progress = MutableStateFlow(Progress())
-    private val accepting = AtomicBoolean(true)
     private var collector: Job? = null
     private var consumer: Job? = null
-    @Volatile private var unsubscribing = false
     private val known = HashMap<String, Known>()
 
     /** Successfully completed fact operations, not downstream action receipts. */
@@ -163,18 +158,18 @@ class BlackboardChangesFactElement(
         }
     }
 
-    override suspend fun open() = lifecycle.withLock {
-        if (state != ElementState.CREATED) return@withLock
-        check(accepting.load()) { "Blackboard projection admission stopped" }
+    suspend fun open() {
+        if (collector != null || supervisor.isCompleted) return
+        check(!wake.isClosed()) { "Blackboard projection admission stopped" }
         progress.value.failure?.let { throw it }
         supervisor.ensureActive()
-        state = ElementState.OPEN
         val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
         collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 blackboard.revisions.collect { wake.kChannel.trySend(Unit) }
             } catch (cause: Throwable) {
-                if (!unsubscribing) {
+                // Drain closes wake before it detaches this reader.
+                if (!wake.isClosed()) {
                     failed(cause)
                     wake.close()
                 }
@@ -190,7 +185,6 @@ class BlackboardChangesFactElement(
                 progress.update { it.copy(closed = true) }
             }
         }
-        state = ElementState.ACTIVE
     }
 
     /** Serial explicit pass, also usable before open; stopped owners reject new work. */
@@ -198,7 +192,8 @@ class BlackboardChangesFactElement(
         checkCallback()
         currentCoroutineContext().ensureActive()
         projection.withLock {
-            check(accepting.load()) {
+            progress.value.failure?.let { throw it }
+            check(!wake.isClosed()) {
                 "Blackboard projection admission stopped"
             }
             // The admitted pass belongs to this supervisor, not its caller's waiting job.
@@ -259,41 +254,28 @@ class BlackboardChangesFactElement(
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
         checkCallback()
-        accepting.store(false)
-        lifecycle.withLock {
-            if (state == ElementState.CLOSED) {
-                progress.value.failure?.let { throw it }
-                return@withLock
+        var failure = progress.value.failure
+        suspend fun release(action: suspend () -> Unit) {
+            try { action() }
+            catch (cause: Throwable) {
+                val first = failure
+                if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
             }
-            val revision = blackboard.snapshot().revision
-            state = ElementState.DRAINING
-            var failure = progress.value.failure
-            suspend fun release(action: suspend () -> Unit) {
-                try { action() }
-                catch (cause: Throwable) {
-                    val first = failure
-                    if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
-                }
-            }
-            if (consumer != null) {
-                // Also covers a writer between its atomic publication and revision notification.
-                wake.kChannel.trySend(Unit)
-                release { awaitRevision(revision) }
-            }
-            unsubscribing = true
-            release { collector?.cancelAndJoin() }
-            wake.close()
-            release { consumer?.join() }
-            release { projection.withLock { } }
-            supervisor.complete()
-            release { supervisor.join() }
-            progress.value.failure?.let { if (failure == null) failure = it }
-            failure?.let { failed(it) }
-            progress.update { it.copy(closed = true) }
-            state = ElementState.CLOSED
-            failure?.let { throw it }
         }
+        // The consumer's last pass reads a snapshot no older than this call, then wake's close ends it.
+        // Also covers a writer between its atomic publication and revision notification.
+        wake.kChannel.trySend(Unit)
+        wake.close()
+        release { consumer?.join() }
+        release { collector?.cancelAndJoin() }
+        release { projection.withLock { } }
+        supervisor.complete()
+        release { supervisor.join() }
+        progress.value.failure?.let { if (failure == null) failure = it }
+        failure?.let { failed(it) }
+        progress.update { it.copy(closed = true) }
+        failure?.let { throw it }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

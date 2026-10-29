@@ -59,7 +59,7 @@ class RelaxServiceE2eTest {
         val port = ServerSocket(0).use { it.localPort }
         val cas = CasStore.inMemory()
         val database = Couch(db, CouchStoreFactory.casBacked(cas), cas)
-        val report = CouchReportReactorElement().also { it.open() }
+        val report = CouchReportReactorElement()
         val router = CouchWireRouter(database, "projects/trikeshed/", report = report)
         val worlds = BtrfsWorldStore.ofFiles(InMemoryFileOperations(cwd = "/"), "/vm-worlds")
         val teleport = VmWorldTeleport(database, worlds)

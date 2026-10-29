@@ -3,8 +3,6 @@ package borg.trikeshed.narsese
 import borg.trikeshed.lib.*
 import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 data class BertSenseLabel(val source: String, val sense: String, val token: BertToken, val table: String? = null)
@@ -26,8 +24,6 @@ class BertSenseElement(
     private class Read(val queries: Series<BertSenseQuery>, val labels: Series<BertSenseLabel>,
                        val reply: CompletableDeferred<Result<BertSenseReading>>)
     private val input = Channel.buffered<Read>(capacity)
-    private val admission = Mutex()
-    private var accepting = true
     private var encoder: BertEncoder? = null
     private val vectors = LinkedHashMap<BertToken, BertVector>()
     private val completion = CompletableDeferred<Result<Unit>>()
@@ -66,15 +62,12 @@ class BertSenseElement(
     suspend fun read(queries: Series<BertSenseQuery>, labels: Series<BertSenseLabel>): BertSenseReading {
         require(queries.size <= 128) { "A BERT sense batch contains at most 128 targets" }
         val reply = CompletableDeferred<Result<BertSenseReading>>()
-        admission.withLock {
-            check(accepting) { "BERT sense lane is draining" }
-            input.send(Read(queries, labels, reply)).getOrThrow()
-        }
+        input.send(Read(queries, labels, reply)).getOrThrow()
         return reply.await().getOrThrow()
     }
 
     suspend fun drain() = withContext(NonCancellable) {
-        admission.withLock { accepting = false; input.close() }
+        input.close()
         worker.join(); supervisor.join()
         completion.await().getOrThrow()
     }

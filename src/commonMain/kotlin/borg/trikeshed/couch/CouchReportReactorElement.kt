@@ -1,8 +1,5 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -61,8 +58,8 @@ data class CouchReportState(
 /** CCEK owner for report execution and pointcut observation. */
 class CouchReportReactorElement(
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<CouchReportReactorElement>()
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<CouchReportReactorElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -75,13 +72,6 @@ class CouchReportReactorElement(
 
     private val _reportState = MutableStateFlow(CouchReportState())
     val reportState: StateFlow<CouchReportState> = _reportState.asStateFlow()
-
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
-        }
-    }
 
     fun ingest(event: CouchReportEvent) {
         _reportState.value = when (event) {

@@ -1,10 +1,10 @@
 package borg.trikeshed.lcnc
 
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.SupervisorJob
 import borg.trikeshed.parse.reifyMap
 import borg.trikeshed.parse.jsonOf
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.kanban.InvokeLowering
 import borg.trikeshed.lib.toList
 import borg.trikeshed.relaxfactory.RelaxTransport
@@ -325,17 +325,16 @@ class LcncServiceBindingTest {
         assertNull(currentCoroutineContext()[SurfaceCallKey])
     }
 
-    private class BorrowedElement : AsyncContextElement() {
+    private class BorrowedElement : CoroutineContext.Element {
         companion object Key : CoroutineContext.Key<BorrowedElement>
         override val key: CoroutineContext.Key<*> get() = Key
+        val supervisor: CompletableJob = SupervisorJob()
     }
 
     @Test
     fun helperBorrowsLifecycleAndExecutesDelegateWithoutASecondInvocation() = runTest {
         val default = BorrowedElement()
         val replacement = BorrowedElement()
-        default.open()
-        replacement.open()
         try {
             val delegate = object : LcncNodeRunner {
                 override suspend fun run(node: LcncNode, inputs: Map<String, Any?>): Map<String, Any?> =
@@ -359,14 +358,12 @@ class LcncServiceBindingTest {
                 throw IllegalStateException("operation failed")
             }
             assertFailsWith<IllegalStateException> { failing.run(LcncNode("failure", "text.value"), emptyMap()) }
-            assertEquals(ElementState.OPEN, default.lifecycleState)
-            assertEquals(ElementState.OPEN, replacement.lifecycleState)
             assertTrue(default.supervisor.isActive)
             assertTrue(replacement.supervisor.isActive)
             assertBindings(wrapped, BorrowedElement.Key)
         } finally {
-            default.close()
-            replacement.close()
+            default.supervisor.cancel()
+            replacement.supervisor.cancel()
         }
     }
 

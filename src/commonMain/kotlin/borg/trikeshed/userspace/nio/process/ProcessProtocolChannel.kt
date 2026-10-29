@@ -81,7 +81,7 @@ class ProcessProtocolChannel(
 
     /** Complete the close handshake first. Drain has no kill timer. */
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        terminal.stop()
+        terminal.end()
         try { protocol.await().stopInput() }
         finally { worker.join(); supervisor.join() }
         completion.await().getOrThrow()

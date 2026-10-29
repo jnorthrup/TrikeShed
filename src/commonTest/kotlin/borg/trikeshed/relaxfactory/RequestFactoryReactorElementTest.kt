@@ -1,6 +1,5 @@
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -59,7 +58,7 @@ class RequestFactoryReactorElementTest {
         drain.await()
         assertEquals(listOf("one", "two", "three"), processed)
         assertEquals(processed, closedAfter)
-        assertEquals(ElementState.CLOSED, element.state)
+        assertTrue(element.closed.isCompleted)
         assertTrue(element.supervisor.isCompleted)
         assertEquals(1, closeCount)
         assertIs<IllegalStateException>(runCatching { element.processRequest("late") }.exceptionOrNull())
@@ -135,6 +134,6 @@ class RequestFactoryReactorElementTest {
         assertIs<CancellationException>(third.await().exceptionOrNull())
         element.drain()
         assertEquals(1, closeCount)
-        assertEquals(ElementState.CLOSED, element.state)
+        assertTrue(element.closed.isCompleted)
     }
 }

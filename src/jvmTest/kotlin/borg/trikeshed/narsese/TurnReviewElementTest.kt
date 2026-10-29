@@ -1,6 +1,5 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
@@ -84,7 +83,7 @@ class TurnReviewElementTest {
         val review = TurnReviewElement(bag)
         review.open()
         review.drain()
-        assertEquals(ElementState.CLOSED, review.state)
+        assertTrue(review.admission.isCompleted)
         val landed = review.reviewTurn(
             listOf(TurnReviewElement.TurnFact("v", true, "ctx", "o")),
             turnSucceeded = true,

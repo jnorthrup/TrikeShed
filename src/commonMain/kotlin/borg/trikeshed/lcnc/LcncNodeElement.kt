@@ -1,6 +1,6 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -28,9 +28,10 @@ class LcncNodeElement internal constructor(
 ) : CoroutineContext.Element {
     private val parentJob = parent
     val supervisor = SupervisorJob(parent)
-    private val phase = MutableStateFlow(ElementState.CREATED)
-    val lifecycleState: ElementState get() = phase.value
-    val state: ElementState get() = phase.value
+    /** Completes at [drain] or supervisor completion; the invocation refuses new work after it. */
+    val admission: CompletableJob = Job()
+    /** Completes when [execute] claims the single invocation. */
+    val consumed: CompletableJob = Job()
     val fanoutSubscribers: List<LcncNodeElement> get() = emptyList()
     private val completion = MutableStateFlow<LcncNodeOutcome?>(null)
     val outcome: LcncNodeOutcome? get() = completion.value
@@ -41,26 +42,12 @@ class LcncNodeElement internal constructor(
             if (cause is CancellationException) {
                 completion.compareAndSet(null, LcncNodeOutcome.Cancelled(cause))
             }
-            advance(ElementState.CLOSED)
-        }
-    }
-
-    private fun advance(target: ElementState) {
-        while (true) {
-            val before = phase.value
-            if (before >= target) return
-            val after = when {
-                before == ElementState.CREATED -> ElementState.OPEN
-                before < ElementState.DRAINING && target >= ElementState.DRAINING -> ElementState.DRAINING
-                else -> target
-            }
-            phase.compareAndSet(before, after)
+            admission.complete()
         }
     }
 
     suspend fun open() {
-        phase.compareAndSet(ElementState.CREATED, ElementState.OPEN)
-        if (lifecycleState >= ElementState.DRAINING) {
+        if (!admission.isActive) {
             if (supervisor.isCancelled) supervisor.ensureActive()
             error("${node.id}: invocation is closed to new work")
         }
@@ -68,7 +55,7 @@ class LcncNodeElement internal constructor(
 
     suspend fun execute(): Map<String, Any?> {
         open()
-        if (!phase.compareAndSet(ElementState.OPEN, ElementState.ACTIVE)) {
+        if (!consumed.complete()) {
             if (supervisor.isCancelled) supervisor.ensureActive()
             error("${node.id}: invocation already consumed")
         }
@@ -114,10 +101,9 @@ class LcncNodeElement internal constructor(
 
     /** Admission stops first; existing children finish before the element is closed. */
     suspend fun drain() {
-        advance(ElementState.DRAINING)
+        admission.complete()
         supervisor.complete()
         supervisor.join()
-        advance(ElementState.CLOSED)
     }
 
     suspend fun close() = drain()

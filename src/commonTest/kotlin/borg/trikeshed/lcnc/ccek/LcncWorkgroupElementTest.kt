@@ -1,6 +1,5 @@
 package borg.trikeshed.lcnc.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.job.ContentId
@@ -64,7 +63,7 @@ class LcncWorkgroupElementTest {
                 try { rig.element.drain() } finally { rig.fanout.drain() }
             }
         }
-        assertEquals(ElementState.CLOSED, rig.element.state)
+        assertTrue(rig.element.supervisor.isCompleted)
         assertFalse(rig.element.supervisor.children.any())
     }
 
@@ -205,7 +204,7 @@ class LcncWorkgroupElementTest {
             try { assertFalse(drained.isCompleted) } finally { release.complete(Unit) }
             opened.await().exceptionOrNull()?.let { assertEquals("LCNC manifestation stopped", it.message) }
             drained.await()
-            assertEquals(ElementState.CLOSED, rig.element.state)
+            assertTrue(rig.element.supervisor.isCompleted)
             assertEquals(ContentId(LcncBlackboard.cidOf(program())) to "first", assertIs<Join<*, *>>(rig.result()).pair)
             rig.put(program("after close"))
             runCurrent()
@@ -334,7 +333,7 @@ class LcncWorkgroupElementTest {
             assertEquals(listOf("lcnc/run/before-failure"), admitted)
             assertEquals(failure.message, assertFailsWith<IllegalStateException> { rig.element.drainQueued() }.message)
             assertEquals(failure.message, assertFailsWith<IllegalStateException> { rig.element.drain() }.message)
-            assertEquals(ElementState.CLOSED, rig.element.state)
+            assertTrue(rig.element.supervisor.isCompleted)
             assertFalse(rig.element.supervisor.children.any(), "A failed producer must release its permit and every owned stage")
         } finally { withContext(NonCancellable) {
             runCatching { rig.element.drain() }

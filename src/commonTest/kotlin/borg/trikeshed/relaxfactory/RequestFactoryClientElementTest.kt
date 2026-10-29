@@ -1,6 +1,5 @@
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.CancellationException
@@ -28,7 +27,7 @@ class RequestFactoryClientElementTest {
                 HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request, response = response(request)))
         }
         val client = HtxClientReactorElement(route, options = HtxClientOptions(maxRedirects = 0),
-            workerContext = context.minusKey(Job), parentJob = context[Job]).also { it.open() }
+            workerContext = context.minusKey(Job), parentJob = context[Job])
         return try { block(client) } finally { withContext(NonCancellable) { client.close() } }
     }
 
@@ -52,7 +51,7 @@ class RequestFactoryClientElementTest {
                 assertEquals("application/json; charset=utf-8", request.headerValue("Content-Type"))
                 assertEquals("application/json", request.headerValue("Accept"))
             } finally { element.drain() }
-            assertEquals(ElementState.ACTIVE, client.state)
+            assertTrue(client.supervisor.isActive && client.admission.isActive)
         }
     }
 
@@ -93,8 +92,8 @@ class RequestFactoryClientElementTest {
             assertEquals("reply:two", results["two"]?.getOrThrow())
             assertEquals(mapOf("one" to 1, "two" to 1, "full" to 1, "late" to 1), callbacks)
             assertSame(callbackFailure, element.callbackFailure)
-            assertEquals(ElementState.CLOSED, element.state)
-            assertEquals(ElementState.ACTIVE, client.state)
+            assertTrue(element.closed)
+            assertTrue(client.supervisor.isActive && client.admission.isActive)
         }
     }
 
@@ -120,7 +119,7 @@ class RequestFactoryClientElementTest {
             for (name in listOf("one", "two", "late")) assertIs<CancellationException>(results[name]?.exceptionOrNull())
             assertEquals(listOf("one"), requests)
             element.drain()
-            assertEquals(ElementState.CLOSED, element.state)
+            assertTrue(element.closed)
         }
     }
 

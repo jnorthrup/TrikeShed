@@ -5,6 +5,8 @@ import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.α
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
 
 /**
@@ -201,33 +203,26 @@ typealias FacetSubscriber = () -> Unit
 
 /**
  * FacetElement: CCEK element carrying SlabFacet tags.
- * Forward-only lifecycle: CREATED → OPEN → ACTIVE → DRAINING → CLOSED
+ * Subscribers are admitted until [closed] completes.
  */
 class FacetElement(
     val key: FacetElementKey,
     val facet: SlabFacet
 ) {
-    var lifecycleState: LifecycleState = LifecycleState.CREATED
-        set(value) {
-            // forward-only enforcement
-            if (field == LifecycleState.CLOSED) return
-            field = value
-        }
+    /** Completes at [close]; subscribers are refused after it. */
+    val closed: CompletableJob = Job()
 
     val fanoutSubscribers: MutableList<FacetSubscriber> = mutableListOf()
 
     fun addSubscriber(sub: FacetSubscriber) {
-        if (lifecycleState == LifecycleState.CLOSED) throw IllegalStateException("Cannot add subscriber after CLOSED")
+        if (closed.isCompleted) throw IllegalStateException("Cannot add subscriber after close")
         if (!fanoutSubscribers.contains(sub)) fanoutSubscribers.add(sub)
     }
     fun removeSubscriber(sub: FacetSubscriber) { fanoutSubscribers.remove(sub) }
     fun fanout(msg: () -> Unit) { fanoutSubscribers.forEach { it() } }
 
-    fun open() { lifecycleState = LifecycleState.OPEN }
-    fun activate() { lifecycleState = LifecycleState.ACTIVE }
-    fun drain() { lifecycleState = LifecycleState.DRAINING }
     fun close() {
-        lifecycleState = LifecycleState.CLOSED
+        closed.complete()
         fanoutSubscribers.clear()
     }
 }
@@ -253,24 +248,12 @@ class FacetControlContext(
 }
 object FacetControlContextKey : CoroutineContext.Key<FacetControlContext>
 
-/** Forward-only lifecycle states for CCEK elements */
-enum class LifecycleState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
-
 /**
  * FacetEngine: orchestrates LCNC modes across btrfs + DuckDB seams.
- * Forward-only lifecycle: CREATED → OPEN → ACTIVE → DRAINING → CLOSED
  */
 class FacetEngine(
     val facet: SlabFacet
 ) {
-    var lifecycleState: LifecycleState = LifecycleState.CREATED
-        private set
-
-    fun open() { if (lifecycleState == LifecycleState.CREATED) lifecycleState = LifecycleState.OPEN }
-    fun activate() { if (lifecycleState == LifecycleState.OPEN) lifecycleState = LifecycleState.ACTIVE }
-    fun drain() { if (lifecycleState == LifecycleState.ACTIVE) lifecycleState = LifecycleState.DRAINING }
-    fun close() { if (lifecycleState == LifecycleState.DRAINING) lifecycleState = LifecycleState.CLOSED }
-
     /** Dispatch pointcut to appropriate LCNC mode handler */
     fun dispatch(event: PointcutEvent, cursor: FacetedCursor, graal: GraalContext): Any {
         val mode = when {

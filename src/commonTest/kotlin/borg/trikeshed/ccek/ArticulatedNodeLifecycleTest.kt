@@ -1,6 +1,5 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDoc
 import kotlinx.coroutines.CancellationException
@@ -33,9 +32,7 @@ class ArticulatedNodeLifecycleTest {
     @Test
     fun drainWaitsForQueuedSignalsAndStructuredDescendants() = runTest {
         val node = ArticulatedNode(ForgeDoc.empty("drain"), backgroundScope, record = true, autoStart = false)
-        assertEquals(ElementState.CREATED, node.lifecycleState)
-        node.open()
-        assertEquals(ElementState.OPEN, node.lifecycleState)
+        assertTrue(node.acceptsSignals && !node.isActive)
         val release = CompletableDeferred<Unit>()
         val delivered = mutableListOf<String>()
         var childCompleted = false
@@ -46,13 +43,13 @@ class ArticulatedNodeLifecycleTest {
                 launch { childCompleted = true }
             }
         }
-        assertEquals(ElementState.ACTIVE, node.lifecycleState)
+        assertTrue(node.supervisor.isActive)
         node.sendSignal(signal("first"))
         node.sendSignal(signal("second"))
         runCurrent()
         val drained = async { node.drain() }
         runCurrent()
-        assertEquals(ElementState.DRAINING, node.lifecycleState)
+        assertFalse(node.acceptsSignals)
         assertFalse(drained.isCompleted)
         assertFalse(childCompleted)
         assertFalse(node.signalIn.trySend(signal("late")).isSuccess)
@@ -62,7 +59,6 @@ class ArticulatedNodeLifecycleTest {
         assertEquals(listOf("first", "second"), delivered)
         assertEquals(2, node.recording().size)
         assertTrue(childCompleted)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
         assertTrue(node.supervisor.isCompleted)
         assertEquals(0, node.childScopeCount)
         assertEquals(0, node.agentCount)
@@ -76,9 +72,8 @@ class ArticulatedNodeLifecycleTest {
         node.close()
         node.stop()
         node.start()
-        node.open()
         assertFalse(node.isActive)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
         assertFailsWith<IllegalStateException> { node.sendSignal(signal("restart")) }
     }
 
@@ -91,7 +86,6 @@ class ArticulatedNodeLifecycleTest {
         node.start()
         node.drain()
         assertEquals(1, node.recording().size)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
         assertTrue(node.supervisor.isCompleted)
         assertFalse(node.signalIn.trySend(signal("closed")).isSuccess)
     }
@@ -101,12 +95,12 @@ class ArticulatedNodeLifecycleTest {
         val node = ArticulatedNode(ForgeDoc.empty("input"), backgroundScope, record = true)
         node.signalIn.send(signal("last"))
         node.signalIn.close()
-        assertEquals(ElementState.DRAINING, node.lifecycleState)
+        assertFalse(node.acceptsSignals)
         assertFailsWith<IllegalStateException> { node.subscribeAgent("closed") {} }
         node.start()
         node.supervisor.join()
         node.start()
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
         assertEquals(1, node.recording().size)
         assertFalse(node.isActive)
     }
@@ -144,7 +138,7 @@ class ArticulatedNodeLifecycleTest {
         parent.cancel()
         parent.join()
         assertTrue(cancelled)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
         assertFalse(node.signalIn.trySend(signal("late")).isSuccess)
         assertFalse(node.projections.replayCache.any { it is ForgeProjection.Error })
         assertFailsWith<CancellationException> { node.drain() }
@@ -172,13 +166,13 @@ class ArticulatedNodeLifecycleTest {
         runCurrent()
         assertTrue(enteredCleanup)
         node.abort(CancellationException("assembly cancelled"))
-        assertEquals(ElementState.DRAINING, node.lifecycleState)
+        assertFalse(node.acceptsSignals)
         assertFalse(node.supervisor.isCompleted)
         assertFalse(node.signalIn.trySend(signal("late")).isSuccess)
         assertFailsWith<IllegalStateException> { node.subscribeAgent("late") {} }
         cleanup.complete(Unit)
         parent.join()
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
     }
 
     @Test
@@ -246,7 +240,7 @@ class ArticulatedNodeLifecycleTest {
         node.drain()
         assertEquals(2, delivered)
         assertSame(failure, (node.projections.replayCache.last() as ForgeProjection.Error).cause)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
     }
 
     @Test
@@ -257,7 +251,7 @@ class ArticulatedNodeLifecycleTest {
         node.sendSignal(signal("queued"))
         assertFailsWith<CancellationException> { node.drain() }
         assertEquals(1, node.recording().size)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
         assertFalse(node.projections.replayCache.any { it is ForgeProjection.Error })
     }
 }

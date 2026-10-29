@@ -256,5 +256,5 @@ class HeadhunterSourcesTest {
     suspend fun sourceElement(response: suspend (HtxRequest) -> HtxResponse): HtxElement = HtxElement(routeService = object : HtxRouteService {
         override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult =
             HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request, response = response(request)), htxFrames())
-    }).also { it.open() }
+    })
 }

@@ -34,4 +34,4 @@ class WasiFileOperations : FileOperations {
     override fun createTempDir(p: String) = Files.createTempDir(p)
 }
 
-internal actual val fileIoContext: CoroutineContext get() = EmptyCoroutineContext
+actual val fileIoContext: CoroutineContext get() = EmptyCoroutineContext

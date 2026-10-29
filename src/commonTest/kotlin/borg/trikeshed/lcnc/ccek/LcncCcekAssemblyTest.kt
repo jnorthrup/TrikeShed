@@ -3,7 +3,6 @@ package borg.trikeshed.lcnc.ccek
 import borg.trikeshed.ccek.ArticulatedNode
 import borg.trikeshed.ccek.ForgeProjection
 import borg.trikeshed.ccek.ForgeSignal
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxExchangeResult
 import borg.trikeshed.htx.HtxExchangeState
@@ -71,7 +70,6 @@ class LcncCcekAssemblyTest {
         assertTrue(run.result.isCompleted)
         assertTrue(run.scope.coroutineContext.job.isCompleted)
         assertFalse(run.node.isActive)
-        assertEquals(ElementState.CLOSED, run.node.lifecycleState)
         assertTrue(run.node.supervisor.isCompleted)
         assertEquals(0, run.node.childScopeCount)
         assertFalse(run.result.children.any(), "result must release all receipt and walker jobs")
@@ -171,7 +169,6 @@ class LcncCcekAssemblyTest {
                     override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult =
                         error("context lookup must not dispatch HTTP")
                 })
-                htx.open()
                 try {
                     val seen = mutableListOf<CoroutineContext>()
                     val runner = LcncRunner(mapOf(

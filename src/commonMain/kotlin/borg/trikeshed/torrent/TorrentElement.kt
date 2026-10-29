@@ -1,7 +1,8 @@
 package borg.trikeshed.torrent
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.htx.client.ipfs.BlockStore
 import borg.trikeshed.htx.client.ipfs.MemoryBlockStore
 import borg.trikeshed.htx.client.ipfs.CID
@@ -11,6 +12,7 @@ import borg.trikeshed.userspace.nio.file.StandardOpenOption
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
@@ -18,8 +20,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
@@ -31,14 +31,23 @@ class TorrentElement(
     parentJob: Job? = null,
     private val reactorContext: CoroutineContext = EmptyCoroutineContext,
     listenAddress: PeerAddress? = PeerAddress("0.0.0.0", 6881),
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
     override val key: CoroutineContext.Key<*> get() = TorrentElementKey
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
     private val scope = CoroutineScope(reactorContext + this + supervisor)
     private val engine = TorrentEngine(blockStore, scope, listenAddress)
-    private val admission = Mutex()
     private val commands = Channel<Command>(32)
-    private val closed = CompletableDeferred<Unit>()
-    private var worker: Job? = null
+    /** Started by the first [open]; [close] starts it if no command did. */
+    val worker: Job = scope.launch(start = CoroutineStart.LAZY) {
+        try {
+            val element = requireNotNull(currentCoroutineContext()[TorrentElementKey])
+            for (command in commands) command.execute(element)
+        } finally {
+            val failure = IllegalStateException("Torrent command worker closed")
+            commands.close(failure)
+            while (true) (commands.tryReceive().getOrNull() ?: break).fail(failure)
+        }
+    }
 
     private interface Command {
         suspend fun execute(element: TorrentElement)
@@ -58,29 +67,11 @@ class TorrentElement(
     val activeTorrents: Map<String, TorrentHandle> get() = engine.getAllTorrents().associateBy { it.infoHash.hex() }
     val stats: StateFlow<TorrentEngineStats> get() = engine.stats
 
-    override suspend fun open() = admission.withLock {
-        if (state == ElementState.CREATED) {
-            super.open()
-            worker = scope.launch {
-                try {
-                    val element = requireNotNull(currentCoroutineContext()[TorrentElementKey])
-                    for (command in commands) command.execute(element)
-                } finally {
-                    val failure = IllegalStateException("Torrent command worker closed")
-                    commands.close(failure)
-                    while (true) (commands.tryReceive().getOrNull() ?: break).fail(failure)
-                }
-            }
-            state = ElementState.ACTIVE
-        } else check(state == ElementState.ACTIVE) { "Torrent element is $state" }
-    }
+    suspend fun open() { worker.start() }
     private suspend fun <T> command(body: suspend TorrentElement.() -> T): T {
         open()
         val result = CompletableDeferred<T>()
-        admission.withLock {
-            check(state == ElementState.ACTIVE) { "Torrent element is draining" }
-            commands.send(Request(body, result))
-        }
+        commands.send(Request(body, result))
         return result.await()
     }
 
@@ -131,25 +122,13 @@ class TorrentElement(
     suspend fun get(cid: CID): ByteArray? = command { blockStore.get(cid) }
 
     override suspend fun drain() = close()
-    override suspend fun close() {
-        val owner = admission.withLock {
-            if (state == ElementState.CLOSED || state == ElementState.DRAINING) false
-            else { state = ElementState.DRAINING; commands.close(); true }
-        }
-        if (!owner) { closed.await(); return }
-        withContext(NonCancellable) {
-            try {
-                worker?.join()
-                engine.close()
-                supervisor.complete()
-                supervisor.join()
-                state = ElementState.CLOSED
-                closed.complete(Unit)
-            } catch (failure: Throwable) {
-                closed.completeExceptionally(failure)
-                throw failure
-            }
-        }
+    /** Repeatable: the engine closes once and later callers join it. */
+    suspend fun close() = withContext(NonCancellable) {
+        commands.close()
+        worker.join()
+        engine.close()
+        supervisor.complete()
+        supervisor.join()
     }
 
     companion object {

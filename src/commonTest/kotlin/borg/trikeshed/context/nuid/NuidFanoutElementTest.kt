@@ -1,6 +1,5 @@
 package borg.trikeshed.context.nuid
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runCurrent
@@ -81,7 +80,7 @@ class NuidFanoutElementTest {
         runCurrent()
         val draining = async { fanout.drain() }
         runCurrent()
-        assertEquals(ElementState.DRAINING, fanout.state)
+        assertTrue(fanout.stopped.isCompleted && !fanout.supervisor.isCompleted)
         assertFalse(draining.isCompleted, "A full accepted channel still owns admitted dispatches")
         assertFailsWith<IllegalStateException> { fanout.dispatch(request, "late") }
         val consumer = launch { repeat(56) { accepted += slot.consumeAccepted() } }
@@ -93,7 +92,6 @@ class NuidFanoutElementTest {
             assertEquals(results.map { it.claimId }, accepted.map { it.claimId })
             assertEquals(56, results.map { it.claimId }.distinct().size)
             assertTrue(results.all { it.winner == "worker" })
-            assertEquals(ElementState.CLOSED, fanout.state)
             assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally {
@@ -139,7 +137,7 @@ class NuidFanoutElementTest {
             assertEquals("result:third", third.await(), "One failed claim must not stop the owned worker")
             draining.await()
             assertEquals(listOf<Any?>("first", "failure", "third"), processed)
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
             assertTrue(currentCoroutineContext().job.isActive)
         } finally { release.complete(Unit); fanout.close() }
@@ -305,7 +303,6 @@ class NuidFanoutElementTest {
             first.join()
             second.await()
             draining.await()
-            assertEquals(ElementState.CLOSED, fanout.state)
             assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { release.complete(Unit); fanout.close() }
@@ -498,7 +495,7 @@ class NuidFanoutElementTest {
             releaseChild.complete(Unit)
             assertEquals("child completed", withTimeout(1_000) { result.await() })
             withTimeout(1_000) { draining.await() }
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { releaseParent.complete(Unit); releaseChild.complete(Unit); owner.cancel(); fanout.close() }
     }
@@ -587,7 +584,7 @@ class NuidFanoutElementTest {
             assertEquals("reused", withTimeout(1_000) { child.await() })
             withTimeout(1_000) { draining.await() }
             assertEquals(1, reused)
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { release.complete(Unit); owner.cancel(); fanout.close() }
     }
@@ -605,7 +602,7 @@ class NuidFanoutElementTest {
                 NuidFanoutElement.Claim(-1, request, null))) {
                 assertFailsWith<IllegalStateException> { fanout.close() }
             }
-            assertEquals(ElementState.OPEN, fanout.state, "A refused self-join cannot stop external admission")
+            assertFalse(fanout.stopped.isCompleted, "A refused self-join cannot stop external admission")
             "usable"
         }
         try {
@@ -615,7 +612,7 @@ class NuidFanoutElementTest {
             }
             val draining = async { fanout.drain() }
             withTimeout(1_000) { draining.await() }
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { owner.cancel(); fanout.close() }
     }
@@ -644,7 +641,7 @@ class NuidFanoutElementTest {
             assertNull(fanout.slotOf(group.name))
             val draining = async { fanout.drain() }
             withTimeout(1_000) { draining.await() }
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { owner.cancel(); fanout.close() }
     }
@@ -722,7 +719,7 @@ class NuidFanoutElementTest {
             assertEquals("retired child", withTimeout(1_000) { result.await() })
             withTimeout(1_000) { removingChild.await(); removingParent.await(); draining.await() }
             assertEquals(1, children)
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { release.complete(Unit); owner.cancel(); fanout.close() }
     }
@@ -922,7 +919,6 @@ class NuidFanoutElementTest {
             assertEquals(List(4) { "2:$it" }, withTimeout(1_000) { second.await() })
             withTimeout(1_000) { draining.await() }
             assertEquals((List(4) { "1:$it" } + List(4) { "2:$it" }).sorted(), processed.map { it.toString() }.sorted())
-            assertEquals(ElementState.CLOSED, fanout.state)
             assertTrue(fanout.supervisor.isCompleted)
             assertFalse(fanout.supervisor.children.any())
         } finally { releaseParent.complete(Unit); releaseChildren.complete(Unit); owner.cancel(); fanout.close() }

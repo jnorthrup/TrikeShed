@@ -1,8 +1,6 @@
 package borg.trikeshed.memory.ace
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.j
@@ -17,17 +15,9 @@ import borg.trikeshed.job.ContentId
  * Merge now deterministically de-dups by ContentId and decays by pure function utility thresholds, not rnd() checks.
  * Lifecycle tokens CREATED, OPEN, ACTIVE, DRAINING, CLOSED
  */
-class AceCuratorElement : AsyncContextElement(ElementState.CREATED) {
-    companion object Key : AsyncContextKey<AceCuratorElement>()
-    override val key: AsyncContextKey<AceCuratorElement> = Key
-
-    override suspend fun open() {
-        super.open()
-        // Override/open or consume so OPEN→ACTIVE occurs before reflect/merge
-        if (state == ElementState.OPEN) {
-            state = ElementState.ACTIVE
-        }
-    }
+class AceCuratorElement : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<AceCuratorElement>
+    override val key: CoroutineContext.Key<AceCuratorElement> = Key
 
     /** Pure function to compute eviction score for a bullet. Replaces random drop. */
     private fun evictionScore(bullet: PlaybookBullet): Long {
@@ -43,7 +33,6 @@ class AceCuratorElement : AsyncContextElement(ElementState.CREATED) {
      * Eviction score is a pure function (Bullet) -> Long.
      */
     fun merge(playbook: Series<PlaybookBullet>, delta: Series<DeltaBullet>): Series<PlaybookBullet> {
-        requireState(ElementState.ACTIVE)
         val nPlaybook = playbook.size
         val nDelta = delta.size
         val total = nPlaybook + nDelta
@@ -150,9 +139,5 @@ class AceCuratorElement : AsyncContextElement(ElementState.CREATED) {
         }
         
         return resultArr α { it }
-    }
-    
-    override suspend fun drain() {
-        super.drain()
     }
 }

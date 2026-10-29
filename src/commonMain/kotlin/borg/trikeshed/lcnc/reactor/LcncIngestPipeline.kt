@@ -1,7 +1,6 @@
 package borg.trikeshed.lcnc.reactor
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.lcnc.ccek.IngestStateElement
 import borg.trikeshed.lcnc.isam.LcncEntity
@@ -74,7 +73,7 @@ class LcncIngestPipeline(
     val ingestId: String,
     override val supportedFormats: Set<IngestFormat> = IngestFormat.entries.toSet(),
     val config: IngestPipelineConfig = IngestPipelineConfig(),
-) : AsyncContextElement(ElementState.CREATED, parentJob), IngestCodec {
+) : CoroutineContext.Element, IngestCodec {
 
     companion object Key : kotlin.coroutines.CoroutineContext.Key<LcncIngestPipeline>
     override val key = Key

@@ -1,8 +1,7 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
@@ -61,11 +60,15 @@ class CuratorImpulseElement(
      */
     groundTheory: String = borg.trikeshed.ontology.SumoOntology.emitUpperKif(),
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<CuratorImpulseElement>()
+    companion object Key : CoroutineContext.Key<CuratorImpulseElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    /** Completes at [open]; enactment starts after it. */
+    val opened: CompletableJob = Job()
+    /** Completes at [drain]; enactment stops after it. */
+    val admission: CompletableJob = Job()
 
     private val evaluator = ContentId.of("curator-impulse".encodeToByteArray())
 
@@ -84,10 +87,9 @@ class CuratorImpulseElement(
         else borg.trikeshed.ontology.SumoOntology.SumoCategory.Agent.kifName
     }
 
-    override suspend fun open() {
-        super.open()
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-    }
+    suspend fun open() { opened.complete() }
+
+    override suspend fun drain() { admission.complete() }
 
     /**
      * Process one teaching pass: assess curator impulses against transcript scenarios AND
@@ -99,7 +101,7 @@ class CuratorImpulseElement(
         scenarios: Series<ReplayScenario>,
         groupings: Series<GroupCoherenceEnactment> = borg.trikeshed.lib.emptySeriesOf(),
     ): List<Join<Long, String>> {
-        if (state != ElementState.ACTIVE) return emptyList()
+        if (!opened.isCompleted || !admission.isActive) return emptyList()
         val assessments = CuratorImpulseRecipient.assess(impulses, scenarios, groupings)
         if (assessments.size == 0) return emptyList()
 

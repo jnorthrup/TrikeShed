@@ -1,8 +1,6 @@
 package borg.trikeshed.sctp
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.context.StreamHandle
 import borg.trikeshed.context.StreamTransport
 import borg.trikeshed.lib.*
@@ -401,10 +399,9 @@ object SctpShutdownCompleteChunk {
     }
 }
 
-val SctpKey: AsyncContextKey<SctpElement> = SctpElement.Key
+val SctpKey: CoroutineContext.Key<SctpElement> = SctpElement.Key
 
-suspend fun openSctpElement(): SctpElement =
-    SctpElement().also { it.open() }
+suspend fun openSctpElement(): SctpElement = SctpElement()
 
 class SctpElement(
    val streams: MutableMap<Int, StreamHandle> = mutableMapOf(),
@@ -412,10 +409,10 @@ class SctpElement(
    val paths: List<String> = emptyList(),          // multi-homing: active path addresses
    val congestionControl: String = "cubic",         // cubic | hstcp | rack — deterministic only
    val wire: SctpWire = SctpWire.default,           // packet boundary SPI; loopback unless registered
-) : AsyncContextElement(), StreamTransport {
-    companion object Key : AsyncContextKey<SctpElement>()
+) : CoroutineContext.Element, StreamTransport {
+    companion object Key : CoroutineContext.Key<SctpElement>
 
-    override val key: AsyncContextKey<SctpElement>
+    override val key: CoroutineContext.Key<SctpElement>
         get() = Key
 
     /** Per-path failover tracking — lazy-initialized from [paths] on first access. */
@@ -456,7 +453,6 @@ class SctpElement(
     val pathStatuses: Map<String, PathStatus> get() = _pathStatuses
 
     override suspend fun openStream(): StreamHandle {
-        requireState(ElementState.OPEN)
         val streamId = (streams.keys.maxOrNull() ?: -1) + 1
         val streamHandle = StreamHandle(
             id = streamId,
@@ -476,7 +472,6 @@ class SctpElement(
 
     /** Begin listening — server stays CLOSED per RFC 4960 §5.2.2 cookie mechanism. */
     suspend fun bind(port: Int): SctpAssociation {
-        requireState(ElementState.OPEN)
         wire.bind(port)
         val id = port.toLong()
         associations[id] = SctpState.CLOSED
@@ -502,7 +497,6 @@ class SctpElement(
      * Caller must progress through [handleInitAck] → [handleCookieAck].
      */
     suspend fun connect(host: String, port: Int): SctpAssociation {
-        requireState(ElementState.OPEN)
         val id = assocId(host, port)
         associations[id] = SctpState.COOKIE_WAIT
         return SctpAssociation(associationId = id, state = SctpState.COOKIE_WAIT)

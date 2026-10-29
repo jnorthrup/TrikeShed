@@ -27,6 +27,7 @@ import borg.trikeshed.userspace.nio.DocumentExtent
 import borg.trikeshed.userspace.nio.DocumentBytes
 import borg.trikeshed.userspace.nio.DocumentInputElement
 import borg.trikeshed.userspace.nio.Volume
+import kotlinx.coroutines.CompletableJob
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -37,7 +38,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.CoroutineContext
@@ -97,7 +97,7 @@ class DocumentFeed private constructor(
             } catch (failure: Throwable) {
                 val retained = feed
                 if (retained?.route != null) {
-                    retained.closed.set(true)
+                    retained.closed.complete()
                     // Camel already attempted cleanup. Its failure must not close dependencies
                     // beneath a live consumer or hide the feed handle from the caller.
                     if (failure is CamelRuntime.StartFailure) throw StartFailure(retained, failure)
@@ -159,7 +159,8 @@ class DocumentFeed private constructor(
 
     override val key: CoroutineContext.Key<*> get() = Key
     private val gate = Mutex()
-    private val closed = AtomicBoolean(false)
+    /** Completes when submission stops: at [drain] or a startup failure that retains the route. */
+    val closed: CompletableJob = Job()
     private var route: CamelRuntime.Route? = null
     private val observationFailures = AtomicInteger()
     private val observationFailure = AtomicReference<String?>()
@@ -216,13 +217,13 @@ class DocumentFeed private constructor(
 
     /** Serialized CAS access and route requests; the curator owns NLP-before-model sequencing. */
     suspend fun submit(extent: DocumentExtent): Receipt = gate.withLock {
-        check(!closed.get()) { "Document feed is closed" }
+        check(!closed.isCompleted) { "Document feed is closed" }
         submit(input.read(extent))
     }
 
     /** Only a caller-reserved staging region may receive HTTP/LCNC source bytes. */
     suspend fun submit(bytes: ByteArray, name: String, mediaType: String? = null): Receipt = gate.withLock {
-        check(!closed.get()) { "Document feed is closed" }
+        check(!closed.isCompleted) { "Document feed is closed" }
         val lba = checkNotNull(stagingLba) { "Document source staging is not configured" }
         require(name.isNotBlank()) { "Document source name must not be blank" }
         submit(input.stage(lba, bytes, name, mediaType))
@@ -230,7 +231,7 @@ class DocumentFeed private constructor(
 
     /** Re-admit exact retained source bytes through the same staging and extraction path. */
     suspend fun submit(originalCid: ContentId, name: String, mediaType: String? = null): Receipt = gate.withLock {
-        check(!closed.get()) { "Document feed is closed" }
+        check(!closed.isCompleted) { "Document feed is closed" }
         val lba = checkNotNull(stagingLba) { "Document source staging is not configured" }
         require(name.isNotBlank()) { "Document source name must not be blank" }
         val bytes = cas.get(originalCid) ?: error("Missing original document $originalCid")
@@ -252,7 +253,7 @@ class DocumentFeed private constructor(
 
     /** No new submissions; finish the active exchange before stopping its dependencies. */
     suspend fun drain() = withContext(NonCancellable) {
-        closed.set(true)
+        closed.complete()
         gate.withLock {
             // A failed route stop retains callbacks and their cleanup handle. Keep their
             // dependencies alive as well; a later drain retries the stop with admission shut.

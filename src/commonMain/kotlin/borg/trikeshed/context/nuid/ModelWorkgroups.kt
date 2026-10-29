@@ -61,7 +61,6 @@ fun modelWorkgroup(
  */
 suspend fun NuidFanoutElement.registerWorkgroup(workgroup: Workgroup): Workgroup {
     register(workgroup)
-    activate()
     return workgroup
 }
 

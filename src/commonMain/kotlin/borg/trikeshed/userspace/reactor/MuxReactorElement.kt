@@ -1,8 +1,9 @@
 package borg.trikeshed.userspace.reactor
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.userspace.reactor.KanbanFSM
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -33,10 +34,13 @@ class MuxReactorElement(
     initialConfig: MuxReactorConfig = MuxReactorConfig(),
     private val keyMux: borg.trikeshed.agent.keymux.KeyMux? = null,
     private val modelMuxProvider: (suspend () -> borg.trikeshed.agent.modelmux.ModelMux)? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<MuxReactorElement>()
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<MuxReactorElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at [close]; resolution and the tick loop stop after it. */
+    val admission: CompletableJob = Job()
 
     init {
         require(modelMuxProvider == null || keyMux != null) { "ModelMux binding requires KeyMux" }
@@ -58,8 +62,8 @@ class MuxReactorElement(
     }
 
     private fun requireMuxOpen() {
-        check(state == ElementState.OPEN || state == ElementState.ACTIVE) {
-            "MuxReactorElement is not accepting model or key resolution: $state"
+        check(admission.isActive) {
+            "MuxReactorElement is not accepting model or key resolution: closed"
         }
     }
 
@@ -110,19 +114,16 @@ class MuxReactorElement(
     /** Reactor-owned kanban event stream. Kanban FSM consumes this; kanban never owns it. */
     val kanbanEvents: SharedFlow<KanbanEvent> = _kanbanEvents.asSharedFlow()
 
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
-            publishState()
-        }
-    }
+    suspend fun open() = publishState()
 
-    override suspend fun close() {
+    override suspend fun drain() = close()
+
+    suspend fun close() {
+        admission.complete()
         keysById.clear()
         modelsById.clear()
         operationalHistory.clear()
-        super.close()
+        supervisor.cancelAndJoin()
     }
 
     fun updateConfig(newConfig: MuxReactorConfig) {
@@ -415,7 +416,7 @@ class MuxReactorElement(
     }
 
     fun startLoop(scope: CoroutineScope): Job = scope.launch {
-        while (state.isLessThan(ElementState.DRAINING)) {
+        while (admission.isActive) {
             tick()
             delay(config.tickIntervalMs)
         }

@@ -87,7 +87,6 @@ class LcncFanoutSignalSpineTest {
             nuidFanout,
             mapOf("process" to stubReduction { executed = true })
         )
-        lcncFanout.open()
 
         val slot = nuidFanout.slotOf("signal-spine-worker")
         assertNotNull(slot)

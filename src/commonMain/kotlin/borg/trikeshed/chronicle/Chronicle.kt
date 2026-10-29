@@ -1,12 +1,10 @@
 package borg.trikeshed.chronicle
 
 import borg.trikeshed.context.SplatFanoutDispatcherElement.DeliveryOutcome
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
-import borg.trikeshed.lib.view
 import borg.trikeshed.splat.Splat
 import borg.trikeshed.splat.toChronology
 
@@ -29,20 +27,6 @@ object Chronicle {
 
 sealed class ChronicleEvent {
     abstract fun toJson(): String
-}
-
-data class TransitionSplat(
-    val elementKey: String,
-    val from: ElementState,
-    val splat: Splat<ElementState>?,
-    val actual: ElementState,
-    val composition: Join<String, Series<String>>
-) : ChronicleEvent() {
-    override fun toJson(): String = buildString {
-        append("[TRANSITION] $elementKey: $from → $actual\n")
-        splat?.let { append("[SPLAT-STATE] ${it.toChronology()}\n") }
-        append("[COMPOSITION] ${composition.a}: ${composition.b.view.joinToString()}\n")
-    }
 }
 
 data class FanoutSplat(

@@ -25,8 +25,10 @@ class TorrentEngine(
     override val key: CoroutineContext.Key<*> get() = Key
     private val owner = SupervisorJob(requireNotNull(scope.coroutineContext[Job]))
     private val scope = CoroutineScope(scope.coroutineContext + Dispatchers.Default + owner + this)
-    private val admission = Mutex()
-    private val termination = Mutex()
+    /** Guards session installation and the listener. */
+    private val registry = Mutex()
+    /** Completes when [close] begins; torrents refuse after it. */
+    val closed: CompletableJob = Job()
     private val sessions = MutableStateFlow<Map<InfoHash, TorrentSession>>(emptyMap())
     private val observations = MutableStateFlow(TorrentEngineStats())
     val stats: StateFlow<TorrentEngineStats> = observations.asStateFlow()
@@ -35,13 +37,12 @@ class TorrentEngine(
     private var accepts: Job? = null
     private val incoming = mutableSetOf<Job>()
     private val incomingMutex = Mutex()
-    private var closed = false
 
     suspend fun addTorrent(torrentData: ByteArray, destinationDir: String? = null): TorrentHandle =
         addTorrent(TorrentFile.parse(torrentData), destinationDir)
 
-    suspend fun addTorrent(torrentFile: TorrentFile, destinationDir: String? = null): TorrentHandle = admission.withLock {
-        check(!closed) { "Torrent engine closed" }
+    suspend fun addTorrent(torrentFile: TorrentFile, destinationDir: String? = null): TorrentHandle = registry.withLock {
+        check(!closed.isCompleted) { "Torrent engine closed" }
         sessions.value[torrentFile.infoHash]?.let { return@withLock it }
         ensureListener()
         install(torrentFile, null, destinationDir)
@@ -50,8 +51,8 @@ class TorrentEngine(
     suspend fun addMagnet(uri: String, destinationDir: String? = null): TorrentHandle {
         val magnet = MagnetUri.parse(uri)
         var existing = false
-        val session = admission.withLock {
-            check(!closed) { "Torrent engine closed" }
+        val session = registry.withLock {
+            check(!closed.isCompleted) { "Torrent engine closed" }
             sessions.value[magnet.infoHash]?.also { existing = true } ?: run {
                 require(magnet.peers.view.any() || magnet.trackers.view.any()) {
                     "Magnet requires a tracker (tr) or direct peer (x.pe); BitTorrent DHT discovery is not implemented"
@@ -138,25 +139,24 @@ class TorrentEngine(
     fun getAllTorrents(): List<TorrentHandle> = sessions.value.values.toList()
     fun pauseAll() { sessions.value.values.forEach { it.pause() } }
     fun resumeAll() { sessions.value.values.forEach { it.resume() } }
-    suspend fun removeTorrent(infoHash: InfoHash) = admission.withLock {
+    suspend fun removeTorrent(infoHash: InfoHash) = registry.withLock {
         sessions.value[infoHash]?.let { session -> session.close(); sessions.value = sessions.value - infoHash; observe() }
     }
 
     suspend fun close() = withContext(NonCancellable) {
-        termination.withLock {
-            admission.withLock { if (closed) return@withContext; closed = true }
-            accepts?.cancelAndJoin()
-            incomingMutex.withLock { incoming.toList() }.joinAll()
-            var failure: Throwable? = null
-            for (session in sessions.value.values) try { session.close() } catch (error: Throwable) {
-                if (failure == null) failure = error else failure.addSuppressed(error)
-            }
-            try { listener?.close() } catch (error: Throwable) {
-                if (failure == null) failure = error else failure.addSuppressed(error)
-            }
-            sessions.value = emptyMap(); observe()
-            owner.complete(); owner.join()
-            failure?.let { throw it }
+        // Completing under the registry orders close after any install that passed its check.
+        if (!registry.withLock { closed.complete() }) return@withContext owner.join()
+        accepts?.cancelAndJoin()
+        incomingMutex.withLock { incoming.toList() }.joinAll()
+        var failure: Throwable? = null
+        for (session in sessions.value.values) try { session.close() } catch (error: Throwable) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
         }
+        try { listener?.close() } catch (error: Throwable) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
+        }
+        sessions.value = emptyMap(); observe()
+        owner.complete(); owner.join()
+        failure?.let { throw it }
     }
 }

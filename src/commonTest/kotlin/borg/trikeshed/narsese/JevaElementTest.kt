@@ -164,7 +164,7 @@ class JevaElementTest {
             assertEquals("fixture@revision", status["model_identity"])
             assertNull(element.process)
             assertTrue(ops.closed.isCompleted)
-            assertTrue(element.accepting)
+            assertTrue(element.admission.isActive)
             assertEquals(1, ops.opens)
             assertEquals(1, ops.statuses)
         } finally { continueInference.complete(Unit); element.drain() }

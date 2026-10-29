@@ -314,4 +314,4 @@ class JvmFileOperations : FileOperations {
     }
 }
 
-internal actual val fileIoContext: CoroutineContext get() = Dispatchers.IO
+actual val fileIoContext: CoroutineContext get() = Dispatchers.IO

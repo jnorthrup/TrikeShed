@@ -1,8 +1,6 @@
 package borg.trikeshed.util.oroboros
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlin.coroutines.CoroutineContext
 
@@ -20,15 +18,15 @@ expect class FileWatchReactorElement(
     excludeGlobs: List<String>,
     walkerBlockedSegments: Set<String>,
     walkerBlockedRelativePrefixes: Set<String>,
-) : AsyncContextElement {
-    companion object Key : AsyncContextKey<FileWatchReactorElement>
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<FileWatchReactorElement>
 
     val events: ReceiveChannel<FileEvent>
     override val key: CoroutineContext.Key<*>
 
-    override suspend fun open()
+    suspend fun open()
     override suspend fun drain()
-    override suspend fun close()
+    suspend fun close()
 }
 
 /** Segment names pruned during the initial walk (shared default across targets). */

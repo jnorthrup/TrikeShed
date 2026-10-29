@@ -19,9 +19,6 @@ class CurationElement(
     val supervisor = SupervisorJob(scope.coroutineContext[Job])
     val scope = CoroutineScope(fileIoContext + scope.coroutineContext + this + supervisor)
     val admission = Mutex()
-    val draining = Mutex()
-    var accepting = true
-        private set
     val input = Channel.buffered<Work>(capacity.also { require(it > 0) })
     val places = Semaphore(capacity)
     val answers = Channel.buffered<Answer>(capacity)
@@ -75,12 +72,10 @@ class CurationElement(
         val workContext = context ?: currentCoroutineContext()
         places.acquire()
         try {
-            return admission.withLock {
-                check(accepting && supervisor.isActive && admissible()) { "curation is not accepting work" }
-                val reply = CompletableDeferred<Result<Unit>>()
-                check(input.kChannel.trySend(Work(workContext, block, reply, failed)).isSuccess)
-                reply
-            }
+            check(supervisor.isActive && admissible()) { "curation is not accepting work" }
+            val reply = CompletableDeferred<Result<Unit>>()
+            check(input.kChannel.trySend(Work(workContext, block, reply, failed)).isSuccess) { "curation is not accepting work" }
+            return reply
         } catch (failure: Throwable) {
             places.release()
             throw failure
@@ -91,16 +86,15 @@ class CurationElement(
     fun offer(context: CoroutineContext = scope.coroutineContext,
               failed: (Throwable) -> Unit = {}, block: suspend () -> Unit): Deferred<Result<Unit>> {
         check(places.tryAcquire()) { "curation admission is full" }
-        if (!admission.tryLock()) { places.release(); error("curation admission is busy") }
         try {
-            check(accepting && supervisor.isActive) { "curation is not accepting work" }
+            check(supervisor.isActive) { "curation is not accepting work" }
             val reply = CompletableDeferred<Result<Unit>>()
-            check(input.kChannel.trySend(Work(context, block, reply, failed)).isSuccess)
+            check(input.kChannel.trySend(Work(context, block, reply, failed)).isSuccess) { "curation is not accepting work" }
             return reply
         } catch (failure: Throwable) {
             places.release()
             throw failure
-        } finally { admission.unlock() }
+        }
     }
 
     /** Identical misses share both success and failure. A later attempt may retry a failed claim. */
@@ -113,7 +107,7 @@ class CurationElement(
                 "usage" to mapOf("input_tokens" to 0, "output_tokens" to 0)) else result
         }
         val standing = admission.withLock {
-            check(context[Key] === this || accepting && supervisor.isActive && admissible()) { "curation is not accepting work" }
+            check(context[Key] === this || !input.isClosed() && supervisor.isActive && admissible()) { "curation is not accepting work" }
             claims[identity]
         }
         if (standing != null) return joined(standing)
@@ -121,7 +115,7 @@ class CurationElement(
         var enqueued = false
         val reply = try {
             admission.withLock {
-                check(context[Key] === this || accepting && supervisor.isActive && admissible()) { "curation is not accepting work" }
+                check(context[Key] === this || !input.isClosed() && supervisor.isActive && admissible()) { "curation is not accepting work" }
                 claims[identity]?.also { answerPlaces.release() } ?: run {
                     val result = CompletableDeferred<Result<Map<String, Any?>>>()
                     val state = states.getOrPut(stateIdentity) { State() }
@@ -139,11 +133,12 @@ class CurationElement(
         return if (enqueued) reply.await().getOrThrow() else joined(reply)
     }
 
-    suspend fun stopAdmission() = admission.withLock { accepting = false; input.close() }
+    fun stopAdmission() = input.close()
 
-    private suspend fun closeLanes() = draining.withLock {
+    private suspend fun closeLanes() {
         stopAdmission()
         worker.join()
+        // Claims and lane state are recorded only for answers the open lane took.
         admission.withLock { answers.close() }
         answerJobs.joinAll()
         completion.complete(Unit)
@@ -152,7 +147,7 @@ class CurationElement(
     /** Finish admitted tasks before closing their answer lane. No cancellation substitutes for completion. */
     suspend fun drain() = withContext(NonCancellable) {
         closeLanes()
-        // The watcher also enters closeLanes in finally; never join it while holding the drain mutex.
+        // The watcher's finally enters closeLanes again; every step there is idempotent.
         cancellation.cancelAndJoin()
         supervisor.complete()
         supervisor.join()

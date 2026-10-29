@@ -1,8 +1,8 @@
 package borg.trikeshed.graal.vitals
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.PlaneFacts
@@ -82,7 +82,10 @@ class GraalFactElement(
     /** Stamp for `vitals/memory` samples. */
     private val clock: () -> Long = System::currentTimeMillis,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The collectors' scope, made at [open]. */
+    var scope: CoroutineScope? = null
 
     /** The daemon shape: one live [JvmVitals] is both the event feed and the snapshot. */
     constructor(
@@ -100,7 +103,7 @@ class GraalFactElement(
         parentJob = parentJob,
     )
 
-    companion object Key : AsyncContextKey<GraalFactElement>() {
+    companion object Key : CoroutineContext.Key<GraalFactElement> {
         const val DEFAULT_TICK_MS = 5_000L
         const val DEFAULT_DEOPT_CAP = 256
         const val DEFAULT_ALLOC_TOP_N = 32
@@ -157,10 +160,9 @@ class GraalFactElement(
     var deoptDropped: Long = 0L
         private set
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
-        val scope = CoroutineScope(supervisor + Dispatchers.Default)
+    suspend fun open() {
+        if (this.scope != null || supervisor.isCompleted) return
+        val scope = CoroutineScope(supervisor + Dispatchers.Default).also { this.scope = it }
         scope.launch { events.collect { onEvent(it) } }
         for (flow in pointcutFlows) scope.launch { flow.collect { onLanding(it) } }
         if (tickMs > 0) scope.launch {
@@ -172,8 +174,9 @@ class GraalFactElement(
                 delay(tickMs)
             }
         }
-        state = ElementState.ACTIVE
     }
+
+    suspend fun close() = supervisor.cancelAndJoin()
 
     // ── producers ────────────────────────────────────────────────
 

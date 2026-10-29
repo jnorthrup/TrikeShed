@@ -22,7 +22,7 @@ class JobSupervisorDrainTest {
         nexus.drain()
 
         assertEquals(2L, nexus.committedSequence, "drain returned before accepted commands committed")
-        assertEquals(ElementState.CLOSED, nexus.state)
+        assertTrue(nexus.rootJob.isCompleted)
     }
 
     @Test
@@ -73,7 +73,7 @@ class JobSupervisorDrainTest {
 
         nexus.cancel()
 
-        assertEquals(ElementState.CLOSED, nexus.state)
+        assertTrue(nexus.rootJob.isCancelled)
         assertTrue(nexus.commandChannelClosed)
         assertTrue(nexus.committedChannelClosed)
     }
@@ -115,10 +115,10 @@ class JobSupervisorDrainTest {
     fun drainRejectsCommandsSubmittedAfterDrainingBegins() = runTest {
         val nexus = JobSupervisorElement.open(this, capacity = 1)
 
-        // Transition to DRAINING without joining the reactor.
+        // Stop admission without joining the reactor.
         nexus.beginDrain()
 
-        assertEquals(ElementState.DRAINING, nexus.state)
+        assertTrue(nexus.commandChannelClosed && !nexus.rootJob.isCompleted)
         assertFalse(nexus.trySubmit(JobCommand.Submit(JobId.of("j-late"), "k-late")),
             "trySubmit must reject after draining begins")
 
@@ -211,7 +211,7 @@ class JobSupervisorDrainTest {
         val parentJob = kotlinx.coroutines.CompletableDeferred<Unit>()
         val parentScope = kotlinx.coroutines.CoroutineScope(parentJob)
         val nexus = JobSupervisorElement.open(parentScope, capacity = 2)
-        assertTrue(nexus.isActive)
+        assertTrue(nexus.rootJob.isActive)
 
         parentJob.cancel()
 
@@ -225,7 +225,7 @@ class JobSupervisorDrainTest {
 
         nexus.cancel()
 
-        assertEquals(ElementState.CLOSED, nexus.state)
+        assertTrue(nexus.rootJob.isCancelled)
         assertTrue(nexus.commandChannelClosed, "command channel must be closed")
         assertTrue(nexus.committedChannelClosed, "committed channel must be closed")
         assertTrue(nexus.factsChannelClosed, "C07: facts channel must be closed")

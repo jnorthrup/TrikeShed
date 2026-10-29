@@ -3,8 +3,6 @@ package borg.trikeshed.userspace.nio.process
 import borg.trikeshed.userspace.nio.channels.spi.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /** Duplex UTF-8 framing shared by parent and child; neither direction waits on guest execution. */
@@ -59,7 +57,7 @@ class ProcessFrameChannel(
     /** Flush admitted frames and half-close output; incoming replies remain readable. */
     suspend fun closeInput(): Unit = withContext(NonCancellable) { output.close() }
 
-    internal suspend fun stopInput() = output.stop()
+    internal fun stopInput() = output.end()
 
     /** Wait for peer EOF and joined cleanup without closing outgoing replies prematurely. */
     suspend fun awaitClosed() {
@@ -69,7 +67,7 @@ class ProcessFrameChannel(
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        output.stop()
+        output.end()
         awaitClosed()
     }
 
@@ -108,8 +106,6 @@ class ProcessFrameChannel(
 internal class ProcessProtocolWriter(capacity: Int) {
     init { require(capacity > 0) }
     private class Write(val bytes: ByteArray) { val completed = CompletableDeferred<Unit>() }
-    private val admission = Mutex()
-    private var accepting = true
     private val completed = CompletableDeferred<Result<Unit>>()
     private val queue = Channel<Write>(capacity, onUndeliveredElement = {
         it.completed.completeExceptionally(CancellationException("Process transport closed before write"))
@@ -137,16 +133,12 @@ internal class ProcessProtocolWriter(capacity: Int) {
 
     suspend fun send(bytes: ByteArray) {
         val write = Write(bytes)
-        admission.withLock {
-            check(accepting) { "Process transport is draining" }
-            queue.send(write)
-        }
+        queue.send(write)
         // Cancellation of the waiter does not discard an admitted write.
         write.completed.await()
     }
 
     fun end() { queue.close() }
-    suspend fun stop() = admission.withLock { accepting = false; end() }
-    suspend fun close() { stop(); completed.await().getOrThrow() }
+    suspend fun close() { end(); completed.await().getOrThrow() }
     fun complete(result: Result<Unit>) { queue.cancel(); completed.complete(result) }
 }

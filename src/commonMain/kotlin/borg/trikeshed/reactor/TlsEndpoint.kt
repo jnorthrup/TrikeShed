@@ -1,8 +1,6 @@
 package borg.trikeshed.reactor
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.forEach
 import borg.trikeshed.lib.Join
@@ -13,6 +11,10 @@ import borg.trikeshed.lib.toSeries
 import borg.trikeshed.userspace.FanoutEvent
 import borg.trikeshed.userspace.FanoutEventSubscriber
 import borg.trikeshed.userspace.nio.spi.NioSupervisor
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.serialization.Serializable
 import kotlin.concurrent.atomics.AtomicLong
@@ -46,20 +48,14 @@ class TlsElement(
     private val backend: TlsCodecBackend,
     parentJob: kotlinx.coroutines.Job? = null,
     private val ownedSupervisor: NioSupervisor? = null,
-    override val fanoutSubscribers: List<AsyncContextElement> = emptyList(),
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<TlsElement>()
+    val fanoutSubscribers: List<CoroutineContext.Element> = emptyList(),
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<TlsElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private val endpoints = linkedSetOf<BackendTlsEndpoint>()
-
-    override suspend fun open() {
-        if (state == ElementState.CREATED) {
-            super.open()
-            state = ElementState.ACTIVE
-        }
-    }
 
     fun clientEndpoint(hostname: String, port: Int = 443): TlsEndpoint =
         register(TlsRole.CLIENT j (hostname j port))
@@ -107,16 +103,16 @@ class TlsElement(
 
     override suspend fun drain() {
         endpoints.toList().forEach { it.close() }
-        super.drain()
+        supervisor.complete()
+        supervisor.join()
+        close()
     }
 
-    override suspend fun close() {
+    suspend fun close() {
         endpoints.toList().forEach { it.close() }
         endpoints.clear()
-        if (ownedSupervisor != null && ownedSupervisor.state.isLessThan(ElementState.CLOSED)) {
-            ownedSupervisor.close()
-        }
-        super.close()
+        ownedSupervisor?.close()
+        supervisor.cancelAndJoin()
     }
 }
 
@@ -124,26 +120,26 @@ suspend fun openTlsElement(
     config: TlsConfig = TlsConfig(),
     backend: TlsCodecBackend,
     parentJob: kotlinx.coroutines.Job? = null,
-    subscribers: List<AsyncContextElement> = emptyList(),
+    subscribers: List<CoroutineContext.Element> = emptyList(),
 ): TlsElement =
     TlsElement(
         config = config,
         backend = backend,
         parentJob = parentJob,
         fanoutSubscribers = subscribers,
-    ).also { it.open() }
+    )
 
 suspend fun openTlsElement(
     config: TlsConfig = TlsConfig(),
     nioSupervisor: NioSupervisor? = null,
     parentJob: kotlinx.coroutines.Job? = null,
-    subscribers: List<AsyncContextElement> = emptyList(),
+    subscribers: List<CoroutineContext.Element> = emptyList(),
 ): TlsElement {
     val contextSupervisor = currentCoroutineContext()[NioSupervisor.Key]
     val activeSupervisor = nioSupervisor ?: contextSupervisor ?: NioSupervisor()
     val ownsSupervisor = nioSupervisor == null && contextSupervisor == null
 
-    if (activeSupervisor.state == ElementState.CREATED) {
+    if (!activeSupervisor.opened.isCompleted && activeSupervisor.admission.isActive) {
         activeSupervisor.open()
     }
 
@@ -156,7 +152,7 @@ suspend fun openTlsElement(
         parentJob = parentJob,
         ownedSupervisor = activeSupervisor.takeIf { ownsSupervisor },
         fanoutSubscribers = subscribers,
-    ).also { it.open() }
+    )
 }
 
 private class BackendTlsEndpoint(
@@ -165,7 +161,8 @@ private class BackendTlsEndpoint(
     private val backend: TlsCodecBackend,
     initialState: TlsFlowState,
 ) : TlsEndpoint {
-    private var closed = false
+    /** Completes at the first [close]; the codec API ends with it. */
+    private val closed: CompletableJob = Job()
 
     override var flowState: TlsFlowState = initialState
         private set
@@ -189,17 +186,16 @@ private class BackendTlsEndpoint(
     }
 
     override suspend fun close(): TlsFrames {
-        if (closed) {
+        if (!closed.complete()) {
             return emptyTlsFrames()
         }
-        closed = true
         val frames = apply(backend.close(config, flowState))
         owner.release(this)
         return frames
     }
 
     private fun ensureOpen() {
-        check(!closed) { "TLS endpoint is closed" }
+        check(!closed.isCompleted) { "TLS endpoint is closed" }
     }
 
     private suspend fun apply(result: TlsCodecResult): TlsFrames {

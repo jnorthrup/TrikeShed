@@ -27,9 +27,12 @@ class LcncWorkgroupElement(
     private val bind: suspend (Workgroup, LcncProgram, ContentId) -> Unit,
     parentJob: Job? = null,
     private val dispatchQueued: (suspend (LcncRunQueueEntry) -> Deferred<Any?>)? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<LcncWorkgroupElement>()
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<LcncWorkgroupElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at [stopAdmission]; afterwards only live fanout dependencies are prepared. */
+    val stopped: CompletableJob = Job()
 
     private val admission = Mutex()
     private class Preparation(val owner: LcncWorkgroupElement) : AbstractCoroutineContextElement(Key) {
@@ -62,11 +65,10 @@ class LcncWorkgroupElement(
     val refusals: Map<String, String> get() = rejected
     val pinnedRegistrations: Series<Join<Workgroup, Join<String, ContentId>>> get() = pinned
 
-    override suspend fun open() {
+    suspend fun open() {
         admission.withLock {
-            if (state != ElementState.CREATED) return
+            if (this.scope != null || stopped.isCompleted) return
             supervisor.ensureActive()
-            state = ElementState.OPEN
             val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
             this.scope = scope
             rootWorker = scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -122,7 +124,6 @@ class LcncWorkgroupElement(
                     if (!input.isClosed()) input.kChannel.close(caught)
                 }
             }
-            state = ElementState.ACTIVE
         }
         refresh()
     }
@@ -131,7 +132,7 @@ class LcncWorkgroupElement(
     suspend fun refresh() {
         val barrier = CompletableDeferred<Unit>()
         admission.withLock {
-            check((state == ElementState.OPEN || state == ElementState.ACTIVE) && supervisor.isActive) {
+            check(scope != null && !stopped.isCompleted && supervisor.isActive) {
                 "LCNC manifestation is not accepting updates"
             }
             updating.value++
@@ -154,8 +155,8 @@ class LcncWorkgroupElement(
         val dependency = fanout.currentInvocation() != null
         val permit = Preparation(this)
         admission.withLock {
-            check(supervisor.isActive && (state == ElementState.OPEN || state == ElementState.ACTIVE ||
-                state == ElementState.DRAINING && dependency)) { "LCNC workgroup admission stopped" }
+            check(supervisor.isActive && (scope != null && !stopped.isCompleted ||
+                stopped.isCompleted && dependency)) { "LCNC workgroup admission stopped" }
             preparations.add(permit)
             preparing.value = preparations.size
         }
@@ -216,7 +217,7 @@ class LcncWorkgroupElement(
     /** The admitted recovery stream is lazy and starts after attachment yields to its caller. */
     suspend fun recover(entries: Sequence<LcncRunQueueEntry>) {
         admission.withLock {
-            check(state == ElementState.OPEN || state == ElementState.ACTIVE) { "LCNC recovery admission stopped" }
+            check(scope != null && !stopped.isCompleted) { "LCNC recovery admission stopped" }
             check(dispatchQueued != null && recovery == null) { "LCNC recovery is unavailable or already installed" }
             val permit = Preparation(this)
             preparations.add(permit)
@@ -247,7 +248,7 @@ class LcncWorkgroupElement(
     /** Stop external preparations and manifestation without joining work that can still need descendants. */
     suspend fun stopAdmission(): Unit = withContext(NonCancellable) {
         admission.withLock {
-            if (state < ElementState.DRAINING) state = ElementState.DRAINING
+            stopped.complete()
             stopping.value = true
         }
     }
@@ -271,12 +272,11 @@ class LcncWorkgroupElement(
         if (consumer == null) completion.complete(Result.success(Unit))
         supervisor.complete()
         supervisor.join()
-        state = ElementState.CLOSED
         queuedFailure?.let { throw it }
         completion.await().getOrThrow()
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 
     private fun publish() {
         registered = bound.values.toTypedArray().toSeries()

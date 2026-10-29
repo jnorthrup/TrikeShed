@@ -2,7 +2,7 @@
 
 package borg.trikeshed.litebike
 
-import borg.trikeshed.context.AsyncContextElement
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.litebike.taxonomy.Protocol
 
 /**
@@ -16,7 +16,7 @@ import borg.trikeshed.litebike.taxonomy.Protocol
  *
  * Where it lives in the picture:
  *   - [LitebikeListenerElement] already owns one CCEK element with a
- *     `fanoutSubscribers: List<AsyncContextElement>` surface.
+ *     `fanoutSubscribers: List<CoroutineContext.Element>` surface.
  *   - Per-protocol worker `ChannelWorkgroupSlot`s accept inbound bytes
  *     via `accept(protocol, payload)`.
  *   - This event hooks the moment **after** the listener has classified
@@ -30,7 +30,7 @@ import borg.trikeshed.litebike.taxonomy.Protocol
  *   element.subscribe(myObserver)              // global fanout
  *   element.subscribeTo(Protocol.Socks5, obs) // per-protocol
  *
- * Any [AsyncContextElement] that wants to be a recipient implements
+ * Any [CoroutineContext.Element] that wants to be a recipient implements
  * [LitebikeFanoutEventSink.onLitebikeFanoutEvent] via the duck-typed
  * `onFanoutEvent` convention [HtxElement] already uses.
  */
@@ -54,7 +54,7 @@ data class LitebikeFanoutEvent(
 /**
  * Heuristic: the CCEK shape preferred by this codebase (`HtxElement`,
  * `SctpElement`, `LitebikeListenerElement`) accepts subscribers as
- * `AsyncContextElement`s and matches those that implement a duck-typed
+ * `CoroutineContext.Element`s and matches those that implement a duck-typed
  * sink by name (`onFanoutEvent`). This file keeps the explicit interface
  * separate from the duck-typed lookup so downstream code can declare
  * intent explicitly without reflection.
@@ -77,7 +77,7 @@ object LitebikeFanoutBridge {
      * `onFanoutEvent(frame)` and the explicit `onLitebikeFanoutEvent`
      * hooks where present.
      */
-    fun bridge(listener: LitebikeListenerElement, subscriber: AsyncContextElement) {
+    fun bridge(listener: LitebikeListenerElement, subscriber: CoroutineContext.Element) {
         // If the subscriber is already a Sink and the listener exposes
         // its own sink list, defer to the listener's explicit API.
         listener.subscribe(subscriber)

@@ -1,6 +1,5 @@
 package borg.trikeshed.graal.vitals
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.lcnc.PointcutMark
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.DagCoordinate
@@ -327,9 +326,9 @@ class GraalFactElementTest {
             mapOf("memory" to mapOf("heapUsed" to 1L, "heapCommitted" to 2L, "heapMax" to 3L, "metaspaceUsed" to 4L))
         }, tickMs = 20)
 
-        assertEquals(ElementState.CREATED, el.state)
+        assertNull(el.scope)
         el.open()
-        assertEquals(ElementState.ACTIVE, el.state)
+        assertTrue(el.scope != null && el.supervisor.isActive)
 
         // collectors are subscribed once open() returned? SharedFlow has no replay here, so wait for subscription.
         withTimeout(5_000) { while (events.subscriptionCount.value == 0 || landings.subscriptionCount.value == 0) delay(5) }
@@ -341,7 +340,7 @@ class GraalFactElementTest {
         assertEquals(1L, fact(net, "gc/G1 Young")!!.fields["collections"])
 
         el.close()
-        assertEquals(ElementState.CLOSED, el.state)
+        assertTrue(el.supervisor.isCompleted)
         val applied = el.factsApplied
         events.tryEmit(gcEvent("G1 Young", 1, "after-close", 2))
         delay(60)

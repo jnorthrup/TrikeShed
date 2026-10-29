@@ -1,6 +1,5 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.runBlocking
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -61,7 +60,7 @@ class LcncNodeElementTest {
             assertSame(node, element.node)
             assertSame(inputs, element.inputs)
             assertSame(host, context[Host])
-            assertEquals(ElementState.ACTIVE, element.lifecycleState)
+            assertTrue(element.consumed.isCompleted && element.admission.isActive)
             assertEquals(node, seen)
             assertEquals(inputs, values)
             mapOf("value" to "ready")
@@ -70,7 +69,6 @@ class LcncNodeElementTest {
         val element = assertNotNull(captured)
         assertEquals(mapOf("value" to "ready"), result)
         assertEquals(result, element.result)
-        assertEquals(ElementState.CLOSED, element.lifecycleState)
         assertTrue(element.supervisor.isCompleted)
         assertNull(currentCoroutineContext()[LcncNodeKey.TEXT_VALUE])
     }
@@ -98,20 +96,19 @@ class LcncNodeElementTest {
             val element = LcncNodeKey.TEXT_VALUE.construct(LcncNode("n", "text.value"), emptyMap(),
                 LcncNodeRunner { _, _ -> entered.complete(Unit); release.await(); mapOf("value" to 1) },
                 currentCoroutineContext().job)
-            assertEquals(ElementState.CREATED, element.lifecycleState)
             element.open()
-            assertEquals(ElementState.OPEN, element.lifecycleState)
+            assertTrue(element.admission.isActive && !element.consumed.isCompleted)
             val execution = async { element.execute() }
             entered.await()
             val draining = async { element.drain() }
             yield()
-            assertEquals(ElementState.DRAINING, element.lifecycleState)
+            assertFalse(element.admission.isActive)
             assertFalse(draining.isCompleted)
             assertFailsWith<IllegalStateException> { element.execute() }
             release.complete(Unit)
             assertEquals(1, execution.await()["value"])
             draining.await()
-            assertEquals(ElementState.CLOSED, element.lifecycleState)
+            assertTrue(element.supervisor.isCompleted)
             element.close()
             assertFailsWith<IllegalStateException> { element.open() }
             Unit
@@ -153,7 +150,7 @@ class LcncNodeElementTest {
             parent.cancel()
             assertFailsWith<CancellationException> { execution.await() }
             parent.join()
-            assertEquals(ElementState.CLOSED, element.lifecycleState)
+            assertTrue(element.supervisor.isCompleted)
             assertNull(element.result)
             assertTrue(element.supervisor.isCompleted)
         }
@@ -166,7 +163,6 @@ class LcncNodeElementTest {
             LcncNodeRunner { _, _ -> throw failure }, currentCoroutineContext().job)
         val caught = assertFailsWith<IllegalArgumentException> { element.execute() }
         assertSame(failure, caught)
-        assertEquals(ElementState.CLOSED, element.lifecycleState)
         assertTrue(element.supervisor.isCompleted)
         assertTrue(currentCoroutineContext().job.isActive)
     }

@@ -1,7 +1,8 @@
 package borg.trikeshed.torrent
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.monotonicNanoTime
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.nio.ByteBuffer
@@ -9,6 +10,8 @@ import borg.trikeshed.userspace.nio.UringIOException
 import borg.trikeshed.userspace.nio.channels.sockaddrIpv4
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.channels.getOrElse
 import kotlinx.coroutines.selects.onTimeout
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Mutex
@@ -28,19 +31,21 @@ private fun utpParent(scope: CoroutineScope, port: Int): Job {
  */
 class UtpManager(
     scope: CoroutineScope, private val bindPort: Int = 0, val limits: UtpLimits = UtpLimits(),
-) : AsyncContextElement(parentJob = utpParent(scope, bindPort)) {
+) : CoroutineContext.Element, Drain {
     companion object Key : CoroutineContext.Key<UtpManager>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(utpParent(scope, bindPort))
+    /** Completes when close begins; connects refuse after it. */
+    val stopped: CompletableJob = Job()
     private val context = scope.coroutineContext + supervisor + this
-    private val admission = Mutex()
-    private val termination = Mutex()
+    /** Guards [streams]; [close] completes [stopped] under it, so every registered stream is closed. */
+    private val registry = Mutex()
     private val permits = Semaphore(limits.maxConnections)
     private val streams = mutableSetOf<UtpStream>()
 
-    suspend fun start() = admission.withLock {
+    suspend fun start() {
         supervisor.ensureActive()
-        check(state < ElementState.DRAINING) { "uTP manager is draining" }
-        state = ElementState.ACTIVE
+        check(!stopped.isCompleted) { "uTP manager is draining" }
     }
 
     suspend fun connect(address: PeerAddress, connId: Int = Random.nextInt(65536)): UtpStream = withTimeout(limits.connectTimeoutMillis) {
@@ -50,10 +55,10 @@ class UtpManager(
         permits.acquire()
         var stream: UtpStream? = null
         try {
-            admission.withLock {
-                check(state < ElementState.DRAINING) { "uTP manager is draining" }
+            registry.withLock {
+                check(!stopped.isCompleted) { "uTP manager is draining" }
                 stream = UtpStream(address, CoroutineScope(context), limits, connId, sockaddr, bindPort) { ended ->
-                    admission.withLock { streams.remove(ended) }
+                    registry.withLock { streams.remove(ended) }
                     permits.release()
                 }.also { streams.add(it) }
             }
@@ -69,25 +74,20 @@ class UtpManager(
         }
     }
 
-    override suspend fun close() = withContext(NonCancellable) {
-        termination.withLock {
-            val active = admission.withLock {
-                if (state == ElementState.CLOSED) return@withLock null
-                state = ElementState.DRAINING
-                streams.toList()
-            } ?: return@withLock
-            var failure: Throwable? = null
-            // Admit every close before joining, so their bounded FIN deadlines run concurrently.
-            for (stream in active) try { stream.beginClose() } catch (cause: Throwable) {
-                if (failure == null) failure = cause else failure!!.addSuppressed(cause)
-            }
-            for (stream in active) try { stream.awaitClose() } catch (cause: Throwable) {
-                if (failure == null) failure = cause else failure!!.addSuppressed(cause)
-            }
-            supervisor.complete(); supervisor.join(); state = ElementState.CLOSED
-            failure?.let { throw it }
-            Unit
+    suspend fun close() = withContext(NonCancellable) {
+        val active = registry.withLock { if (stopped.complete()) streams.toList() else null }
+            ?: return@withContext supervisor.join()
+        var failure: Throwable? = null
+        // Admit every close before joining, so their bounded FIN deadlines run concurrently.
+        for (stream in active) try { stream.beginClose() } catch (cause: Throwable) {
+            if (failure == null) failure = cause else failure!!.addSuppressed(cause)
         }
+        for (stream in active) try { stream.awaitClose() } catch (cause: Throwable) {
+            if (failure == null) failure = cause else failure!!.addSuppressed(cause)
+        }
+        supervisor.complete(); supervisor.join()
+        failure?.let { throw it }
+        Unit
     }
     override suspend fun drain() = close()
 }
@@ -101,29 +101,28 @@ class UtpStream internal constructor(
     private val sockaddr: ByteArray,
     private val bindPort: Int,
     private val released: suspend (UtpStream) -> Unit,
-) : AsyncContextElement(parentJob = requireNotNull(scope.coroutineContext[Job])), PeerStream {
+) : CoroutineContext.Element, PeerStream, Drain {
     companion object Key : CoroutineContext.Key<UtpStream>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(requireNotNull(scope.coroutineContext[Job]))
     private val context = scope.coroutineContext + supervisor + this
     private val ring = try { TorrentSocketRing(CoroutineScope(context)) }
         catch (failure: Throwable) { supervisor.complete(); throw failure }
     private val protocol = UtpSocket(connId, limits = limits)
+    /** Reads and writes; closing it begins the FIN exchange once the worker has taken every admitted command. */
     private val commands = Channel<Command>(8)
     private val setup = Mutex()
     private val reads = Mutex()
     private val writes = Mutex()
-    private val admission = Mutex()
     private val connected = CompletableDeferred<Unit>()
     private val finished = CompletableDeferred<Unit>()
     private var fd = -1
     private var worker: Job? = null
-    private var closing = false
     private var closeFailure: Throwable? = null
 
     private sealed interface Command {
         class Read(val maximum: Int, val reply: CompletableDeferred<ByteArray>) : Command
         class Write(val bytes: ByteArray, val reply: CompletableDeferred<Unit>) : Command
-        data object Close : Command
     }
 
     internal suspend fun establish(): Unit = coroutineScope {
@@ -134,7 +133,7 @@ class UtpStream internal constructor(
             try { awaitCancellation() } finally { if (!accepted.isCompleted) ring.close() }
         }
         try { setup.withLock {
-            check(!closing)
+            check(!commands.isClosedForSend)
             try {
                 // SOCK_NONBLOCK is explicit: polling must never strand SEND behind a blocking RECV.
                 fd = utpResult(UringOp.SOCKET, ring.execute(UringOp.SOCKET, 2, length = 17, offset = (2 or 0x800).toLong()))
@@ -148,7 +147,6 @@ class UtpStream internal constructor(
                     if (result != -11 && result != -4 && result != -115 && result != -114) utpResult(UringOp.CONNECT, result)
                     delay(limits.tickMillis)
                 }
-                state = ElementState.ACTIVE
                 worker = CoroutineScope(context).launch(start = CoroutineStart.UNDISPATCHED) { run() }
             } catch (failure: Throwable) {
                 dispose(failure)
@@ -169,10 +167,8 @@ class UtpStream internal constructor(
         }
         val reply = CompletableDeferred<ByteArray>()
         try {
-            admission.withLock {
-                if (closing) { reply.complete(byteArrayOf()); return@withLock }
-                commands.send(Command.Read(maxBytes, reply))
-            }
+            try { commands.send(Command.Read(maxBytes, reply)) }
+            catch (_: ClosedSendChannelException) { return@withLock byteArrayOf() }
             reply.await()
         } catch (failure: Throwable) {
             reply.cancel()
@@ -188,10 +184,7 @@ class UtpStream internal constructor(
                 while (offset < bytes.size) {
                     val end = minOf(bytes.size, offset + limits.sendBytes)
                     val reply = CompletableDeferred<Unit>()
-                    admission.withLock {
-                        check(!closing && !finished.isCompleted) { "uTP stream is draining" }
-                        commands.send(Command.Write(bytes.copyOfRange(offset, end), reply))
-                    }
+                    commands.send(Command.Write(bytes.copyOfRange(offset, end), reply))
                     try { reply.await() } catch (failure: Throwable) { reply.cancel(); throw failure }
                     offset = end
                 }
@@ -206,13 +199,7 @@ class UtpStream internal constructor(
     }
 
     internal suspend fun beginClose() {
-        setup.withLock {
-            admission.withLock {
-                if (closing || finished.isCompleted) return
-                closing = true; state = ElementState.DRAINING
-                if (worker == null) dispose(null) else commands.send(Command.Close)
-            }
-        }
+        setup.withLock { if (commands.close() && worker == null) dispose(null) }
     }
     internal suspend fun awaitClose() = withContext(NonCancellable) {
         finished.await(); supervisor.join()
@@ -223,12 +210,7 @@ class UtpStream internal constructor(
     override suspend fun drain() = close()
 
     internal suspend fun reject(failure: Throwable) = withContext(NonCancellable) {
-        setup.withLock {
-            if (!finished.isCompleted) {
-                closing = true
-                if (worker == null) dispose(failure) else commands.close(failure)
-            }
-        }
+        setup.withLock { if (commands.close(failure) && worker == null) dispose(failure) }
         finished.await(); supervisor.join()
     }
 
@@ -271,7 +253,13 @@ class UtpStream internal constructor(
                 if (protocol.state == UtpState.CLOSED && wire == null) break
                 if (closeAt?.let { monotonicNanoTime() >= it } == true) error("uTP FIN drain timed out")
                 select<Unit> {
-                    commands.onReceive { command ->
+                    if (closeAt == null) commands.onReceiveCatching received@{ result ->
+                        val command = result.getOrElse { cause ->
+                            if (cause != null) throw cause
+                            closeAt = monotonicNanoTime() + limits.closeTimeoutMillis * 1_000_000
+                            protocol.close()
+                            return@received
+                        }
                         try { when (command) {
                             is Command.Read -> {
                                 check(read == null || read!!.reply.isCancelled) { "uTP read already pending" }
@@ -282,15 +270,10 @@ class UtpStream internal constructor(
                                 check(protocol.send(command.bytes) == command.bytes.size) { "uTP send admission mismatch" }
                                 write = command
                             }
-                            Command.Close -> {
-                                closeAt = monotonicNanoTime() + limits.closeTimeoutMillis * 1_000_000
-                                protocol.close()
-                            }
                         } } catch (cause: Throwable) {
                             when (command) {
                                 is Command.Read -> command.reply.completeExceptionally(cause)
                                 is Command.Write -> command.reply.completeExceptionally(cause)
-                                Command.Close -> Unit
                             }
                             throw cause
                         }
@@ -308,7 +291,6 @@ class UtpStream internal constructor(
             while (true) when (val command = commands.tryReceive().getOrNull() ?: break) {
                 is Command.Read -> if (failure == null) command.reply.complete(byteArrayOf()) else command.reply.completeExceptionally(cause)
                 is Command.Write -> command.reply.completeExceptionally(cause)
-                Command.Close -> Unit
             }
             dispose(failure)
         }
@@ -325,7 +307,7 @@ class UtpStream internal constructor(
             try { ring.close() } catch (cleanup: Throwable) {
                 if (closeFailure == null) closeFailure = cleanup else closeFailure!!.addSuppressed(cleanup)
             }
-            fd = -1; state = ElementState.CLOSED
+            fd = -1
             try { released(this@UtpStream) } finally {
                 supervisor.complete(); finished.complete(Unit)
             }

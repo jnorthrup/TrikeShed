@@ -21,8 +21,8 @@ import kotlin.coroutines.CoroutineContext
  *  Generic over source carrier type (CharSeries, ByteSeries, etc.).
  *
  *  A ParseScope is a CoroutineContext.Element that:
- *    - holds a SupervisorJob (one child failure doesn't cancel siblings)
- *    - tracks forward-only lifecycle: CREATED→OPEN→ACTIVE→DRAINING→CLOSED
+ *    - holds a SupervisorJob (one child failure doesn't cancel siblings);
+ *      the Job is its lifecycle: active admits, completed is sealed
  *    - supports subscriber fanout (downstream consumers receive results)
  *    - can fan out to child scopes (concurrent sub-parsers)
  *
@@ -30,16 +30,6 @@ import kotlin.coroutines.CoroutineContext
  *  Sealing is the synchronization boundary — a scope seals when all
  *  children have sealed. Readers see immutable sealed scopes.
  * ═══════════════════════════════════════════════════════════════════════════ */
-
-
-/** Forward-only lifecycle for parse scopes. */
-enum class ParseLifecycle {
-    CREATED,    // scope created, not yet started
-    OPEN,       // subscribed, ready to activate
-    ACTIVE,     // parsing in progress
-    DRAINING,   // all children done, finalizing
-    CLOSED      // sealed, immutable
-}
 
 /** A subscriber that receives parse results as scopes seal. */
 fun interface ParseSubscriber {
@@ -67,11 +57,9 @@ class ParseScope(
     parentContext: CoroutineContext? = null,
 ) : AbstractCoroutineContextElement(ParseScopeKey) {
 
+    /** Admits subscribers and child scopes until it completes; [close] completes it once every child scope has. */
     val supervisor: CompletableJob =
         if (parentContext == null) SupervisorJob() else SupervisorJob(parentContext[Job])
-
-   var _state: ParseLifecycle = ParseLifecycle.CREATED
-    val lifecycleState: ParseLifecycle get() = _state
 
    val subs = mutableListOf<ParseSubscriber>()
    val children = mutableListOf<ParseScope>()
@@ -82,30 +70,12 @@ class ParseScope(
     val resultCount: Int get() = results.size
 
     fun subscribe(subscriber: ParseSubscriber) {
-        check(_state == ParseLifecycle.CREATED || _state == ParseLifecycle.OPEN) {
-            "cannot subscribe in state $_state"
-        }
+        check(supervisor.isActive) { "cannot subscribe to a sealed scope" }
         subs.add(subscriber)
     }
 
-    fun open() {
-        check(_state == ParseLifecycle.CREATED) { "open() requires CREATED, was $_state" }
-        _state = ParseLifecycle.OPEN
-    }
-
-    fun activate() {
-        check(_state == ParseLifecycle.OPEN) { "activate() requires OPEN, was $_state" }
-        _state = ParseLifecycle.ACTIVE
-    }
-
-    fun drain() {
-        if (_state == ParseLifecycle.CLOSED) return
-        _state = ParseLifecycle.DRAINING
-    }
-
+    /** Seals the scope: [supervisor] completes once every child scope has. */
     fun close() {
-        if (_state == ParseLifecycle.CLOSED) return
-        _state = ParseLifecycle.CLOSED
         supervisor.complete()
     }
 
@@ -128,9 +98,7 @@ class ParseScope(
      * Create a child scope for a sub-region.
      */
     fun childScope(childSpan: Twin<Int>): ParseScope {
-        check(_state == ParseLifecycle.ACTIVE || _state == ParseLifecycle.OPEN) {
-            "childScope requires ACTIVE or OPEN, was $_state"
-        }
+        check(supervisor.isActive) { "childScope requires an unsealed scope" }
         val child = ParseScope(source, childSpan, supervisor)
         children.add(child)
         return child
@@ -146,10 +114,7 @@ class ParseScope(
         identify: (Series<Char>, Twin<Int>) -> Series<Twin<Int>>,
         childParser: (Series<Char>, Twin<Int>) -> Any?,
     ): Series<Any?> {
-        check(_state == ParseLifecycle.OPEN || _state == ParseLifecycle.ACTIVE) {
-            "fanout requires OPEN or ACTIVE, was $_state"
-        }
-        _state = ParseLifecycle.ACTIVE
+        check(supervisor.isActive) { "fanout requires an unsealed scope" }
 
         val childSpans = identify(source, span)
         val collected = mutableListOf<Any?>()
@@ -158,21 +123,18 @@ class ParseScope(
             for (i in 0 until childSpans.size) {
                 val childSpan = childSpans[i]
                 val child = childScope(childSpan)
-                child.open()
                 launch {
-                    child.activate()
                     val result = childParser(child.source, childSpan)
                     if (result != null) {
                         child.emit(result)
                         collected.add(result)
                     }
-                    child.drain()
                     child.close()
                 }
             }
         }
 
-        _state = ParseLifecycle.DRAINING
+        close()
         return collected.size j { i: Int -> collected[i] }
     }
 
@@ -186,10 +148,7 @@ class ParseScope(
         identify: (Series<Char>, Twin<Int>) -> Series<Join<Twin<Int>, Int>>,
         childParserFactory: (Int) -> (Series<Char>, Twin<Int>) -> T?,
     ): Series<T> {
-        check(_state == ParseLifecycle.OPEN || _state == ParseLifecycle.ACTIVE) {
-            "fanoutParsers requires OPEN or ACTIVE, was $_state"
-        }
-        _state = ParseLifecycle.ACTIVE
+        check(supervisor.isActive) { "fanoutParsers requires an unsealed scope" }
 
         val childEntries = identify(source, span)
         val collected = mutableListOf<T>()
@@ -200,23 +159,20 @@ class ParseScope(
                 val childSpan = entry.a
                 val tag = entry.b
                 val child = childScope(childSpan)
-                child.open()
                 val childParser = childParserFactory(tag)
                 launch {
-                    child.activate()
                     val result = childParser(child.source, childSpan)
                     if (result != null) {
                         @Suppress("UNCHECKED_CAST")
                         child.emit(result as Any?)
                         collected.add(result)
                     }
-                    child.drain()
                     child.close()
                 }
             }
         }
 
-        _state = ParseLifecycle.DRAINING
+        close()
         return collected.size j { i: Int -> collected[i] }
     }
 }
@@ -238,10 +194,7 @@ suspend fun <T> withParseScope(
     parser: suspend (Series<Char>, Twin<Int>) -> T?,
 ): Join<T, ParseScope> {
     val scope = ParseScope(source, 0 j source.size)
-    scope.open()
-    scope.activate()
     val result = parser(source, scope.span)
-    scope.drain()
     scope.close()
     return (result ?: error("root parser returned null")) j scope
 }

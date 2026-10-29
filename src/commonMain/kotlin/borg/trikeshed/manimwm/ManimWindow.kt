@@ -1,8 +1,6 @@
 package borg.trikeshed.manimwm
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.Job
 
 /**
@@ -11,7 +9,7 @@ import kotlinx.coroutines.Job
  */
 class ManimWindowElement(
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<ManimWindowElement>()
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<ManimWindowElement>
     override val key = Key
 }

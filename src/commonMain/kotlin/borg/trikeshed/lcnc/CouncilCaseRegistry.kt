@@ -125,18 +125,17 @@ class CouncilCaseRegistry(
         var seeded = instance.lifecycle(jobId) == "active" || terminal
         var terminalAt = 0L
         var pins = 0
-        var closing = false
-        var closed: CompletableDeferred<Unit>? = null
-        var evicted = false
+        /** Completes when this entry is claimed for closing; [closed] completes once that close has finished. */
+        val closing: CompletableJob = Job()
+        val closed: CompletableJob = Job()
     }
 
     private val entriesLock = Mutex()
     private val entries = LinkedHashMap<String, CaseEntry>()
     private val operations = MutableStateFlow(0)
+    /** Completes when [drain] begins: new operations are refused and later drains await the first. */
+    private val admission: CompletableJob = Job()
     private val drained = CompletableDeferred<Result<Unit>>()
-    @Volatile private var accepting = true
-    @Volatile private var aborted = false
-    private var drainStarted = false
     private var terminalClock = 0L
 
     private companion object {
@@ -153,7 +152,7 @@ class CouncilCaseRegistry(
         "fail", reason,
     )
 
-    fun liveCases(): Int = if (aborted) 0 else entries.values.count { !it.evicted }
+    fun liveCases(): Int = if (ownerJob.isCancelled) 0 else entries.values.count { !it.closed.isCompleted }
     fun recordedCid(caseId: String): String? = entries[caseId]?.lastRecordedCid
     fun lifecycle(caseId: String): String? = entries[caseId]?.let { it.instance.lifecycle(it.jobId) }
     fun revision(caseId: String): Long? = entries[caseId]?.let { it.instance.revision(it.jobId) }
@@ -165,7 +164,7 @@ class CouncilCaseRegistry(
             val call = checkNotNull(currentCoroutineContext()[Call])
             val view = Case(caseId, JobId.of(entry.jobId), entry.instance.nexus, entry.cas,
                 guard = { check(currentCoroutineContext()[Call] === call) { "Council case view belongs to another callback" } },
-                readOnly = entry.evicted || entry.terminal || entry.instance.lifecycle(entry.jobId) in setOf("closed", "failed"),
+                readOnly = entry.closed.isCompleted || entry.terminal || entry.instance.lifecycle(entry.jobId) in setOf("closed", "failed"),
                 seedCase = { seedKey, startKey ->
                     if (!entry.seeded) {
                         seed(entry, seedKey, startKey)
@@ -185,8 +184,8 @@ class CouncilCaseRegistry(
         val entry = acquire(caseId, create)
         try {
             return entry.mutex.withLock {
-                check(!aborted && parentJob.isActive && (entry.childJob.isActive ||
-                    entry.evicted && entry.terminal && entry.childJob.isCompleted)) { "Council case owner stopped" }
+                check(!ownerJob.isCancelled && parentJob.isActive && (entry.childJob.isActive ||
+                    entry.closed.isCompleted && entry.terminal && entry.childJob.isCompleted)) { "Council case owner stopped" }
                 withContext(Call(this, caseId, caller)) { body(entry) }
             }
         } finally {
@@ -208,27 +207,26 @@ class CouncilCaseRegistry(
 
     private suspend fun acquire(caseId: String, create: Boolean): CaseEntry {
         entriesLock.withLock {
-            check(accepting && !aborted && parentJob.isActive) { "Council case admission stopped" }
+            check(admission.isActive && !ownerJob.isCancelled && parentJob.isActive) { "Council case admission stopped" }
             operations.value++ // Includes an admitted open/eviction preparation before its entry pin exists.
         }
         try {
             while (true) {
                 var victim: CaseEntry? = null
-                var closing: Deferred<Unit>? = null
+                var closing: Job? = null
                 var inactive: CaseEntry? = null
                 val found = entriesLock.withLock {
-                    check(!aborted && parentJob.isActive) { "Council case owner stopped during admission" }
+                    check(!ownerJob.isCancelled && parentJob.isActive) { "Council case owner stopped during admission" }
                     entries[caseId]?.let { entry ->
-                        if (entry.closing) closing = checkNotNull(entry.closed)
+                        if (entry.closing.isCompleted && !entry.closed.isCompleted) closing = entry.closed
                         else { entry.pins++; return@withLock entry }
                         return@withLock null
                     }
-                    if (entries.values.count { !it.evicted } >= cap) {
-                        victim = entries.values.filter { !it.evicted && !it.closing && it.terminal && it.pins == 0 }
+                    if (entries.values.count { !it.closed.isCompleted } >= cap) {
+                        victim = entries.values.filter { !it.closed.isCompleted && !it.closing.isCompleted && it.terminal && it.pins == 0 }
                             .minByOrNull { it.terminalAt }
                         val selected = victim ?: throw Capacity(cap)
-                        selected.closing = true
-                        selected.closed = CompletableDeferred()
+                        selected.closing.complete()
                         return@withLock null
                     }
                     val source = componentFactories(caseId)
@@ -239,12 +237,11 @@ class CouncilCaseRegistry(
                             source.indexFactory, source.reteFactory, source.projectionFactory, source.checkpointFactory)
                     }
                     // The global lock reserves capacity before any child/nexus allocation.
-                    check(!aborted && parentJob.isActive) { "Council case owner stopped during preparation" }
+                    check(!ownerJob.isCancelled && parentJob.isActive) { "Council case owner stopped during preparation" }
                     val entry = CaseEntry(caseId, factories)
                     entries[caseId] = entry
-                    if (aborted || !parentJob.isActive || !entry.childJob.isActive) {
-                        entry.closing = true
-                        entry.closed = CompletableDeferred()
+                    if (ownerJob.isCancelled || !parentJob.isActive || !entry.childJob.isActive) {
+                        entry.closing.complete()
                         inactive = entry
                         null
                     } else { entry.pins++; entry }
@@ -254,7 +251,7 @@ class CouncilCaseRegistry(
                     closeEntry(it)
                     error("Council case parent stopped during open")
                 }
-                closing?.await()
+                closing?.join()
                 victim?.let { closeEntry(it) }
             }
         } catch (failure: Throwable) {
@@ -331,18 +328,14 @@ class CouncilCaseRegistry(
     /** Stop new operations, finish admitted callbacks/receipts, then drain every nexus and child. */
     suspend fun drain(): Unit = withContext(NonCancellable) {
         check(!currentCoroutineContext()[Call].contains(this@CouncilCaseRegistry)) { "Council case cannot drain its own registry" }
-        val leader = entriesLock.withLock {
-            if (drainStarted) false else { drainStarted = true; accepting = false; true }
-        }
+        val leader = entriesLock.withLock { admission.complete() }
         if (!leader) { drained.await().getOrThrow(); return@withContext }
         var failure: Throwable? = null
         try {
             operations.first { it == 0 }
             val pending = entriesLock.withLock {
-                entries.values.filter { !it.evicted || !it.childJob.isCompleted }.onEach { entry ->
-                    check(!entry.closing)
-                    entry.closing = true
-                    entry.closed = CompletableDeferred()
+                entries.values.filter { !it.closed.isCompleted || !it.childJob.isCompleted }.onEach { entry ->
+                    check(entry.closing.complete())
                 }
             }
             for (entry in pending) try { closeEntry(entry) }
@@ -367,7 +360,7 @@ class CouncilCaseRegistry(
                             val event = entry.instance.nexus.committed.receiveCatching()
                             if (event.isClosed) {
                                 event.exceptionOrNull()?.let {
-                                    if (failure == null && !(it is CancellationException && (aborted || !parentJob.isActive))) failure = it
+                                    if (failure == null && !(it is CancellationException && (ownerJob.isCancelled || !parentJob.isActive))) failure = it
                                 }
                                 break
                             }
@@ -382,19 +375,13 @@ class CouncilCaseRegistry(
         finally {
             if (failure != null) entry.childJob.cancel() else entry.childJob.complete()
             entry.childJob.join()
-            entriesLock.withLock {
-                entry.evicted = true
-                entry.closing = false
-                entry.closed?.complete(Unit)
-            }
+            entriesLock.withLock { entry.closed.complete() }
         }
         failure?.let { throw it }
     }
 
     /** Explicit abort compatibility. Normal owners use suspend drain(). */
     fun close() {
-        aborted = true
-        accepting = false
         ownerJob.cancel() // Includes children constructed concurrently with the abort.
     }
 }

@@ -91,7 +91,7 @@ class BeliefWire(
                 }
                 val landed = review.reviewTurn(facts, turnSucceeded)
                 for ((angular, gloss) in landed) memoryFiles?.gloss(angular, gloss)
-                json(mapOf("landed" to landed.size, "bagSize" to bag.size, "factsParsed" to facts.size, "reviewState" to review.state.name))
+                json(mapOf("landed" to landed.size, "bagSize" to bag.size, "factsParsed" to facts.size, "reviewClosed" to review.admission.isCompleted))
             }
 
             method == "POST" && p == "/api/beliefs/tick" -> {

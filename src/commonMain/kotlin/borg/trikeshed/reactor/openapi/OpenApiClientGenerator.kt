@@ -56,7 +56,7 @@ fun renderClientKeys(cfg: ClientGenConfig): String {
     val bindings = ctx?.clientBindings ?: emptyList()
 
     val keyImports = buildString {
-        appendLine("import borg.trikeshed.context.AsyncContextKey")
+        appendLine("import kotlin.coroutines.CoroutineContext")
         bindings.forEach { b ->
             appendLine("import ${b.keyFqn}")
         }
@@ -72,7 +72,7 @@ fun renderClientKeys(cfg: ClientGenConfig): String {
         appendLine("object ${cfg.keysClassName} {")
         bindings.forEachIndexed { i, b ->
             if (i > 0) appendLine()
-            appendLine("    val ${b.name}: AsyncContextKey<${b.elementSimple}> = ${b.keySimple}")
+            appendLine("    val ${b.name}: CoroutineContext.Key<${b.elementSimple}> = ${b.keySimple}")
         }
         if (bindings.isEmpty()) {
             appendLine("    // No x-trikeshed-context client bindings declared in this spec")

@@ -300,7 +300,7 @@ object OroborosDaemon {
                 // child of daemonScope by construction, and one cancel of the parent ends all of
                 // it, in a `finally`, on every path including throw. Supervisor rather than plain
                 // Job so a child failing during shutdown cannot cancel its siblings mid-close —
-                // the same idiom AsyncContextElement already uses for its own elements.
+                // the same idiom each element uses for its own supervisor.
                 val daemonScope = CoroutineScope(coroutineContext + SupervisorJob(coroutineContext.job))
                 val ipnsNodes = mutableListOf<borg.trikeshed.ipns.IpnsNode>()
                 try {
@@ -574,7 +574,6 @@ object OroborosDaemon {
         node: borg.trikeshed.ipns.IpnsNode,
     ): borg.trikeshed.forge.server.CouchWire {
         val report = CouchReportReactorElement(parentJob = coroutineContext[kotlinx.coroutines.Job])
-        launch { report.open() }
         val processor = borg.trikeshed.relaxfactory.GwtCouchRequestFactory(db,
             viewServer = borg.trikeshed.couch.ViewServer(report))
         val requestFactory = borg.trikeshed.relaxfactory.RequestFactoryReactorElement(
@@ -765,7 +764,7 @@ object OroborosDaemon {
             nioSupervisor = nioSupervisor,
             parentJob = coroutineContext[kotlinx.coroutines.Job],
         )
-        HostSystem.err("[OROBOROS] HTX reactor open: ${htxElement.state} — Jules/ModelMux via TLS codec")
+        HostSystem.err("[OROBOROS] HTX reactor open — Jules/ModelMux via TLS codec")
 
         // ── MuxReactorElement: the live key+quota surface ────────────────
         // Owns lease/quota state for both ModelMux.chat/stream/embed and the
@@ -815,7 +814,7 @@ object OroborosDaemon {
                 )
             }
         }
-        HostSystem.err("[OROBOROS] MuxReactor open: ${muxReactor.state} — KeyMux/ModelMux live")
+        HostSystem.err("[OROBOROS] MuxReactor open — KeyMux/ModelMux live")
 
         // ── TorrentElement: BitTorrent v2 + uTP transport sharing HTX/TLS ──
         // Tracker announces flow through the same HtxElement → HtxReactorElement
@@ -828,7 +827,7 @@ object OroborosDaemon {
             reactorContext = htxElement + muxReactor + nioSupervisor,
         )
         torrentElement.open()
-        HostSystem.err("[OROBOROS] TorrentElement open: ${torrentElement.state} — torrent:// via HTX/TLS + uTP datagrams")
+        HostSystem.err("[OROBOROS] TorrentElement open — torrent:// via HTX/TLS + uTP datagrams")
 
         // ── The store: CAS-collapsed Couch (rev hash = body blob CID) over the forge-home CAS ──
         // Built before the HTTP tier so the server can host the PWA and the build out of it.
@@ -954,7 +953,7 @@ object OroborosDaemon {
         )
         launch {
             incrementalViews.open()
-            HostSystem.err("[OROBOROS] incremental-view registry: ${incrementalViews.state}")
+            HostSystem.err("[OROBOROS] incremental-view registry open")
         }
         // One replicator, held by both mountings: `POST _replicate` drives it as a route, and the
         // RequestFactory's `replicate` operation drives the same object inside a batch.
@@ -1078,7 +1077,7 @@ object OroborosDaemon {
                     bag.intake.send(borg.trikeshed.narsese.BeliefIntake.DecayTick)
                 }
             }
-            HostSystem.err("[OROBOROS] BeliefBag open: ${bag.state} — ${bag.size} beliefs (capacity 4096, WAL ${walDir}/belief.wal)")
+            HostSystem.err("[OROBOROS] BeliefBag open — ${bag.size} beliefs (capacity 4096, WAL ${walDir}/belief.wal)")
             bag
         } else null
 
@@ -2257,7 +2256,7 @@ object OroborosDaemon {
             walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { gitWatcher.open() }
-        HostSystem.err("[OROBOROS] Git watcher: ${gitWatcher.state} — reactive .git/** events")
+        HostSystem.err("[OROBOROS] Git watcher open — reactive .git/** events")
 
         // The Jules causal WAL is an event source, not an out-of-band operator
         // surface. External queue/review appends wake the same serialized cycle
@@ -2281,7 +2280,7 @@ object OroborosDaemon {
                 println("[OROBOROS] jules-wal-event: ${event.type}")
             }
         }
-        HostSystem.err("[OROBOROS] Jules WAL watcher: ${julesWalWatcher.state} — serialized cycle trigger")
+        HostSystem.err("[OROBOROS] Jules WAL watcher open — serialized cycle trigger")
 
         // Working-tree plane: source and document files live under Couch/CAS,
         // independently of the `.git/**` identity plane above.
@@ -2313,7 +2312,7 @@ object OroborosDaemon {
             walkerBlockedRelativePrefixes = WorktreeCouchGateway.EXCLUDED_RELATIVE_PREFIXES,
         )
         launch(Dispatchers.IO) { worktreeWatcher.open() }
-        HostSystem.err("[OROBOROS] Worktree watcher: ${worktreeWatcher.state} — reactive source/document events")
+        HostSystem.err("[OROBOROS] Worktree watcher open — reactive source/document events")
 
         launch {
             // Seismic damping: a build refeed or git fetch is thousands of events in seconds;
@@ -2466,7 +2465,7 @@ object OroborosDaemon {
 
         // ── Couch report reactor: CCEK element for map/reduce events ──
         val reportReactor = reportReactorForWires
-        HostSystem.err("[OROBOROS] Couch report reactor: ${reportReactor.state} — feeding the Graal console flourish feed")
+        HostSystem.err("[OROBOROS] Couch report reactor — feeding the Graal console flourish feed")
 
         // ── Tendon: _changes → report bus + Rete facts. Every committed revision (local write,
         //    reconcile, or a peer's replication) is a fact in the production system; the git object
@@ -2483,7 +2482,7 @@ object OroborosDaemon {
         )
         launch {
             changesFacts.open()
-            HostSystem.err("[OROBOROS] Changes→Rete tendon: ${changesFacts.state} — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
+            HostSystem.err("[OROBOROS] Changes→Rete tendon open — ${changesFacts.factsApplied} facts from the initial reconcile, commits=${reportReactor.reportState.value.commits}")
         }
 
         // ── Tendon: daemonBlackboard keys → Rete facts (partition "blackboard"). Admit table is
@@ -2506,9 +2505,9 @@ object OroborosDaemon {
         )
         launch {
             blackboardFacts.open()
-            HostSystem.err("[OROBOROS] Blackboard→Rete tendon: ${blackboardFacts.state} — ${blackboardFacts.factsApplied} facts from the initial drain of ${daemonBlackboard.keys().size} keys")
+            HostSystem.err("[OROBOROS] Blackboard→Rete tendon open — ${blackboardFacts.factsApplied} facts from the initial drain of ${daemonBlackboard.keys().size} keys")
             graalFacts.open()
-            HostSystem.err("[OROBOROS] Graal→Rete tendon: ${graalFacts.state}")
+            HostSystem.err("[OROBOROS] Graal→Rete tendon open")
             // Belt to the tee's brace: anything the network held before the observer attached is projected once.
             kifTee.prime(rete)
             HostSystem.err("[OROBOROS] Rete→KIF tee: ${kifTee.trackedCount()} facts projected into the one bank")
@@ -2589,14 +2588,13 @@ object OroborosDaemon {
                 runCatching { moduleScope.coroutineContext.job.cancelAndJoin() }
                 runCatching { headhunterWire.close() }
                 runCatching { documentReviewWire.close() }
-                runCatching { turnReview?.close() }
-                runCatching { causalityRete?.close() }
-                runCatching { curatorImpulse?.close() }
-                runCatching { beliefBag?.close() }
+                runCatching { turnReview?.drain() }
+                runCatching { causalityRete?.drain() }
+                runCatching { curatorImpulse?.drain() }
+                runCatching { beliefBag?.supervisor?.cancelAndJoin() }
                 runCatching { incrementalViews.closeAll() }
-                runCatching { reportReactor.close() }
                 runCatching { memoryIndex.close() }
-                runCatching { gitReconcileElement.close() }
+                runCatching { gitReconcileElement.supervisor.cancelAndJoin() }
                 runCatching { worktreeWatcher.close() }
                 runCatching { gitWatcher.close() }
                 runCatching { julesWalWatcher.close() }

@@ -1,6 +1,5 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
@@ -89,10 +88,10 @@ class NalNodesContextTest {
                 assertTrue(replacement.budgetOf(11L)!!.pf < 0.3f)
             }
             assertEquals(0, originalTicks.get())
-            assertEquals(ElementState.ACTIVE, replacement.state)
+            assertTrue(replacement.worker != null && replacement.supervisor.isActive)
             decay.run(LcncNode("d", "nal.decay"), emptyMap())
             await { originalTicks.get() == 1 }
-            assertEquals(ElementState.ACTIVE, original.state)
+            assertTrue(original.worker != null && original.supervisor.isActive)
         } finally {
             replacement.drain()
             original.drain()
@@ -124,7 +123,7 @@ class NalNodesContextTest {
                     val context = currentCoroutineContext()
                     assertSame(expectedBag, context[BeliefBagElement.Key], "the selected bag must actually be installed")
                     assertSame(assertNotNull(invocation), context[LcncNodeKey.NAL_MINT], "delegation must not construct another invocation")
-                    assertEquals(ElementState.ACTIVE, invocation!!.state)
+                    assertTrue(invocation!!.consumed.isCompleted && invocation!!.admission.isActive)
                     assertEquals(line, cas.get(cid)!!.decodeToString())
                     if (fail) error("model failed")
                     return """{"constructions":[{"subject":"smoke","relation":"causes","object":"alarm","polarity":true,"evidenceCid":"${cid.value}","dependency":"nsubj"}]}"""
@@ -148,7 +147,7 @@ class NalNodesContextTest {
             await { original.size == 1 }
             assertEquals(1, (first["accepted"] as List<*>).size)
             assertEquals(0, replacement.size)
-            assertEquals(ElementState.CLOSED, invocation!!.state)
+            assertTrue(invocation!!.supervisor.isCompleted)
             assertNull(currentCoroutineContext()[BeliefBagElement.Key], "default binding must not leak to the caller")
 
             expectedBag = replacement
@@ -156,15 +155,15 @@ class NalNodesContextTest {
             await { replacement.size == 1 }
             assertEquals(2, modelCalls)
             assertEquals(listOf("(causes smoke alarm)", "(causes smoke alarm)"), kif)
-            assertEquals(ElementState.CLOSED, invocation!!.state)
-            assertEquals(ElementState.ACTIVE, original.state)
-            assertEquals(ElementState.ACTIVE, replacement.state)
+            assertTrue(invocation!!.supervisor.isCompleted)
+            assertTrue(original.worker != null && original.supervisor.isActive)
+            assertTrue(replacement.worker != null && replacement.supervisor.isActive)
 
             fail = true
             val failure = runCatching { withContext(replacement) { runner.run(node, inputs) } }.exceptionOrNull()
             assertEquals("model failed", assertNotNull(failure).message)
-            assertEquals(ElementState.CLOSED, invocation!!.state)
-            assertEquals(ElementState.ACTIVE, replacement.state, "failed invocations also leave the borrowed service alive")
+            assertTrue(invocation!!.supervisor.isCompleted)
+            assertTrue(replacement.worker != null && replacement.supervisor.isActive, "failed invocations also leave the borrowed service alive")
             assertTrue(replacement.supervisor.isActive)
         } finally {
             replacement.drain()

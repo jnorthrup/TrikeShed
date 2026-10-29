@@ -56,7 +56,7 @@ class IpnsWireRouterTest {
             node.publisher.open()
             val initial = json(node.request("GET", "/api/v0/name/status"))
             assertNull(initial["latest"])
-            assertEquals("ACTIVE", initial["lifecycle"])
+            assertEquals(false, initial["closed"])
             assertEquals(0, node.puts)
             val published = node.request("POST", "/api/v0/name/publish?arg=$value")
             val result = json(published)

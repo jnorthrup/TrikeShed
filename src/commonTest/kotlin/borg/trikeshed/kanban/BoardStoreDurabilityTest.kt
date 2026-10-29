@@ -2,7 +2,6 @@ package borg.trikeshed.kanban
 
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.parse.jsonOf
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
@@ -47,7 +46,7 @@ class BoardStoreDurabilityTest {
             assertEquals(failure.message, assertFailsWith<Exception> { pending.await() }.message)
             assertTrue(wal.closed, "An unsuccessful replay releases its WAL handle")
             assertEquals(2, wal.replayed, "A committed corrupt record cannot be skipped")
-            assertEquals(ElementState.CLOSED, store.state)
+            assertTrue(store.supervisor.isCompleted)
             assertTrue(store.cards().isEmpty(), "A partial recovered board cannot become visible")
             assertEquals(0L, store.lastSequence)
             assertTrue(store.failure != null)

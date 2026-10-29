@@ -21,12 +21,18 @@ class PanelsElement(
     private val maxActions: Int = 64,
     maxPicklists: Int = 8,
     private val maxCachedPicklists: Int = 128,
-) : AsyncContextElement(ElementState.CREATED, parentJob.also {
-    require(capacity > 0 && workers > 0 && maxActions > 0 && maxPicklists > 0)
-    require(maxCachedPicklists >= maxPicklists)
-}) {
-    companion object Key : AsyncContextKey<PanelsElement>()
+) : CoroutineContext.Element, Drain {
+    init {
+        require(capacity > 0 && workers > 0 && maxActions > 0 && maxPicklists > 0)
+        require(maxCachedPicklists >= maxPicklists)
+    }
+    companion object Key : CoroutineContext.Key<PanelsElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes once [open] has opened both lanes. */
+    val opened: CompletableJob = Job()
+    /** Completes at [stopAdmission]; external action roots are refused after it. */
+    val admission: CompletableJob = Job()
 
     private class Invocation(val owner: PanelsElement) : AbstractCoroutineContextElement(Key) {
         companion object Key : CoroutineContext.Key<Invocation>
@@ -43,31 +49,26 @@ class PanelsElement(
         val failed = AtomicBoolean(false)
     }
 
-    private val lifecycle = Mutex()
     private val cacheMutex = Mutex()
-    private val accepting = AtomicBoolean(true)
-    private val opened = AtomicBoolean(false)
     private val admitted = AtomicInt(0)
     private val actions = BoardActionElement(supervisor, capacity, workers)
     private val reads = BoardActionElement(supervisor, capacity, workers)
     private val readPermits = Semaphore(maxPicklists)
     private val cache = LinkedHashMap<String, Picklist>()
 
-    override suspend fun open() = lifecycle.withLock {
-        if (opened.load()) return@withLock
-        check(state == ElementState.CREATED && accepting.load()) { "Panels owner is stopped" }
-        supervisor.ensureActive()
+    suspend fun open() {
+        if (opened.isCompleted) return
+        if (supervisor.isCancelled) supervisor.ensureActive()
+        check(admission.isActive && supervisor.isActive) { "Panels owner is stopped" }
         try {
             withContext(this@PanelsElement) { actions.open(); reads.open() }
-            state = ElementState.ACTIVE
-            opened.store(true)
+            opened.complete()
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
                 for (lane in arrayOf(actions, reads)) try { lane.drain() }
                 catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
                 supervisor.complete()
                 supervisor.join()
-                state = ElementState.CLOSED
             }
             throw failure
         }
@@ -80,7 +81,7 @@ class PanelsElement(
             if (before >= maxActions) return null
             if (admitted.compareAndSet(before, before + 1)) break
         }
-        if (!opened.load() || !accepting.load() || !supervisor.isActive) {
+        if (!opened.isCompleted || !admission.isActive) {
             admitted.fetchAndAdd(-1)
             return null
         }
@@ -165,7 +166,7 @@ class PanelsElement(
     }
 
     /** Stop external action roots; their admitted dependent reads remain available until joined. */
-    fun stopAdmission() { accepting.store(false) }
+    fun stopAdmission() { admission.complete() }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
         val current = currentCoroutineContext()
@@ -174,20 +175,17 @@ class PanelsElement(
             "A page action cannot join its own owner"
         }
         stopAdmission()
-        lifecycle.withLock {
-            var failure: Throwable? = null
-            // Reads stay open until every admitted action and its structured children has finished.
-            for (lane in arrayOf(actions, reads)) try { lane.drain() }
-            catch (caught: Throwable) {
-                if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
-            }
-            cacheMutex.withLock { cache.clear() }
-            supervisor.complete()
-            supervisor.join()
-            state = ElementState.CLOSED
-            failure?.let { throw it }
+        var failure: Throwable? = null
+        // Reads stay open until every admitted action and its structured children has finished.
+        for (lane in arrayOf(actions, reads)) try { lane.drain() }
+        catch (caught: Throwable) {
+            if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
         }
+        cacheMutex.withLock { cache.clear() }
+        supervisor.complete()
+        supervisor.join()
+        failure?.let { throw it }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

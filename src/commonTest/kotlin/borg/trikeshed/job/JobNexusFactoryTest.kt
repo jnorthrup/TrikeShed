@@ -145,8 +145,8 @@ class JobNexusFactoryTest {
                 names,
                 "successful open must record every component in assembly order",
             )
-            assertTrue(element.lifecycleState == ElementState.ACTIVE,
-                "successful open must transition element to ACTIVE")
+            assertTrue(element.rootJob.isActive && !element.commandChannelClosed,
+                "successful open must leave the element admitting commands")
         } finally {
             element.cancel()
         }

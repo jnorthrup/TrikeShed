@@ -118,7 +118,6 @@ class FuseTest {
         val element = MemoryRetrievalElement(candidates = { query ->
             listOf(Candidate("lexical", "doc-$query", 3.0, rank = 1), Candidate("vector", "doc-$query", 0.2, rank = 1, direction = Direction.LOWER_IS_BETTER), Candidate("vector", "other", 0.9, rank = 2, direction = Direction.LOWER_IS_BETTER))
         })
-        element.open(); element.activate()
         @Suppress("UNCHECKED_CAST")
         val hits = element.retrieve("q").await() as List<HybridHit>
         assertEquals(listOf("doc-q", "other"), hits.map { it.id })

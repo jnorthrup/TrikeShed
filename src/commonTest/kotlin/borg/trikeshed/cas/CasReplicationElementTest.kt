@@ -1,6 +1,7 @@
 package borg.trikeshed.cas
 
-import borg.trikeshed.context.ElementState
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -25,7 +26,7 @@ class CasReplicationElementTest {
     @Test
     fun testElementLifecycleAndFanout() = runTest {
         val element = CasReplicationElement()
-        assertEquals(ElementState.CREATED, element.lifecycleState)
+        assertNull(element.worker)
 
         val hook1 = TrackingHook()
         val hook2 = TrackingHook()
@@ -34,7 +35,7 @@ class CasReplicationElementTest {
         element.registerHook(hook2)
 
         element.open()
-        assertTrue(element.lifecycleState == ElementState.OPEN || element.lifecycleState == ElementState.ACTIVE)
+        assertNotNull(element.worker)
 
         val payload = "hello".encodeToByteArray()
         val cid = ContentId.of(payload)
@@ -42,7 +43,7 @@ class CasReplicationElementTest {
         element.replicate(cid, payload)
 
         element.drain()
-        assertEquals(ElementState.CLOSED, element.lifecycleState)
+        assertTrue(element.supervisor.isCompleted)
 
         assertEquals(1, hook1.puts.size)
         assertEquals(cid, hook1.puts[0].first)
@@ -68,6 +69,6 @@ class CasReplicationElementTest {
         element.drain()
 
         assertEquals(1, hook.puts.size, "Hook should have completed before drain returned")
-        assertEquals(ElementState.CLOSED, element.lifecycleState)
+        assertTrue(element.supervisor.isCompleted)
     }
 }

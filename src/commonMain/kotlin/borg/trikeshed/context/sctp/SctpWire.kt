@@ -1,5 +1,7 @@
 package borg.trikeshed.sctp
 
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
 
@@ -67,16 +69,17 @@ object LoopbackSctpWire : SctpWire {
     override val kernelOffload: Boolean = false
 
     private val inboxes = mutableMapOf<Int, Channel<SctpDatagram>>()
-    private var closed = false
+    /** Completes at [close]; [reset] installs a fresh one. */
+    private var closed: CompletableJob = Job()
 
     override suspend fun bind(port: Int): Int {
-        check(!closed) { "loopback wire closed" }
+        check(!closed.isCompleted) { "loopback wire closed" }
         inboxes.getOrPut(port) { Channel(Channel.BUFFERED) }
         return port
     }
 
     override suspend fun send(path: String, packet: ByteArray) {
-        check(!closed) { "loopback wire closed" }
+        check(!closed.isCompleted) { "loopback wire closed" }
         val port = path.substringAfterLast(':').toIntOrNull() ?: return
         inboxes[port]?.send(SctpDatagram(path, packet))
     }
@@ -87,7 +90,7 @@ object LoopbackSctpWire : SctpWire {
     }
 
     override suspend fun close() {
-        closed = true
+        closed.complete()
         inboxes.values.forEach { it.close() }
         inboxes.clear()
     }
@@ -96,6 +99,6 @@ object LoopbackSctpWire : SctpWire {
     fun reset() {
         inboxes.values.forEach { it.close() }
         inboxes.clear()
-        closed = false
+        closed = Job()
     }
 }

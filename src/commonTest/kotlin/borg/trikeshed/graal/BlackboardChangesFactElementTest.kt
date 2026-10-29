@@ -1,6 +1,5 @@
 package borg.trikeshed.graal
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.Activation
 import borg.trikeshed.dag.FactId
@@ -337,7 +336,7 @@ class BlackboardChangesFactElementTest {
     fun openCollectsTheChangeStreamAndCloseStops() = runTest {
         val rig = Rig()
         rig.element.open()
-        assertEquals(ElementState.ACTIVE, rig.element.state)
+        assertTrue(rig.element.supervisor.isActive)
 
         withContext(Dispatchers.Default) {
             rig.board.put("probe/x", mapOf("a" to "1"), "ide")
@@ -353,7 +352,7 @@ class BlackboardChangesFactElementTest {
         assertEquals(ReteOp.RETRACT, rig.ops.last().first)
 
         rig.element.close()
-        assertEquals(ElementState.CLOSED, rig.element.state)
+        assertTrue(rig.element.supervisor.isCompleted)
         val applied = rig.element.factsApplied
         rig.board.put("probe/y", mapOf("a" to "2"), "ide")
         withContext(Dispatchers.Default) { delay(100) }

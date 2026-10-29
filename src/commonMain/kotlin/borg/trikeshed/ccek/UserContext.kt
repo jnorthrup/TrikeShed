@@ -1,6 +1,5 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.forge.ForgeDocument
 import borg.trikeshed.kanban.BoardCol
 import kotlinx.coroutines.CancellationException
@@ -112,10 +111,12 @@ class UserContext(
     private val nodes = ArrayList<ArticulatedNode>()
     private val adapted = ArrayList<AdaptedParadigm>()
 
-    var lifecycleState: ElementState = ElementState.CREATED
-        private set
+    /** Completes when [drain] begins; forks, facts and nodes refuse after it. */
+    val admission: CompletableJob = Job()
 
+    /** Set by [activate] and [deactivate]; reads false once [admission] completes. */
     var active: Boolean = false
+        get() = field && admission.isActive
         private set
 
     val factCount: Int get() = reteTable.rowCount
@@ -125,30 +126,20 @@ class UserContext(
 
     init {
         supervisor.invokeOnCompletion {
-            active = false
-            lifecycleState = ElementState.CLOSED
+            admission.complete()
             children.clear()
             nodes.clear()
         }
     }
 
-    suspend fun open() {
-        if (lifecycleState == ElementState.CLOSED) return
-        if (lifecycleState == ElementState.CREATED) lifecycleState = ElementState.OPEN
-    }
-
     fun activate() {
         requireAccepting()
-        if (lifecycleState == ElementState.CREATED) lifecycleState = ElementState.OPEN
-        lifecycleState = ElementState.ACTIVE
         active = true
     }
 
     fun deactivate() {
-        check(lifecycleState != ElementState.CLOSED) { "UserContext is closed" }
+        check(!supervisor.isCompleted) { "UserContext is closed" }
         active = false
-        if (lifecycleState == ElementState.CREATED) lifecycleState = ElementState.OPEN
-        if (lifecycleState == ElementState.OPEN) lifecycleState = ElementState.ACTIVE
     }
 
     fun fork(role: String): UserContext {
@@ -247,9 +238,7 @@ class UserContext(
     )
 
     suspend fun drain() {
-        if (lifecycleState == ElementState.CLOSED) return
-        lifecycleState = ElementState.DRAINING
-        active = false
+        admission.complete()
         children.toList().forEach { it.drain() }
         nodes.toList().forEach { it.drain() }
         adapted.forEach { it.scope.coroutineContext[Job]?.completeIfCompletable() }
@@ -270,7 +259,7 @@ class UserContext(
     }
 
     private fun requireAccepting() {
-        check(lifecycleState < ElementState.DRAINING && supervisor.isActive) { "UserContext is closed" }
+        check(admission.isActive && supervisor.isActive) { "UserContext is closed" }
     }
 
     private fun assertFromSignal(signal: ForgeSignal) {

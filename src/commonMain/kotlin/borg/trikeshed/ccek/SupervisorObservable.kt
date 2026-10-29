@@ -1,16 +1,12 @@
 package borg.trikeshed.ccek
 
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.SupervisorJob
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
 interface CancelToken {
     fun cancel()
-}
-
-enum class FanoutLifecycle {
-    CLOSED,
-    OPEN,
-    DRAINING,
 }
 
 class MutableObservable<T>(initial: T) {
@@ -48,48 +44,29 @@ class RealSupervisorJob(
 
     override val key: CoroutineContext.Key<*> get() = Key
 
-    private val held = ArrayList<CancelToken>()
+    /** Completion releases every held token; a token handed over after completion is released on arrival. */
+    val supervisor: CompletableJob = SupervisorJob()
     private val slots = LinkedHashSet<CancelToken>()
-    private var terminal = false
-
-    var lifecycle: FanoutLifecycle = FanoutLifecycle.CLOSED
-        private set
 
     val fanoutSubscribers: Int
         get() = slots.size
 
-    fun open() {
-        if (!terminal) lifecycle = FanoutLifecycle.OPEN
-    }
-
+    /** [supervisor] completes, releasing what it holds, once in-flight children finish. */
     fun drain() {
-        if (!terminal && lifecycle == FanoutLifecycle.OPEN) lifecycle = FanoutLifecycle.DRAINING
+        supervisor.complete()
     }
 
     fun close() {
-        if (terminal) return
-        terminal = true
-        lifecycle = FanoutLifecycle.CLOSED
-        val release = held.toList()
-        held.clear()
-        release.forEach { token ->
-            try {
-                token.cancel()
-            } catch (_: Throwable) {
-            }
-        }
-        slots.clear()
+        supervisor.cancel()
     }
 
     fun hold(token: CancelToken): CancelToken {
-        if (terminal) {
+        supervisor.invokeOnCompletion {
             try {
                 token.cancel()
             } catch (_: Throwable) {
             }
-            return token
         }
-        held += token
         return token
     }
 

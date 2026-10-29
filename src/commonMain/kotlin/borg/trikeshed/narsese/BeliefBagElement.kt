@@ -1,8 +1,6 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.couch.isam.DurableAppendLog
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
@@ -15,6 +13,8 @@ import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -99,11 +99,14 @@ class BeliefBagElement(
      */
     private val afterTick: () -> Unit = {},
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<BeliefBagElement>()
+    companion object Key : CoroutineContext.Key<BeliefBagElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The intake's single writer, launched at [open]. */
+    var worker: Job? = null
 
     val intake: Channel<BeliefIntake> = Channel(capacity = 256)
 
@@ -145,14 +148,12 @@ class BeliefBagElement(
 
     // ── lifecycle ─────────────────────────────────────────────────────
 
-    override suspend fun open() {
-        super.open()
+    suspend fun open() {
         wal?.replay { seq, payload ->
             if (seq > walSeq) walSeq = seq
             applyWalRecord(payload)
         }
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-        CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
+        worker = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             var failure: Throwable? = null
             try {
                 for (cmd in intake) {
@@ -185,7 +186,7 @@ class BeliefBagElement(
 
     /** Await the existing single writer, including its WAL append/flush policy. */
     suspend fun submit(cmd: BeliefIntake.Mint) {
-        requireState(ElementState.ACTIVE)
+        check(worker != null) { "Belief bag is not open" }
         val completion = CompletableDeferred<Unit>()
         intake.send(cmd.copy(completion = completion))
         completion.await()
@@ -194,7 +195,8 @@ class BeliefBagElement(
     override suspend fun drain() {
         intake.close()
         // The consumer loop drains the closed channel under the element supervisor.
-        super.drain()
+        supervisor.complete()
+        supervisor.join()
         wal?.flush()
     }
 

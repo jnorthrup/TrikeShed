@@ -13,9 +13,7 @@ import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import borg.trikeshed.userspace.nio.platform.spi.MatrixOperations
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlin.coroutines.CoroutineContext
 
 /** One bounded inference lane owns the mapped Kotlin model or explicit Python compatibility runtime. */
@@ -24,16 +22,12 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     override val key: CoroutineContext.Key<JevaElement> get() = Key
     val supervisor = SupervisorJob(parent.coroutineContext[Job])
     val scope = CoroutineScope(parent.coroutineContext + supervisor + this)
-    val admission = Mutex()
-    val draining = Mutex()
+    /** Completes at [closeAdmission]; afterwards only retained curators submit until their effects settle. */
+    val admission: CompletableJob = Job()
     val dependentsLock = Any()
     val dependents = mutableMapOf<CurationElement, Job>()
-    var retaining = true
-    var inputClosed = false
     val places = Semaphore(capacity.also { require(it > 0) })
     val input = Channel.buffered<Work>(capacity)
-    var accepting = true
-        private set
     @kotlin.concurrent.Volatile
     var metadata: Map<String, Any?> = config.fields() + mapOf("available" to false, "error" to "Jeva runtime has not been checked")
         private set
@@ -110,7 +104,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
 
     /** Registered upstream lanes retain future inference admission until their accepted effects have settled. */
     fun retain(curator: CurationElement) = synchronizedLock(dependentsLock) {
-        if (retaining && supervisor.isActive && curator !in dependents) {
+        if (admission.isActive && supervisor.isActive && curator !in dependents) {
             dependents[curator] = scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) {
                 curator.completion.await()
             } }
@@ -206,6 +200,13 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
                         requireNotNull(owned.service<FileOperations>()) { "Jeva requires FileOperations" }
                     }
                 withContext(Dispatchers.Default + fileIoContext + files) {
+                    if (config.device == "mlx") {
+                        val encoders = context[EncoderOperations] ?: context[NioSupervisor]?.service<EncoderOperations>()
+                            ?: nio?.service<EncoderOperations>()
+                        return@withContext JevaInference.loadDevice(config, requireNotNull(encoders) {
+                            "Jeva device mlx needs an EncoderOperations provider (macOS native)"
+                        })
+                    }
                     val owner = CoroutineScope(currentCoroutineContext())
                     val matrices = context[MatrixOperations] ?: context[NioSupervisor]?.service<MatrixOperations>()
                         ?: nio?.service<MatrixOperations>()
@@ -213,7 +214,7 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
                 }.also { inference = it }
             }
             fields = mapOf("available" to true, "loaded" to true,
-                "model_identity" to runtime.identity, "runtime" to "kotlin", "device" to "cpu",
+                "model_identity" to runtime.identity, "runtime" to "kotlin", "device" to config.device,
                 "mapped_weights" to true, "arithmetic" to "float32",
                 "matrix" to runtime.model.decision.matrix.identity, "error" to null)
         } else {
@@ -241,14 +242,12 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
     suspend fun submit(request: String?, questions: JevaQuestions?,
                        operation: Operation = if (request == null) Operation.STATUS else Operation.INFER): Map<String, Any?> {
         val curator = currentCoroutineContext()[CurationElement]
-        admission.withLock { check(!inputClosed && (accepting && supervisor.isActive || nested(curator))) { "Jeva inference is draining" } }
+        check(admission.isActive && supervisor.isActive || nested(curator)) { "Jeva inference is draining" }
         places.acquire()
         val reply = CompletableDeferred<Result<Map<String, Any?>>>()
         try {
-            admission.withLock {
-                check(!inputClosed && (accepting && supervisor.isActive || nested(curator))) { "Jeva inference is draining" }
-                check(input.kChannel.trySend(Work(operation, request, questions, reply)).isSuccess)
-            }
+            check(admission.isActive && supervisor.isActive || nested(curator)) { "Jeva inference is draining" }
+            check(input.kChannel.trySend(Work(operation, request, questions, reply)).isSuccess) { "Jeva inference is draining" }
         } catch (failure: Throwable) {
             places.release()
             throw failure
@@ -266,13 +265,13 @@ class JevaElement(parent: CoroutineScope, val config: JevaConfig = JevaConfig(),
         return submit(Jeva.body(state, prepared), prepared)
     }
 
-    suspend fun closeAdmission() = admission.withLock { accepting = false }
+    fun closeAdmission() { admission.complete() }
 
-    private suspend fun closeLanes() = draining.withLock {
+    private suspend fun closeLanes() {
         closeAdmission()
-        val retained = synchronizedLock(dependentsLock) { retaining = false; dependents.values.toList() }
+        val retained = synchronizedLock(dependentsLock) { dependents.values.toList() }
         retained.joinAll()
-        admission.withLock { inputClosed = true; input.close() }
+        input.close()
         worker.join()
         synchronizedLock(dependentsLock) { dependents.clear() }
     }

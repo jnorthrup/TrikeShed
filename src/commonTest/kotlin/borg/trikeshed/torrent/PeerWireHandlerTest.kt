@@ -1,6 +1,5 @@
 package borg.trikeshed.torrent
 
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.test.runTest
@@ -53,7 +52,7 @@ class PeerWireHandlerTest {
             output.receive()
             handler.close()
             assertTrue(pending.await().isFailure)
-            assertEquals(ElementState.CLOSED, handler.lifecycleState)
+            assertTrue(handler.supervisor.isCompleted)
         } finally { handler.close() }
     }
 

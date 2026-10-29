@@ -54,7 +54,6 @@ class SctpWireTest {
             assertTrue(SctpWire.default.kernelOffload)
             val element = SctpElement()
             assertEquals("kernel-sctp (stub)", element.wire.backing)
-            element.open()
             assertFailsWith<UnsupportedOperationException> { element.bind(9003) }
         }
     }
@@ -62,7 +61,6 @@ class SctpWireTest {
     @Test
     fun elementBindRegistersThePortOnTheWire() = runBlocking {
         val element = SctpElement()
-        element.open()
         element.bind(9004)
         element.wire.send("localhost:9004", byteArrayOf(42))
         assertEquals(42, element.wire.receive(9004)?.bytes?.single())

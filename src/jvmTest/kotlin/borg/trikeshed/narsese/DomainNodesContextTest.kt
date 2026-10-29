@@ -1,6 +1,5 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.dag.JobDependencyProduction
 import borg.trikeshed.dag.ReteNetwork
 import borg.trikeshed.job.CasStore
@@ -96,7 +95,7 @@ class DomainNodesContextTest {
                 assertSame(rete, context[ReteNetworkKey]!!.value)
                 assertSame(expectedRoute, context[ModelRoute])
                 assertNotSame(muxJob, context[Job])
-                assertEquals(ElementState.ACTIVE, context[LcncNodeKey.of(type)!!]!!.state)
+                assertTrue(context[LcncNodeKey.of(type)!!]!!.consumed.isCompleted && context[LcncNodeKey.of(type)!!]!!.admission.isActive)
                 assertEquals(line, cas.get(cid)!!.decodeToString())
                 """{"constructions":[{"subject":"fire starts","relation":"if_then","object":"sprinklers activate","polarity":true,"evidenceCid":"${cid.value}","dependency":"mark:if"}]}"""
             }
@@ -125,7 +124,7 @@ class DomainNodesContextTest {
             assertNull(originalCas.get(cid))
             assertTrue(originalKif.isEmpty())
             assertEquals(listOf("(causes fire_starts sprinklers_activate)", "(causes fire_starts sprinklers_activate)"), kif)
-            assertEquals(ElementState.ACTIVE, bag.state)
+            assertTrue(bag.worker != null && bag.supervisor.isActive)
             assertTrue(muxJob.isActive)
         } finally {
             muxJob.cancel()
@@ -169,7 +168,7 @@ class DomainNodesContextTest {
             assertEquals(DocumentCurationLegos.CURATE, node.type)
             assertSame(selectedRoute, currentCoroutineContext()[ModelRoute])
             assertSame(cas, currentCoroutineContext()[CasStoreKey]!!.value)
-            assertEquals(ElementState.ACTIVE, currentCoroutineContext()[LcncNodeKey.LEGAL_INGEST]!!.state)
+            assertTrue(currentCoroutineContext()[LcncNodeKey.LEGAL_INGEST]!!.consumed.isCompleted && currentCoroutineContext()[LcncNodeKey.LEGAL_INGEST]!!.admission.isActive)
             val source = DocumentCurationLegos.retainSource(cas, assertIs<Map<*, *>>(inputs["source"]))
             assertEquals(text, source.text)
             assertEquals("legal/i", source.name)

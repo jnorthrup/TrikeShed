@@ -6,10 +6,8 @@ import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -23,12 +21,14 @@ class BoardActionElement(
     capacity: Int = 64,
     private val workers: Int = 3,
     private val dependency: suspend () -> Boolean = { false },
-) : AsyncContextElement(ElementState.CREATED, parentJob.also {
-    require(capacity > 0)
-    require(workers > 0)
-}) {
-    companion object Key : AsyncContextKey<BoardActionElement>()
+) : CoroutineContext.Element, Drain {
+    init {
+        require(capacity > 0)
+        require(workers > 0)
+    }
+    companion object Key : CoroutineContext.Key<BoardActionElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
     class AdmissionFailure(message: String) : IllegalStateException(message)
 
     private class Admission(val action: BoardAction, val reservation: CompletableJob) {
@@ -43,27 +43,26 @@ class BoardActionElement(
 
     private class Execution(val owner: BoardActionElement) : AbstractCoroutineContextElement(Key) {
         companion object Key : CoroutineContext.Key<Execution>
-        val active = AtomicBoolean(true)
+        /** Completes when the action returns; a retained carrier then holds no authority. */
+        val active: CompletableJob = Job()
     }
 
-    private val lifecycle = Mutex()
-    private val accepting = AtomicBoolean(true)
-    private val preparing = AtomicBoolean(true)
+    /** Completes at [stopPreparations]; afterwards only executing actions and the dependency prepare. */
+    private val preparing: CompletableJob = Job()
     private val actions = SupervisorJob(supervisor)
     private val preparations = SupervisorJob(supervisor)
     private val input = Channel.buffered<Admission>(capacity)
-    private val workerJobs = mutableListOf<Job>()
     private val failures = MutableStateFlow<Series<Throwable>>(emptySeriesOf())
-    @kotlin.concurrent.Volatile private var scope: CoroutineScope? = null
+    /** Published once by the [open] that launches the workers, children of [supervisor]. */
+    private val scope = AtomicReference<CoroutineScope?>(null)
 
-    override suspend fun open() = lifecycle.withLock {
-        if (state != ElementState.CREATED) return@withLock
+    suspend fun open() {
+        if (scope.load() != null || input.isClosed()) return
         supervisor.ensureActive()
-        check(accepting.load()) { "Board action admission stopped" }
         val opened = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
-        scope = opened
+        if (!scope.compareAndSet(null, opened)) return
         repeat(workers) { index ->
-            workerJobs.add(opened.launch(CoroutineName("board-actions:$index"), start = CoroutineStart.UNDISPATCHED) {
+            opened.launch(CoroutineName("board-actions:$index"), start = CoroutineStart.UNDISPATCHED) {
                 var stopped: Throwable? = null
                 try {
                     for (admission in input.kChannel) {
@@ -75,7 +74,7 @@ class BoardActionElement(
                                 catch (failure: Throwable) { Result.failure(failure) }
                             }
                         } catch (failure: Throwable) { Result.failure(failure) }
-                        finally { execution.active.store(false) }
+                        finally { execution.active.complete() }
                         settle(admission, result, executing = true)
                         currentCoroutineContext().ensureActive()
                     }
@@ -89,17 +88,16 @@ class BoardActionElement(
                         settle(pending, Result.failure(stopped ?: CancellationException("Board action worker closed")), executing = false)
                     }
                 }
-            })
+            }
         }
-        state = ElementState.ACTIVE
     }
 
     /** Null refuses admission. An accepted result settles only after the actual action finishes. */
     fun submit(action: BoardAction): Deferred<Unit>? {
         // Reserve before checking admission: stop/drain cannot miss a producer awaiting launch.
         val reservation = Job(actions)
-        val owner = scope
-        if (owner == null || !accepting.load() || !supervisor.isActive || input.isClosed()) {
+        val owner = scope.load()
+        if (owner == null || !supervisor.isActive || input.isClosed()) {
             reservation.complete()
             return null
         }
@@ -124,7 +122,7 @@ class BoardActionElement(
     }
 
     /** External route admission stops separately from accepted effects and their derived actions. */
-    fun stopPreparations() { preparing.store(false) }
+    fun stopPreparations() { preparing.complete() }
 
     suspend fun <T> prepare(action: suspend () -> T): T {
         val current = currentCoroutineContext()
@@ -136,10 +134,10 @@ class BoardActionElement(
         // Reserve before validation or launch so drain includes every accepted preparation.
         val reservation = Job(preparations)
         try {
-            if (scope == null || !accepting.load() || !supervisor.isActive)
+            if (scope.load() == null || input.isClosed() || !supervisor.isActive)
                 throw AdmissionFailure("Board action owner is closed")
             val execution = current[Execution]
-            if (!(preparing.load() || execution?.let { it.owner === this && it.active.load() } == true || dependency()))
+            if (!(preparing.isActive || execution?.let { it.owner === this && it.active.isActive } == true || dependency()))
                 throw AdmissionFailure("Board route admission stopped")
         } catch (failure: Throwable) {
             reservation.complete()
@@ -185,12 +183,10 @@ class BoardActionElement(
         }
     }
 
-    suspend fun stopAdmission() = withContext(NonCancellable) {
-        lifecycle.withLock {
-            preparing.store(false)
-            accepting.store(false)
-            if (state < ElementState.DRAINING) state = ElementState.DRAINING
-        }
+    /** Closing the stage refuses new actions; producers already suspended in it are still delivered. */
+    fun stopAdmission() {
+        preparing.complete()
+        input.close()
     }
 
     /** The module first joins external preparations and receipt cascades, then closes action admission. */
@@ -201,27 +197,22 @@ class BoardActionElement(
             "A board route cannot join its own owner"
         }
         stopAdmission()
-        lifecycle.withLock {
-            preparations.complete()
-            preparations.join()
-            actions.complete()
-            actions.join()
-            input.close()
-            workerJobs.joinAll()
-            supervisor.complete()
-            supervisor.join()
-            state = ElementState.CLOSED
-        }
+        preparations.complete()
+        preparations.join()
+        actions.complete()
+        actions.join()
+        supervisor.complete()
+        supervisor.join()
         val errors = failures.value
         if (errors.size > 0) throw IllegalStateException("Board actions failed", errors[0]).also { aggregate ->
             for (index in 1 until errors.size) aggregate.addSuppressed(errors[index])
         }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 
     private suspend fun checkExecution() {
         val execution = currentCoroutineContext()[Execution]
-        check(execution == null || execution.owner !== this || !execution.active.load()) { "A board action cannot join its own owner" }
+        check(execution == null || execution.owner !== this || !execution.active.isActive) { "A board action cannot join its own owner" }
     }
 }

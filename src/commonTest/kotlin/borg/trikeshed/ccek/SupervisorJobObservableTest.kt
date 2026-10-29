@@ -1,5 +1,6 @@
 package borg.trikeshed.ccek
 
+import kotlinx.coroutines.Job
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,17 +12,16 @@ import kotlin.test.assertTrue
 
 class SupervisorJobObservableTest {
 
-    /** Lifecycle is forward-only: CLOSED → OPEN → DRAINING → CLOSED. Never backward. */
+    /** Lifecycle is the supervisor Job, forward-only: active → completing while work is in flight → completed. */
     @Test
     fun lifecycle_forwardOnly() {
         val job = RealSupervisorJob("wallet")
-        assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
-        job.open()
-        assertEquals(FanoutLifecycle.OPEN, job.lifecycle)
+        Job(job.supervisor) // in-flight work
+        assertTrue(job.supervisor.isActive)
         job.drain()
-        assertEquals(FanoutLifecycle.DRAINING, job.lifecycle)
+        assertFalse(job.supervisor.isCompleted)
         job.close()
-        assertEquals(FanoutLifecycle.CLOSED, job.lifecycle)
+        assertTrue(job.supervisor.isCompleted)
         assertEquals(0, job.fanoutSubscribers) // close clears
     }
 
@@ -38,7 +38,6 @@ class SupervisorJobObservableTest {
     @Test
     fun slot_exposesFanoutSubscriberCount() {
         val job = RealSupervisorJob("key")
-        job.open()
         assertEquals(0, job.fanoutSubscribers)
         job.slot(MutableObservable(1))
         assertEquals(1, job.fanoutSubscribers)
@@ -53,7 +52,6 @@ class SupervisorJobObservableTest {
     @Test
     fun slot_drawThrough_reflectsSource() {
         val job = RealSupervisorJob("key")
-        job.open()
         val source = MutableObservable(0)
         val view = job.slot(source)
         assertEquals(0, view.value)

@@ -371,7 +371,7 @@ class LcncSubnetRouteTest {
             val retained = assertIs<Map<*, *>>(reifyMap(assertNotNull(rig.ctx.casStore.get(ContentId(childRun["receiptCid"].toString()))))["lcncRun"])
             for (key in listOf("claimLineage", "parentClaimId", "parentWorkgroup", "parentRunId", "executionFamily"))
                 assertEquals(childRun[key], retained[key])
-            if (drain) assertEquals("CLOSED", assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["state"])
+            if (drain) assertEquals(true, assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["closed"])
             completed = true
         } finally {
             release.complete(Unit)
@@ -491,7 +491,7 @@ class LcncSubnetRouteTest {
                 "document" to document(LcncProgram("queued-debug", s_[LcncNode("clock", "timer")], emptySeriesOf())))) }
             second = queued
             assertFalse(queued.isCompleted)
-            assertEquals(borg.trikeshed.context.ElementState.ACTIVE, fanout.state)
+            assertTrue(fanout.supervisor.isActive)
             pending.cancelAndJoin()
             val draining = async(start = CoroutineStart.UNDISPATCHED) { rig.supervisor.detach("kanban") }
             assertFalse(draining.isCompleted)
@@ -506,7 +506,7 @@ class LcncSubnetRouteTest {
             assertEquals("queued-debug", queuedRun["program"])
             assertNotEquals(completed["claimId"], queuedRun["claimId"])
             assertEquals(3.0, assertIs<Map<*, *>>(assertIs<Map<*, *>>(queuedRun["outputs"])["clock"])["tick"])
-            assertEquals("CLOSED", assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["state"])
+            assertEquals(true, assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["closed"])
         } finally { released.complete(Unit); pending.cancelAndJoin(); second?.cancelAndJoin(); rig.close() }
     }
 
@@ -531,7 +531,7 @@ class LcncSubnetRouteTest {
             assertEquals(200, completed.status, completed.body)
             assertEquals("completed", body(completed)["status"])
             assertEquals(LcncBlackboard.cidOf(original), body(completed)["programCid"])
-            assertEquals("CLOSED", assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroups"])["state"])
+            assertEquals(true, assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroups"])["closed"])
         } finally { pending.cancelAndJoin(); inventory?.cancelAndJoin(); rig.close() }
     }
 
@@ -555,7 +555,7 @@ class LcncSubnetRouteTest {
             val completed = receipt(rig, withTimeout(5_000) { pending.await() })
             assertEquals(paused["runId"], completed["runId"])
             assertEquals(3.0, assertIs<Map<*, *>>(assertIs<Map<*, *>>(completed["outputs"])["clock"])["tick"])
-            assertEquals("CLOSED", assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["state"])
+            assertEquals(true, assertIs<Map<*, *>>(rig.handle.describe()["lcncWorkgroup"])["closed"])
         } finally { pending.cancelAndJoin(); rig.close() }
     }
 

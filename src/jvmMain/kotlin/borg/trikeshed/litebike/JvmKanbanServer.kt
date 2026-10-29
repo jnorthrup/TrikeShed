@@ -174,7 +174,6 @@ class JvmKanbanServer(
         fanout.register(processWorkgroup)
         fanout.register(casWorkgroup)
         fanout.register(wireprotoWorkgroup)
-        fanout.activate()
         listOf(processWorkgroup, casWorkgroup, wireprotoWorkgroup).forEach { workgroup ->
             val slot = requireNotNull(fanout.slotOf(workgroup.name))
             scope.launch {

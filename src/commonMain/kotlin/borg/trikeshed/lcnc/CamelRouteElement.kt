@@ -3,9 +3,7 @@ package borg.trikeshed.lcnc
 import borg.trikeshed.context.*
 import borg.trikeshed.kanban.BoardActionElement
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -30,11 +28,15 @@ class CamelRouteElement(
     capacity: Int = 16,
     private val maxCommands: Int = 64,
     maxObservations: Int = 64,
-) : AsyncContextElement(ElementState.CREATED, parentJob.also {
-    require(capacity > 0 && maxCommands > 0 && maxObservations > 0)
-}) {
-    companion object Key : AsyncContextKey<CamelRouteElement>()
+) : CoroutineContext.Element, Drain {
+    init { require(capacity > 0 && maxCommands > 0 && maxObservations > 0) }
+    companion object Key : CoroutineContext.Key<CamelRouteElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes once [open] has opened both lanes; the lanes refuse admission after drain. */
+    val opened: CompletableJob = Job()
+    /** Completes once the owner's lanes are drained and its supervisor joined. */
+    val closed: CompletableJob = Job()
 
     private enum class Lane { COMMAND, PUBLICATION }
 
@@ -55,9 +57,6 @@ class CamelRouteElement(
     }
 
     private class Lease(val handle: CamelRouteHandle, val stop: suspend () -> Unit)
-    private val lifecycle = Mutex()
-    private val accepting = AtomicBoolean(true)
-    private val opened = AtomicBoolean(false)
     private val admitted = AtomicInt(0)
     private val commands = BoardActionElement(supervisor, capacity, workers = 1)
     private val observations = BoardActionElement(supervisor, capacity, workers = 1)
@@ -65,21 +64,20 @@ class CamelRouteElement(
     // Lifetime obligations only; the backend remains the one registry of live Camel contexts.
     private val leases = mutableListOf<Lease>()
 
-    override suspend fun open() = lifecycle.withLock {
-        if (opened.load()) return@withLock
-        check(state == ElementState.CREATED && accepting.load()) { "Camel owner is stopped" }
-        supervisor.ensureActive()
+    suspend fun open() {
+        if (opened.isCompleted) return
+        if (supervisor.isCancelled) supervisor.ensureActive()
+        check(supervisor.isActive) { "Camel owner is stopped" }
         try {
             withContext(this@CamelRouteElement) { commands.open(); observations.open() }
-            state = ElementState.ACTIVE
-            opened.store(true)
+            opened.complete()
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
                 for (lane in arrayOf(commands, observations)) try { lane.drain() }
                 catch (cleanup: Throwable) { if (cleanup !== failure) failure.addSuppressed(cleanup) }
                 supervisor.complete()
                 supervisor.join()
-                state = ElementState.CLOSED
+                closed.complete()
             }
             throw failure
         }
@@ -95,7 +93,7 @@ class CamelRouteElement(
             check(count < maxCommands) { "Camel command capacity reached" }
             if (admitted.compareAndSet(count, count + 1)) break
         }
-        if (!opened.load() || !accepting.load() || !supervisor.isActive) {
+        if (!opened.isCompleted) {
             admitted.fetchAndAdd(-1)
             error("Camel command admission stopped")
         }
@@ -128,7 +126,7 @@ class CamelRouteElement(
         check(!current[Invocation].contains(this, Lane.PUBLICATION)) {
             "A Camel publication cannot await its own lane"
         }
-        check(opened.load() && supervisor.isActive) { "Camel observation owner is stopped" }
+        check(opened.isCompleted) { "Camel observation owner is stopped" }
         observationPermits.acquire()
         val completion = observations.submit {
             val invocation = Invocation(this@CamelRouteElement, Lane.PUBLICATION, current[Invocation])
@@ -186,33 +184,27 @@ class CamelRouteElement(
         }
     }
 
-    fun stopAdmission() { accepting.store(false) }
-
     override suspend fun drain(): Unit = withContext(NonCancellable) {
         checkOwnedCallback(currentCoroutineContext())
-        stopAdmission()
-        lifecycle.withLock {
-            if (state == ElementState.CLOSED) return@withLock
-            state = ElementState.DRAINING
-            commands.drain()
-            var failure: Throwable? = null
-            for (lease in leases.toList()) try {
-                lease.stop()
-                leases.remove(lease)
-            } catch (caught: Throwable) {
-                if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
-            }
-            // A failed consumer stop still owns callbacks: keep their lane and dependencies live
-            // for an explicit drain retry, but never reopen external command admission.
-            failure?.let { throw it }
-            try { observations.drain() }
-            finally {
-                supervisor.complete()
-                supervisor.join()
-                state = ElementState.CLOSED
-            }
+        if (closed.isCompleted) return@withContext
+        commands.drain()
+        var failure: Throwable? = null
+        for (lease in leases.toList()) try {
+            lease.stop()
+            leases.remove(lease)
+        } catch (caught: Throwable) {
+            if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
+        }
+        // A failed consumer stop still owns callbacks: keep their lane and dependencies live
+        // for an explicit drain retry, but never reopen external command admission.
+        failure?.let { throw it }
+        try { observations.drain() }
+        finally {
+            supervisor.complete()
+            supervisor.join()
+            closed.complete()
         }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

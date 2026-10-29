@@ -2,14 +2,8 @@
 
 package borg.trikeshed.memory.ontology
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
-import borg.trikeshed.context.ElementState.CREATED
-import borg.trikeshed.context.ElementState.OPEN
-import borg.trikeshed.context.ElementState.ACTIVE
-import borg.trikeshed.context.ElementState.DRAINING
-import borg.trikeshed.context.ElementState.CLOSED
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.query.Candidate
 import borg.trikeshed.cursor.query.FusionMethod
 import borg.trikeshed.cursor.query.HybridHit
@@ -34,13 +28,12 @@ import kotlin.coroutines.EmptyCoroutineContext
 /**
  * CCEK elements for the two substrate phases (VAL-TAX-CCEK).
  *
- * Each element extends [AsyncContextElement] (CoroutineContext.Element) with a
- * singleton [AsyncContextKey] companion so that it composes into scopes via
- * `+` and is looked up by reference equality — never toString comparison.
+ * Each element is a CoroutineContext.Element with a singleton Key companion so
+ * that it composes into scopes via `+` and is looked up by reference equality —
+ * never toString comparison.
  *
- * Lifecycle honored: CREATED → OPEN → ACTIVE → DRAINING → CLOSED.
- * [drain] is graceful: it signals no-more-work, lets in-flight requests
- * finish, then transitions to CLOSED — no hard child cancellation.
+ * [drain] is graceful: it closes the fan-out channel, lets in-flight requests
+ * finish and joins the supervisor — no hard child cancellation.
  */
 
 // ── Retrieval phase element ─────────────────────────────────────────
@@ -53,13 +46,6 @@ import kotlin.coroutines.EmptyCoroutineContext
  * the query (lexical postings, vector distances, …) and fuses them Evoke's way
  * ([fuseCandidates]); the trace carries the fused [HybridHit]s with each
  * source's rank and score kept.
- *
- * Lifecycle:
- *   CREATED  ⇒ element exists, not wired.
- *   OPEN     ⇒ channel open, accepting subscribe/register.
- *   ACTIVE   ⇒ serving retrieval requests; fan-out delivers to subscribers.
- *   DRAINING ⇒ no new work accepted; in-flight requests complete gracefully.
- *   CLOSED   ⇒ channel closed, supervisor completed, resources released.
  */
 class MemoryRetrievalElement(
     parentJob: Job? = null,
@@ -68,10 +54,11 @@ class MemoryRetrievalElement(
     private val candidates: suspend (query: Any) -> List<Candidate> = { emptyList() },
     private val k: Int = 10,
     private val method: FusionMethod = FusionMethod.RRF,
-) : AsyncContextElement(CREATED, parentJob), MemoryPhaseElement {
+) : MemoryPhaseElement, Drain {
 
-    companion object Key : AsyncContextKey<MemoryRetrievalElement>()
-    override val key: AsyncContextKey<MemoryRetrievalElement> = Key
+    companion object Key : CoroutineContext.Key<MemoryRetrievalElement>
+    override val key: CoroutineContext.Key<MemoryRetrievalElement> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     /** The phase anchor this element operationalizes. */
     val phase: SubstratePhase get() = Retrieval
@@ -84,21 +71,12 @@ class MemoryRetrievalElement(
     /** Subscribers awaiting retrieval results. */
     private val subscriberScope: CoroutineScope = CoroutineScope(reactorContext + this + supervisor)
 
-    override suspend fun open() {
-        if (state == CREATED) state = OPEN
-    }
-
-    /** Promote OPEN → ACTIVE. Idempotent if already ACTIVE or later. */
-    suspend fun activate() {
-        if (state == OPEN) state = ACTIVE
-    }
-
     /**
      * Submit a retrieval request. Returns a deferred that completes with the fused
-     * hits once the trace is fanned out to subscribers. Requires ACTIVE state.
+     * hits once the trace is fanned out to subscribers. Refused after [drain].
      */
     suspend fun retrieve(query: Any): CompletableDeferred<Any> {
-        check(state == ACTIVE) { "MemoryRetrievalElement must be ACTIVE (was $state)" }
+        check(!resultChannel.isClosedForSend) { "MemoryRetrievalElement is drained" }
         val deferred = CompletableDeferred<Any>()
         requestMutex.withLock {
             subscriberScope.launch {
@@ -115,31 +93,16 @@ class MemoryRetrievalElement(
     /** Subscribe to retrieval result fan-out. Returns the receive channel. */
     fun subscribe(): Channel<Join<SubstratePhase, Any>> = resultChannel
 
-    /**
-     * Graceful drain — DRAINING: stop accepting new work, let in-flight
-     * requests finish, then CLOSED. No hard child cancel.
-     */
+    /** Graceful drain: stop accepting new work, let in-flight requests finish. No hard child cancel. */
     override suspend fun drain() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
-            state = DRAINING
-            // Close the channel to signal no more work; in-flight sends drain.
-            resultChannel.close()
-            // Let in-flight coroutines finish gracefully — complete supervisor, do not cancel.
-            supervisor.complete()
-            supervisor.join()
-            state = CLOSED
-        }
+        // Close the channel to signal no more work; in-flight sends drain.
+        resultChannel.close()
+        // Let in-flight coroutines finish gracefully — complete supervisor, do not cancel.
+        supervisor.complete()
+        supervisor.join()
     }
 
-    override suspend fun close() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
-            if (state < DRAINING) state = DRAINING
-            resultChannel.close()
-            supervisor.complete()
-            supervisor.join()
-            state = CLOSED
-        }
-    }
+    suspend fun close() = drain()
 }
 
 // ── Write-back phase element ────────────────────────────────────────
@@ -149,21 +112,15 @@ class MemoryRetrievalElement(
  * Owns a fan-out channel that delivers write-back signals (preference logs,
  * episode records, weight updates) to subscribers. The phase anchor
  * [WriteBack] is the marker this element operationalizes.
- *
- * Lifecycle:
- *   CREATED  ⇒ element exists, not wired.
- *   OPEN     ⇒ channel open, accepting subscribe/register.
- *   ACTIVE   ⇒ serving write-back requests; fan-out delivers to subscribers.
- *   DRAINING ⇒ no new work accepted; in-flight write-backs complete gracefully.
- *   CLOSED   ⇒ channel closed, supervisor completed, resources released.
  */
 class MemoryWritebackElement(
     parentJob: Job? = null,
     override val reactorContext: CoroutineContext = EmptyCoroutineContext,
-) : AsyncContextElement(CREATED, parentJob), MemoryPhaseElement {
+) : MemoryPhaseElement, Drain {
 
-    companion object Key : AsyncContextKey<MemoryWritebackElement>()
-    override val key: AsyncContextKey<MemoryWritebackElement> = Key
+    companion object Key : CoroutineContext.Key<MemoryWritebackElement>
+    override val key: CoroutineContext.Key<MemoryWritebackElement> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     /** The phase anchor this element operationalizes. */
     val phase: SubstratePhase get() = WriteBack
@@ -176,21 +133,12 @@ class MemoryWritebackElement(
     /** Subscribers awaiting write-back signals. */
     private val subscriberScope: CoroutineScope = CoroutineScope(reactorContext + this + supervisor)
 
-    override suspend fun open() {
-        if (state == CREATED) state = OPEN
-    }
-
-    /** Promote OPEN → ACTIVE. Idempotent if already ACTIVE or later. */
-    suspend fun activate() {
-        if (state == OPEN) state = ACTIVE
-    }
-
     /**
      * Submit a write-back signal (preference, episode, update). Returns a
-     * deferred that completes when the signal is fanned out. Requires ACTIVE.
+     * deferred that completes when the signal is fanned out. Refused after [drain].
      */
     suspend fun writeBack(signal: Any): CompletableDeferred<Any> {
-        check(state == ACTIVE) { "MemoryWritebackElement must be ACTIVE (was $state)" }
+        check(!signalChannel.isClosedForSend) { "MemoryWritebackElement is drained" }
         val deferred = CompletableDeferred<Any>()
         writeMutex.withLock {
             subscriberScope.launch {
@@ -205,29 +153,14 @@ class MemoryWritebackElement(
     /** Subscribe to write-back signal fan-out. Returns the receive channel. */
     fun subscribe(): Channel<Join<SubstratePhase, Any>> = signalChannel
 
-    /**
-     * Graceful drain — DRAINING: stop accepting new work, let in-flight
-     * write-backs finish, then CLOSED. No hard child cancel.
-     */
+    /** Graceful drain: stop accepting new write-backs, let in-flight ones finish. No hard child cancel. */
     override suspend fun drain() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(DRAINING)) {
-            state = DRAINING
-            signalChannel.close()
-            supervisor.complete()
-            supervisor.join()
-            state = CLOSED
-        }
+        signalChannel.close()
+        supervisor.complete()
+        supervisor.join()
     }
 
-    override suspend fun close() {
-        if (state.isAtLeast(OPEN) && state.isLessThan(CLOSED)) {
-            if (state < DRAINING) state = DRAINING
-            signalChannel.close()
-            supervisor.complete()
-            supervisor.join()
-            state = CLOSED
-        }
-    }
+    suspend fun close() = drain()
 }
 
 // ── Shared phase-element interface ──────────────────────────────────
@@ -246,7 +179,7 @@ interface MemoryPhaseElement : CoroutineContext.Element {
  * Series of the two phase-element companion keys, for lookup by reference.
  * Navigated with [α], never toString comparison.
  */
-val phaseElementKeys: Series<AsyncContextKey<*>> = s_[
+val phaseElementKeys: Series<CoroutineContext.Key<*>> = s_[
     MemoryRetrievalElement.Key,
     MemoryWritebackElement.Key,
 ]

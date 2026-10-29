@@ -7,9 +7,6 @@ import borg.trikeshed.userspace.concurrency.Channel
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.selects.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import kotlin.concurrent.Volatile
 import kotlin.coroutines.CoroutineContext
 
 /** Serial board projection and clock fan-in; a watermark follows every completed projection. */
@@ -21,11 +18,11 @@ class BoardObservationElement(
     private val intervalMs: Long = 60_000,
     capacity: Int = 64,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob.also {
-    require(intervalMs > 0 && capacity > 0)
-}) {
-    companion object Key : AsyncContextKey<BoardObservationElement>()
+) : CoroutineContext.Element, Drain {
+    init { require(intervalMs > 0 && capacity > 0) }
+    companion object Key : CoroutineContext.Key<BoardObservationElement>
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
 
     private data class Progress(val sequence: Long = 0, val failure: Throwable? = null, val closed: Boolean = false)
     private val progress = MutableStateFlow(Progress())
@@ -34,26 +31,24 @@ class BoardObservationElement(
     private val stop = CompletableDeferred<Unit>()
     private val initialized = CompletableDeferred<Unit>()
     private val subscribed = CompletableDeferred<Unit>()
-    private val lifecycle = Mutex()
     private var collector: Job? = null
     private var consumer: Job? = null
     private var ticker: Job? = null
-    @Volatile private var unsubscribing = false
 
     private fun failed(cause: Throwable) {
         progress.update { before -> if (before.failure == null) before.copy(failure = cause) else before }
     }
 
-    override suspend fun open() = lifecycle.withLock {
-        if (state != ElementState.CREATED) return@withLock
+    suspend fun open() {
+        if (collector != null || stop.isCompleted) return
         supervisor.ensureActive()
-        state = ElementState.OPEN
         val scope = CoroutineScope(currentCoroutineContext().minusKey(Job) + supervisor + this)
         collector = scope.launch(start = CoroutineStart.UNDISPATCHED) {
             try {
                 store.committed.onSubscription { subscribed.complete(Unit) }.collect { events.kChannel.send(it) }
             } catch (cause: Throwable) {
-                if (!unsubscribing) {
+                // Drain closes events before it detaches this reader.
+                if (!events.isClosed()) {
                     failed(cause)
                     events.kChannel.close(cause)
                     subscribed.completeExceptionally(cause)
@@ -121,7 +116,6 @@ class BoardObservationElement(
                     }
                 } catch (cause: Throwable) { failed(cause) }
             }
-            state = ElementState.ACTIVE
         } catch (cause: Throwable) {
             // The caller performs the same joined drain used after a later processing failure.
             failed(cause)
@@ -143,35 +137,30 @@ class BoardObservationElement(
     }
 
     override suspend fun drain(): Unit = withContext(NonCancellable) {
-        lifecycle.withLock {
-            var failure = progress.value.failure
-            suspend fun release(action: suspend () -> Unit) {
-                try { action() }
-                catch (cause: Throwable) {
-                    val first = failure
-                    if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
-                }
+        var failure = progress.value.failure
+        suspend fun release(action: suspend () -> Unit) {
+            try { action() }
+            catch (cause: Throwable) {
+                val first = failure
+                if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
             }
-            if (state == ElementState.CREATED) {
-                initialized.complete(Unit)
-                subscribed.complete(Unit)
-            }
-            state = ElementState.DRAINING
-            release { stopTicker() }
-            if (consumer != null) release { awaitSequence(store.lastSequence) }
-            // The watermark joins all delivered work before unsubscribing the idle SharedFlow reader.
-            unsubscribing = true
-            release { collector?.cancelAndJoin() }
-            events.close()
-            ticks.close()
-            release { consumer?.join() }
-            supervisor.complete()
-            release { supervisor.join() }
-            progress.value.failure?.let { if (failure == null) failure = it }
-            state = ElementState.CLOSED
-            failure?.let { throw it }
         }
+        if (collector == null) {
+            initialized.complete(Unit)
+            subscribed.complete(Unit)
+        }
+        release { stopTicker() }
+        if (consumer != null) release { awaitSequence(store.lastSequence) }
+        // The watermark joins all delivered work before unsubscribing the idle SharedFlow reader.
+        events.close()
+        ticks.close()
+        release { collector?.cancelAndJoin() }
+        release { consumer?.join() }
+        supervisor.complete()
+        release { supervisor.join() }
+        progress.value.failure?.let { if (failure == null) failure = it }
+        failure?.let { throw it }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

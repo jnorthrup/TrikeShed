@@ -1,8 +1,7 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.Job
@@ -31,11 +30,15 @@ class TurnReviewElement(
     private val bag: BeliefBagElement,
     private val intakeCap: Int = 16,
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<TurnReviewElement>()
+    companion object Key : CoroutineContext.Key<TurnReviewElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    /** Completes at [open]; review starts after it. */
+    val opened: CompletableJob = Job()
+    /** Completes at [drain]; review stops after it. */
+    val admission: CompletableJob = Job()
 
     /** One landed pen fact, boundary-shaped for review. */
     data class TurnFact(
@@ -52,10 +55,9 @@ class TurnReviewElement(
      */
     var evaluatorIdentity: Evaluator = Evaluator.pure("turn-review")
 
-    override suspend fun open() {
-        super.open()
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-    }
+    suspend fun open() { opened.complete() }
+
+    override suspend fun drain() { admission.complete() }
 
     /**
      * The pure induction pass. Returns the (angular → gloss) pairs landed
@@ -69,7 +71,7 @@ class TurnReviewElement(
         identity: Evaluator = evaluatorIdentity,
     ): List<Pair<Long, String>> {
         val evaluator = identity.cid
-        if (state != ElementState.ACTIVE) return emptyList()
+        if (!opened.isCompleted || !admission.isActive) return emptyList()
         val landed = ArrayList<Pair<Long, String>>()
 
         // 1. per-fact observation: (context → object|verb) outcome evidence

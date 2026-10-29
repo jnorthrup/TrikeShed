@@ -701,7 +701,6 @@ class KanbanModule : ForgeModule {
                 }
             }
         }
-        fanout.activate()
         lateinit var workgroups: LcncWorkgroupElement
         fun completed(response: JvmKanbanServer.HttpResponse): Deferred<Any?> =
             CompletableDeferred<Any?>().also { it.complete(response) }
@@ -775,10 +774,10 @@ class KanbanModule : ForgeModule {
                 subnet.split('.').any { part -> part.isEmpty() || part.any { it.isWhitespace() || it.isISOControl() } })
                 return JvmKanbanServer.HttpResponse(400, """{"error":"invalid_subnet"}""")
             val dependency = fanout.currentInvocation() != null
-            if (declared != null && !dependency && workgroups.state < borg.trikeshed.context.ElementState.DRAINING) try {
+            if (declared != null && !dependency && !workgroups.stopped.isCompleted) try {
                 workgroups.refresh()
             } catch (_: IllegalStateException) {
-                if (workgroups.state < borg.trikeshed.context.ElementState.DRAINING)
+                if (!workgroups.stopped.isCompleted)
                     return JvmKanbanServer.HttpResponse(503, """{"error":"workgroup_unavailable"}""")
             }
             val scope = Subnet.parse(declared ?: "local")
@@ -798,7 +797,7 @@ class KanbanModule : ForgeModule {
             }
 
         fun workgroupView(): Map<String, Any?> = mapOf(
-            "state" to workgroups.state.name,
+            "closed" to workgroups.supervisor.isCompleted,
             "workgroups" to (workgroups.registrations α { registration -> mapOf(
                 "name" to registration.a.name, "scope" to registration.a.scope.toString(),
                 "program" to registration.b.a, "programCid" to registration.b.b.value,
@@ -1091,7 +1090,7 @@ class KanbanModule : ForgeModule {
             override fun describe(): Map<String, Any?> = mapOf(
                 "cards" to store.cards().size,
                 "sequence" to store.lastSequence,
-                "lcncWorkgroup" to mapOf("state" to fanout.state.name),
+                "lcncWorkgroup" to mapOf("closed" to fanout.supervisor.isCompleted),
                 "lcncWorkgroups" to workgroupView(),
                 "routes" to listOf(
                     "/api/board", "/api/invoke", "/api/board/import",

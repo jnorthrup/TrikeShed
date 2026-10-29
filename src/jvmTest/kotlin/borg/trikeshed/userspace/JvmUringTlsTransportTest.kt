@@ -1,6 +1,5 @@
 package borg.trikeshed.userspace
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
@@ -204,11 +203,11 @@ class JvmUringTlsTransportTest {
                 }
                 clientElement?.let { element -> release {
                     element.drain()
-                    assertEquals(ElementState.CLOSED, element.state)
+                    assertTrue(element.supervisor.isCompleted)
                 } }
                 serverElement?.let { element -> release {
                     element.drain()
-                    assertEquals(ElementState.CLOSED, element.state)
+                    assertTrue(element.supervisor.isCompleted)
                 } }
                 for (fd in descriptors.asReversed()) release { assertEquals(0, submit(UringOp.CLOSE, fd)) }
                 release { ring?.drain() }

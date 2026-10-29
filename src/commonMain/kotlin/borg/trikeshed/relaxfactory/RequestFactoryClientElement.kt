@@ -1,6 +1,5 @@
 package borg.trikeshed.relaxfactory
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.CompletableDeferred
@@ -29,8 +28,9 @@ class RequestFactoryClientElement(
     private val binding = MutableStateFlow<RequestFactoryReactorElement?>(null)
     private val ownership = Mutex()
     private val callback = MutableStateFlow<Throwable?>(null)
-    val state: ElementState get() = binding.value?.state ?: ElementState.CREATED
     val callbackFailure: Throwable? get() = callback.value
+    /** True once [drain] has closed the bound processor. */
+    val closed: Boolean get() = binding.value?.closed?.isCompleted == true
 
     init {
         require(capacity > 0) { "RequestFactory client capacity must be positive" }

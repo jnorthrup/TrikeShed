@@ -7,7 +7,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withTimeout
-import borg.trikeshed.context.ElementState
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -26,7 +25,6 @@ class CouchChangesFactElementTest {
         withTimeout(1_000) {
             assertFailsWith<CancellationException> { tendon.drain() }
         }
-        assertEquals(ElementState.CLOSED, tendon.state)
         assertTrue(tendon.supervisor.isCompleted)
     }
 
@@ -37,7 +35,6 @@ class CouchChangesFactElementTest {
         val db = Couch("trikeshed", store, cas)
         val rete = ReteNetwork()
         val report = CouchReportReactorElement()
-        report.open()
         val tendon = CouchChangesFactElement(db, rete, report)
 
         db.ensureDesignDoc()

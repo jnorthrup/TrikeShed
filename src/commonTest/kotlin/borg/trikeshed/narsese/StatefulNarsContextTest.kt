@@ -1,6 +1,5 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
@@ -88,8 +87,8 @@ class StatefulNarsContextTest {
             }
             // snapshot creates fresh Join keys; compare both coordinate values, not object identity.
             assertEquals(originalSnapshot.mapKeys { it.key.pair }, original.snapshot().mapKeys { it.key.pair })
-            assertEquals(ElementState.ACTIVE, original.state)
-            assertEquals(ElementState.ACTIVE, replacement.state)
+            assertTrue(original.worker != null && original.supervisor.isActive)
+            assertTrue(replacement.worker != null && replacement.supervisor.isActive)
             mint(replacement, 33L)
             assertEquals(3, replacement.size, "the owner can keep using the borrowed service")
         } finally {
@@ -124,8 +123,8 @@ class StatefulNarsContextTest {
             runner.run(node("beliefs.review"), facts)
             await { originalBag.size == 1 }
             assertEquals(2, glosses.size)
-            assertEquals(ElementState.ACTIVE, original.state)
-            assertEquals(ElementState.ACTIVE, replacement.state)
+            assertTrue(original.opened.isCompleted && original.admission.isActive)
+            assertTrue(replacement.opened.isCompleted && replacement.admission.isActive)
         } finally {
             replacement.drain()
             original.drain()
@@ -170,8 +169,8 @@ class StatefulNarsContextTest {
             target = original
             assertEquals(1, admit.run(rule, emptyMap())["admitted"])
             assertEquals(3, writes.size)
-            assertEquals(ElementState.ACTIVE, original.state)
-            assertEquals(ElementState.ACTIVE, replacement.state)
+            assertTrue(original.opened.isCompleted && original.admission.isActive)
+            assertTrue(replacement.opened.isCompleted && replacement.admission.isActive)
         } finally {
             replacement.drain()
             original.drain()
@@ -230,8 +229,8 @@ class StatefulNarsContextTest {
             assertTrue("(instance Freeze RoundTrip)" in restoredKif.toKifFile())
             assertTrue("Freeze" !in originalKif.toKifFile())
             assertEquals(1, original.size)
-            assertEquals(ElementState.ACTIVE, source.state)
-            assertEquals(ElementState.ACTIVE, target.state)
+            assertTrue(source.worker != null && source.supervisor.isActive)
+            assertTrue(target.worker != null && target.supervisor.isActive)
 
             val defaultSnapshot = freeze.run(node("state.freeze"), emptyMap())["snapshot"] as Map<*, *>
             assertEquals(1, defaultSnapshot["bagSize"])

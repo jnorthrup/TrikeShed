@@ -1,7 +1,6 @@
 package borg.trikeshed.splat
 
 import borg.trikeshed.context.SplatFanoutDispatcherElement
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.userspace.SplatChannelRunner
 import borg.trikeshed.lib.Join
 import borg.trikeshed.lib.Series
@@ -65,22 +64,6 @@ object MotionFeatures {
                 SplatFanoutDispatcherElement.DeliveryOutcome.ERROR -> if (i == 4) 1.0 else 0.0
             }
         }
-
-    /** ElementState transition context: (elementKey, fromState) → query features */
-    fun elementStateQuery(context: Join<String, ElementState>): Series<Double> =
-        8.j { i ->
-            when (i) {
-                0 -> context.a.hashCode().toDouble() * 0.001
-                1 -> context.b.ordinal.toDouble()
-                else -> 0.0
-            }
-        }
-
-    fun elementStateTransform(context: Join<String, ElementState>): Series<Double> =
-        elementStateQuery(context)
-
-    fun elementStateTarget(state: ElementState): Series<Double> =
-        5.j { if (it == state.ordinal) 1.0 else 0.0 }
 }
 
 /**
@@ -101,8 +84,4 @@ object GaussianMotionModels {
     /** Model for the fanout dispatcher's delivery predictions. */
     fun fanoutDispatcher(): GaussianMotionModel<Join<String, String>, SplatFanoutDispatcherElement.DeliveryOutcome> =
         GaussianMotionModel(MotionFeatures::fanoutQuery)
-
-    /** Model for [ElementState] lifecycle transitions. */
-    fun elementState(): GaussianMotionModel<Join<String, ElementState>, ElementState> =
-        GaussianMotionModel(MotionFeatures::elementStateQuery)
 }

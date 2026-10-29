@@ -22,7 +22,7 @@ class TorrentHttpRouter(val element: TorrentElement) {
                 "/torrent", "/torrent/status" -> {
                     if (method != "GET") return WireReply.methodNotAllowed(method)
                     val stats = element.stats.value
-                    WireReply.json(200, mapOf("state" to element.state.name, "activeTorrents" to stats.activeTorrents,
+                    WireReply.json(200, mapOf("closed" to element.supervisor.isCompleted, "activeTorrents" to stats.activeTorrents,
                         "totalPeers" to stats.totalPeers, "downloadBytesPerSecond" to stats.totalDownloadSpeedBps,
                         "uploadBytesPerSecond" to stats.totalUploadSpeedBps,
                         "torrents" to element.activeTorrents.values.map(::describe)))

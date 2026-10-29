@@ -1,8 +1,8 @@
 package borg.trikeshed.util.oroboros.element
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.j
 import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.memory.CouchIndexBridge
@@ -11,6 +11,7 @@ import borg.trikeshed.util.oroboros.WorktreeCouchGateway
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -19,8 +20,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.selects.select
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -35,54 +34,57 @@ class WorktreeReconcileElement(
     private val memoryBridge: MemoryBridge,
     private val headShaProvider: suspend () -> String,
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<WorktreeReconcileElement>()
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<WorktreeReconcileElement>
     override val key: CoroutineContext.Key<*> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at the first [open]; [sync] refuses before it. */
+    val opened: CompletableJob = Job()
+    /** The reconcile loop, launched at [open]. */
+    var worker: Job? = null
 
     val worktreeDirty = Channel<Unit>(Channel.CONFLATED)
     private val requests = Channel<CompletableDeferred<WorktreeCouchGateway.Snapshot>>(
         capacity = 64,
         onUndeliveredElement = { it.completeExceptionally(CancellationException("Worktree reconciliation stopped")) },
     )
-    private val lifecycle = Mutex()
 
-    override suspend fun open() {
-        lifecycle.withLock {
-            if (state != ElementState.CREATED) return
-            super.open()
-            CoroutineScope(currentCoroutineContext() + this + supervisor).launch(Dispatchers.Default) {
-                var dirtyOpen = true
-                var requestsOpen = true
-                while (dirtyOpen || requestsOpen) {
-                    select<Unit> {
-                        if (requestsOpen) requests.onReceiveCatching { received ->
-                            val result = received.getOrNull()
-                            if (result == null) requestsOpen = false
-                            else reconcile(result)
-                        }
-                        if (dirtyOpen) worktreeDirty.onReceiveCatching { received ->
-                            if (received.isClosed) dirtyOpen = false
-                            else {
-                                delay(250)
-                                worktreeDirty.tryReceive() // One pending conflated dirty; sync requests remain queued.
-                                reconcile()
-                            }
+    suspend fun open() {
+        // The loop is a supervisor child before [opened] admits a sync, so drain joins it.
+        val loop = CoroutineScope(currentCoroutineContext() + this + supervisor).launch(Dispatchers.Default, CoroutineStart.LAZY) {
+            var dirtyOpen = true
+            var requestsOpen = true
+            while (dirtyOpen || requestsOpen) {
+                select<Unit> {
+                    if (requestsOpen) requests.onReceiveCatching { received ->
+                        val result = received.getOrNull()
+                        if (result == null) requestsOpen = false
+                        else reconcile(result)
+                    }
+                    if (dirtyOpen) worktreeDirty.onReceiveCatching { received ->
+                        if (received.isClosed) dirtyOpen = false
+                        else {
+                            delay(250)
+                            worktreeDirty.tryReceive() // One pending conflated dirty; sync requests remain queued.
+                            reconcile()
                         }
                     }
                 }
-            }.invokeOnCompletion {
-                requests.cancel()
-                worktreeDirty.cancel()
-                supervisor.complete()
             }
         }
+        if (!opened.complete()) return loop.cancel()
+        loop.invokeOnCompletion {
+            requests.cancel()
+            worktreeDirty.cancel()
+            supervisor.complete()
+        }
+        worker = loop
+        loop.start()
     }
 
     /** Returns after the accepted scan and its index/memory projections complete. */
     suspend fun sync(): WorktreeCouchGateway.Snapshot {
-        lifecycle.withLock {
-            check(state == ElementState.OPEN || state == ElementState.ACTIVE) { "Worktree reconciliation is $state" }
-        }
+        check(opened.isCompleted) { "Worktree reconciliation is not open" }
         val result = CompletableDeferred<WorktreeCouchGateway.Snapshot>()
         requests.send(result)
         return result.await()
@@ -116,16 +118,11 @@ class WorktreeReconcileElement(
     }
 
     override suspend fun drain() = withContext(NonCancellable) {
-        lifecycle.withLock {
-            if (state == ElementState.CLOSED) return@withContext
-            state = ElementState.DRAINING
-            worktreeDirty.close()
-            requests.close()
-            supervisor.complete()
-        }
+        worktreeDirty.close()
+        requests.close()
+        supervisor.complete()
         supervisor.join()
-        lifecycle.withLock { state = ElementState.CLOSED }
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

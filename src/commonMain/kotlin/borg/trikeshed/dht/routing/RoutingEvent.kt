@@ -2,8 +2,6 @@ package borg.trikeshed.dht.routing
 
 import borg.trikeshed.dht.include.Route
 import borg.trikeshed.lib.Join
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlin.coroutines.CoroutineContext
@@ -25,7 +23,7 @@ sealed class RoutingEvent<TNum : Comparable<TNum>> {
  */
 class RoutingEventElement<TNum : Comparable<TNum>>(
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
 
     // Fanout channel for routing events
     val fanout = Channel<RoutingEvent<TNum>>(Channel.BUFFERED)

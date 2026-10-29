@@ -1,8 +1,7 @@
 package borg.trikeshed.narsese
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.BudgetCoord
 import borg.trikeshed.isam.synchronizedLock
 import borg.trikeshed.job.ContentId
@@ -64,11 +63,15 @@ class CausalityReteElement(
     private val mintBudget: BudgetCoord = BudgetCoord(0.5f, 0.4f, 0.5f),
     parentJob: Job? = null,
     private val traceCapacity: Int = 256,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
-    companion object Key : AsyncContextKey<CausalityReteElement>()
+    companion object Key : CoroutineContext.Key<CausalityReteElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    /** Completes at [open]; firing starts after it. */
+    val opened: CompletableJob = Job()
+    /** Completes at [drain]; firing stops after it. */
+    val admission: CompletableJob = Job()
 
     // The inner CausalityRete freezes its alpha network at construction, so
     // ADMISSION is a whole-rete swap: one volatile write of an immutable,
@@ -98,10 +101,9 @@ class CausalityReteElement(
     /** The admitted eternal rules (temporal input was refused at admission). */
     val rules: Series<EternalRule> get() = rete.rules
 
-    override suspend fun open() {
-        super.open()
-        if (state == ElementState.OPEN) state = ElementState.ACTIVE
-    }
+    suspend fun open() { opened.complete() }
+
+    override suspend fun drain() { admission.complete() }
 
     /** Record the term identity of a signal the caller minted with known terms.
      *  Guarded: the curator feeder and HTTP teach write while the 250ms
@@ -190,7 +192,7 @@ class CausalityReteElement(
      * call anywhere on this path.
      */
     suspend fun fireLive(): Series2<Long, String> = fireGate.withLock {
-        if (state != ElementState.ACTIVE) return@withLock emptySeriesOf()
+        if (!opened.isCompleted || !admission.isActive) return@withLock emptySeriesOf()
         val assertions = projectLive()
         if (assertions.size == 0) return@withLock emptySeriesOf()
         val firings = rete.fire(assertions)

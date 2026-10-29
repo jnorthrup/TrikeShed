@@ -1,6 +1,5 @@
 package borg.trikeshed.lcnc.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.lcnc.*
 import borg.trikeshed.lib.*
@@ -23,7 +22,7 @@ class LcncWorkgroupTest {
         fanout.open()
         try { body(ccekReactorBinding(reactor), fanout) }
         finally { withContext(NonCancellable) { try { fanout.drain() } finally { reactor.drain() } } }
-        assertEquals(ElementState.CLOSED, fanout.state)
+        assertTrue(fanout.supervisor.isCompleted)
         assertFalse(fanout.supervisor.children.any())
     }
 
@@ -139,7 +138,7 @@ class LcncWorkgroupTest {
                 assertEquals(listOf("tasks", "relay", "vote"), lineage.map { assertIs<Map<*, *>>(it)["workgroup"] })
                 assertEquals(parentClaim, (assertIs<Map<*, *>>(lineage.first())["claimId"] as Number).toLong())
             }
-            assertEquals(ElementState.CLOSED, fanout.state)
+            assertTrue(fanout.supervisor.isCompleted)
         }
     }
 
@@ -220,7 +219,7 @@ class LcncWorkgroupTest {
             }
             assertEquals(listOf(gathered), received)
             val node = assertNotNull(receiptNode)
-            assertEquals(ElementState.CLOSED, node.lifecycleState)
+            assertTrue(node.supervisor.isCompleted)
             val events = node.recording().filterIsInstance<borg.trikeshed.ccek.ForgeSignal.AppendBlock>()
             assertEquals(listOf("started", "finished"), events.map { it.properties["state"] })
             assertTrue(events.all { it.properties["programCid"] == recipientCid.value &&

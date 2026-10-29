@@ -10,6 +10,8 @@ import borg.trikeshed.kernel.KernelId
 import borg.trikeshed.userspace.nio.process.KernelSeat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.sync.Mutex
@@ -203,13 +205,14 @@ class SharedContextElement private constructor(
         }
     }
 
+    /** Completes at [drain]; requests are refused after it. */
+    val admission: CompletableJob = Job()
     private val stateLock = Mutex()
-    private var draining = false
     private val cache = LinkedHashMap<Identity, ContextAcquisition>()
     private var cacheHits = 0
 
-    private suspend fun ensureOpen() {
-        check(!stateLock.withLock { draining }) { "shared context element is draining" }
+    private fun ensureOpen() {
+        check(admission.isActive) { "shared context element is draining" }
     }
 
     /** Resolves a pinned revision. Verification, scope and budgets are [SharedContext.acquire]'s; fetches are coalesced. */
@@ -253,7 +256,7 @@ class SharedContextElement private constructor(
 
     /** Stops admission, settles everything admitted, then closes what this element created. Safe to call again. */
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        stateLock.withLock { draining = true }
+        admission.complete()
         var failure: Throwable? = null
         // Work first: its tasks fetch, so the fetch seat must outlive it.
         for (step in listOf<suspend () -> Unit>({ workSeat.drain() }, { fetchSeat.drain() }, { kernel.drain() })) {

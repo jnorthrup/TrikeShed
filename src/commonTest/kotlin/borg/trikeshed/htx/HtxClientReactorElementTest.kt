@@ -1,7 +1,5 @@
 package borg.trikeshed.htx
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lib.ByteSeries
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.toSeries
@@ -32,7 +30,7 @@ class HtxClientReactorElementTest {
 
         val response = element.request("http://example.com/health")
 
-        assertEquals(ElementState.ACTIVE, element.state)
+        assertTrue(element.supervisor.isActive && element.admission.isActive)
         assertEquals(200, response.status)
         assertEquals("ok", response.body.asString())
         assertEquals(
@@ -61,7 +59,7 @@ class HtxClientReactorElementTest {
         val element = openHtxClientReactorElement(nioSupervisor = supervisor)
         val response = element.request(parseHtxRequest("http://example.com/supervisor"))
 
-        assertEquals(ElementState.ACTIVE, element.state)
+        assertTrue(element.supervisor.isActive && element.admission.isActive)
         assertEquals(200, response.status)
         assertEquals("supervisor", response.body.asString())
 
@@ -129,7 +127,7 @@ class HtxClientReactorElementTest {
     }
 }
 
-private class RecordingHtxClientFrameSubscriber : AsyncContextElement(), HtxClientFrameSubscriber {
+private class RecordingHtxClientFrameSubscriber : kotlin.coroutines.CoroutineContext.Element, HtxClientFrameSubscriber {
     companion object Key : CoroutineContext.Key<RecordingHtxClientFrameSubscriber>
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -140,7 +138,7 @@ private class RecordingHtxClientFrameSubscriber : AsyncContextElement(), HtxClie
     }
 }
 
-private class RecordingHtxClientFanoutSubscriber : AsyncContextElement(), FanoutEventSubscriber {
+private class RecordingHtxClientFanoutSubscriber : kotlin.coroutines.CoroutineContext.Element, FanoutEventSubscriber {
     companion object Key : CoroutineContext.Key<RecordingHtxClientFanoutSubscriber>
     override val key: CoroutineContext.Key<*> get() = Key
 
@@ -151,7 +149,7 @@ private class RecordingHtxClientFanoutSubscriber : AsyncContextElement(), Fanout
     }
 }
 
-private class RecordingClientRouteService : AsyncContextElement(), HtxRouteService {
+private class RecordingClientRouteService : kotlin.coroutines.CoroutineContext.Element, HtxRouteService {
     override val key: CoroutineContext.Key<*> get() = HtxRouteService
 
     private val requests = mutableListOf<HtxRequest>()

@@ -117,7 +117,7 @@ class PostingLifecycleElementTest {
         element.drain()
         for (r in replies) assertEquals(null, r.reply.getCompletionExceptionOrNull(), "admitted write ${r.key} finished")
         assertEquals(10, element.index("docs").documents)
-        assertEquals(ElementState.CLOSED, element.state)
+        assertTrue(element.supervisor.isCompleted)
         assertTrue(element.intake.isClosedForSend)
         assertTrue(element.supervisor.isCompleted)
         val bursts = element.bursts

@@ -2,7 +2,6 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.graal.ConfixBlackboard
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
@@ -18,7 +17,7 @@ class CurationLifecycleTest {
                 nodes.curation.submit { entered.complete(Unit); release.await() }
                 entered.await()
                 val draining = async(start = CoroutineStart.UNDISPATCHED) { nodes.drain() }
-                while (selected.curation.admission.withLock { selected.curation.accepting }) yield()
+                while (!selected.curation.input.isClosed()) yield()
                 assertFalse(draining.isCompleted)
                 val failure = assertFailsWith<IllegalStateException> {
                     selected.admitScore("fixture", emptyList(), coroutineContext)
@@ -59,7 +58,7 @@ class CurationLifecycleTest {
                 parent.cancel()
                 val joined = async { parent.join() }
                 val drained = async { owner.drain() }
-                while (owner.admission.withLock { owner.accepting }) yield()
+                while (!owner.input.isClosed()) yield()
                 assertFalse(active.isCompleted, "Parent cancellation must preserve the accepted result record")
                 assertFalse(queued.isCompleted)
                 assertFalse(parent.isCompleted, "The parent must retain ownership until its curation effects settle")
@@ -103,7 +102,7 @@ class CurationLifecycleTest {
             }
             assertFalse(rejected.isCompleted, "A full admission queue must suspend its sender")
             val drain = async { owner.drain() }
-            while (owner.admission.withLock { owner.accepting }) yield()
+            while (!owner.input.isClosed()) yield()
             assertFalse(drain.isCompleted)
             release.complete(Unit)
             answering.await()

@@ -1,6 +1,5 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDoc
 import kotlinx.coroutines.CompletableDeferred
@@ -25,22 +24,19 @@ class UserContextLifecycleTest {
     @Test
     fun lifecycleOwnsActivationAndCannotReopenAfterClose() = runTest {
         val context = UserContext("lifecycle", backgroundScope)
-        assertEquals(ElementState.CREATED, context.lifecycleState)
+        assertTrue(context.admission.isActive)
         assertSame(UserContext.Key, context.key)
-        context.open()
-        assertEquals(ElementState.OPEN, context.lifecycleState)
         context.activate()
-        assertEquals(ElementState.ACTIVE, context.lifecycleState)
+        assertTrue(context.supervisor.isActive)
         assertTrue(context.active)
         context.deactivate()
         assertFalse(context.active)
-        assertEquals(ElementState.ACTIVE, context.lifecycleState)
+        assertTrue(context.supervisor.isActive)
         context.activate()
         context.close()
         context.close()
         context.cancel()
-        context.open()
-        assertEquals(ElementState.CLOSED, context.lifecycleState)
+        assertTrue(context.supervisor.isCompleted)
         assertFalse(context.active)
         assertFailsWith<IllegalStateException> { context.activate() }
         assertFailsWith<IllegalStateException> { context.fork("late") }
@@ -62,9 +58,9 @@ class UserContextLifecycleTest {
         assertSame(node, fork.fanoutSubscribers.single())
         val drained = async { context.drain() }
         runCurrent()
-        assertEquals(ElementState.DRAINING, context.lifecycleState)
-        assertEquals(ElementState.DRAINING, fork.lifecycleState)
-        assertEquals(ElementState.DRAINING, node.lifecycleState)
+        assertFalse(context.admission.isActive)
+        assertFalse(fork.admission.isActive)
+        assertFalse(node.acceptsSignals)
         assertFalse(drained.isCompleted)
         assertFailsWith<IllegalStateException> { context.fork("late") }
         assertFailsWith<IllegalStateException> { fork.loadPolyglotFacts(emptyList()) }
@@ -72,9 +68,9 @@ class UserContextLifecycleTest {
         drained.await()
         assertEquals(2, fork.reteTable.query("block:appended").size)
         assertEquals(0, context.factCount)
-        assertEquals(ElementState.CLOSED, context.lifecycleState)
-        assertEquals(ElementState.CLOSED, fork.lifecycleState)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
+        assertTrue(context.supervisor.isCompleted)
+        assertTrue(fork.supervisor.isCompleted)
+        assertTrue(node.supervisor.isCompleted)
         assertTrue(context.fanoutSubscribers.isEmpty())
         assertTrue(context.supervisor.children.none())
     }
@@ -111,9 +107,9 @@ class UserContextLifecycleTest {
         assertTrue(cancelledNode)
         assertTrue(cancelledAdapted)
         assertFalse(adapted.isActive)
-        assertEquals(ElementState.CLOSED, node.lifecycleState)
-        assertEquals(ElementState.CLOSED, fork.lifecycleState)
-        assertEquals(ElementState.CLOSED, context.lifecycleState)
+        assertTrue(node.supervisor.isCompleted)
+        assertTrue(fork.supervisor.isCompleted)
+        assertTrue(context.supervisor.isCompleted)
     }
 
     @Test
@@ -144,7 +140,7 @@ class UserContextLifecycleTest {
         runCurrent()
         val closed = async { context.close() }
         runCurrent()
-        assertEquals(ElementState.DRAINING, context.lifecycleState)
+        assertFalse(context.admission.isActive)
         assertFalse(closed.isCompleted)
         assertFalse(completed)
         assertFailsWith<IllegalStateException> { context.adaptParadigm(MetaLcncParadigm("late", emptyList())) }
@@ -153,6 +149,6 @@ class UserContextLifecycleTest {
         assertTrue(completed)
         assertEquals(1, context.factCount)
         assertFalse(adapted.isActive)
-        assertEquals(ElementState.CLOSED, context.lifecycleState)
+        assertTrue(context.supervisor.isCompleted)
     }
 }

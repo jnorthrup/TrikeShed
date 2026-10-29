@@ -20,7 +20,7 @@ import borg.trikeshed.lib.isEmpty
  *
  * Owns a bounded command channel, processes commands through the durability
  * pipeline (schema → CAS → WAL → barrier → reducer → index), and exposes
- * committed snapshots and lifecycle state.
+ * committed snapshots. Admission is the command channel; completion is [rootJob].
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class JobSupervisorElement private constructor(
@@ -57,11 +57,6 @@ class JobSupervisorElement private constructor(
     val facts: ReceiveChannel<JobFact> get() = _facts
     val activations: ReceiveChannel<Activation> get() = _activations
 
-    private var _lifecycleState: ElementState = ElementState.CREATED
-
-    val lifecycleState: ElementState get() = _lifecycleState
-    val state: ElementState get() = _lifecycleState
-
     var committedSequence: Long = 0L
         private set
 
@@ -77,8 +72,6 @@ class JobSupervisorElement private constructor(
     private val receipts = mutableMapOf<String, ContentId>()
     private val factLog = mutableMapOf<JobId, MutableList<String>>()
 
-    val isActive: Boolean get() = _lifecycleState == ElementState.ACTIVE
-
     val rootJob: Job get() = _rootJob
 
     val commandCapacity: Int get() = capacity
@@ -89,7 +82,6 @@ class JobSupervisorElement private constructor(
     val activationsChannelClosed: Boolean get() = _activations.isClosedForReceive
 
     init {
-        _lifecycleState = ElementState.OPEN
         // The supplied log is authoritative; walData retains the compatibility
         // entrypoint's map-backed replay. Rebuild receipts before admission.
         try {
@@ -114,7 +106,6 @@ class JobSupervisorElement private constructor(
             _rootJob.cancel()
             throw failure
         }
-        _lifecycleState = ElementState.ACTIVE
         reactorJob = parentScope.launch(coroutineContext) { reactor() }
         reteProducerJob = parentScope.launch(coroutineContext) { reteNetwork.run(_commands) }
         reteConsumerJob = parentScope.launch(coroutineContext) {
@@ -219,7 +210,6 @@ class JobSupervisorElement private constructor(
     }
 
     suspend fun submit(cmd: JobCommand) {
-        check(_lifecycleState == ElementState.ACTIVE || _lifecycleState == ElementState.OPEN) { "not active" }
         _commands.send(cmd)
     }
 
@@ -250,10 +240,7 @@ class JobSupervisorElement private constructor(
         _commands.send(cmd)
     }
 
-    fun trySubmit(cmd: JobCommand): Boolean {
-        if (_lifecycleState != ElementState.ACTIVE && _lifecycleState != ElementState.OPEN) return false
-        return _commands.trySend(cmd).isSuccess
-    }
+    fun trySubmit(cmd: JobCommand): Boolean = _commands.trySend(cmd).isSuccess
 
     suspend fun drain() {
         // Wait for Rete to finish producing events and adding to _commands BEFORE beginDrain
@@ -271,19 +258,15 @@ class JobSupervisorElement private constructor(
         reteNetwork.close()
         reteProducerJob.join()
         _activations.close()
-        _lifecycleState = ElementState.CLOSED
         _rootJob.complete()
     }
 
-    /** Transition to DRAINING and close the command channel without joining the reactor. */
+    /** Stop admission: close the command channel without joining the reactor. */
     fun beginDrain() {
-        if (_lifecycleState != ElementState.ACTIVE) return
-        _lifecycleState = ElementState.DRAINING
         _commands.close()
     }
 
     fun cancel(cause: Throwable? = null) {
-        _lifecycleState = ElementState.CLOSED
         _commands.close()
         _committed.close(cause)
         _facts.close()
@@ -361,7 +344,5 @@ class Instrumentation {
     var walAppendAttempts = 0
     var globalSequence = 0L
 }
-
-enum class ElementState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
 
 data class Activation(val ruleId: String, val factId: String, val payload: String)

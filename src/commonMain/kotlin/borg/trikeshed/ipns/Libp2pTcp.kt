@@ -1,7 +1,9 @@
 package borg.trikeshed.ipns
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.lib.*
 import borg.trikeshed.reactor.TlsCodecBackend
 import borg.trikeshed.userspace.FunctionalUringFacade
@@ -47,8 +49,11 @@ class UringLibp2pDialer(
     maxConnections: Int = 8,
     private val ebpfPrograms: List<UringEbpfProgram> = emptyList(),
     context: CoroutineContext = EmptyCoroutineContext,
-) : AsyncContextElement(ElementState.CREATED, parentJob), Libp2pDialer {
+) : Libp2pDialer, Drain {
     override val key get() = Libp2pDialer.Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes at [close]; dialing refuses after it. */
+    val admission: CompletableJob = Job()
     private val scope = CoroutineScope(context + Dispatchers.Default + supervisor)
     private val permits = Semaphore(maxConnections)
     private val registry = Mutex()
@@ -56,8 +61,7 @@ class UringLibp2pDialer(
     init { require(timeoutMillis in 1..120000 && maxConnections in 1..64) }
 
     override suspend fun open(peer: Libp2pPeer, protocol: String): Libp2pStream = withTimeout(timeoutMillis) {
-        super.open()
-        check(state.isLessThan(ElementState.DRAINING)) { "Libp2p dialer is draining" }
+        check(admission.isActive) { "Libp2p dialer is draining" }
         require(peer.id.isNotEmpty() && peer.addresses.size in 1..64)
         permits.acquire()
         var connected: Libp2pStream? = null
@@ -103,7 +107,7 @@ class UringLibp2pDialer(
                 }
             }
             registry.withLock {
-                check(state.isLessThan(ElementState.DRAINING)) { "Libp2p dialer is draining" }
+                check(admission.isActive) { "Libp2p dialer is draining" }
                 streams.add(owned)
             }
             owned
@@ -114,10 +118,10 @@ class UringLibp2pDialer(
         }
     }
 
-    override suspend fun close() {
-        val active = registry.withLock { state = ElementState.DRAINING; streams.toList() }
+    suspend fun close() {
+        val active = registry.withLock { admission.complete(); streams.toList() }
         withContext(NonCancellable) { for (stream in active) runCatching { stream.close() } }
-        super.close()
+        supervisor.cancelAndJoin()
     }
 
     override suspend fun drain() = close()

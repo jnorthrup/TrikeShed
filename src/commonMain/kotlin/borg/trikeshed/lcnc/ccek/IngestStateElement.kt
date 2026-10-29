@@ -2,8 +2,6 @@ package borg.trikeshed.lcnc.ccek
 
 import borg.trikeshed.lcnc.isam.LcncEntity
 import borg.trikeshed.lib.Series
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.lcnc.reactor.ReactorAction
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -22,7 +20,7 @@ import kotlin.coroutines.CoroutineContext
 class IngestStateElement(
     val ingestId: String,
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
 
     // Fanout channel for reactor actions, replacing mutableListOf accumulator
     val fanout = Channel<ReactorAction>(Channel.BUFFERED)

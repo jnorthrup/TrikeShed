@@ -1,6 +1,5 @@
 package borg.trikeshed.kanban
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.context.nuid.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
@@ -51,7 +50,7 @@ class BoardActionElementTest {
             withTimeout(1_000) { draining.await() }
             accepted.awaitAll()
             assertEquals((0 until 7).toList(), processed)
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
         } finally { release.complete(Unit); owner.close() }
     }
@@ -86,7 +85,7 @@ class BoardActionElementTest {
             assertTrue(generateSequence<Throwable>(failure) { it.cause }.any {
                 it.suppressedExceptions.any { other -> other.message == "Prepared work failed" }
             })
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
         } finally { runCatching { owner.close() } }
     }
@@ -146,7 +145,7 @@ class BoardActionElementTest {
                     owner.prepare { assertSame(executing, currentCoroutineContext().job) }
                     assertFailsWith<IllegalStateException> { owner.awaitPreparations() }
                     assertFailsWith<IllegalStateException> { owner.drain() }
-                    assertEquals(ElementState.ACTIVE, owner.state)
+                    assertTrue(owner.supervisor.isActive)
                     launch { childEntered.complete(Unit); releaseChild.await(); effects++ }
                     entered.complete(Unit)
                     releaseBody.await()
@@ -173,7 +172,7 @@ class BoardActionElementTest {
             releaseChild.complete(Unit)
             withTimeout(1_000) { preparations.await(); draining.await() }
             assertEquals(1, effects)
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
             assertFalse(owner.supervisor.children.any())
         } finally {
             releaseBody.complete(Unit)
@@ -216,7 +215,7 @@ class BoardActionElementTest {
             assertFalse(parent.children.any())
             assertFalse(owner.supervisor.children.any())
             assertFailsWith<IllegalStateException> { owner.drain() }
-            assertEquals(ElementState.CLOSED, owner.state)
+            assertTrue(owner.supervisor.isCompleted)
         } finally {
             releaseCleanup.complete(Unit)
             caller.cancelAndJoin()
@@ -233,7 +232,7 @@ class BoardActionElementTest {
         try {
             assertNotNull(owner.submit {
                 assertFailsWith<IllegalStateException> { owner.drain() }
-                assertEquals(ElementState.ACTIVE, owner.state)
+                assertTrue(owner.supervisor.isActive)
                 assertNotNull(owner.submit { childEntered.complete(Unit); release.await() })
             }).await()
             childEntered.await()

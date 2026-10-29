@@ -1,6 +1,5 @@
 package borg.trikeshed.graal
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.dag.*
 import borg.trikeshed.lib.*
 import kotlinx.coroutines.*
@@ -49,7 +48,6 @@ class BlackboardProjectionLifecycleTest {
             })
             assertFailure(failure, assertFailsWith<IllegalStateException> { element.close() })
             assertEquals(1, rete.snapshot().size, "Partial work is not a complete revision acknowledgement")
-            assertEquals(ElementState.CLOSED, element.state)
             assertTrue(element.supervisor.isCompleted)
             assertTrue(element.supervisor.children.none())
         } finally { element.supervisor.cancelAndJoin() }
@@ -85,7 +83,6 @@ class BlackboardProjectionLifecycleTest {
         val element = BlackboardChangesFactElement(ConfixBlackboard.empty(), ReteNetwork(), parentJob = parent)
         try {
             withTimeout(1_000) { element.drain() }
-            assertEquals(ElementState.CLOSED, element.state)
             assertTrue(element.supervisor.isCompleted)
             assertTrue(parent.children.none())
             element.close()
@@ -116,7 +113,6 @@ class BlackboardProjectionLifecycleTest {
             repeat(300) { board.put("probe/live", it, "test") }
             board.remove("probe/gone")
             element.close()
-            assertEquals(ElementState.CLOSED, element.state)
             assertTrue(element.supervisor.isCompleted)
             assertTrue(element.supervisor.children.none())
             val facts = rete.snapshot()
@@ -138,7 +134,6 @@ class BlackboardProjectionLifecycleTest {
         try {
             assertFailure(failure, assertFailsWith<IllegalStateException> { element.drainKeys() })
             assertFailure(failure, assertFailsWith<IllegalStateException> { element.close() })
-            assertEquals(ElementState.CLOSED, element.state)
             assertTrue(element.supervisor.isCompleted)
             assertFailure(failure, assertFailsWith<IllegalStateException> { element.close() })
         } finally { element.supervisor.cancelAndJoin() }

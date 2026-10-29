@@ -1,5 +1,6 @@
 package borg.trikeshed.ccek
 
+import kotlinx.coroutines.Job
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,20 +24,20 @@ class SupervisorHoldTest {
 
     @Test
     fun closingReleasesEverythingHeld() {
-        val s = RealSupervisorJob("t").also { it.open() }
+        val s = RealSupervisorJob("t")
         val a = Probe(); val b = Probe(); val c = Probe()
         s.hold(a); s.hold(b); s.hold(c)
         assertEquals(0, a.cancels + b.cancels + c.cancels, "nothing releases before close")
         s.close()
         assertEquals(1, a.cancels); assertEquals(1, b.cancels); assertEquals(1, c.cancels)
-        assertEquals(FanoutLifecycle.CLOSED, s.lifecycle)
+        assertTrue(s.supervisor.isCompleted)
     }
 
     @Test
     fun aResourceHandedToAClosedSupervisorIsReleasedNotRetained() {
         // The leak this method exists to prevent: acquiring during shutdown and being kept by
         // something that will never close again. Cancelling on arrival is the only honest answer.
-        val s = RealSupervisorJob("t").also { it.open(); it.close() }
+        val s = RealSupervisorJob("t").also { it.close() }
         val late = Probe()
         s.hold(late)
         assertEquals(1, late.cancels, "a late resource must be released immediately")
@@ -46,7 +47,7 @@ class SupervisorHoldTest {
     fun oneFailingReleaseDoesNotStrandTheRest() {
         // A resource that throws on close must not keep the ones behind it in the list. This is the
         // shape of the original bug: one uncancelled member and the whole shutdown never completes.
-        val s = RealSupervisorJob("t").also { it.open() }
+        val s = RealSupervisorJob("t")
         val after = Probe()
         s.hold(object : CancelToken { override fun cancel() = throw IllegalStateException("boom") })
         s.hold(after)
@@ -56,7 +57,7 @@ class SupervisorHoldTest {
 
     @Test
     fun closeIsIdempotentAndDoesNotDoubleRelease() {
-        val s = RealSupervisorJob("t").also { it.open() }
+        val s = RealSupervisorJob("t")
         val p = Probe()
         s.hold(p)
         s.close(); s.close()
@@ -67,7 +68,7 @@ class SupervisorHoldTest {
     fun holdAndSlotShareTheOneLifecycle() {
         // The point of putting hold on the SAME supervisor as slot: a subsystem does not get to
         // have two lifecycles, one for its subscriptions and a forgotten one for its resources.
-        val s = RealSupervisorJob("t").also { it.open() }
+        val s = RealSupervisorJob("t")
         val src = MutableObservable(1)
         val mirrored = s.slot(src)
         val res = Probe()
@@ -83,13 +84,15 @@ class SupervisorHoldTest {
 
     @Test
     fun drainIsNotYetClosedSoInFlightWorkCanFinish() {
-        val s = RealSupervisorJob("t").also { it.open() }
+        val s = RealSupervisorJob("t")
         val p = Probe()
         s.hold(p)
+        val inFlight = Job(s.supervisor)
         s.drain()
-        assertEquals(FanoutLifecycle.DRAINING, s.lifecycle)
-        assertEquals(0, p.cancels, "draining must not release; that is what close is for")
-        s.close()
+        assertTrue(!s.supervisor.isCompleted)
+        assertEquals(0, p.cancels, "draining must not release while in-flight work runs")
+        inFlight.complete()
         assertEquals(1, p.cancels)
+        assertTrue(s.supervisor.isCompleted)
     }
 }

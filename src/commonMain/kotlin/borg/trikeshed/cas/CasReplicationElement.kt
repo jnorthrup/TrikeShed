@@ -1,7 +1,10 @@
 // Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
 package borg.trikeshed.cas
 
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.job.ContentId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -16,9 +19,12 @@ object CasReplicationKey : CoroutineContext.Key<CasReplicationElement>
 class CasReplicationElement(
     parentJob: Job? = null,
     capacity: Int = 64
-) : borg.trikeshed.context.AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element, Drain {
 
     override val key: CoroutineContext.Key<*> get() = CasReplicationKey
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The replication loop, launched at [open]. */
+    var worker: Job? = null
 
     // Channel is finite and suspending. bounded backpressure.
     private val replicationChannel = Channel<Pair<ContentId, ByteArray>>(capacity = capacity)
@@ -28,12 +34,10 @@ class CasReplicationElement(
         hooks.add(hook)
     }
 
-    override suspend fun open() {
-        super.open()
-
-        CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
+    suspend fun open() {
+        worker = CoroutineScope(currentCoroutineContext() + this + supervisor).launch {
             for ((cid, payload) in replicationChannel) {
-                if (state.isLessThan(ElementState.CLOSED)) {
+                if (supervisor.isActive) {
                     // structured concurrency over listeners
                     coroutineScope {
                         for (hook in hooks) {
@@ -52,7 +56,7 @@ class CasReplicationElement(
     }
 
     suspend fun replicate(cid: ContentId, payload: ByteArray) {
-        if (state.isAtLeast(ElementState.OPEN) && state.isLessThan(ElementState.DRAINING)) {
+        if (worker != null && !replicationChannel.isClosedForSend) {
             try {
                 replicationChannel.send(cid to payload)
             } catch (e: Exception) {
@@ -65,11 +69,13 @@ class CasReplicationElement(
         // Graceful drain: close channel so the loop can exhaust in-flight items,
         // then await supervisor completion.
         replicationChannel.close()
-        super.drain()
+        supervisor.complete()
+        supervisor.join()
+        close()
     }
 
-    override suspend fun close() {
+    suspend fun close() {
         replicationChannel.close() // idempotent
-        super.close()
+        supervisor.cancelAndJoin()
     }
 }

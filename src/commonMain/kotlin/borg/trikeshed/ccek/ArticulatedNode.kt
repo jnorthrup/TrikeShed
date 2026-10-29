@@ -1,6 +1,5 @@
 package borg.trikeshed.ccek
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.forge.ForgeBlockId
 import borg.trikeshed.forge.ForgeBlockKind
 import borg.trikeshed.forge.ForgeDocument
@@ -79,17 +78,14 @@ class ArticulatedNode(
     val markdownProjections = MutableSharedFlow<String>(replay = 1, extraBufferCapacity = 16)
     val agentStatus = MutableSharedFlow<AgentStatusEvent>(replay = 1, extraBufferCapacity = 256)
 
-    var lifecycleState: ElementState = ElementState.CREATED
-        private set
-
     val isActive: Boolean
-        get() = lifecycleState == ElementState.ACTIVE && supervisor.isActive
+        get() = consumer != null && acceptsSignals
 
     val childScopeCount: Int
         get() = supervisor.children.count()
 
     val agentCount: Int
-        get() = if (lifecycleState == ElementState.CLOSED) 0 else agents.size
+        get() = if (supervisor.isCompleted) 0 else agents.size
 
     val markdownProjectionCount: Int
         get() = markdownProjections.replayCache.size
@@ -98,7 +94,7 @@ class ArticulatedNode(
         get() = downstream.toList()
 
     internal val acceptsSignals: Boolean
-        get() = lifecycleState < ElementState.DRAINING && supervisor.isActive
+        get() = !input.isClosedForSend && supervisor.isActive
 
     init {
         require(maxConcurrency in 1..256) { "maxConcurrency must be in 1..256" }
@@ -107,23 +103,15 @@ class ArticulatedNode(
                 terminalFailure = cause
                 input.close(cause)
             }
-            lifecycleState = ElementState.CLOSED
             agents.clear()
             downstream.clear()
         }
         if (autoStart) start()
     }
 
-    fun open() {
-        if (lifecycleState == ElementState.CLOSED) return
-        if (lifecycleState == ElementState.CREATED) lifecycleState = ElementState.OPEN
-    }
-
     fun start() {
-        if (lifecycleState >= ElementState.DRAINING) return
+        if (!acceptsSignals) return
         if (consumer != null) return
-        open()
-        lifecycleState = ElementState.ACTIVE
         consumer = executionScope.launch(CoroutineName("ccek-node")) {
             try {
                 for (signal in input) process(signal)
@@ -131,10 +119,7 @@ class ArticulatedNode(
                 terminalFailure = t
                 throw t
             } finally {
-                if (supervisor.isActive) {
-                    lifecycleState = ElementState.CLOSED
-                    supervisor.complete()
-                }
+                if (supervisor.isActive) supervisor.complete()
             }
         }
     }
@@ -183,11 +168,10 @@ class ArticulatedNode(
     }
 
     internal fun requireAccepting() {
-        check(acceptsSignals) { "ArticulatedNode is not accepting signals: $lifecycleState" }
+        check(acceptsSignals) { "ArticulatedNode is not accepting signals" }
     }
 
     internal fun closeAdmission(cause: Throwable?) {
-        if (lifecycleState < ElementState.DRAINING) lifecycleState = ElementState.DRAINING
         input.close(cause)
     }
 

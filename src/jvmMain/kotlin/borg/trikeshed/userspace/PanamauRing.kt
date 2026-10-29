@@ -416,7 +416,12 @@ internal class PanamauChannelBackend(
                             if (sub.operationFlags != 0) return -95
                             if (sub.offset != -1L && sub.offset != 0L) return -29
                             if (code == OP_SEND) operationFlags = 0x4000 // MSG_NOSIGNAL
-                        } else offset = if (JvmFileTable.descriptor(sub.fd) is JvmSocketDescriptor) -1L else sub.offset
+                        } else if (JvmFileTable.descriptor(sub.fd) is JvmSocketDescriptor) {
+                            offset = -1L
+                            // These sockets are O_NONBLOCK. Match read/write(2) and the native encoder instead of
+                            // letting io_uring poll an EAGAIN until readiness; blocking channels own that wait.
+                            operationFlags = 0x8 // RWF_NOWAIT
+                        } else offset = sub.offset
                         val buffer = sub.buffer
                         if (buffer != null) {
                             if (sub.len > buffer.remaining() || read && buffer.isReadOnly()) return -22

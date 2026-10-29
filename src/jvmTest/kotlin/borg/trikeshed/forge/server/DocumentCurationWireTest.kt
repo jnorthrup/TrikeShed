@@ -271,7 +271,7 @@ class DocumentCurationWireTest {
                     module?.close()
                     documents?.close()
                     rig.bag?.drain()
-                    rig.bag?.close()
+                    rig.bag?.supervisor?.cancelAndJoin()
                 } finally { owner.cancelAndJoin() }
             }
         }
@@ -331,7 +331,7 @@ class DocumentCurationWireTest {
         } finally {
             try {
                 documents?.stopAdmission(); module?.drain(); documents?.drain()
-                module?.close(); documents?.close(); rig.bag?.drain(); rig.bag?.close()
+                module?.close(); documents?.close(); rig.bag?.drain(); rig.bag?.supervisor?.cancelAndJoin()
             } finally {
                 try { reactor.close() } finally { try { htx.close() } finally { owner.cancelAndJoin() } }
             }

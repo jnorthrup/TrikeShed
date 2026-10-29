@@ -57,22 +57,23 @@ class PgServerElement(
     private val ring: FunctionalUringFacade = UringChannels.open(scope, entries)
     private val tokens = Mutex()
     private var token = 0L
-    private val admission = Mutex()
-    private val termination = Mutex()
+    /** Guards [waiting], [connections] and the listener. */
+    private val registry = Mutex()
+    /** Completes when [drain] begins; SQE registration, session admission and [open] refuse after it. */
+    val closed: CompletableJob = Job()
     /** Token of a readiness or accept SQE a stage waits on → its descriptor; cancelled when the session ends or at drain. */
     private val waiting = HashMap<Long, Int>()
     private val connections = LinkedHashSet<Job>()
     private var accepts: Job? = null
     private var listenFd = -1
     private var pids = 0
-    private var closed = false
 
     /** The bound address, `a.b.c.d:port`, once [open] has listened (the port is read back, so `:0` works). */
     var localAddress: String? = null
         private set
 
     /** Sessions still running. */
-    suspend fun connected(): Int = admission.withLock { connections.count { it.isActive } }
+    suspend fun connected(): Int = registry.withLock { connections.count { it.isActive } }
 
     private suspend fun tok(): Long = tokens.withLock { ++token }
 
@@ -86,8 +87,8 @@ class PgServerElement(
 
     /** A SQE that may stay pending until the peer acts, registered so [release] and [drain] can cancel it. */
     private suspend fun blocking(fd: Int, make: (Long) -> UringSubmission): Int {
-        val id = admission.withLock { if (closed) return ECANCELED; tok().also { waiting[it] = fd } }
-        try { return submit(make(id)) } finally { admission.withLock { waiting.remove(id) } }
+        val id = registry.withLock { if (closed.isCompleted) return ECANCELED; tok().also { waiting[it] = fd } }
+        try { return submit(make(id)) } finally { registry.withLock { waiting.remove(id) } }
     }
 
     /**
@@ -98,7 +99,7 @@ class PgServerElement(
     private suspend fun release(fd: Int?) {
         var passes = 0
         while (passes++ < CANCEL_PASSES) {
-            val targets = admission.withLock { waiting.filterValues { fd == null || it == fd }.keys.toList() }
+            val targets = registry.withLock { waiting.filterValues { fd == null || it == fd }.keys.toList() }
             if (targets.isEmpty()) return
             for (target in targets) submit(UringSubmission(UringOp.ASYNC_CANCEL, -1, target, 0, 0, userData = tok()))
             delay(1)
@@ -117,7 +118,7 @@ class PgServerElement(
     }
 
     suspend fun open(): PgServerElement {
-        admission.withLock { check(!closed) { "pg wire closed" }; check(listenFd < 0) { "pg wire already open" } }
+        registry.withLock { check(!closed.isCompleted) { "pg wire closed" }; check(listenFd < 0) { "pg wire already open" } }
         val domain = if (address.startsWith("[")) SocketDomain.AF_INET6 else SocketDomain.AF_INET
         val fd = allocate(UringOp.SOCKET) {
             submit(Submissions.socket(domain.posix, SocketType.withFlags(SocketType.SOCK_STREAM, SocketType.SOCK_NONBLOCK, SocketType.SOCK_CLOEXEC), SocketProtocol.IPPROTO_TCP.posix, tok()))
@@ -131,8 +132,8 @@ class PgServerElement(
             val named = ByteBuffer(128)
             expect(UringOp.URING_CMD, submit(Submissions.getsockname(fd, named, false, tok())))
             localAddress = sockaddrText(named.array())
-            admission.withLock {
-                check(!closed) { "pg wire drained while opening" }
+            registry.withLock {
+                check(!closed.isCompleted) { "pg wire drained while opening" }
                 listenFd = fd
                 accepts = scope.launch { acceptLoop(fd) }
             }
@@ -171,9 +172,9 @@ class PgServerElement(
     private suspend fun admit(fd: Int) {
         var transferred = false
         try {
-            admission.withLock {
+            registry.withLock {
                 connections.removeAll { it.isCompleted }
-                if (!closed && connections.size < maxConnections) {
+                if (!closed.isCompleted && connections.size < maxConnections) {
                     val pid = ++pids
                     // Enter try/finally before handing the descriptor to a child: a child cancelled before its body never cleans up.
                     val job = scope.launch(start = CoroutineStart.UNDISPATCHED) { serve(fd, pid) }
@@ -263,22 +264,17 @@ class PgServerElement(
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        termination.withLock {
-            admission.withLock {
-                if (closed) return@withContext
-                closed = true
-            }
-            release(null)
-            accepts?.cancelAndJoin()
-            val open = admission.withLock { connections.toList() }
-            for (job in open) job.cancel()
-            open.joinAll()
-            val listen = admission.withLock { listenFd.also { listenFd = -1 } }
-            if (listen >= 0) submit(Submissions.close(listen, tok()))
-            ring.drain()
-            owner.complete()
-            owner.join()
-        }
+        if (!closed.complete()) return@withContext owner.join()
+        release(null)
+        accepts?.cancelAndJoin()
+        val open = registry.withLock { connections.toList() }
+        for (job in open) job.cancel()
+        open.joinAll()
+        val listen = registry.withLock { listenFd.also { listenFd = -1 } }
+        if (listen >= 0) submit(Submissions.close(listen, tok()))
+        ring.drain()
+        owner.complete()
+        owner.join()
     }
 
     suspend fun close() = drain()

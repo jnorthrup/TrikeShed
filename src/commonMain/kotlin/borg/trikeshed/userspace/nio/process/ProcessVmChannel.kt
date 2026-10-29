@@ -6,8 +6,6 @@ import borg.trikeshed.userspace.nio.channels.spi.*
 import borg.trikeshed.vm.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlin.concurrent.atomics.*
 import kotlin.coroutines.CoroutineContext
 
@@ -21,13 +19,11 @@ class ProcessVmChannel(
     companion object Key : CoroutineContext.Key<ProcessVmChannel>
     override val key: CoroutineContext.Key<*> get() = Key
 
-    private enum class Phase { Open, Draining, Revoked, Closed }
     private class Request(val message: Teleported.Obj) {
         val result = CompletableDeferred<Result<Teleported>>()
     }
     private class Pending(val id: Int) { val reply = CompletableDeferred<Teleported.Obj>() }
     init { require(capacity > 0) }
-    private val phase = AtomicReference(Phase.Open)
     private val connected = AtomicBoolean(true)
     private val separateProtocol = pipes.separateProtocol
     private val revoked = AtomicBoolean(false)
@@ -38,13 +34,14 @@ class ProcessVmChannel(
     private val calls = AtomicLong(0)
     private val hostCalls = AtomicLong(0)
     private val interrupts = AtomicLong(0)
-    private val admission = Mutex()
     private val input = Channel<Request>(capacity, onUndeliveredElement = {
         it.result.complete(Result.failure(VmGuestException("DEAD", "Process request was not dispatched")))
     })
     private val supervisor = SupervisorJob(context[Job])
     private val scope = CoroutineScope(context + supervisor + this)
     private val completion = CompletableDeferred<Result<Unit>>()
+    /** The first [drain] claims it to close guest input once, then [input]. */
+    private val initiation: CompletableJob = Job()
     private val initiationFailure = AtomicReference<Throwable?>(null)
     private val protocol = CompletableDeferred<ProcessProtocolChannel>()
     private val callbacks = ProcessCalls(scope.coroutineContext, concurrency = 1, capacity = capacity) { response ->
@@ -80,7 +77,7 @@ class ProcessVmChannel(
         }).also { protocol.complete(it) }
 
     val processId: Long get() = transport.processId
-    val isAlive: Boolean get() = phase.load() != Phase.Closed && connected.load() && transport.isAlive
+    val isAlive: Boolean get() = !completion.isCompleted && connected.load() && transport.isAlive
     fun stats() = VmStats(evals.load(), calls.load(), hostCalls.load(), interrupted = interrupts.load())
 
     private val worker = scope.launch(start = CoroutineStart.UNDISPATCHED) {
@@ -124,7 +121,6 @@ class ProcessVmChannel(
                 val first = failure
                 if (first == null) failure = cause else if (first !== cause) first.addSuppressed(cause)
             }
-            phase.store(Phase.Closed)
             completion.complete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
             supervisor.complete()
         }
@@ -150,10 +146,7 @@ class ProcessVmChannel(
 
     private suspend fun request(message: Teleported.Obj): Teleported {
         val request = Request(message)
-        admission.withLock {
-            check(phase.load() == Phase.Open && isAlive) { "Process VM is closed or draining" }
-            input.send(request)
-        }
+        input.send(request)
         // Cancellation abandons only this waiter, never an already admitted guest effect.
         return request.result.await().getOrThrow()
     }
@@ -177,22 +170,21 @@ class ProcessVmChannel(
         if (!transport.isAlive) return@withContext false
         interrupts.fetchAndAdd(1)
         revoked.store(true)
-        phase.store(Phase.Revoked)
         input.close()
         transport.revoke(0)
         true
     }
 
     suspend fun drain(): Unit = withContext(NonCancellable) {
-        if (phase.compareAndSet(Phase.Open, Phase.Draining)) {
+        if (initiation.complete()) {
             try {
                 // Unblock guest input before joining an admitted eval or a full request queue.
-                if (isAlive) {
+                if (!revoked.load() && isAlive) {
                     if (separateProtocol) transport.closeInput()
                     else transport.send(SubVmProtocol.encode(Teleported.obj("op" to "stdin-close")))
                 }
             } catch (cause: Throwable) { initiationFailure.compareAndSet(null, cause) }
-            finally { admission.withLock { input.close() } }
+            finally { input.close() }
         }
         worker.join()
         supervisor.join()

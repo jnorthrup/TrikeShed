@@ -2,7 +2,6 @@ package borg.trikeshed.lcnc
 
 import borg.trikeshed.parse.jsonOf
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.GuestModules
 import borg.trikeshed.graal.subvm.TikaRuntime
@@ -83,7 +82,7 @@ class HeadhunterHttpsTest {
                     tlsConfig = TlsConfig(trustStore = certificate.toString(), hostnameVerification = true,
                         protocols = s_[TlsProtocol.TLS13], alpnProtocols = s_[TlsApplicationProtocol.HTTP_1_1]),
                     parentJob = coroutineContext[Job]).also { it.open() }
-                val htx = HtxElement(routeService = reactor, parentJob = coroutineContext[Job]).also { it.open() }
+                val htx = HtxElement(routeService = reactor, parentJob = coroutineContext[Job])
                 try {
                     ready.await()
                     var sourceId = ""
@@ -260,7 +259,7 @@ class HeadhunterHttpsTest {
                         cleanupFailure?.addSuppressed(failure) ?: run { cleanupFailure = failure }
                     }
                 }
-                release { tls.drain(); assertEquals(ElementState.CLOSED, tls.state) }
+                release { tls.drain(); assertTrue(tls.supervisor.isCompleted) }
                 for (fd in descriptors.asReversed()) release { assertEquals(0, submit(UringOp.CLOSE, fd)) }
                 release { ring.drain() }
                 release { assertEquals(admitted, settled, "Every TLS fixture SQE settles before completion") }

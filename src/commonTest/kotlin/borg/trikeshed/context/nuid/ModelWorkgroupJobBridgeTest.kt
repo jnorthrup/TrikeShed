@@ -74,7 +74,6 @@ class ModelWorkgroupJobBridgeTest {
     fun signalFacetReducedCommitsAJobEvent() = runTest {
         val jobs = JobSupervisorElement.open(this, capacity = 64)
         val bridge = SignalJobBridgeElement(jobs = jobs)
-        bridge.open()
 
         val event = facetEvent(sourceSignalId = "sig-direct-1")
         val jobId = bridge.bridge(event)
@@ -107,7 +106,6 @@ class ModelWorkgroupJobBridgeTest {
     fun distinctReductionsSharingASourceSignalIdBothCommit() = runTest {
         val jobs = JobSupervisorElement.open(this, capacity = 64)
         val bridge = SignalJobBridgeElement(jobs = jobs)
-        bridge.open()
 
         val constantSignalId = "lcnc:logic:dispatched:afterget"
         val first = facetEvent(constantSignalId, reducedValue = "first", timestampMs = 10L)

@@ -33,11 +33,21 @@
     let playing = true, t0 = performance.now(), offset = 0;
     const now = () => playing ? offset + (performance.now() - t0) / 1000 : offset;
     const sync = t => { try { audio.currentTime = t; if (playing) audio.play().catch(() => {}); else audio.pause(); } catch (e) {} };
+    // Browsers refuse sound until the viewer interacts: the first click or key anywhere starts it at the film's time.
+    const unmute = () => { if (playing && audio.paused) sync(now()); };
+    addEventListener('pointerdown', unmute, { once: true });
+    addEventListener('keydown', unmute, { once: true });
+    // Sound that starts late (buffering, a refused autoplay) joins at the film's time rather than at its own zero.
+    audio.addEventListener('playing', () => { const t = now(); if (Math.abs(audio.currentTime - t) > 0.05) audio.currentTime = t; });
     btn.onclick = () => { offset = now(); playing = !playing; t0 = performance.now(); btn.textContent = playing ? 'pause' : 'play'; sync(offset); };
     scrub.oninput = () => { offset = scrub.value / 10000 * Film.duration; t0 = performance.now(); sync(offset); };
     document.fonts.ready.then(() => {
+      // The film starts when its fonts are ready, not when the page was parsed.
+      t0 = performance.now(); offset = 0;
       sync(0);
       (function loop() {
+        // While the score plays it is the clock, so picture and sound cannot drift apart.
+        if (playing && !audio.paused && !audio.seeking && audio.readyState >= 3) { offset = audio.currentTime; t0 = performance.now(); }
         let t = now();
         if (t >= Film.duration) { offset = 0; t0 = performance.now(); t = 0; sync(0); }
         renderAt(t); scrub.value = Math.round(t / Film.duration * 10000); clock.textContent = t.toFixed(1) + 's';

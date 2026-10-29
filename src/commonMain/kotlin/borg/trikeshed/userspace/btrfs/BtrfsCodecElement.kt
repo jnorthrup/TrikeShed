@@ -1,8 +1,5 @@
 package borg.trikeshed.userspace.btrfs
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
-import borg.trikeshed.userspace.context.AsyncContextKey
 import kotlinx.coroutines.Job
 import kotlin.coroutines.CoroutineContext
 
@@ -104,8 +101,10 @@ object BtrfsCodecLE : BtrfsCodec {
 /** CCEK element that provides [BtrfsCodec] via coroutine context. */
 open class BtrfsCodecElement(
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    override val key: CoroutineContext.Key<*> = AsyncContextKey.BtrfsCodecKey
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<BtrfsCodecElement>
+
+    override val key: CoroutineContext.Key<*> get() = Key
 
     val codec: BtrfsCodec = BtrfsCodecLE
 }

@@ -95,6 +95,5 @@ internal suspend fun <T> withHtxClientRoute(
                 request = request, response = response(request)))
     }
     val htx = HtxElement(routeService = route, parentJob = currentCoroutineContext()[Job])
-    htx.open()
     return try { withContext(htx) { block() } } finally { htx.drain() }
 }

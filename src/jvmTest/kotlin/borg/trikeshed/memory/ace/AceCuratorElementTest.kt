@@ -1,6 +1,5 @@
 package borg.trikeshed.memory.ace
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lib.emptySeriesOf
 import borg.trikeshed.lib.j
@@ -14,18 +13,8 @@ import kotlinx.coroutines.test.runTest
 class AceCuratorElementTest {
 
     @Test
-    fun testLifecycle() = runTest {
-        val element = AceCuratorElement()
-        element.open()
-        assertEquals(ElementState.ACTIVE, element.lifecycleState)
-        element.drain()
-        assertTrue(element.lifecycleState == ElementState.CLOSED || element.lifecycleState == ElementState.DRAINING)
-    }
-
-    @Test
     fun testMergeDeduplication() = runTest {
         val element = AceCuratorElement()
-        element.open()
         
         val cid1 = ContentId.of(byteArrayOf(1))
         val cid2 = ContentId.of(byteArrayOf(2))

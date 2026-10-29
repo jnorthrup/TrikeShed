@@ -1,14 +1,13 @@
 package borg.trikeshed.userspace.nio.spi
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import borg.trikeshed.context.Drain
 import borg.trikeshed.context.Synchronization
+import borg.trikeshed.htx.HtxReactorElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CompletableJob
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,11 +21,14 @@ import kotlinx.coroutines.withContext
 open class NioSupervisor(
     private val maxConcurrentIo: Int = 10000,
     val reactorSynchronization: Synchronization = Synchronization.MONITOR,
-) : CoroutineContext.Element {
-    private val lifecycle = Mutex()
+) : CoroutineContext.Element, Drain {
     private val completion = CompletableDeferred<Result<Unit>>()
-    var state = ElementState.CREATED
-        private set
+    /** Completes once [open] has registered and opened the providers; cancelled when that open failed or drain came first. */
+    val opened: CompletableJob = Job()
+    /** Completes when drain begins; [open] refuses after it. */
+    val admission: CompletableJob = Job()
+    /** Claimed by the [open] that registers the platform providers, or by [drain] when it comes first. */
+    private val registration: CompletableJob = Job()
     private val ioSemaphore = kotlinx.coroutines.sync.Semaphore(maxConcurrentIo)
 
     suspend fun acquireIo() {
@@ -41,7 +43,7 @@ open class NioSupervisor(
         ioSemaphore.release()
     }
 
-    companion object Key : AsyncContextKey<NioSupervisor>()
+    companion object Key : CoroutineContext.Key<NioSupervisor>
     override val key: CoroutineContext.Key<*> get() = Key
 
     @PublishedApi
@@ -55,51 +57,49 @@ open class NioSupervisor(
     /** Expose the launch-time I/O capability report registered by the platform. */
     fun capabilityReport(): NioCapabilityReport? = service()
 
-    suspend fun open() = lifecycle.withLock {
-        check(state < ElementState.DRAINING) { "NIO providers are draining or closed" }
-        if (state != ElementState.CREATED) return@withLock
+    suspend fun open() {
+        if (!admission.isActive || !registration.complete()) {
+            // Another open registers, or drain came first: wait for that outcome.
+            opened.join()
+            check(admission.isActive) { "NIO providers are draining or closed" }
+            return
+        }
         try {
             val providers = platformNioProviders(reactorSynchronization)
             (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
             providers.forEach { if (it !is NioCapabilityReport) register(it) }
-            for (provider in services) if (provider is AsyncContextElement) provider.open()
-            state = ElementState.ACTIVE
+            for (provider in services) if (provider is HtxReactorElement) provider.open()
+            opened.complete()
         } catch (failure: Throwable) {
             withContext(NonCancellable) {
-                for (provider in services.asReversed()) if (provider is AsyncContextElement) {
-                    runCatching { provider.close() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                for (provider in services.asReversed()) if (provider is Drain) {
+                    runCatching { provider.drain() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
                 }
-                state = ElementState.CLOSED
+                admission.complete()
                 completion.complete(Result.failure(failure))
             }
+            opened.cancel()
             throw failure
         }
     }
 
-    suspend fun drain(): Unit = withContext(NonCancellable) {
-        val owner = lifecycle.withLock {
-            if (state >= ElementState.DRAINING) false
-            else { state = ElementState.DRAINING; true }
-        }
-        if (owner) {
-            var failure: Throwable? = null
-            // Consumers are registered after their dependencies. Finish them first;
-            // a failed provider must not prevent the remaining resources closing.
-            for (provider in services.asReversed()) if (provider is AsyncContextElement) {
-                try {
-                    if (provider.state >= ElementState.OPEN) provider.drain()
-                } catch (caught: Throwable) {
-                    if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
-                } finally {
+    override suspend fun drain(): Unit = withContext(NonCancellable) {
+        if (admission.complete()) {
+            if (registration.complete()) opened.cancel() else opened.join()
+            // A failed open has already drained its providers and recorded its failure.
+            if (!completion.isCompleted) {
+                var failure: Throwable? = null
+                // Consumers are registered after their dependencies. Finish them first;
+                // a failed provider must not prevent the remaining resources closing.
+                for (provider in services.asReversed()) if (provider is Drain) {
                     try {
-                        provider.close()
+                        provider.drain()
                     } catch (caught: Throwable) {
                         if (failure == null) failure = caught else if (failure !== caught) failure.addSuppressed(caught)
                     }
                 }
+                completion.complete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
             }
-            lifecycle.withLock { state = ElementState.CLOSED }
-            completion.complete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
         }
         completion.await().getOrThrow()
     }

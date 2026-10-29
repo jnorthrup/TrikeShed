@@ -1,8 +1,8 @@
 package borg.trikeshed.couch
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
+import borg.trikeshed.context.Drain
 import borg.trikeshed.cursor.BlackboardContext
 import borg.trikeshed.dag.FactId
 import borg.trikeshed.dag.ReteNetwork
@@ -45,16 +45,18 @@ class CouchChangesFactElement(
     /** Only document ids accepted here become facts (default: everything but `_design/`). */
     private val admit: (CouchCommittedFrame) -> Boolean = { !it.docId.startsWith("_design/") },
     parentJob: Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<CouchChangesFactElement>()
+) : CoroutineContext.Element, Drain {
+    companion object Key : CoroutineContext.Key<CouchChangesFactElement>
 
     override val key: CoroutineContext.Key<*> get() = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** Completes once [drain] has retracted the projection and joined the supervisor. */
+    val closed: CompletableJob = Job()
 
     private val wake = Channel<Unit>(Channel.CONFLATED)
     private var cancelSubscription: (() -> Unit)? = null
     private var nextSeq: Long = 0L
     private val known = HashSet<String>()
-    private val lifecycle = Mutex()
     private val processing = Mutex()
     private var worker: Job? = null
     private val completion = CompletableDeferred<Result<Unit>>()
@@ -63,9 +65,8 @@ class CouchChangesFactElement(
     var factsApplied: Long = 0L
         private set
 
-    override suspend fun open() = lifecycle.withLock {
-        if (state != ElementState.CREATED) return@withLock
-        super.open()
+    suspend fun open() {
+        if (worker != null || wake.isClosedForSend) return
         cancelSubscription = db.store.changes.subscribe { wake.trySend(Unit) }
         worker = CoroutineScope(currentCoroutineContext() + this + supervisor + Dispatchers.Default).launch {
             try {
@@ -80,12 +81,11 @@ class CouchChangesFactElement(
             // A parent may cancel a dispatched reader before its body starts.
             completion.complete(failure?.let { Result.failure(it) } ?: Result.success(Unit))
         } }
-        state = ElementState.ACTIVE
     }
 
     /** Pull every frame since the last one seen and apply it. Safe to call repeatedly. */
     suspend fun drainFrames() = processing.withLock {
-        if (state == ElementState.CLOSED) return@withLock
+        if (closed.isCompleted) return@withLock
         for (f in db.store.changes.afterSequence(nextSeq - 1).view) {
             apply(f)
             nextSeq = f.sequence + 1
@@ -115,29 +115,26 @@ class CouchChangesFactElement(
 
     /** Stop admission, finish the reader, and release this database's fact projection. */
     override suspend fun drain() = withContext(NonCancellable) {
-        lifecycle.withLock {
-            if (state == ElementState.CLOSED) return@withLock
-            state = ElementState.DRAINING
-            cancelSubscription?.invoke()
-            cancelSubscription = null
-            wake.close()
-            worker?.join()
-            processing.withLock {
-                val ids = known.iterator()
-                while (ids.hasNext()) {
-                    rete.retract(FactId(db.name, ids.next()))
-                    ids.remove()
-                }
+        if (closed.isCompleted) return@withContext
+        cancelSubscription?.invoke()
+        cancelSubscription = null
+        wake.close()
+        worker?.join()
+        processing.withLock {
+            val ids = known.iterator()
+            while (ids.hasNext()) {
+                rete.retract(FactId(db.name, ids.next()))
+                ids.remove()
             }
-            supervisor.complete()
-            supervisor.join()
-            state = ElementState.CLOSED
-            val result = worker?.let { completion.await() }
-            worker = null
-            result?.getOrThrow()
-            Unit
         }
+        supervisor.complete()
+        supervisor.join()
+        closed.complete()
+        val result = worker?.let { completion.await() }
+        worker = null
+        result?.getOrThrow()
+        Unit
     }
 
-    override suspend fun close() = drain()
+    suspend fun close() = drain()
 }

@@ -74,7 +74,6 @@ class LcncFanoutElementTest {
         val stubRegistry = mapOf("process" to stubReduction)
 
         val lcncFanout = LcncFanoutElement(nuidFanout, stubRegistry)
-        lcncFanout.open()
 
         val testPayload = emptyArray<Any>()
         val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)
@@ -103,7 +102,6 @@ class LcncFanoutElementTest {
         nuidFanout.open()
 
         val lcncFanout = LcncFanoutElement(nuidFanout, emptyMap())
-        lcncFanout.open()
 
         // Missing workgroup -> no claim
         val testPayload = emptyArray<Any>()
@@ -129,7 +127,6 @@ class LcncFanoutElementTest {
 
         // Empty registry means we have a winning capability, but no reducer mapped for its category
         val lcncFanout = LcncFanoutElement(nuidFanout, emptyMap())
-        lcncFanout.open()
 
         val testPayload = emptyArray<Any>()
         val nuid = nuid(Capability.Process("test_process"), Nonce.RandomBytes(), Subnet.core)

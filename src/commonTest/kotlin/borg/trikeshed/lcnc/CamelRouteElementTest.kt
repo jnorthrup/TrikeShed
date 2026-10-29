@@ -1,6 +1,5 @@
 package borg.trikeshed.lcnc
 
-import borg.trikeshed.context.ElementState
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
 import kotlin.coroutines.AbstractCoroutineContextElement
@@ -52,7 +51,6 @@ class CamelRouteElementTest {
             drain.await()
             assertTrue(stopped)
             assertTrue(published, "the exchange lane must stay open through consumer cleanup")
-            assertEquals(ElementState.CLOSED, owner.state)
             assertTrue(owner.supervisor.isCompleted)
         } finally { gate.complete(Unit); owner.drain() }
     }
@@ -80,7 +78,6 @@ class CamelRouteElementTest {
             assertEquals("stop refused", assertFailsWith<IllegalStateException> { owner.drain() }.message)
             assertEquals(1, failedStops)
             assertEquals(1, healthyStops, "one failure cannot abandon other consumer cleanup")
-            assertEquals(ElementState.DRAINING, owner.state)
             assertTrue(owner.supervisor.isActive)
             assertFailsWith<IllegalStateException> { owner.command {} }
             owner.observe { revisions++ }

@@ -1,7 +1,6 @@
 package borg.trikeshed.forge.server
 
 import borg.trikeshed.couch.isam.DurableAppendLog
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.narsese.*
 import borg.trikeshed.parse.reify
 import kotlinx.coroutines.*
@@ -44,7 +43,7 @@ class KgBeliefIntakeTest {
             assertEquals(200, response.status)
             assertEquals(1, ((reify(response.body) as Map<*, *>)["minted"] as Number).toInt())
             assertNotNull(bag.signalOf(KgNalBridge.bridge(body).single().signal("source").angular))
-            assertEquals(ElementState.CLOSED, bag.state)
+            assertTrue(bag.supervisor.isCompleted)
         } finally {
             log.release.countDown()
             bag.drain()
@@ -75,7 +74,7 @@ class KgBeliefIntakeTest {
             log.release.countDown()
             bag.drain()
             assertEquals(1, bag.size)
-            assertEquals(ElementState.CLOSED, bag.state)
+            assertTrue(bag.supervisor.isCompleted)
         } finally {
             log.release.countDown()
             bag.drain()

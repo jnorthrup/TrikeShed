@@ -1,5 +1,6 @@
 package borg.trikeshed.context
 
+import kotlin.coroutines.CoroutineContext
 import borg.trikeshed.chronicle.Chronicle
 import borg.trikeshed.chronicle.FanoutSplat
 import borg.trikeshed.lib.Join
@@ -11,12 +12,12 @@ import borg.trikeshed.splat.SplatModel
 import borg.trikeshed.splat.toChronology
 import borg.trikeshed.splat.EmpiricalMotionModel
 
-class SplatFanoutDispatcherElement : SplatAsyncContextElement() {
-    companion object Key : AsyncContextKey<SplatFanoutDispatcherElement>()
+class SplatFanoutDispatcherElement : kotlin.coroutines.CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<SplatFanoutDispatcherElement>
 
     override val key: kotlin.coroutines.CoroutineContext.Key<*> get() = Key
 
-    override val fanoutSubscribers: MutableList<AsyncContextElement> = mutableListOf()
+    val fanoutSubscribers: MutableList<kotlin.coroutines.CoroutineContext.Element> = mutableListOf()
 
     var fanoutSplatModel: SplatModel<Join<String, String>, DeliveryOutcome>? = null
 
@@ -55,9 +56,8 @@ class SplatFanoutDispatcherElement : SplatAsyncContextElement() {
         )
     }
 
-    private suspend fun tryDeliver(sub: AsyncContextElement, completion: Any): DeliveryOutcome {
+    private suspend fun tryDeliver(sub: kotlin.coroutines.CoroutineContext.Element, completion: Any): DeliveryOutcome {
         return try {
-            if (sub.lifecycleState != ElementState.ACTIVE) return DeliveryOutcome.DEFERRED
             // ... actual delivery logic
             DeliveryOutcome.DELIVERED
         } catch (e: Exception) {
@@ -69,7 +69,7 @@ class SplatFanoutDispatcherElement : SplatAsyncContextElement() {
         }
     }
 
-    override fun captureComposition(): Join<String, Series<String>> =
+    fun captureComposition(): Join<String, Series<String>> =
         "FanoutDispatcher".j(fanoutSubscribers.size.j { i: Int -> "sub_$i" })
 
     private fun <T> emptySplat(): Splat<T> = 0.j { _ : Int -> error("empty") }

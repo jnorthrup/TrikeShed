@@ -318,7 +318,6 @@ class ProjectDbMountTest {
         val bank = KifKnowledgeBase()
         val (tee, subscription) = KifTee.attach(rete, bank)
         val report = CouchReportReactorElement()
-        report.open()
         h.registry.factPlane(this, rete, report)
         try {
             h.scopes.beginUpload("drain")
@@ -332,7 +331,6 @@ class ProjectDbMountTest {
         } finally {
             h.scopes.drain()
             subscription.close()
-            report.close()
             tmp.deleteRecursively()
         }
     }

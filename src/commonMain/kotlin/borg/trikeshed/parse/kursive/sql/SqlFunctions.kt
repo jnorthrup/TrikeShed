@@ -1,5 +1,9 @@
 package borg.trikeshed.parse.kursive.sql
 
+import borg.trikeshed.lib.CharSeries
+import borg.trikeshed.lib.j
+import borg.trikeshed.lib.toList
+
 /** A scalar function: the argument counts it takes and its body over evaluated arguments. */
 class Scalar(val arity: IntRange, val body: (Array<Any?>) -> Any?)
 
@@ -59,18 +63,28 @@ object SqlFunctions {
         "pg_indexes_size" to Scalar(1..1) { a -> a[0]?.let { 0L } },
         "pg_size_pretty" to Scalar(1..1) { a -> (a[0] as? Number)?.toLong()?.let(::sizePretty) },
         "array_to_string" to Scalar(2..3) { a ->
-            val delimiter = a[1]?.let(::scalarText)
+            val delimiter = a[1]?.let(::text)
             a[0]?.let(::elementsOf)?.takeIf { delimiter != null }?.let { items ->
-                items.mapNotNull { x -> x?.let(::scalarText) ?: a.getOrNull(2)?.let(::scalarText) }.joinToString(delimiter!!)
+                val nullText = a.getOrNull(2)?.let(::text)
+                buildString {
+                    var first = true
+                    for (x in items) {
+                        val t = if (x == null) nullText else text(x)
+                        if (t == null) continue
+                        if (!first) append(delimiter)
+                        append(t)
+                        first = false
+                    }
+                }
             }
         },
         "coalesce" to Scalar(1..Int.MAX_VALUE) { a -> a.firstOrNull { it != null } },
         "nullif" to Scalar(2..2) { a -> a[0]?.let { x -> if (a[1]?.let { compareCells(x, it) == 0 } == true) null else x } },
         "lower" to Scalar(1..1) { a -> a[0]?.let { scalarText(it).lowercase() } },
         "upper" to Scalar(1..1) { a -> a[0]?.let { scalarText(it).uppercase() } },
-        "length" to Scalar(1..1) { a -> a[0]?.let { scalarText(it).length.toLong() } },
-        "quote_ident" to Scalar(1..1) { a -> a[0]?.let { scalarText(it) }?.let { s -> if (plainIdentifier(s)) s else "\"" + s.replace("\"", "\"\"") + "\"" } },
-        "quote_literal" to Scalar(1..1) { a -> a[0]?.let { "'" + scalarText(it).replace("'", "''") + "'" } },
+        "length" to Scalar(1..1) { a -> a[0]?.let { text(it).length.toLong() } },
+        "quote_ident" to Scalar(1..1) { a -> a[0]?.let(::text)?.let { s -> if (plainIdentifier(s)) s.toString() else quoted(s, '"') } },
+        "quote_literal" to Scalar(1..1) { a -> a[0]?.let { quoted(text(it), '\'') } },
         "abs" to Scalar(1..1) { a ->
             when (val v = a[0]) {
                 null -> null
@@ -80,12 +94,24 @@ object SqlFunctions {
         },
     )
 
+    /** A cell as text without a copy when it already is text. */
+    private fun text(cell: Any): CharSequence = cell as? CharSequence ?: scalarText(cell)
+
+    /** [s] between [q] quotes, each inner [q] doubled, in one pass. */
+    private fun quoted(s: CharSequence, q: Char): String = buildString(s.length + 2) {
+        append(q)
+        for (i in 0 until s.length) { val c = s[i]; if (c == q) append(q); append(c) }
+        append(q)
+    }
+
+    private val SIZE_UNITS = arrayOf("kB", "MB", "GB", "TB")
+
     /** pg's `pg_size_pretty(bigint)`: bytes below 10 KiB, then kB, MB, GB, TB, PB, each step rounded half up as dbsize.c does. */
     fun sizePretty(bytes: Long): String {
         val limit = 10L * 1024
         if (kotlin.math.abs(bytes) < limit) return "$bytes bytes"
         var size = bytes shr 9
-        for (unit in listOf("kB", "MB", "GB", "TB")) {
+        for (unit in SIZE_UNITS) {
             if (kotlin.math.abs(size) < limit * 2 - 1) return "${halfRounded(size)} $unit"
             size = size shr 10
         }
@@ -96,22 +122,40 @@ object SqlFunctions {
 
     /** The elements of an array cell: a primitive array, an Iterable or Array, or pg's `{a,b}` text; null for a scalar. */
     fun elementsOf(value: Any): List<Any?>? = when (value) {
-        is FloatArray -> value.toList()
-        is DoubleArray -> value.toList()
-        is IntArray -> value.toList()
-        is LongArray -> value.toList()
-        is BooleanArray -> value.toList()
-        is Array<*> -> value.toList()
+        is FloatArray -> (value.size j { i: Int -> value[i] as Any? }).toList()
+        is DoubleArray -> (value.size j { i: Int -> value[i] as Any? }).toList()
+        is IntArray -> (value.size j { i: Int -> value[i] as Any? }).toList()
+        is LongArray -> (value.size j { i: Int -> value[i] as Any? }).toList()
+        is BooleanArray -> (value.size j { i: Int -> value[i] as Any? }).toList()
+        is Array<*> -> (value.size j { i: Int -> value[i] }).toList()
+        is List<*> -> value
         is Iterable<*> -> value.toList()
-        is CharSequence -> value.toString().takeIf { it.startsWith("{") && it.endsWith("}") }?.let { t ->
-            t.substring(1, t.length - 1).let { body -> if (body.isEmpty()) emptyList() else body.split(',').map { e -> if (e == "NULL") null else e.trim('"') } }
-        }
+        is CharSequence -> if (value.length >= 2 && value[0] == '{' && value[value.length - 1] == '}') braceElements(CharSeries(value)) else null
         else -> null
     }
 
+    /** The comma-separated elements of pg's `{a,b}` text (a String each: a cell is a map key and a type probe, and a window has no hashCode): quotes narrowed off, bare NULL as null. */
+    private fun braceElements(text: CharSeries): List<Any?> {
+        val out = ArrayList<Any?>()
+        val end = text.length - 1
+        if (end == 1) return out
+        var from = 1
+        for (at in 1..end) {
+            if (at != end && text[at] != ',') continue
+            var lo = from
+            var hi = at
+            while (lo < hi && text[lo] == '"') lo++
+            while (hi > lo && text[hi - 1] == '"') hi--
+            val null_ = hi - lo == 4 && text[lo] == 'N' && text[lo + 1] == 'U' && text[lo + 2] == 'L' && text[lo + 3] == 'L'
+            out.add(if (null_ && lo == from && hi == at) null else CharSeries(text[lo j hi]).asString())
+            from = at + 1
+        }
+        return out
+    }
+
     /** An identifier pg prints bare: a lowercase word. */
-    fun plainIdentifier(s: String): Boolean =
-        s.isNotEmpty() && (s[0] == '_' || s[0].isLetter() && s[0].isLowerCase()) && s.all { it == '_' || it.isDigit() || it.isLetter() && it.isLowerCase() }
+    fun plainIdentifier(s: CharSequence): Boolean =
+        s.isNotEmpty() && (s[0] == '_' || s[0].isLetter() && s[0].isLowerCase()) && (0 until s.length).all { s[it].let { c -> c == '_' || c.isDigit() || c.isLetter() && c.isLowerCase() } }
 
     /** Rejects an unknown name or arity at compile time, so the error names the statement, not a row. */
     fun require(name: String, arity: Int) {

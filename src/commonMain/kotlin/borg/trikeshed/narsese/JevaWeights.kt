@@ -16,7 +16,7 @@ class JevaWeights private constructor(
     val directory: String,
     val channels: (String) -> FileChannel,
     val maxCacheBytes: Long,
-) {
+) : JevaTensors {
     enum class Dtype(val bytes: Int) { F32(4), BF16(2), F16(2) }
     data class Parameter(val channel: FileChannel, val shape: Tensor, val dtype: Dtype, val offset: Long, val bytes: Int)
     data class Window(val channel: FileChannel, val offset: Long)
@@ -31,7 +31,7 @@ class JevaWeights private constructor(
     private var content: String? = null
     private var closed = false
     /** Logical mapped extent, not an RSS guarantee; the operating system manages page residency. */
-    var mappedBytes: Long = 0
+    final override var mappedBytes: Long = 0
         private set
     val names: Set<String> get() { checkOpen(); return parameters.keys.toSet() }
     /** Header/index provenance is intentionally distinct from a digest of every weight byte. */
@@ -63,7 +63,7 @@ class JevaWeights private constructor(
         return ContentId.of(jsonOf(value).encodeToByteArray()).hex.also { check(); content = it }
     }
 
-    operator fun get(name: String): MetaSeries<Tensor, Float> {
+    override operator fun get(name: String): MetaSeries<Tensor, Float> {
         checkOpen()
         val parameter = requireNotNull(parameters[name]) { "Missing Jeva tensor: $name" }
         return Weight(name, parameter)
@@ -162,7 +162,7 @@ class JevaWeights private constructor(
         } finally { channel.close() }
     }
 
-    fun close() {
+    override fun close() {
         closed = true
         parameters.clear(); texts.clear(); content = null
         buffer = ByteArray(0)

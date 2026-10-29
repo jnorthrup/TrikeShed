@@ -1,6 +1,5 @@
 package borg.trikeshed.forge.server
 
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.ipns.*
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.lcnc.ccek.*
@@ -31,10 +30,10 @@ class LcncDhtWire(
             return json(405, mapOf("error" to "method_not_allowed"))
         return try {
             workgroups.refresh()
-            if (target.endsWith("/status") && (node == null || node.lifecycleState != ElementState.ACTIVE))
+            if (target.endsWith("/status") && (node == null || !node.accepting))
                 return json(200, mapOf("state" to "unavailable", "name" to null, "bootstrapPeers" to 0,
                     "registeredPrograms" to workgroups.registrations.size, "latest" to null, "error" to "network_unavailable"))
-            val owner = node?.takeIf { it.lifecycleState == ElementState.ACTIVE }
+            val owner = node?.takeIf { it.accepting }
                 ?: return json(503, mapOf("error" to "network_unavailable"))
             val request = if (method == "GET") emptyMap() else {
                 val body = text.substringAfter("\r\n\r\n", text)

@@ -1,7 +1,5 @@
 package borg.trikeshed.reactor.openapi
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.ElementState
 import borg.trikeshed.htx.HtxElement
 import borg.trikeshed.htx.HtxKey
 import borg.trikeshed.htx.HtxMethod
@@ -25,12 +23,11 @@ data class OpenApiInvocation(
 class OpenApiCallPipeline(
     val document: ResolvedOpenApiDocument,
     parentJob: kotlinx.coroutines.Job? = null,
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
+) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<OpenApiCallPipeline>
     override val key: CoroutineContext.Key<*> get() = Key
 
     suspend fun execute(invocation: OpenApiInvocation): HtxResponse {
-        check(state.isAtLeast(ElementState.OPEN)) { "OpenAPI call pipeline must be open" }
         val operation = document.operationsById[invocation.operationId]
             ?: error("OpenAPI operation is not declared: ${invocation.operationId}")
         val path = operation.path.replace(Regex("\\{([^}]+)}")) { match ->

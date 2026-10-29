@@ -104,7 +104,7 @@ class CcekNodesTest {
         assertEquals(true, fact["asserted"])
 
         assertEquals(true, reg.getValue("ccek.drain").run(LcncNode("d", "ccek.drain"), mapOf("handle" to "t"))["drained"])
-        assertTrue(store.nodes.getValue("t").drained, "drain reached the plane")
+        assertTrue(store.nodes.getValue("t").drained.isCompleted, "drain reached the plane")
     }
 
     @Test

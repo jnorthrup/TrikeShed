@@ -1,9 +1,8 @@
 // Rejected malformed Pijul materialization; intentionally inert pending a complete CCEK implementation.
 package borg.trikeshed.util.oroboros.element
 
-import borg.trikeshed.context.AsyncContextElement
-import borg.trikeshed.context.AsyncContextKey
-import borg.trikeshed.context.ElementState
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.CompletableJob
 import borg.trikeshed.lib.j
 import borg.trikeshed.cursor.currentTimeMillis
 import borg.trikeshed.memory.CouchIndexBridge
@@ -25,15 +24,17 @@ class GitReconcileElement(
     private val headShaProvider: suspend () -> String,
     private val awaitObjectsDirty: suspend () -> Unit,
     parentJob: Job? = null
-) : AsyncContextElement(ElementState.CREATED, parentJob) {
-    companion object Key : AsyncContextKey<GitReconcileElement>()
+) : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<GitReconcileElement>
     override val key: CoroutineContext.Key<*> = Key
+    val supervisor: CompletableJob = SupervisorJob(parentJob)
+    /** The reconcile loop, launched at [open]. */
+    var worker: Job? = null
 
-    override suspend fun open() {
-        if (state != ElementState.CREATED) return
-        super.open()
+    suspend fun open() {
+        if (worker != null) return
 
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor).launch(Dispatchers.Default) {
+        worker = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.currentCoroutineContext() + this + supervisor).launch(Dispatchers.Default) {
             var lastReconcledSha = ""
             while (isActive) {
                 // Wait for object-dirty signal, then reconcile

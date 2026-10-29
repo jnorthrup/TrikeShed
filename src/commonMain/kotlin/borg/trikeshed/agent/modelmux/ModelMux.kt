@@ -106,12 +106,6 @@ object CapabilityRouter : borg.trikeshed.agent.modelmux.ModelRouter {
         action in card.caps.iterable() || card.b.b.b.a == action
 }
 
-// ═══════════════════════════════════════════
-// Session lifecycle — CCEK-aligned
-// ═══════════════════════════════════════════
-
-enum class SessionState { CREATED, OPEN, ACTIVE, DRAINING, CLOSED }
-
 @OptIn(ExperimentalUuidApi::class)
 class LlmSession(
     val model: borg.trikeshed.agent.modelmux.ModelEntry,
@@ -122,21 +116,11 @@ class LlmSession(
     /** The binding path resolved with this session's credential and destination. */
     val keyId: String? = null,
 ) {
-    private var _state = borg.trikeshed.agent.modelmux.SessionState.CREATED
-    val state: borg.trikeshed.agent.modelmux.SessionState get() = _state
-
     /** Most recent receipt produced by this session (chat/stream/embed). */
     var lastReceipt: ModelResponseReceipt? = null
         private set
 
     fun recordReceipt(receipt: ModelResponseReceipt) { lastReceipt = receipt }
-
-    fun open() { if (_state == borg.trikeshed.agent.modelmux.SessionState.CREATED) _state = borg.trikeshed.agent.modelmux.SessionState.OPEN }
-    fun activate() { if (_state == borg.trikeshed.agent.modelmux.SessionState.OPEN) _state = borg.trikeshed.agent.modelmux.SessionState.ACTIVE }
-    fun drain() { _state = borg.trikeshed.agent.modelmux.SessionState.DRAINING }
-    fun close() { _state = borg.trikeshed.agent.modelmux.SessionState.CLOSED }
-
-    fun isUsable(): Boolean = _state in listOf(borg.trikeshed.agent.modelmux.SessionState.OPEN, borg.trikeshed.agent.modelmux.SessionState.ACTIVE)
 
     /** Build HTTP headers with auth */
     fun authHeaders(): Series<Join<String, String>> {
@@ -251,7 +235,6 @@ class ModelMux internal constructor(
             binding.baseUrl,
             keyId = binding.keyId
         )
-        session.open()
         return Result.success(session)
     }
 
@@ -448,10 +431,8 @@ class ModelMux internal constructor(
         if (sessionResult.isFailure) return Result.failure(sessionResult.exceptionOrNull()!!)
         val session = sessionResult.getOrThrow()
         if (expectedBaseUrl != null && session.baseUrl.trimEnd('/') != expectedBaseUrl.trimEnd('/')) {
-            session.close()
             return Result.failure(IllegalStateException("Model destination changed; review the current destination before sending source material"))
         }
-        session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         // Meter under the resolved key ID (the binding path), not the key VALUE
         // — the value is the secret, and it bypassed the providerTag chain
@@ -626,7 +607,6 @@ class ModelMux internal constructor(
             )
             return Result.failure(t)
         } finally {
-            session.drain(); session.close()
             // Quota legion metering: only real (non-cached) calls consume provider
             // quota. A 429 receipt exhausts the key inside applyReceipt.
             session.lastReceipt?.let { receipt ->
@@ -660,7 +640,6 @@ class ModelMux internal constructor(
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
         val session = sessionResult.getOrThrow()
-        session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         // Lease identity is the binding PATH (llm.<provider>.key), never the secret
         // value — keyMux.get(...) returns the credential, which matched no lease and
@@ -727,7 +706,6 @@ class ModelMux internal constructor(
                 emit(parsed.a j parsed.b)
             }
         } finally {
-            session.drain(); session.close()
             if (reactor != null && keyId != null) {
                 val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
                 if (leasedTo != null) {
@@ -743,7 +721,6 @@ class ModelMux internal constructor(
         val sessionResult = session(modelId)
         if (sessionResult.isFailure) throw sessionResult.exceptionOrNull()!!
         val session = sessionResult.getOrThrow()
-        session.activate()
         val reactor = currentCoroutineContext()[MuxReactorElement.Key]
         // Lease identity is the binding PATH, never the secret value (stream() fix,
         // same defect class): keyMux.get returns the credential, which matched no
@@ -809,7 +786,6 @@ class ModelMux internal constructor(
             }
             return parseEmbeddings(respBody, texts)
         } finally {
-            session.drain(); session.close()
             if (reactor != null && keyId != null) {
                 val leasedTo = reactor.flowState.value.leases.firstOrNull { it.keyId == keyId }?.leasedTo
                 if (leasedTo != null) {

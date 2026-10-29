@@ -326,7 +326,7 @@ class CouchWireRouter(
                 val latest = publisher.latest
                 val lastReport = publisher.lastReport
                 val lastFailure = publisher.lastFailure
-                WireReply.json(200, mapOf("Name" to publisher.name.toString(), "lifecycle" to publisher.lifecycleState.name,
+                WireReply.json(200, mapOf("Name" to publisher.name.toString(), "closed" to publisher.supervisor.isCompleted,
                     "latest" to latest?.let(::ipnsRecord), "lastReport" to lastReport?.let(::ipnsPublicationValue),
                     "lastFailure" to lastFailure?.let { mapOf("type" to it::class.simpleName, "reason" to it.message) }))
             }

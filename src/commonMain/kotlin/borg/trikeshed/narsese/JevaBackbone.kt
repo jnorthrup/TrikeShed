@@ -65,7 +65,7 @@ data class JevaBackboneConfig(
             require(fields["hidden_act"] == "silu") { "Qwen3.5 reference requires SwiGLU" }
             require(fields["attn_output_gate"] != false) { "Qwen3.5 reference requires the query output gate" }
             val rope = requireNotNull(fields["rope_parameters"] as? Map<*, *>) { "Missing Qwen3.5 RoPE" }
-            require(rope["rope_type"] == "default") { "Unsupported Qwen3.5 RoPE type" }
+            require((rope["rope_type"] ?: rope["type"]) == "default") { "Unsupported Qwen3.5 RoPE type" }
             val count = integer("num_hidden_layers")
             val layerTypes = fields["layer_types"] as? List<*>
             require(layerTypes != null && layerTypes.size == count && layerTypes.all { it is String }) {
@@ -93,7 +93,7 @@ class JevaBackbone(
     val weights: (String) -> MetaSeries<Tensor, Float>,
     val prefix: String = "language_model.",
     val matrix: JevaMatrix = JevaMatrix.reference,
-) {
+) : JevaEncoder {
     companion object { const val ATTENTION_ROWS = 64 }
 
     fun weight(name: String, vararg dims: Int): MetaSeries<Tensor, Float> {
@@ -127,7 +127,7 @@ class JevaBackbone(
     fun vector(weight: MetaSeries<Tensor, Float>, check: () -> Unit): FloatArray =
         FloatArray(tensorSize(weight.a)).also { read(weight, 0, it, 0, it.size, check) }
 
-    fun encode(tokens: Series<Int>, check: () -> Unit = {}, progress: (Int, Int) -> Unit = { _, _ -> }): MetaSeries<Tensor, Float> {
+    override fun encode(tokens: Series<Int>, check: () -> Unit, progress: (Int, Int) -> Unit): MetaSeries<Tensor, Float> {
         check()
         require(tokens.size in 1..config.maxPositions) { "Qwen3.5 sequence length outside configured positions" }
         val width = config.hiddenSize
