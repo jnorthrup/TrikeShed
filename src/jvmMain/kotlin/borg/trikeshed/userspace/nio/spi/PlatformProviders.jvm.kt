@@ -24,7 +24,6 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
         report,
         JvmFileOperations(),
         JvmSystemOperations(),
-        JvmMatrixOperations.available(),
         JvmColumnOperations.available(),
         ClassfileExprCompiler(),
         channelOperations,
@@ -37,3 +36,5 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
         ),
     )
 }
+
+actual fun platformMatrixProviders(): List<CoroutineContext.Element> = listOfNotNull(JvmMatrixOperations.available())

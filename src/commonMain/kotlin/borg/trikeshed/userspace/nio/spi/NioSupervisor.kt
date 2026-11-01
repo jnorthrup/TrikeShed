@@ -65,7 +65,7 @@ open class NioSupervisor(
             return
         }
         try {
-            val providers = platformNioProviders(reactorSynchronization)
+            val providers = platformNioProviders(reactorSynchronization) + platformMatrixProviders()
             (providers.firstOrNull { it is NioCapabilityReport } as? NioCapabilityReport)?.let { register(it) }
             providers.forEach { if (it !is NioCapabilityReport) register(it) }
             for (provider in services) if (provider is HtxReactorElement) provider.open()
@@ -113,3 +113,10 @@ open class NioSupervisor(
  * Each platform provides an [actual] implementation returning its concrete SPI instances.
  */
 expect fun platformNioProviders(reactorSynchronization: Synchronization = Synchronization.MONITOR): List<CoroutineContext.Element>
+
+/**
+ * The platform's matrix and encoder providers (MLX on macOS, the JVM's vector backend), registered by
+ * [NioSupervisor.open] after [platformNioProviders]. Kept apart so an I/O caller of [platformNioProviders] carries no
+ * model runtime; consumers resolve them by Key ([borg.trikeshed.userspace.nio.platform.spi.MatrixOperations]).
+ */
+expect fun platformMatrixProviders(): List<CoroutineContext.Element>

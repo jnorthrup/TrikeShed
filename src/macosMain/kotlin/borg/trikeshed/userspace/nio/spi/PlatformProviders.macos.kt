@@ -26,8 +26,6 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
     ),
     fileOperations,
     PosixSystemOperations(),
-    MlxMatrixOperations(),
-    MlxEncoderOperations(),
     channelOperations,
         tlsBackend,
         HtxReactorElement(channelOperations = channelOperations, tlsBackend = tlsBackend),
@@ -37,3 +35,5 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
 
 
 }
+
+actual fun platformMatrixProviders(): List<CoroutineContext.Element> = listOf(MlxMatrixOperations(), MlxEncoderOperations())

@@ -26,3 +26,6 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
 
 
 }
+
+/** No matrix or encoder backend on this target. */
+actual fun platformMatrixProviders(): List<CoroutineContext.Element> = emptyList()
