@@ -203,6 +203,9 @@ kotlin {
         }
     }
 
+    val mlirNixDir = providers.gradleProperty("mlirNix.dir").orNull ?: "${rootDir}/../mlir-nix"
+    val mlirNixLib = file("${mlirNixDir}/build/lib/libmlnix-c.dylib")
+
     if (isMac) {
         macosArm64("macos") {
             compilations.getByName("main") {
@@ -214,7 +217,14 @@ kotlin {
                     create("mlx") {
                         defFile = project.file("src/macosMain/resources/META-INF/cinterop/mlx.def")
                     }
+                    // The mlnix dialects' C surface (mlir-nix: include/mlnix-c/MlnixC.h, build/lib/libmlnix-c.dylib), present only
+                    // where mlir-nix is built beside this checkout (-PmlirNix.dir=... names it elsewhere).
+                    if (mlirNixLib.exists()) create("mlnixC") {
+                        defFile = project.file("src/macosMain/resources/META-INF/cinterop/mlnixC.def")
+                        compilerOpts("-I${mlirNixDir}/include")
+                    }
                 }
+                if (mlirNixLib.exists()) defaultSourceSet.kotlin.srcDir("src/mlirMain/kotlin")
             }
             // The POSIX non-Linux canary (Jim, 2026-09-06): one native executable that runs
             // commonMain end to end with no JVM. Several main()s live on the native classpath,
@@ -233,6 +243,12 @@ kotlin {
                 // ./gradlew linkMcpStdioReleaseExecutableMacos → build/bin/macos/mcpStdioReleaseExecutable/mcpStdio.kexe
                 executable("mcpStdio") {
                     entryPoint = "borg.trikeshed.mux.mcpStdioMain"
+                }
+                // Kotlin/Native host of the mlnix dialects: parses, verifies and prints a module through mlir-nix's C surface.
+                // ./gradlew linkMlirMainReleaseExecutableMacos → build/bin/macos/mlirMainReleaseExecutable/mlirMain.kexe
+                if (mlirNixLib.exists()) executable("mlirMain") {
+                    entryPoint = "borg.trikeshed.mlir.mlirMain"
+                    linkerOpts("-L${mlirNixDir}/build/lib", "-lmlnix-c", "-rpath", "${mlirNixDir}/build/lib")
                 }
                 // K/N 2.4.20/2.4.21 ship macos_arm64 system caches tagged iOS (LC_BUILD_VERSION platform 2,
                 // e.g. CoreFoundationBase); Xcode 26 ld refuses to link them into a macOS binary, the test binary too.
