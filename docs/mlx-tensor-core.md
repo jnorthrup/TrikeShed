@@ -208,6 +208,52 @@ scalar loops in `JevaBackbone` (rope, delta recurrence, softmax rows) cannot be 
   weight content identity in place of the Python/torch library fingerprint; the old `worker_sha256` and
   `jeva_source_sha256` disappear with the worker.
 
+## 5a. Memory and residency (measured 2026-10-28, 36 GiB machine, 5.5 GB of swap already in use before any test)
+
+Requirement: the quantized weights stay resident, and running Jeva must not push other processes' memory out.
+
+Incident. The first monitored run of the oversight test (before the fixes below) drove the machine into a memory
+collapse: the compressor grew from 2 GB to 22.6 GB, wired from 2.3 to 8.5 GB, free memory fell to 36 MB, swap-outs
+reached about 19 GB (swap in use 5.5 GB to 23.8 GB), and two JVM daemons (5.3 GB and 3.0 GB resident, presumably gradle and
+the Kotlin daemon), Brave, Spotlight and WindowServer lost almost all resident pages. The watchdog killed the test only after this had happened (its sample
+interval stretched under thrash, and it watched swap in use, which lagged). Cause: `MlxBackbone.encode` built the whole
+32-layer graph lazily and `session.scoped` freed nothing until the end, so every intermediate of every step stayed
+alive; the delta recurrence alone keeps several `[32, 128, 128]` temporaries per token per layer. The earlier "flaky"
+`Unknown` failure of the `JevaElement` test is probably the same pressure; that is a hypothesis, not shown.
+
+Fixes in the repo: `MlxMatrixSession.mark()/settle()` end the graph per layer and every 8 recurrence steps, freeing
+what is not kept; `MlxMatrixOperations(memoryLimit = 8 GiB, cacheLimit = 512 MiB, wiredLimit = 4 GiB)` sets MLX's
+process-wide budget when a session opens, so an overrun fails inside MLX; `deviceMemory()` reads active, peak and cache.
+
+Verified (sampler at 0.5 s: swap in use, vm_stat, per-process RSS; watchdog on swap growth, compressor growth,
+swap-outs and reclaimable memory; the sampler is `monitor.py` in the Hermes scratch directory, not in this repo):
+
+| run | result |
+|---|---|
+| oversight pair, cold file cache | passed in 88.8 s, same answers (0.1465 / 0.8379); MLX active 2778 MiB, peak 2958 MiB, cache 280 MiB; test RSS 3.2 GB, process footprint 3.6 GB; wired +3.2 GB while running; compressor 1.9 to 2.2 GB; swap in use did not rise; no process lost more than 50 MB of RSS; 218 MB swapped out machine-wide, all in the last 2 s as the process exited, cause unexplained |
+| `JevaElement`, two asks, warm cache | ask 1 83.6 s (load about 25 s plus inference), ask 2 56.1 s with the weights resident; MLX active, peak and cache identical after both asks; swap-outs 0, swap in use flat at 6795 MB, page-ins 142 MB, wired back to its start value at exit |
+
+Gaps found against the strategy, each open unless stated:
+
+1. Residency is not a policy yet. The weights are wired while a session lives (observed), but `JevaElement.release()`,
+   `drain()` and any idle release drop the session, and the next ask reloads 2.9 GB in about 25 s warm, more cold.
+   Nothing decides when the quant may be dropped.
+2. The weights are held twice during load: the file's page cache (file-backed memory grew 3.3 GB on a cold run) and the
+   MLX copy. Page cache is reclaimable, but it competes with other processes. `mlx_load_safetensors` cannot read
+   through the NIO facade or avoid the copy; the zero-copy route (section 5) is unverified.
+3. The limits are MLX process-global: every `open()` resets them, the last session wins, and the three numbers are
+   defaults, not derived. Measured peak is 2.96 GiB, so 8 GiB is a guard, not a budget; the budget should be the
+   weights plus a bound on activations per token, and `maxStateLength` (9000 tokens) has not been run: activations
+   grow with tokens and no 9000-token run has been made.
+4. No admission control: `JevaElement` does not look at available memory before loading, and nothing refuses a second
+   concurrent device session (two would hold two copies of the weights).
+5. Speed: 56 s per ask of two short questions with the weights resident; the cold run used 95.8 s of user CPU in 89 s of
+   wall time. The cause is not profiled; many small op dispatches from the host is the suspect, and the gated-delta
+   kernel is the intended fix, not started.
+6. The Python MLX path was never measured under the same sampler, so "no worse than Python" is unproven.
+7. The identity does not hash the backbone weights (section 5, Identity).
+8. The sampler's abort is not a safety property of the product; only the MLX limits are.
+
 ## 6. Acceptance
 
 A parity gate before any Python is removed, written first and shown failing against the CPU backbone on this

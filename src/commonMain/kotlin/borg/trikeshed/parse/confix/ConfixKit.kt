@@ -364,13 +364,52 @@ internal fun decodeTextSpan(src: Series<Byte>, open: Int, close: Int): String {
             'b' -> { out.append('\b'); i += 2 }
             'f' -> { out.append('\u000C'); i += 2 }
             'u' -> {
-                val hex = if (i + 5 < raw.length) raw.substring(i + 2, i + 6).toIntOrNull(16) else null
-                if (hex == null) { out.append(c); i++ } else { out.append(hex.toChar()); i += 6 }
+                val unit = if (i + 5 < raw.length) hexUnit(raw, i + 2) else -1
+                if (unit < 0) { out.append(c); i++ } else { out.append(unit.toChar()); i += 6 }
             }
             else -> { out.append(c); i++ }
         }
     }
     return out.toString()
+}
+
+/**
+ * The value of the four hex digits of [s] from [at] (the caller has seen that there are four), or -1 when one of them is not a hex digit.
+ * `toIntOrNull(16)` is not this: it takes a sign, so `\u+041` read as 'A' and `\u-041` as a negative number.
+ */
+fun hexUnit(s: String, at: Int): Int {
+    var v = 0
+    for (k in 0 until 4) {
+        val d = when (val ch = s[at + k]) {
+            in '0'..'9' -> ch - '0'
+            in 'a'..'f' -> ch - 'a' + 10
+            in 'A'..'F' -> ch - 'A' + 10
+            else -> return -1
+        }
+        v = (v shl 4) or d
+    }
+    return v
+}
+
+/**
+ * The Long the span from [open] to [close] spells, or null when it is not an optional minus and at least one digit, or does not fit 64 bits.
+ * The digits are summed downward from zero, so Long.MIN_VALUE fits and nothing wraps.
+ */
+fun Series<Byte>.spanLongOrNull(open: Int, close: Int): Long? {
+    var i = open
+    val negative = i <= close && this[i].toInt().toChar() == '-'
+    if (negative) i++
+    if (i > close) return null
+    val multmin = Long.MIN_VALUE / 10
+    var v = 0L
+    while (i <= close) {
+        val d = this[i++].toInt().toChar() - '0'
+        if (d < 0 || d > 9 || v < multmin) return null
+        v *= 10
+        if (v < Long.MIN_VALUE + d) return null
+        v -= d
+    }
+    return if (negative) v else if (v == Long.MIN_VALUE) null else -v
 }
 
 private fun Series<Byte>.spanLong(open: Int, close: Int): Long {

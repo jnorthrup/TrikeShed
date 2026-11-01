@@ -59,6 +59,7 @@ class MlxJevaTest {
         val inference = JevaInference.loadDevice(JevaConfig(model = model, device = "mlx"), MlxEncoderOperations())
         try {
             val reply = inference.infer(jsonOf(state), Jeva.questions(questions))
+            println("MLX-KOTLIN-JEVA device memory after inference: ${MlxMatrixOperations.deviceMemory()}")
             ranked("inference", reply["answers"] as Map<*, *>)
         } finally { inference.close() }
     }
@@ -69,8 +70,17 @@ class MlxJevaTest {
         val owner = SupervisorJob()
         val element = JevaElement(CoroutineScope(coroutineContext + owner), JevaConfig(model = model, device = "mlx"))
         try {
+            // The second ask finds the weights already resident: no reload, no reread of the checkpoint.
+            val first = kotlin.time.TimeSource.Monotonic.markNow()
             val reply = element.ask(state, questions)
+            val firstMs = first.elapsedNow().inWholeMilliseconds
+            val afterFirst = MlxMatrixOperations.deviceMemory()
+            val second = kotlin.time.TimeSource.Monotonic.markNow()
+            val again = element.ask(state, questions)
+            println("MLX-KOTLIN-JEVA element ask1=${firstMs}ms ask2=${second.elapsedNow().inWholeMilliseconds}ms " +
+                "memory after ask1: $afterFirst after ask2: ${MlxMatrixOperations.deviceMemory()}")
             ranked("element", reply["answers"] as Map<*, *>)
+            assertEquals(reply["answers"], again["answers"])
             assertEquals("mlx", element.status()["device"])
         } catch (failure: Throwable) {
             println("MLX-KOTLIN-JEVA element failure: $failure\n${failure.stackTraceToString()}")

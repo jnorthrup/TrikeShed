@@ -58,6 +58,7 @@ class MlxBackbone(private val session: MlxMatrixSession, directory: String) : Je
         val epsilon = config.rmsEpsilon
         for (layer in 0 until config.layers.size) {
             check(); progress(layer, 0)
+            val mark = session.mark()
             val at = "layers.$layer."
             val input = session.rmsNorm(hidden, vector(at + "input_layernorm.weight"), epsilon)
             val mixed = if (config.layers[layer] == "full_attention") {
@@ -77,6 +78,7 @@ class MlxBackbone(private val session: MlxMatrixSession, directory: String) : Je
             val gate = session.linear(gated, matrix(at + "mlp.gate_proj"))
             val up = session.linear(gated, matrix(at + "mlp.up_proj"))
             hidden = session.add(hidden, session.linear(session.times(session.silu(gate), up), matrix(at + "mlp.down_proj")))
+            session.settle(mark, hidden)
         }
         check(); progress(config.layers.size, 0)
         val result = session.rmsNorm(hidden, vector("norm.weight"), epsilon)

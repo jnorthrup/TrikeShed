@@ -5,10 +5,28 @@ import borg.trikeshed.narsese.JevaWeight
 import kotlinx.cinterop.*
 import mlxc.*
 import platform.posix.memcpy
+import platform.posix.size_tVar
 
-/** Float32 GEMM on the MLX GPU stream through mlx-c; tier 1 of docs/mlx-tensor-core.md. */
-class MlxMatrixOperations : MatrixOperations {
-    override fun open(): MlxMatrixSession = MlxMatrixSession(mlx_default_gpu_stream_new(), identity)
+/**
+ * Float32 GEMM on the MLX GPU stream through mlx-c; tier 1 of docs/mlx-tensor-core.md.
+ * The three limits are the process-wide MLX budget, so that a run which outgrows it fails inside MLX instead of
+ * paging other processes out: [memoryLimit] bounds all device allocations, [cacheLimit] the freed buffers MLX keeps for
+ * reuse, [wiredLimit] the memory kept resident (weights are wired and cannot be swapped out).
+ */
+class MlxMatrixOperations(
+    val memoryLimit: Long = 8L shl 30,
+    val cacheLimit: Long = 512L shl 20,
+    val wiredLimit: Long = 4L shl 30,
+) : MatrixOperations {
+    override fun open(): MlxMatrixSession {
+        memScoped {
+            val previous = alloc<size_tVar>()
+            status(mlx_set_memory_limit(previous.ptr, memoryLimit.toULong()), "set_memory_limit")
+            status(mlx_set_cache_limit(previous.ptr, cacheLimit.toULong()), "set_cache_limit")
+            status(mlx_set_wired_limit(previous.ptr, wiredLimit.toULong()), "set_wired_limit")
+        }
+        return MlxMatrixSession(mlx_default_gpu_stream_new(), identity)
+    }
 
     companion object {
         val identity: String by lazy {
@@ -23,6 +41,19 @@ class MlxMatrixOperations : MatrixOperations {
         }
 
         fun status(code: Int, call: String) { check(code == 0) { "mlx-c $call failed: $code" } }
+
+        /** Device memory MLX holds now, its high-water mark since the last reset, and the freed buffers it caches. */
+        class DeviceMemory(val active: Long, val peak: Long, val cache: Long) {
+            override fun toString() = "active=${active shr 20}MiB peak=${peak shr 20}MiB cache=${cache shr 20}MiB"
+        }
+
+        fun deviceMemory(): DeviceMemory = memScoped {
+            val active = alloc<size_tVar>(); val peak = alloc<size_tVar>(); val cache = alloc<size_tVar>()
+            status(mlx_get_active_memory(active.ptr), "get_active_memory")
+            status(mlx_get_peak_memory(peak.ptr), "get_peak_memory")
+            status(mlx_get_cache_memory(cache.ptr), "get_cache_memory")
+            DeviceMemory(active.value.toLong(), peak.value.toLong(), cache.value.toLong())
+        }
     }
 }
 
@@ -65,6 +96,25 @@ class MlxMatrixSession internal constructor(
     internal fun gpu(): CValue<mlx_stream_> = checkNotNull(stream) { "Matrix session is closed" }
 
     private fun own(handle: CValue<mlx_array_>): CValue<mlx_array_> = handle.also { owned += it }
+
+    /** Position in the owned handles; pair with [settle]. */
+    fun mark(): Int = owned.size
+
+    /**
+     * Ends the lazy graph here: evaluates [keep], then frees every handle made since [mark] that is not one of them.
+     * Without it a long sequence keeps every intermediate of every step alive until the scope closes. Tensors made
+     * since [mark] other than [keep] must not be used afterwards.
+     */
+    fun settle(mark: Int, vararg keep: MlxTensor) {
+        for (tensor in keep) MlxMatrixOperations.status(mlx_array_eval(tensor.handle), "eval")
+        val kept = keep.map { tensor -> tensor.handle.useContents { ctx } }
+        val survivors = ArrayList<CValue<mlx_array_>>()
+        while (owned.size > mark) {
+            val handle = owned.removeAt(owned.lastIndex)
+            if (kept.contains(handle.useContents { ctx })) survivors += handle else mlx_array_free(handle)
+        }
+        owned.addAll(survivors.reversed())
+    }
 
     /** Handles made inside [block] are freed when it returns; the result must be copied out of the device before then. */
     fun <R> scoped(block: () -> R): R {

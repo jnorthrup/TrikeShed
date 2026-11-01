@@ -3,6 +3,8 @@ package borg.trikeshed.userspace.nio.platform.spi
 import borg.trikeshed.lib.*
 import kotlin.math.sqrt
 
+const val RECURRENCE_CHUNK = 8
+
 /** A packed affine-quantized matrix [out, in * bits / 32] with its scales and biases. */
 class MlxQuantized(val weight: MlxTensor, val scales: MlxTensor, val biases: MlxTensor, val groupSize: Int, val bits: Int)
 
@@ -55,6 +57,7 @@ fun MlxMatrixSession.linearAttention(
     val retention = exp(negate(times(exp(stateA), softplus(add(dense(input, decay), stateBias)))))
     var state = zeros(valueHeads, valueDim, keyDim)
     val rows = ArrayList<MlxTensor>(tokens)
+    var mark = mark()
     for (t in 0 until tokens) {
         fun at(of: MlxTensor, vararg extents: Int) = reshape(slice(of, 0, t, t + 1), *extents)
         val key = at(keys, valueHeads, 1, keyDim)
@@ -63,6 +66,11 @@ fun MlxMatrixSession.linearAttention(
         val correction = times(minus(at(values, valueHeads, valueDim), memory), at(learning, valueHeads, 1))
         state = add(state, times(key, reshape(correction, valueHeads, valueDim, 1)))
         rows += reshape(sum(times(state, at(queries, valueHeads, 1, keyDim)), 2), 1, valueHeads, valueDim)
+        // The state is [heads, valueDim, keyDim]: every step's temporaries are megabytes, so the graph ends every few steps.
+        if ((t + 1) % RECURRENCE_CHUNK == 0 || t == tokens - 1) {
+            settle(mark, state, *rows.subList(maxOf(0, rows.size - RECURRENCE_CHUNK), rows.size).toTypedArray())
+            mark = mark()
+        }
     }
     val normed = times(rmsNorm(concatenate(rows, 0), norm, epsilon), silu(gates))
     return linear(reshape(normed, tokens, valueWidth), output)
