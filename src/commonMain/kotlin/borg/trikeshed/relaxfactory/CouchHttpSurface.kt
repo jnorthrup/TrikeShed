@@ -206,14 +206,18 @@ class CouchHttpSurface(
         }
 
         /** `a=1&b=%22x%22` → map; percent-decoded, '+' as space. */
-        fun parseQuery(raw: String): Map<String, String> =
-            raw.split('&').filter { it.isNotEmpty() }.associate { pair ->
+        fun parseQuery(raw: String): Map<String, String> {
+            if (raw.isEmpty()) return emptyMap()
+            return raw.split('&').filter { it.isNotEmpty() }.associate { pair ->
                 val k = pair.substringBefore('=')
                 val v = pair.substringAfter('=', "")
                 percentDecode(k) to percentDecode(v)
             }
+        }
 
+        // Bolt: Fast-path zero-allocation check for unencoded strings and direct byte copying for ASCII characters
         fun percentDecode(s: String): String {
+            if ('%' !in s && '+' !in s) return s
             val out = ByteArray(s.length * 3)
             var n = 0
             var i = 0
@@ -221,16 +225,36 @@ class CouchHttpSurface(
                 val c = s[i]
                 when {
                     c == '%' && i + 2 < s.length -> {
-                        out[n++] = s.substring(i + 1, i + 3).toInt(16).toByte(); i += 3
+                        val hi = hexVal(s[i + 1])
+                        val lo = hexVal(s[i + 2])
+                        if (hi >= 0 && lo >= 0) {
+                            out[n++] = ((hi shl 4) or lo).toByte()
+                            i += 3
+                        } else {
+                            out[n++] = s.substring(i + 1, i + 3).toInt(16).toByte()
+                            i += 3
+                        }
                     }
                     c == '+' -> { out[n++] = ' '.code.toByte(); i++ }
+                    c.code < 0x80 -> {
+                        out[n++] = c.code.toByte()
+                        i++
+                    }
                     else -> {
-                        val bytes = c.toString().encodeToByteArray()
-                        bytes.copyInto(out, n); n += bytes.size; i++
+                        val width = if (c.isHighSurrogate() && i + 1 < s.length) 2 else 1
+                        val bytes = s.substring(i, i + width).encodeToByteArray()
+                        bytes.copyInto(out, n); n += bytes.size; i += width
                     }
                 }
             }
             return out.decodeToString(0, n)
+        }
+
+        private fun hexVal(c: Char): Int = when (c) {
+            in '0'..'9' -> c - '0'
+            in 'a'..'f' -> c - 'a' + 10
+            in 'A'..'F' -> c - 'A' + 10
+            else -> -1
         }
     }
 }
