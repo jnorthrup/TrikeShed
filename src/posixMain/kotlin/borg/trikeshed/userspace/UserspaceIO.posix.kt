@@ -263,6 +263,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                     sub.opcode == UringOp.STATX || sub.opcode == UringOp.GETDENTS) && buffer.isReadOnly()) return -22
             if ((sub.opcode == UringOp.SENDMSG || sub.opcode == UringOp.RECVMSG) && sub.len < UringOp.DATAGRAM_ADDRESS) return -22
         }
+        if ((sub.opcode == UringOp.SENDMSG || sub.opcode == UringOp.RECVMSG) &&
+            sub.operationFlags and UringOp.MSG_DONTWAIT.inv() != 0) return -22
         if (sub.opcode of positioned && sub.offset < -1) return -22
         if (sub.opcode == UringOp.STATX) {
             // The path's len bytes, its NUL, then the struct statx this call writes.
@@ -305,7 +307,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
                 nativeBatch.add(submission)
             } else {
                 val result = emulate(submission)
-                if (result == -11 && submission.opcode of waits) {
+                // MSG_DONTWAIT datagrams settle -EAGAIN at once, as a kernel ring completes them; others wait for readiness.
+                if (result == -11 && submission.opcode of waits && !submission.nowait()) {
                     blocked.add(submission)
                 } else {
                     iterator.remove()
@@ -744,6 +747,10 @@ internal fun UringSubmission.paths(): List<String> {
 
 /** Translate host errno values to Linux CQE values, including Darwin's differing numbers. */
 internal fun posixCompletion(result: Int): Int = if (result >= 0) result else -linuxErrno(errno)
+
+/** A SENDMSG or RECVMSG that completes at once ([UringOp.MSG_DONTWAIT]) instead of waiting for readiness. */
+internal fun UringSubmission.nowait(): Boolean =
+    (opcode == UringOp.SENDMSG || opcode == UringOp.RECVMSG) && operationFlags and UringOp.MSG_DONTWAIT != 0
 
 /** A host errno in Linux numbering. */
 internal fun linuxErrno(value: Int): Int = when (value) {

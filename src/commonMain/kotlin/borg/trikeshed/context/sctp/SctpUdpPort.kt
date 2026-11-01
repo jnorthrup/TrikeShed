@@ -25,16 +25,22 @@ import kotlin.time.TimeSource
  *
  * The wheel: [wheel] datagram windows, made once, recycled and never cleared. Window b below [half] receives; its
  * counterpart b xor [half] sends. The window index is the request's userData, so one bit tells the halves apart.
- * Receives turn through every window of their half, so that half stays in cache only if all of it fits; sends take
- * the window freed last, so only the sends in flight are hot. The default, 2 × 32 windows of 1,480 bytes (92.5 KB),
- * fits in half of a 256 KB L2: the smallest L2 per core of an x86 server, which a droplet's vCPU shares with the
- * core's other hyperthread.
+ * Both halves keep their free windows on a stack, so the window freed last, still in cache, goes out next. The
+ * default, 2 × 32 windows of 1,480 bytes (92.5 KB), fits in half of a 256 KB L2: the smallest L2 per core of an x86
+ * server, which a droplet's vCPU shares with the core's other hyperthread.
  *
- * Fill: the receive half stays armed. Drain, once per wake: one nonblocking reap takes every completion. A send
- * completion frees its window at once; each datagram goes to [table] in place (the window's payload starts at offset
- * 0). [SctpTcbTable.flush] runs once, and its packets leave as SENDMSGs in the same submit as the re-armed receives.
- * A wake is reactor readiness on the socket, the next T1/T3 deadline, or [kick] from the layer above after it queued
- * a message.
+ * Fill: free receive windows go to the ring as RECVMSGs with [UringOp.MSG_DONTWAIT], in the same submit as the
+ * wake's SENDMSGs. Each completes inside that submit, with a datagram or -EAGAIN, so nothing stays armed: a kernel
+ * ring holds no poll for them, so several receives on the one socket never all wake for each datagram, and no
+ * datagram is taken outside a wake. The reactor's readiness on the socket stays true to the queue. A fill that met
+ * an empty socket leaves the port [drained]: until the reactor next reports the socket readable, wakes fill nothing.
+ * The fill size follows the traffic: it doubles after a fill that every window took a datagram for, up to [half],
+ * and is twice the datagrams found after one that emptied the socket.
+ *
+ * Drain, once per wake: one nonblocking reap takes every completion. A send completion frees its window at once;
+ * each datagram goes to [table] in place (the window's payload starts at offset 0), then its window is free again.
+ * [SctpTcbTable.flush] runs once. A wake is reactor readiness on the socket, the next T1/T3 deadline, or [kick] from
+ * the layer above after it queued a message.
  *
  * Every association of the port shares the one socket: the kernel holds one descriptor however many connections run.
  */
@@ -62,12 +68,25 @@ class SctpUdpPort(
      */
     val buffers = Array(wheel) { ByteBuffer(windows[it], 0, window) }
     /**
-     * Receive completions the table has not had yet: (window, result) pairs in a ring of [half] slots, the counters
-     * taken modulo [half]. A receive window re-arms only after the table had its datagram, so no more than [half] wait.
+     * Datagrams the table has not had yet: (window, length) pairs in a ring of [half] slots, the counters taken modulo
+     * [half]. Only receive windows wait here, so no more than [half] do.
      */
     val received = IntArray(2 * half)
     var receivedHead = 0
     var receivedTail = 0
+    /** Free receive windows: a stack. */
+    val idle = IntArray(half) { half - 1 - it }
+    var idleCount = half
+    /** Receives in the ring, and what the current fill has come back with. */
+    var armed = 0
+    var filled = 0
+    var emptied = 0
+    /** Receives the next fill arms; see the class comment. */
+    var fillSize = FILL_MIN
+    /** The last fill met an empty socket: only readiness starts the next fill. */
+    var drained = true
+    /** The current wake came from the reactor's readiness on the socket. */
+    var readable = false
     /** Free send windows: a stack, so the window freed last, still in cache, goes out next. */
     val free = IntArray(half) { wheel - 1 - it }
     var freeCount = half
@@ -87,15 +106,13 @@ class SctpUdpPort(
         return handle.wait(1).single().res
     }
 
-    /** UDP socket bound to [local], the receive half armed. */
+    /** UDP socket bound to [local], watched for readiness; the first readable wake fills the receive half. */
     fun open(): SctpUdpPort {
         val domain = if (local.a.size == 4) SocketDomain.AF_INET else SocketDomain.AF_INET6
         fd = settle(handle.prepSocket(domain.posix, SocketType.SOCK_DGRAM.mask or NONBLOCK, SocketProtocol.IPPROTO_UDP.posix))
         check(fd >= 0) { "UDP socket: $fd" }
         val bound = settle(handle.prepBind(fd, ByteBuffer(local.sockaddr)))
         check(bound == 0) { "bind ${local.a.joinToString(".") { (it.toInt() and 255).toString() }}:${local.b}: $bound" }
-        for (b in 0 until half) check(handle.recvmsg(fd, buffers[b], b.toLong()) == 0)
-        handle.submit()
         reactor.register(fd, setOf(Interest.READ))
         return this
     }
@@ -148,31 +165,38 @@ class SctpUdpPort(
     }
 
     /**
-     * Completions into their halves: a send frees its window at once; a receive waits in [received], because the
-     * table may be mid-call with its packet writer in use.
+     * Completions into their halves: a send frees its window at once; a datagram waits in [received], because the
+     * table may be mid-call with its packet writer in use; a receive that found no datagram frees its window.
      */
     fun reap(minComplete: Int) {
         for (r in handle.wait(minComplete)) {
             val b = r.userData.toInt()
             if (b and half != 0) free[freeCount++] = b
             else {
-                val s = (receivedTail++ and (half - 1)) shl 1
-                received[s] = b
-                received[s + 1] = r.res
+                armed--
+                if (r.res >= 0) {
+                    filled++
+                    val s = (receivedTail++ and (half - 1)) shl 1
+                    received[s] = b
+                    received[s + 1] = r.res
+                } else {
+                    emptied++
+                    idle[idleCount++] = b
+                }
             }
         }
     }
 
-    /** Receive window [b]'s datagram ([res] bytes) into the table, then the window re-armed as it is. */
+    /** Receive window [b]'s datagram ([res] bytes) into the table; the window is free again. */
     fun receive(b: Int, res: Int, now: Long) {
         val w = windows[b]
         if (res > 0) table.receive(w, res, pathOf(w, window - UringOp.DATAGRAM_ADDRESS), now)
-        check(handle.recvmsg(fd, buffers[b], b.toLong()) == 0) { "receive window $b not re-armed" }
+        idle[idleCount++] = b
     }
 
     /**
-     * Every waiting datagram into the table, then a flush. A send that runs out of windows reaps more receives; they
-     * go to the table before this returns, because their datagrams no longer make the socket readable.
+     * Every waiting datagram into the table, then a flush. A send that runs out of windows reaps more datagrams; they
+     * go to the table before this returns.
      */
     fun drain(now: Long) {
         do {
@@ -184,11 +208,25 @@ class SctpUdpPort(
         } while (receivedHead != receivedTail)
     }
 
-    /** One wake: every completion, the datagrams into the table, one flush, one submit. */
+    /** Up to [fillSize] free receive windows as MSG_DONTWAIT RECVMSGs, for the next submit. */
+    fun fill() {
+        var n = minOf(fillSize, idleCount)
+        filled = 0
+        emptied = 0
+        while (n-- > 0) {
+            val b = idle[--idleCount]
+            check(handle.recvmsg(fd, buffers[b], b.toLong(), UringOp.MSG_DONTWAIT) == 0) { "receive window $b refused" }
+            armed++
+        }
+    }
+
+    /** One wake: every completion, the datagrams into the table, one flush, then the fill and the sends in one submit. */
     fun pump() {
         val now = now()
         reap(0)
         drain(now)
+        if (readable || !drained) fill()
+        readable = false
         submitAndReap()
     }
 
@@ -199,12 +237,18 @@ class SctpUdpPort(
     }
 
     /**
-     * The submit of the SENDMSGs and re-armed receives, then a reap. A receive the submit completes at once took its
-     * datagram off the socket, so the socket no longer wakes the owner for it: [kick] wakes the next turn instead.
+     * The submit of the SENDMSGs and the fill, then a reap: the fill's receives complete inside the submit. Their
+     * datagrams wait for the next turn, which [kick] starts; a fill that met an empty socket leaves the port [drained].
      */
     fun submitAndReap() {
         handle.submit()
         reap(0)
+        if (filled + emptied > 0 && armed == 0) {
+            drained = emptied > 0
+            fillSize = if (drained) minOf(half, maxOf(FILL_MIN, 2 * filled)) else minOf(half, 2 * fillSize)
+            filled = 0
+            emptied = 0
+        }
         if (receivedHead != receivedTail) kick.trySend(Unit)
     }
 
@@ -215,9 +259,9 @@ class SctpUdpPort(
         val timeout = if (deadline == Long.MAX_VALUE) Duration.INFINITE else maxOf(0L, deadline - now()).nanoseconds
         coroutineScope {
             val observation = async(start = CoroutineStart.UNDISPATCHED) { reactor.poll(timeout) }
-            select {
-                kick.onReceiveCatching { }
-                observation.onAwait { }
+            readable = select {
+                kick.onReceiveCatching { false }
+                observation.onAwait { it.isNotEmpty() }
             }
             observation.cancelAndJoin()
         }
@@ -234,20 +278,13 @@ class SctpUdpPort(
     fun stop() { kick.close() }
 
     /**
-     * After the owner loop returned: the sends in flight reaped, the armed receives cancelled and reaped (a ring
-     * closes only once its requests have terminal CQEs), then the ring, then the socket.
+     * After the owner loop returned: the sends in flight and any fill's receives reaped (a ring closes only once its
+     * requests have terminal CQEs; MSG_DONTWAIT receives end inside their submit), then the ring, then the socket.
      */
     fun close() {
         reactor.deregister(fd)
         handle.submit()
-        // Receives still armed: not those waiting in [received]; a receive completing below is not re-armed.
-        var armed = half - (receivedTail - receivedHead)
-        while (freeCount < half) for (r in handle.wait(1)) if (r.userData.toInt() and half != 0) freeCount++ else armed--
-        var outstanding = armed
-        // A cancel's userData is [wheel] + its target: outside every window's index.
-        for (b in 0 until half) if (handle.prepCancel(b.toLong(), (wheel + b).toLong()) == 0) outstanding++
-        handle.submit()
-        while (outstanding > 0) outstanding -= handle.wait(1).size
+        while (freeCount < half || armed > 0) reap(1)
         handle.close()
         check(channels.close(fd) == 0) { "close UDP socket $fd" }
     }
@@ -255,5 +292,7 @@ class SctpUdpPort(
     companion object {
         /** Linux SOCK_NONBLOCK in the socket type, as the ring's SOCKET takes it. */
         const val NONBLOCK = 0x800
+        /** The smallest fill. */
+        const val FILL_MIN = 8
     }
 }
