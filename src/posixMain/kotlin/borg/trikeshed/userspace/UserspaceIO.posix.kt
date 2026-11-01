@@ -546,9 +546,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         val host = if (linux) (storage[0].toInt() and 255) or ((storage[1].toInt() and 255) shl 8) else storage[1].toInt() and 255
         val family = when (host) { AF_INET -> 2; AF_INET6 -> 10; else -> return@memScoped -97 }
         val size = if (family == 2) 16 else 28
+        // Only the family's length is written: bytes past it keep a previous datagram's and are never read.
         val slot = start + n
-        for (i in 0 until UringOp.DATAGRAM_ADDRESS) bytes[slot + i] = 0
         bytes[slot] = family.toByte()
+        bytes[slot + 1] = 0
         for (i in 2 until size) bytes[slot + i] = storage[i]
         got
     }

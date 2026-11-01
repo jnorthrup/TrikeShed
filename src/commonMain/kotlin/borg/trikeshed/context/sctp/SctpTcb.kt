@@ -461,6 +461,8 @@ class SctpTcbTable(
     fun established(t: SctpTcb, now: Long) {
         t.state = SctpState.ESTABLISHED
         t.cookie = null
+        // A T1 retransmission of the COOKIE ECHO can still wait for the next flush: the COOKIE ACK ends it.
+        t.control = t.control and SctpTcb.SEND_COOKIE_ECHO.inv()
         t.retransmissions = 0
         if (t.flight > 0) arm(t, now) else t.timerOn = false
         upper.associated(t)
