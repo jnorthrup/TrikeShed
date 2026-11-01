@@ -19,6 +19,18 @@ import kotlin.random.Random
 /** An index the owner gives to a peer address (UDP address and port); the table only hands it back. */
 typealias SctpPath = Int
 
+/** Association states (RFC 9260 §4). */
+enum class SctpState {
+    CLOSED,
+    COOKIE_WAIT,
+    COOKIE_ECHOED,
+    ESTABLISHED,
+    SHUTDOWN_PENDING,
+    SHUTDOWN_SENT,
+    SHUTDOWN_RECEIVED,
+    SHUTDOWN_ACK_SENT,
+}
+
 /** What the table delivers upward. One implementation per program keeps these calls monomorphic. */
 interface SctpUpper {
     /** [tcb] reached ESTABLISHED, on either side. */

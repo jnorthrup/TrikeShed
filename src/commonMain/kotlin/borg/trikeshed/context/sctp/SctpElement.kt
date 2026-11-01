@@ -51,17 +51,6 @@ data class PathStatus(
     val failures: Int = 0,
 )
 
-enum class SctpState {
-    CLOSED,
-    COOKIE_WAIT,
-    COOKIE_ECHOED,
-    ESTABLISHED,
-    SHUTDOWN_PENDING,
-    SHUTDOWN_SENT,
-    SHUTDOWN_RECEIVED,
-    SHUTDOWN_ACK_SENT,
-}
-
 sealed class SctpError(message: String) : RuntimeException(message) {
     class BindFailed(details: String) : SctpError(details)
     class ConnectFailed(details: String) : SctpError(details)
