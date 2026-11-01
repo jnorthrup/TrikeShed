@@ -155,3 +155,51 @@ static inline long long trikeshed_last_modified(const char *path) {
     return (long long)value.st_mtim.tv_sec * 1000 + value.st_mtim.tv_nsec / 1000000;
 #endif
 }
+
+// CRC32c (Castagnoli) with the CPU's own instruction: SSE4.2 crc32 on x86_64, the CRC extension on arm64. Eight bytes per
+// instruction, then the tail byte by byte. trikeshed_crc32c_hw says whether this CPU has it (cpuid on x86_64, the
+// auxiliary vector on Linux arm64; every Apple arm64 has it); without it Kotlin keeps the table (Crc32C.software).
+#include <stdint.h>
+#if defined(__x86_64__)
+#include <cpuid.h>
+#include <nmmintrin.h>
+__attribute__((target("sse4.2"))) static uint32_t trikeshed_crc32c_step(uint32_t crc, const unsigned char *p, size_t n) {
+    uint64_t c = crc;
+    while (n >= 8) { uint64_t v; memcpy(&v, p, 8); c = _mm_crc32_u64(c, v); p += 8; n -= 8; }
+    crc = (uint32_t)c;
+    while (n--) crc = _mm_crc32_u8(crc, *p++);
+    return crc;
+}
+static inline int trikeshed_crc32c_hw(void) {
+    unsigned a, b, c, d;
+    return __get_cpuid(1, &a, &b, &c, &d) && (c & bit_SSE4_2) ? 1 : 0;
+}
+#elif defined(__aarch64__)
+#include <arm_acle.h>
+#if defined(__linux__)
+#include <sys/auxv.h>
+#include <asm/hwcap.h>
+#endif
+__attribute__((target("crc"))) static uint32_t trikeshed_crc32c_step(uint32_t crc, const unsigned char *p, size_t n) {
+    while (n >= 8) { uint64_t v; memcpy(&v, p, 8); crc = __crc32cd(crc, v); p += 8; n -= 8; }
+    while (n--) crc = __crc32cb(crc, *p++);
+    return crc;
+}
+static inline int trikeshed_crc32c_hw(void) {
+#if defined(__APPLE__)
+    return 1;
+#elif defined(__linux__)
+    return (getauxval(AT_HWCAP) & HWCAP_CRC32) ? 1 : 0;
+#else
+    return 0;
+#endif
+}
+#else
+static inline uint32_t trikeshed_crc32c_step(uint32_t crc, const unsigned char *p, size_t n) { (void)p; (void)n; return crc; }
+static inline int trikeshed_crc32c_hw(void) { return 0; }
+#endif
+
+/** The CRC32c of n bytes at p. Call it only when trikeshed_crc32c_hw() is 1. */
+static inline uint32_t trikeshed_crc32c(const void *p, int n) {
+    return ~trikeshed_crc32c_step(0xFFFFFFFFu, (const unsigned char *)p, (size_t)n);
+}

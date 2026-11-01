@@ -18,7 +18,11 @@ object Crc32C {
             TABLE[i] = crc
         }
     }
-    fun compute(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size): Int {
+    /** The CRC32c of bytes[offset, offset + length): the target's [crc32c] (the CPU's instruction where it has one). */
+    fun compute(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size): Int = crc32c(bytes, offset, length)
+
+    /** The same CRC32c from the table, one byte per step: what targets without the instruction run, and what tests hold [crc32c] to. */
+    fun software(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size): Int {
         var crc = 0xFFFFFFFF.toInt()
         for (i in 0 until length) {
             val b = bytes[offset + i].toInt() and 0xFF
