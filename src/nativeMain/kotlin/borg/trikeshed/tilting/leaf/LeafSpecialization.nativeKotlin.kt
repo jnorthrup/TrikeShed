@@ -6,9 +6,10 @@ import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.Platform
 
 /**
- * TrikeShed's own native targets (macos, linux, mingwX64) bind no C library here: the kotlin implementations are the
- * platform's. src/lzNativeMain holds the liblz4 / liblzo2 specialization through cinterop
- * (src/nativeInterop/cinterop/lz.def); a build that wires lzNativeMain compiles that file instead of this one.
+ * Every native target (TrikeShed's macos, linux and mingwX64; the challenge slice's linuxX64, linuxArm64 and macosArm64)
+ * binds no C library for the leaf codecs: the Kotlin LZ4 and LZO of commonMain are the platform's, as on WASI. No
+ * cinterop, no C header, no liblz4 or liblzo2 at link or run time. [platform] is the target's OS and CPU, e.g.
+ * linux-x64, macosx-arm64.
  */
 actual object LeafSpecialization {
     @OptIn(ExperimentalNativeApi::class)
