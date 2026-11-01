@@ -255,6 +255,16 @@ class SctpTcbTable(
         t.ssthresh = t.peerRwnd
     }
 
+    /** The earliest armed T1/T3 deadline on the owner's clock, or Long.MAX_VALUE when none is armed. */
+    fun nextDeadline(): Long {
+        var d = Long.MAX_VALUE
+        for (k in 0 until timedCount) {
+            val t = timed[k]!!
+            if (t.timerOn && t.deadline < d) d = t.deadline
+        }
+        return d
+    }
+
     // ── Client side ───────────────────────────────────────────────────────────
 
     /** INIT toward [path]:[peerPort]; [SctpUpper.associated] follows once the COOKIE ACK arrives. */

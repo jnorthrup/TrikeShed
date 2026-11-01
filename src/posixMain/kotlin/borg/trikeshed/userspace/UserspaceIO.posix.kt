@@ -36,7 +36,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         UringOp.CLOSE, UringOp.FADVISE, UringOp.MADVISE, UringOp.READ_FIXED, UringOp.WRITE_FIXED,
         UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT, UringOp.GETDENTS, UringOp.SOCKET, UringOp.BIND,
         UringOp.LISTEN, UringOp.ACCEPT, UringOp.CONNECT, UringOp.SHUTDOWN, UringOp.POLL_ADD, UringOp.POLL_REMOVE,
-        UringOp.URING_CMD)
+        UringOp.URING_CMD, UringOp.SENDMSG, UringOp.RECVMSG, UringOp.ASYNC_CANCEL)
     /** Directory streams GETDENTS continues, by descriptor; CLOSE of the descriptor ends one. */
     private val directories = mutableMapOf<Int, CPointer<DIR>>()
     /** CONNECTs whose connect(2) is in progress: writable or failed, SO_ERROR settles them. */
@@ -74,7 +74,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         val count = submissions.size
         if (count > entries || count > INLINE_LIMIT || queued.isNotEmpty() || pending.isNotEmpty() ||
             completed.isNotEmpty() || results.isNotEmpty()) return null
-        val queuedOps = native.capabilities or waits or UringOp.POLL_REMOVE.mask
+        val queuedOps = native.capabilities or waits or UringOp.POLL_REMOVE.mask or UringOp.ASYNC_CANCEL.mask
         for (index in 0 until count) {
             val sub = submissions[index]
             if (sub.opcode of queuedOps) return null
@@ -111,6 +111,7 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             val invalid = validate(submission)
             if (invalid != null) publish(UringCompletion(submission.userData, invalid, 0))
             else if (submission.opcode == UringOp.POLL_REMOVE) publish(UringCompletion(submission.userData, removePoll(submission.addr), 0))
+            else if (submission.opcode == UringOp.ASYNC_CANCEL) publish(UringCompletion(submission.userData, cancelRequest(submission.addr), 0))
             else queued.add(submission)
         }
         dispatch()
@@ -129,8 +130,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             blocked.add(submission)
             if (dependency || submission.opcode of native.capabilities) continue
             val mask = when (submission.opcode) {
-                UringOp.RECV, UringOp.ACCEPT -> POLLIN
-                UringOp.SEND, UringOp.CONNECT -> POLLOUT
+                UringOp.RECV, UringOp.RECVMSG, UringOp.ACCEPT -> POLLIN
+                UringOp.SEND, UringOp.SENDMSG, UringOp.CONNECT -> POLLOUT
                 UringOp.POLL_ADD -> submission.operationFlags
                 else -> null
             }
@@ -258,8 +259,9 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         if (sub.opcode of bufferOps) {
             if (buffer == null) return -22
             if (sub.len > buffer.remaining()) return -22
-            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.STATX ||
-                    sub.opcode == UringOp.GETDENTS) && buffer.isReadOnly()) return -22
+            if ((sub.opcode == UringOp.READ || sub.opcode == UringOp.RECV || sub.opcode == UringOp.RECVMSG ||
+                    sub.opcode == UringOp.STATX || sub.opcode == UringOp.GETDENTS) && buffer.isReadOnly()) return -22
+            if ((sub.opcode == UringOp.SENDMSG || sub.opcode == UringOp.RECVMSG) && sub.len < UringOp.DATAGRAM_ADDRESS) return -22
         }
         if (sub.opcode of positioned && sub.offset < -1) return -22
         if (sub.opcode == UringOp.STATX) {
@@ -394,6 +396,8 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
             UringOp.POLL_ADD -> if (sub.len != 0 || sub.operationFlags and 0x3f.inv() != 0) -95 else
                 poll(sub.fd, sub.operationFlags).let { if (it == 0) -11 else if (it > 0 && it and POLLNVAL != 0) -9 else it }
             UringOp.URING_CMD -> socketCommand(sub)
+            UringOp.SENDMSG -> datagramSend(sub)
+            UringOp.RECVMSG -> datagramReceive(sub)
             UringOp.SEND, UringOp.RECV -> {
                 buffer!!.array().usePinned { pinned ->
                     val ptr = if (sub.len == 0) null else pinned.addressOf(buffer.arrayOffset() + buffer.position())
@@ -503,6 +507,52 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         return bytes.usePinned { action(it.addressOf(0).reinterpret(), size) }
     }
 
+    /** SENDMSG over a datagram window: sendto(2) of the payload to the Linux sockaddr in the window's last bytes. */
+    private fun datagramSend(sub: UringSubmission): Int {
+        val buffer = sub.buffer!!
+        val bytes = buffer.array()
+        val start = buffer.arrayOffset() + buffer.position()
+        val n = sub.len - UringOp.DATAGRAM_ADDRESS
+        val slot = start + n
+        val family = (bytes[slot].toInt() and 255) or ((bytes[slot + 1].toInt() and 255) shl 8)
+        val size = when (family) { 2 -> 16; 10 -> 28; else -> return -97 }
+        val address = bytes.copyOfRange(slot, slot + size)
+        if (!linux) {
+            address[0] = size.toByte()
+            address[1] = hostFamily(family)!!.toByte()
+        }
+        return address.usePinned { a ->
+            bytes.usePinned { p ->
+                posixCompletion(sendto(sub.fd, if (n == 0) null else p.addressOf(start), n.convert(),
+                    MSG_DONTWAIT or if (linux) MSG_NOSIGNAL else 0, a.addressOf(0).reinterpret(), size.convert()).toInt())
+            }
+        }
+    }
+
+    /** RECVMSG over a datagram window: recvfrom(2) into its start, the sender as a Linux sockaddr into its last bytes. */
+    private fun datagramReceive(sub: UringSubmission): Int = memScoped {
+        val buffer = sub.buffer!!
+        val bytes = buffer.array()
+        val start = buffer.arrayOffset() + buffer.position()
+        val storage = allocArray<ByteVar>(128)
+        val length = alloc<socklen_tVar>().apply { value = 128.convert() }
+        val n = sub.len - UringOp.DATAGRAM_ADDRESS
+        val got = bytes.usePinned { p ->
+            recvfrom(sub.fd, if (n == 0) null else p.addressOf(start), n.convert(), MSG_DONTWAIT,
+                storage.reinterpret(), length.ptr).toInt()
+        }
+        if (got < 0) return@memScoped posixCompletion(got)
+        // Darwin leads with sa_len and an 8-bit family; Linux with a 16-bit family. Port and address follow alike.
+        val host = if (linux) (storage[0].toInt() and 255) or ((storage[1].toInt() and 255) shl 8) else storage[1].toInt() and 255
+        val family = when (host) { AF_INET -> 2; AF_INET6 -> 10; else -> return@memScoped -97 }
+        val size = if (family == 2) 16 else 28
+        val slot = start + n
+        for (i in 0 until UringOp.DATAGRAM_ADDRESS) bytes[slot + i] = 0
+        bytes[slot] = family.toByte()
+        for (i in 2 until size) bytes[slot + i] = storage[i]
+        got
+    }
+
     /** IORING_OP_ACCEPT waits for a connection, as the kernel's poll-armed accept does; accept4's flags in operationFlags. */
     private fun accept(sub: UringSubmission): Int {
         if (sub.operationFlags and SOCKET_FLAGS.inv() != 0) return -22
@@ -544,6 +594,16 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
     }
 
     /** POLL_REMOVE: a POLL_ADD of [target] still waiting here or in the kernel ring settles -ECANCELED; -ENOENT otherwise. */
+    /**
+     * IORING_OP_ASYNC_CANCEL with the target's userData in addr: the target ends -ECANCELED (-125) and the cancel
+     * completes 0; with no such request outstanding, -ENOENT.
+     */
+    private fun cancelRequest(target: Long): Int {
+        if (queued.none { it.userData == target } && !pending.containsKey(target)) return -2
+        cancel(setOf(target))
+        return 0
+    }
+
     private fun removePoll(target: Long): Int {
         val waiting = queued.any { it.userData == target && it.opcode == UringOp.POLL_ADD } ||
             pending[target]?.opcode == UringOp.POLL_ADD
@@ -656,9 +716,10 @@ private class PosixUserspaceChannelBackend(private val entries: Int, mode: Uring
         val transferOps = UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.GETDENTS)
         val pathOps = UringOp.caps(UringOp.OPENAT, UringOp.MKDIRAT, UringOp.RENAMEAT, UringOp.UNLINKAT)
         val bufferOps = pathOps or UringOp.caps(UringOp.READ, UringOp.WRITE, UringOp.SEND, UringOp.RECV, UringOp.STATX,
-            UringOp.GETDENTS, UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD)
+            UringOp.GETDENTS, UringOp.BIND, UringOp.CONNECT, UringOp.URING_CMD, UringOp.SENDMSG, UringOp.RECVMSG)
         /** Operations the kernel ring completes only when ready: their emulation leaves them queued while it reports -EAGAIN. */
-        val waits = UringOp.caps(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD)
+        val waits = UringOp.caps(UringOp.SEND, UringOp.RECV, UringOp.ACCEPT, UringOp.CONNECT, UringOp.POLL_ADD,
+            UringOp.SENDMSG, UringOp.RECVMSG)
         /** Batch size up to which [settleInline] checks userData pairwise. */
         const val INLINE_LIMIT = 64
         /** Linux SOCK_NONBLOCK | SOCK_CLOEXEC. */

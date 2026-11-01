@@ -90,6 +90,17 @@ internal class PosixChannelHandle(
     override fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
         enqueue(UringSubmission(UringOp.RECVMSG, fd, msgHdrPtr, 0, 0), userData)
 
+    override fun sendmsg(fd: Int, datagram: ByteBuffer, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.SENDMSG, fd, 0, datagram.remaining(), -1, buffer = datagram), userData)
+
+    override fun recvmsg(fd: Int, datagram: ByteBuffer, userData: Long): Int =
+        enqueue(UringSubmission(UringOp.RECVMSG, fd, 0, datagram.remaining(), -1, buffer = datagram), userData)
+
+    override fun prepCancel(target: Long, userData: Long): Int = synchronized(lock) {
+        val token = requests.entries.firstOrNull { it.value.b == target }?.key ?: return@synchronized -2
+        stage(UringSubmission(UringOp.ASYNC_CANCEL, -1, token, 0, 0), userData)
+    }
+
     override fun submit(): Int = synchronized(lock) {
         if (closing) -9 else facade.submit()
     }

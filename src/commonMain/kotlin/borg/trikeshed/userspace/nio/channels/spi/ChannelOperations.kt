@@ -81,6 +81,18 @@ interface ChannelOperations : CoroutineContext.Element {
         fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
         /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */
         fun recvmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
+        /**
+         * One datagram: [datagram]'s window holds the payload, then the destination as a Linux sockaddr in its last
+         * UringOp.DATAGRAM_ADDRESS bytes. The completion counts payload bytes; the window's position does not move.
+         */
+        fun sendmsg(fd: Int, datagram: ByteBuffer, userData: Long = 0L): Int = -1
+        /** One datagram into [datagram]'s window from its start; the sender's Linux sockaddr into its last UringOp.DATAGRAM_ADDRESS bytes. */
+        fun recvmsg(fd: Int, datagram: ByteBuffer, userData: Long = 0L): Int = -1
+        /**
+         * IORING_OP_ASYNC_CANCEL of the outstanding request this handle admitted with [target] as its userData: the
+         * target completes -125 and the cancel 0, or the cancel -2 when no such request is outstanding.
+         */
+        fun prepCancel(target: Long, userData: Long = 0L): Int = -1
         /** Settle admitted requests and release the owned submission backend. */
         fun close() {}
         fun submit(): Int

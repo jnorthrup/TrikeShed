@@ -28,7 +28,14 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
     WRITE_FIXED(5, "write to registered buffer"),
     POLL_ADD(6, "add poll watch on fd"),
     POLL_REMOVE(7, "cancel poll watch"),
+    /**
+     * With a buffer window, one datagram: the payload, then in the window's last [DATAGRAM_ADDRESS] bytes the
+     * destination as a Linux sockaddr (sockaddr.kt framing, as BIND and CONNECT take it). The payload starts the window
+     * so a packet codec reads and writes it in place. Without a buffer, [addr] is a native msghdr (kernel rings only).
+     * The result counts payload bytes; the window's position does not move.
+     */
     SENDMSG(9, "sendmsg — datagram/send buffer vector"),
+    /** With a buffer window, one datagram: the payload from the window's start, the sender's Linux sockaddr into its last [DATAGRAM_ADDRESS] bytes. */
     RECVMSG(10, "recvmsg — datagram/recv buffer vector"),
     TIMEOUT(11, "completion timeout — __kernel_timespec"),
     TIMEOUT_REMOVE(12, "cancel pending timeout"),
@@ -125,6 +132,8 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val LOCK_NB: Int = 4
         /** sizeof(struct statx). */
         const val STATX_SIZE: Int = 256
+        /** The address slot ending a SENDMSG/RECVMSG window: sizeof(struct sockaddr_in6), which holds a sockaddr_in too. */
+        const val DATAGRAM_ADDRESS: Int = 28
         // Linux poll, socket-option and socket-command values, translated by each backend like the O_* flags.
         const val POLLIN: Int = 0x1
         const val POLLOUT: Int = 0x4
