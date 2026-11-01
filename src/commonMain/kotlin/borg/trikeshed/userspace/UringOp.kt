@@ -145,6 +145,9 @@ enum class UringOp(val code: Int, val desc: String) : BitMasked<Long> {
         const val POLLOUT: Int = 0x4
         const val SOL_SOCKET: Int = 1
         const val SO_REUSEADDR: Int = 2
+        /** Socket buffer sizes, an int in native order; a host may cap or refuse a value above its maximum. */
+        const val SO_SNDBUF: Int = 7
+        const val SO_RCVBUF: Int = 8
         /** IPPROTO_TCP and TCP_NODELAY are the same numbers on Linux and Darwin. */
         const val IPPROTO_TCP: Int = 6
         const val TCP_NODELAY: Int = 1

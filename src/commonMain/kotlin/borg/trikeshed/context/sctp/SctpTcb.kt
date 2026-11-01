@@ -11,7 +11,10 @@ import kotlin.random.Random
  *
  * Scope of this version, stated so nothing reads as more than it is:
  * - one ordered stream per association (connection-oriented, as TCP); messages are fragmented with B/E flags;
- * - congestion control is RFC 9260 §7.2 slow start and congestion avoidance with T3-rtx; there is no fast retransmit;
+ * - congestion control is RFC 9260 §7.2 slow start and congestion avoidance; loss recovery is QUIC's (RFC 9002): a
+ *   chunk is lost on three miss indications (§7.2.4, counted by HTNA) or once a later chunk is acknowledged and 9/8 of
+ *   the RTT has passed since it was sent; T3 runs as QUIC's PTO, srtt + max(4 rttvar, 1 ms) + the peer's ACK delay,
+ *   with no RTO.Min; a loss halves cwnd once per Fast Recovery, and PTOs shrink it only when three come in a row;
  * - gap-acked chunks are not sent again; there are no HEARTBEATs (a path is presumed alive while it carries data);
  * - the receive window is the table's constant; out-of-order chunks are held until the gap fills.
  */
@@ -75,6 +78,8 @@ class SctpTcb(val table: SctpTcbTable) {
     var rto: Long = 0
     var srtt: Long = 0
     var rttvar: Long = 0
+    /** The last RTT sample, for the time threshold. */
+    var latestRtt: Long = 0
     /** The TSN being timed for an RTT sample, valid while [timing]; cleared by a retransmission (Karn). */
     var timedTsn: Tsn = 0
     var timedAt: Long = 0
@@ -96,10 +101,22 @@ class SctpTcb(val table: SctpTcbTable) {
     var qOff = IntArray(16)
     var qLen = IntArray(16)
     var qGapAcked = BooleanArray(16)
+    /** Miss indications (RFC 9260 §7.2.4): 0 to 2 counting, [MARKED] for the next flush, [FAST_SENT] once resent. */
+    var qMiss = IntArray(16)
+    /** When each chunk last left, on the owner's clock, for the time threshold. */
+    var qSentAt = LongArray(16)
     var qMsg = arrayOfNulls<ByteArray>(16)
     var head = 0
     var sent = 0
     var tail = 0
+    /** Some chunk in [head, sent) is [MARKED]. */
+    var fastPending = false
+    /** Fast Recovery (§7.2.4): cwnd holds until the cumulative TSN reaches [recoverTsn]. */
+    var recovering = false
+    var recoverTsn: Tsn = 0
+    /** The loss timer (RFC 9002 §6.1.2): when the earliest chunk below an acknowledged one passes the time threshold. */
+    var lossOn = false
+    var lossAt: Long = 0
 
     // Receive side.
     /** The last TSN received in order. */
@@ -128,6 +145,10 @@ class SctpTcb(val table: SctpTcbTable) {
         val n = cap * 2
         fun IntArray.regrow(): IntArray { val r = IntArray(n); for (c in head until tail) r[c and (n - 1)] = this[c and (cap - 1)]; return r }
         qTsn = qTsn.regrow(); qFlags = qFlags.regrow(); qPpid = qPpid.regrow(); qOff = qOff.regrow(); qLen = qLen.regrow()
+        qMiss = qMiss.regrow()
+        val at = LongArray(n)
+        for (c in head until tail) at[c and (n - 1)] = qSentAt[c and (cap - 1)]
+        qSentAt = at
         val g = BooleanArray(n); val m = arrayOfNulls<ByteArray>(n)
         for (c in head until tail) { g[c and (n - 1)] = qGapAcked[c and (cap - 1)]; m[c and (n - 1)] = qMsg[c and (cap - 1)] }
         qGapAcked = g; qMsg = m
@@ -135,6 +156,10 @@ class SctpTcb(val table: SctpTcbTable) {
 
     companion object {
         val NO_DATA = ByteArray(0)
+        /** [qMiss]: the third miss indication came; the chunk goes again at the next flush. */
+        const val MARKED = 3
+        /** [qMiss]: fast retransmitted; it takes no more miss indications (only T3 sends it again). */
+        const val FAST_SENT = -1
         const val SEND_SHUTDOWN = 1
         const val SEND_SHUTDOWN_ACK = 2
         const val SEND_COOKIE_ACK = 4
@@ -218,7 +243,10 @@ class SctpTcbTable(
     val mtu: Int = 1452,
     val rwnd: Int = 1 shl 20,
     val rtoInitialNanos: Long = 1_000_000_000L,
-    val rtoMinNanos: Long = 1_000_000_000L,
+    /** QUIC's kGranularity (RFC 9002): the least variance term in the PTO, and the least loss delay. */
+    val granularityNanos: Long = 1_000_000L,
+    /** The peer's ACK delay in the PTO, QUIC's max_ack_delay default: a SACK leaves at the end of the wake its DATA came in. */
+    val maxAckDelayNanos: Long = 25_000_000L,
     val rtoMaxNanos: Long = 60_000_000_000L,
     val maxRetransmissions: Int = 10,
     /** A cookie older than this on the owner's monotonic clock is refused (RFC 9260 Valid.Cookie.Life). */
@@ -252,8 +280,10 @@ class SctpTcbTable(
         dirty[dirtyCount++] = t
     }
 
+    /** The PTO (T1 or T3) from [now], or the loss timer when that comes first. */
     fun arm(t: SctpTcb, now: Long) {
         t.deadline = now + t.rto
+        if (t.lossOn && t.lossAt - t.deadline < 0) t.deadline = t.lossAt
         t.timerOn = true
         if (t.listed) return
         t.listed = true
@@ -327,6 +357,8 @@ class SctpTcbTable(
             t.qOff[i] = at
             t.qLen[i] = n
             t.qGapAcked[i] = false
+            t.qMiss[i] = 0
+            t.qSentAt[i] = 0L
             t.qMsg[i] = msg
             t.tail++
             at += n
@@ -538,18 +570,27 @@ class SctpTcbTable(
         t.oooCount++
     }
 
-    /** SACK: the cumulative point frees the ring's head, gap blocks mark later chunks, the windows move. */
+    /**
+     * SACK: the cumulative point frees the ring's head, gap blocks mark later chunks, the windows move. Fast retransmit
+     * (RFC 9260 §7.2.4): a chunk still missing below the highest TSN this SACK newly acknowledges (HTNA) takes a miss
+     * indication; the third marks it, and the next flush sends it ahead of new DATA. The first mark outside Fast
+     * Recovery halves cwnd and starts Fast Recovery, which lasts until the cumulative TSN passes everything then in
+     * flight; cwnd does not grow during it.
+     */
     fun sack(t: SctpTcb, p: ByteArray, at: Int, len: Int, now: Long) {
         if (len < 16) return
         val cum = p.sackCumulative(at)
         t.peerRwnd = p.sackRwnd(at)
         val mask = t.qTsn.size - 1
         var acked = 0
+        // The highest TSN this SACK newly acknowledges, valid once [fresh].
+        var newest: Tsn = cum
+        var fresh = false
         if (tsnDistance(cum, t.ackedTsn) > 0) {
             // To the tail, not to [sent]: after a T3 reset the peer may acknowledge chunks sent before it.
             while (t.head < t.tail && tsnDistance(t.qTsn[t.head and mask], cum) <= 0) {
                 val i = t.head and mask
-                if (!t.qGapAcked[i] && t.head < t.sent) acked += t.qLen[i]
+                if (!t.qGapAcked[i] && t.head < t.sent) { acked += t.qLen[i]; newest = t.qTsn[i]; fresh = true }
                 t.qMsg[i] = null
                 t.head++
             }
@@ -566,30 +607,83 @@ class SctpTcbTable(
             for (c in t.head until t.sent) {
                 val i = c and mask
                 val off = tsnDistance(t.qTsn[i], cum)
-                if (off in from..to && !t.qGapAcked[i]) { t.qGapAcked[i] = true; acked += t.qLen[i] }
+                if (off in from..to && !t.qGapAcked[i]) {
+                    t.qGapAcked[i] = true
+                    acked += t.qLen[i]
+                    if (!fresh || tsnDistance(t.qTsn[i], newest) > 0) { newest = t.qTsn[i]; fresh = true }
+                }
             }
             g++
         }
+        if (t.recovering && tsnDistance(cum, t.recoverTsn) >= 0) t.recovering = false
+        var marked = false
+        if (fresh && gaps > 0) {
+            for (c in t.head until t.sent) {
+                val i = c and mask
+                if (tsnDistance(t.qTsn[i], newest) >= 0) break
+                if (t.qGapAcked[i] || t.qMiss[i] < 0 || t.qMiss[i] >= SctpTcb.MARKED) continue
+                if (++t.qMiss[i] == SctpTcb.MARKED) marked = true
+            }
+        }
+        if (detectLoss(t, now)) marked = true
+        if (marked) lost(t)
         if (acked > 0) {
             t.flight = maxOf(0, t.flight - acked)
-            if (t.cwnd <= t.ssthresh) t.cwnd += minOf(acked, mtu)
-            else {
-                t.partialAcked += acked
-                if (t.partialAcked >= t.cwnd) { t.partialAcked -= t.cwnd; t.cwnd += mtu }
+            if (!t.recovering) {
+                if (t.cwnd <= t.ssthresh) t.cwnd += minOf(acked, mtu)
+                else {
+                    t.partialAcked += acked
+                    if (t.partialAcked >= t.cwnd) { t.partialAcked -= t.cwnd; t.cwnd += mtu }
+                }
             }
         }
         if (t.head == t.sent) t.timerOn = false else arm(t, now)
         if (t.queued > 0 || t.closing) markDirty(t)
     }
 
-    /** RFC 9260 §6.3.1 smoothed RTT and RTO. */
+    /**
+     * Time threshold (RFC 9002 §6.1.2): a chunk below the highest one the peer holds in a gap block is lost once 9/8 of
+     * max(srtt, latest RTT), at least [granularityNanos], has passed since it left; the earliest of the others sets the
+     * loss timer. Chunks already fast retransmitted wait for the PTO. True when one was marked.
+     */
+    fun detectLoss(t: SctpTcb, now: Long): Boolean {
+        t.lossOn = false
+        val mask = t.qTsn.size - 1
+        var top = t.sent - 1
+        while (top >= t.head && !t.qGapAcked[top and mask]) top--
+        if (top < t.head) return false
+        val delay = maxOf(9 * maxOf(t.srtt, t.latestRtt) / 8, granularityNanos)
+        var marked = false
+        for (c in t.head until top) {
+            val i = c and mask
+            if (t.qGapAcked[i] || t.qMiss[i] < 0 || t.qMiss[i] >= SctpTcb.MARKED) continue
+            val due = t.qSentAt[i] + delay
+            if (now - due >= 0) { t.qMiss[i] = SctpTcb.MARKED; marked = true }
+            else if (!t.lossOn || due - t.lossAt < 0) { t.lossOn = true; t.lossAt = due }
+        }
+        return marked
+    }
+
+    /** Marked chunks go at the next flush; the first loss outside Fast Recovery halves cwnd and starts it. */
+    fun lost(t: SctpTcb) {
+        t.fastPending = true
+        if (t.recovering) return
+        t.ssthresh = maxOf(t.cwnd / 2, 4 * mtu)
+        t.cwnd = t.ssthresh
+        t.partialAcked = 0
+        t.recovering = true
+        t.recoverTsn = t.qTsn[(t.sent - 1) and (t.qTsn.size - 1)]
+    }
+
+    /** RFC 9260 §6.3.1 smoothed RTT; the RTO is QUIC's PTO (RFC 9002 §6.2.1), with no RTO.Min beneath it. */
     fun sample(t: SctpTcb, r: Long) {
+        t.latestRtt = r
         if (t.srtt == 0L) { t.srtt = r; t.rttvar = r / 2 }
         else {
             t.rttvar = (3 * t.rttvar + kotlin.math.abs(t.srtt - r)) / 4
             t.srtt = (7 * t.srtt + r) / 8
         }
-        t.rto = (t.srtt + 4 * t.rttvar).coerceIn(rtoMinNanos, rtoMaxNanos)
+        t.rto = minOf(t.srtt + maxOf(4 * t.rttvar, granularityNanos) + maxAckDelayNanos, rtoMaxNanos)
     }
 
     fun shutdown(t: SctpTcb, p: ByteArray, at: Int) {
@@ -602,10 +696,11 @@ class SctpTcbTable(
     // ── Drain ─────────────────────────────────────────────────────────────────
 
     /**
-     * End of the wake: for each association touched, one packet or more with its control chunks, a SACK when DATA
-     * arrived, and DATA as far as min(cwnd, peer rwnd) allows; then the timers.
+     * End of the wake: the timers first, so what they mark leaves now; then for each association touched, one packet
+     * or more with its control chunks, a SACK when DATA arrived, and DATA as far as min(cwnd, peer rwnd) allows.
      */
     fun flush(now: Long) {
+        expire(now)
         var k = 0
         while (k < dirtyCount) {
             val t = dirty[k]!!
@@ -615,7 +710,6 @@ class SctpTcbTable(
             k++
         }
         dirtyCount = 0
-        expire(now)
     }
 
     fun drain(t: SctpTcb, now: Long) {
@@ -633,6 +727,7 @@ class SctpTcbTable(
         if (t.state == SctpState.ESTABLISHED || t.state == SctpState.SHUTDOWN_PENDING || t.state == SctpState.SHUTDOWN_RECEIVED ||
             t.state == SctpState.COOKIE_ECHOED) {
             val mask = t.qTsn.size - 1
+            if (t.fastPending) fastRetransmit(t, now)
             while (t.sent < t.tail) {
                 val i = t.sent and mask
                 val n = t.qLen[i]
@@ -640,6 +735,7 @@ class SctpTcbTable(
                 if (!writer.room(DATA_HEADER + n)) { emit(t); writer.begin(localPort, t.peerPort, t.peerTag) }
                 if (!t.qGapAcked[i]) {
                     writer.data(t.qTsn[i], 0, 0, t.qPpid[i], t.qFlags[i], t.qMsg[i]!!, t.qOff[i], n)
+                    t.qSentAt[i] = now
                     t.flight += n
                     t.peerRwnd = maxOf(0, t.peerRwnd - n)
                     if (!t.timing) { t.timing = true; t.timedTsn = t.qTsn[i]; t.timedAt = now }
@@ -662,6 +758,34 @@ class SctpTcbTable(
             }
         }
         if (!writer.empty) emit(t)
+    }
+
+    /**
+     * §7.2.4: the earliest [SctpTcb.MARKED] chunks, as many as one packet holds, regardless of cwnd; the rest wait for
+     * the next flush (every SACK while chunks are queued brings one). T3 restarts when the first outstanding chunk goes
+     * again, and Karn's rule drops a timed sample of a resent chunk.
+     */
+    fun fastRetransmit(t: SctpTcb, now: Long) {
+        val mask = t.qTsn.size - 1
+        var any = false
+        var left = false
+        for (c in t.head until t.sent) {
+            val i = c and mask
+            if (t.qMiss[i] != SctpTcb.MARKED) continue
+            val n = t.qLen[i]
+            if (!writer.room(DATA_HEADER + n)) {
+                if (any) { left = true; break }
+                emit(t)
+                writer.begin(localPort, t.peerPort, t.peerTag)
+            }
+            writer.data(t.qTsn[i], 0, 0, t.qPpid[i], t.qFlags[i], t.qMsg[i]!!, t.qOff[i], n)
+            t.qMiss[i] = SctpTcb.FAST_SENT
+            t.qSentAt[i] = now
+            if (t.timing && t.timedTsn == t.qTsn[i]) t.timing = false
+            if (c == t.head) arm(t, now)
+            any = true
+        }
+        t.fastPending = left
     }
 
     /** The packet in [writer] goes to [t]'s path. */
@@ -695,6 +819,13 @@ class SctpTcbTable(
             k++
             if (!t.timerOn || tags[t.localTag] !== t) { t.timerOn = false; t.listed = false; continue }
             if (now - t.deadline < 0) { timed[keep++] = t; continue }
+            if (t.lossOn && now - t.lossAt >= 0) {
+                // The loss timer, not the PTO: chunks past the time threshold go again, with no backoff.
+                if (detectLoss(t, now)) { lost(t); markDirty(t) }
+                arm(t, now)
+                timed[keep++] = t
+                continue
+            }
             if (++t.retransmissions > maxRetransmissions) { t.timerOn = false; t.listed = false; release(t); continue }
             t.rto = minOf(t.rto * 2, rtoMaxNanos)
             t.deadline = now + t.rto
@@ -705,12 +836,21 @@ class SctpTcbTable(
                 SctpState.SHUTDOWN_SENT -> { t.state = SctpState.SHUTDOWN_PENDING; markDirty(t) }
                 SctpState.SHUTDOWN_ACK_SENT -> { t.state = SctpState.SHUTDOWN_RECEIVED; markDirty(t) }
                 else -> {
-                    t.ssthresh = maxOf(t.cwnd / 2, 4 * mtu)
-                    t.cwnd = mtu
-                    t.partialAcked = 0
+                    // PTO (RFC 9002 §6.2): everything outstanding goes again from the oldest chunk. cwnd shrinks only on
+                    // persistent congestion (§7.6), the third PTO in a row, and then to two packets.
+                    if (t.retransmissions >= PERSISTENT_PTOS) {
+                        t.ssthresh = maxOf(t.cwnd / 2, 4 * mtu)
+                        t.cwnd = 2 * mtu
+                        t.partialAcked = 0
+                    }
                     t.flight = 0
                     t.timing = false
                     t.sent = t.head
+                    t.recovering = false
+                    t.fastPending = false
+                    t.lossOn = false
+                    val mask = t.qTsn.size - 1
+                    for (c in t.head until t.tail) t.qMiss[c and mask] = 0
                     markDirty(t)
                 }
             }
@@ -719,6 +859,8 @@ class SctpTcbTable(
     }
 
     companion object {
+        /** Consecutive PTOs that make persistent congestion (RFC 9002 §7.6, kPersistentCongestionThreshold). */
+        const val PERSISTENT_PTOS = 3
         /** Cookie fields: local tag, peer tag, local TSN, peer TSN, peer a_rwnd, peer port + 2 spare, creation time (8, owner's clock). */
         const val COOKIE_FIELDS = 32
         /** HMAC-SHA256 truncated to 128 bits. */

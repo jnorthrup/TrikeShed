@@ -77,6 +77,11 @@ interface ChannelOperations : CoroutineContext.Element {
         fun prepConnect(fd: Int, address: ByteBuffer, userData: Long = 0L): Int = -1
         /** IORING_OP_CLOSE — queues a close SQE; CQE res = 0 or -errno. */
         fun prepClose(fd: Int, userData: Long = 0L): Int = -1
+        /**
+         * SETSOCKOPT socket command: [optname] at [level] (UringOp's Linux numbering) set to [value]'s bytes; CQE res = 0,
+         * -ENOPROTOOPT (-92) for an option the backend does not carry, or -errno.
+         */
+        fun prepSetsockopt(fd: Int, level: Int, optname: Int, value: ByteArray, userData: Long = 0L): Int = -1
         /** Async UDP sendmsg — queues a SENDMSG SQE with msghdr. */
         fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long = 0L): Int = -1
         /** Async UDP recvmsg — queues a RECVMSG SQE with msghdr. */

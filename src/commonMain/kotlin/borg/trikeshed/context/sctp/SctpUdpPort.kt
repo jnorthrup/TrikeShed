@@ -2,6 +2,7 @@ package borg.trikeshed.sctp
 
 import borg.trikeshed.userspace.UringOp
 import borg.trikeshed.userspace.nio.ByteBuffer
+import borg.trikeshed.userspace.nio.ByteOrder
 import borg.trikeshed.userspace.nio.channels.Endpoint
 import borg.trikeshed.userspace.nio.channels.SocketDomain
 import borg.trikeshed.userspace.nio.channels.SocketProtocol
@@ -53,6 +54,12 @@ class SctpUdpPort(
     /** Windows in each half of the wheel, a power of two. */
     val half: Int = 32,
     mtu: Int = 1452,
+    /**
+     * Bytes asked for the socket's receive and send buffers. Every association shares the one socket, so its receive
+     * buffer holds all of their arrivals while the owner is busy: arrival rate times the longest stall (a COMMIT, a
+     * collection). 4 MB holds about 100 ms at 128k users; a host caps or refuses more (see [sizeBuffer]).
+     */
+    val socketBuffer: Int = 4 shl 20,
 ) : SctpSink {
     init { require(half > 0 && half and (half - 1) == 0) { "half is not a power of two: $half" } }
 
@@ -113,8 +120,24 @@ class SctpUdpPort(
         check(fd >= 0) { "UDP socket: $fd" }
         val bound = settle(handle.prepBind(fd, ByteBuffer(local.sockaddr)))
         check(bound == 0) { "bind ${local.a.joinToString(".") { (it.toInt() and 255).toString() }}:${local.b}: $bound" }
+        sizeBuffer(UringOp.SO_RCVBUF)
+        sizeBuffer(UringOp.SO_SNDBUF)
         reactor.register(fd, setOf(Interest.READ))
         return this
+    }
+
+    /**
+     * [socketBuffer] bytes for one of the socket's buffers, halved until the host takes it: Linux caps a request at
+     * rmem_max/wmem_max (and doubles it for its bookkeeping); macOS refuses one above kern.ipc.maxsockbuf. Below 64 KB
+     * the host's default stays.
+     */
+    fun sizeBuffer(option: Int) {
+        var bytes = socketBuffer
+        while (bytes >= 64 shl 10) {
+            val value = ByteBuffer(4).order(ByteOrder.nativeOrder()).putInt(0, bytes).array()
+            if (settle(handle.prepSetsockopt(fd, UringOp.SOL_SOCKET, option, value)) == 0) return
+            bytes = bytes shr 1
+        }
     }
 
     /** The path index of a peer's Linux sockaddr (as sockaddr.kt frames it): [Endpoint.sockaddr] for a dial. */

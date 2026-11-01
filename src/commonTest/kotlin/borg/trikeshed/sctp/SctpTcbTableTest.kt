@@ -7,8 +7,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SctpTcbTableTest {
-    /** Two tables over an in-memory link; [lose] decides, by packet count, which packets the link drops. */
-    class Link(val lose: (Int) -> Boolean = { false }) {
+    /**
+     * Two tables over an in-memory link; [lose] decides, by packet count, which packets the link drops. The clock
+     * stands still while packets flow and moves [idle] when both sides idle with a timer armed.
+     */
+    class Link(val lose: (Int) -> Boolean = { false }, val idle: Long = 1_000_000_000L) {
         var now = 0L
         var packets = 0
         val toServer = ArrayDeque<ByteArray>()
@@ -52,7 +55,7 @@ class SctpTcbTableTest {
             while (rounds++ < 100_000) {
                 if (toServer.isEmpty() && toClient.isEmpty()) {
                     if (client.timedCount == 0 && server.timedCount == 0) return
-                    now += 1_000_000_000L
+                    now += idle
                 }
                 while (toServer.isNotEmpty()) { val p = toServer.removeFirst(); server.receive(p, p.size, 0, now) }
                 server.flush(now)
@@ -149,5 +152,39 @@ class SctpTcbTableTest {
         link.server.receive(p, p.size, 0, link.now)
         assertEquals(1L, link.server.dropped)
         assertEquals(0, link.server.count)
+    }
+
+    @Test
+    fun aLostChunkGoesAgainOnThreeMissIndicationsBeforeT3() {
+        var drop = -1
+        val link = Link(lose = { it == drop })
+        val t = link.connect()
+        link.pump()
+        val started = link.now
+        // The second DATA packet of a 15-chunk message: the SACKs for the chunks after it report it missing.
+        drop = link.packets + 1
+        val body = ((0 until 20_000).toSeries() α { 'a' + it % 26 }).view.joinToString("")
+        link.send(t, body)
+        link.pump()
+        assertEquals(_l["echo:$body"], link.clientGot)
+        // The link's clock moves only when both sides idle with a timer armed: T3 never had to fire.
+        assertEquals(started, link.now)
+    }
+
+    @Test
+    fun aLostChunkWithTooFewLaterChunksGoesAgainOnTheTimeThreshold() {
+        var drop = -1
+        val link = Link(lose = { it == drop }, idle = 10_000_000L)
+        val t = link.connect()
+        link.pump()
+        val started = link.now
+        // The second of four DATA packets: only two later chunks are acknowledged, short of three miss indications.
+        drop = link.packets + 1
+        val body = ((0 until 5_000).toSeries() α { 'a' + it % 26 }).view.joinToString("")
+        link.send(t, body)
+        link.pump()
+        assertEquals(_l["echo:$body"], link.clientGot)
+        // One idle step: the loss timer (9/8 RTT, at least 1 ms) went off; a PTO (over 25 ms) would take three.
+        assertEquals(started + 10_000_000L, link.now)
     }
 }

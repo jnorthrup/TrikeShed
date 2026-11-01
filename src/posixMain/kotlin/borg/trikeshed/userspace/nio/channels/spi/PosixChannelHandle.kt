@@ -84,6 +84,9 @@ internal class PosixChannelHandle(
     override fun prepClose(fd: Int, userData: Long): Int =
         enqueue(UringSubmission(UringOp.CLOSE, fd, 0, 0, 0), userData)
 
+    override fun prepSetsockopt(fd: Int, level: Int, optname: Int, value: ByteArray, userData: Long): Int =
+        enqueue(UringOp.Companion.Submissions.setsockopt(fd, level, optname, value, 0), userData)
+
     override fun sendmsg(fd: Int, msgHdrPtr: Long, userData: Long): Int =
         enqueue(UringSubmission(UringOp.SENDMSG, fd, msgHdrPtr, 0, 0), userData)
 
