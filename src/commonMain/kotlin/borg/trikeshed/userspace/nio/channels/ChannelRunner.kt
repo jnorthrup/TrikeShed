@@ -35,6 +35,10 @@ import kotlin.time.Duration
 class ChannelRunner(
     private val channelOps: ChannelOperations,
     private val reactorOps: ReactorOperations,
+    /** Descriptors that may wait for read readiness at once, and for write readiness: the reactor's reach. */
+    val capacity: Int = 63,
+    /** Ports for dials that name a source address. */
+    val sourcePorts: SourcePorts? = null,
 ) {
     /** Map of fd → pending read deferred. */
     private val readers = mutableMapOf<Int, CompletableDeferred<Int>>()
@@ -68,11 +72,18 @@ class ChannelRunner(
     }
 
     /** Open a TCP client socket and register for connect events.
-     *  Used by clients dialing out. */
-    fun tcpDial(host: String, port: Int): Int {
+     *  Used by clients dialing out. With [source] (4 octets) the socket binds there first, on the next port of
+     *  [sourcePorts] (configured from the environment when the runner names none), not on an ephemeral port. */
+    fun tcpDial(host: String, port: Int, source: ByteArray? = null): Int {
         val address = channelOps.resolve(host)?.let { ByteBuffer(sockaddrIpv4(it, port)) } ?: return -2
-        return tcpSocket { fd -> settle(socketRing.prepConnect(fd, address)) }
+        val local = source?.let { ByteBuffer(sockaddrIpv4(it, (sourcePorts ?: configuredPorts).next(it))) }
+        return tcpSocket { fd ->
+            val bound = if (local == null) 0 else settle(socketRing.prepBind(fd, local))
+            if (bound < 0) bound else settle(socketRing.prepConnect(fd, address))
+        }
     }
+
+    private val configuredPorts by lazy { SourcePorts.configured() }
 
     /** socket(2) as an SQE: prep, submit, wait for the fd CQE. */
     private fun tcpSocket(configure: (Int) -> Int): Int {
@@ -112,7 +123,7 @@ class ChannelRunner(
     suspend fun readAsync(fd: Int, timeoutMs: Long = 60_000L): Int? {
         check(admission.isActive) { "Channel runner is draining or closed" }
         check(fd !in readers) { "A read is already pending for fd=$fd" }
-        check(readers.size < 63) { "Read readiness capacity exceeded" }
+        check(readers.size < capacity) { "Read readiness capacity exceeded" }
         val deferred = CompletableDeferred<Int>()
         readers[fd] = deferred
         return try {
@@ -130,7 +141,7 @@ class ChannelRunner(
     suspend fun writeAsync(fd: Int, timeoutMs: Long = 60_000L): Unit? {
         check(admission.isActive) { "Channel runner is draining or closed" }
         val deferred = CompletableDeferred<Unit>()
-        check(fd in writers || writers.size < 63) { "Write readiness capacity exceeded" }
+        check(fd in writers || writers.size < capacity) { "Write readiness capacity exceeded" }
         val queue = writers.getOrPut(fd) { mutableListOf() }
         check(queue.size < 16) { "Write readiness queue is full for fd=$fd" }
         queue.add(deferred)

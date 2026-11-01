@@ -154,12 +154,12 @@ val <T> T.leftIdentity: () -> T get() = { this }
 
 // ── Collection literals ─────────────────────────────────────────
 
-/** List literal: _l[a, b, c] */
+/** List literal: _l[a, b, c, ...] */
 object _l {
     operator fun <T> get(vararg t: T): List<T> = listOf(*t)
 }
 
-/** Array literal: _a[a, b, c], primitive arrays for primitive elements. */
+/** Array literal: _a[a, b, c, ...], primitive arrays for primitive elements. */
 @OptIn(ExperimentalUnsignedTypes::class)
 object _a {
     operator fun get(vararg t: Boolean): BooleanArray = t
@@ -177,12 +177,17 @@ object _a {
     inline operator fun <reified T> get(vararg t: T): Array<T> = arrayOf(*t)
 }
 
-/** Set literal: _s[a, b, c] */
+/** Set literal: _s[a, b, c, ...] */
 object _s {
     operator fun <T> get(vararg t: T): Set<T> = setOf(*t)
 }
 
-/** Series literal: s_[a, b, c] */
+/** Map literal over the algebra's pair: _m[k j v, k2 j v2, ...] */
+object _m {
+    operator fun <K, V> get(vararg t: Join<K, V>): Map<K, V> = t.associate { it.a to it.b }
+}
+
+/** Series literal: s_[a, b, c, ...] */
 object s_ {
     operator fun <T> get(vararg t: T): Series<T> = t.size j { i -> t[i] }
 }

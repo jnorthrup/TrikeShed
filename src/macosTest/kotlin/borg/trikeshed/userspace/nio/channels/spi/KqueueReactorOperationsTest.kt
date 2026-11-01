@@ -19,7 +19,7 @@ class KqueueReactorOperationsTest {
             val a = pair[0]; val b = pair[1]
             try {
                 reactor.register(a, setOf(Interest.READ), 7L)
-                assertEquals(emptyList(), reactor.poll(20.milliseconds))
+                assertTrue(reactor.poll(20.milliseconds).isEmpty())
                 val byte = alloc<ByteVar>().apply { value = 1 }
                 assertEquals(1L, write(b, byte.ptr, 1u).toLong())
                 val first = reactor.poll(1000.milliseconds).single()
@@ -27,10 +27,10 @@ class KqueueReactorOperationsTest {
                 // Level-triggered: still ready until read.
                 assertEquals(a, reactor.poll(1000.milliseconds).single().fd)
                 assertEquals(1L, read(a, byte.ptr, 1u).toLong())
-                assertEquals(emptyList(), reactor.poll(20.milliseconds))
+                assertTrue(reactor.poll(20.milliseconds).isEmpty())
                 assertEquals(1L, write(b, byte.ptr, 1u).toLong())
                 reactor.deregister(a)
-                assertEquals(emptyList(), reactor.poll(20.milliseconds))
+                assertTrue(reactor.poll(20.milliseconds).isEmpty())
                 // Peer close: ERROR with the registered interest.
                 reactor.register(a, setOf(Interest.READ), 9L)
                 close(b)

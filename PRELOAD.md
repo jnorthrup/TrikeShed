@@ -5,7 +5,7 @@ below is the project's kernel fp concepts we use in our kotlin-common projects.
 >
 > | TrikeShed | Pedigree | Notes |
 > |-----------|----------|-------|
-> | `Series<T> = Join<Int, (Int) -> T>` | **K / kdb+ enumerable** (1993) | size + index oracle. `α`=`each`, `j`=`,`, `s_[]`=`enlist`, `/`=`reshape`, `%`=`where` |
+> | `Series<T> = Join<Int, (Int) -> T>` | **K / kdb+ enumerable** (1993) | size + index oracle. `α`=`each`, `j`=`,`, `s_[]`=`enlist`, `_l`/`_a`/`_s`/`_m` = typed literals, `/`=`reshape`, `%`=`where` |
 > | `Cursor = Series<RowVec>` + `ColumnMeta` + `IOMemento` | **Apache Arrow RecordBatch + FieldVector + ArrowType** | lazified; `get(range)`/`get(IntArray)` = fancy indexing |
 > | `ConfixIndexK<R>` / `facet(key): R` GADT-key pattern | **Haskell `Lens' s a` / Monocle optics** | sealed-key singletons fix the result type by the key |
 > |
@@ -46,6 +46,11 @@ val <T> Series<T>.size: Int get() = a
 operator fun <T> Series<T>.get(i: Int): T = b(i)
 val <T> Series<T>.view: IterableSeries<T> get() = this as? IterableSeries ?: IterableSeries(this)
 
+/** a range IS a Series: lazy view, no List; (lo..hi).toSeries() α { f(it) } */
+fun ClosedRange<Int>.toSeries(): Series<Int> = (endInclusive - start + 1) j { i: Int -> i + start }
+/** range view of a Series: composition, not a copy */
+operator fun <T> Series<T>.get(range: IntRange): Series<T> = range.count() j { i -> this[range.first + i] }
+
 /** left identity / constant anchor */
 inline val <T> T.`↺`: () -> T get() = leftIdentity
 
@@ -61,13 +66,32 @@ val <T : Comparable<T>> Series<T>.cpb: CSeries<T>
 
     series.view = IterableSeries for .map , .filter, .all, and so on stdlib collection iterators
 
-// collection literals / macros
+// collection literals: first-class operators of the algebra, not helpers
 object _l { operator fun <T> get(vararg t: T): List<T> = listOf(*t) }
 _l[...]   // List<T>
-_a[...]   // Array<T> and primitive arrays
+_a[...]   // Array<T> and primitive arrays (IntArray, ByteArray, ...)
 _s[...]   // Set<T>
+_m[...]   // Map<K, V> from Joins: _m["a" j 1, "b" j 2, ...]
 s_[...]   // Series<T>
 ```
+
+### Literal operators
+
+`_l`, `_a`, `_s`, `_m` and `s_` are first-class operators, on a level with `j`, `⋈`, `α` and `↺`. Write a
+collection value with its literal operator, never with `listOf`, `arrayOf`/`intArrayOf`/`byteArrayOf`, `setOf`,
+`mapOf`/`to` pairs or a `List(n) { }` builder:
+
+| Operator | Result | Replaces |
+|----------|--------|----------|
+| `_l[a, b, ...]` | `List<T>` | `listOf(a, b, ...)` |
+| `_a[a, b, ...]` | `Array<T>`, or the primitive array for primitive elements | `arrayOf(a, b, ...)`, `intArrayOf(...)`, `byteArrayOf(...)`, ... |
+| `_s[a, b, ...]` | `Set<T>` | `setOf(a, b, ...)` |
+| `_m[k j v, ...]` | `Map<K, V>` | `mapOf(k to v, ...)` |
+| `s_[a, b, ...]` | `Series<T>` | `listOf(a, b, ...).toSeries()` |
+
+`s_` is the default: a literal that is only read is a Series (maxim of categorical idempotency below). Reach for
+`_l`, `_a`, `_s` or `_m` only where the consumer needs that type. Tests follow the same rule: expected values are
+literals or `α` projections, not Lists built to satisfy `assertEquals`.
 
 Read this algebra as:
 - Join = the base binary composition
@@ -76,8 +100,10 @@ Read this algebra as:
 - `j` = infix constructor grammar
 - `⋈` = factory/literal grammar over the same Join representations (backticks required in Kotlin)
 - `α` = lazy map / projection
+- `(lo..hi).toSeries()` = a range as a lazy Series of its Ints; `xs[lo..hi]` = a range view of a Series. Neither copies;
+  write `(0 until n).toSeries() α { f(it) }`, never `(0 until n).map { f(it) }` or `List(n) { f(it) }`
 - `↺` = visible constant / left identity anchor
-- literals like `_l`, `_a`, `_s`, `s_` keep composition dense without hiding type shape
+- `_l`, `_a`, `_s`, `_m`, `s_` = first-class literal operators; they keep composition dense without hiding type shape
 
 Design bias:
 1. composition over inheritance
@@ -153,6 +179,41 @@ These aliases support the project's lightweight JSON indexer/reifier/path select
 - index first, reify later
 - segments stay cheap and sliceable
 - path selection is algebra over indexed structure, not reflection-driven object walking
+
+## Network address grammar (InetGrammar)
+
+Addresses, ports, ranges and host:port tuples parse as `CharSeries` productions
+(`userspace/nio/channels/InetGrammar.kt`), never with `split`/`toInt` on Strings. Each production consumes its text
+and returns the value, or restores the position and returns null; `parseWhole(text) { production() }` requires the
+whole text.
+
+```kotlin
+typealias Port = Int
+typealias PortRange = IntRange
+typealias Inet = ByteArray            // 4 octets (IPv4) or 16 (IPv6); call sites mono- or bimorphize, no class tree
+typealias Ipv4 = Inet
+typealias Ipv6 = Inet
+typealias Endpoint = Join<Inet, Port>
+typealias SctpEndpoint = Join<Series<Inet>, Port>   // RFC 9260: a multihomed association's addresses share one port
+
+//  port         = digit{1,5}                (0..65535)
+//  portRange    = port [ '-' port ]
+//  octet        = digit{1,3}                (0..255)
+//  ipv4         = octet '.' octet '.' octet '.' octet
+//  ipv4Range    = ipv4 [ '-' octet ]        192.168.50.201-208 -> Series<Ipv4>
+//  ipv6         = RFC 4291 text: 8 hex16 groups, one '::', optional ipv4 tail (::ffff:192.168.50.1)
+//  inet         = ipv4 | ipv6
+//  hostInet     = ipv4 | '[' ipv6 ']'
+//  endpoint     = hostInet ':' port         -> Endpoint; Endpoint.sockaddr picks sockaddr_in / sockaddr_in6
+//  sctpEndpoint = hostInet { ',' hostInet } ':' port
+//  list(p)      = p { ',' p }               -> Series<T>
+parseWhole("10000-48999") { portRange() }
+parseWhole("127.0.0.1:3000,[::1]:3001") { list { endpoint() } }
+parseWhole("10.0.0.1,[2001:db8::1]:9899") { sctpEndpoint() }
+```
+
+Platform port facts are configuration, not constants: `SourcePorts` reads `TRIKESHED_SOURCE_PORTS=lo-hi` through this
+grammar and otherwise sits under the host's ephemeral range (macOS/Windows 10000-48999, Linux 10000-32767).
 
 ## Userspace async context algebra (aka CCEK meaning Coroutine, Context, Element, Key )
 
