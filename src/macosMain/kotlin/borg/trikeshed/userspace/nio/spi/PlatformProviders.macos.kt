@@ -3,7 +3,7 @@ package borg.trikeshed.userspace.nio.spi
 import borg.trikeshed.context.Synchronization
 import borg.trikeshed.userspace.nio.channels.spi.PosixChannelOperations
 import borg.trikeshed.userspace.nio.channels.spi.PosixProcessOperations
-import borg.trikeshed.userspace.nio.channels.spi.PosixReactorOperations
+import borg.trikeshed.userspace.nio.channels.spi.KqueueReactorOperations
 import borg.trikeshed.userspace.nio.file.spi.PosixFileOperations
 import borg.trikeshed.userspace.nio.file.spi.PosixSystemOperations
 import borg.trikeshed.userspace.nio.platform.spi.MlxEncoderOperations
@@ -31,7 +31,7 @@ actual fun platformNioProviders(reactorSynchronization: Synchronization): List<C
     channelOperations,
         tlsBackend,
         HtxReactorElement(channelOperations = channelOperations, tlsBackend = tlsBackend),
-    PosixReactorOperations(reactorSynchronization),
+    KqueueReactorOperations(reactorSynchronization),
     PosixProcessOperations(),
 )
 
