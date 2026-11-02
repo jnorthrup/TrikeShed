@@ -1,0 +1,144 @@
+Grant / finance / legal / ledger: next review slice
+Read-only source review at master e4b1a1d04 (merged #1077), 2026-11-02.
+No Gradle, implementation, financial posting, payment, or external writes.
+
+Recommendation
+The next small workflow should compare a selected source budget with source-stated
+charges for one grant, line and period, and display an evidence-backed numeric
+review report. Call the output a budget cross-reference, not an allowability
+finding or a general ledger. Do not implement grant eligibility, journal posting,
+or a legal rule engine until actual award/source records are available.
+
+What exists now
+* ExactAmount.kt provides CurrencyScale, canonical decimal parsing to checked Long
+  minor units, checked addition and exact rendering. JSON boundaries must continue
+  to encode units/totals as decimal strings (including values >2^53).
+* Reconciliation.kt matches unique account/reference/currency/signed amount/date
+  candidates and preserves invalid, duplicate and ambiguous rows. Its source roles
+  are caller declarations, not authenticity or approval. Its complete flag is not
+  an approval and does not mean every row matched.
+* FinanceNodes reads current original ProjectDoc bytes, checks selection equality,
+  length, strict UTF-8 and content hash, parses CSV/TSV, records consumed identities,
+  then checks both sources again before returning. It reports raw rows, logical
+  ordinals, header/cell/record ranges, UTF-16-half-open offset units, parser/policy
+  identity and exact string totals. It explicitly does not retain a durable source
+  snapshot or obtain an atomic cross-source snapshot.
+* Existing finance preset is project.read(bank.csv), project.read(expenditure.csv),
+  finance.reconcile, production display. It is executable with a mounted project.
+  FinanceKifPresetExecutionTest exercises that graph with synthetic source CSVs.
+* ProjectCorpus exposes docs/document/bytes and extraction provenance. LegalNodes
+  delegates to canonical document.curate and retains source-linked proposals.
+  ConditionSpan/ConditionAssessment can preserve quoted conditions, but they are
+  proposed human assessments; authenticated ReviewPrincipal and the private
+  CurationReview WAL establish the existing review authority. That machinery is
+  not a grant policy resolver, and the strict executable-condition gate is
+  currently book-specific.
+* docs/grant-finance-ledger-plan.txt is an earlier audit. Its CSV/exact-money
+  blocking gaps1/2 are now partly superseded by the merged finance path above.
+  Its grant-policy, financial-ledger and financial-approval gaps remain open.
+
+Actual source availability / gaps
+The inspected tracked finance inputs are synthetic strings in tests. No actual
+award, approved grant budget, fund allocation, accounting journal export, chart of
+accounts, or expenditure export with grant/line attribution was identified in the
+bounded repository/artifact inventory. The nonprofit demo references a public
+IPPF annual report in a separate macOS corpus; an annual report is not an award or
+client logframe. Local artifacts include public legal/reference PDFs (including
+Coinbase terms), not an identified grant budget or financial journal. The ingest
+catalog includes finance textbook paths, not transactional grant data.
+No live mounted-project registry was queried; this is not a claim that all user
+corpora lack such records. A concrete next implementation needs the selected
+ProjectDoc source records/schema, not invented grant data described as real.
+
+Current expenditure schema is only:
+  id,account,reference,currency,date,amount
+It has no grant/fund/budget-line key, allocation basis, service/incurrence period,
+award-version link or allowability evidence. Its amount is a signed source
+movement. An outflow must not silently become a positive grant charge by negation.
+There is no source-approved legal ruleset, award-amendment precedence, jurisdiction,
+period close, restricted-fund policy, or double-entry journal interface established
+by this inspection. Runtime Curation/Invocation/Usage ledgers are not financial
+journals. A filename, caller policyId, status="approved", or graph label cannot
+supply missing authority.
+
+Concrete proposed input contract (NEW schema, not existing real source data)
+Two fully selected ProjectDoc inputs, budget and expenditure, current metadata and
+original bytes verified as in FinanceNodes. One declared currency+scale and exact
+CSV/TSV parser identity; bounded1MiB/4096rows as current finance boundary.
+
+budget.csv required unique headers:
+  id,grant_id,budget_line,currency,period_start,period_end,limit_amount,conditions_text
+* Unique source id; exact nonblank grant/line keys; ISO dates with start<=end.
+* Nonnegative canonical decimal limit_amount parsed without rounding.
+* conditions_text is copied exactly, with its cell range. Empty/missing substantive
+  terms remain unassessed; empty is never interpreted as unconditional permission.
+* Source statement of a limit is not evidence that a funder approved it. A future
+  award/amendment link must name retained source versions and exact clause spans.
+
+expenditure.csv: retain the existing six columns and add these required fields:
+  grant_id,budget_line,charge_amount
+* Existing amount remains the signed movement and remains visible.
+* charge_amount is the SOURCE-STATED budget charge, positive cost/negative credit,
+  not inferred from the movement sign or supplied by a model. A selected export
+  without this field needs an explicit source-backed mapping decision first.
+* A negative charge is a stated credit, not proof of a valid refund/reversal.
+  Service-period allocation, split charging and credit provenance stay unassessed.
+* No fuzzy matching of line names. Date within an inclusive source budget period
+  is a numeric cross-reference convention, not a legal conclusion about eligible
+  service dates. Overlapping candidate periods are ambiguous, never picked first.
+
+Bounded computation and review output
+1. Revalidate both exact selected source heads/bytes. Parse required unique
+   headers, quoted cells, logical records and arity with CSVUtil.records. Preserve
+   every original cell/range, including unused columns; no trim/locale coercion.
+2. For each selected grant+line+currency and unambiguous period, sum charge_amount
+   with checked integer arithmetic; compare to the source-stated limit. Use checked
+   subtraction too (Long.MIN_VALUE cannot safely be negated). Preserve invalid,
+   duplicate, foreign-grant/currency, missing-line and ambiguous-period rows once
+   each for review. Do not silently drop them into apparently complete totals.
+3. Emit limitMinorUnits, chargeMinorUnits, remainingMinorUnits as strings or null
+   when uncomputable, plus numeric comparison and completeness/coverage reasons.
+   A value within the stated limit only describes that arithmetic. Always expose
+   allowability="unassessed", source roles="caller-selected", and copied conditions.
+   Conditions with "only if", exceptions, prior-approval clauses or uncertainty
+   must never disappear into a bare eligible=true flag.
+4. Include both source CIDs/revisions/sequences/byte lengths, parser identity,
+   report-rule version, grant/line/period key and exact row/cell evidence for each
+   limit and contributing charge. Repeat current source readback before return.
+   Mark current as-of-read scope; do not imply durable retention or atomicity.
+
+One synthetic illustration, for schema discussion only
+budget: G1/travel/USD/2026-11-01..2026-11-30 limit100.00,
+  conditions_text="Only with prior written funder consent."
+source charges:60.10 and49.90 -> stated charges110.00, remainder-10.00,
+  numeric comparison above stated limit; allowability unassessed.
+Even charges90.00 with remainder10.00 would leave the consent condition unassessed.
+No sample grant or consent is claimed to exist in the user's corpus.
+
+Concrete work items after obtaining the actual source schema
+A. Select one original budget/award-budget table and one expenditure export;
+   verify actual headers, movement/charge signs, currency precision, period and
+   grant/line IDs. Resolve source gaps before choosing adapter names/semantics.
+B. Add only the exercised budget cross-reference function and FinanceNodes runner.
+   Reuse exact-money and CSV record APIs; factor the existing source admission/
+   evidence helpers narrowly if needed. Do not add an unused accounting framework.
+C. Add the port contract, registry entry and a preset with the two existing project
+   readers, the new runner and the production review display. No model dependency.
+D. Prove exact known totals plus overflow; duplicate/overlapping budget lines;
+   missing/foreign mappings; invalid dates/currency/precision; negative stated
+   credits; quoted/multiline conditions; values above2^53; and raw cell recovery.
+   Changed source/CID/revision/parser version must not reuse stale evidence.
+E. Run the actual preset on supplied source documents and verify displayed values
+   against original bytes. Synthetic fixtures prove behavior only. Preserve every
+   uncertainty. Nothing in this slice creates an authenticated financial decision.
+
+Deferred until real domain records and authority exist
+Grant allowability needs an exact award/amendment version, funder/program and
+jurisdiction/effective dates, applicable conditions/exceptions, cost/incurrence
+facts, supporting evidence and authenticated reviewer scope. Existing quoted
+condition/curation machinery may support review after a concrete adapter exists;
+parser proposals or council text do not establish those facts. A ledger extension
+needs an actual immutable financial journal export and debit/credit/fund/period
+semantics; first implement a read-only exact source cross-reference if supplied.
+No financial posting/payment, balance-sheet claims, filings or automated approval
+is included in this proposed slice.

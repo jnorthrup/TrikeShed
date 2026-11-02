@@ -302,7 +302,8 @@ object DocumentSurface {
 
     /** Match both recorded revisions and the returned preview; no text search or head substitution. */
     fun passageHtml(view: DocView?, selected: DocumentPassage?): String {
-        fun unavailable() = "<section data-passage-result=\"1\"><p>Passage unavailable: the saved quotation or current document revision does not match.</p></section>"
+        val context = selected?.let { SourceSelection.from(it).html() }.orEmpty()
+        fun unavailable() = context + "<section data-passage-result=\"1\"><p>Passage unavailable: the saved quotation or current document revision does not match.</p></section>"
         if (view == null || selected == null || view.project != selected.source.project || view.id != selected.source.id ||
             view.sourceRevision != selected.source) return unavailable()
         val text = when (selected.textRevision) {
@@ -313,7 +314,7 @@ object DocumentSurface {
         if (!exact(text, selected.begin, selected.end, selected.quote) || selected.contextBegin < 0 ||
             selected.contextBegin > selected.begin || selected.contextEnd < selected.end || selected.contextEnd > text.length ||
             text.substring(selected.contextBegin, selected.contextEnd) != selected.context) return unavailable()
-        return "<section data-passage-result=\"1\"><h2>Selected passage</h2><p>Matched to the saved text and document revisions. Original-page accuracy and review are not established.</p><pre>" +
+        return context + "<section data-passage-result=\"1\"><h2>Selected passage</h2><p>Matched to the saved text and document revisions. Original-page accuracy and review are not established.</p><pre>" +
             esc(text.substring(selected.contextBegin, selected.begin)) + "<mark>" + esc(selected.quote) + "</mark>" +
             esc(text.substring(selected.end, selected.contextEnd)) + "</pre></section>"
     }
@@ -402,9 +403,8 @@ object DocumentSurface {
                     .append(esc(p.predicate!!)).append("</span> ").append(esc(p.obj!!)).append("</div>")
                 if (!p.quote.isNullOrBlank()) append("<blockquote class=\"ds-curate-quote\">“").append(esc(p.quote)).append("”</blockquote>")
                 val passage = passage(result, p, validText)
-                if (passage != null) append("<p><a data-passage-receipt=\"").append(esc(passage.receiptCid)).append("\" href=\"/documents?passageReceipt=")
-                    .append(WikiSurface.encode(passage.receiptCid)).append("&amp;passageProposal=").append(passage.ordinal)
-                    .append('#').append(WikiSurface.encode(passage.source.project)).append('/').append(WikiSurface.encode(passage.source.id))
+                if (passage != null) append("<p><a data-passage-receipt=\"").append(esc(passage.receiptCid)).append("\" href=\"")
+                    .append(esc(SourceSelection.from(passage).documentsHref()))
                     .append("\">Show passage in project document</a></p>")
                 append("<div class=\"ds-curate-status\">")
                     .append(when {

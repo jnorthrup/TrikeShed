@@ -1,5 +1,7 @@
 package borg.trikeshed.web
 
+import borg.trikeshed.docs.SourceSelection
+import borg.trikeshed.lib.*
 import borg.trikeshed.web.pages.AppDestination
 import borg.trikeshed.web.pages.AppDestinations
 import kotlinx.browser.document
@@ -46,17 +48,30 @@ object AppNav {
         fun remember() {
             if (URLSearchParams(window.location.search).has("example")) return
             views = readViews()
-            views[current.id] = window.location.pathname + window.location.search + window.location.hash
+            val url = URL(window.location.href)
+            for (key in SourceSelection.keys.view) url.searchParams.delete(key)
+            url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
+            views[current.id] = url.pathname + url.search + url.hash
             try { sessionStorage.setItem(AppDestinations.STORAGE_KEY, JSON.stringify(views)) } catch (_: Throwable) {}
         }
 
+        fun selectedSource(): SourceSelection? = runCatching {
+                SourceSelection.parse(SourceSelection.queryValues(window.location.search))
+            }.getOrNull()
+        fun destinationTitle(d: AppDestination): String =
+            if (d.id == "board" && selectedSource() != null) "Inspect selected source on the zoomable Panels canvas" else d.label
+
         fun destinationHref(d: AppDestination): String {
+            val source = selectedSource()
+            source?.applicationHref(d.id)?.let { return it }
             if (d.id == "board") return d.href
             val saved: dynamic = views[d.id]
             var href = d.href
             if (jsTypeOf(saved) == "string") {
                 try {
                     val url = URL(saved as String, window.location.origin)
+                    for (key in SourceSelection.keys.view) url.searchParams.delete(key)
+                    url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
                     if (url.origin == window.location.origin && !url.searchParams.has("example") && AppDestinations.accepts(d, url.pathname)) {
                         href = url.pathname + url.search + url.hash
                     }
@@ -93,6 +108,7 @@ object AppNav {
         val brand = document.createElement("a") as HTMLAnchorElement
         brand.className = "application-brand"
         brand.href = destinationHref(AppDestinations.all[0])
+        brand.title = destinationTitle(AppDestinations.all[0])
         brand.textContent = "Forge"
         val active = document.createElement("span") as HTMLElement
         active.className = "application-current"
@@ -116,6 +132,7 @@ object AppNav {
         for (d in AppDestinations.primary) {
             val link = document.createElement("a") as HTMLAnchorElement
             link.href = destinationHref(d)
+            link.title = destinationTitle(d)
             link.textContent = d.label
             if (d.id == current.id) link.setAttribute("aria-current", "page")
             primary.append(link)
@@ -123,6 +140,7 @@ object AppNav {
         for (d in AppDestinations.all) {
             val link = document.createElement("a") as HTMLAnchorElement
             link.href = destinationHref(d)
+            link.title = destinationTitle(d)
             link.textContent = d.label
             link.setAttribute("data-destination", d.id)
             if (d.id == current.id) link.setAttribute("aria-current", "page")
@@ -152,10 +170,15 @@ object AppNav {
         document.addEventListener("DOMContentLoaded", { callIcons() }, once)
         fun refreshLinks() {
             brand.href = destinationHref(AppDestinations.all[0])
+            brand.title = destinationTitle(AppDestinations.all[0])
             val children = links.children
-            for (index in 0 until children.length) (children.item(index) as HTMLAnchorElement).href = destinationHref(AppDestinations.all[index])
+            for (index in 0 until children.length) (children.item(index) as HTMLAnchorElement).let {
+                it.href = destinationHref(AppDestinations.all[index]); it.title = destinationTitle(AppDestinations.all[index])
+            }
             val primaryChildren = primary.children
-            for (index in 0 until primaryChildren.length) (primaryChildren.item(index) as HTMLAnchorElement).href = destinationHref(AppDestinations.primary[index])
+            for (index in 0 until primaryChildren.length) (primaryChildren.item(index) as HTMLAnchorElement).let {
+                it.href = destinationHref(AppDestinations.primary[index]); it.title = destinationTitle(AppDestinations.primary[index])
+            }
         }
         window.addEventListener("hashchange", { remember(); refreshLinks() })
         window.addEventListener("pageshow", {

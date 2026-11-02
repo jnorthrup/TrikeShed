@@ -94,11 +94,16 @@ class WikiReadWire(
 
     /** Project retained curation identities into the bounded, containment-checked wiki plane. */
     private suspend fun page(path: String): JvmKanbanServer.HttpResponse {
+        val context = runCatching {
+            val values = borg.trikeshed.docs.SourceSelection.queryValues(path.substringAfter('?', ""))
+            if (borg.trikeshed.docs.SourceSelection.requested(values)) borg.trikeshed.docs.SourceSelection.parse(values) else null
+        }
         val selected = query(path, "page")?.takeIf { it.isNotBlank() }
         val source = query(path, "source") == "1"
         fun html(status: Int, articles: Series<WikiArticle>, unavailable: String? = null, truncated: Boolean = false) =
             JvmKanbanServer.HttpResponse(status,
-                WikiSurface.render(articles, selected, source, unavailable, truncated), "text/html; charset=utf-8")
+                WikiSurface.render(articles, selected, source, unavailable, truncated,
+                    context.getOrNull(), context.isFailure), "text/html; charset=utf-8")
         val files = mutableListOf<WikiArticle>()
         val listing = checkNotNull(route("GET", LIST_ROUTE, ByteArray(0)))
         val index = if (listing.status == 200) reify(listing.body) as Map<*, *> else emptyMap<Any?, Any?>()

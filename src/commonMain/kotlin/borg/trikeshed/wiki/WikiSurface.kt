@@ -1,6 +1,7 @@
 package borg.trikeshed.wiki
 
 import borg.trikeshed.docs.DocumentMarkdown
+import borg.trikeshed.docs.SourceSelection
 import borg.trikeshed.lib.*
 
 enum class WikiKind { FILE, LIBRARY, CONSTELLATION, BOOK, SECTION }
@@ -17,23 +18,30 @@ object WikiSurface {
         source: Boolean = false,
         unavailable: String? = null,
         truncated: Boolean = false,
+        sourceContext: SourceSelection? = null,
+        sourceContextUnavailable: Boolean = false,
     ): String {
+        fun pageUrl(value: String) = url(value) + (sourceContext?.let { "&" + it.query() } ?: "")
+        val wikiHome = sourceContext?.href("wiki") ?: "/wiki"
+        val curatorHref = sourceContext?.href("curator") ?: "/curator"
         val index = articles.view.associateBy { it.path }
         val article = index[path]
         val title = article?.let(::title) ?: path?.let(::filename) ?: "Curations"
-        val rendered = article?.let { content(it, articles, index) }
+        val rendered = article?.let { content(it, articles, index, sourceContext) }
         return buildString {
             append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">")
             append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>")
             append(escape(title)).append(" · TrikeShed</title>")
             append("<link rel=\"stylesheet\" href=\"/application-nav.css\"><link rel=\"stylesheet\" href=\"/wiki.css\">")
             append("<script defer src=\"/kotlin/pages/pages.js\"></script></head><body data-app-page=\"wiki\">")
-            append("<div class=\"wiki-shell\"><aside class=\"wiki-sidebar\"><a class=\"wiki-brand\" href=\"/wiki\">Curations</a>")
+            append("<div class=\"wiki-shell\"><aside class=\"wiki-sidebar\"><a class=\"wiki-brand\" href=\"").append(escape(wikiHome)).append("\">Curations</a>")
             append("<p class=\"wiki-kicker\">The wiki</p><nav aria-label=\"Wiki navigation\"><ul class=\"wiki-tools\">")
-            append("<li><a href=\"/wiki\">All pages</a></li><li><a href=\"/documents#curation\">Document curations</a></li>")
-            append("<li><a href=\"/curator\">Curator</a></li></ul></nav></aside><main class=\"wiki-main\">")
+            append("<li><a href=\"").append(escape(wikiHome)).append("\">All pages</a></li><li><a href=\"/documents#curation\">Document curations</a></li>")
+            append("<li><a href=\"").append(escape(curatorHref)).append("\">Curator</a></li></ul></nav></aside><main class=\"wiki-main\">")
             append("<header><p class=\"wiki-kicker\">Curations</p><h1 class=\"wiki-title\">")
             append(escape(title)).append("</h1></header>")
+            sourceContext?.let { append(it.html()); append("<p class=\"wiki-notice\">The wiki page has its own identity; this source context does not identify this page as the selected project document.</p>") }
+            if (sourceContextUnavailable) append("<p class=\"wiki-notice\">Selected source context unavailable: invalid navigation reference.</p>")
             if (unavailable != null) {
                 append("<p class=\"wiki-notice\" role=\"status\">Wiki unavailable: ").append(escape(unavailable)).append("</p>")
             }
@@ -52,7 +60,7 @@ object WikiSurface {
                                 WikiKind.LIBRARY -> if (constellations) continue
                                 else -> continue
                             }
-                            append("<li><a href=\"").append(url(item.path)).append("\">").append(escape(title(item))).append("</a>")
+                            append("<li><a href=\"").append(escape(pageUrl(item.path))).append("\">").append(escape(title(item))).append("</a>")
                             append(" <span class=\"wiki-path\">").append(escape(item.path)).append("</span></li>")
                         }
                         append("</ul>")
@@ -63,9 +71,9 @@ object WikiSurface {
                     append(escape(path)).append("</p><p><a href=\"/wiki\">Browse all pages</a></p>")
                 }
                 else -> {
-                    append("<nav class=\"wiki-tabs\" aria-label=\"Page views\"><a href=\"").append(url(path)).append('"')
+                    append("<nav class=\"wiki-tabs\" aria-label=\"Page views\"><a href=\"").append(escape(pageUrl(path))).append('"')
                     if (!source) append(" aria-current=\"page\"")
-                    append(">Read</a><a href=\"").append(url(path)).append("&amp;source=1\"")
+                    append(">Read</a><a href=\"").append(escape(pageUrl(path))).append("&amp;source=1\"")
                     if (source) append(" aria-current=\"page\"")
                     append(">View source</a>")
                     if (article.kind == WikiKind.FILE) append("<a href=\"/api/wiki/read?path=").append(encode(path)).append("\">Raw source</a>")
@@ -92,7 +100,7 @@ object WikiSurface {
                         if (item.path == path || !content(item, articles, index).links.view.contains(path)) continue
                         if (!linked) append("<ul>")
                         linked = true
-                        append("<li><a href=\"").append(url(item.path)).append("\">").append(escape(title(item))).append("</a></li>")
+                        append("<li><a href=\"").append(escape(pageUrl(item.path))).append("\">").append(escape(title(item))).append("</a></li>")
                     }
                     if (linked) append("</ul>") else append("<p>No available pages link here.</p>")
                     append("</section>")
@@ -132,7 +140,8 @@ object WikiSurface {
     }
 
     /** Protect inline literals and links before the shared Markdown block renderer runs. */
-    fun content(article: WikiArticle, articles: Series<WikiArticle>, index: Map<String, WikiArticle>? = null): WikiContent {
+    fun content(article: WikiArticle, articles: Series<WikiArticle>, index: Map<String, WikiArticle>? = null,
+        sourceContext: SourceSelection? = null): WikiContent {
         val substitutions = mutableListOf<String>()
         val blocks = mutableSetOf<Int>()
         val links = mutableListOf<String>()
@@ -166,7 +175,8 @@ object WikiSurface {
             val resolved = resolve(target, article, articles, wiki, index)
             if (resolved == null) return token(text)
             if (resolved.article != null && resolved.path !in links) links.add(resolved.path)
-            val href = (if (resolved.path == article.path && target.startsWith('#')) "" else url(resolved.path)) +
+            val href = (if (resolved.path == article.path && target.startsWith('#')) "" else url(resolved.path) +
+                (sourceContext?.let { "&" + it.query() } ?: "")) +
                 if (resolved.fragment.isEmpty()) "" else "#" + encode(anchor(resolved.fragment))
             val state = if (resolved.article == null) " class=\"wiki-missing\" title=\"Page not available\"" else ""
             return token("<a href=\"${escape(href)}\"$state>$text</a>")

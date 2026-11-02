@@ -1,0 +1,129 @@
+Camel/EIP integration trace — source e4b1a1d04c70a6c486d8f9646f92d0dd1750d819
+2026-11-02. Read-only source audit; no installs, model downloads, Gradle, runtime
+execution or repository changes. This is a proposal before implementation.
+
+Finding and next slice
+----------------------
+Use the existing content-based router (Camel Choice) for receipt-pinned document
+review dispositions, and make its execution genuinely bounded first. Do not add
+another EIP catalog. The typed router already exists; its current host-library
+execution has no enforceable full-call deadline. A bounded Splitter is useful
+later, but adding its syntax now would multiply work before fixing this seam.
+
+Useful pilot: validate one retained document/curation receipt and source identities
+on the host, pass only bounded metadata and a status into a fixed declared route,
+then let actual Camel Choice return a review-lane header and an unchanged source
+reference. Missing source means needs-source, never false/approved. A mismatched
+CID/revision must refuse before dispatch. The output is an auditable routing
+receipt, not document approval, financial posting, rule admission or an email.
+The current document-routing preset already carries CurationReceipt and has an
+explicit no-firings branch; replace guest-side destination selection with an
+actual typed Camel Choice so the enterprise decision occurs in Camel.
+
+What is actually present
+------------------------
+* CamelCatalog reads EIP/component JSON and service names from mounted jars;
+  vm.camel.catalog is read-only discovery, not an execution registry. The palette
+  comment mentions104 model names; that is not104 implemented typed runners.
+  SubVmLegos.kt:64-112; CamelCatalog.kt:12-99; LcncContracts.kt:1494-1514.
+* The typed Confix route supports To, constant SetBody, constant SetHeader,
+  Choice with exact bodyEquals branches/otherwise, and Stop. Parsing rejects
+  unknown keys and dynamic endpoints; limits128 steps,128 branches, depth8,
+  64KiB aggregate text. It snapshots owned route data before admission/lowering.
+  CamelRoutePlan.kt:6-169; CamelRuntime.kt:195-237,621-647.
+* Native Java/Groovy Camel DSL is real, OWN-trust and explicitly unbounded.
+  Nonzero statement/wall/call budgets are refused for that path. The saved
+  nonprofit flow contains actual split(body()).stopOnException(), enrich,
+  choice and parameterized JDBC/readback. Its documented executed evidence is
+  historical macOS evidence, not a fresh execution on this Linux workspace.
+  SubVmLegos.kt:339-367; resources/lcnc/nonprofit/source-store.json;
+  docs/lcnc/nonprofit-camel-postgres.md.
+* CamelRouteElement already has separate bounded command/publication lanes,
+  admission caps, backpressure, exact handle-token ownership, cancellation-safe
+  admitted effects and drain/retry obligations. CamelRouteLegos binds persistent
+  vm.camel.up/down/routes to that owner and moves blocking work to Dispatchers.IO.
+  The one-shot vm.camel runner is registered directly and calls the reflective
+  CamelRuntime.execute path; it does not acquire that persistent-route owner.
+  CamelRouteElement.kt:33-205; CamelRouteLegos.kt:85-145;
+  SubVmLegos.kt:46-57,368-395.
+* One-shot typed routes build a real DefaultCamelContext, start it, optionally
+  dispatch a direct: request and stop it. ProducerTemplate.request is reflective
+  and synchronous, with no explicit deadline; context/producer stop is attempted
+  synchronously through local try/finally. Body/receipt sizes are not globally bounded by the route
+  text cap. The4096-character cap is only the persistent exchange FACT tap.
+  CamelRuntime.kt:195-237,48-53,687-705.
+
+Important boundaries
+--------------------
+Camel module4.8.5 has a pinned58-jar manifest. Module verification/loading is a
+real separate classloader mount, not a security sandbox. Default LOCAL admits
+memory/clock/control/POSIX/compute schemes, including file/bean/class/language;
+LOCAL is therefore not pure/no-I/O. Mail and JDBC need their mounted departments
+and DEPARTMENT reach. A JDBC DataSource may reach another machine. Native
+processors can perform ordinary Java I/O outside Camel endpoint lookup.
+CamelLinkage.kt:30-150; GuestModules.kt:102-147; CamelRuntime.kt:240-260.
+
+Graal authoring can return bounded inert route data; the Camel library executes
+after that guest closes. A Graal wall clock does not cancel arbitrary Java code
+already executing in Camel or its worker threads. ProcessIsolate provides an
+existing userspace process/protocol lifecycle, but currently has no Camel module
+handoff; its JVM-facet trust intentionally degrades to restricted js in the child.
+Wrapping current CamelRuntime.execute in withTimeout alone would not establish a
+hard execution bound. Do not silently weaken that child trust behavior.
+LcncWorkspacePresets.kt:357-415; GuestBounds.kt:21-28;
+ProcessIsolate.kt:40-76 and child entrypoint455 onward.
+
+No Spring boot/container or Spark engine integration was found in the current
+LCNC/module paths. The only Spring ApplicationContext reference in the inspected
+runtime is a harness assertion that it must NOT leak onto the host classpath.
+Camel's bean/class endpoints do not establish Spring support. Apache Spark would
+be a separate optional analytics engine with its own provisioning and lifecycle;
+it is not Camel EIP control flow and should not be installed to execute Choice.
+DocumentCurationIndexHarness.kt:63-68; utils/subvm module declarations.
+
+PostgREST is an actual projected-Cursor/Couch API, not this Camel PostgreSQL
+DataSource. The daemon supplies RDF_QUAD tables, breadcrumb Cursor and optional
+nars_beliefs to PostgrestWire. CursorTable views have no writes; the surface
+refuses insert/update/delete on those views with405. Couch-backed SQL tables
+have separate write support. No current route registers document-routing receipts
+as a projected table, nor is there a shared transaction across Camel JDBC, Couch
+and CAS. Expose retained routing receipts through an additional read-only Cursor
+projection if needed; do not pretend the catalog is PostgreSQL persistence.
+OroborosDaemon.kt:2670-2681; PostgrestWire.kt:9-38;
+cursor/query/Catalog.kt:18-50; PostgrestSurface.kt:217-258.
+
+Smallest concrete implementation proposal
+----------------------------------------
+1. Keep the typed plan/Choice algebra. Pilot accepts direct: entry and only
+   constant body/header changes, Choice and Stop; no file/bean/class/language,
+   network endpoints, native DSL, redelivery loops or parallel child work.
+2. Put one-shot execution behind the existing bounded CCEK command owner.
+   Reuse userspace process pipes/control and a small explicit OWN Camel worker
+   entrypoint that parses/validates the same Confix plan and invokes the existing
+   CamelRuntime lowering in a child JVM. Do not duplicate the Camel engine or
+   reinterpret a host loop as a Camel EIP. The child must receive only pinned
+   module paths and bounded data; no frontend-selected command/classpath/source.
+3. Bound request bytes, steps, headers, reply bytes, admitted jobs, child heap and
+   full-call wall time. On deadline terminate and join that exact owned child;
+   admitted work and one terminal result must still be accounted for. Successful
+   and failed paths close admission, drain publication and join cleanup before
+   replacing the generation. Process separation bounds lifetime, not host I/O
+   authority: this remains explicitly OWN-trust.
+4. Wire the existing receipt-pinned document preset to actual Choice and retain
+   route definition, source identities, branch/result and completion/refusal in
+   its ordinary LCNC receipt. An optional read-only projected table can consume
+   those receipts later; no new database or generic pattern registry is needed.
+
+First meaningful proof: actual Camel takes both branches with immutable source
+identities preserved; stale/mismatched source refuses before child launch;
+unsupported/oversized/nested plans and non-pilot endpoints refuse; a deliberately
+blocked owned worker hits the finite deadline, exits and is joined; cancelled
+waiters do not discard admitted effects; drain refuses late work and leaks no
+child. Read-only projection rejects writes. A fake Camel interpreter or a timeout
+exception while its real worker keeps running is not a passing proof.
+
+Provisioning blocker for a fresh proof here: utils/subvm/camel currently has its
+manifest but no installed lib jars/classes. GuestModules.isInstalled requires a
+nonempty classpath. No install was attempted. Existing historical native flow
+and parser/lowering source were inspected, not re-executed. Pi and Hermes remain
+separate architectures; their model tool waist is not a Camel execution backend.

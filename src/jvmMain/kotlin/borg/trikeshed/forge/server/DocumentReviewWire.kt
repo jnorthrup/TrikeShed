@@ -48,6 +48,28 @@ class DocumentReviewWire private constructor(
             return value
         }
 
+        internal fun taxonomyRequest(body: String): Map<*, *> {
+            require(body.length <= 65536 && body.encodeToByteArray().size <= 65536) { "Taxonomy request exceeds 64KiB" }
+            var depth = 0
+            var string = false
+            var escaped = false
+            for (c in body) {
+                if (string) {
+                    when {
+                        escaped -> escaped = false
+                        c == '\\' -> escaped = true
+                        c == '"' -> string = false
+                    }
+                } else when (c) {
+                    '"' -> string = true
+                    '{', '[' -> { depth++; require(depth <= 16) { "Taxonomy request nesting limit" } }
+                    '}', ']' -> { depth--; require(depth >= 0) { "Malformed taxonomy request" } }
+                }
+            }
+            require(depth == 0 && !string) { "Malformed taxonomy request" }
+            return request(body)
+        }
+
         private fun fields(value: Map<*, *>, required: Set<String>, optional: Set<String> = emptySet()) {
             require(value.keys.all { it is String && it in required + optional } && required.all { it in value }) {
                 "Unexpected or missing review fields"
@@ -168,7 +190,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment", "/taxonomy-plan"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -186,8 +208,10 @@ class DocumentReviewWire private constructor(
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
-                endpoint.endsWith("/assess") || endpoint.endsWith("/assessment")) && actor == null)
+                endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || endpoint.endsWith("/taxonomy-plan")) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
+        if (endpoint.endsWith("/taxonomy-plan") && method != "POST")
+            return json(mapOf("error" to "method_not_allowed"), 405)
         return try {
             requests.call {
                 when {
@@ -198,10 +222,20 @@ class DocumentReviewWire private constructor(
                     }
                     method == "POST" -> {
                         val body = text.substringAfter("\r\n\r\n", text)
-                        val input = request(body)
+                        val input = if (endpoint.endsWith("/taxonomy-plan")) taxonomyRequest(body) else request(body)
                         fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
+                            endpoint.endsWith("/taxonomy-plan") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision", "goal"))
+                                val goal = input["goal"] as? Map<*, *> ?: error("Taxonomy goal required")
+                                fields(goal, setOf("predicate", "subject", "object"))
+                                fun term(key: String) = goal[key] as? String ?: error("Goal $key must be text")
+                                val report = ReviewedTaxonomyPlan.report(review, ctx.casStore, cid("snapshotCid"), revision(),
+                                    term("predicate"), term("subject"), term("object"))
+                                require(jsonOf(report).encodeToByteArray().size <= 1048576) { "Taxonomy report exceeds 1MiB" }
+                                report
+                            }
                             endpoint.endsWith("/snapshot") -> review.snapshot(input["kind"] as String, cid("receiptCid"),
                                 (input["selection"] as List<*>).map { it as String })
                             endpoint.endsWith("/assess") -> withContext(checkNotNull(actor)) {

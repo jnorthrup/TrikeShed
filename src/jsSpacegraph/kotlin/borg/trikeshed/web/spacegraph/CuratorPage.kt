@@ -59,6 +59,7 @@ object CuratorPage {
     }
 
     private fun install() {
+        mountCuratorSourceContext()?.let { context -> page.own { context.remove() } }
         page.own {
             window.cancelAnimationFrame(animation); window.clearTimeout(pollTimer); window.clearTimeout(gateTimer)
             resizeObserver?.disconnect()
