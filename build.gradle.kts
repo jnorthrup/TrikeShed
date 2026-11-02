@@ -1410,6 +1410,16 @@ kotlin {
 
 allOpen { annotation("org.openjdk.jmh.annotations.State") }
 
+// One benchmark run at a time. org.gradle.parallel=true started jvm and both linuxX64 suites together: each @Setup
+// opens the one fixture file with O_TRUNC, so a suite read back another's truncation (READ completed with 0), and
+// concurrent runs skew each other's timings. Compiles and links stay parallel; only the run tasks share this slot.
+abstract class SerialBenchmarkRuns : org.gradle.api.services.BuildService<org.gradle.api.services.BuildServiceParameters.None>
+val serialBenchmarkRuns = gradle.sharedServices.registerIfAbsent("serialBenchmarkRuns", SerialBenchmarkRuns::class) {
+    maxParallelUsages.set(1)
+}
+val benchmarkRunTask = Regex("^(${benchTargetNames.joinToString("|")})Bench([A-Z][A-Za-z]*)?Benchmark$")
+tasks.configureEach { if (benchmarkRunTask.matches(name)) usesService(serialBenchmarkRuns) }
+
 benchmark {
     configurations {
         named("main") {
