@@ -27,6 +27,25 @@ class PiWorkspaceTest {
             assertEquals("Pi Pi", Files.readString(source))
         } finally { root.toFile().deleteRecursively() }
     }
+    @Test fun sessionsRetainIndependentReadSnapshots() {
+        val root = Files.createTempDirectory("pi-session-source")
+        try {
+            val source = root.resolve("agent.ts")
+            Files.writeString(source, "const title = 'Pi';\n")
+            val grant = PiWorkspace(root, _s["agent.ts"])
+            val a = grant.fork()
+            val b = grant.fork()
+            a.dispatch("read", _m["path" j "agent.ts"])
+            Files.writeString(source, "// changed\nconst title = 'Pi';\n")
+            b.dispatch("read", _m["path" j "agent.ts"])
+            val edit = _m["path" j "agent.ts", "oldText" j "'Pi'", "newText" j "'Graal Pi'"]
+            assertFails { a.dispatch("edit", edit) }
+            assertTrue(b.dispatch("edit", edit).contains("diff"))
+            assertEquals("// changed\nconst title = 'Graal Pi';\n", Files.readString(source))
+            assertFails { a.dispatch("edit", edit) }
+        } finally { root.toFile().deleteRecursively() }
+    }
+
     @Test fun symlinksInvalidUtf8AndOversizeSourcesAreRefused() {
         val root = Files.createTempDirectory("pi-source")
         val outside = Files.createTempDirectory("pi-outside")

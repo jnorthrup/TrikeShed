@@ -49,10 +49,11 @@ object PiPage {
         if (!response.ok) error(strOrEmpty(value?.detail).ifBlank { strOrEmpty(value?.error).ifBlank { "Pi is unavailable" } })
         return value
     }
-    private fun append(label: String, text: String) {
+    private fun append(label: String, text: String, toolResult: String? = null) {
         val out = byId("pi-transcript")
         if (out.textContent == "No messages yet.") out.textContent = ""
         val item = window.document.createElement("section")
+        if (toolResult != null) item.setAttribute("data-pi-tool-result", toolResult)
         val heading = window.document.createElement("strong"); heading.textContent = label
         val body = window.document.createElement("pre"); body.textContent = text
         body.asDynamic().style.cssText = "font:inherit;white-space:pre-wrap;overflow-wrap:anywhere"
@@ -75,7 +76,22 @@ object PiPage {
             }
             val error = strOrEmpty(message?.errorMessage)
             val label = if (role == "toolResult") "Tool · " + strOrEmpty(message?.toolName) + (if (message?.isError == true) " · refused" else " · result") else role
-            if (text.isNotBlank() || error.isNotBlank()) append(label, text + if (error.isBlank()) "" else "\n" + error)
+            val tool = strOrEmpty(message?.toolName)
+            val display = if (role == "toolResult" && message?.isError != true && tool in setOf("read", "edit")) {
+                try {
+                    val payload = JSON.parse<dynamic>(text)
+                    val path = strOrEmpty(payload?.path)
+                    when {
+                        path.isBlank() -> text
+                        tool == "read" && jsTypeOf(payload?.content) == "string" -> path + "\n\n" + str(payload.content)
+                        tool == "edit" && payload?.changed == true && jsTypeOf(payload?.diff) == "string" -> str(payload.diff)
+                        else -> text
+                    }
+                } catch (_: Throwable) { text }
+            } else text
+            if (text.isNotBlank() || error.isNotBlank()) append(label,
+                display + if (error.isBlank()) "" else "\n" + error,
+                if (role == "toolResult") text else null)
         }
     }
     private fun poll(ticket: Int, id: String) {
