@@ -1056,9 +1056,9 @@ object LcncContracts {
             outputKinds = mapOf("moves" to "json", "count" to "num"),
             params = mapOf("constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"))),
         LcncPortContract("constellation.ask", "norms a SUMO class holds in a constellation: stated of it, or of an ancestor deduced down is-a and revised with its own evidence",
-            listOf("class?", "facts?", "negativeFacts?"), listOf("class", "held", "count", "facts", "negativeFacts", "negativeFactsSource", "fires", "pending", "blocked", "conflicted"),
+            listOf("class?", "facts?", "negativeFacts?"), listOf("class", "held", "count", "facts", "factsSource", "withheldLegacyFacts", "negativeFacts", "negativeFactsSource", "fires", "pending", "blocked", "conflicted"),
             inputKinds = mapOf("class" to "text", "facts" to "text", "negativeFacts" to "json"),
-            outputKinds = mapOf("class" to "text", "held" to "json", "count" to "num", "facts" to "json", "negativeFacts" to "json", "negativeFactsSource" to "text", "fires" to "json", "pending" to "json", "blocked" to "json", "conflicted" to "json"),
+            outputKinds = mapOf("class" to "text", "held" to "json", "count" to "num", "facts" to "json", "factsSource" to "text", "withheldLegacyFacts" to "json", "negativeFacts" to "json", "negativeFactsSource" to "text", "fires" to "json", "pending" to "json", "blocked" to "json", "conflicted" to "json"),
             params = mapOf(
                 "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"),
                 "class" to LcncPortContract.LcncParamSpec(ph = "SUMO class or noun, when no cable carries it"),

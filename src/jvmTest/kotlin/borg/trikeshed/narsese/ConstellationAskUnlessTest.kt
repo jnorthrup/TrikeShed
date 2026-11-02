@@ -13,11 +13,11 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.test.*
 
-/** Production node integration with synthetic saved books; no CoreNLP or model calls. */
+/** Production node integration with synthetic saved books; the text-input test uses CoreNLP. */
 class ConstellationAskUnlessTest {
     @TempDir lateinit var directory: Path
 
-    @Test fun missingUnlessWaitsExplicitRefutationFiresAndPositiveBlocks() = runBlocking {
+    @Test fun missingAndLegacyFactsWaitWhileExplicitRefutationFires() = runBlocking {
         val classId = requireNotNull(SumoCorpus.classifier.classId("Human")).value
         val bookDir = directory.resolve("constellations/books")
         Files.createDirectories(bookDir)
@@ -56,15 +56,90 @@ class ConstellationAskUnlessTest {
             val positive = ask("positive")
             assertTrue((positive["fires"] as List<*>).isEmpty())
             assertTrue((positive["held"] as List<*>).isEmpty())
-            assertTrue(premise in (positive["blocked"] as Map<*, *>))
+            assertTrue(premise in (positive["pending"] as Map<*, *>))
+            assertTrue((positive["blocked"] as Map<*, *>).isEmpty())
+            assertTrue((positive["facts"] as List<*>).isEmpty())
+            assertTrue(premise in (positive["withheldLegacyFacts"] as List<*>))
             assertEquals(0, bank.size())
 
-            val conflict = ask("positive", _m["negativeFacts" j _l[premise]])
-            assertTrue((conflict["fires"] as List<*>).isEmpty())
-            assertTrue((conflict["held"] as List<*>).isEmpty())
-            assertTrue(premise in (conflict["conflicted"] as Map<*, *>))
+            val explicitRefutation = ask("positive", _m["negativeFacts" j _l[premise]])
+            assertEquals(1, (explicitRefutation["fires"] as List<*>).size)
+            assertEquals(1, (explicitRefutation["held"] as List<*>).size)
+            assertTrue((explicitRefutation["conflicted"] as Map<*, *>).isEmpty())
+            assertTrue(premise in (explicitRefutation["withheldLegacyFacts"] as List<*>))
             assertEquals(0, bank.size())
             assertFails { ask("unknown", _m["negativeFacts" j premise]) }
+        } finally { nodes.drain() }
+    }
+
+    @Test fun negatedCallerTextDoesNotBecomeAPositivePremise() = runBlocking {
+        val classId = requireNotNull(SumoCorpus.classifier.classId("Human")).value
+        val bookDir = directory.resolve("constellations/books")
+        Files.createDirectories(bookDir)
+        val premise = "rent be due"
+        val statement = _m["bearer" j "tenant", "modality" j "may", "action" j "occupy",
+            "object" j "home", "condition" j "unless $premise", "bearerClass" j classId]
+        val book = _m["name" j "negated", "work" j "synthetic", "date" j "2026",
+            "headings" j _l["fixture"], "statements" j _l[statement], "support" j _l[_l[0]],
+            "facts" j emptyList<String>(), "sections" j _l["urn:sha256:synthetic"]]
+        Files.writeString(bookDir.resolve("negated.json"), jsonOf(book))
+        Files.writeString(directory.resolve("constellations/negated.members"), "negated\n")
+        val bank = KifKnowledgeBase()
+        val nodes = ConstellationNodes(directory.toFile(), ConfixBlackboard.empty(), bank = bank, scope = this)
+        val runners = mutableMapOf<String, LcncNodeRunner>()
+        nodes.register(runners)
+        try {
+            // This exercises the real CoreNLP → applicabilityFacts → constellation.ask path.
+            val result = runners.getValue(ConstellationNodes.ASK).run(
+                LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "negated", "class" j "Human"]),
+                _m["facts" j "Rent is not due."])
+            assertTrue((result["facts"] as List<*>).isEmpty())
+            assertTrue((result["fires"] as List<*>).isEmpty())
+            assertTrue((result["held"] as List<*>).isEmpty())
+            assertTrue(premise in (result["pending"] as Map<*, *>))
+            assertTrue((result["blocked"] as Map<*, *>).isEmpty())
+            assertEquals(0, bank.size())
+
+            val positive = runners.getValue(ConstellationNodes.ASK).run(
+                LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "negated", "class" j "Human"]),
+                _m["facts" j "Rent is due."])
+            assertTrue(premise in (positive["facts"] as List<*>))
+            assertTrue(premise in (positive["blocked"] as Map<*, *>))
+            assertTrue((positive["fires"] as List<*>).isEmpty())
+            assertTrue((positive["held"] as List<*>).isEmpty())
+            assertEquals(0, bank.size())
+        } finally { nodes.drain() }
+    }
+
+    @Test fun unconditionalNormRemainsHeldWhileUnlessNormIsPending() = runBlocking {
+        val classId = requireNotNull(SumoCorpus.classifier.classId("Human")).value
+        val bookDir = directory.resolve("constellations/books")
+        Files.createDirectories(bookDir)
+        val premise = "rent be due"
+        val unconditional = _m["bearer" j "tenant", "modality" j "may", "action" j "occupy",
+            "object" j "home", "bearerClass" j classId]
+        val conditional = unconditional + _m["condition" j "unless $premise"]
+        val book = _m["name" j "mixed", "work" j "synthetic", "date" j "2026",
+            "headings" j _l["one", "two"], "statements" j _l[unconditional, conditional],
+            "support" j _l[_l[0], _l[1]], "facts" j emptyList<String>(),
+            "sections" j _l["urn:sha256:one", "urn:sha256:two"]]
+        Files.writeString(bookDir.resolve("mixed.json"), jsonOf(book))
+        Files.writeString(directory.resolve("constellations/mixed.members"), "mixed\n")
+        val nodes = ConstellationNodes(directory.toFile(), ConfixBlackboard.empty(), scope = this)
+        val runners = mutableMapOf<String, LcncNodeRunner>()
+        nodes.register(runners)
+        try {
+            val result = runners.getValue(ConstellationNodes.ASK).run(
+                LcncNode("ask", ConstellationNodes.ASK, params = _m["constellation" j "mixed", "class" j "Human"]),
+                emptyMap())
+            val fires = result["fires"] as List<*>
+            val held = result["held"] as List<*>
+            val pending = (result["pending"] as Map<*, *>)[premise] as List<*>
+            assertEquals(1, fires.size)
+            assertEquals(1, held.size)
+            assertEquals(1, pending.size)
+            assertEquals(fires.toSet(), ((held.single() as Map<*, *>)["norms"] as List<*>).toSet())
+            assertTrue(fires.none { it in pending })
         } finally { nodes.drain() }
     }
 }

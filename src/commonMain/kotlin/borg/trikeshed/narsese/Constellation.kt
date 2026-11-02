@@ -271,7 +271,9 @@ class Constellation(val name: String) {
      * memory of the [facts] that hold and explicitly supplied [negativeFacts]. Absence from [facts]
      * does not establish a negative fact. Conflicting signs never fire a conditioned statement.
      */
-    fun fire(mask: RoaringSeries, facts: Set<String>, negativeFacts: Set<String> = emptySet()): Fired {
+    fun fire(mask: RoaringSeries, facts: Set<String>): Fired = fire(mask, facts, emptySet())
+
+    fun fire(mask: RoaringSeries, facts: Set<String>, negativeFacts: Set<String>): Fired {
         val alpha = applicable(mask)
         var fires = alpha and unconditioned
         val pending = LinkedHashMap<String, RoaringSeries>()
@@ -370,26 +372,59 @@ class Constellation(val name: String) {
      * nearest ancestor's row (highest preorder id first), pooled with the further ones that agree. [via] is the class
      * whose row the reading starts from.
      */
-    fun held(cls: Int, lineage: RoaringSeries): List<Held> {
+    fun held(cls: Int, lineage: RoaringSeries): List<Held> =
+        heldFrom(cls, lineage, bearing, predications, predicationStatements)
+
+    /**
+     * Read only evidence belonging to [eligible] statement ids. Filtering a previously pooled
+     * [Held] row is insufficient: its evidence could already include excluded statements.
+     * Eligibility is supplied by the caller; this does not authorize or verify a legal conclusion.
+     */
+    fun heldEligible(cls: Int, lineage: RoaringSeries, eligible: RoaringSeries): List<Held> {
+        val filtered = EvidenceLedger()
+        val byClass = HashMap<Int, IntAccumulator>()
+        val byPredication = HashMap<Long, IntAccumulator>()
+        for ((b, book) in books.withIndex()) for ((i, s) in book.statements.withIndex()) {
+            val id = ids[s.key] ?: continue
+            val c = s.bearerClass
+            // Statement identity omits SUMO typing. Do not let an occurrence whose class differs
+            // from the class used by the eligible global statement lend it a different scope.
+            if (!eligible.contains(id) || c < 0 || statements[id].bearerClass != c ||
+                (c != cls && !lineage.contains(c)) || book.support[i].isEmpty()) continue
+            val p = predicationIds.getValue(s.predication)
+            val key = packInts(c, p)
+            byClass.getOrPut(c) { IntAccumulator(4) }.add(id)
+            byPredication.getOrPut(key) { IntAccumulator(2) }.add(id)
+            for (k in book.support[i]) {
+                val w = book.weight(i, k)
+                val sign = if (s.modality == Modality.MUST_NOT) EvidenceCoord(0, w) else EvidenceCoord(w, 0)
+                filtered.observe(key, source((b shl 20) or k), sign)
+            }
+        }
+        return heldFrom(cls, lineage, byClass.mapValues { it.value.toRoaring() }, filtered, byPredication)
+    }
+
+    private fun heldFrom(cls: Int, lineage: RoaringSeries, classes: Map<Int, RoaringSeries>,
+                         ledger: EvidenceLedger, rows: Map<Long, IntAccumulator>): List<Held> {
         // predication → the classes above [cls] that state it, each once.
         val above = HashMap<Int, IntAccumulator>()
         lineage.forEach { a ->
             if (a == cls) return@forEach
-            val stated = bearing[a] ?: return@forEach
+            val stated = classes[a] ?: return@forEach
             val seen = HashSet<Int>()
             stated.forEach { id -> val p = predicationIds.getValue(statements[id].predication); if (seen.add(p)) above.getOrPut(p) { IntAccumulator(2) }.add(a) }
         }
-        bearing[cls]?.forEach { id -> above.getOrPut(predicationIds.getValue(statements[id].predication)) { IntAccumulator(2) } }
+        classes[cls]?.forEach { id -> above.getOrPut(predicationIds.getValue(statements[id].predication)) { IntAccumulator(2) } }
         val out = ArrayList<Held>(above.size)
         for ((p, acc) in above) {
             val ancestors = acc.toIntArray(); ancestors.sortDescending()
-            val slots = IntArray(ancestors.size) { predications.slot(packInts(ancestors[it], p)) }
-            val directSlot = predications.slot(packInts(cls, p))
-            val direct = if (directSlot < 0) null else predications.evidence(directSlot)
-            val read = Inheritance.read(direct, if (directSlot < 0) null else predications.basis(directSlot),
-                LongArray(slots.size) { predications.evidence(slots[it]).packed }, slots.map { predications.basis(it) }) ?: continue
+            val slots = IntArray(ancestors.size) { ledger.slot(packInts(ancestors[it], p)) }
+            val directSlot = ledger.slot(packInts(cls, p))
+            val direct = if (directSlot < 0) null else ledger.evidence(directSlot)
+            val read = Inheritance.read(direct, if (directSlot < 0) null else ledger.basis(directSlot),
+                LongArray(slots.size) { ledger.evidence(slots[it]).packed }, slots.map { ledger.basis(it) }) ?: continue
             val via = if (direct != null) cls else ancestors[read.from[0]]
-            fun idsOf(c: Int) = predicationStatements[packInts(c, p)]?.toIntArray() ?: IntArray(0)
+            fun idsOf(c: Int) = rows[packInts(c, p)]?.toIntArray()?.distinct()?.toIntArray() ?: IntArray(0)
             val ids = if (read.from.isEmpty()) idsOf(cls) else {
                 val all = IntAccumulator(4)
                 if (direct != null) idsOf(cls).forEach(all::add)

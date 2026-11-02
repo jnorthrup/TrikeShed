@@ -342,10 +342,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val id = sumo.classId(cls)?.value ?: SumoCorpus.nounClassId(cls.lowercase()).takeIf { it >= 0 }
             ?: error("constellation.ask: '$cls' is neither a SUMO class nor a mapped noun")
         val c = constellation(name)
-        val held = c.held(id, SumoCorpus.closure(id)).sortedByDescending { Nal.truthOf(it.belief).confidence }
         // The join: facts read by the same parser as the norms, in premise form.
         val factText = ((inputs["facts"] ?: inputs["facts?"])?.toString() ?: node.params["facts"]).orEmpty()
-        val facts = if (factText.isBlank()) emptySet() else NormClauses.facts(CoreNlpRuntime().use { it.analyze(factText) })
+        val facts = if (factText.isBlank()) emptySet() else NormClauses.applicabilityFacts(CoreNlpRuntime().use { it.analyze(factText) })
         val negativeInput = inputs["negativeFacts"] ?: inputs["negativeFacts?"]
         val negativeFacts = if (negativeInput == null) emptySet() else {
             val values = negativeInput as? List<*> ?: error("constellation.ask: negativeFacts must be an array of exact premise strings")
@@ -354,11 +353,13 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             }
             values.map { it as String }.toSet()
         }
-        val fired = c.fire(SumoCorpus.closure(id), c.facts + facts, negativeFacts)
+        // Legacy book facts have no provenance or polarity guarantees and cannot establish applicability.
+        val fired = c.fire(SumoCorpus.closure(id), facts, negativeFacts)
+        val held = c.heldEligible(id, SumoCorpus.closure(id), fired.fires).sortedByDescending { Nal.truthOf(it.belief).confidence }
         fun addresses(ids: RoaringSeries) = ids.toIntArray().map { "constellation/$name/norm/${c.statements[it].id}" }
         fun q(s: String) = "\"" + s.replace("\"", "\\\"") + "\""
         val className = sumo.className(SumoClassId(id))
-        val rows = held.filter { h -> h.statements.isNotEmpty() && h.statements.all { fired.fires.contains(it) } }.map { h ->
+        val rows = held.map { h ->
             val t = Nal.truthOf(h.belief)
             val via = sumo.className(SumoClassId(h.via))
             if (h.statements.all { c.statements[it].premise == null })
@@ -370,6 +371,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 "norms" to h.statements.map { "constellation/$name/norm/${c.statements[it].id}" })
         }
         mapOf("class" to className, "held" to rows, "count" to rows.size, "facts" to facts.toList(),
+            "factsSource" to "caller-text-heuristic-unverified", "withheldLegacyFacts" to c.facts.toList(),
             "negativeFacts" to negativeFacts.toList(), "negativeFactsSource" to "caller-provided-unverified",
             "fires" to addresses(fired.fires), "pending" to fired.pending.mapValues { addresses(it.value) },
             "blocked" to fired.blocked.mapValues { addresses(it.value) }, "conflicted" to fired.conflicted.mapValues { addresses(it.value) })
@@ -1571,7 +1573,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             ?: (SumoCorpus.nounSense(l, nouns, believed).takeIf { it >= 0 } ?: SumoCorpus.nounSense(l.removeSuffix("s"), nouns, believed)).takeIf { it >= 0 } }
             .distinct()
         val mask = classes.fold(RoaringSeries.EMPTY) { acc, id -> acc or SumoCorpus.closure(id) }
-        val stated = NormClauses.facts(doc)
+        val stated = NormClauses.applicabilityFacts(doc)
         // Passages: windows of whole sentences over every member section; the open page's best windows first,
         // then the windows richest in the question's rarer lemmas.
         val all = c.books.flatMapIndexed { b, bk -> texts(bk.name).flatMapIndexed { s, t -> windows(t).map { Triple(b, s, it) } } }
@@ -1615,12 +1617,15 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val ranked = passages.entries.sortedByDescending { (p[it.key] as? Number)?.toDouble() ?: 0.0 }
             .map { (id, v) -> v + mapOf("id" to id, "p" to ((p[id] as? Number)?.toDouble() ?: 0.0)) }
         val established = premises.filterIndexed { i, _ -> Jev.noulOf(answers, "premise_$i") >= HOLDS }
-        val fired = c.fire(mask, c.facts + stated + established)
+        // Neither legacy stored facts nor model suggestions are verified applicability evidence.
+        val fired = c.fire(mask, stated)
         return mapOf(
             "question" to ask, "constellation" to name, "model" to reply["model"], "usage" to reply["usage"], "asked" to reply["asked"],
             "exists" to Jev.noulOf(answers, "exists"), "choice" to where?.get("choice"), "confidence" to where?.get("confidence"),
             "passages" to ranked.take(RANKED),
-            "classes" to classes.map { sumo.className(SumoClassId(it)) }, "facts" to (stated + established).toList(),
+            "classes" to classes.map { sumo.className(SumoClassId(it)) }, "facts" to stated.toList(),
+            "factsSource" to "caller-text-heuristic-unverified", "withheldLegacyFacts" to c.facts.toList(),
+            "modelSuggestedFacts" to established,
             "norms" to norms.mapIndexed { i, id -> normEntry(c, id) + mapOf("sentence" to c.statements[id].sentence, "bears" to Jev.noulOf(answers, "bears_${nid(i)}")) }
                 .sortedByDescending { it["bears"] as Double },
             "premises" to premises.mapIndexed { i, pr -> mapOf("premise" to pr, "question" to question(pr), "holds" to Jev.noulOf(answers, "premise_$i")) },
