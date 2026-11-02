@@ -104,7 +104,7 @@ object SurfaceNodes {
             command["type"] = verb
             if (command["idempotencyKey"]?.toString().isNullOrBlank()) {
                 command.remove("idempotencyKey")
-                val canonical = command.entries.sortedBy { it.key }.toMap()
+                val canonical = command.entries.sortedBy { it.key }.associateBy({ it.key }, { it.value })
                 command["idempotencyKey"] = "lcnc:${node.id}:${ContentId.of(jsonOf(canonical).encodeToByteArray()).hex}"
             }
             val results = invokeResults(service.value, node.type, listOf(command))

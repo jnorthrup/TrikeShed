@@ -4,6 +4,7 @@ package borg.trikeshed.userspace.nio.channels.spi
 
 import borg.trikeshed.context.Synchronization
 import borg.trikeshed.context.synchronize
+import borg.trikeshed.lib.j
 import borg.trikeshed.userspace.Winsock
 import borg.trikeshed.userspace.reactor.Interest
 import kotlinx.cinterop.*
@@ -15,6 +16,7 @@ import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import platform.posix.*
+import platform.windows.htonl
 import kotlin.concurrent.AtomicInt
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.time.Duration
@@ -77,11 +79,9 @@ class WsaPollReactorOperations(val synchronization: Synchronization = Synchroniz
 
     /** One WSAPoll over the wake socket and every registered descriptor, up to [timeout]; the ready ones. */
     fun collect(timeout: Duration): List<ReactorSignal> = memScoped {
-        val fds: IntArray
-        val pfds: CArrayPointer<WSAPOLLFD>
-        synchronize(lock) {
-            fds = fdInterest.keys.toIntArray()
-            pfds = allocArray(fds.size + 1)
+        val (fds, pfds) = synchronize(lock) {
+            val fds = fdInterest.keys.toIntArray()
+            val pfds = allocArray<WSAPOLLFD>(fds.size + 1)
             pfds[0].fd = wakeFd.toULong(); pfds[0].events = POLLRDNORM.convert(); pfds[0].revents = 0
             for (i in fds.indices) {
                 pfds[i + 1].fd = fds[i].toULong()
@@ -89,6 +89,7 @@ class WsaPollReactorOperations(val synchronization: Synchronization = Synchroniz
                 pfds[i + 1].revents = 0
             }
             waiting.value = 1
+            fds j pfds
         }
         val millis = if (timeout.isInfinite()) -1 else timeout.inWholeMilliseconds.coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         val n = WSAPoll(pfds, (fds.size + 1).convert(), millis)
