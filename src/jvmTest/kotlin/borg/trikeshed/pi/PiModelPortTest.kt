@@ -7,6 +7,8 @@ import borg.trikeshed.htx.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.vm.Teleported
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,7 +28,7 @@ class PiModelPortTest {
             }
         })
         val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
-            model("fixture", caps = _s["chat", "tools"], wireModel = "wire-fixture", baseUrl = "https://fixture.invalid/v1")
+            model("fixture", provider = "fixture", caps = _s["chat", "tools"], wireModel = "wire-fixture", baseUrl = "https://fixture.invalid/v1")
         }
         val breadcrumbs = BreadcrumbElement()
         breadcrumbs.transact("pi-host") { it.put(BreadcrumbId("proof"), "fixture", "host evidence") }
@@ -35,7 +37,8 @@ class PiModelPortTest {
         try {
             PiModelPort("fixture", generation, htx + breadcrumbs) { mux }.use { port ->
                 assertTrue(port.guest.restrictedJsLeaseCapable)
-                val result = port.prompt("Recall proof and answer")
+                // Yield this generation owner's event loop while the synchronous child call waits.
+                val result = withContext(Dispatchers.IO) { port.prompt("Recall proof and answer") }
                 val transcript = result.canonical()
                 assertTrue(transcript.contains("answer from retained evidence"), transcript)
                 assertTrue(transcript.contains("host evidence"), transcript)
@@ -69,7 +72,7 @@ class PiModelPortTest {
         val generation = BreadcrumbGeneration(this, "pi-airgap")
         try {
             PiModelPort("fixture", generation, breadcrumbs).use { port ->
-                val result = port.prompt("air-gapped probe").canonical()
+                val result = withContext(Dispatchers.IO) { port.prompt("air-gapped probe") }.canonical()
                 assertTrue(result.contains("no-mux"), result)
                 assertTrue(result.contains("\"stopReason\":\"error\""), result)
                 assertFalse(result.contains("\"error\":"), result)

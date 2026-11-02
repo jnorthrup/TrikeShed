@@ -37,12 +37,6 @@ class ProcessIsolateTest {
                 "polyglot=${cp.contains("polyglot")}, pathingJar=${cp.endsWith(".jar") && !cp.contains(java.io.File.pathSeparator)}"
         }
 
-    private fun subVmChildren(): List<ProcessHandle> = ProcessHandle.current().children().filter { h ->
-        val info = h.info()
-        val cmd = info.commandLine().orElse("") + " " + info.arguments().map { it.joinToString(" ") }.orElse("")
-        cmd.contains("SubVmMain") || cmd.isBlank()
-    }.toList()
-
     private fun spawnJs(budget: Budget = Budget(), replyTimeoutMillis: Long = 30_000) =
         ProcessIsolate("p-${System.nanoTime()}", VmFacet.GRAAL_JS, budget, replyTimeoutMillis = replyTimeoutMillis)
 
@@ -442,17 +436,20 @@ class ProcessIsolateTest {
     }
 
     @Test fun interruptDestroysAHungChild() {
-        val before = subVmChildren().size
         val iso = spawnJs(Budget(statements = 0, wallMillis = 0), replyTimeoutMillis = 8_000)
+        var caller: Thread? = null
         try {
             assertEquals(Num(1), iso.eval("1"))
-            assertTrue(subVmChildren().size >= before + 1, "child JVM visible as a direct child process")
+            val child = ProcessHandle.of(iso.processId).orElseThrow()
+            assertTrue(child.isAlive, "the isolate's exact child process is alive")
+            assertEquals(ProcessHandle.current().pid(), child.parent().orElseThrow().pid(), "isolate child belongs to this JVM")
             val outcome = AtomicReference<Throwable?>()
             val entered = CountDownLatch(1)
             val t = Thread({
                 entered.countDown()
                 try { iso.eval("while(true){}") } catch (e: Throwable) { outcome.set(e) }
             }, "hung-guest").apply { isDaemon = true }
+            caller = t
             t.start(); entered.await()
             Thread.sleep(500)
             val t0 = System.nanoTime()
@@ -461,28 +458,37 @@ class ProcessIsolateTest {
             assertTrue(ms < 6_500, "interrupt() returned after ${ms}ms")
             assertFalse(iso.isAlive, "hung child must be destroyed")
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            while (subVmChildren().size > before && System.nanoTime() < deadline) Thread.sleep(50)
-            assertEquals(before, subVmChildren().size, "child process gone after destroyForcibly")
+            while (child.isAlive && System.nanoTime() < deadline) Thread.sleep(50)
+            assertFalse(child.isAlive, "the isolate's exact child process is gone after interrupt")
             t.join(20_000)
             assertFalse(t.isAlive, "eval thread released after the child died")
             val e = outcome.get()
             assertIs<GuestException>(e, "hung eval ended with $e")
             assertTrue(e.kind == GuestFailure.DEAD || e.kind == GuestFailure.INTERRUPTED, e.message)
-        } finally { iso.close() }
+        } finally {
+            if (caller?.isAlive == true) runCatching { iso.interrupt() }
+            caller?.join(20_000)
+            iso.close()
+        }
     }
 
     @Test fun closeTerminatesTheChildProcess() {
-        val before = subVmChildren().size
         val iso = spawnJs()
-        assertEquals(Num(4), iso.eval("2+2"))
-        assertTrue(subVmChildren().size >= before + 1)
-        iso.close()
-        assertFalse(iso.isAlive)
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        while (subVmChildren().size > before && System.nanoTime() < deadline) Thread.sleep(50)
-        assertEquals(before, subVmChildren().size, "child process gone after close()")
-        val e = assertFailsWith<GuestException> { iso.eval("1") }
-        assertEquals(GuestFailure.DEAD, e.kind)
+        var closed = false
+        try {
+            assertEquals(Num(4), iso.eval("2+2"))
+            val child = ProcessHandle.of(iso.processId).orElseThrow()
+            assertTrue(child.isAlive, "the isolate's exact child process is alive")
+            assertEquals(ProcessHandle.current().pid(), child.parent().orElseThrow().pid(), "isolate child belongs to this JVM")
+            iso.close()
+            closed = true
+            assertFalse(iso.isAlive)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (child.isAlive && System.nanoTime() < deadline) Thread.sleep(50)
+            assertFalse(child.isAlive, "the isolate's exact child process is gone after close()")
+            val e = assertFailsWith<GuestException> { iso.eval("1") }
+            assertEquals(GuestFailure.DEAD, e.kind)
+        } finally { if (!closed) iso.close() }
     }
 
     @Test fun closePreservesAnAdmittedHostCallBeyondTheFormerKillGrace() {
