@@ -253,12 +253,23 @@ class HermesPenDelegatesTest {
                     }
                     structured = json.loads(host.call('mux_completion', 'fixture', json.dumps(request), 1500, 'hermes-session'))
                     assert structured['verdict'] == 'ok', structured
-                    text = json.loads(host.call('mux_converse', 'fixture', 'hello'))
                     (structured['verdict'], structured['completion']['choices'][0]['message']['tool_calls'][0]['id'],
-                     structured['completion']['choices'][0]['finish_reason'], text['response'], text['usage']['prompt_tokens'])
+                     structured['completion']['choices'][0]['finish_reason'])
                 """.trimIndent(), "pen-tool-conversation.py") as Teleported.Arr
-                assertEquals(listOf(Teleported.Str("ok"), Teleported.Str("call-2"), Teleported.Str("tool_calls"),
-                    Teleported.Str("answer"), Teleported.Num(4)), out.v)
+                assertEquals(_l[Teleported.Str("ok"), Teleported.Str("call-2"), Teleported.Str("tool_calls")], out.v)
+                // Inspect this submission before converse correctly replaces the same session's latest input.
+                val submitted = BreadcrumbModelHost(mux, breadcrumbs).handle(parseHtxRequest(
+                    "http://localhost/v1/breadcrumbs?context=hermes-session&view=submitted", method = HtxMethod.GET))!!
+                assertEquals(200, submitted.status)
+                val snapshot = confixDoc(submitted.body.toArray().decodeToString())
+                assertEquals(true, snapshot.value("exact"))
+                assertEquals("call-1", snapshot.value("messages", 0, "tool_call_id"))
+                assertEquals(confixDoc(sent.single()).value("messages", 1, "content"), snapshot.value("messages", 0, "content"))
+                val text = g.eval("""
+                    text = json.loads(host.call('mux_converse', 'fixture', 'hello'))
+                    (text['response'], text['usage']['prompt_tokens'])
+                """.trimIndent(), "pen-text-conversation.py") as Teleported.Arr
+                assertEquals(_l[Teleported.Str("answer"), Teleported.Num(4)], text.v)
             }
             assertEquals(2, sent.size)
             val request = confixDoc(sent.first())
@@ -267,13 +278,7 @@ class HermesPenDelegatesTest {
             assertEquals("lookup", request.value("tools", 0, "function", "name"))
             assertEquals(null, request.getAt("tools", 1), "Observation must not advertise a tool Hermes cannot execute")
             assertEquals(null, request.getAt("breadcrumb_context"))
-            val submitted = BreadcrumbModelHost(mux, breadcrumbs).handle(parseHtxRequest(
-                "http://localhost/v1/breadcrumbs?context=hermes-session&view=submitted", method = HtxMethod.GET))!!
-            assertEquals(200, submitted.status)
-            val snapshot = confixDoc(submitted.body.toArray().decodeToString())
-            assertEquals(true, snapshot.value("exact"))
-            assertEquals("call-1", snapshot.value("messages", 0, "tool_call_id"))
-            assertEquals(request.value("messages", 1, "content"), snapshot.value("messages", 0, "content"))
+            assertEquals("hello", confixDoc(sent.last()).value("messages", 0, "content"))
             assertEquals(true, (blackboard.get("hermes/python/pen/mux_completion/1") as Map<*, *>)["ok"])
         } finally { htx.close() }
     }
