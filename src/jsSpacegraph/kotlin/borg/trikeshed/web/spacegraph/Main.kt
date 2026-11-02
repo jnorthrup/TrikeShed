@@ -239,6 +239,8 @@ private fun wire(p: Panels) {
     p.page.on(byId("fdBtn"), "click", { p.launchJs { p.layout.settle(p.layoutOwner) } })
     byId("runBtn").title = "Run this authored program once in the daemon and inspect its durable receipt"
     p.page.on(byId("runBtn"), "click", { p.admitProgram() })
+    p.installVisualQuery()
+    p.installVisualSqlQuery()
     val debug = document.createElement("button").asDynamic()
     debug.id = "debugBtn"; debug.textContent = "Debug nodes"
     debug.title = "Run once in the daemon; step nodes and rings, or enter in-process JS/Python/Ruby source. Pauses count toward timeouts."

@@ -128,7 +128,7 @@ object LcncContracts {
     /** Full vocabulary — ONE author for node types, ports, titles, param defaults.
      *  inputKinds/outputKinds drive the mating filter; omit a kind and the type
      *  is invisible to drag-to-empty-space. */
-    fun all(): List<LcncPortContract> = SqlGraph.contracts() + HeadhunterWorkflow.contracts() + listOf(
+    fun all(): List<LcncPortContract> = SqlGraph.contracts() + SparqlGraph.contracts() + HeadhunterWorkflow.contracts() + listOf(
         // ── §4: concentric scope — the call, the binding, the return ──
         // A scope's REAL ports are declared by its child (`scope.in`/`scope.out`
         // names); the generic args?/returns pair is the declared wire spelling —
@@ -985,25 +985,25 @@ object LcncContracts {
                 "mode" to LcncPortContract.LcncParamSpec(v = "top", opts = listOf("top", "sample", "near")),
                 "k" to LcncPortContract.LcncParamSpec(v = "16"),
             )),
-        LcncPortContract("nl.rules", "describe it: text → NAL evidence → SUMO class rules → answers",
-            listOf("text?", "ask?"), listOf("rules", "answers", "unparsed"),
+        LcncPortContract("nl.rules", "describe it: unreviewed parser candidates; class answers deferred",
+            listOf("text?", "ask?"), listOf("candidates", "rules", "answers", "answerStatus", "coverage", "unparsed"),
             inputKinds = mapOf("text" to "text", "ask" to "text"),
-            outputKinds = mapOf("rules" to "json", "answers" to "json", "unparsed" to "json"),
+            outputKinds = mapOf("candidates" to "json", "rules" to "json", "answers" to "json", "answerStatus" to "text", "coverage" to "text", "unparsed" to "json"),
             params = mapOf(
                 "text" to LcncPortContract.LcncParamSpec(ta = true, ph = "Mammals cause allergies."),
                 "ask" to LcncPortContract.LcncParamSpec(ph = "SUMO classes, e.g. DomesticDog Lion"),
-                "promote" to LcncPortContract.LcncParamSpec(v = "0.7"),
+                "promote" to LcncPortContract.LcncParamSpec(v = "0.7", ph = "legacy CLI only; ignored by candidate mode"),
             ), isEffect = true),
-        LcncPortContract("norm.clauses", "text → sections → normative clauses → NAL beliefs by section",
-            listOf("text"), listOf("beliefs", "rules", "clauses", "sections"),
+        LcncPortContract("norm.clauses", "text → unreviewed clause readings; publication deferred",
+            listOf("text"), listOf("candidates", "beliefs", "rules", "clauses", "sections", "coverage", "publicationStatus"),
             inputKinds = mapOf("text" to "text"),
-            outputKinds = mapOf("beliefs" to "json", "rules" to "json", "clauses" to "num", "sections" to "num"),
+            outputKinds = mapOf("candidates" to "json", "beliefs" to "json", "rules" to "json", "clauses" to "num", "sections" to "num", "coverage" to "text", "publicationStatus" to "text"),
             params = mapOf(
                 "generic" to LcncPortContract.LcncParamSpec(ph = "subjects whose present tense states a rule"),
-                "promote" to LcncPortContract.LcncParamSpec(v = "0.6"),
+                "promote" to LcncPortContract.LcncParamSpec(v = "0.6", ph = "legacy CLI only; ignored by candidate mode"),
             ), isEffect = true),
         LcncPortContract("book.curate", "text → the sections its own heading shape evidences → statements (every asserted clause: modal norms and OpenIE relations, coreference resolved) with section support, frozen as a book",
-            listOf("text", "doc?", "conventions?", "notes?", "source?", "ontologyCid?"), listOf("book", "sections", "clauses", "statements", "senses", "shape", "conformance", "curationReceiptCid", "ontologyCid", "ontologyVersion", "relationships"),
+            listOf("text?", "doc?", "conventions?", "notes?", "source?", "ontologyCid?"), listOf("book", "sections", "clauses", "statements", "senses", "shape", "conformance", "curationReceiptCid", "ontologyCid", "ontologyVersion", "relationships"),
             inputKinds = mapOf("text" to "text", "doc" to borg.trikeshed.lcnc.ProjectDoc.KIND, "conventions" to "json", "notes" to "text", "source" to "DocumentSource", "ontologyCid" to "id"),
             outputKinds = mapOf("book" to "text", "sections" to "num", "clauses" to "num", "statements" to "num", "senses" to "json", "shape" to "json", "conformance" to "json", "curationReceiptCid" to "id", "ontologyCid" to "id", "ontologyVersion" to "text", "relationships" to "ProposedRelationships"),
             params = mapOf(
@@ -1125,7 +1125,7 @@ object LcncContracts {
             )),
 
         // ── Rule admission: eternal law into the LIVE rete ────────────
-        LcncPortContract("nal.rule.admit", "admit eternal rules (live rete)",
+        LcncPortContract("nal.rule.admit", "admit reviewed eternal rules (live rete; host policy)",
             listOf("rules?", "releaseCid?"), listOf("admitted", "ruleCids", "rejected"),
             inputKinds = mapOf("rules" to "json", "releaseCid" to "id"),
             outputKinds = mapOf("admitted" to "json", "ruleCids" to "json", "rejected" to "num"),
@@ -1135,10 +1135,10 @@ object LcncContracts {
                 "copula" to LcncPortContract.LcncParamSpec(v = "==>", opts = listOf("==>", "<=>")),
                 "discount" to LcncPortContract.LcncParamSpec(v = "1.0"),
             ), isEffect = true),
-        LcncPortContract("nal.rules.fromKg", "kg → eternal rules (bridge + admit)",
-            listOf("kgText?"), listOf("rules", "admitted", "rejectedTemporal"),
+        LcncPortContract("nal.rules.fromKg", "kg → unreviewed rule candidates (admission deferred)",
+            listOf("kgText?"), listOf("rules", "admitted", "admissionStatus", "rejectedTemporal", "rejectedNonEternal"),
             inputKinds = mapOf("kgText" to "text"),
-            outputKinds = mapOf("rules" to "json", "admitted" to "json", "rejectedTemporal" to "json"),
+            outputKinds = mapOf("rules" to "json", "admitted" to "json", "admissionStatus" to "text", "rejectedTemporal" to "json", "rejectedNonEternal" to "json"),
             params = mapOf(
                 "kgText" to LcncPortContract.LcncParamSpec(ta = true, ph = "(=> fire smoke)\nex:a ex:causes ex:b ."),
                 "confidence" to LcncPortContract.LcncParamSpec(v = "0.9"),
@@ -1589,7 +1589,7 @@ object LcncContracts {
                 "contextId" to LcncPortContract.LcncParamSpec(ph = "council/<caseId>/<panel>/<seat> spend receipt"),
                 "caseId" to LcncPortContract.LcncParamSpec(ph = "convened case id"),
             ), isEffect = true),
-        LcncPortContract("nars.seat", "NARS seat (curated belief review, no model call)",
+        LcncPortContract("nars.seat", "NARS seat (unverified nearby context; asks for review)",
             listOf("charge", "choices"), listOf("content", "labeled", "model", "record"),
             cardinality = mapOf("choices" to LcncCardinality.MANY),
             inputKinds = mapOf("charge" to "text", "choices" to "json"),
@@ -1600,7 +1600,7 @@ object LcncContracts {
                 "taxonomy" to LcncPortContract.LcncParamSpec(ph = "belief taxonomy"),
                 "k" to LcncPortContract.LcncParamSpec(v = "8"),
                 "maxDistance" to LcncPortContract.LcncParamSpec(v = "16"),
-                "minEvidence" to LcncPortContract.LcncParamSpec(v = "1"),
+                "minEvidence" to LcncPortContract.LcncParamSpec(v = "1", ph = "legacy setting; no effect until reviewed proposition bindings exist"),
                 "panel" to LcncPortContract.LcncParamSpec(v = "council"),
                 "seat" to LcncPortContract.LcncParamSpec(ph = "seat name"),
                 "role" to LcncPortContract.LcncParamSpec(v = "review"),

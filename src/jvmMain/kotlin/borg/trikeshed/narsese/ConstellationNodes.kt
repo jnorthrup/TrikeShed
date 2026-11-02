@@ -9,6 +9,7 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
 import borg.trikeshed.kif.KifKnowledgeBase
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.CanonicalCbor
 import borg.trikeshed.lcnc.CurationReviewCandidate
@@ -45,7 +46,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                          private val owner: ConstellationNodes? = null,
                          private val modelIdentity: String? = null,
                          namespace: String? = null,
-                         private val cas: CasStore? = null) {
+                         private val cas: CasStore? = null,
+                         /** Host-only fresh corpus parsing selection; reduced parsing does not support retained snapshots. */
+                         val corpusParserProfile: CoreNlpRuntime.Profile = CoreNlpRuntime.Profile.FULL) {
     private val wiki = File(stateDir, "wiki")
     val root = File(stateDir, "constellations").apply { mkdirs() }
     private val books = File(root, "books").apply { mkdirs() }
@@ -85,7 +88,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         return synchronized(providers) {
             check(!drained && (!draining || reading)) { "Curation is draining" }
             if (namespace == decisionNamespace) this else providers.getOrPut(namespace) {
-                ConstellationNodes(stateDir, blackboard, bank, liveRete, bert, files, provider, scope, this, model, namespace, cas)
+                ConstellationNodes(stateDir, blackboard, bank, liveRete, bert, files, provider, scope, this, model, namespace, cas, corpusParserProfile)
             }
         }
     }
@@ -269,8 +272,13 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val conflicts = c.conflicts()
         val open = c.open()
         val restated = c.restated().sortedByDescending { c.support[it].cardinality }
+        // Membership files are retained for recovery and overwrite checks. They do not
+        // themselves authorize every saved book to enter the live constellation.
+        val accepted = c.books.map { it.name }.toSet()
+        val excluded = members(name).filter { it !in accepted }
         val text = buildString {
             appendLine("Constellation '$name': ${c.books.size} books (${c.books.joinToString { it.name }}), ${c.statements.size} norms.")
+            if (excluded.isNotEmpty()) appendLine("Excluded saved members (unavailable, identity mismatch, or require reviewed relationships): ${excluded.joinToString()}.")
             if (conflicts.isNotEmpty()) {
                 appendLine(); appendLine("Conflicts (opposed force on one proposition):")
                 for ((x, y) in conflicts.take(SAMPLE)) {
@@ -295,7 +303,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         val page = if (node.params["page"] == "true") "patterns/constellation-$name.md".also { rel ->
             File(wiki, rel).apply { parentFile.mkdirs() }.writeText("# Constellation $name\n\n$text")
         } else null
-        mapOf("summary" to text, "cid" to borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value, "page" to page)
+        mapOf("summary" to text, "cid" to borg.trikeshed.job.ContentId.of(text.encodeToByteArray()).value,
+            "page" to page, "excludedMembers" to excluded)
     }
 
     /**
@@ -392,7 +401,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         File(root, "$constellation.members").takeIf { it.isFile }?.let { f ->
             f.writeText(f.readLines().filter { it.isNotBlank() && it != book }.joinToString("") { it + "\n" })
         }
-        for (f in listOf(bookFile(book), sourceFile(book), File(books, "${safe(book)}.sections.jsonl"))) f.delete()
+        for (f in listOf(bookFile(book), sourceFile(book), parserMarker(book), File(books, "${safe(book)}.sections.jsonl"))) f.delete()
         File(books, "${safe(book)}.readings").deleteRecursively()
         for (suffix in judgmentSuffixes(book).view) File(books, "${safe(book)}.$suffix").deleteRecursively()
         invalidateSource(book)
@@ -958,33 +967,63 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         Constellation(name).also { c ->
             File(root, "$name.members").takeIf { it.isFile }?.readLines()?.filter { it.isNotBlank() }?.distinct()
                 ?.forEach { b ->
-                    val selected = forBook(b)
-                    if (SENSES_ENABLED) selected.memory()
-                    selected.load(b)?.let(c::join)
+                    // Legacy membership names are not permits for customer-ontology books.
+                    // A reviewed release admits selected relationships, not a whole book.
+                    if (File(books, "${safe(b)}.curation").exists()) return@forEach
+                    val book = try {
+                        val selected = forBook(b)
+                        if (SENSES_ENABLED) selected.memory()
+                        selected.load(b)?.takeIf { it.name == b && !selected.customerOntologyBook(b, it) }
+                    } catch (_: Exception) { null }
+                    if (book != null) c.join(book)
                 }
         }
     }
+
+    /** A sidecar also keeps a damaged or replaced provenance field from making a customer book legacy. */
+    private fun customerOntologyBook(name: String, book: Book): Boolean =
+        book.provenance.containsKey("ontologyCid") || File(books, "${safe(name)}.curation").exists()
 
     /** Review authority is installed once by the host's durable review ledger. */
     var reviewRelease: (suspend (ContentId) -> Map<String, Any?>)? = null
 
     fun reviewCandidate(receiptCid: ContentId, selection: List<String>): CurationReviewCandidate =
-        BookCurationReceipt.candidate(requireNotNull(cas), receiptCid, selection)
+        BookCurationReceipt.candidateVerified(requireNotNull(cas), receiptCid, selection)
 
-    fun reviewSource(receiptCid: ContentId): DocumentSource = BookCurationReceipt.source(requireNotNull(cas), receiptCid)
+    fun reviewSource(receiptCid: ContentId): DocumentSource = BookCurationReceipt.verified(requireNotNull(cas), receiptCid).source
 
     fun reviewCurrent(candidate: CurationReviewCandidate): Boolean {
         val store = cas ?: return false
-        val receipt = BookCurationReceipt.read(store, candidate.curationReceiptCid)
-        val book = receipt["book"] as String
-        val source = BookCurationReceipt.source(store, candidate.curationReceiptCid)
-        val selected = forBook(book)
-        val sourcePath = selected.sourceFile(book).absolutePath
-        val receiptPath = File(selected.books, "${safe(book)}.curation").absolutePath
-        return receipt["ontologyCid"] == candidate.ontologyCid.value &&
-            receipt["sourceRevision"] == candidate.sourceRevision && store.get(candidate.ontologyCid) != null &&
-            selected.files.isFile(sourcePath) && selected.files.readString(sourcePath) == source.extractedTextCid.value &&
-            selected.files.isFile(receiptPath) && selected.files.readString(receiptPath) == candidate.curationReceiptCid.value
+        return try {
+            val receipt = BookCurationReceipt.verified(store, candidate.curationReceiptCid)
+            if (!receipt.matches(candidate)) return false
+            val selected = forBook(receipt.book)
+            val sourcePath = selected.sourceFile(receipt.book).absolutePath
+            val receiptPath = File(selected.books, "${safe(receipt.book)}.curation").absolutePath
+            val reader = store as? BoundedCasReader ?: return false
+            val ontology = reader.getBounded(candidate.ontologyCid, BookCurationReceipt.MAX_REVIEW_RECEIPT_BYTES) ?: return false
+            ContentId.of(ontology) == candidate.ontologyCid && selected.files.isFile(sourcePath) &&
+                selected.files.readString(sourcePath) == receipt.source.extractedTextCid.value &&
+                selected.files.isFile(receiptPath) && selected.files.readString(receiptPath) == candidate.curationReceiptCid.value
+        } catch (_: Exception) { false }
+    }
+
+    fun curationBookName(base: String, ontologyCid: ContentId): String =
+        curationBookName(base, ontologyCid, corpusParserProfile)
+
+    private fun parserMarker(name: String) = File(books, "${safe(name)}.parser.json")
+
+    /** Legacy projections have no parser identity and remain FULL-only. Reduced profiles always parse fresh. */
+    private fun retainedParserCompatible(base: String, sourceCid: ContentId): Boolean {
+        if (corpusParserProfile != CoreNlpRuntime.Profile.FULL || safe(base).contains("-parser-no-kbp-v1-")) return false
+        val marker = parserMarker(base)
+        if (!files.isFile(marker.absolutePath)) return true
+        return runCatching {
+            require(marker.length() <= 65_536)
+            val fields = reifyMap(files.readString(marker.absolutePath))
+            fields["state"] == "complete" && fields["profile"] == CoreNlpRuntime.Profile.FULL.id &&
+                fields["configuration"] == CoreNlpRuntime.Profile.FULL.configuration && fields["extractedTextCid"] == sourceCid.value
+        }.getOrDefault(false)
     }
 
     private val snapshot = LcncNodeRunner { node, inputs ->
@@ -997,14 +1036,24 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
     private suspend fun corpus(node: borg.trikeshed.lcnc.LcncNode, inputs: Map<String, Any?>,
         ontologyCid: ContentId, snapshotOnly: Boolean): Map<String, Any?> {
         if (snapshotOnly) {
+            require(corpusParserProfile == CoreNlpRuntime.Profile.FULL) { "NO_KBP book.snapshot is unsupported; reduced corpus parsing is fresh-only" }
             val source = corpusSource(node, inputs)
             val base = corpusBook(node, inputs, source)
+            require(retainedParserCompatible(base, source.extractedTextCid)) { "book.snapshot requires a compatible FULL parser reading" }
+            val markerAtAdmission = parserMarker(base).absolutePath.let { if (files.isFile(it)) files.readString(it) else null }
             val identity = ContentId.of(CanonicalCbor.encodeMap(mapOf("book" to base, "ontologyCid" to ontologyCid.value,
-                "source" to (DocumentCuratorCodec.source(source) - "text")))).value
+                "source" to (DocumentCuratorCodec.source(source) - "text"),
+                "parserProfile" to corpusParserProfile.id, "parserMarker" to markerAtAdmission?.let {
+                    ContentId.of(it.encodeToByteArray()).value }))).value
             val state = "$SNAPSHOT/${safe("$base@${ontologyCid.hex.take(16)}")}"
-            return curation.answer("$SNAPSHOT/$identity", state, ::admitting) {
+            val answer = curation.answer("$SNAPSHOT/$identity", state, ::admitting) {
                 curateCorpus(node, inputs + ("source" to DocumentCuratorCodec.source(source)), ontologyCid, true)
             }
+            require(retainedParserCompatible(base, source.extractedTextCid) &&
+                parserMarker(base).absolutePath.let { if (files.isFile(it)) files.readString(it) else null } == markerAtAdmission) {
+                "Retained parser generation changed during snapshot answer"
+            }
+            return answer
         }
         if (kotlinx.coroutines.currentCoroutineContext()[CurationElement] === curation)
             return curateCorpus(node, inputs, ontologyCid, snapshotOnly)
@@ -1040,12 +1089,14 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         require(store.get(source.originalCid) != null &&
             store.get(source.extractedTextCid)?.contentEquals(source.text.encodeToByteArray()) == true) { "Book source is not retained" }
         val base = corpusBook(node, inputs, source)
-        val name = "$base@${ontology.cid.hex.take(16)}"
+        val name = curationBookName(base, ontology.cid)
         val sourcePath = sourceFile(base).absolutePath
         val sectionsPath = File(books, "${safe(base)}.sections.jsonl").absolutePath
-        val sectionText = files.takeIf { it.isFile(sectionsPath) }?.readString(sectionsPath)
+        val compatibleParser = retainedParserCompatible(base, source.extractedTextCid)
+        val sectionText = files.takeIf { compatibleParser && it.isFile(sectionsPath) }?.readString(sectionsPath)
         val savedSections = sectionText?.lineSequence()?.filter(String::isNotEmpty)?.map { (reify(it) as? String).orEmpty() }?.toList().orEmpty()
-        val retained = files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
+        val parserMarkerText = parserMarker(base).absolutePath.let { if (compatibleParser && files.isFile(it)) files.readString(it) else null }
+        val retained = compatibleParser && files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
             savedSections.isNotEmpty() && savedSections.indices.all { files.isFile(readingFile(base, it).absolutePath) }
         require(!snapshotOnly || retained) { "book.snapshot requires the retained parser reading of this exact source" }
         val sections = if (retained) savedSections else SectionShapes.sections(source.text).texts
@@ -1074,6 +1125,16 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             return NormClause(m["bearer"].toString(), if (force == "presumed") "generic" else force,
                 force != "must-not", m["action"].toString(), m["object"] as? String, null, sentence, m["condition"] as? String)
         }
+        // Publish invalidity before touching any final projection: an interrupted generation must never reuse an old source/marker.
+        require(files.durability == borg.trikeshed.userspace.nio.file.spi.StorageDurability.DURABLE) {
+            "Corpus parser publication requires durable filesystem markers"
+        }
+        val publicationLease = files.acquireExclusiveLease(File(books, "${safe(name)}.parser.lock").absolutePath)
+        try {
+        val generation = java.util.UUID.randomUUID().toString()
+        val inProgressMarker = jsonOf(mapOf("state" to "in-progress", "generation" to generation,
+            "selectedProfile" to corpusParserProfile.id, "extractedTextCid" to source.extractedTextCid.value))
+        files.writeAtomically(parserMarker(name).absolutePath, inProgressMarker.encodeToByteArray())
         files.mkdirs(File(books, "${safe(name)}.readings").absolutePath)
         fun retainReading(k: Int, reading: List<Map<String, Any?>>) {
             val projected = reading.map { s ->
@@ -1094,7 +1155,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         if (retained) for ((k, _) in sections.withIndex()) {
             val parserText = files.readString(readingFile(base, k).absolutePath)
             val parserReceipt = store.put(parserText.encodeToByteArray())
-            if (snapshotOnly) parserIdentities.add(readingFile(base, k).absolutePath to parserReceipt)
+            parserIdentities.add(readingFile(base, k).absolutePath to parserReceipt)
             @Suppress("UNCHECKED_CAST")
             val reading = reify(parserText) as List<Map<String, Any?>>
             val found = ArrayList<NormClause>()
@@ -1104,9 +1165,11 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 found.addAll(inSentence); quotation(sentence, k, inSentence, parserReceipt)
             }
             clauses.add(found); retainReading(k, reading)
-        } else CoreNlpRuntime().use { nlp ->
+        } else CoreNlpRuntime(corpusParserProfile).use { nlp ->
             for ((k, section) in sections.withIndex()) {
                 val parsed = nlp.analyze(section)
+                require(parsed.metadata?.runtime?.get("profile") == corpusParserProfile.id &&
+                    parsed.metadata?.configuration == corpusParserProfile.configuration) { "Fresh parser metadata differs from selected host profile" }
                 val parserReceipt = store.put(CanonicalCbor.encodeMap(DocumentCuratorCodec.nlp(parsed)))
                 val found = NormClauses.extract(parsed, generic)
                 clauses.add(found)
@@ -1126,36 +1189,62 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 retainReading(k, reading)
             }
         }
-        if (snapshotOnly) {
-            require(files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
+        if (retained) {
+            require(retainedParserCompatible(base, source.extractedTextCid) &&
+                parserMarker(base).absolutePath.let { if (files.isFile(it)) files.readString(it) else null } == parserMarkerText &&
+                files.isFile(sourcePath) && files.readString(sourcePath) == source.extractedTextCid.value &&
                 files.isFile(sectionsPath) && files.readString(sectionsPath) == sectionText &&
                 parserIdentities.all { (path, cid) -> files.isFile(path) && ContentId.of(files.readAllBytes(path)) == cid }) {
                 "Retained book source or parser reading changed during snapshot"
             }
-            for ((k, bytes) in requireNotNull(pendingReadings)) files.writeAtomically(readingFile(name, k).absolutePath, bytes)
+            if (pendingReadings != null)
+                for ((k, bytes) in pendingReadings) files.writeAtomically(readingFile(name, k).absolutePath, bytes)
         }
+        require(files.readString(parserMarker(name).absolutePath) == inProgressMarker) { "Output parser generation changed before publication" }
+        // Legacy projections do not attest a parser: preserve that unknown identity rather than promote the host selection into provenance.
+        val parserProvenance = mapOf("profile" to if (retained) "unknown-retained" else corpusParserProfile.id,
+            "configuration" to if (retained) emptyMap<String, String>() else corpusParserProfile.configuration,
+            "selectedProfile" to corpusParserProfile.id, "selectedConfiguration" to corpusParserProfile.configuration,
+            "freshOnly" to (corpusParserProfile != CoreNlpRuntime.Profile.FULL),
+            "retainedParser" to retained, "retainedProjectionIdentityUnverified" to retained)
         val receiptCid = BookCurationReceipt.retain(store, name, source, ontology, spans.toSeries(),
-            if (retained) "retained-book-parser" else "CoreNLP/NormClauses", unresolved)
+            if (retained) "retained-book-parser" else "CoreNLP/NormClauses", unresolved, parserProvenance)
         val book = Book.of(name, base, ontology.version, sections, clauses,
             provenance = mapOf("ontologyCid" to ontology.cid.value, "ontologyVersion" to ontology.version,
-                "curationReceiptCid" to receiptCid.value))
+                "curationReceiptCid" to receiptCid.value, "parserProfile" to parserProvenance["profile"].toString(),
+                "parserConfiguration" to jsonOf(parserProvenance["configuration"]),
+                "selectedParserProfile" to corpusParserProfile.id))
         save(book); saveSections(name, sections)
         files.writeAtomically(sourceFile(name).absolutePath, source.extractedTextCid.value.encodeToByteArray())
         files.writeAtomically(File(books, "${safe(name)}.curation").absolutePath, receiptCid.value.encodeToByteArray())
+        require(files.readString(parserMarker(name).absolutePath) == inProgressMarker) { "Output parser generation changed during publication" }
+        files.writeAtomically(parserMarker(name).absolutePath, jsonOf(parserProvenance +
+            mapOf("state" to "complete", "generation" to generation, "extractedTextCid" to source.extractedTextCid.value)).encodeToByteArray())
         if (snapshotOnly) synchronized(loaded) { loaded.remove(name) } else invalidateFamilyViews()
         val receipt = BookCurationReceipt.read(store, receiptCid)
         return mapOf("book" to name, "sections" to sections.size, "statements" to book.statements.size,
             "curationReceiptCid" to receiptCid.value, "ontologyCid" to ontology.cid.value,
             "ontologyVersion" to ontology.version, "sumoAlignmentCid" to ontology.alignment?.cid?.value,
             "relationships" to receipt["relationships"], "unresolved" to unresolved,
-            "retainedParser" to retained, "reviewStatus" to "unreviewed")
+            "retainedParser" to retained, "parserProvenance" to parserProvenance, "reviewStatus" to "unreviewed")
+        } finally { publicationLease.close() }
     }
 
     private val curate = LcncNodeRunner { node, inputs ->
+        val suppliedText = inputs["text"] ?: inputs["text?"]
+        val suppliedSource = inputs["source"] ?: inputs["source?"]
+        if (suppliedText != null && suppliedSource != null) {
+            val source = requireNotNull(suppliedSource as? Map<*, *>) { "book.curate source must be a DocumentSource" }
+            require(suppliedText is String && source["text"] == suppliedText) {
+                "book.curate text differs from source text"
+            }
+        }
         val ontologyCid = (inputs["ontologyCid"] ?: inputs["ontologyCid?"] ?: node.params["ontologyCid"])
             ?.toString()?.takeIf(String::isNotBlank)
         if (ontologyCid != null) return@LcncNodeRunner corpus(node, inputs, ContentId(ontologyCid), false)
-        val text = (inputs["text"] ?: inputs["text?"]) as? String ?: ""
+        // The legacy path has no retained-source/ontology review boundary. Refuse before
+        // it invalidates or writes a book rather than silently curating empty text.
+        val text = requireNotNull(suppliedText as? String) { "book.curate requires text without an ontology" }
         // The book is the document it was read from: a wired doc's id, else the text's own content id.
         val doc = (inputs["doc"] ?: inputs["doc?"]) as? Map<*, *>
         // Conventions bind late: the document's curation notes, then the node's params, then the text itself.
@@ -1607,11 +1696,16 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
         val bookName = (inputs["book"] ?: inputs["book?"])?.toString() ?: node.params["book"] ?: error("constellation.join: no book")
         val selected = forBook(bookName)
-        require(selected.load(bookName)?.provenance?.get("ontologyCid") == null) {
+        val checked = selected.load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
+        require(checked.name == bookName) { "constellation.join: saved book identity differs" }
+        require(!selected.customerOntologyBook(bookName, checked)) {
             "Customer ontology relationships require a reviewed releaseCid"
         }
         if (SENSES_ENABLED) selected.memory()
         val book = selected.load(bookName) ?: error("constellation.join: book '$bookName' is not curated")
+        require(book.name == bookName && !selected.customerOntologyBook(bookName, book)) {
+            "constellation.join: saved book changed or requires reviewed relationships"
+        }
         // A member curated again is read again: the constellation is cleared and rebuilt from its
         // members' saved books, so the new reading replaces the old one in statements, truth,
         // conflicts, alignment and tells — never kept stale, never counted twice.
@@ -2178,6 +2272,15 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
     }
 
     companion object {
+        /** FULL keeps existing book names; reduced outputs cannot overwrite FULL readings or receipts. */
+        fun curationBookName(base: String, ontologyCid: ContentId,
+            profile: CoreNlpRuntime.Profile = CoreNlpRuntime.Profile.FULL): String {
+            val name = "$base@${ontologyCid.hex.take(16)}"
+            if (profile == CoreNlpRuntime.Profile.FULL) return name
+            val configCid = ContentId.of(CanonicalCbor.encodeMap(profile.configuration))
+            return "$name@parser-${profile.id}-${configCid.hex.take(16)}"
+        }
+
         private val tries = HashMap<String, borg.trikeshed.cas.LaneTrie>()
 
         /** One CursorTrie per forge home, shared by every provider's nodes over it. */
@@ -2246,8 +2349,14 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 if (method != "GET") return@claim borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(405, """{"error":"method_not_allowed"}""")
                 val q = borg.trikeshed.relaxfactory.CouchHttpSurface.parseQuery(path.substringAfter('?', ""))
                 val selected = nodes.forBook(q["book"].orEmpty(), q["decisionProvider"])
-                val out = selected.section(q["book"].orEmpty(), q["section"].orEmpty()) +
-                    mapOf("provider" to selected.decisionProvider.id, "model" to selected.decisionModel)
+                val reading = selected.section(q["book"].orEmpty(), q["section"].orEmpty())
+                // The wiki projects sections only for books in retained constellation membership.
+                // Check the root used by that projection at request time rather than caching membership
+                // with the section reading: books can be added to or removed from a constellation later.
+                val wikiAvailable = !reading.containsKey("error") &&
+                    nodes.constellationOf(reading["book"]?.toString().orEmpty()) != null
+                val out = reading + mapOf("provider" to selected.decisionProvider.id,
+                    "model" to selected.decisionModel, "wikiAvailable" to wikiAvailable)
                 borg.trikeshed.litebike.JvmKanbanServer.HttpResponse(if (out.containsKey("error")) 404 else 200, jsonOf(out))
             }
             // Jev rides the HTX reactor in the module's context; its key resolves through the operator KeyMux.

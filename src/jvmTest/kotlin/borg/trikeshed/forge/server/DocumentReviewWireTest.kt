@@ -124,4 +124,47 @@ class DocumentReviewWireTest {
             assertEquals(selected["revision"], state["revision"])
         }
     }
+
+    @Test fun assessmentRoutesRequireAuthenticatedReviewer(): Unit = runBlocking {
+        fixture { session ->
+            val selected = snapshot(session)
+            val assessment = mapOf("snapshotCid" to selected["snapshotCid"], "expectedRevision" to selected["revision"],
+                "assessments" to emptyList<Any>())
+            val inspection = mapOf("snapshotCid" to selected["snapshotCid"], "expectedRevision" to selected["revision"])
+            assertEquals("authenticated_reviewer_required", request(session, "POST", "/assess", assessment, status = 401)["error"])
+            assertEquals("authenticated_reviewer_required", request(session, "POST", "/assessment", inspection, status = 401)["error"])
+            request(session, "POST", "/assess", assessment, authorization = "forged-token", status = 401)
+            request(session, "POST", "/assessment", inspection, authorization = "forged-token", status = 401)
+            // This fixture is document curation; the book-specific assessment path must refuse it.
+            val refused = request(session, "POST", "/assess", assessment, authorization = token, status = 409)
+            assertContains(assertIs<String>(refused["error"]), "book")
+            val unchanged = request(session, "GET", "?snapshotCid=${selected["snapshotCid"]}")
+            assertEquals("snapshot", unchanged["state"])
+            assertEquals(selected["revision"], unchanged["revision"])
+        }
+    }
+
+    @Test fun assessmentInputsRejectDuplicateFieldsAndInvalidOffsets() {
+        assertFailsWith<IllegalArgumentException> {
+            DocumentReviewWire.request("""{"action":"approve","\u0061ction":"reject"}""")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            DocumentReviewWire.request("""{"assessments":[{"spans":[],"spans":[]}]}""")
+        }
+        assertFailsWith<IllegalArgumentException> { DocumentReviewWire.request("{\"note\":\"\uD800\"}") }
+        val snapshot = ContentId.of("snapshot".encodeToByteArray())
+        val text = ContentId.of("source".encodeToByteArray())
+        fun row(begin: Any?) = listOf(mapOf("selectionId" to "p:0", "state" to "conditional", "spans" to listOf(
+            mapOf("textCid" to text.value, "begin" to begin, "end" to 1, "quote" to "s"))))
+        val valid = DocumentReviewWire.assessments(snapshot, row(0)).single()
+        assertEquals(snapshot, valid.snapshotCid)
+        assertEquals(ConditionAssessmentState.CONDITIONAL, valid.state)
+        assertEquals(0, valid.spans.single().begin)
+        for (bad in listOf(-1, 0.5, Int.MAX_VALUE.toLong() + 1, "0"))
+            assertFailsWith<IllegalArgumentException> { DocumentReviewWire.assessments(snapshot, row(bad)) }
+        assertFailsWith<IllegalArgumentException> {
+            DocumentReviewWire.assessments(snapshot, listOf(mapOf("selectionId" to "p:0", "state" to "conditional",
+                "spans" to emptyList<Any>(), "extra" to true)))
+        }
+    }
 }

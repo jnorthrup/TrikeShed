@@ -1,0 +1,33 @@
+Pi core / ModelMux transport
+
+Source https://github.com/badlogic/pi-mono.git at
+cf74b67653633c565cf2033e78c19c5525ed2432, pi-agent-core 1.5.0.
+The upstream Agent, agent-loop and JSON schema implementation are bundled unmodified.
+MIT notices: LICENSE-pi.txt and LICENSE-typebox.txt. Local transport: model-entry.ts.
+manifest.json pins all inputs and the bundle SHA-256 checked before execution.
+
+Rebuild with Node 24.19.0, webpack 5.108.1, target=web, mode=none,
+optimization.minimize=false, extensions=[.ts,.js]. A .ts loader returns
+node:module.stripTypeScriptTypes(source,{mode:'strip'}). Alias pi-agent-core
+to packages/agent/src/agent.ts. Alias pi-ai to a barrel that re-exports only
+packages/ai/src/utils/{transcript,event-stream,identity,validation}.ts.
+Alias pi-schema to packages/schema/src/index.ts and its /formats subpath
+to packages/schema/src/formats/index.ts. Package aliases use the
+@earendil-works/ scope. Bundle model-entry.ts; paths affect webpack comments.
+Recorded external build: /workspace/library-files/pi-agent-proof/model-bundle.cjs.
+No dependencies were installed during bundling.
+
+Scope: actual Pi core, buffered text and function completions through ModelMux,
+explicit retained-context tools through a host-bound session. Not the Node CLI,
+terminal, coding tools, extension system, provider SDKs, or incremental streaming.
+OpenAI wire costs/cache accounting are not portable; Pi's cost/cache fields are
+zero placeholders, not billing receipts. Existing host ModelMux usage owns billing.
+JSON-only structuredClone is provided only for Pi's tool argument validator;
+other clone types are rejected. Abort event support is local to the serialized
+loop. External interruption closes/revokes the child, not a resumable user abort.
+Clock readings use a monotonic host delegate. No browser or Node environment is granted.
+The adapter's input/result limits do not bound protocol frame allocation or JVM heap.
+JSON crosses an additional quote-aware depth guard (maximum 32) before Pi adapter
+reification. ModelMux/provider response allocation and its upstream transport limit
+remain outside this guard; this is not a total response-memory cap. Retained context
+uses explicit tools; adaptive breadcrumb projection is not enabled by this adapter.

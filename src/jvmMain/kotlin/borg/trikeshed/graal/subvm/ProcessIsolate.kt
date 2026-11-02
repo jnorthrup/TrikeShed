@@ -21,6 +21,7 @@ import borg.trikeshed.terminal.TerminalInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.io.OutputStream
 import java.util.Base64
@@ -60,6 +61,22 @@ class ProcessIsolate(
     override val trust = if (pythonWorker == null) Trust.UNTRUSTED else Trust.OWN
     override val bounds: FacetBounds = GuestBounds.of(facet)
 
+    /**
+     * Eligible for bounded host leases in the restricted child JS engine, never Node.
+     * JS uses its wall watchdog only with statements disabled; this policy therefore
+     * does not claim a statement or memory limit. Protocol frame size is separately
+     * unbounded and must not be treated as resource containment.
+     * This is not the ordinary duplex ProcessIsolate lifecycle: while a crossing is
+     * active, other eval/call/delegate/interrupt/close/pushInput calls fail fast rather
+     * than waiting or delivering out-of-band cancellation/input. The owner must await
+     * the crossing before close. A callback which ignores interruption may indefinitely
+     * delay that crossing's cleanup even after the child has been revoked.
+     */
+    val restrictedJsLeaseCapable: Boolean get() = pythonWorker == null && nodeLauncher == null &&
+        facet == VmFacet.GRAAL_JS && budget.statements == 0L && budget.wallMillis > 0 &&
+        replyTimeoutMillis in 1..MAX_RESTRICTED_JS_REPLY_MILLIS &&
+        budget.wallMillis < replyTimeoutMillis - RESTRICTED_JS_LEASE_MARGIN_MILLIS
+
     private val lock = ReentrantLock()
     private val transport: ProcessProtocolChannel
     private val inbox = LinkedBlockingQueue<Teleported.Obj>()
@@ -71,10 +88,14 @@ class ProcessIsolate(
     @Volatile private var alive = true
     @Volatile private var accepting = true
     @Volatile private var revoked = false
+    @Volatile private var restrictedJsLeased = false
+    private val restrictedHostCall = ThreadLocal.withInitial { false }
     val processId: Long get() = transport.processId
 
     private companion object {
         val surveyed = java.util.concurrent.atomic.AtomicBoolean(false)
+        const val MAX_RESTRICTED_JS_REPLY_MILLIS = 3_600_000L
+        const val RESTRICTED_JS_LEASE_MARGIN_MILLIS = 1_000L
     }
 
     init {
@@ -164,8 +185,15 @@ class ProcessIsolate(
             channel.send(SubVmProtocol.encode(Teleported.obj("id" to msg.int("id"), "error" to "no host delegate named '$name'")))
             return
         }
-        val admitted = hostDispatch.trySubmit(msg.int("id") ?: -1, name, delegate.timeoutMillis ?: pythonWorker?.timeoutMillis) {
-            processHostCall { delegate.function(args) }
+        val deadline = delegate.timeoutMillis ?: pythonWorker?.timeoutMillis ?: if (restrictedJsLeased) budget.wallMillis else null
+        val admitted = hostDispatch.trySubmit(msg.int("id") ?: -1, name, deadline) {
+            processHostCall {
+                if (!restrictedJsLeased) delegate.function(args)
+                else {
+                    restrictedHostCall.set(true)
+                    try { delegate.function(args) } finally { restrictedHostCall.remove() }
+                }
+            }
         }
         if (admitted == null) {
             channel.send(SubVmProtocol.encode(Teleported.obj("id" to msg.int("id"), "error" to
@@ -176,27 +204,78 @@ class ProcessIsolate(
     private suspend fun sendFrame(m: Teleported.Obj) = transport.send(SubVmProtocol.encode(m))
     private fun send(m: Teleported.Obj) = runBlocking { sendFrame(m) }
 
-    private fun roundTrip(vararg fields: Pair<String, Any?>): Teleported = lock.withLock {
-        if (!accepting) throw GuestException(GuestFailure.DEAD, "isolate $id is draining")
-        exchange(*fields)
+    /** Leased JS rejects concurrent crossings instead of waiting behind a host callback. */
+    private inline fun <T> crossingLock(block: () -> T): T {
+        if (!restrictedJsLeased) return lock.withLock(block)
+        check(lock.tryLock()) { "Restricted JS isolate is busy" }
+        try { return block() } finally { lock.unlock() }
+    }
+
+    private fun roundTrip(vararg fields: Pair<String, Any?>): Teleported {
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot re-enter its isolate" }
+        return crossingLock {
+            if (!accepting) throw GuestException(GuestFailure.DEAD, "isolate $id is draining")
+            exchange(*fields)
+        }
     }
 
     private fun exchange(vararg fields: Pair<String, Any?>): Teleported {
         if (!alive) throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
         val rid = ids.incrementAndGet()
-        send(Teleported.obj("id" to rid, *fields))
+        // For the restricted leased-JS lane, a single absolute outer deadline
+        // bounds all replies for this crossing, including repeated host calls.
+        // A callback which ignores interruption can outlive revocation; close()
+        // still joins admitted host work and is not promised to finish on time.
+        val deadline = if (restrictedJsLeased) System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(replyTimeoutMillis) else null
+        val request = Teleported.obj("id" to rid, *fields)
+        if (deadline == null) send(request)
+        else {
+            val sent = try {
+                val remaining = TimeUnit.NANOSECONDS.toMillis((deadline - System.nanoTime()).coerceAtLeast(0))
+                runBlocking { withTimeoutOrNull(remaining) { sendFrame(request); true } } == true
+            } catch (failure: Throwable) {
+                val interrupted = failure is InterruptedException || Thread.currentThread().isInterrupted
+                if (interrupted) Thread.interrupted() // cleanup uses runBlocking; restore after it finishes
+                try { stopRestrictedJs() } finally { if (interrupted) Thread.currentThread().interrupt() }
+                throw GuestException(GuestFailure.DEAD, "restricted JS transport failed", failure)
+            }
+            if (!sent) {
+                stopRestrictedJs()
+                throw GuestException(GuestFailure.DEAD, "restricted JS send deadline expired")
+            }
+        }
         var reply: Teleported.Obj
         do {
             val timeout = pythonWorker?.timeoutMillis ?: replyTimeoutMillis
-            reply = inbox.poll(timeout, TimeUnit.MILLISECONDS) ?: run {
-                if (pythonWorker != null) revokeWorker()
+            val received = try {
+                if (deadline != null) {
+                    val remaining = deadline - System.nanoTime()
+                    if (remaining <= 0) null else inbox.poll(remaining, TimeUnit.NANOSECONDS)
+                } else inbox.poll(timeout, TimeUnit.MILLISECONDS)
+            } catch (interrupted: InterruptedException) {
+                if (restrictedJsLeased) {
+                    // poll clears the interrupt flag. Do not restore it until our
+                    // non-cancellable revocation and admitted-effect drain finish.
+                    try { stopRestrictedJs() } finally { Thread.currentThread().interrupt() }
+                }
+                throw interrupted
+            }
+            reply = received ?: run {
+                if (restrictedJsLeased) stopRestrictedJs() else if (pythonWorker != null) revokeWorker()
                 throw GuestException(if (!alive) GuestFailure.DEAD else GuestFailure.INTERRUPTED,
                     if (!alive) "child died or its deadline expired" else "no reply in ${timeout}ms")
             }
-            if (reply.str("op") == "dead") throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
+            if (reply.str("op") == "dead") {
+                if (restrictedJsLeased) stopRestrictedJs()
+                throw GuestException(GuestFailure.DEAD, "child of isolate $id is gone")
+            }
         } while (reply.int("id") != rid)
         if (reply.bool("ok") == true) return reply.field("value") ?: Teleported.Null
         val kind = runCatching { GuestFailure.valueOf(reply.str("kind") ?: "") }.getOrDefault(GuestFailure.GUEST_ERROR)
+        // A guest error may race the completion/cleanup of an admitted host call.
+        // The restricted leased lane therefore fails closed and drains it before
+        // reporting any failed crossing; the child is not offered for reuse.
+        if (restrictedJsLeased) stopRestrictedJs()
         if (kind == GuestFailure.EXHAUSTED) alive = false
         throw GuestException(kind, reply.str("error") ?: "guest error")
     }
@@ -207,19 +286,60 @@ class ProcessIsolate(
 
     /** Register on both sides: the parent keeps the function, the child installs a bridge that asks for it. */
     override fun delegate(name: String, fn: (List<Teleported>) -> Teleported) {
-        delegates[name] = HostDelegate(null, fn)
-        roundTrip("op" to "delegate", "name" to name)
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot re-enter its isolate" }
+        if (!restrictedJsLeaseCapable) {
+            delegates[name] = HostDelegate(null, fn)
+            roundTrip("op" to "delegate", "name" to name)
+        } else crossingLock {
+            require(!restrictedJsLeased || delegates[name]?.timeoutMillis == null) { "Cannot replace a bounded JS delegate with an unbounded delegate" }
+            val previous = delegates.put(name, HostDelegate(null, fn))
+            try { exchange("op" to "delegate", "name" to name) }
+            catch (failure: Throwable) {
+                if (previous == null) delegates.remove(name) else delegates[name] = previous
+                throw failure
+            }
+        }
     }
 
     override fun delegate(name: String, hostWallMillis: Long, fn: (List<Teleported>) -> Teleported) {
-        require(pythonWorker != null) { "bounded host delegation requires a Python worker" }
-        require(hostWallMillis > 0 && hostWallMillis <= pythonWorker.timeoutMillis)
-        delegates[name] = HostDelegate(hostWallMillis, fn)
-        roundTrip("op" to "delegate", "name" to name, "timeout" to hostWallMillis)
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot re-enter its isolate" }
+        if (pythonWorker != null) {
+            require(hostWallMillis > 0 && hostWallMillis <= pythonWorker.timeoutMillis)
+            delegates[name] = HostDelegate(hostWallMillis, fn)
+            roundTrip("op" to "delegate", "name" to name, "timeout" to hostWallMillis)
+            return
+        }
+        require(restrictedJsLeaseCapable) { "bounded JS delegation requires a restricted JS child with a finite wall-only budget and outer deadline" }
+        require(hostWallMillis > 0 && hostWallMillis <= replyTimeoutMillis - budget.wallMillis - RESTRICTED_JS_LEASE_MARGIN_MILLIS) {
+            "host lease exceeds the restricted JS crossing deadline"
+        }
+        crossingLock {
+            check(accepting && isAlive) { "isolate $id is unavailable" }
+            val previous = delegates.put(name, HostDelegate(hostWallMillis, fn))
+            try {
+                // The registration itself also needs the finite send/reply deadline.
+                restrictedJsLeased = true
+                exchange("op" to "delegate", "name" to name, "timeout" to hostWallMillis)
+            } catch (failure: Throwable) {
+                if (previous == null) delegates.remove(name) else delegates[name] = previous
+                // A failure may leave the child partially registered. Never reuse it.
+                runCatching { stopRestrictedJs() }
+                throw failure
+            }
+        }
     }
 
     /** Stock Python has physical stdin; restricted children multiplex input beside protocol frames. */
     fun pushInput(text: String) {
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot re-enter its isolate" }
+        if (restrictedJsLeased) {
+            crossingLock {
+                check(accepting && isAlive) { "isolate $id is draining" }
+                val encoded = Base64.getEncoder().encodeToString(text.encodeToByteArray())
+                send(Teleported.obj("op" to "stdin", "data" to encoded))
+            }
+            return
+        }
         check(accepting && isAlive) { "isolate $id is draining" }
         if (pythonWorker != null) {
             runBlocking { transport.writeInput(text.encodeToByteArray()) }
@@ -231,6 +351,8 @@ class ProcessIsolate(
 
     /** Interrupt politely through the protocol; if the child does not answer, the wall does its job: kill it. */
     override fun interrupt(): Boolean {
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot interrupt its isolate" }
+        if (restrictedJsLeased) return crossingLock { interruptLeasedJs() }
         if (!alive) return false
         interrupted.incrementAndGet()
         runCatching { send(Teleported.obj("id" to ids.incrementAndGet(), "op" to "interrupt")) }
@@ -243,10 +365,24 @@ class ProcessIsolate(
         return true
     }
 
+    /** Leased JS rejects concurrent interrupt callers so they cannot steal crossing replies. */
+    private fun interruptLeasedJs(): Boolean {
+        if (!alive) return false
+        interrupted.incrementAndGet()
+        stopRestrictedJs()
+        return true
+    }
+
     override fun stats() = IsolateStats(evals.get(), calls.get(), hostCalls.get(), 0, 0, 0, 0, interrupted.get())
     override val isAlive: Boolean get() = alive && transport.isAlive
 
     override fun close() {
+        check(!restrictedHostCall.get()) { "A restricted JS host callback cannot close its isolate" }
+        if (restrictedJsLeased) return crossingLock { closeOwned() }
+        closeOwned()
+    }
+
+    private fun closeOwned() {
         try {
             accepting = false
             // Release terminal reads without closing the protocol needed by admitted host calls.
@@ -276,6 +412,12 @@ class ProcessIsolate(
         revoked = true
         runBlocking { transport.revoke(InProcessIsolate.INTERRUPT_GRACE_MS) }
         alive = false
+    }
+
+    /** Terminal restricted-JS failure: no success/failure is reported before admitted effects drain. */
+    private fun stopRestrictedJs() {
+        try { if (!revoked) revokeWorker() }
+        finally { runBlocking { hostDispatch.drain() } }
     }
 
     /** The Node.js side of the protocol, for the GraalJS `node` launcher. Same envelope (canonical JSON is JSON). */
@@ -312,6 +454,7 @@ class ProcessIsolate(
 
 /** Child-JVM entry point: one [InProcessIsolate] speaking [SubVmProtocol] on stdin/stdout. */
 object SubVmMain {
+    private const val MAX_CHILD_HOST_LEASE_MILLIS = 3_600_000L
     @JvmStatic
     fun main(args: Array<String>): Unit = runBlocking {
         val languageId = args.getOrElse(0) { "js" }
@@ -389,7 +532,14 @@ object SubVmMain {
                         }
                         "delegate" -> asyncReply(message) {
                             val name = message.str("name") ?: ""
-                            iso.delegate(name, hostBridge(name))
+                            val timeout = message.field("timeout")
+                            if (timeout == null) iso.delegate(name, hostBridge(name))
+                            else {
+                                val millis = (timeout as? Teleported.Num)?.v
+                                    ?.takeIf { it > 0 && it <= MAX_CHILD_HOST_LEASE_MILLIS }
+                                    ?: error("invalid child host lease")
+                                iso.delegate(name, millis, hostBridge(name))
+                            }
                             Teleported.Null
                         }
                         "interrupt" -> {

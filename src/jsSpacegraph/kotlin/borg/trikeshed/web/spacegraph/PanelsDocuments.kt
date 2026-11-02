@@ -1,11 +1,33 @@
 package borg.trikeshed.web.spacegraph
 
 import borg.trikeshed.web.*
+import borg.trikeshed.docs.ReviewQuoteSpan
+import borg.trikeshed.docs.reviewQuoteSpan
 import kotlinx.browser.document
 import kotlinx.coroutines.CancellationException
 
 // Credentials live only in this tab's memory, never in graph JSON, receipts or browser storage.
 private var documentReviewCredential: String? = null
+private var documentReviewCredentialEpoch = 0
+private val documentReviewCredentialListeners = mutableSetOf<() -> Unit>()
+
+private fun updateDocumentReviewCredential(value: String?) {
+    documentReviewCredential = value
+    documentReviewCredentialEpoch++
+    documentReviewCredentialListeners.toList().forEach { it() }
+}
+
+private class ConditionEditorRow(
+    val id: String,
+    val textCid: String,
+    val begin: Int,
+    val end: Int,
+    val quote: String,
+    val state: dynamic,
+    val spans: MutableList<ReviewQuoteSpan>,
+    val hasParserCondition: Boolean,
+    var unsupportedSpans: Boolean = false,
+)
 
 private suspend fun reviewRequest(path: String, body: dynamic = null, authenticated: Boolean = false): dynamic {
     val init = objOf {
@@ -32,7 +54,7 @@ private fun Panels.documentReviewPane(target: dynamic) {
     var forget: (() -> Unit)? = null
     observer = jsNew(js("ResizeObserver"), { _: dynamic ->
         if (page.closing || !truthy(pane.isConnected)) { observer.disconnect(); forget?.invoke() }
-        else {
+        else if (!truthy(pane.hasAttribute("data-review-focus-hold"))) {
             val owner = nodes().firstOrNull { it.el === pane.parentElement }
             if (owner != null) growRingWorldFor(owner)
             resolveTopLevelOverlaps()
@@ -47,13 +69,56 @@ private fun Panels.documentReviewPane(target: dynamic) {
 private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, current: () -> Boolean) {
     documentReviewPane(target)
     var review = initial
+    var savedAssessment: dynamic = null
+    var savedAssessmentEpoch = -1
+    var reviewerSession: dynamic = null
+    var busy = false
     var generation = 0
     val box = document.createElement("section").asDynamic()
     box.className = "document-review"
     target.appendChild(box)
+    var credentialChanged: () -> Unit = {}
+    val listener: () -> Unit = { if (truthy(box.isConnected)) credentialChanged() }
+    documentReviewCredentialListeners.add(listener)
+    page.own { documentReviewCredentialListeners.remove(listener) }
     fun render() {
         val rendered = ++generation
-        fun present() = current() && truthy(box.isConnected) && generation == rendered
+        fun present() = current() && reviewFocus.sourceConnected(box) && truthy(box.isConnected) && generation == rendered
+        val book = review.snapshot?.kind == "book"
+        val legacyWithdraw = book && review.conditionReviewState == "legacy-unassessed" && review.sourceCurrent == true
+        val recoverAssessment = book && review.sourceCurrent == true && review.state == "draft" &&
+            typeOf(review.assessmentCid) == "string" && review.assessmentAvailability != "available"
+        val mayAssess = review.current == true || recoverAssessment
+        var conditionFields: dynamic = null
+        var approvalButton: dynamic = null
+        var savedAssessmentInspectable = false
+        fun forgetSavedAssessment() {
+            savedAssessment = null
+            savedAssessmentEpoch = -1
+            if (approvalButton != null) approvalButton.disabled = true
+            box.querySelector("[data-condition-export]")?.remove()
+            box.querySelector("[data-condition-saved-status]")?.remove()
+        }
+        fun assessmentMatches(value: dynamic, forDraft: Boolean = false, completeRows: Boolean = false): Boolean {
+            if (value == null || review.current != true || value.snapshotCid != review.snapshotCid ||
+                value.revision != review.revision || value.assessmentCid != review.assessmentCid ||
+                !isArray(value.assessments) || !isArray(review.snapshot?.selections)) return false
+            if (forDraft && (review.state != "draft" || value.draftCid != review.decisionCid)) return false
+            val selections = arr(review.snapshot.selections)
+            val rows = arr(value.assessments)
+            if (selections.any { it == null || typeOf(it.id) != "string" } ||
+                rows.any { it == null || typeOf(it.selectionId) != "string" || typeOf(it.state) != "string" }) return false
+            val ids = selections.map { str(it.id) }
+            val selected = rows.map { str(it.selectionId) }
+            return ids.isNotEmpty() && ids.distinct().size == ids.size && selected.size <= ids.size &&
+                selected.distinct().size == selected.size && ids.toSet().containsAll(selected) &&
+                (!completeRows || selected.size == ids.size) &&
+                rows.all { it.state in arrayOf("unresolved", "unconditional", "conditional") }
+        }
+        fun approvalReady(): Boolean = savedAssessmentEpoch == documentReviewCredentialEpoch && savedAssessmentInspectable && assessmentMatches(savedAssessment, forDraft = true, completeRows = true) &&
+            savedAssessment.status == "complete" && arr(savedAssessment.assessments).none { it.state == "unresolved" }
+        fun exportReady(): Boolean = savedAssessmentEpoch == documentReviewCredentialEpoch && savedAssessmentInspectable && assessmentMatches(savedAssessment, completeRows = true) && savedAssessment.status == "complete" &&
+            arr(savedAssessment.assessments).all { it.state == "unconditional" }
         box.textContent = ""
         val title = document.createElement("h4")
         title.textContent = "Analyst review · " + str(review.state) + " · revision " + str(review.revision)
@@ -75,9 +140,16 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
                 arr(review.snapshot.selections), ::present) { frozen -> review = frozen; render() }
         }
         val identity = document.createElement("p")
-        identity.textContent = if (review.synthetic == true) "Synthetic validation decision by " + str(review.reviewer)
+        identity.textContent = if (reviewerSession != null)
+            (if (reviewerSession.synthetic == true) "Synthetic validation reviewer: " else "Authenticated reviewer: ") + str(reviewerSession.reviewer)
+            else if (review.synthetic == true) "Synthetic validation decision by " + str(review.reviewer)
             else if (typeOf(review.reviewer) == "string") "Decision by " + str(review.reviewer) else "No authenticated decision yet."
         box.appendChild(identity)
+        credentialChanged = {
+            reviewerSession = null
+            forgetSavedAssessment()
+            identity.textContent = "Reviewer credential changed; authenticate and reload the assessment."
+        }
         val credential = document.createElement("input").asDynamic()
         credential.type = "password"; credential.autocomplete = "off"
         credential.placeholder = "Reviewer credential"
@@ -88,80 +160,358 @@ private fun Panels.documentReviewActions(target: dynamic, initial: dynamic, curr
         note.setAttribute("aria-label", "Review decision note")
         note.style.cssText = "display:block;width:100%;margin:8px 0"
         box.appendChild(note)
-        fun button(label: String, operation: suspend () -> Unit) {
+        fun button(label: String, operation: suspend () -> Unit): dynamic {
             val button = document.createElement("button").asDynamic()
             button.textContent = label; box.appendChild(button)
             on(button, "click", { event ->
-                event.stopPropagation(); button.disabled = true
+                event.stopPropagation()
+                if (busy) return@on
+                busy = true; button.disabled = true
+                val fields = conditionFields
+                val fieldsDisabled = fields?.disabled
+                if (fields != null) fields.disabled = true
                 launchJs {
                     try { require(present()) { "The source result or review changed; reopen its current review" }; operation() }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: dynamic) { status("Review: " + failureText(error)) }
-                    finally { button.disabled = false }
+                    finally {
+                        busy = false
+                        button.disabled = if (button === approvalButton) !approvalReady() else false
+                        if (fields != null) fields.disabled = fieldsDisabled
+                    }
                 }
             })
+            return button
         }
         button("Authenticate reviewer") {
             val supplied = str(credential.value).trim()
-            if (supplied.isNotEmpty()) documentReviewCredential = supplied
+            if (supplied.isNotEmpty()) {
+                updateDocumentReviewCredential(supplied)
+                identity.textContent = "Authenticating reviewer…"
+            }
             credential.value = ""
+            val requestEpoch = documentReviewCredentialEpoch
             val session = reviewRequest("/session", authenticated = true)
-            require(present()) { "The review changed while authenticating; reopen it" }
+            require(present() && requestEpoch == documentReviewCredentialEpoch) {
+                "The review or credential changed while authenticating; authenticate again"
+            }
+            reviewerSession = session
+            if (savedAssessment != null) { savedAssessment = null; render(); return@button }
             identity.textContent = (if (session.synthetic == true) "Synthetic validation reviewer: " else "Authenticated reviewer: ") + str(session.reviewer)
         }
         button("Forget credential") {
-            documentReviewCredential = null; credential.value = ""
+            updateDocumentReviewCredential(null); credential.value = ""
+            if (savedAssessment != null) { savedAssessment = null; render(); return@button }
             identity.textContent = "Reviewer credential removed from this tab."
         }
         button("Refresh review") {
             val refreshed = reviewRequest("?snapshotCid=" + encodeURIComponent(str(review.snapshotCid)))
             require(present()) { "The source result changed while reading the review" }
+            savedAssessment = null
             review = refreshed
             render()
         }
+
+        if (book && isArray(review.snapshot?.selections)) {
+            val selections = arr(review.snapshot.selections)
+            val label = document.createElement("h4")
+            label.textContent = "Conditions and exceptions"
+            box.appendChild(label)
+            val help = document.createElement("p")
+            help.textContent = "Each claim starts unresolved. Inspect the retained quotation and choose whether it is unconditional or has conditions or exceptions. A conditional assessment keeps source text for review; it cannot be exported as an executable condition. If a qualifier is outside the displayed quotation, leave it unresolved."
+            box.appendChild(help)
+            if (assessmentMatches(savedAssessment)) {
+                val loaded = document.createElement("p").asDynamic()
+                loaded.setAttribute("data-condition-saved-status", "")
+                loaded.textContent = "Authenticated saved assessment · " + str(savedAssessment.status) + " · " + str(savedAssessment.assessmentCid)
+                box.appendChild(loaded)
+            }
+            val fields = document.createElement("fieldset").asDynamic()
+            fields.setAttribute("data-condition-editor", "")
+            fields.disabled = !mayAssess || review.state !in arrayOf("snapshot", "draft", "reject")
+            conditionFields = fields
+            box.appendChild(fields)
+            val rows = mutableListOf<ConditionEditorRow>()
+            var valid = selections.isNotEmpty() && selections.size <= 256
+            if (!valid) {
+                val warning = document.createElement("p")
+                warning.textContent = "Choose between 1 and 256 claims for each condition assessment."
+                fields.appendChild(warning)
+            }
+            fun index(value: dynamic): Int? = if (typeOf(value) == "number" && num(value).isFinite() &&
+                num(value) >= 0 && num(value) <= Int.MAX_VALUE.toDouble() && num(value) % 1.0 == 0.0) num(value).toInt() else null
+            val prior = if (assessmentMatches(savedAssessment)) arr(savedAssessment.assessments) else emptyArray()
+            for (selection in selections) {
+                if (selection == null) { valid = false; continue }
+                val value = selection.value ?: selection
+                val quote = selection.quotation ?: value.quotation
+                val id = if (typeOf(selection.id) == "string") str(selection.id) else ""
+                val sourceCid = str(quote?.extractedTextCid)
+                val begin = index(quote?.begin)
+                val end = index(quote?.end)
+                val quoted = if (typeOf(quote?.quote) == "string") str(quote.quote) else ""
+                if (id.isBlank() || !Regex("^sha256:[0-9a-f]{64}$").matches(sourceCid) || begin == null || end == null ||
+                    quoted.length > 32768 || reviewQuoteSpan(begin, end, quoted, 0, quoted.length) == null) {
+                    valid = false
+                    val warning = document.createElement("p")
+                    warning.textContent = "A claim has no usable exact extracted-text quotation; choose a different selection."
+                    fields.appendChild(warning)
+                    continue
+                }
+                val row = document.createElement("section").asDynamic()
+                row.setAttribute("data-condition-selection", id)
+                row.style.cssText = "border:1px solid var(--line);padding:8px;margin:8px 0"
+                fields.appendChild(row)
+                val claim = document.createElement("p")
+                claim.textContent = arrayOf(value.subject, value.predicate, value.`object`).filter { it != null }
+                    .joinToString(" ") { str(it) } + " · parser condition: " +
+                    (if (value.condition == null) "not identified" else str(value.condition)) +
+                    " · ontology: " + str(value.ontologyMapping?.status ?: "unresolved")
+                row.appendChild(claim)
+                val sourceLabel = document.createElement("p")
+                sourceLabel.textContent = "Retained extracted text · UTF-16 offsets " + begin + "–" + end +
+                    " (end exclusive). Page and layout markers are supplied source metadata."
+                row.appendChild(sourceLabel)
+                val quotation = document.createElement("pre").asDynamic()
+                quotation.setAttribute("data-condition-quote", "")
+                quotation.style.cssText = "white-space:pre-wrap;user-select:text;max-height:240px;overflow:auto"
+                quotation.textContent = quoted
+                row.appendChild(quotation)
+                val quoteNode = quotation.firstChild
+                documentSourceActions(row, selection, ::present)
+                val stateLabel = document.createElement("label").asDynamic()
+                stateLabel.textContent = "Assessment "
+                val state = document.createElement("select").asDynamic()
+                state.setAttribute("data-condition-state", "")
+                state.setAttribute("aria-label", "Condition assessment for " + id)
+                for ((choice, description) in arrayOf("unresolved" to "Unresolved",
+                    "unconditional" to "Unconditional", "conditional" to "Conditional or has exceptions")) {
+                    val option = document.createElement("option").asDynamic()
+                    option.value = choice; option.textContent = description
+                    if (choice == "unconditional" && value.condition != null) option.disabled = true
+                    state.appendChild(option)
+                }
+                stateLabel.appendChild(state); row.appendChild(stateLabel)
+                if (value.condition != null) {
+                    val warning = document.createElement("p")
+                    warning.textContent = "The parser recorded a condition. An unconditional assessment conflicts with this retained claim; correction requires a new reviewed claim."
+                    row.appendChild(warning)
+                }
+                val spanList = document.createElement("div").asDynamic()
+                spanList.setAttribute("data-condition-spans", "")
+                row.appendChild(spanList)
+                val editor = ConditionEditorRow(id, sourceCid, begin, end, quoted, state, mutableListOf(), value.condition != null)
+                rows.add(editor)
+                val stored = prior.firstOrNull { it.selectionId == id }
+                if (stored != null) {
+                    state.value = str(stored.state)
+                    if (!isArray(stored.spans)) editor.unsupportedSpans = true
+                    else for (span in arr(stored.spans)) {
+                        if (span == null) { editor.unsupportedSpans = true; continue }
+                        val spanBegin = index(span.begin); val spanEnd = index(span.end)
+                        val resolved = if (spanBegin != null && spanEnd != null && spanBegin >= begin && spanEnd <= end &&
+                            span.textCid == sourceCid) reviewQuoteSpan(begin, end, quoted, spanBegin - begin, spanEnd - begin) else null
+                        if (resolved == null || resolved.quote != span.quote) editor.unsupportedSpans = true else editor.spans.add(resolved)
+                    }
+                    if (state.value == "conditional" && editor.spans.isEmpty() ||
+                        state.value != "conditional" && editor.spans.isNotEmpty()) editor.unsupportedSpans = true
+                }
+                fun showSpans() {
+                    spanList.textContent = ""
+                    for (span in editor.spans) {
+                        val line = document.createElement("p")
+                        line.textContent = "Qualifier · " + span.begin + "–" + span.end + " · " + span.quote
+                        spanList.appendChild(line)
+                    }
+                    if (editor.unsupportedSpans) {
+                        val warning = document.createElement("p")
+                        warning.textContent = "A saved qualifier is outside this quotation. It cannot be edited here; leave this claim unresolved or use another review surface."
+                        spanList.appendChild(warning)
+                    }
+                }
+                showSpans()
+                on(state, "change", { _ ->
+                    if (busy) return@on
+                    editor.spans.clear(); editor.unsupportedSpans = false; showSpans(); forgetSavedAssessment()
+                })
+                fun addSpan(localBegin: Int, localEnd: Int) {
+                    require(present()) { "The source result changed; reopen its review" }
+                    require(!busy) { "Wait for the current review operation" }
+                    require(state.value == "conditional") { "Choose conditional or has exceptions first" }
+                    require(editor.spans.size < 16) { "At most 16 qualifiers per claim" }
+                    val span = requireNotNull(reviewQuoteSpan(begin, end, quoted, localBegin, localEnd)) {
+                        "Select nonempty text without splitting a character"
+                    }
+                    editor.spans.add(span); showSpans(); forgetSavedAssessment()
+                }
+                val highlight = document.createElement("button").asDynamic()
+                highlight.type = "button"; highlight.textContent = "Use highlighted words"
+                highlight.setAttribute("data-condition-add-selection", "")
+                row.appendChild(highlight)
+                on(highlight, "pointerdown", { event -> event.preventDefault(); event.stopPropagation() })
+                on(highlight, "click", { event ->
+                    event.stopPropagation()
+                    try {
+                        val selected = document.asDynamic().getSelection()
+                        require(selected != null && selected.rangeCount == 1) { "Highlight words in this quotation first" }
+                        val range = selected.getRangeAt(0)
+                        require(range.startContainer === quoteNode && range.endContainer === quoteNode) { "Select only words in this quotation" }
+                        addSpan(requireNotNull(index(range.startOffset)), requireNotNull(index(range.endOffset)))
+                    } catch (error: dynamic) { status("Condition: " + failureText(error)) }
+                })
+                val full = document.createElement("button").asDynamic()
+                full.type = "button"; full.textContent = "Use full quotation"
+                full.setAttribute("data-condition-add-full", "")
+                row.appendChild(full)
+                on(full, "click", { event ->
+                    event.stopPropagation()
+                    try { addSpan(0, quoted.length) } catch (error: dynamic) { status("Condition: " + failureText(error)) }
+                })
+                val clear = document.createElement("button").asDynamic()
+                clear.type = "button"; clear.textContent = "Clear qualifiers"; row.appendChild(clear)
+                on(clear, "click", { event ->
+                    if (busy) return@on
+                    event.stopPropagation(); editor.spans.clear(); editor.unsupportedSpans = false; showSpans(); forgetSavedAssessment()
+                })
+            }
+            savedAssessmentInspectable = valid && rows.size == selections.size && rows.none {
+                it.unsupportedSpans || it.hasParserCondition && it.state.value == "unconditional"
+            }
+            if (!valid || rows.size != selections.size) fields.disabled = true
+            if (mayAssess && review.state in arrayOf("snapshot", "draft", "reject") && valid && rows.size == selections.size) {
+                button("Save condition assessment") {
+                    val assessments = rows.map { row ->
+                        val state = str(row.state.value)
+                        require(state in setOf("unresolved", "unconditional", "conditional")) { "Choose an assessment for each claim" }
+                        require(state != "conditional" || row.spans.isNotEmpty() && !row.unsupportedSpans) {
+                            "Attach a qualifier from each conditional claim's displayed quotation"
+                        }
+                        require(state == "conditional" || row.spans.isEmpty()) { "Only conditional claims carry qualifiers" }
+                        objOf { entry ->
+                            entry.selectionId = row.id; entry.state = state
+                            entry.spans = row.spans.map { span -> objOf { q ->
+                                q.textCid = row.textCid; q.begin = span.begin; q.end = span.end; q.quote = span.quote
+                            } }.toTypedArray()
+                        }
+                    }.toTypedArray()
+                    val request = objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision; it.assessments = assessments }
+                    require(JSON.stringify(request).length <= 262144) { "Assessment is too large; choose fewer claims or shorter qualifiers" }
+                    val requestEpoch = documentReviewCredentialEpoch
+                    val updated = reviewRequest("/assess", request, authenticated = true)
+                    require(present() && requestEpoch == documentReviewCredentialEpoch) {
+                        "Assessment may have been retained, but the source or credential changed; refresh the review"
+                    }
+                    review = updated; savedAssessment = null
+                    try {
+                        val loaded = reviewRequest("/assessment", objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision }, authenticated = true)
+                        require(present() && requestEpoch == documentReviewCredentialEpoch && assessmentMatches(loaded)) {
+                            "Assessment or credential changed while loading; refresh before approval"
+                        }
+                        savedAssessment = loaded; savedAssessmentEpoch = requestEpoch
+                        render()
+                        status("Condition assessment retained; inspect it before approval.")
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: dynamic) {
+                        if (present()) render()
+                        status("Assessment retained, but could not be loaded: " + failureText(error))
+                    }
+                }
+            }
+            if (review.current == true && typeOf(review.assessmentCid) == "string") {
+                button("Load saved assessment") {
+                    val requestEpoch = documentReviewCredentialEpoch
+                    val loaded = reviewRequest("/assessment", objOf { it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision }, authenticated = true)
+                    require(present() && requestEpoch == documentReviewCredentialEpoch && assessmentMatches(loaded)) {
+                        "Assessment or credential changed while loading; refresh before approval"
+                    }
+                    savedAssessment = loaded; savedAssessmentEpoch = requestEpoch
+                    render()
+                }
+            }
+        }
         for ((label, action) in arrayOf("Save draft" to "draft", "Approve exact selection" to "approve",
             "Reject selection" to "reject", "Correct / withdraw approval" to "correct")) {
-            button(label) {
-                require(review.current == true) { "This review is stale; create a snapshot from current evidence" }
+            if (legacyWithdraw && action != "draft") continue
+            val display = when {
+                legacyWithdraw && action == "draft" -> "Withdraw old approval for reassessment"
+                book && action == "draft" && review.state in arrayOf("approve", "release") -> "Withdraw current approval for reassessment"
+                book && action == "draft" && review.state == "consume" -> "Open a new review draft"
+                else -> label
+            }
+            val control = button(display) {
+                require(review.current == true || legacyWithdraw && action == "draft") {
+                    "This review is stale; create a snapshot from current evidence"
+                }
+                if (book && action == "approve") require(approvalReady()) {
+                    "Load the exact complete assessment for this draft before approval"
+                }
                 val request = objOf {
                     it.snapshotCid = review.snapshotCid; it.expectedRevision = review.revision
                     it.action = action; it.note = str(note.value)
+                    if (book && action == "approve") it.expectedAssessmentCid = savedAssessment.assessmentCid
                 }
+                val requestEpoch = documentReviewCredentialEpoch
                 val decided = reviewRequest("/decision", request, authenticated = true)
-                require(present()) { "Decision retained, but this result changed; reopen the review before continuing" }
+                require(present() && requestEpoch == documentReviewCredentialEpoch) {
+                    "Decision may have been retained, but the source or credential changed; refresh the review"
+                }
+                savedAssessment = null
                 review = decided
                 render()
                 status(if (action == "correct") "Approval withdrawn. Correct the source and curate a new snapshot before approval."
                     else "Review " + action + " retained at revision " + str(review.revision))
             }
+            if (book && action == "approve") {
+                approvalButton = control
+                control.disabled = !approvalReady()
+            }
         }
-        if (review.state == "approve" && review.current == true) {
+        if (book && review.state == "approve" && review.conditionReviewState == "conditional-nonexecutable") {
+            val warning = document.createElement("p")
+            warning.textContent = "Conditional assessment cannot be exported as an executable relationship."
+            box.appendChild(warning)
+        } else if (book && review.state == "approve" && review.current == true && !exportReady()) {
+            val warning = document.createElement("p")
+            warning.textContent = "Load the saved assessment to inspect whether this approval can be exported."
+            box.appendChild(warning)
+        }
+        if (review.state == "approve" && review.current == true &&
+            (!book || review.conditionReviewState != "conditional-nonexecutable" && exportReady())) {
+            val export = document.createElement("section").asDynamic()
+            if (book) export.setAttribute("data-condition-export", "")
+            box.appendChild(export)
             val reference = objOf {
                 it.snapshotCid = review.snapshotCid; it.approvalCid = review.decisionCid; it.expectedRevision = review.revision
             }
             val receipt = document.createElement("pre")
             receipt.textContent = JSON.stringify(reference, null, 2)
             receipt.asDynamic().style.cssText = "white-space:pre-wrap;overflow-wrap:anywhere"
-            box.appendChild(receipt)
+            export.appendChild(receipt)
             val instruction = document.createElement("p")
             instruction.textContent = "Put this reference in the workflow's approvals array, then run export. Export issues and consumes its own one-use permit."
-            box.appendChild(instruction)
+            export.appendChild(instruction)
             for ((label, value) in arrayOf("Copy approval reference" to JSON.stringify(reference),
                 "Copy approvals array" to JSON.stringify(arrayOf(reference)))) {
-                val copy = document.createElement("button").asDynamic(); copy.textContent = label; box.appendChild(copy)
+                val copy = document.createElement("button").asDynamic(); copy.textContent = label; export.appendChild(copy)
                 on(copy, "click", { event ->
                     event.stopPropagation()
-                    if (present()) copyText(value) else status("Review changed; refresh before copying approval references.")
+                    if (present() && (!book || exportReady())) copyText(value)
+                    else status("Review or credential changed; reload before copying approval references.")
                 })
             }
         }
         if (review.current != true) {
             val warning = document.createElement("p")
-            warning.textContent = "This snapshot or source is no longer current. Decisions and release are refused."
+            warning.textContent = when {
+                legacyWithdraw -> "This prior approval lacks a condition assessment. Its source is current; withdraw the old approval to reassess it."
+                recoverAssessment -> "The saved assessment is unavailable or invalid. The source is current; record a new assessment before approval."
+                else -> "This snapshot or source is no longer current. Decisions and release are refused."
+            }
             box.appendChild(warning)
         }
     }
     render()
+    reviewFocus.register(box, current)
 }
 
 private fun Panels.documentSourceActions(target: dynamic, selection: dynamic, current: () -> Boolean) {

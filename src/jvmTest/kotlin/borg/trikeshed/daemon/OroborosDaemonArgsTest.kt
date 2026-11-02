@@ -2,6 +2,7 @@ package borg.trikeshed.daemon
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import borg.trikeshed.agent.modelmux.Airgap
 
 class OroborosDaemonArgsTest {
@@ -30,9 +31,17 @@ class OroborosDaemonArgsTest {
     }
 
     @Test
-    fun documentFeedFlagsDoNotBecomeStoragePaths() {
-        val config = OroborosDaemon.parseConfig(arrayOf("--belief-bag", "--document-feed", "/state/forge", "/source/repo"))
+    fun beliefBagFlagDoesNotBecomeStoragePath() {
+        val config = OroborosDaemon.parseConfig(arrayOf("--belief-bag", "/state/forge", "/source/repo"))
         assertEquals(listOf("/state/forge", "/source/repo"), config.positional)
+    }
+
+    @Test
+    fun unsupportedDocumentFeedFlagIsNotTreatedAsStoragePath() {
+        val failure = assertFailsWith<IllegalArgumentException> {
+            OroborosDaemon.parseConfig(arrayOf("--belief-bag", "--document-feed", "/state/forge", "/source/repo"))
+        }
+        kotlin.test.assertTrue(failure.message.orEmpty().contains("--document-feed is not supported"))
     }
 
     @Test
@@ -60,6 +69,20 @@ class OroborosDaemonArgsTest {
         assertEquals("/source/hermes", config.hermesRoot)
         assertEquals("/sleeve/hermes", config.hermesSleeve)
         assertEquals(true, config.hermesConsole)
+    }
+
+    @Test
+    fun nativeHermesWorkerIsExplicitAndIncompatibleWithAirgap() {
+        val restricted = OroborosDaemon.parseConfig(arrayOf("--hermes-console"))
+        assertEquals(false, restricted.hermesNativeWorker)
+        assertEquals(false, OroborosDaemon.nativeHermesWorker(restricted))
+        val selected = OroborosDaemon.parseConfig(arrayOf("--hermes-native-worker", "/state/forge"))
+        assertEquals(true, selected.hermesNativeWorker)
+        assertEquals(listOf("/state/forge"), selected.positional)
+        assertFailsWith<IllegalArgumentException> {
+            OroborosDaemon.nativeHermesWorker(selected.copy(airgap = true))
+        }
+        if (!Airgap.configured()) assertEquals(true, OroborosDaemon.nativeHermesWorker(selected.copy(airgap = false)))
     }
 }
  

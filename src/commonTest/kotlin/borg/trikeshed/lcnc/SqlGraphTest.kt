@@ -9,6 +9,11 @@ import kotlin.test.*
 
 /** The sql.* vocabulary and its codec: lift then lower is the identity on every statement the strict parser reads. */
 class SqlGraphTest {
+    @Test fun quadStarterIsAnInspectionOnlySqlGraph() {
+        val program = LcncProgramConfix.fromJson("sql-quad", LcncPresets.all().getValue("preset-sql-quad"))
+        assertTrue(program.controls.inspectionOnly)
+        assertEquals(SqlGraph.signature(strict("SELECT S, P, O FROM DB.DBA.RDF_QUAD")), SqlGraph.signature(SqlGraph.lower(program)))
+    }
     val corpus = listOf(
         "SELECT a FROM t",
         "SELECT * FROM t",

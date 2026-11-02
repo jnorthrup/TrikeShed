@@ -2,6 +2,9 @@ package borg.trikeshed.collections.associative
 
 import borg.trikeshed.lib.j
 
+enum class CborLimitKind { BYTES, DEPTH, ITEMS }
+class CborLimitException(val kind: CborLimitKind) : IllegalArgumentException("CBOR ${kind.name.lowercase()} limit")
+
 /**
  * CBOR codec for Item -- RFC 8949.
  *
@@ -99,12 +102,30 @@ object Cbor {
 
     fun decode(bytes: ByteArray): Item = Reader(bytes, 0).readItem()
 
+    /** Opt-in bounded structural decoding for untrusted, JSON-shaped CBOR.
+     * Depth counts edges from the root; this does not certify canonical key order.
+     */
+    fun decodeBounded(bytes: ByteArray, maxBytes: Int, maxDepth: Int = 64, maxItems: Int = 1_000_000): Item {
+        require(maxBytes in 0..(16 * 1024 * 1024)) { "Invalid CBOR byte limit" }
+        if (bytes.size > maxBytes) throw CborLimitException(CborLimitKind.BYTES)
+        require(maxDepth in 0..64 && maxItems in 1..1_000_000) { "Invalid CBOR limits" }
+        val snapshot = bytes.copyOf()
+        val reader = Reader(snapshot, 0, maxDepth, maxItems).apply { strictStructure = true }
+        val item = reader.readItem()
+        require(reader.pos == snapshot.size) { "Trailing CBOR bytes" }
+        return item
+    }
+
    class Reader(val data: ByteArray, var pos: Int, val maxDepth: Int = Int.MAX_VALUE, val maxItems: Int = Int.MAX_VALUE) {
+        internal var strictStructure: Boolean = false
         var depth = 0
         var items = 0
 
         fun readItem(): Item {
-            require(depth <= maxDepth && items < maxItems) { "CBOR work limit" }
+            if (strictStructure) {
+                if (depth > maxDepth) throw CborLimitException(CborLimitKind.DEPTH)
+                if (items >= maxItems) throw CborLimitException(CborLimitKind.ITEMS)
+            } else require(depth <= maxDepth && items < maxItems) { "CBOR work limit" }
             items++
             depth++
             try { return readValue() } finally { depth-- }
@@ -115,6 +136,7 @@ object Cbor {
             val major = head shr 5
             val additional = head and 0x1F
 
+            if (strictStructure) require(additional != 31 && major != 6 && !(major == 7 && additional == 23)) { "Unsupported CBOR structure" }
             if (additional == 31) return when (major) {
                 2 -> readIndefBytes()
                 3 -> readIndefText()
@@ -151,6 +173,7 @@ object Cbor {
         }
 
        fun readArray(count: Int): Item.Arr {
+            if (strictStructure && count > maxItems - items) throw CborLimitException(CborLimitKind.ITEMS)
             require(count <= maxItems - items) { "CBOR work limit" }
             val items = ArrayList<Item>(count)
             for (i in 0 until count) items.add(readItem())
@@ -158,12 +181,17 @@ object Cbor {
         }
 
        fun readMap(count: Int): Item.Map {
+            if (strictStructure && count > (maxItems - items) / 2) throw CborLimitException(CborLimitKind.ITEMS)
             require(count <= (maxItems - items) / 2) { "CBOR work limit" }
             val keys = ArrayList<String>(count)
             val vals = ArrayList<Item>(count)
+            val seen = if (strictStructure) HashSet<String>() else null
             for (i in 0 until count) {
                 val keyItem = readItem()
-                keys.add((keyItem as? Item.Str)?.value ?: keyItem.toString())
+                if (strictStructure) require(keyItem is Item.Str) { "CBOR map key is not text" }
+                val key = (keyItem as? Item.Str)?.value ?: keyItem.toString()
+                if (seen != null) require(seen.add(key)) { "Duplicate CBOR map key" }
+                keys.add(key)
                 vals.add(readItem())
             }
             return Item.Map(keys.size j { keys[it] j vals[it] })

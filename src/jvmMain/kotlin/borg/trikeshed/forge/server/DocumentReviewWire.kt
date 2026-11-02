@@ -26,6 +26,60 @@ class DocumentReviewWire private constructor(
             }
             return number.toLong()
         }
+
+        /** reifyStrict retains duplicate entries; reject them recursively before map lookup. */
+        internal fun uniqueJson(value: Any?): Boolean = when (value) {
+            is Map<*, *> -> {
+                val keys = HashSet<Any?>()
+                value.entries.all { it.key is String && keys.add(it.key) && uniqueJson(it.key) && uniqueJson(it.value) }
+            }
+            is List<*> -> value.all(::uniqueJson)
+            is Array<*> -> value.all(::uniqueJson)
+            is String -> value.encodeToByteArray().decodeToString(throwOnInvalidSequence = true) == value
+            else -> true
+        }
+
+        internal fun request(body: String): Map<*, *> {
+            require(body.length <= 262144) { "Review request exceeds 256 KiB" }
+            require(body.encodeToByteArray().decodeToString(throwOnInvalidSequence = true) == body) { "Invalid Unicode in review request" }
+            val value = reifyStrict(body) as? Map<*, *> ?: error("Review request must be an object")
+            require(uniqueJson(value)) { "Duplicate field or invalid Unicode in review request" }
+            require("reviewer" !in value && "synthetic" !in value) { "Reviewer identity comes from authentication" }
+            return value
+        }
+
+        private fun fields(value: Map<*, *>, required: Set<String>, optional: Set<String> = emptySet()) {
+            require(value.keys.all { it is String && it in required + optional } && required.all { it in value }) {
+                "Unexpected or missing review fields"
+            }
+        }
+
+        internal fun assessments(snapshot: ContentId, value: Any?): List<ConditionAssessment> {
+            require(uniqueJson(value)) { "Duplicate field or invalid Unicode in assessments" }
+            val rows = value as? List<*> ?: error("Assessments must be an array")
+            require(rows.size <= 256) { "Assessment selection limit" }
+            fun int(value: Any?): Int {
+                val n = revision(value)
+                require(n <= Int.MAX_VALUE) { "Assessment offset exceeds integer range" }
+                return n.toInt()
+            }
+            return rows.map { raw ->
+                val row = raw as? Map<*, *> ?: error("Assessment must be an object")
+                fields(row, setOf("selectionId", "state", "spans"))
+                val selectionId = row["selectionId"] as? String ?: error("Assessment selectionId required")
+                val state = (row["state"] as? String)?.let { text ->
+                    ConditionAssessmentState.entries.singleOrNull { it.name.lowercase() == text }
+                } ?: error("Assessment state must be unresolved, unconditional, or conditional")
+                val spans = row["spans"] as? List<*> ?: error("Assessment spans must be an array")
+                require(spans.size <= 16) { "Assessment span limit" }
+                ConditionAssessment(snapshot, selectionId, state, spans.map { rawSpan ->
+                    val span = rawSpan as? Map<*, *> ?: error("Assessment span must be an object")
+                    fields(span, setOf("textCid", "begin", "end", "quote"))
+                    ConditionSpan(ContentId(span["textCid"] as? String ?: error("Assessment textCid required")),
+                        int(span["begin"]), int(span["end"]), span["quote"] as? String ?: error("Assessment quote required"))
+                })
+            }
+        }
         suspend fun open(ctx: ModuleContext, corpus: ProjectCorpus, books: ConstellationNodes): DocumentReviewWire =
             withContext(fileIoContext) {
                 val files = checkNotNull(ctx.scope.coroutineContext[FileOperations])
@@ -65,7 +119,7 @@ class DocumentReviewWire private constructor(
                         retained && DocumentCurationLegos.current(corpus, source) && (evidenceId == null ||
                             evidence?.get("cid") == source.metadata["evidenceCid"]?.singleOrNull() &&
                                 (evidence?.get("fields") as? Map<*, *>)?.get("deleted") != true)
-                    }, clock = ctx.clock)
+                    }, clock = ctx.clock, conditionPolicy = ConditionReviewPolicy.STRICT_BOOK)
                 try {
                     review.open(CoroutineScope(ctx.scope.coroutineContext + fileIoContext))
                     DocumentReviewWire(ctx, log, review, principals, corpus).also {
@@ -94,8 +148,17 @@ class DocumentReviewWire private constructor(
             review.snapshot(node.params["kind"] ?: "book", cid, ids)
         }
         bindings["document.reviewDecision"] = LcncNodeRunner { node, inputs ->
+            require(inputs["expectedAssessmentCid"] == null || inputs["expectedAssessmentCid"] is String) { "Assessment CID must be text" }
             review.decide(ContentId(inputs["snapshotCid"] as String), revision(inputs["expectedRevision"]),
-                node.params["action"] ?: "draft", node.params["note"].orEmpty())
+                node.params["action"] ?: "draft", node.params["note"].orEmpty(),
+                (inputs["expectedAssessmentCid"] as? String)?.let(::ContentId))
+        }
+        bindings["document.reviewAssess"] = LcncNodeRunner { _, inputs ->
+            val snapshot = ContentId(inputs["snapshotCid"] as String)
+            review.assess(snapshot, revision(inputs["expectedRevision"]), assessments(snapshot, inputs["assessments"]))
+        }
+        bindings["document.reviewAssessment"] = LcncNodeRunner { _, inputs ->
+            review.assessment(ContentId(inputs["snapshotCid"] as String), revision(inputs["expectedRevision"]))
         }
         bindings["document.reviewRelease"] = LcncNodeRunner { _, inputs ->
             review.release(ContentId(inputs["snapshotCid"] as String), ContentId(inputs["approvalCid"] as String),
@@ -105,7 +168,7 @@ class DocumentReviewWire private constructor(
         ctx.blackboard.put("lcnc/readiness/document.reviewDecision", mapOf(
             "available" to principals.isNotEmpty(), "reason" to if (principals.isEmpty()) "No analyst principal is configured" else null,
             "prerequisites" to listOf("authenticated analyst session")), "documents")
-        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release"))
+        for (suffix in listOf("", "/session", "/snapshot", "/decision", "/release", "/assess", "/assessment"))
             ctx.routes.claim("document-review", "/api/documents/review$suffix", route = ::route)
     }
 
@@ -122,7 +185,8 @@ class DocumentReviewWire private constructor(
     private suspend fun route(method: String, path: String, text: String, respond: (suspend (ByteArray) -> Unit)?): WireHttpResponse {
         val endpoint = path.substringBefore('?')
         val actor = principal(text)
-        if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release")) && actor == null)
+        if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
+                endpoint.endsWith("/assess") || endpoint.endsWith("/assessment")) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
         return try {
             requests.call {
@@ -134,16 +198,27 @@ class DocumentReviewWire private constructor(
                     }
                     method == "POST" -> {
                         val body = text.substringAfter("\r\n\r\n", text)
-                        require(body.length <= 262144) { "Review request exceeds 256 KiB" }
-                        val input = reifyMap(body)
-                        require("reviewer" !in input && "synthetic" !in input) { "Reviewer identity comes from authentication" }
-                        fun cid(key: String) = ContentId(input[key] as String)
+                        val input = request(body)
+                        fun cid(key: String) = ContentId(input[key] as? String ?: error("$key required"))
                         fun revision() = revision(input["expectedRevision"])
                         json(when {
                             endpoint.endsWith("/snapshot") -> review.snapshot(input["kind"] as String, cid("receiptCid"),
                                 (input["selection"] as List<*>).map { it as String })
+                            endpoint.endsWith("/assess") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision", "assessments"))
+                                val snapshot = cid("snapshotCid")
+                                review.assess(snapshot, revision(), assessments(snapshot, input["assessments"]))
+                            }
+                            endpoint.endsWith("/assessment") -> withContext(checkNotNull(actor)) {
+                                fields(input, setOf("snapshotCid", "expectedRevision"))
+                                review.assessment(cid("snapshotCid"), revision())
+                            }
                             endpoint.endsWith("/decision") -> withContext(checkNotNull(actor)) {
-                                review.decide(cid("snapshotCid"), revision(), input["action"] as String, input["note"] as? String ?: "")
+                                fields(input, setOf("snapshotCid", "expectedRevision", "action"), setOf("note", "expectedAssessmentCid"))
+                                require(input["note"] == null || input["note"] is String) { "Review note must be text" }
+                                require(input["expectedAssessmentCid"] == null || input["expectedAssessmentCid"] is String) { "Assessment CID must be text" }
+                                review.decide(cid("snapshotCid"), revision(), input["action"] as String, input["note"] as? String ?: "",
+                                    (input["expectedAssessmentCid"] as? String)?.let(::ContentId))
                             }
                             endpoint.endsWith("/release") -> review.release(cid("snapshotCid"), cid("approvalCid"), revision())
                             else -> error("Unknown review endpoint")

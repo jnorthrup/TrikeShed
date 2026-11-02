@@ -108,15 +108,18 @@ object AgentSleeveRegistry {
     /**
      * Pi — the Pi coding agent as a guest.
      *
-     * Donor root is unpinned, which is deliberate rather than an omission: nothing can be trapped until
-     * the checkout is named, so the sleeve is RED on that alone. The traps listed are the four sandbox
-     * bounds every guest meets, carried here so the first boot has somewhere to record what it hits.
+     * Upstream https://github.com/badlogic/pi-mono.git was inspected at
+     * cf74b67653633c565cf2033e78c19c5525ed2432 (Pi 1.5.0). The entry below identifies donor
+     * TypeScript source, not an executable guest module. No reviewed JS bundle is staged, so
+     * donorRoot remains null and this sleeve stays RED. The coding agent requires Node >=22.19.0;
+     * enabling Node is not a substitute for the restricted guest boundary. The four unresolved
+     * bounds remain inventory requirements, not measured Pi traps.
      */
     val PI = AgentSleeveManifest(
         id = "pi",
-        facet = VmFacet.GRAAL_PYTHON,
-        entryModule = "pi.main",
-        sleeveRoot = "utils/graalpy-sleeve/pi",
+        facet = VmFacet.GRAAL_JS,
+        entryModule = "packages/coding-agent/src/index.ts",
+        sleeveRoot = "utils/graaljs-sleeve/pi",
         donorRoot = null,
         traps = boundTraps("pi"),
     )

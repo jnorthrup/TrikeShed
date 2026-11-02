@@ -51,7 +51,7 @@ data class EternalRule(
             val obj = (list.elements[2] as? KifExpr.Atom)?.token ?: return null
             val (copula, relation) = KgNalBridge.mapPredicate(pred)
             val evidence = EvidenceCoord(Nal.UNIT, 0L)
-            return EternalRule(subj, obj, copula, evidence)
+            return EternalRule(subj, obj, KgNalBridge.causalRuleCopula(copula, relation), evidence)
         }
 
         /**
@@ -75,7 +75,7 @@ data class EternalRule(
         ): EternalRule = EternalRule(
             antecedent = triplet.subject,
             consequent = triplet.obj,
-            copula = copula,
+            copula = KgNalBridge.causalRuleCopula(copula, relation),
             evidence = EvidenceCoord(evidenceWeight, 0L),
         )
     }

@@ -91,7 +91,7 @@ class ProjectMiner(
         }
         /** Markup read as its markup declares it ([borg.trikeshed.narsese.MarkupStreams]): no print, no OCR, no Tika. */
         val MARKUP = setOf("html", "htm", "xhtml")
-        /** Formats read into curation: PDF pages, markup, and what Tika earns its keep on. Plain text/markdown mints at mount already. */
+        /** Formats automatically offered for curation: PDF pages, markup, and other Tika inputs. */
         val MINEABLE = setOf(
             "pdf", "docx", "doc", "rtf", "odt", "pptx", "ppt", "xlsx", "epub",
             "png", "jpg", "jpeg", "tif", "tiff", "bmp", "webp",

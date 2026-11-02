@@ -3,6 +3,16 @@ package narchy.spacegraph
 import kotlin.test.*
 
 class CuratorReadingTest {
+    @Test fun sectionLinkCarriesTheExactBookAndOrdinal() {
+        val book = "A & B/party's agreement"
+        val page = borg.trikeshed.wiki.WikiSurface.curationSectionPath(book, 3)
+        val html = CuratorReading.html(mapOf("book" to book, "ordinal" to 3, "wikiAvailable" to true))
+        assertTrue("href='${borg.trikeshed.wiki.WikiSurface.url(page)}'" in html)
+        assertTrue("A%2520%2526%2520B%252Fparty%2527s%2520agreement" in html)
+        assertFalse("Open this section in the wiki" in CuratorReading.html(mapOf("book" to book)))
+        assertFalse("Open this section in the wiki" in CuratorReading.html(mapOf("book" to book, "ordinal" to 3, "wikiAvailable" to false)))
+    }
+
     @Test fun bertReceiptsAreNotRenderedAsJevJudgments() {
         val receipt = mapOf("model" to "bert-test", "status" to "Supported", "neighbors" to
             listOf(mapOf("source" to "label's-source", "table" to "retained/0.json", "sense" to "Organization", "cosine" to 0.9)))

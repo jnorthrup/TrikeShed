@@ -299,6 +299,7 @@ class HermesVmConsoleTest {
                 assertFalse(html.contains("id=\"command\""))
                 val snapshot = wire.route("GET", "/api/hermes/terminal", "", null)
                 assertTrue(snapshot?.body?.contains("\"kind\":\"xterm-256color\"") == true)
+                assertTrue(snapshot?.body?.contains("\"runtimeTier\":\"restricted-vfs\"") == true)
                 val resized = wire.route(
                     "POST", "/api/hermes/terminal/resize",
                     "POST / HTTP/1.1\r\n\r\n{\"columns\":52,\"rows\":9}", null,
@@ -316,6 +317,23 @@ class HermesVmConsoleTest {
                 wire.drain()
             }
         } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
+    fun terminalRouteShowsNativeTrustBeforeWorkerStarts() = runTest {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val console = HermesVmConsole(Path.of("unused"), Path.of("unused"),
+            workerConfiguration = borg.trikeshed.graal.subvm.PythonWorker())
+        val wire = HermesConsoleWire(console, scope)
+        try {
+            val snapshot = wire.route("GET", "/api/hermes/terminal", "", null)
+            assertEquals(200, snapshot?.status)
+            assertTrue(snapshot?.body?.contains("\"runtimeTier\":\"native-own-trust\"") == true)
+            assertEquals(HermesVmConsole.State.CLOSED, console.state)
+        } finally {
+            wire.drain()
             scope.cancel()
         }
     }

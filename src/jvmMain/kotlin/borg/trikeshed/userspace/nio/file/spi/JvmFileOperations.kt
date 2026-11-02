@@ -30,7 +30,7 @@ import java.util.zip.ZipFile
  * JVM userspace.nio adapter — pure [java.nio.file] / NIO channels.
  * No java.io.File. Platform filesystem is only this adapter layer.
  */
-class JvmFileOperations : FileOperations {
+class JvmFileOperations : FileOperations, BoundedFileReader {
 
     override val durability: StorageDurability get() = StorageDurability.DURABLE
 
@@ -98,6 +98,17 @@ class JvmFileOperations : FileOperations {
 
     override fun readAllBytes(filename: String): ByteArray =
         NioFiles.readAllBytes(pathOf(filename))
+
+    override fun readBounded(path: String, maxBytes: Int): ByteArray {
+        require(maxBytes >= 0 && maxBytes < Int.MAX_VALUE) { "Invalid file read limit" }
+        // Read from one opened handle; a size(path) check followed by readAllBytes can
+        // allocate beyond the bound if another writer changes the file between calls.
+        return NioFiles.newInputStream(pathOf(path)).use { input ->
+            val bytes = input.readNBytes(maxBytes + 1)
+            if (bytes.size > maxBytes) throw BoundedReadLimitException(maxBytes)
+            bytes
+        }
+    }
 
     override fun readString(filename: String): String =
         NioFiles.readString(pathOf(filename), StandardCharsets.UTF_8)

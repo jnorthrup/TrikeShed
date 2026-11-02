@@ -115,7 +115,10 @@ class TurnReviewElement(
         val byContext = facts.groupBy { it.contextTerm }
         outer@ for ((context, group) in byContext) {
             if (group.size < 2) continue
-            val truths = group.map { TruthCoord(if (it.ok) 1f else 0f, 0.9f) }
+            // The observation above judges the fact in the outcome of the whole turn.
+            // Induction must use that same outcome: a successful tool call in a failed
+            // turn is not positive evidence that the resulting association worked.
+            val truths = group.map { TruthCoord(if (it.ok && turnSucceeded) 1f else 0f, 0.9f) }
             for (i in group.indices) for (jj in i + 1 until group.size) {
                 if (landed.size >= intakeCap) break@outer
                 val a = group[i].objectTerm ?: group[i].verb

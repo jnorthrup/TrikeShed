@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.wiki.WikiSurface
 
 /**
  * THE DOCUMENT SURFACE: the muggle half of Forge, and the first page whose logic lives in
@@ -20,6 +21,8 @@ data class ProjectRow(val name: String, val kind: String, val docs: Int, val pat
 
 data class DocRow(val id: String, val cid: String, val rev: String, val seq: Long, val length: Long, val contentType: String)
 
+data class DocRevision(val project: String, val id: String, val cid: String, val rev: String, val seq: Long)
+
 data class DocView(
     val project: String,
     val id: String,
@@ -30,6 +33,10 @@ data class DocView(
     val text: String,
     /** The miner's `.extract.md` twin when one sits beside the document. */
     val extract: String? = null,
+    val hasRevisionDetails: Boolean = false,
+    val sourceRevision: DocRevision? = null,
+    val displayTextRevision: DocRevision? = null,
+    val extractionRevision: DocRevision? = null,
 )
 
 /** Page reads one document; Table reads the whole project as rows. Both are the same data. */
@@ -64,6 +71,8 @@ data class CurationResult(
     val proposals: List<CurationProposal>, val reasons: List<String>, val axioms: List<CurationAxiom>,
     val stages: Series<CurationStageReceipt> = emptySeriesOf(),
     val modelReceipt: CurationModelReceipt? = null,
+    val project: String? = null,
+    val documentId: String? = null,
 )
 
 /** The table's sortable columns, each with the header a reader sees. */
@@ -82,6 +91,12 @@ object DocumentSurface {
     const val CONTENT_ID = "ds-content"
     const val DIGEST_HREF = "/harness?load=preset-corpus"
     const val CURATION_HASH = "curation"
+
+    /** Split before URL decoding so an encoded slash stays inside the project or document ID. */
+    fun fragmentParts(fragment: String): Pair<String, String> {
+        val raw = fragment.removePrefix("#")
+        return Pair(raw.substringBefore('/'), raw.substringAfter('/', ""))
+    }
 
     // ── parsing the routes' JSON ────────────────────────────────────────────
 
@@ -116,6 +131,12 @@ object DocumentSurface {
     fun document(json: Any?): DocView? {
         val m = json as? Map<*, *> ?: return null
         val id = m["id"]?.toString() ?: return null
+        fun revision(value: Any?): DocRevision? {
+            val r = value as? Map<*, *> ?: return null
+            return DocRevision(r["project"] as? String ?: return null, r["id"] as? String ?: return null,
+                r["cid"] as? String ?: return null, r["rev"] as? String ?: return null,
+                (r["seq"] as? Number)?.toLong() ?: return null)
+        }
         return DocView(
             project = m["project"]?.toString().orEmpty(),
             id = id,
@@ -125,6 +146,10 @@ object DocumentSurface {
             contentType = m["contentType"]?.toString().orEmpty(),
             text = m["text"]?.toString().orEmpty(),
             extract = m["extract"]?.toString(),
+            hasRevisionDetails = m.containsKey("sourceRevision") || m.containsKey("displayTextRevision"),
+            sourceRevision = revision(m["sourceRevision"]),
+            displayTextRevision = revision(m["displayTextRevision"]),
+            extractionRevision = revision(m["extractionRevision"]),
         )
     }
 
@@ -155,6 +180,7 @@ object DocumentSurface {
         val receiptCid = m["receiptCid"]?.toString() ?: return null
         val record = m["record"] as? Map<*, *> ?: return null
         val source = record["source"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+        val revision = source["project"] as? Map<*, *>
         val submittedCids = (record["submitted"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
         val duplicateCids = (record["duplicates"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
         val proposals = (record["proposals"] as? List<*> ?: emptyList<Any?>()).mapNotNull { row ->
@@ -188,6 +214,8 @@ object DocumentSurface {
                 (r["httpStatus"] as? Number)?.toInt(), (r["latencyMs"] as? Number)?.toLong(),
                 r["cachedHit"] as? Boolean, r["errorClass"] as? String,
             ) },
+            project = revision?.get("project") as? String,
+            documentId = revision?.get("id") as? String,
         )
     }
 
@@ -253,6 +281,14 @@ object DocumentSurface {
         append("<h2 class=\"ds-curate-h2\">").append(esc(result.name.ifBlank { "Untitled" })).append("</h2>")
         append("<p class=\"ds-sub\">Saved attempt · <code class=\"ds-cid\" title=\"")
             .append(esc(result.receiptCid)).append("\">").append(esc(shortCid(result.receiptCid))).append("</code></p>")
+        val project = result.project?.takeIf { it.isNotBlank() && it != CURATION_HASH }
+        val documentId = result.documentId?.takeIf { it.isNotBlank() }
+        if (project != null && documentId != null) {
+            append("<p><a href=\"/documents#").append(WikiSurface.encode(project)).append('/').append(WikiSurface.encode(documentId))
+                .append("\" data-source-project=\"").append(esc(project)).append("\" data-source-document=\"")
+                .append(esc(documentId)).append("\">Open current project document</a> ")
+                .append("(it may have changed since this attempt).</p>")
+        }
         append(curationConfixLink(result.receiptCid, "Inspect retained attempt in Confix"))
         append(curationReceiptsHtml(result))
         append("<details class=\"ds-curate-source\"><summary>Source text</summary><pre>")
@@ -521,12 +557,29 @@ object DocumentSurface {
         val sb = StringBuilder()
         sb.append("<div class=\"ds-page\">")
         sb.append("<h1 class=\"ds-title\">").append(esc(view.id)).append("</h1>")
-        sb.append("<p class=\"ds-sub\">").append(esc(view.contentType.ifBlank { "document" }))
-            .append(" · sequence ").append(view.seq)
-            .append(" · <code class=\"ds-cid\" title=\"").append(esc(view.cid)).append("\">")
-            .append(esc(shortCid(view.cid))).append("</code>")
-            .append(" · rev <code title=\"").append(esc(view.rev)).append("\">")
-            .append(esc(shortRev(view.rev))).append("</code></p>")
+        fun showRevision(label: String, revision: DocRevision?) {
+            sb.append("<p class=\"ds-sub\">").append(esc(label)).append(": ")
+            if (revision == null) sb.append("unavailable") else sb.append(esc(revision.id))
+                .append(" · sequence ").append(revision.seq)
+                .append(" · <code class=\"ds-cid\" title=\"").append(esc(revision.cid)).append("\">")
+                .append(esc(shortCid(revision.cid))).append("</code>")
+                .append(" · rev <code title=\"").append(esc(revision.rev)).append("\">")
+                .append(esc(shortRev(revision.rev))).append("</code>")
+            sb.append("</p>")
+        }
+        if (view.hasRevisionDetails) {
+            sb.append("<p class=\"ds-sub\">").append(esc(view.contentType.ifBlank { "document" })).append("</p>")
+            showRevision("Source document", view.sourceRevision)
+            showRevision("Displayed text", view.displayTextRevision)
+            sb.append("<p class=\"ds-sub\">Text may be a preview. Revisions are read separately; an extraction is not verified against this source here.</p>")
+        } else {
+            sb.append("<p class=\"ds-sub\">").append(esc(view.contentType.ifBlank { "document" }))
+                .append(" · sequence ").append(view.seq)
+                .append(" · <code class=\"ds-cid\" title=\"").append(esc(view.cid)).append("\">")
+                .append(esc(shortCid(view.cid))).append("</code>")
+                .append(" · rev <code title=\"").append(esc(view.rev)).append("\">")
+                .append(esc(shortRev(view.rev))).append("</code></p>")
+        }
         sb.append("<article class=\"ds-body\">")
         if (isMarkdown(view)) {
             var ordinal = 0
@@ -536,7 +589,10 @@ object DocumentSurface {
         } else sb.append("<pre>").append(DocumentMarkdown.escape(view.text)).append("</pre>")
         sb.append("</article>")
         view.extract?.let { twin ->
-            sb.append("<section class=\"ds-extract\"><h2>Extract (the miner's twin)</h2>").append(DocumentMarkdown.render(twin)).append("</section>")
+            if (view.hasRevisionDetails && view.extractionRevision != null && view.extractionRevision == view.displayTextRevision) return@let
+            sb.append("<section class=\"ds-extract\"><h2>Extract (the miner's twin)</h2>")
+            if (view.hasRevisionDetails) showRevision("Extracted text", view.extractionRevision)
+            sb.append(DocumentMarkdown.render(twin)).append("</section>")
         }
         sb.append("</div>")
         return sb.toString()

@@ -2,8 +2,11 @@ package borg.trikeshed.btrfs
 
 import borg.trikeshed.cas.CasPaths
 import borg.trikeshed.job.CasStore
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
+import borg.trikeshed.userspace.nio.file.spi.BoundedFileReader
+import borg.trikeshed.userspace.nio.file.spi.BoundedReadLimitException
 import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.reflink.ReferenceCounter
 
@@ -59,7 +62,7 @@ class BtrfsReflinkStore(
      * (decision D14) — same filesystem, so `cp --reflink=always` is legal across the planes.
      */
     private val topicRoot: String = rootDir.trimEnd('/').substringBeforeLast('/', rootDir),
-) : CasStore() {
+) : CasStore(), BoundedCasReader {
 
     override val durability get() = fileOps.durability
 
@@ -225,6 +228,18 @@ class BtrfsReflinkStore(
         if (ContentId.of(bytes) != cid) {
             throw IllegalStateException("CAS integrity failure: stored blob for $cid does not match hash")
         }
+        return bytes
+    }
+
+    override fun getBounded(cid: ContentId, maxBytes: Int): ByteArray? {
+        require(maxBytes >= 0 && maxBytes < Int.MAX_VALUE) { "Invalid CAS read limit" }
+        val reader = fileOps as? BoundedFileReader
+            ?: throw UnsupportedOperationException("Bounded file reads are unavailable")
+        val target = readablePath(cid)
+        if (!fileOps.exists(target)) return null
+        val bytes = reader.readBounded(target, maxBytes)
+        if (bytes.size > maxBytes) throw BoundedReadLimitException(maxBytes)
+        check(ContentId.of(bytes) == cid) { "CAS integrity failure: stored blob for $cid does not match hash" }
         return bytes
     }
 

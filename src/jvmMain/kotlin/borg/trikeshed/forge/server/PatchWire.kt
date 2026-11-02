@@ -79,6 +79,10 @@ class ProjectScopes(
     @Volatile
     private var scopes: List<Scope> = emptyList()
     private val mutex = Mutex()
+    // Loaded before mount/remount hooks can offer any document to intake.
+    private val ledgerLock = Any()
+    private val intakePolicies = ProjectIntakePolicies(ledgerFile, fileOps, casStore, ledgerLock)
+    private val unmountRecovery = java.util.concurrent.ConcurrentHashMap<String, String>()
     /** Serialize managed-path changes with promotion of their prior content into owned CAS bytes. */
     private val sourceWrites = Any()
     private val closingSources = mutableSetOf<String>()
@@ -98,11 +102,44 @@ class ProjectScopes(
     fun decisionProvider(project: String, id: String): DecisionProvider? = documentProviders[project to id]
         ?: scopes.firstOrNull { it.name == project }?.decisionProvider
 
+    /** This controls future intake admissions, not direct joins or existing constellation members. */
+    fun intakeMode(project: String): CurationIntake.Mode = unmountRecovery[project]?.let { CurationIntake.Mode.Blocked(it) }
+        ?: intakePolicies.mode(project)
+
+    fun intakePolicyStatus(project: String): Map<String, Any?> = when (val mode = intakeMode(project)) {
+        CurationIntake.Mode.Legacy -> mapOf("mode" to "legacy")
+        is CurationIntake.Mode.ReviewRequired -> mapOf("mode" to "review-required", "ontologyCid" to mode.ontologyCid.value)
+        is CurationIntake.Mode.Blocked -> mapOf("mode" to "blocked", "reason" to mode.reason)
+    } + ("appliesTo" to "future-intake-admissions")
+
+    /** Persist a per-project selection; failure never acknowledges a policy change. */
+    fun setIntakePolicy(project: String, mode: CurationIntake.Mode) {
+        require(scopes.any { it.name == project }) { "no project '$project'" }
+        check(!unmountRecovery.containsKey(project)) { "Project requires unmount recovery" }
+        intakePolicies.set(project, mode)
+    }
+
     /** An explicit document request persists independently of later project selections. */
     fun admitDocument(project: String, id: String, provider: DecisionProvider? = decisionProvider(project, id)) {
+        val selectedText = CurationIntake.explicitText(id)
         require(!borg.trikeshed.lcnc.ProjectNodes.twin(id) && !id.endsWith(ProjectMiner.FOOTNOTES_SUFFIX) &&
-            id.substringAfterLast('.', "").lowercase() in ProjectMiner.MINEABLE) { "Document format is not supported for curation: $id" }
+            (selectedText || id.substringAfterLast('.', "").lowercase() in ProjectMiner.MINEABLE)) { "Document format is not supported for curation: $id" }
         val pdb = requireNotNull(projectDbs?.get(project)) { "no project db '$project'" }
+        if (selectedText) {
+            synchronized(sourceWrites) {
+                check(project !in closingSources) { "project is unmounting: $project" }
+                val head = pdb.store.head
+                val rev = requireNotNull(head.getRev(id)) { "no document '$project/$id'" }
+                val seq = requireNotNull(head.sequenceOf(id)) { "Document sequence is unavailable" }
+                val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
+                check(!head.isDeleted(id) && head.getRev(id) == rev && head.sequenceOf(id) == seq) {
+                    "Document revision changed during selection"
+                }
+                val selected = borg.trikeshed.lcnc.ProjectDoc(project, id, ref.contentId.value, rev, seq, ref.length, ref.contentType)
+                requireNotNull(onTextForReview) { "Text review intake is not available" }.invoke(selected)
+            }
+            return
+        }
         val ref = requireNotNull(pdb.gateway.getAttachmentRef(id)) { "no document '$project/$id'" }
         val intake = requireNotNull(onDocument) { "Document curation intake is not available" }
         if (provider != null) {
@@ -207,6 +244,8 @@ class ProjectScopes(
 
     /** Told of every document an upload lands (never its twins): the intake that reads and curates it. */
     @Volatile var onDocument: ((project: String, id: String, decisionProvider: DecisionProvider?) -> Unit)? = null
+    /** Separate from automatic mount/upload intake; selected text requires review. */
+    @Volatile var onTextForReview: ((borg.trikeshed.lcnc.ProjectDoc) -> Unit)? = null
 
     /** One uploaded file into an upload-kind project db; manifest line makes it boot-durable. */
     fun uploadPut(name: String, relPath: String, bytes: ByteArray,
@@ -425,6 +464,7 @@ class ProjectScopes(
 
     /** Unmount: registry + ledger + manifest + files clone all released. Docs' CAS blobs stay (content-addressed). */
     suspend fun unmount(name: String): Boolean = mutex.withLock {
+        check(!unmountRecovery.containsKey(name)) { "Project requires unmount recovery: ${unmountRecovery[name]}" }
         val had = synchronized(sourceWrites) {
             if (scopes.none { it.name == name }) false
             else {
@@ -441,15 +481,61 @@ class ProjectScopes(
             }
         }
         if (!had) return false
+        var removedLedgerRow: String? = null
         try {
+            // Publish the durable unmount first. If its outcome is uncertain the guard
+            // blocks intake and the still-mounted DB remains available for recovery.
+            synchronized(sourceWrites) {
+                ledgerFile?.let { f -> synchronized(ledgerLock) {
+                    try {
+                        if (f.exists()) {
+                            val rows = f.readLines()
+                            val removed = rows.filter { it.substringBefore('\t') == name }
+                            check(removed.size <= 1) { "Duplicate project ledger rows" }
+                            removedLedgerRow = removed.singleOrNull()
+                            val remaining = rows.filter { it.substringBefore('\t') != name }
+                            val body = if (remaining.isEmpty()) "" else remaining.joinToString(separator = "\n", postfix = "\n")
+                            fileOps.writeAtomically(f.absolutePath, body.encodeToByteArray())
+                        }
+                    } finally {
+                        intakePolicies.retire(name)
+                    }
+                }
+                }
+            }
             // Registry reader draining can suspend; no JVM monitor is held across it.
-            projectDbs?.remove(name)
+            try {
+                projectDbs?.remove(name)
+            } catch (failure: Throwable) {
+                // The registry removes its DB before draining its reader, so it may
+                // already be absent. Preserve all data and refuse blind cleanup/retry.
+                unmountRecovery[name] = "Registry removal failed; operator recovery is required"
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    val restoration = runCatching {
+                        // Do not restore the row unless a durable recovery marker can
+                        // keep it blocked on the next boot, including legacy projects.
+                        intakePolicies.markRecovery(name)
+                        val row = requireNotNull(removedLedgerRow) { "No prior ledger row was available" }
+                        val file = requireNotNull(ledgerFile)
+                        synchronized(ledgerLock) {
+                            val rows = if (file.exists()) file.readLines() else emptyList()
+                            val same = rows.filter { it.substringBefore('\t') == name }
+                            require(same.isEmpty() || same == listOf(row)) { "Project ledger changed during recovery" }
+                            if (same.isEmpty()) fileOps.writeAtomically(file.absolutePath,
+                                (rows + row).joinToString(separator = "\n", postfix = "\n").encodeToByteArray())
+                        }
+                    }
+                    restoration.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                    unmountRecovery[name] = if (restoration.isSuccess)
+                        "Registry removal failed; ledger restored, operator recovery required"
+                    else "Registry removal failed; ledger restoration failed, operator recovery required"
+                }
+                if (failure is kotlinx.coroutines.CancellationException) throw failure
+                throw IllegalStateException(unmountRecovery.getValue(name), failure)
+            }
             synchronized(sourceWrites) {
                 scopes = scopes.filter { it.name != name }
                 documentProviders.keys.removeIf { it.first == name }
-                ledgerFile?.takeIf { it.exists() }?.let { f ->
-                    runCatching { f.writeText(f.readLines().filter { it.substringBefore('\t') != name }.joinToString("\n").let { if (it.isBlank()) "" else it + "\n" }) }
-                }
                 manifestFileFor(name)?.delete()
                 commits.remove(name)?.close()
                 projectCouchDir(name)?.deleteRecursively()
@@ -469,11 +555,12 @@ class ProjectScopes(
     /** Append to the mount ledger (name TAB kind TAB path TAB decisionProvider?), deduped by name. */
     private fun ledgerAppend(name: String, kind: String, path: String, decisionProvider: DecisionProvider? = null) {
         val f = ledgerFile ?: return
-        runCatching {
+        synchronized(ledgerLock) {
             f.parentFile?.mkdirs()
             val existing = if (f.exists()) f.readLines() else emptyList()
             if (existing.none { it.substringBefore('\t') == name }) {
-                f.appendText("$name\t$kind\t$path" + (decisionProvider?.let { "\t${it.id}" } ?: "") + "\n")
+                val row = "$name\t$kind\t$path" + (decisionProvider?.let { "\t${it.id}" } ?: "")
+                fileOps.writeAtomically(f.absolutePath, (existing + row).joinToString(separator = "\n", postfix = "\n").encodeToByteArray())
             }
         }
     }
@@ -822,7 +909,8 @@ class PatchWire(
                 mapOf(
                     "scopes" to scopes.list().map {
                         mapOf("name" to it.name, "path" to it.path, "kind" to it.kind, "prefix" to it.prefix,
-                            "paths" to it.paths, "minted" to it.minted, "docs" to it.docs, "decisionProvider" to it.decisionProvider?.id)
+                            "paths" to it.paths, "minted" to it.minted, "docs" to it.docs, "decisionProvider" to it.decisionProvider?.id,
+                            "intakePolicy" to scopes.intakePolicyStatus(it.name))
                     },
                 ),
             )
@@ -1021,14 +1109,17 @@ class PatchWire(
                     // A binary document (a PDF, a scan) reads as its miner's extract twin.
                     val text = c.read(name, id, 262_144) ?: twin
                     if (text == null) {
-                        val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
+                        val listed = c.document(name, id)
                         if (listed == null) json(mapOf("error" to "absent", "project" to name, "id" to id), 404)
                         else json(mapOf("error" to "not_text", "project" to name, "id" to id, "contentType" to listed.contentType, "length" to listed.length, "cid" to listed.cid), 415)
                     } else {
                         val notes = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX, 262_144)
-                        val listed = c.docs(name, id, "", 8).firstOrNull { it.id == id }
+                        val listed = c.document(name, id)
+                        fun revision(t: borg.trikeshed.lcnc.ProjectText): Map<String, Any?> =
+                            linkedMapOf("project" to t.project, "id" to t.id, "cid" to t.cid, "rev" to t.rev, "seq" to t.seq)
                         json(linkedMapOf<String, Any?>("project" to name, "id" to id, "cid" to text.cid, "rev" to text.rev, "seq" to text.seq,
-                            "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text)
+                            "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text,
+                            "sourceRevision" to listed?.toMap(), "displayTextRevision" to revision(text), "extractionRevision" to twin?.let(::revision))
                             .also { m -> twin?.let { m["extract"] = it.text }; notes?.let { m["notes"] = it.text } })
                     }
                 }
@@ -1057,15 +1148,16 @@ class PatchWire(
                 runCatching { m.recognize(rest.substringBefore('/'), id) }.fold({ json(it) }, { json(mapOf("error" to (it.message ?: "")), 400) })
             }
             method == "POST" && p.startsWith("/api/projects/") && p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("ingest/") -> {
-                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
                 val rest = p.removePrefix("/api/projects/")
                 val name = rest.substringBefore('/'); val id = java.net.URLDecoder.decode(rest.substringAfter("ingest/"), "UTF-8")
                 val provider = runCatching { parse(text)["decisionProvider"]?.let { DecisionProvider.of(it.toString()) }
                     ?: scopes.decisionProvider(name, id) }.getOrElse { return json(mapOf("error" to it.message), 400) }
-                if (provider != null) return runCatching { scopes.admitDocument(name, id, provider) }.fold(
-                    { json(mapOf("verdict" to "queued", "project" to name, "id" to id, "decisionProvider" to provider.id), 202) },
+                if (provider != null || CurationIntake.explicitText(id)) return runCatching { scopes.admitDocument(name, id, provider) }.fold(
+                    { json(mapOf("verdict" to "queued", "project" to name, "id" to id,
+                        "decisionProvider" to if (CurationIntake.explicitText(id)) null else provider?.id), 202) },
                     { json(mapOf("error" to it.message), 400) },
                 )
+                val m = miner ?: return json(mapOf("error" to "miner not wired"), 503)
                 val bg = mountScope
                 if (bg == null) runCatching { m.ingest(name, id) }.fold({ json(it) }, { json(mapOf("error" to (it.message ?: "")), 400) })
                 else {

@@ -1,5 +1,7 @@
 package narchy.spacegraph
 
+import borg.trikeshed.wiki.WikiSurface
+
 /**
  * A curated section read whole, as the curator panel shows it (the value of `/api/curation/section`):
  * the section's shape (lines, tokens, Shannon bits, LZ description length and K-complexity), the
@@ -17,6 +19,12 @@ object CuratorReading {
         val shape = map(v["shape"])
         append("<h2>").append(esc(v["heading"])).append("<span>section ").append(v["ordinal"]).append(" of ").append(v["of"])
             .append(" · ").append(esc(v["book"])).append("</span></h2>")
+        val book = (v["book"] as? String)?.takeIf { it.isNotBlank() }
+        val ordinal = (v["ordinal"] as? Number)?.toInt()?.takeIf { it >= 0 }
+        if (book != null && ordinal != null && v["wikiAvailable"] == true) {
+            val section = WikiSurface.curationSectionPath(book, ordinal)
+            append("<p><a href='").append(esc(WikiSurface.url(section))).append("'>Open this section in the wiki</a></p>")
+        }
         val k = (shape["k"] as? Number)?.toDouble() ?: 0.0
         append("<div class='k'><i style='width:").append((k * 100).toInt()).append("%'></i></div>")
         append("<dl>")

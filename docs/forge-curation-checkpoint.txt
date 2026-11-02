@@ -1,0 +1,57 @@
+Forge / curation cloud checkpoint — 2026-11-02
+
+Workspace: /workspace/TrikeShed. Initial branch: work. Base: 9f32cdd01.
+Origin: https://github.com/jnorthrup/TrikeShed.git.
+
+This recovery checkpoint preserves accumulated session changes; it is not a
+claim that the full Forge acceptance goal is complete or ready for master.
+Subsequent slices should be committed and pushed individually after their checks.
+
+Current slice: independent Pi and Hermes tabs and runtimes. Pi uses upstream
+agent-core in a restricted Graal JS child, direct ModelMux and host-owned
+breadcrumb services, separate /pi and /api/pi routes, bounded retained message
+deltas, and serialized session close. Hermes retains its own terminal/runtime.
+Pi API requires the operator's trikeshed.pi.tokenSha256 system property.
+
+Verified: pages development webpack build; Pi UI browser proof with mocked
+host; document review/focus browser proofs with mocked backend. Earlier selected
+JVM runs passed 151 and 48 checks before the latest Pi/profile changes.
+
+Full JVM main compilation passed in v11. Test compilation then found a missing
+assertion import, fixed in 6f8f4e4e5; the coordinated v12 checks are running.
+Earlier v9/v10 builds failed the startup method's JVM size limit; substantive
+startup extraction resolved it under the full compiler.
+
+Actual Pi page/API/runtime loopback proof passed against frozen v11 main
+classes and assets from checkpoint a0e85f878: real PiWire, Graal JS child,
+ModelMux, fixture HTX provider, and file-backed breadcrumb store. Browser and
+server both exited zero; two provider fixture calls; retained final assistant
+and tool evidence restored from disk. Hermes standalone tab navigation passed;
+the fixture deliberately did not run Hermes. No real external model or physical
+air-gap claim. Cloud artifacts: pi-loopback-proof/run-v11-kwaWVn under the
+library-files directory, with commands, hashes, screenshots and restored state.
+
+Master 35886891f was merged without conflicts in 1127a5f83 and pushed. The
+integrated JVM main compilation also passed. The corrected combined loopback
+proof was repeated against frozen integrated commit 1d50684ab: browser/server
+both exit zero in 9 seconds, two fixture provider calls, durable context restore
+and retained evidence verified. Artifacts: pi-loopback-proof/run-v13-GlWmNs.
+
+The v12 test run was stopped after two child-discovery assertions missed long
+Java command lines and a blocking Pi test starved its generation's event loop.
+Test-only exact-PID assertions, IO dispatch and explicit fixture-provider fixes
+were pushed in 1d50684ab. The integrated v13 suite is running, including upstream
+CRC32C and Couch recovery checks. Also pending: real document review route and
+visual SPARQL browser proofs.
+
+Limits: Pi integrates agent-core, not the Node coding CLI/extensions. It uses
+buffered completions and explicit breadcrumb tools, without automatic context
+projection or session resume. Retained contexts have finite capacity. Shared
+operator bearer, provider destination rotation, deployment TLS, unbounded
+protocol frames/provider response allocation, and noncooperative host callback
+termination remain material boundaries. SUMO/NARS and legacy curation paths
+still have the remaining work recorded in the cloud progress log.
+
+Cloud evidence/backups: /workspace/library-files/curation-work-progress.txt,
+/workspace/library-files/forge-work-backup, and per-slice logs/proofs in
+/workspace/library-files. These are not included in this source checkpoint.
