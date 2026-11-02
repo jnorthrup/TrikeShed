@@ -1,0 +1,21 @@
+Source-scoped query pilot — verification 2026-11-02
+
+Feature source: faea61101 and eb031836d.
+Full JVM main/test compilation and Kotlin/JS compilation passed in combined
+validation with current master and the independent passage/Hermes slices.
+All 11 query-pilot JVM cases passed; the full selected run passed 81 tests with
+no failures/errors/skips. Tests include the production review resolver with a
+retained book receipt, source/ontology-receipt replacement, exact scope and
+quotation, release replay, real bag processing, forced collision and actual
+four-slot eviction with five distinct coordinates.
+
+The review fixture is synthetic and explicitly labeled. The pilot consumes one
+host-bound strict-book release, including on no match/collision. It supports
+unconditional reviewed selections only. Exact strings and graph labels are not
+claimed to be typed RDF terms or original graph membership. A derived text graph
+is labeled separately. The final currentness check is an as-of observation.
+No HTTP query endpoint, NAL inference/training, confidence reinforcement, live
+Rete admission or repair of legacy bag state is introduced.
+
+Cloud evidence: /workspace/library-files/next-slices-tests-v20.log and
+/workspace/library-files/next-slices-v20-results.
