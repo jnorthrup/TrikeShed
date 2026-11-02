@@ -68,6 +68,13 @@ import borg.trikeshed.agent.modelmux.Airgap
 /** Bridge shim Path to the JVM neighbors' java.io.File at the port boundary. */
 private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
 
+/** Preserve a named worktree alias; resolve dot-only spellings so the project has a real name. */
+internal fun primaryWorktreeRoot(path: java.io.File): java.io.File {
+    val root = if (path.name.isBlank() || path.name == "." || path.name == "..") path.canonicalFile else path.absoluteFile
+    require(root.name.isNotBlank()) { "Primary worktree must have a project name" }
+    return root
+}
+
 //java and sun deps are forbidden
 //syncronous calls, anything not SQE->CQE are absolutely banned here.  what is not written you must write as uring code hosted in commonMain nio code
 // see PRELOAD.md for additional ques
@@ -683,7 +690,7 @@ object OroborosDaemon {
                 exitProcess(1)
             }
             fHome.mkdirs()
-            Pair(fHome, rDir)
+            Pair(fHome, File(primaryWorktreeRoot(jfile(rDir)).absolutePath))
         }
         if (!preflight(repoDir)) {
             HostSystem.err("[OROBOROS] preflight failed; aborting")
@@ -1474,7 +1481,10 @@ object OroborosDaemon {
         ) { HostSystem.currentTimeMillis() }
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
-        val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes, projectMiner)
+        val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes, projectMiner,
+            primary = borg.trikeshed.forge.server.PrimaryProjectBinding(repoDir.name.lowercase(),
+                WorktreeCouchGateway.WORKTREE_PREFIX, couchStore, attachmentGateway, repoDir.absolutePath,
+                reader = casStore as? borg.trikeshed.job.BoundedCasReader))
         // Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, a lineage
         // in <forgeHome>/snapshots/ledger.jsonl, the head as lcnc/snapshot/head.
         val snapshotService = borg.trikeshed.forge.server.WorkspaceSnapshotService(

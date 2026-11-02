@@ -47,6 +47,8 @@ class CurationIntake(
     private val score: suspend (DecisionProvider, String) -> Unit = { provider, book ->
         requireNotNull(constellations()) { "Curation is not available" }.forProvider(provider).ingestScore(book)
     },
+    /** Host admission policy; distinct from per-document curation mode. */
+    private val eligible: (String) -> Boolean = { true },
 ) {
     sealed interface Mode {
         data object Legacy : Mode
@@ -119,7 +121,10 @@ class CurationIntake(
 
     /** Every document of every mounted project: what a boot resumes. Curated documents pass through at once. */
     suspend fun resume() {
-        for (p in corpus.projects()) for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) offer(p.name, d.id)
+        for (p in corpus.projects()) {
+            if (!eligible(p.name)) continue
+            for (d in corpus.docs(p.name, limit = Int.MAX_VALUE)) offer(p.name, d.id)
+        }
     }
 
     /** A document removed from its upload: a queued reading of it is dropped, not failed. */
@@ -154,7 +159,13 @@ class CurationIntake(
     }
 
     /** Queue one landed document. PDFs and the miner's other formats curate; twins and the rest do not. */
-    fun offer(project: String, id: String, decisionProvider: DecisionProvider? = selectedProvider(project, id)) {
+    fun offer(project: String, id: String) {
+        if (!eligible(project)) return
+        offer(project, id, selectedProvider(project, id))
+    }
+
+    fun offer(project: String, id: String, decisionProvider: DecisionProvider?) {
+        if (!eligible(project)) return
         if (ProjectNodes.twin(id)) return
         if (id.substringAfterLast('.', "").lowercase() !in ProjectMiner.MINEABLE) return
         val selectedMode = mode(project, id)
@@ -165,6 +176,7 @@ class CurationIntake(
     fun offerTextForReview(selected: ProjectDoc) {
         val project = selected.project
         val id = selected.id
+        require(eligible(project)) { "Project is not eligible for curation intake: $project" }
         require(explicitText(id) && !ProjectNodes.twin(id)) { "Document format is not supported for text review: $id" }
         require(selected.cid.isNotBlank() && selected.rev.isNotBlank() && selected.seq >= 0) { "Text selection requires a complete revision" }
         val selectedMode = mode(project, id)
@@ -204,7 +216,7 @@ class CurationIntake(
             (d.decisionProvider?.let { mapOf("decisionProvider" to it.id) } ?: emptyMap())
         try {
             settlement.withLock { }
-            if (removed.contains(d)) {
+            if (removed.contains(d) || !eligible(d.project)) {
                 t.queued.decrementAndGet(); providerTally?.queued?.decrementAndGet()
                 return
             }
@@ -378,7 +390,7 @@ class CurationIntake(
                 retainedSource = { project, id ->
                     DocumentCurationLegos.projectSource(ctx.casStore, corpus,
                         requireNotNull(corpus.document(project, id)) { "Source document is unavailable" })
-                }, mode = { project, _ -> scopes.intakeMode(project) })
+                }, mode = { project, _ -> scopes.intakeMode(project) }, eligible = corpus::intakeEligible)
             scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
             scopes.onTextForReview = { selected -> intake.offerTextForReview(selected) }
             scopes.onRemoved = { project, id -> intake.forget(project, id); nodes.leave(project, id) }

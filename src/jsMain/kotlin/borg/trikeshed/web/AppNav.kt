@@ -28,6 +28,18 @@ object AppNav {
 
     fun mount() {
         if (document.getElementById("application-nav") != null) return
+        if (document.body?.getAttribute("data-standalone") == "pi") {
+            val nav = document.createElement("nav") as HTMLElement
+            nav.id = "application-nav"
+            nav.setAttribute("aria-label", "Application")
+            val brand = document.createElement("a") as HTMLAnchorElement
+            brand.className = "application-brand"
+            brand.href = "/pi"
+            brand.textContent = "Graal Pi"
+            nav.appendChild(brand)
+            document.body?.insertBefore(nav, document.body?.firstChild)
+            return
+        }
         val current = AppDestinations.current(window.location.pathname) ?: return
         var views: dynamic = readViews()
 

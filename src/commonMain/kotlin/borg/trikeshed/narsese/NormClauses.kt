@@ -1,7 +1,9 @@
 package borg.trikeshed.narsese
 
+import borg.trikeshed.lib.*
 import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.nlp.NlpRelation
+import borg.trikeshed.nlp.NlpSentence
 import borg.trikeshed.nlp.NlpToken
 
 /**
@@ -327,18 +329,59 @@ object NormClauses {
     }
 
     /**
-     * Facts of [doc] in premise form: per subject, its phrase, `be` when the head is copular, and the
-     * head lemma ("The rent is due." → "rent be due"), so a fact matches the premise of a condition.
+     * A deliberately conservative exclusion filter, not proof that a remaining sentence is true.
+     * Reject the entire sentence when it contains an overt negation, hypothetical/modal context,
+     * question, quoted assertion, or attribution/uncertainty cue. This avoids promoting an embedded
+     * or qualified claim to an unconditional positive premise; it never mints negative evidence.
+     * Some affirmative facts will be omitted, and unrecognized language can still pass the filter.
      */
-    fun facts(doc: NlpDocument): Set<String> {
+    internal fun maySupplyPositivePremise(doc: NlpDocument, sentence: NlpSentence): Boolean {
+        if (sentence.begin < 0 || sentence.end <= sentence.begin || sentence.end > doc.text.length) return false
+        val text = doc.text.substring(sentence.begin, sentence.end)
+        if ('?' in text || '"' in text || '“' in text || '”' in text) return false
+        val excluded = _s["no", "not", "never", "none", "neither", "nor", "or", "without", "cannot",
+            "if", "unless", "until", "when", "whenever", "before", "after", "whether", "assuming", "provided",
+            "why", "how", "which", "who", "what", "were", "was", "had", "did", "formerly", "previously",
+            "may", "might", "could", "would", "should", "shall", "must", "can", "will",
+            "possible", "possibly", "potential", "potentially", "uncertain", "likely", "unlikely", "perhaps",
+            "probably", "apparently", "alleged", "allegedly", "purported", "purportedly", "supposedly",
+            "say", "claim", "allege", "believe", "suppose", "assume", "expect", "think", "suggest", "report",
+            "assert", "argue", "deny", "dispute", "appear", "seem", "speculate", "hardly", "scarcely", "barely", "false"]
+        val words = Regex("[A-Za-z]+(?:['’][A-Za-z]+)?").findAll(text)
+            .map { it.value.lowercase().replace('’', '\'') }
+        if (words.any { it in excluded || it.endsWith("n't") } ||
+            Regex("\\bsubject\\s+to\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)) return false
+        for (token in sentence.tokens.values()) {
+            val word = token.word.lowercase().replace('’', '\'')
+            if (token.tag in _s["MD", "VBD", "VBN"] || word in excluded ||
+                token.lemma.lowercase() in excluded || word.endsWith("n't")) return false
+        }
+        if (sentence.dependencies.values().any { it.relation.lowercase().startsWith("neg") }) return false
+        return true
+    }
+
+    /** Legacy broad extraction, retained for callers that do not use it for applicability. */
+    fun facts(doc: NlpDocument): Set<String> = premiseFacts(doc, conservative = false)
+
+    /**
+     * Candidate positive premises from simple, unqualified root assertions; these are not reviewed
+     * facts and cannot establish source authority. Unknown or excluded material yields no negative.
+     */
+    fun applicabilityFacts(doc: NlpDocument): Set<String> = premiseFacts(doc, conservative = true)
+
+    private fun premiseFacts(doc: NlpDocument, conservative: Boolean): Set<String> {
         val out = LinkedHashSet<String>()
         for (s in doc.sentences.values()) {
+            if (conservative && !maySupplyPositivePremise(doc, s)) continue
             val tokens = s.tokens.values().associateBy { it.index }
             val deps = s.dependencies.values()
+            val roots = deps.filter { it.governor == 0 && it.relation.equals("root", ignoreCase = true) }
+                .map { it.dependent }.toSet()
             fun kids(head: Int, vararg rel: String) = deps.filter { d -> d.governor == head && rel.any { d.relation.lowercase().startsWith(it) } }
             fun phrase(t: NlpToken) = (kids(t.index, *modifiers).mapNotNull { tokens[it.dependent] }.filter { it.index < t.index }.sortedBy { it.index } + t)
                 .joinToString(" ") { (if (it.tag == "PRP$") it.word else it.lemma).lowercase() }
             for (d in deps) if (d.relation.lowercase().startsWith("nsubj")) {
+                if (conservative && d.governor !in roots) continue
                 val head = tokens[d.governor] ?: continue
                 val subj = tokens[d.dependent]?.takeIf { it.tag.startsWith("NN") } ?: continue
                 out.add(listOfNotNull(phrase(subj), "be".takeIf { kids(head.index, "cop").isNotEmpty() }, head.lemma.lowercase()).joinToString(" "))

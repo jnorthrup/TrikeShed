@@ -5,7 +5,7 @@
   "version": "1.5.0",
   "purpose": "Opt-in text/function ModelMux transport; not the Node coding-agent CLI",
   "bundle": "pi-core-model.js",
-  "sha256": "f74a0d989b0da7e4853717d23dd84b3b7b64344846b6de14ae86146be044cb5c",
+  "sha256": "789d1f5690b7ec22b30ae312db2a9a418bec14e186d2be037c8b02e6ce5404cb",
   "build": {
     "node": "24.19.0",
     "webpack": "5.108.1",
@@ -23,16 +23,31 @@
     ],
     "schemaAlias": "packages/schema/src/index.ts",
     "schemaFormatsAlias": "packages/schema/src/formats/index.ts",
-    "dependenciesInstalled": false
+    "dependenciesInstalled": false,
+    "context": "isolated temporary input tree",
+    "moduleIds": "natural",
+    "builder": "tools/pi-core/build.cjs"
   },
   "inputs": [
     {
+      "path": "ai-barrel.ts",
+      "sha256": "faca1965661a1d2e704359479aa5f12afdfbf2b83458bd28c66748b130b69197"
+    },
+    {
       "path": "build/ai-barrel.ts",
-      "sha256": "f90bd213bc319aef7db83da3010685e1418a9ee20f958917068e527c3404df48"
+      "sha256": "faca1965661a1d2e704359479aa5f12afdfbf2b83458bd28c66748b130b69197"
+    },
+    {
+      "path": "build/build.cjs",
+      "sha256": "675bad741157b6cc38f4af3df7e2e52cf6d7428b3bb7e3dfa10cc86aafa4b9a2"
+    },
+    {
+      "path": "build/strip-loader.cjs",
+      "sha256": "967ee43d685c537ed81aaac4c7c1d0da8e2e99ddf19519fe9940d1daabf35dff"
     },
     {
       "path": "model-entry.ts",
-      "sha256": "7969fb76b1a6bd47bea5d27a40eb37c05e0a30f5a337ce9c61c385effbc5a16e"
+      "sha256": "a9e0330efece2f0c1a9e02e848d20b2a0e3ca0ab712a6aa1a97398738d828f62"
     },
     {
       "path": "upstream/packages/agent/src/agent-loop.ts",
@@ -95,12 +110,12 @@
       "sha256": "3ef8c2ef13abed6435130021d9f86c2a2a57afa53919cca46132c9fe195a1abd"
     },
     {
-      "path": "upstream/packages/schema/src/formats/typebox/date.ts",
-      "sha256": "4e7236a32373ebb191c23429c247e5b8dd1e1b51db47db61a0458427b50f218b"
-    },
-    {
       "path": "upstream/packages/schema/src/formats/typebox/date_time.ts",
       "sha256": "7e17fae3ba72d3d9b156e0979f95c14b54ad7ec5788d968ec3752589a7a7d245"
+    },
+    {
+      "path": "upstream/packages/schema/src/formats/typebox/date.ts",
+      "sha256": "4e7236a32373ebb191c23429c247e5b8dd1e1b51db47db61a0458427b50f218b"
     },
     {
       "path": "upstream/packages/schema/src/formats/typebox/duration.ts",
@@ -167,20 +182,20 @@
       "sha256": "3032b0ce5a6b31efccd7724d73042e6cb264f8a0daf1dc9b00dd760bdac1591c"
     },
     {
-      "path": "upstream/packages/schema/src/formats/typebox/iri.ts",
-      "sha256": "6cb40c02152c80b019c2e18c41afee952da30fdf66cd465c4a4b68be2a42a4f6"
-    },
-    {
       "path": "upstream/packages/schema/src/formats/typebox/iri_reference.ts",
       "sha256": "19a7cdf721c7839a0f4689241d3c5e62d6aa0b17cd16e54a1edc29d74cf6729f"
     },
     {
-      "path": "upstream/packages/schema/src/formats/typebox/json_pointer.ts",
-      "sha256": "21850b35d7ba4abb03ea6476e40088f06cd1ecda8bd98580bbc5250fa441e770"
+      "path": "upstream/packages/schema/src/formats/typebox/iri.ts",
+      "sha256": "6cb40c02152c80b019c2e18c41afee952da30fdf66cd465c4a4b68be2a42a4f6"
     },
     {
       "path": "upstream/packages/schema/src/formats/typebox/json_pointer_uri_fragment.ts",
       "sha256": "e815f3595527684f07f92fcff0ca49f8ed67776bf1079f5a328429e7e7673a93"
+    },
+    {
+      "path": "upstream/packages/schema/src/formats/typebox/json_pointer.ts",
+      "sha256": "21850b35d7ba4abb03ea6476e40088f06cd1ecda8bd98580bbc5250fa441e770"
     },
     {
       "path": "upstream/packages/schema/src/formats/typebox/regex.ts",
@@ -195,16 +210,16 @@
       "sha256": "e960d95a550422e2c69d8b74af65305dc8cb425d2ef3d8a4140d2b89099ffb47"
     },
     {
-      "path": "upstream/packages/schema/src/formats/typebox/uri.ts",
-      "sha256": "be17dccf4ea743684e63c5fa0d18b313b20af4a8ed67a40477ed31a055300c89"
-    },
-    {
       "path": "upstream/packages/schema/src/formats/typebox/uri_reference.ts",
       "sha256": "e4516dd7ad28fd96557609878d3f4db2a865918a7601a9720fa7be3ae945b0c1"
     },
     {
       "path": "upstream/packages/schema/src/formats/typebox/uri_template.ts",
       "sha256": "588d34367c65d3f8d81f6c5d8f9bdc3ccabe7db77ed06898a27d2128d6c5691c"
+    },
+    {
+      "path": "upstream/packages/schema/src/formats/typebox/uri.ts",
+      "sha256": "be17dccf4ea743684e63c5fa0d18b313b20af4a8ed67a40477ed31a055300c89"
     },
     {
       "path": "upstream/packages/schema/src/formats/typebox/url.ts",

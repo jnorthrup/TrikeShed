@@ -485,6 +485,110 @@ val kotlinJsBundlesJar = tasks.register<Jar>("kotlinJsBundlesJar") {
     archiveClassifier.set("web")
 }
 
+// Standalone Pi: the host still uses the project JVM jar, but the guest needs only
+// the JS language and the common runtime, not the daemon's Python/Ruby/LLVM stack.
+// This closure must be exercised by a real packaged-process smoke test before release.
+val graalPiRuntime = configurations.create("graalPiRuntime") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+dependencies {
+    add(graalPiRuntime.name, "org.jetbrains.kotlin:kotlin-stdlib:2.4.21")
+    add(graalPiRuntime.name, "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:$coroutinesVersion")
+    add(graalPiRuntime.name, "org.jetbrains.kotlinx:atomicfu-jvm:0.33.0")
+    add(graalPiRuntime.name, "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:$serializationVersion")
+    add(graalPiRuntime.name, "org.jetbrains.kotlinx:kotlinx-datetime-jvm:$datetimeVersion")
+    add(graalPiRuntime.name, "org.graalvm.polyglot:polyglot:$graalVersion")
+    add(graalPiRuntime.name, "org.graalvm.polyglot:js-community:$graalVersion")
+}
+
+val graalPiPages = tasks.register<Jar>("graalPiPagesJar") {
+    group = "distribution"
+    description = "Package only the production Pages browser bundle for Graal Pi."
+    val pages = tasks.named<KotlinWebpack>("jsBrowserPagesProductionWebpack")
+    from(pages.flatMap { it.outputDirectory }) { into("web/kotlin/pages") }
+    archiveClassifier.set("pi-pages")
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val graalPiScripts = tasks.register<org.gradle.jvm.application.tasks.CreateStartScripts>("graalPiStartScripts") {
+    group = "distribution"
+    description = "Generate relocatable launchers for the standalone Graal Pi host."
+    applicationName = "graal-pi"
+    mainClass.set("borg.trikeshed.pi.GraalPiMain")
+    classpath = files(tasks.named("jvmJar"), graalPiPages, graalPiRuntime)
+    outputDir = layout.buildDirectory.dir("generated/graal-pi/bin").get().asFile
+    defaultJvmOpts = listOf("--add-modules=jdk.httpserver", "--enable-native-access=ALL-UNNAMED")
+}
+
+val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
+    group = "distribution"
+    description = "Stage the standalone Graal Pi distribution under build/install/graal-pi."
+    dependsOn(graalPiScripts)
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    into(layout.buildDirectory.dir("install/graal-pi"))
+    from(graalPiScripts) {
+        include("graal-pi")
+        into("bin")
+        filePermissions { unix("rwxr-xr-x") }
+    }
+    from(graalPiScripts) {
+        include("graal-pi.bat")
+        into("bin")
+        filePermissions { unix("rw-r--r--") }
+    }
+    from(files(tasks.named("jvmJar"), graalPiPages, graalPiRuntime)) { into("lib") }
+    from("LICENSE", "NOTICE.md")
+    from("release/graal-pi/README.md")
+    from("src/jvmMain/resources/pi-core") { into("source/pi-core") }
+    from("tools/pi-core") { into("source/tools/pi-core") }
+    from("src/jvmMain/kotlin/borg/trikeshed/pi") { into("source/host/pi") }
+    from("src/jvmMain/kotlin/borg/trikeshed/forge/server/PiWire.kt") { into("source/host/forge/server") }
+    from("src/commonMain/resources/web/pi.html") { into("source/web") }
+    from("src/jsPages/kotlin/borg/trikeshed/web/pages/PiPage.kt") { into("source/web") }
+}
+
+val graalPiZip = tasks.register<Zip>("graalPiZip") {
+    group = "distribution"
+    description = "Build a relocatable Graal Pi zip; validate it before publishing."
+    from(graalPiInstall) { into("graal-pi"); exclude("bin/graal-pi") }
+    from(graalPiInstall) {
+        into("graal-pi")
+        include("bin/graal-pi")
+        filePermissions { unix("rwxr-xr-x") }
+    }
+    archiveBaseName.set("graal-pi")
+    archiveVersion.set(providers.gradleProperty("graalPiVersion").orElse(project.version.toString()))
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+val graalPiTar = tasks.register<Tar>("graalPiTar") {
+    group = "distribution"
+    description = "Build a relocatable Graal Pi tar.gz; validate it before publishing."
+    from(graalPiInstall) { into("graal-pi"); exclude("bin/graal-pi") }
+    from(graalPiInstall) {
+        into("graal-pi")
+        include("bin/graal-pi")
+        filePermissions { unix("rwxr-xr-x") }
+    }
+    archiveBaseName.set("graal-pi")
+    archiveVersion.set(providers.gradleProperty("graalPiVersion").orElse(project.version.toString()))
+    archiveExtension.set("tar.gz")
+    compression = Compression.GZIP
+    destinationDirectory.set(layout.buildDirectory.dir("distributions"))
+    isPreserveFileTimestamps = false
+    isReproducibleFileOrder = true
+}
+
+tasks.register("graalPiDist") {
+    group = "distribution"
+    description = "Build both Graal Pi archives."
+    dependsOn(graalPiZip, graalPiTar)
+}
+
 tasks.named<org.gradle.language.jvm.tasks.ProcessResources>("jvmProcessResources") {
     // Purge what an earlier layout staged here: processedResources must not shadow the bundles jar.
     doFirst { destinationDir.resolve("web/kotlin").deleteRecursively() }

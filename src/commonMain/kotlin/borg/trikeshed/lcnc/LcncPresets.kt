@@ -1073,7 +1073,7 @@ object LcncPresets {
                 LcncNode("n27", "constellation.join", params = mapOf("constellation" to "roads"), x = 630.0, y = 860.0),
                 LcncNode("n28", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Automobile"), x = 930.0, y = 860.0),
                 LcncNode("n29", "constellation.ask", params = mapOf("constellation" to "roads", "class" to "Truck"), x = 930.0, y = 1000.0),
-                // The rete join: a conditioned norm fires only when its premise is among the facts.
+                // The text is a candidate only; wire an explicit positiveFacts array to assume a premise.
                 LcncNode("n30", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant"), x = 1230.0, y = 60.0),
                 LcncNode("n31", "constellation.ask", params = mapOf("constellation" to "leases", "class" to "tenant",
                     "facts" to "The rent is due."), x = 1230.0, y = 200.0),
