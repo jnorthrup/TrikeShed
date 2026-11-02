@@ -25,7 +25,7 @@ class PiRuntimeInfoTest {
             guest.delegate("pi_clock", 1_000) { args ->
                 require(args.isEmpty())
                 clockCalls++
-                Teleported.Real(System.nanoTime().toDouble() / 1_000_000.0)
+                Teleported.Real(java.lang.System.nanoTime().toDouble() / 1_000_000.0)
             }
             guest.eval(source, "pi-core-model.js")
             fun info(): Map<String, Teleported> {
