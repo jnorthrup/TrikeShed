@@ -48,6 +48,16 @@ private fun boot() {
 /** boot: restore, or seed the starter panel. Boot waits for contract hydration. */
 private suspend fun start(p: Panels, revision: Int = p.documentRevision) {
     val search = URLSearchParams(window.location.search)
+    val sourceContext = sourceContextValues()
+    if (borg.trikeshed.docs.SourceSelection.requested(sourceContext)) {
+        p.autosave = false
+        p.graph.controls = objOf { it.humanOversight = true; it.inspectionOnly = true }
+        byId("runBtn").disabled = true; byId("liveBtn")?.disabled = true; byId("debugBtn")?.disabled = true
+        byId("palette").classList.remove("open")
+        p.applyView(); p.page.frame { p.redraw() }
+        p.inspectSourceContext(sourceContext)
+        return
+    }
     if (DebugNavigation.requested(search)) {
         // Reconnect to an existing run before contracts, scratch, timers, or source activation.
         p.autosave = false
