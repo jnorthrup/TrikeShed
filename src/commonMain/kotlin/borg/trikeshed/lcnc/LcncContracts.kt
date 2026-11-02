@@ -1056,9 +1056,9 @@ object LcncContracts {
             outputKinds = mapOf("moves" to "json", "count" to "num"),
             params = mapOf("constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"))),
         LcncPortContract("constellation.ask", "query class norms using explicit premise assumptions; text and stored facts are unverified candidates",
-            listOf("class?", "facts?", "positiveFacts?", "negativeFacts?"), listOf("class", "held", "count", "facts", "factsSource", "positiveFacts", "positiveFactsSource", "parsedCandidates", "withheldReason", "withheldLegacyFacts", "negativeFacts", "negativeFactsSource", "fires", "pending", "blocked", "conflicted"),
+            listOf("class?", "facts?", "positiveFacts?", "negativeFacts?"), listOf("class", "held", "count", "facts", "factsSource", "positiveFacts", "positiveFactsSource", "candidateText", "parsedCandidates", "withheldReason", "withheldLegacyFacts", "negativeFacts", "negativeFactsSource", "fires", "pending", "blocked", "conflicted"),
             inputKinds = mapOf("class" to "text", "facts" to "text", "positiveFacts" to "json", "negativeFacts" to "json"),
-            outputKinds = mapOf("class" to "text", "held" to "json", "count" to "num", "facts" to "json", "factsSource" to "text", "positiveFacts" to "json", "positiveFactsSource" to "text", "parsedCandidates" to "json", "withheldReason" to "text", "withheldLegacyFacts" to "json", "negativeFacts" to "json", "negativeFactsSource" to "text", "fires" to "json", "pending" to "json", "blocked" to "json", "conflicted" to "json"),
+            outputKinds = mapOf("class" to "text", "held" to "json", "count" to "num", "facts" to "json", "factsSource" to "text", "positiveFacts" to "json", "positiveFactsSource" to "text", "candidateText" to "text", "parsedCandidates" to "json", "withheldReason" to "text", "withheldLegacyFacts" to "json", "negativeFacts" to "json", "negativeFactsSource" to "text", "fires" to "json", "pending" to "json", "blocked" to "json", "conflicted" to "json"),
             params = mapOf(
                 "constellation" to LcncPortContract.LcncParamSpec(ph = "constellation name"),
                 "class" to LcncPortContract.LcncParamSpec(ph = "SUMO class or noun, when no cable carries it"),

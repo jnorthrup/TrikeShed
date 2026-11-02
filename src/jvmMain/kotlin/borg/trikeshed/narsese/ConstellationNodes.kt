@@ -374,7 +374,7 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         }
         mapOf("class" to className, "held" to rows, "count" to rows.size, "facts" to positiveFacts.toList(),
             "positiveFacts" to positiveFacts.toList(), "factsSource" to "caller-assumed-unverified",
-            "positiveFactsSource" to "caller-assumed-unverified", "parsedCandidates" to candidates.toList(),
+            "positiveFactsSource" to "caller-assumed-unverified", "candidateText" to factText, "parsedCandidates" to candidates.toList(),
             "withheldReason" to "parsed-and-legacy-facts-are-unverified", "withheldLegacyFacts" to c.facts.toList(),
             "negativeFacts" to negativeFacts.toList(), "negativeFactsSource" to "caller-assumed-unverified",
             "fires" to addresses(fired.fires), "pending" to fired.pending.mapValues { addresses(it.value) },
