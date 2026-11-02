@@ -185,22 +185,11 @@ kotlin {
     val isLinux = hostOs.contains("linux")
     val isWindowsHost = hostOs.startsWith("windows")
 
-    if (isWindowsHost) {
-        mingwX64("mingwX64") {
-            compilations.getByName("main") {
-                cinterops {
-                    val posixSpawn = create("posixSpawn") {
-                    }
-                }
-            }
-        }
-    } else if (providers.gradleProperty("enableMingwX64").orNull == "true") {
-        mingwX64("mingwX64") {
-            compilations.getByName("main") {
-                cinterops {
-                }
-            }
-        }
+    // mingwX64: always on a Windows host, and on other hosts with -PenableMingwX64=true (cross-compiled; the .exe runs
+    // on Windows with no JVM). No cinterop: posix_spawn.def is POSIX, and src/mingwMain reaches Winsock and Win32
+    // through the platform klibs.
+    if (isWindowsHost || providers.gradleProperty("enableMingwX64").orNull == "true") {
+        mingwX64("mingwX64")
     }
 
     val mlirNixDir = providers.gradleProperty("mlirNix.dir").orNull ?: "${rootDir}/../mlir-nix"
@@ -412,9 +401,10 @@ kotlin {
             }
         }
         if (targets.findByName("mingwX64") != null) {
-            // These two ARE mingwX64's own default source sets, so the target wires the
-            // compilation; all that is needed is their place in the hierarchy.
-            maybeCreate("mingwX64Main").apply { dependsOn(nativeMain) }
+            // mingwMain: the Windows actuals (Winsock, WSAPoll, Win32 files) over nativeMain; mingwX64Main is the
+            // target's own default source set, so the target wires the compilation.
+            val mingwMain = maybeCreate("mingwMain").apply { dependsOn(nativeMain) }
+            maybeCreate("mingwX64Main").apply { dependsOn(mingwMain) }
             maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
         }
         val macosMain = maybeCreate("macosMain").apply { dependsOn(posixMain) }
