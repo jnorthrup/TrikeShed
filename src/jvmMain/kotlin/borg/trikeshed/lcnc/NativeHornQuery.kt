@@ -1,6 +1,7 @@
 package borg.trikeshed.lcnc
 
 import borg.trikeshed.job.*
+import borg.trikeshed.kif.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.parse.*
 import borg.trikeshed.userspace.nio.channels.spi.JvmProcessProtocolPipes
@@ -139,21 +140,77 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
         }
     }
 
+    /** Verify only the supplied certificate; no theorem search or replacement inference. */
     private fun checkProof(proof: Any?, data: Map<String, Any?>) {
+        if (proof == null) return
+        fun atom(value: Any?): List<String> {
+            val words = value as? List<*> ?: error("Native atom required")
+            require(words.isNotEmpty() && words.all { it is String }) { "Native scalar atom required" }
+            return words.map { it as String }
+        }
+        fun ground(value: Any?): List<String> {
+            val decoded = KifSemantic.decode(value as? String ?: error("Native proof fact required")).formula
+                as? KifFormula.Predicate ?: error("Native proof must be a positive ground fact")
+            return _l[decoded.name] + decoded.arguments.map {
+                when (it) {
+                    is KifTerm.Constant -> it.token
+                    is KifTerm.Literal -> it.spelling
+                    else -> error("Native proof must be a scalar ground fact")
+                }
+            }
+        }
         val provenance = data["provenance"] as Map<*, *>
-        val sources = ((provenance["facts"] as List<*>) + (provenance["rules"] as List<*>))
-            .map { (it as Map<*, *>)["source"] }
+        val factSources = provenance["facts"] as List<*>
+        val ruleSources = provenance["rules"] as List<*>
+        val rules = data["rules"] as List<*>
+        val factsByAtom = factSources.map { it as Map<*, *> }.groupBy { atom(it["fact"]) }
+        val sourcesByRule = ruleSources.map { it as Map<*, *> }.groupBy { it["id"] }
+        val rulesById = buildMap<String, List<*>> {
+            for ((index, value) in rules.withIndex()) {
+                val rule = value as List<*>
+                require(rule.size == 3 && rule[0] == "=>")
+                require(put(atom(rule[2]).first() + "#${index + 1}", rule) == null)
+            }
+        }
         var count = 0
-        fun visit(value: Any?, depth: Int) {
-            if (value == null) return
+        fun visit(value: Any?, depth: Int): List<String> {
             require(depth <= 64 && ++count <= 4096) { "Native proof limit" }
             val node = value as? Map<*, *> ?: error("Native proof node required")
+            val fact = ground(node["fact"])
             val witnesses = node["sources"] as? List<*> ?: error("Native proof sources required")
-            require(witnesses.isNotEmpty() && witnesses.all { it in sources }) { "Native proof source differs" }
-            if (node["asserted"] == true) require(node["witnessMode"] == "any-one-asserted-source")
-            else for (child in node["from"] as? List<*> ?: error("Native proof premises required")) visit(child, depth + 1)
+            require(witnesses.isNotEmpty()) { "Native proof witnesses required" }
+            if (node["asserted"] == true) {
+                require(node.keys == _s["fact", "asserted", "sources", "witnessMode"] &&
+                    node["witnessMode"] == "any-one-asserted-source") { "Native asserted proof contract differs" }
+                val eligible = factsByAtom[fact].orEmpty().map { it["source"] }
+                require(witnesses.all { it in eligible }) { "Native leaf source does not assert this fact" }
+            } else {
+                require(node.keys == _s["fact", "rule", "sources", "from"]) { "Native derived proof contract differs" }
+                val id = node["rule"] as? String ?: error("Native proof rule required")
+                val rule = rulesById[id] ?: error("Native proof rule identity differs")
+                val eligible = sourcesByRule[id].orEmpty().map { it["source"] }
+                require(eligible.isNotEmpty() && witnesses == eligible) { "Native rule source differs" }
+                val antecedent = rule[1] as List<*>
+                val body = if (antecedent.firstOrNull() == "and") antecedent.drop(1).map(::atom) else _l[atom(antecedent)]
+                val children = node["from"] as? List<*> ?: error("Native proof premises required")
+                require(children.size == body.size) { "Native proof premise count differs" }
+                val bindings = mutableMapOf<String, String>()
+                fun match(pattern: List<String>, actual: List<String>, bind: Boolean = true) {
+                    require(pattern.size == actual.size) { "Native proof atom arity differs" }
+                    for ((expected, observed) in pattern.zip(actual)) {
+                        if (expected.startsWith('?')) {
+                            val previous = bindings[expected]
+                            if (previous == null) { require(bind) { "Native proof head variable is unbound" }; bindings[expected] = observed }
+                            else require(previous == observed) { "Native proof shared variable differs" }
+                        } else require(expected == observed) { "Native proof rule atom differs" }
+                    }
+                }
+                for (i in body.indices) match(body[i], visit(children[i], depth + 1))
+                match(atom(rule[2]), fact, bind = false)
+            }
+            return fact
         }
-        visit(proof, 0)
+        require(visit(proof, 0) == atom(data["query"])) { "Native proof root differs from query" }
     }
 
     companion object {

@@ -54,7 +54,14 @@ accepted requests on retirement; client disconnect does not discard an accepted
 request, which still has the finite host deadline.
 
 Only exit0, untruncated strict JSON with matching schema/frame/input/query/pins
-and retained proof-source references can be returned. Authenticated reviewed
+and a checked proof certificate can be returned. The private certificate checker
+parses each ground fact with KifSemantic, binds asserted witnesses to that exact
+input fact, requires the returned root to equal the query, resolves derived
+rule IDs to the exact input rule and associated sources, and verifies ordered
+premises and head under one shared variable substitution. It visits only the
+supplied certificate (depth64/nodes4096), without theorem search or a Kotlin
+replacement solver. Wrong-source/goal/rule/shared-variable certificates refuse.
+Authenticated reviewed
 read, exact quotations, source/ontology/current revision and inputCID are
 rechecked after execution. Stale state, parse/process/pin/timeout/overflow errors
 are refusal/errors, never logical UNKNOWN. Successful no-proof is UNKNOWN in
