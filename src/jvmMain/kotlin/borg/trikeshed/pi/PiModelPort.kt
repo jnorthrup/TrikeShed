@@ -36,7 +36,7 @@ class PiModelPort(
         const val PROMPT_CHARS = 32_768
         const val MAX_COMPLETIONS = 8
         const val MODEL_WALL_MILLIS = 300_000L
-        const val BUNDLE_SHA256 = "39f2371eafe0af805870cbde0295bbbeec1080bc9e4a5a870e8bf95f7e684bd5"
+        const val BUNDLE_SHA256 = "40d9b54e0a0389c0472eb3447717c84aee665118c7073b95ce369b0953b19679"
     }
 
     val session: String get() = generation.session

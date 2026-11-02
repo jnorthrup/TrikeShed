@@ -11,7 +11,7 @@ import java.nio.file.attribute.BasicFileAttributeView
 /** Host grant: existing, explicitly named TS/JS sources only. No directory listing or shell. */
 class PiWorkspace(root: Path, val paths: Set<String>) {
     val root: Path = root.toRealPath()
-    val snapshots = mutableMapOf<String, String>()
+    private val snapshots = mutableMapOf<String, String>()
     init {
         require(paths.isNotEmpty() && paths.size <= 16)
         paths.forEach { path ->
