@@ -5,7 +5,7 @@
   "version": "1.5.0",
   "purpose": "Opt-in text/function ModelMux transport; not the Node coding-agent CLI",
   "bundle": "pi-core-model.js",
-  "sha256": "40d9b54e0a0389c0472eb3447717c84aee665118c7073b95ce369b0953b19679",
+  "sha256": "789d1f5690b7ec22b30ae312db2a9a418bec14e186d2be037c8b02e6ce5404cb",
   "build": {
     "node": "24.19.0",
     "webpack": "5.108.1",
@@ -47,7 +47,7 @@
     },
     {
       "path": "model-entry.ts",
-      "sha256": "59e3f91f52837f4a79193fa2235212bfd0bdd23a03f76dd859a4ce5f8c209620"
+      "sha256": "a9e0330efece2f0c1a9e02e848d20b2a0e3ca0ab712a6aa1a97398738d828f62"
     },
     {
       "path": "upstream/packages/agent/src/agent-loop.ts",
