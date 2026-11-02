@@ -81,8 +81,8 @@ class HermesPen(
     private val modelMuxProvider: suspend () -> ModelMux? = { modelMux },
     /** Host-owned command identity; the guest cannot supply receipt attribution. */
     private val contextId: () -> String? = { null },
-    /** Host-owned breadcrumb session for this pen; null disables session access. */
-    private val breadcrumbSession: () -> String? = { null },
+    /** Legacy host binding, sampled once at construction; rotating sessions requires a fresh pen. */
+    breadcrumbSession: () -> String? = { null },
     /** When supplied, the immutable generation owns and drains model and breadcrumb crossings. */
     private val breadcrumbGeneration: BreadcrumbGeneration? = null,
 ) {
@@ -92,6 +92,7 @@ class HermesPen(
 
     private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
+    private val breadcrumbBinding = breadcrumbGeneration?.session ?: breadcrumbSession()
 
     fun install(guest: GuestIsolate, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
@@ -181,7 +182,7 @@ class HermesPen(
         withContext(muxContext.minusKey(Job)) { operation() }
     } ?: operation()
 
-    private fun boundBreadcrumbSession(): String? = breadcrumbGeneration?.session ?: breadcrumbSession()
+    private fun boundBreadcrumbSession(): String? = breadcrumbBinding
 
     /** Inventory may advertise local memory tools without exposing the host session identity. */
     val breadcrumbToolsEnabled: Boolean get() = boundBreadcrumbSession()?.let { it.isNotBlank() && it.length <= 128 } == true &&
