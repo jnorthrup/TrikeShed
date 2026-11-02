@@ -213,7 +213,8 @@ class HermesPen(
         if (args.isNotEmpty()) return refusal("bad-args", "mux_catalog()")
         val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
         return true j mapOf("verdict" to "ok", "defaultModel" to mux.defaultModel,
-            "models" to mux.listModels().view.map { mapOf("id" to it.id, "capabilities" to it.caps.view.toList()) })
+            "models" to mux.listModels().view.map { mapOf("id" to it.id, "capabilities" to it.caps.view.toList(),
+                "contextWindow" to mux.contextWindow(it.id)?.takeIf { limit -> limit > 0 }) })
     }
 
     private suspend fun muxConverse(args: List<Teleported>, cause: String?): Join<Boolean, Map<String, Any?>> {
