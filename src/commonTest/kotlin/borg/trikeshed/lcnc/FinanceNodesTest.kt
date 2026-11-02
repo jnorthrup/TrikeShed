@@ -17,8 +17,8 @@ class FinanceNodesTest {
     private suspend fun inputs(corpus: ProjectCorpus): Map<String, Any?> = _m[
         "bank" j requireNotNull(corpus.document("pilot", "bank.csv")).toMap(),
         "expenditure" j requireNotNull(corpus.document("pilot", "expenditure.csv")).toMap()]
-    private suspend fun execute(corpus: ProjectCorpus, selections: Map<String, Any?> = inputs(corpus)): Map<String, Any?> =
-        FinanceNodes.registry(corpus).getValue(FinanceNodes.RECONCILE).run(node(), selections)
+    private suspend fun execute(corpus: ProjectCorpus, selections: Map<String, Any?>? = null): Map<String, Any?> =
+        FinanceNodes.registry(corpus).getValue(FinanceNodes.RECONCILE).run(node(), selections ?: inputs(corpus))
 
     @Test fun originalQuotedCellsExactAmountsAndConsumedIdentitySurvive(): Unit = runBlocking {
         val bank = "b,cash,\"ref,\"\"quoted\"\"\nline\",USD,2026-11-02,90071992547409.93"
