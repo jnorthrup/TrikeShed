@@ -92,6 +92,27 @@ class ProjectDocsRoutesTest {
     private fun json(r: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = reify(r.body) as Map<String, Any?>
 
     @Test
+    fun encodedPrimaryProjectNameAndDocumentIdReachTheActualRoute(): Unit = runBlocking {
+        val rig = Rig()
+        rig.scopes.registerPrimary(File(rig.home, "Docs and law+&"), 1)
+        val project = rig.scopes.list().single().name
+        assertEquals("docs and law+&", project)
+        val corpus = InMemoryProjectCorpus()
+        corpus.put(project, "folder/agreement+1.txt", "text".encodeToByteArray(), "text/plain")
+        val wire = rig.wire(projectCorpus = corpus)
+        val listing = get(wire, "/api/projects/docs%20and%20law%2B%26/docs")
+        assertEquals(200, listing.status, listing.body)
+        assertEquals(project, json(listing)["project"])
+        assertEquals(1, (json(listing)["count"] as Number).toInt())
+        val read = get(wire, "/api/projects/docs%20and%20law%2B%26/docs/folder%2Fagreement%2B1.txt")
+        assertEquals(200, read.status, read.body)
+        assertEquals("text", json(read)["text"])
+        assertEquals("folder/agreement+1.txt", json(read)["id"])
+        assertEquals(project, json(get(wire, "/api/projects/docs%20and%20law+%26/docs"))["project"], "a literal plus stays a plus")
+        assertEquals(400, get(wire, "/api/projects/%ZZ/docs").status)
+    }
+
+    @Test
     fun listsReadsAndRefusesThroughTheRoutes(): Unit = runBlocking {
         val rig = Rig()
         val scope = rig.scopes.mount(rig.folder().absolutePath)

@@ -1095,8 +1095,10 @@ class PatchWire(
             method == "GET" && p.startsWith("/api/projects/") && (p.removePrefix("/api/projects/").substringAfter('/', "") == "docs" || p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("docs/")) -> {
                 val c = corpus ?: return json(mapOf("error" to "project corpus not wired"), 503)
                 val rest = p.removePrefix("/api/projects/")
-                val name = rest.substringBefore('/')
-                val tail = rest.substringAfter("docs", "").removePrefix("/")
+                // URI path segments use percent encoding; a literal '+' is not a form-encoded space.
+                val name = runCatching { java.net.URLDecoder.decode(rest.substringBefore('/').replace("+", "%2B"), "UTF-8") }
+                    .getOrNull() ?: return json(mapOf("error" to "invalid_project"), 400)
+                val tail = rest.substringAfter('/', "").removePrefix("docs").removePrefix("/")
                 val query = path.substringAfter('?', "").split('&').filter { it.contains('=') }
                     .associate { it.substringBefore('=') to java.net.URLDecoder.decode(it.substringAfter('='), "UTF-8") }
                 if (tail.isEmpty()) {

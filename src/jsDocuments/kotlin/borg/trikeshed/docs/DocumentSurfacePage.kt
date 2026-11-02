@@ -14,6 +14,8 @@ import org.w3c.dom.HTMLElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLTextAreaElement
 import org.w3c.dom.events.Event
+import org.w3c.dom.url.URL
+import org.w3c.dom.url.URLSearchParams
 import org.w3c.fetch.Headers
 import org.w3c.fetch.RequestInit
 
@@ -56,6 +58,7 @@ object DocumentSurfacePage {
 
     /** Bumped on every navigation; a poll whose generation has moved on stops. */
     private var generation = 0
+    private var passageView: String? = null
 
     // ── curation state: reachable from the sidebar and #curation, independent of a project ──
     private var curationMode = false
@@ -77,21 +80,46 @@ object DocumentSurfacePage {
         root.addEventListener("submit", { e -> onSubmit(e) })
         root.addEventListener("input", { e -> onInput(e) })
         projects = DocumentSurface.projects(getJson("/api/projects"))
-        // Deep link: #project or #project/doc, the hrefs the panes render. READ BEFORE the first
-        // render: nothing is open yet, so that render writes `window.location.hash = ""` and would
-        // erase the very link it is about to be asked to follow (a cold load of
-        // /documents#genesis-notes/digest.md landed on "Pick a document").
+        // Keep the original deep link intact while its project, receipt and document load.
+        render(keepLocation = true)
+        window.addEventListener("popstate", { MainScope().launch { openLocation() } })
+        openLocation()
+        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { documentSurface: true })")
+    }
+
+    private suspend fun openLocation() {
         val (head, tail) = DocumentSurface.fragmentParts(window.location.hash)
         val projectOrCuration = decode(head)
         val selectedId = decode(tail)
-        render()
+        val query = URLSearchParams(window.location.search)
+        val passageRequested = query.has("passageReceipt") || query.has("passageProposal")
+        val receipt = query.get("passageReceipt").orEmpty()
+        val ordinal = query.get("passageProposal")?.let { if (Regex("^(0|[1-9][0-9]*)$").matches(it)) it.toIntOrNull() else null } ?: -1
         if (projectOrCuration == DocumentSurface.CURATION_HASH) {
-            openCuration(selectedId.ifEmpty { null })
+            openCuration(selectedId.ifEmpty { null }, keepLocation = true)
         } else if (projectOrCuration.isNotEmpty()) {
-            openProject(projectOrCuration)
-            if (selectedId.isNotEmpty()) openDoc(selectedId)
+            if (passageRequested && selectedId.isNotEmpty()) openPassage(projectOrCuration, selectedId, receipt, ordinal)
+            else {
+                if (openProject(projectOrCuration, keepLocation = true) && selectedId.isNotEmpty()) {
+                    view = SurfaceView.PAGE
+                    openDoc(selectedId, keepLocation = true)
+                }
+            }
+        } else {
+            generation++; clearPassage(); curationMode = false; project = null; doc = null
+            docs = emptyList(); blocks = emptyList(); runStates.clear(); view = SurfaceView.PAGE
+            render(keepLocation = true)
         }
-        js("window.forgeKotlin = Object.assign(window.forgeKotlin || {}, { documentSurface: true })")
+    }
+
+    /** Remove passage state when leaving it without changing unrelated query or hash state. */
+    private fun clearPassage() {
+        passageView = null
+        val url = URL(window.location.href)
+        if (!url.searchParams.has("passageReceipt") && !url.searchParams.has("passageProposal")) return
+        url.searchParams.delete("passageReceipt"); url.searchParams.delete("passageProposal")
+        window.history.replaceState(window.history.asDynamic().state, "", url.pathname + url.search + url.hash)
+        window.dispatchEvent(Event("hashchange"))
     }
 
     private fun onClick(e: Event) {
@@ -112,6 +140,10 @@ object DocumentSurfacePage {
         // A view switch and a sort are projections of what is already loaded: they repaint from
         // the rows in hand and never re-read the daemon.
         if (wantView != null) {
+            if (wantView == "table") {
+                if (passageView != null) generation++
+                clearPassage()
+            }
             view = if (wantView == "table") SurfaceView.TABLE else SurfaceView.PAGE
             render(); return
         }
@@ -125,8 +157,8 @@ object DocumentSurfacePage {
         if (curateOpen != null) { MainScope().launch { openCuration(curateOpen) }; return }
         MainScope().launch {
             when {
-                sourceProject != null && sourceDocument != null -> { openProject(sourceProject); view = SurfaceView.PAGE; openDoc(sourceDocument) }
-                p != null -> openProject(p)
+                sourceProject != null && sourceDocument != null -> { if (openProject(sourceProject)) { view = SurfaceView.PAGE; openDoc(sourceDocument) }; Unit }
+                p != null -> { openProject(p); Unit }
                 // Opening a page from the table is how a reader leaves the table: the row they
                 // picked is the page they meant, so the view follows the gesture.
                 d != null -> { view = SurfaceView.PAGE; openDoc(d) }
@@ -152,13 +184,15 @@ object DocumentSurfacePage {
     }
 
     /** Independent of project browsing: leaving it and returning finds the workspace unchanged. */
-    suspend fun openCuration(cid: String?) {
-        generation++
+    suspend fun openCuration(cid: String?, keepLocation: Boolean = false) {
+        val ticket = ++generation
+        clearPassage()
         curationMode = true
         curationFormError = null
         curationListError = null
         curationResultError = null
         val listJson = requestJson("/api/documents")
+        if (ticket != generation) return
         curationListError = DocumentSurface.curationError(listJson)
         curationAvailable = DocumentSurface.curationAvailable(listJson)
         curationDestination = DocumentSurface.curationDestination(listJson)
@@ -167,11 +201,12 @@ object DocumentSurfacePage {
             curationResult = null
         } else {
             val resultJson = requestJson("/api/documents?cid=" + encode(cid))
+            if (ticket != generation) return
             val err = DocumentSurface.curationError(resultJson)
             curationResult = if (err == null) DocumentSurface.curationResult(resultJson) else null
             curationResultError = err ?: if (curationResult == null) "That saved result could not be read." else null
         }
-        render()
+        render(keepLocation)
     }
 
     private suspend fun submitCuration() {
@@ -202,30 +237,72 @@ object DocumentSurfacePage {
         render()
     }
 
-    suspend fun openProject(name: String) {
-        generation++
+    suspend fun openProject(name: String, keepLocation: Boolean = false): Boolean {
+        val ticket = ++generation
+        clearPassage()
         curationMode = false
-        project = name; doc = null
+        project = name; doc = null; docs = emptyList()
         view = SurfaceView.TABLE
         blocks = emptyList(); runStates.clear()
-        docs = DocumentSurface.docs(getJson("/api/projects/" + encode(name) + "/docs?limit=512"))
-        render()
+        render(keepLocation = true)
+        val loaded = DocumentSurface.docs(getJson("/api/projects/" + encode(name) + "/docs?limit=512"))
+        if (ticket != generation || project != name || curationMode) return false
+        docs = loaded
+        render(keepLocation)
+        return true
     }
 
-    suspend fun openDoc(id: String) {
+    suspend fun openDoc(id: String, keepLocation: Boolean = false) {
         val p = project ?: return
         curationMode = false
+        clearPassage()
         val generationHere = ++generation
-        doc = DocumentSurface.document(getJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
+        doc = null; blocks = emptyList(); runStates.clear()
+        render(keepLocation = true)
+        val loaded = DocumentSurface.document(getJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
+        if (generationHere != generation || project != p || curationMode) return
+        doc = loaded
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
-        render()
+        render(keepLocation)
         if (blocks.none { it is RunBlock.Spec }) return
         refreshBlocks()
         MainScope().launch {
             while (generationHere == generation) {
                 delay(POLL_MS)
                 if (generationHere != generation) return@launch
+                refreshBlocks()
+            }
+        }
+    }
+
+    /** The receipt, project listing and current document belong to the same navigation ticket. */
+    private suspend fun openPassage(p: String, id: String, receipt: String, ordinal: Int) {
+        val ticket = ++generation
+        project = p; doc = null; curationMode = false; view = SurfaceView.PAGE
+        docs = emptyList(); blocks = emptyList(); runStates.clear()
+        passageView = "<section data-passage-result=\"1\"><p>Reading selected passage…</p></section>"
+        render(keepLocation = true)
+        val listed = DocumentSurface.docs(requestJson("/api/projects/" + encode(p) + "/docs?limit=512"))
+        if (ticket != generation) return
+        docs = listed; render(keepLocation = true)
+        val retained = if (Regex("^sha256:[0-9a-f]{64}$").matches(receipt) && ordinal >= 0)
+            DocumentSurface.curationResult(requestJson("/api/documents?cid=" + encode(receipt))) else null
+        if (ticket != generation) return
+        val selected = retained?.takeIf { it.receiptCid == receipt }?.let { DocumentSurface.passage(it, ordinal) }
+        val current = DocumentSurface.document(requestJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
+        if (ticket != generation || project != p || curationMode) return
+        doc = current
+        blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
+        runStates.clear()
+        passageView = DocumentSurface.passageHtml(current, selected)
+        render(keepLocation = true)
+        if (blocks.none { it is RunBlock.Spec }) return
+        refreshBlocks()
+        MainScope().launch {
+            while (ticket == generation) {
+                delay(POLL_MS)
+                if (ticket != generation) return@launch
                 refreshBlocks()
             }
         }
@@ -238,10 +315,12 @@ object DocumentSurfacePage {
      * exactly as they are using it.
      */
     private suspend fun refreshBlocks() {
+        val ticket = generation
         // Bolt: avoid intermediate List/Sequence allocation from filterIsInstance
         for (spec in blocks) {
             if (spec !is RunBlock.Spec) continue
             val state = RunBlock.state(getJson(headUrl(spec))) ?: continue
+            if (ticket != generation) return
             if (runStates.put(spec.ordinal, state) != state) repaint(spec, state)
         }
     }
@@ -274,7 +353,7 @@ object DocumentSurfacePage {
         refreshBlocks()
     }
 
-    private fun render() {
+    private fun render(keepLocation: Boolean = false) {
         setHtml(DocumentSurface.SIDE_ID, DocumentSurface.sidebarHtml(projects, project, docs, doc?.id, curationMode))
         if (curationMode) {
             setHtml(DocumentSurface.CRUMB_ID, DocumentSurface.curationCrumbHtml(curationResult))
@@ -284,7 +363,7 @@ object DocumentSurfacePage {
                 curationResult, curationResultError,
             ))
             val wanted = "#" + DocumentSurface.CURATION_HASH + (curationResult?.let { "/" + encode(it.receiptCid) } ?: "")
-            if (window.location.hash != wanted) window.location.hash = wanted
+            if (!keepLocation) setHash(wanted)
             document.title = listOfNotNull(curationResult?.name?.ifBlank { null }, "Curate", "Documents").joinToString(" · ")
             return
         }
@@ -292,12 +371,18 @@ object DocumentSurfacePage {
         setHtml(
             DocumentSurface.CONTENT_ID,
             if (view == SurfaceView.TABLE) DocumentSurface.tableHtml(project, docs, column, ascending, doc?.id)
-            else DocumentSurface.documentHtml(doc, runStates.toMap()),
+            else (passageView ?: "") + DocumentSurface.documentHtml(doc, runStates.toMap()),
         )
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (doc?.let { "/" + encode(it.id) } ?: "")
-        if (window.location.hash != wanted) window.location.hash = wanted
+        if (!keepLocation) setHash(wanted)
         document.title = listOfNotNull(doc?.id, project, "Documents").joinToString(" · ")
+    }
+
+    private fun setHash(wanted: String) {
+        if (window.location.hash == wanted) return
+        window.history.pushState(window.history.asDynamic().state, "", window.location.pathname + window.location.search + wanted)
+        window.dispatchEvent(Event("hashchange"))
     }
 
     private fun setHtml(id: String, html: String) {
