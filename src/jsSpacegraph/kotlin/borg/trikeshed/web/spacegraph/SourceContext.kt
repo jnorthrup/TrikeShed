@@ -30,13 +30,15 @@ internal fun mountCuratorSourceContext(): HTMLElement? {
 
 /** A card in the existing camera world, outside program bindings and execution state. */
 internal suspend fun Panels.inspectSourceContext(values: Map<String, List<String>>) {
+    val lifetime = page
     val card = document.createElement("section") as HTMLElement
     card.className = "document-source-context"
     card.setAttribute("data-source-inspection", "1")
     card.style.cssText = "position:absolute;left:0;top:0;width:740px;max-height:760px;overflow:auto;padding:24px;background:var(--panel,#101620);color:var(--ink,#ddd);border:1px solid var(--line,#263348);border-radius:10px;white-space:normal"
     world.appendChild(card)
-    page.own { card.remove() }
-    page.on(card, "wheel", { event -> event.stopPropagation() }, objOf { it.passive = true })
+    lifetime.own { card.remove() }
+    lifetime.on(card, "wheel", { event -> event.stopPropagation() }, objOf { it.passive = true })
+    fun present() = !lifetime.closing && truthy(card.asDynamic().isConnected)
     val selected = try { SourceSelection.parse(values) } catch (_: Exception) {
         card.innerHTML = "<p>Source context unavailable: invalid navigation reference. No source was substituted.</p><a href=\"/documents\">Return to Documents</a>"
         status("Invalid source context — inspection only")
@@ -54,13 +56,15 @@ internal suspend fun Panels.inspectSourceContext(values: Map<String, List<String
         val passage = retained?.takeIf { it.receiptCid == selected.receiptCid }?.let { DocumentSurface.passage(it, selected.proposal) }
         require(passage != null && selected.matches(passage)) { "Retained passage does not match the navigation identity" }
         val current = DocumentSurface.document(get("/api/projects/" + WikiSurface.encode(selected.project) + "/docs/" + WikiSurface.encode(selected.document)))
-        if (page.closing || !truthy(card.asDynamic().isConnected)) return
+        if (!present()) return
         card.innerHTML = DocumentSurface.passageHtml(current, passage)
         status("Selected passage inspection — no construction loaded or executed")
     } catch (cancelled: CancellationException) { throw cancelled }
     catch (failure: Throwable) {
-        if (!page.closing && truthy(card.asDynamic().isConnected)) card.innerHTML = context + "<p role=\"status\">Source context unavailable: " +
-            DocumentMarkdown.escape(failure.message ?: "Source could not be resolved") + ". No source was substituted.</p>"
-        status("Source context unavailable — inspection only")
+        if (present()) {
+            card.innerHTML = context + "<p role=\"status\">Source context unavailable: " +
+                DocumentMarkdown.escape(failure.message ?: "Source could not be resolved") + ". No source was substituted.</p>"
+            status("Source context unavailable — inspection only")
+        }
     }
 }
