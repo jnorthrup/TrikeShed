@@ -1,0 +1,21 @@
+Native KIF/SUMO over curation tuples — design boundary, 2026-11-02
+
+A proof is relative to an explicitly selected theory, not a legal truth certificate.
+
+Tuple interpretation
+Retain graph/subject/predicate/object exactly. Map identifiers through collision-free terms and an inspectable lexical sidecar; do not collapse different document entities just because labels match. The graph selects a source context/theory, not silently a fourth predicate argument. Evidence binds original and extracted-text CIDs, exact span, source revision, mapping/ontology CID, review capability and statement kind.
+
+Admission
+Keep extraction observations, document statements/norms and admitted object-language propositions distinct. A reviewed extraction means its passage was accurately represented, not that the passage is true or universally applicable. First explicit object proposition receipt accepts only positive unconditional instance/subclass facts with reviewed term mappings, as assumptions in a declared source context. Existing MUST/MAY/MUST_NOT/PRESUMED selections must not be converted to those facts. Caller-supplied review flags, source sidecars or rules cannot establish host authority.
+
+Execution
+Build immutable frame manifest with exact admitted source receipts, pinned ontology/rules/policy, query and execution bounds. Compile supported positive Horn via SumoNixBridge to JSON and native registered sumo/kif MLIR; actual sumo-to-kif-to-nix yields ordered facts/rules. Preserve provenance outside MLIR lowering. Run pinned solver and validate the returned finite proof certificate. Every logical inheritance step must be explicit input with source attribution; keep ontology=null until implicit ancestry has adequate proof support.
+
+Results
+Read-only result is SUPPORTED relative to frame, UNKNOWN for no derivation, or explicit refusal/unsupported/timeout. Missing exception evidence is not proof of no exception. Norm applicability requires positively established facts for triggering conditions, temporal/jurisdictional scope and resolved exceptions; do not use unstratified negation-as-failure for legal conclusions. Candidate errors/OCR uncertainty remain visible. Full quantified, functional, negative and higher-order SUO-KIF is outside the current engine and needs another proof backend, never silent flattening.
+
+Return
+Persist any future inference receipt in a separate versioned derived graph, with input/frame/proof IDs, exact supporting passages, ontology/rule versions and limits. SPARQL/Forge can expose proof -> rule -> source clause. Do not mix raw or alternative contexts into the asserted dataset by default. A source/review/ontology change constructs a new frame. Cached old results remain historical but cannot silently answer current-state queries. Current PR1079 returns checked receipts; persistent derived-graph admission and visual execution UI remain future slices.
+
+Roles
+NARS can prioritize candidate retrieval/activation and uncertainty, Rete can track dependencies and schedule fresh frames, and Roaring can remain an efficient physical candidate index. Neither repeated recall nor duplicate proof paths are independent evidence. The native KIF theory supplies articulated symbolic structure; the index alone is not its semantics.

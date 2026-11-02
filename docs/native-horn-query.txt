@@ -96,3 +96,23 @@ This development binary embeds RUNPATH to the extracted SDK directories
 and /workspace/library-files/mlnix-native-validation/sdk/usr/lib/llvm-22/lib.
 Those operator-provisioned libraries must remain available; this is not a
 relocatable release packaging or dependency authentication claim.
+
+Exact integrated-artifact follow-up
+Coordinated v42 source 6246c3085daae5ce74890d4291a6d49a3b01e439 passed all
+50 selected JUnit checks, with actual native integration configured and zero
+failures/errors/skips. Documents, Pages and Spacegraph development bundles
+were built/reused by that same coordinated task graph. Frozen main.jar SHA256
+1f2ab5525bd001159f4b2bfe366333e40ef9eb1b543e47b5451ef430527104c1.
+The final incremental rerun followed earlier full compilation; it is not a
+clean-build timing measurement.
+
+An external localhost HTTP transport exercised the public
+OroborosLcncWiring.documentReview bootstrap using its actual environment-selected
+operator profile and only this frozen main JAR plus immutable dependencies. No
+production class overlay or friend access was used. Configured: SUPPORTED and
+no-proof UNKNOWN; unset: UNAVAILABLE; invalid explicit JSON: startup refused
+before ready. Actual authenticated Book review, current-source replacement,
+401/405/409 request refusals and unchanged WAL were verified. All fixture JVMs
+were joined and no exact native executable process remained. This is not a
+full daemon-listener, browser query UI or OS containment claim. Sanitized receipt:
+docs/evidence/2026-11-02/native-horn-bootstrap-v42.json.

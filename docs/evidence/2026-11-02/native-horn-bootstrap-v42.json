@@ -1,0 +1,79 @@
+{
+  "kind": "native-horn-public-bootstrap-http-proof/1",
+  "source": "6246c3085daae5ce74890d4291a6d49a3b01e439",
+  "mainJarSha256": "1f2ab5525bd001159f4b2bfe366333e40ef9eb1b543e47b5451ef430527104c1",
+  "productionOverlays": false,
+  "friendPaths": false,
+  "bootstrap": "public OroborosLcncWiring.documentReview with actual operator environment config selection",
+  "transport": "external localhost JDK HTTP harness forwarding actual production routes; not full daemon listener/browser claim",
+  "operatorProfileSha256": "05b2e6b305af6cd0fa0db54eed54543ac9a3e0f15404832103df493350489fd6",
+  "fixtureSha256": "b038a008de6a78ef74eb7161591413d1f7dd6206a7cf8a17d82dc7a710d413cc",
+  "runtimeClasspathSha256": "32be3424899f10c7b83e087131d56b54b6fe35d432c5fe5d96af9e8a26cb3f1d",
+  "binarySha256": "97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5",
+  "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+  "cases": [
+    {
+      "mode": "configured",
+      "status": "SUPPORTED",
+      "noProofStatus": "UNKNOWN",
+      "worldObligationApplicability": "UNKNOWN",
+      "inputCid": "sha256:6b1bcc1a319e49f988725c2e2a5d45cd4f9e9466a6f73d43237e40d1e2ddff29",
+      "frameId": "sha256:a50639de497ccc8db2d0a2c90b355cc4bb4eba2cb1d3eaf2421e676cd59539cf",
+      "readCid": "sha256:9dcd054c9663534343af19dffdb670a485cfc307b79bdc0e1ca96876fb2a45b6",
+      "snapshotCid": "sha256:f769f39c7d90bf946f6f6d0bee456a15deac0539b6491e6c86ec698544e9fa2a",
+      "sourceCid": "sha256:9f95cf7630b14493d40261bb0bf4885ec118969add754def4c514b988c2c6001",
+      "proofSha256": "d0c2751b44e16a638e704d3cb4941f3e9752e483b196b2e769283ccb5e441e4a",
+      "authRefused": 401,
+      "methodRefused": 405,
+      "forgedFieldsRefused": 409,
+      "staleRefused": 409,
+      "walUnchanged": true
+    },
+    {
+      "mode": "unset",
+      "status": "UNAVAILABLE",
+      "worldObligationApplicability": "UNKNOWN",
+      "authRefused": 401,
+      "methodRefused": 405,
+      "forgedFieldsRefused": 409,
+      "walUnchanged": true
+    },
+    {
+      "mode": "invalid",
+      "startupRefused": true,
+      "exit": 1,
+      "diagnostic": "Unexpected or missing native profile fields"
+    }
+  ],
+  "cleanup": [
+    {
+      "mode": "configured",
+      "pid": 175905,
+      "exit": 0,
+      "joined": true,
+      "seconds": 1.6071724509965861,
+      "pidAbsentAfterJoin": true
+    },
+    {
+      "mode": "unset",
+      "pid": 175955,
+      "exit": 0,
+      "joined": true,
+      "seconds": 0.8920815919991583,
+      "pidAbsentAfterJoin": true
+    },
+    {
+      "mode": "invalid",
+      "pid": 175994,
+      "exit": 1,
+      "joined": true,
+      "seconds": 0.5660706519993255,
+      "pidAbsentAfterJoin": true
+    }
+  ],
+  "osSandboxClaim": false,
+  "networkIsolationClaim": false,
+  "memoryIsolationClaim": false,
+  "sharedLibraries": "operator-trusted development SDK RUNPATH; no constructor environment added",
+  "cleanupNativeExecutableProcessIdsRemaining": []
+}

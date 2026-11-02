@@ -1,0 +1,76 @@
+{
+  "kind": "legal-taxonomy-stage-identities/1",
+  "legacyInputCidMeaning": {
+    "source-manifest.frames.inputCid": "originalExportInputCid",
+    "results.results.inputCid": "executedNativeInputCid"
+  },
+  "nativeRerunRequired": false,
+  "cases": [
+    {
+      "case": "classification",
+      "originalExportFile": "classification.input.json",
+      "originalExportInputCid": "sha256:99c4dfec034123e232886918cb13a6ac8424cf4104e7ddc9982b383639a9bcd8",
+      "executedNativeFile": "classification.native-input.json",
+      "executedNativeInputCid": "sha256:5f1b7c991bf25176aea03b7899895e0b1934d90d9e745cf9da3b4c901688193a",
+      "frameId": "sha256:6818798ec3ac4dafe562872420f972e0ddef60ca2ab43f1e74fc906cd8be2079",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    },
+    {
+      "case": "absent-case-predicate",
+      "originalExportFile": "absent-case-predicate.input.json",
+      "originalExportInputCid": "sha256:b7fbea494468b67e49b8271d010a89c92acbffdf392c06abaf890d227fe62465",
+      "executedNativeFile": "absent-case-predicate.native-input.json",
+      "executedNativeInputCid": "sha256:61398fb870731f35cf6d6b7514cb928b0567689fca7b47e5e13408545d4797d0",
+      "frameId": "sha256:8802a7b2060c24a0046fac1ae0717bddb16b9db504d66671e3318fc80bf74b9f",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    },
+    {
+      "case": "cross-context",
+      "originalExportFile": "cross-context.input.json",
+      "originalExportInputCid": "sha256:d774eac48a2aa413426dfbc651fee3ea19bdf851ce25b612617df918e58677a7",
+      "executedNativeFile": "cross-context.native-input.json",
+      "executedNativeInputCid": "sha256:002ae5e836e6a6120713e1fc7b8388e392dd6f79345924e30ad50d4f775a204b",
+      "frameId": "sha256:5483c2a08b199ba26bca178a461432410d7b042c2bdd700f6c3df88ff65c3440",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    },
+    {
+      "case": "one-source-retracted",
+      "originalExportFile": "one-source-retracted.input.json",
+      "originalExportInputCid": "sha256:5910f9ddebf1a8a34fcf49364ba31d13bb6da6a9520676cbbfbfc25e6bc2c290",
+      "executedNativeFile": "one-source-retracted.native-input.json",
+      "executedNativeInputCid": "sha256:98475e7ae0e818f1c0c834233d9ef117c5ba511c95d1696a1dcc014117338ed1",
+      "frameId": "sha256:086ab9c0c6e3bb0e4fecb0e9f88f652f701c7749d7d72435eea17d7b9f9e0f25",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    },
+    {
+      "case": "last-source-retracted",
+      "originalExportFile": "last-source-retracted.input.json",
+      "originalExportInputCid": "sha256:584c9428b491df9b777a0b1cf5b4f5323cb30b6707d85399e5163f89ed3a026e",
+      "executedNativeFile": "last-source-retracted.native-input.json",
+      "executedNativeInputCid": "sha256:7a12bd8262e77d53054eca8dd1d32a82ca24e246311b408c90a9894c2a1f54ea",
+      "frameId": "sha256:88ff0209c524e170b457e90996b651b184230c259dae9dfdc7f2fc0209a80d9f",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    },
+    {
+      "case": "separate-context-B",
+      "originalExportFile": "separate-context-B.input.json",
+      "originalExportInputCid": "sha256:db587474e25cf68f3a05b25a00e9539bdaf82eafa6e3d34930712cb5d8a8e753",
+      "executedNativeFile": "separate-context-B.native-input.json",
+      "executedNativeInputCid": "sha256:a99aee663b3027681592d03fadb00d897cec6aafbe58225bebd70699cdc3037b",
+      "frameId": "sha256:253cd48e1052a74b34e20f8de5c146fec643deb016ae53298669b8192ba248f4",
+      "exactByteHashesVerified": true,
+      "equalParsedPayloads": true,
+      "serializationNote": "Original export uses Kotlin jsonOf serialization; native-rejoined input is Python JSON serialization. Parsed payload and frameId are unchanged; byte-level input CIDs can differ."
+    }
+  ]
+}

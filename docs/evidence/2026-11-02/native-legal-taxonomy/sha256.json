@@ -1,0 +1,12 @@
+{
+  "README.txt": "2a0db0e9ad3b820b789955a23fe9ce031d6fc12023bdef38ff9ba3a0d2b8fc9a",
+  "classification.input.json": "99c4dfec034123e232886918cb13a6ac8424cf4104e7ddc9982b383639a9bcd8",
+  "classification.native-input.json": "5f1b7c991bf25176aea03b7899895e0b1934d90d9e745cf9da3b4c901688193a",
+  "classification.result.stdout": "61553d3d1e36479c38190372466110c2ef68baa44b0e971a1417c1b32e90d7d6",
+  "curation-path.txt": "804b72c0e8e64cec2c7e4bd92cfedf9625965d8be88acbe6c334b88bed47891e",
+  "proof-readable.txt": "0439dbf59351cd7d7ca9086e518118d1c89b2bb875f2d1d9ef5c78f6afee8f0c",
+  "results.json": "6cc54fb464d9be45049bd312ac0f0dda2fd37cf10290743884ee1e4a1bec2766",
+  "retraction-summary.txt": "6075ce769daccb10c7ca6fedb705e548e33aff30c8880f19b60a137c131a1b7a",
+  "source-manifest.json": "e597b7e12cb878a7a3509eb7fbde71ebf853743a04c1ff53d26b93410d58599e",
+  "stage-identity.json": "36609aec60c2c5c537d59752247c8c0e9dc1eb69d2b63e8ca8219d6bd7be926e"
+}

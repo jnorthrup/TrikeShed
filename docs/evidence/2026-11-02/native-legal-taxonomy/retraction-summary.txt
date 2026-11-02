@@ -1,0 +1,8 @@
+Actual native results; complete JSON matched official Nix in all six cases.
+
+classification            SUPPORTED
+absent-case-predicate     UNKNOWN
+cross-context             UNKNOWN
+one-source-retracted      SUPPORTED
+last-source-retracted     UNKNOWN
+separate-context-B        SUPPORTED

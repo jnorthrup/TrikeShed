@@ -1,0 +1,222 @@
+{
+  "kind": "synthetic-legal-taxonomy-native-demo-results/1",
+  "synthetic": true,
+  "interpretation": "Classifications hold under selected source-context assumptions; no legal validity, service or world truth conclusion.",
+  "newProductionAssertionReceiptImplemented": false,
+  "sourceManifest": "source-manifest.json",
+  "adapterSha256": "e5c5a5df8b465dd93cdc18a4081df1aea0a6cec0049b3834cbdf5b13cfe38c3c",
+  "nativeMlnixRevision": "1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba",
+  "sumoNixRevision": "1e2fb138d562769d21e7f3e6cfdade9129705ec4",
+  "sumoSourceRevision": "25bb366fdffd8769e741d2e22f215c2785bddce1",
+  "limits": {
+    "timeoutSeconds": 45,
+    "addressSpaceBytes": 8589934592,
+    "observedOutputAtMostBytes": 1048576,
+    "nativeOSIsolationClaim": false
+  },
+  "contextIsolationChecked": true,
+  "quotationSpansAndSourceHashesChecked": true,
+  "alternativeWitnessesChecked": true,
+  "firstProofOnly": true,
+  "results": [
+    {
+      "case": "classification",
+      "contextCid": "sha256:40d71e1c63cd513094f739a3dd14ed914b4ba1a44049d28f2f32be1de95efb7a",
+      "status": "SUPPORTED",
+      "query": [
+        "instance",
+        "ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c",
+        "ContentBearingObject"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:5f1b7c991bf25176aea03b7899895e0b1934d90d9e745cf9da3b4c901688193a",
+      "frameId": "sha256:6818798ec3ac4dafe562872420f972e0ddef60ca2ab43f1e74fc906cd8be2079",
+      "runtimeSeconds": 0.0248,
+      "proofFile": "classification.result.stdout",
+      "outputSha256": "61553d3d1e36479c38190372466110c2ef68baa44b0e971a1417c1b32e90d7d6",
+      "assertedWitnesses": [
+        {
+          "fact": "(instance ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c Certificate)",
+          "sourceIds": [
+            "filing-A:certificate-claim-1",
+            "filing-A:certificate-claim-2"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Certificate Text)",
+          "sourceIds": [
+            "sumo:Certificate-Text"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Text ContentBearingObject)",
+          "sourceIds": [
+            "sumo:Text-ContentBearingObject"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        }
+      ],
+      "ruleSources": [
+        "host-rule:instance-subclass/v1"
+      ],
+      "originalExportInputCid": "sha256:99c4dfec034123e232886918cb13a6ac8424cf4104e7ddc9982b383639a9bcd8",
+      "executedNativeInputCid": "sha256:5f1b7c991bf25176aea03b7899895e0b1934d90d9e745cf9da3b4c901688193a"
+    },
+    {
+      "case": "absent-case-predicate",
+      "contextCid": "sha256:40d71e1c63cd513094f739a3dd14ed914b4ba1a44049d28f2f32be1de95efb7a",
+      "status": "UNKNOWN",
+      "query": [
+        "local:ServedOn",
+        "ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c",
+        "local:Respondent"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:61398fb870731f35cf6d6b7514cb928b0567689fca7b47e5e13408545d4797d0",
+      "frameId": "sha256:8802a7b2060c24a0046fac1ae0717bddb16b9db504d66671e3318fc80bf74b9f",
+      "runtimeSeconds": 0.0269,
+      "proofFile": "absent-case-predicate.result.stdout",
+      "outputSha256": "c6c80e23c19ecfa7e64e0adfe80aa0f3e6ed2e68b37a54634becc5f2502b91d5",
+      "assertedWitnesses": [],
+      "ruleSources": [],
+      "originalExportInputCid": "sha256:b7fbea494468b67e49b8271d010a89c92acbffdf392c06abaf890d227fe62465",
+      "executedNativeInputCid": "sha256:61398fb870731f35cf6d6b7514cb928b0567689fca7b47e5e13408545d4797d0"
+    },
+    {
+      "case": "cross-context",
+      "contextCid": "sha256:40d71e1c63cd513094f739a3dd14ed914b4ba1a44049d28f2f32be1de95efb7a",
+      "status": "UNKNOWN",
+      "query": [
+        "instance",
+        "e90310bd9713ab49e51a7f8fc66ed594e3f5aa14005e523d30f70783aadf43b93",
+        "ContentBearingObject"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:002ae5e836e6a6120713e1fc7b8388e392dd6f79345924e30ad50d4f775a204b",
+      "frameId": "sha256:5483c2a08b199ba26bca178a461432410d7b042c2bdd700f6c3df88ff65c3440",
+      "runtimeSeconds": 0.0206,
+      "proofFile": "cross-context.result.stdout",
+      "outputSha256": "24f1af1306e354d9c970998b6ded4bba0229649712f4bef1d0ed316442f81a7f",
+      "assertedWitnesses": [],
+      "ruleSources": [],
+      "originalExportInputCid": "sha256:d774eac48a2aa413426dfbc651fee3ea19bdf851ce25b612617df918e58677a7",
+      "executedNativeInputCid": "sha256:002ae5e836e6a6120713e1fc7b8388e392dd6f79345924e30ad50d4f775a204b"
+    },
+    {
+      "case": "one-source-retracted",
+      "contextCid": "sha256:40d71e1c63cd513094f739a3dd14ed914b4ba1a44049d28f2f32be1de95efb7a",
+      "status": "SUPPORTED",
+      "query": [
+        "instance",
+        "ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c",
+        "ContentBearingObject"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:98475e7ae0e818f1c0c834233d9ef117c5ba511c95d1696a1dcc014117338ed1",
+      "frameId": "sha256:086ab9c0c6e3bb0e4fecb0e9f88f652f701c7749d7d72435eea17d7b9f9e0f25",
+      "runtimeSeconds": 0.0225,
+      "proofFile": "one-source-retracted.result.stdout",
+      "outputSha256": "c0617fa3720d25f853516d8ea748a505869debd3b1cb3841a745e3133fa906cc",
+      "assertedWitnesses": [
+        {
+          "fact": "(instance ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c Certificate)",
+          "sourceIds": [
+            "filing-A:certificate-claim-2"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Certificate Text)",
+          "sourceIds": [
+            "sumo:Certificate-Text"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Text ContentBearingObject)",
+          "sourceIds": [
+            "sumo:Text-ContentBearingObject"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        }
+      ],
+      "ruleSources": [
+        "host-rule:instance-subclass/v1"
+      ],
+      "originalExportInputCid": "sha256:5910f9ddebf1a8a34fcf49364ba31d13bb6da6a9520676cbbfbfc25e6bc2c290",
+      "executedNativeInputCid": "sha256:98475e7ae0e818f1c0c834233d9ef117c5ba511c95d1696a1dcc014117338ed1"
+    },
+    {
+      "case": "last-source-retracted",
+      "contextCid": "sha256:40d71e1c63cd513094f739a3dd14ed914b4ba1a44049d28f2f32be1de95efb7a",
+      "status": "UNKNOWN",
+      "query": [
+        "instance",
+        "ebe772225c052c925783d603a28b15d17ecfab145485668c5c619fa476a117d6c",
+        "ContentBearingObject"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:7a12bd8262e77d53054eca8dd1d32a82ca24e246311b408c90a9894c2a1f54ea",
+      "frameId": "sha256:88ff0209c524e170b457e90996b651b184230c259dae9dfdc7f2fc0209a80d9f",
+      "runtimeSeconds": 0.0299,
+      "proofFile": "last-source-retracted.result.stdout",
+      "outputSha256": "77c451e8375377b015873e17be83409fc0d1741848122a18b0bc1f4dd1440247",
+      "assertedWitnesses": [],
+      "ruleSources": [],
+      "originalExportInputCid": "sha256:584c9428b491df9b777a0b1cf5b4f5323cb30b6707d85399e5163f89ed3a026e",
+      "executedNativeInputCid": "sha256:7a12bd8262e77d53054eca8dd1d32a82ca24e246311b408c90a9894c2a1f54ea"
+    },
+    {
+      "case": "separate-context-B",
+      "contextCid": "sha256:f7b9b57ad6c05663104cf9765d0e8d9390d531ce8f5a30bc7d079a7ece915039",
+      "status": "SUPPORTED",
+      "query": [
+        "instance",
+        "e90310bd9713ab49e51a7f8fc66ed594e3f5aa14005e523d30f70783aadf43b93",
+        "ContentBearingObject"
+      ],
+      "exactNativeInterchange": true,
+      "exactOfficialNixMatch": true,
+      "inputCid": "sha256:a99aee663b3027681592d03fadb00d897cec6aafbe58225bebd70699cdc3037b",
+      "frameId": "sha256:253cd48e1052a74b34e20f8de5c146fec643deb016ae53298669b8192ba248f4",
+      "runtimeSeconds": 0.0262,
+      "proofFile": "separate-context-B.result.stdout",
+      "outputSha256": "3e0a4d1e4ed912f69a8abbfeeb2b8082b4137914bb4a5e96184d088769878bb3",
+      "assertedWitnesses": [
+        {
+          "fact": "(instance e90310bd9713ab49e51a7f8fc66ed594e3f5aa14005e523d30f70783aadf43b93 Certificate)",
+          "sourceIds": [
+            "filing-B:same-label-certificate-claim"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Certificate Text)",
+          "sourceIds": [
+            "sumo:Certificate-Text"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        },
+        {
+          "fact": "(subclass Text ContentBearingObject)",
+          "sourceIds": [
+            "sumo:Text-ContentBearingObject"
+          ],
+          "witnessMode": "any-one-asserted-source"
+        }
+      ],
+      "ruleSources": [
+        "host-rule:instance-subclass/v1"
+      ],
+      "originalExportInputCid": "sha256:db587474e25cf68f3a05b25a00e9539bdaf82eafa6e3d34930712cb5d8a8e753",
+      "executedNativeInputCid": "sha256:a99aee663b3027681592d03fadb00d897cec6aafbe58225bebd70699cdc3037b"
+    }
+  ]
+}
