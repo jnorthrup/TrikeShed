@@ -1,0 +1,50 @@
+{
+  "result": "PASS",
+  "scope": "Synthetic primary worktree; actual Documents bundle, WorktreeCouchGateway, PackCasStore and PatchWire. Source retention only; no models, OCR, candidate acceptance or legal review.",
+  "meta": {
+    "project": "primary reference",
+    "id": "notes/law + duty.md",
+    "otherId": "other.txt",
+    "selected": {
+      "project": "primary reference",
+      "id": "notes/law + duty.md",
+      "cid": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+      "rev": "1-sha256:d6b5c815a2f00c99dbcb5f91b6c27690ce27b3237ae57c005a96209360a489ab",
+      "seq": 2,
+      "length": 48,
+      "contentType": "text/markdown",
+      "contentStatus": "verified-bytes"
+    },
+    "sourceSha256": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+    "bundleSha256": "sha256:5a23640266450dc6dddc039b9849cc6720e9d3e91b22fdca7325e4fb388e6180"
+  },
+  "evidence": {
+    "ownedSourceExact": true,
+    "receiptVerified": true,
+    "sourceCid": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+    "receiptCid": "sha256:8d776d8965bef9ded0940813d475974aa2929d2b577774af118e95de130e3a07",
+    "sourceBytes": 48
+  },
+  "refusal": {
+    "error": "Selected primary revision changed"
+  },
+  "writes": [
+    {
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md/retain-source",
+      "body": {
+        "cid": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+        "rev": "1-sha256:d6b5c815a2f00c99dbcb5f91b6c27690ce27b3237ae57c005a96209360a489ab",
+        "seq": 2
+      }
+    },
+    {
+      "path": "/api/projects/primary%20reference/docs/notes%2Flaw%20%2B%20duty.md/retain-source",
+      "body": {
+        "cid": "sha256:42a5a63cf92eb01e44cd63ba93495149890bb35abbbbb3c54896e026f3074db9",
+        "rev": "1-sha256:d6b5c815a2f00c99dbcb5f91b6c27690ce27b3237ae57c005a96209360a489ab",
+        "seq": 2
+      }
+    }
+  ],
+  "browserErrors": []
+}

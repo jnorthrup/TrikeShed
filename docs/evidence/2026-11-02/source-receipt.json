@@ -1,0 +1,19 @@
+{
+  "source": "942afa63182ecb5e1bb4bd36365c30917da2e77e",
+  "mainJarSha256": "64fcf3a8e9dcc779cf69447d3c674d4fa50209baeb63d235c9fc60045747043c",
+  "documentsBundleSha256": "5a23640266450dc6dddc039b9849cc6720e9d3e91b22fdca7325e4fb388e6180",
+  "scope": "Synthetic primary worktree; production Documents bundle, WorktreeCouchGateway, PackCasStore and PatchWire; source retention only, no model, OCR or candidate approval.",
+  "countsNotAdditive": true,
+  "v36": {
+    "tests": 142,
+    "passed": 141,
+    "failure": "Obsolete exact model catalog assertion; corrected in validation branch and passing in v37."
+  },
+  "files": {
+    "curator-result.json": "4df272cfc29a88ca48b959a237dce3a49bec90590c1c4a02630dae47722c07a2",
+    "verification-v37.json": "a60451fb862b1f1999809d641e245d83747aca7d317ebd7322764dd9e55135f8",
+    "verification-v35.json": "55a53e4de251528af5611921a6061352b7093fe505e438db95ca4fed887e0eee",
+    "curator-retained-unreviewed.png": "766992fa94247f8b66d31c11920ce284d9b820792b281c94b6ee66a2376b4b95",
+    "curator-stale-refused-other-selected.png": "1d2e354ac0095aa9f7a9f18c8ecd54e9fd047e9af0b611c0e0a5cf2e673a490c"
+  }
+}
