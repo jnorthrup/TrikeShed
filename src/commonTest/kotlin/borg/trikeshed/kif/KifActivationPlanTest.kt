@@ -8,6 +8,28 @@ class KifActivationPlanTest {
     private fun source(id: String, text: String) =
         KifSourceAssertion(id, ContentId.of("source:$id".encodeToByteArray()), "source-v1", KifReview.APPROVED, text)
 
+    @Test fun malformedIdentityFieldsCannotCollapseAndNonBmpFieldsRemainExact() {
+        val good = source("one", "(subclass A B)")
+        val empty = KifTaxonomySnapshot.create(0, _l.get<KifSourceAssertion>())
+        for (bad in s_["\uD800", "\uD801", "\uDC00"].view) {
+            assertFailsWith<CharacterCodingException> {
+                KifTaxonomySnapshot.create(0, _l[good.copy(text = "(subclass $bad B)")])
+            }
+            for (source in s_[good.copy(id = bad), good.copy(sourceRevision = bad)].view)
+                assertFailsWith<CharacterCodingException> {
+                    KifTaxonomySnapshot.create(0, _l[source]).activationPlan("subclass", "A", "B")
+                }
+            assertFailsWith<CharacterCodingException> { empty.activationPlan(bad, "A", "B") }
+            assertFailsWith<CharacterCodingException> { empty.activationPlan("subclass", bad, "B") }
+            assertFailsWith<CharacterCodingException> { empty.activationPlan("subclass", "A", bad) }
+        }
+        val nonBmp = "\uD83D\uDE00"
+        val first = empty.activationPlan("subclass", nonBmp, "B")
+        val second = empty.activationPlan("subclass", "\uD83D\uDE01", "B")
+        assertNotEquals(first.queryId, second.queryId)
+        assertNotEquals(first.frameId, second.frameId)
+    }
+
     @Test fun sourceIdentityAndAlternativeDependenciesSurviveRevisionsAndRetraction() {
         val one = source("one", "(subclass A B)")
         val two = source("two", "(subclass A B)")
@@ -72,8 +94,9 @@ class KifActivationPlanTest {
     }
 
     @Test fun exportUsesUtf8LengthsAndRetainsRawSourceWithoutDelimiterAmbiguity() {
-        val input = source("résumé:3", "; λ\n(subclass A B)")
-        val plan = KifTaxonomySnapshot.create(6, _l[input]).activationPlan("subclass", "A", "B")
+        val input = source("résumé:3\uD83D\uDE00", "; λ\uD801\uDC00\n(subclass \uD83D\uDE00 B)")
+            .copy(sourceRevision = "revision-\uD83D\uDE00")
+        val plan = KifTaxonomySnapshot.create(6, _l[input]).activationPlan("subclass", "\uD83D\uDE00", "B")
         val bytes = plan.export()
         val fields = mutableListOf<String>()
         var offset = 0
@@ -81,7 +104,9 @@ class KifActivationPlanTest {
             var length = 0
             while (bytes[offset] != ':'.code.toByte()) length = length * 10 + (bytes[offset++].toInt() - '0'.code)
             offset++
-            fields.add(bytes.decodeToString(offset, offset + length))
+            val field = bytes.decodeToString(offset, offset + length, throwOnInvalidSequence = true)
+            assertEquals(length, field.encodeToByteArray(throwOnInvalidSequence = true).size)
+            fields.add(field)
             offset += length
         }
         assertEquals(bytes.size, offset)
@@ -91,6 +116,8 @@ class KifActivationPlanTest {
         assertTrue(input.text in fields)
         assertTrue(input.id in fields)
         assertTrue(input.sourceCid.value in fields)
+        assertTrue(input.sourceRevision in fields)
+        assertTrue("\uD83D\uDE00" in fields)
         assertContentEquals(bytes, plan.export())
         val empty = KifTaxonomySnapshot.create(7, _l.get<KifSourceAssertion>())
         assertNotEquals(empty.activationPlan("subclass", "a:b", "c").queryId,

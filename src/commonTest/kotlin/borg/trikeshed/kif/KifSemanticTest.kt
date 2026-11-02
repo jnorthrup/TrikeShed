@@ -1,8 +1,25 @@
 package borg.trikeshed.kif
 
+import borg.trikeshed.lib.*
 import kotlin.test.*
 
 class KifSemanticTest {
+    @Test fun malformedUtf16IsRejectedAndNonBmpSyntaxRoundTrips() {
+        val first = "\uD800"
+        val second = "\uD801"
+        assertNotEquals(first, second)
+        assertContentEquals(first.encodeToByteArray(), second.encodeToByteArray(), "Default UTF-8 encoding loses distinct malformed input")
+        for (malformed in s_[first, second, "\uDC00", "\uD800x", "x\uDC00"].view) {
+            assertFailsWith<CharacterCodingException> { KifSemantic.decode("(p $malformed)") }
+            assertFailsWith<CharacterCodingException> { KifSemantic.decode("; $malformed\n(p A)") }
+        }
+        val text = "(p \uD83D\uDE00 \"\uD801\uDC00\")"
+        val decoded = KifSemantic.decode(text)
+        assertEquals(text, decoded.syntax.toKifString())
+        assertTrue(decoded.alphaEquivalent(KifSemantic.decode(decoded.syntax.toKifString())))
+        assertEquals(text, text.encodeToByteArray(throwOnInvalidSequence = true).decodeToString(throwOnInvalidSequence = true))
+    }
+
     @Test fun shadowedBindersAreDistinctAndAlphaSafe() {
         val a = KifSemantic.decode("(forall (?X) (and (p ?X ?Free) (exists (?X) (q ?X ?Free))))")
         val b = KifSemantic.decode("(forall (?A) (and (p ?A ?Free) (exists (?B) (q ?B ?Free))))")
