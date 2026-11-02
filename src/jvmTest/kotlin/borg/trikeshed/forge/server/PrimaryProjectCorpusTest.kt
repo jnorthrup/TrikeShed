@@ -77,11 +77,8 @@ class PrimaryProjectCorpusTest {
                 assertEquals("unreviewed", retained.provenance["reviewStatus"])
                 val wire = rig.wire(corpus)
                 val path = "/api/projects/${enc(binding.name)}/docs/${enc(source.name)}/retain-source"
-<<<<<<< HEAD
-=======
                 val readable = json(get(wire, path.removeSuffix("/retain-source")))
                 assertEquals(true, readable["canRetainSource"])
->>>>>>> origin/codex/primary-manual-curation-20261102
                 suspend fun post(selection: Map<String, Any?>) = assertNotNull(wire.route("POST", path,
                     "POST $path HTTP/1.1\r\n\r\n" + borg.trikeshed.parse.jsonOf(selection), null))
                 val response = post(selected.toMap())

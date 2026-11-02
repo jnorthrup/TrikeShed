@@ -95,8 +95,6 @@ object KifSemantic {
             }
         }
         count(syntax, 0)
-<<<<<<< HEAD
-=======
         fun variableNames(e: KifExpr) {
             when (e) {
                 is KifExpr.Var -> require(e.name.length > 1) { "KIF variable requires a name after ?" }
@@ -106,7 +104,6 @@ object KifSemantic {
             }
         }
         variableNames(syntax)
->>>>>>> origin/codex/kif-activation-20261102
         return Decoder().decode(syntax)
     }
 
@@ -161,12 +158,9 @@ object KifSemantic {
                     require(args.size == 2) { "$head requires binders and body" }
                     val variables = (args[0] as? KifExpr.ListExpr)?.elements
                         ?: throw IllegalArgumentException("Quantifier requires variable list")
-<<<<<<< HEAD
-=======
                     // SUO-KIF row binders are valid syntax outside this scoped scalar fragment.
                     // Preserve the entire quantified form; do not erase the binder or decode its body as facts.
                     if (variables.any { it is KifExpr.Atom && it.token.startsWith('@') }) return unknown(e, scope)
->>>>>>> origin/codex/kif-activation-20261102
                     require(variables.isNotEmpty() && variables.all { it is KifExpr.Var }) { "Invalid quantified variables" }
                     val names = variables.map { (it as KifExpr.Var).name }
                     require(names.distinct().size == names.size) { "Duplicate binder in one scope" }

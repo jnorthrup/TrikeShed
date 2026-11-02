@@ -36,12 +36,6 @@ class KifSemanticTest {
         assertIs<KifFormula.Unsupported>(assertIs<KifFormula.ForAll>(decoded.formula).body)
         assertEquals(text, decoded.syntax.toKifString())
         assertIs<KifFormula.Unsupported>(KifSemantic.decode("(?Predicate A)").formula)
-<<<<<<< HEAD
-    }
-
-    @Test fun malformedAndOversizedInputsFailBeforeRecursiveDecode() {
-        for (text in listOf("(p A) (q B)", "(not (p A) (q B))", "(forall (?X ?X) (p ?X))",
-=======
         val row = KifSemantic.decode("(forall (@ROW) (p @ROW))")
         assertIs<KifFormula.Unsupported>(row.formula)
         assertEquals("(forall (@ROW) (p @ROW))", row.unsupportedForms.single().toKifString())
@@ -49,7 +43,6 @@ class KifSemanticTest {
 
     @Test fun malformedAndOversizedInputsFailBeforeRecursiveDecode() {
         for (text in listOf("(p ?)", "(forall (?) (p ?))", "(p A) (q B)", "(not (p A) (q B))", "(forall (?X ?X) (p ?X))",
->>>>>>> origin/codex/kif-activation-20261102
             "(exists (A) (p A))", "(p \"unterminated)", "(p A"))
             assertFailsWith<IllegalArgumentException>(text) { KifSemantic.decode(text) }
         assertFailsWith<IllegalArgumentException> {

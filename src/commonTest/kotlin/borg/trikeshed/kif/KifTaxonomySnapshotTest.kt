@@ -59,15 +59,12 @@ class KifTaxonomySnapshotTest {
         assertEquals(setOf(listOf("one"), listOf("two")), snapshot.explain("subclass", "A", "B").proofs.map { it.assertionIds }.toSet())
         assertEquals(KifExplanationStatus.UNKNOWN, snapshot.explain("subclass", "A", "C").status)
         assertEquals(4, snapshot.assertions.count { it.exclusion != null })
-<<<<<<< HEAD
-=======
         val supported = snapshot.explain("subclass", "A", "B")
         assertEquals("positive-ground-taxonomy-support/v1", supported.semantics)
         assertEquals(setOf("unverified", "negative", "quantified", "functional"), supported.excludedAssertionIds.toSet())
         assertEquals(KifExplanationStatus.SUPPORTED, supported.status)
         assertEquals("(not (subclass A B))", snapshot.assertion("negative")?.source?.text)
         assertNotNull(snapshot.assertion("negative")?.exclusion)
->>>>>>> origin/codex/kif-activation-20261102
         assertEquals(KifExplanationStatus.UNSUPPORTED, snapshot.explain("not", "A", "B").status)
         assertNotNull(snapshot.assertion("quantified")?.decoded)
         assertFailsWith<IllegalArgumentException> { KifTaxonomySnapshot.create(6, sources + sources.first()) }

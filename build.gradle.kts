@@ -538,11 +538,7 @@ val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
         into("bin")
         filePermissions { unix("rw-r--r--") }
     }
-<<<<<<< HEAD
     from(files(tasks.named("jvmJar"), graalPiPages, graalPiRuntime)) { into("lib") }
-=======
-    from(tasks.named("jvmJar"), graalPiPages, graalPiRuntime) { into("lib") }
->>>>>>> origin/codex/graal-pi-release-20261102
     from("LICENSE", "NOTICE.md")
     from("release/graal-pi/README.md")
     from("src/jvmMain/resources/pi-core") { into("source/pi-core") }
