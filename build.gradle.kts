@@ -529,7 +529,7 @@ val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
     duplicatesStrategy = DuplicatesStrategy.FAIL
     into(layout.buildDirectory.dir("install/graal-pi"))
     from(graalPiScripts) { into("bin") }
-    from(tasks.named("jvmJar"), graalPiPages, graalPiRuntime) { into("lib") }
+    from(files(tasks.named("jvmJar"), graalPiPages, graalPiRuntime)) { into("lib") }
     from("LICENSE", "NOTICE.md")
     from("release/graal-pi/README.md")
     from("src/jvmMain/resources/pi-core") { into("source/pi-core") }
