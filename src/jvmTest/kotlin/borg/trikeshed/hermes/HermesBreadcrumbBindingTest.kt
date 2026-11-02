@@ -13,6 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** Real restricted GraalPy + pinned donor registry. This does not substitute or claim the full donor agent loop. */
@@ -135,5 +136,63 @@ class HermesBreadcrumbBindingTest {
             assertEquals("fixture", contexts.transact("host-session", create = false) { it.submission?.model })
             assertFailsWith<BreadcrumbContextNotFoundException> { contexts.transact("command-1", create = false) { } }
         } finally { generation.drain(); htx.close() }
+    }
+
+    @Test fun legacySessionCallbackIsCapturedWhileModelLeaseAndCommandAttributionRemainDynamic() = runBlocking<Unit>(Dispatchers.IO) {
+        var requests = 0
+        val htx = openHtxElement(routeService = object : HtxRouteService {
+            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
+                requests++
+                return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request,
+                    response = HtxResponse(200, body = ByteSeries("""{"choices":[{"message":{"role":"assistant","content":"answer"}}]}""".encodeToByteArray()))))
+            }
+        })
+        val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
+            model("fixture", provider = "fixture", caps = _s["chat"], baseUrl = "https://fixture.invalid/v1")
+        }
+        val contexts = BreadcrumbElement()
+        contexts.transact("session-a") { it.put(BreadcrumbId("proof"), "fixture", "A retained evidence") }
+        contexts.transact("session-b") { it.put(BreadcrumbId("proof"), "fixture", "B private evidence") }
+        var selectedSession = "session-a"
+        var bindingReads = 0
+        var modelLease: ModelMux? = null
+        var command = "command-a"
+        val board = ConfixBlackboard.empty()
+        val pen = HermesPen(board, muxContext = htx + contexts,
+            modelMuxProvider = { modelLease }, contextId = { command },
+            breadcrumbSession = { bindingReads++; selectedSession })
+        assertEquals(1, bindingReads)
+        selectedSession = "session-b"
+        modelLease = mux
+        command = "command-b"
+        try {
+            HermesPythonPort(blackboard = board, pen = pen).use { port ->
+                port.importInVm(port.inventorySources(_m["entry" j ("entry.py" to "READY = True")]), "entry")
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    request = json.dumps({'messages':[{'role':'user','content':'hello'}]})
+                    completion = json.loads(host.call('mux_completion', 'fixture', request))
+                    assert completion['verdict'] == 'ok', completion
+                    matches = json.loads(json.loads(host.call('mux_breadcrumb', 'search', '{"query":"evidence"}'))['content'])['matches']
+                    assert len(matches) == 1
+                    match = matches[0]
+                    arguments = json.dumps({'ref':match['ref'],'cid':match['cid'],'presence':1})
+                    retained = json.loads(host.call('mux_breadcrumb', 'recall', arguments))
+                    assert retained['verdict'] == 'ok', retained
+                    assert 'A retained evidence' in retained['content']
+                    assert 'B private evidence' not in retained['content']
+                    assert json.loads(host.call('mux_breadcrumb', 'session-b', 'recall', arguments))['verdict'] == 'forbidden'
+                    assert json.loads(host.call('mux_completion', 'fixture', request, 1000, 'session-b'))['verdict'] == 'forbidden'
+                    foreign = json.dumps({'messages':[{'role':'user','content':'hello'}],'breadcrumb_context':'session-b'})
+                    assert json.loads(host.call('mux_completion', 'fixture', foreign))['verdict'] == 'forbidden'
+                    True
+                """.trimIndent()))
+            }
+            assertEquals(1, requests)
+            assertEquals(1, bindingReads)
+            assertEquals("command-b", mux.lastReceipt?.assessmentId)
+            assertEquals("fixture", contexts.transact("session-a", create = false) { it.submission?.model })
+            assertNull(contexts.transact("session-b", create = false) { it.submission })
+        } finally { htx.close() }
     }
 }
