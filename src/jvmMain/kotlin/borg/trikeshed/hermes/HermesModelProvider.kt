@@ -217,6 +217,11 @@ object HermesModelProvider {
                 def fetch_models(self, **kwargs):
                     return [model['id'] for model in _call('mux_catalog')['models']]
 
+                def get_model_context_length(self, model):
+                    card = next((card for card in _call('mux_catalog')['models'] if card['id'] == model), {})
+                    context = card.get('contextWindow')
+                    return context if type(context) is int and context > 0 else None
+
             profile = ModelMuxProfile(name=PROVIDER, api_mode='chat_completions',
                                       base_url=BASE_URL, env_vars=(),
                                       supports_health_check=False, supports_model_listing=True)
