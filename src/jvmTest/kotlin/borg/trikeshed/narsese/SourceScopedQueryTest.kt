@@ -47,12 +47,14 @@ class SourceScopedQueryTest {
     }
 
     private class Fixture(private val withGraph: Boolean, conflictingQualifier: Boolean,
-        sameProposition: Boolean, missingPolarity: Boolean) {
+        sameProposition: Boolean, missingPolarity: Boolean, bagPressure: Boolean) {
         val cas = Store()
         val log = Log()
         val firstQuote = "Alice owns the orchard."
         val secondQuote = if (sameProposition) "Alice also owns the orchard." else "Alice leases the orchard."
-        val text = "$firstQuote\n$secondQuote"
+        val extraPredicates = _l["visits", "manages", "sells"]
+        val extraQuotes = extraPredicates.map { "Alice $it the orchard." }
+        val text = (_l[firstQuote, secondQuote] + if (bagPressure) extraQuotes else emptyList()).joinToString("\n")
         val sourceCid = cas.put(text.encodeToByteArray())
         val receipt = cas.put("synthetic curation".encodeToByteArray())
         val ontology = cas.put("synthetic ontology".encodeToByteArray())
@@ -70,8 +72,10 @@ class SourceScopedQueryTest {
         }
         val selected = _l[selection("p:0", "owns", firstQuote),
             selection("p:1", if (sameProposition) "owns" else "leases", secondQuote)] +
-            if (conflictingQualifier || missingPolarity)
-                _l[selection("p:2", "owns", firstQuote, "must", if (missingPolarity) null else false)] else emptyList()
+            (if (conflictingQualifier || missingPolarity)
+                _l[selection("p:2", "owns", firstQuote, "must", if (missingPolarity) null else false)] else emptyList()) +
+            (if (bagPressure) extraPredicates.mapIndexed { i, predicate -> selection("p:${i + 2}", predicate, extraQuotes[i]) }
+            else emptyList())
         val candidate = CurationReviewCandidate("book", "synthetic:source-query", receipt, ontology,
             "synthetic:source-revision", selected.toSeries())
         val principal = ReviewPrincipal("synthetic:reviewer", synthetic = true)
@@ -101,9 +105,9 @@ class SourceScopedQueryTest {
     }
 
     private suspend fun withFixture(withGraph: Boolean = true, conflictingQualifier: Boolean = false,
-        sameProposition: Boolean = false, missingPolarity: Boolean = false,
+        sameProposition: Boolean = false, missingPolarity: Boolean = false, bagPressure: Boolean = false,
         block: suspend (Fixture, ContentId) -> Unit) = coroutineScope {
-        val fixture = Fixture(withGraph, conflictingQualifier, sameProposition, missingPolarity)
+        val fixture = Fixture(withGraph, conflictingQualifier, sameProposition, missingPolarity, bagPressure)
         fixture.review.open(this)
         try { block(fixture, fixture.release()) } finally { fixture.review.drain() }
     }
@@ -164,6 +168,32 @@ class SourceScopedQueryTest {
             assertTrue(result.matches.isEmpty())
             assertFailsWith<IllegalArgumentException> { SourceScopedQuery.query(f.review, f.cas, release, f.request()) }
         } }
+    }
+
+    @Test fun realBagEvictionReturnsUnknownOnlyForTheDisplacedSelection() = runBlocking {
+        withTimeout(10_000) {
+            val predicates = _l["owns", "leases", "visits", "manages", "sells"]
+            val statuses = mutableListOf<SourceQueryStatus>()
+            for (predicate in predicates) withFixture(bagPressure = true) { f, release ->
+                val coordinates = linkedMapOf<ContentId, Long>()
+                val result = SourceScopedQuery.query(f.review, f.cas, release,
+                    f.request().copy(predicate = predicate), bagCapacity = 4,
+                    priority = { id -> if (coordinates.getValue(id) == 4L) 1f else 0f },
+                    coordinate = { id -> coordinates.getOrPut(id) { coordinates.size.toLong() } })
+                assertEquals(5, coordinates.size, "each proposition must have a distinct coordinate")
+                if (result.status == SourceQueryStatus.MATCH) {
+                    assertEquals(predicate, result.matches.single().predicate)
+                } else {
+                    assertEquals(SourceQueryStatus.UNKNOWN, result.status)
+                    assertTrue(result.matches.isEmpty())
+                }
+                statuses.add(result.status)
+                assertFailsWith<IllegalArgumentException> { SourceScopedQuery.query(f.review, f.cas, release, f.request()) }
+            }
+            assertEquals(SourceQueryStatus.MATCH, statuses.last(), "the high-priority fifth signal must land")
+            assertEquals(1, statuses.take(4).count { it == SourceQueryStatus.UNKNOWN })
+            assertEquals(3, statuses.take(4).count { it == SourceQueryStatus.MATCH })
+        }
     }
 
     @Test fun opposingQualifiersRequireAnExplicitSelection() = runBlocking {

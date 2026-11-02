@@ -43,9 +43,10 @@ data class SourceQueryResult(val status: SourceQueryStatus, val matches: List<So
  * never establish identity; any coordinate shared by distinct identities is quarantined.
  * Reviewed graph strings are exact labels only: this lookup does not establish RDF graph
  * membership. A derived extracted-text graph is labeled separately from a reviewed label.
- * Any unsupported selected relationship, bag eviction, rejection, or an absent selection
- * yields UNKNOWN, not absence. Explicit modality/polarity filters select reviewed rows;
- * they do not establish that no opposing row exists.
+ * Any unsupported selected relationship or absent selection yields UNKNOWN, not absence.
+ * A queried proposition lost to eviction or rejection also yields UNKNOWN; other
+ * resident matches remain available. Explicit modality/polarity filters select reviewed
+ * rows; they do not establish that no opposing row exists.
  * The final ledger check is an as-of observation, not an atomic guarantee against a later
  * correction. Exact extracted-text quotation does not authenticate the original, prove OCR
  * correctness, or establish legal truth. No live rete, training, or model is used.
@@ -58,7 +59,8 @@ object SourceScopedQuery {
 
     /** Host-only coordinate seam permits a deterministic collision test; never selected by a graph input. */
     internal suspend fun query(review: CurationReview, cas: CasStore, releaseCid: ContentId, request: SourceQuery,
-        coordinate: (ContentId) -> Long): SourceQueryResult {
+        bagCapacity: Int = 64, priority: (ContentId) -> Float = { 0.5f }, coordinate: (ContentId) -> Long): SourceQueryResult {
+        require(bagCapacity in 4..64) { "Pilot bag capacity out of range" }
         val reader = cas as? BoundedCasReader ?: return SourceQueryResult(SourceQueryStatus.UNKNOWN, emptyList())
         val admitted = review.consume(releaseCid)
         if (admitted["kind"] != "book") return SourceQueryResult(SourceQueryStatus.UNKNOWN, emptyList())
@@ -150,7 +152,7 @@ object SourceScopedQuery {
         val matching = entries.filter { it.originalCid == request.originalCid && it.extractedTextCid == request.extractedTextCid &&
             it.graph == request.graph && it.subject == request.subject && it.predicate == request.predicate && it.obj == request.obj &&
             (request.modality == null || it.modality == request.modality) && (request.polarity == null || it.polarity == request.polarity) }
-        val bag = BeliefBagElement(capacity = 64)
+        val bag = BeliefBagElement(capacity = bagCapacity)
         bag.open()
         try {
             for ((angular, ids) in byCoordinate) {
@@ -159,7 +161,9 @@ object SourceScopedQuery {
                 val row = byId.getValue(id).first()
                 val signal = SemanticSignal(angular, EvidenceCoord.EMPTY, RelationKind.ATTRACTION,
                     row.originalCid.value, provenanceCid = admission.value)
-                bag.submit(BeliefIntake.Mint(signal, BudgetCoord(0.5f, 0.4f, 0.5f), receiptCid = id))
+                val p = priority(id)
+                require(p.isFinite() && p in 0f..1f) { "Pilot priority out of range" }
+                bag.submit(BeliefIntake.Mint(signal, BudgetCoord(p, 0.4f, 0.5f), receiptCid = id))
             }
             bag.awaitProcessed()
             val present = bag.snapshot().entries.groupBy { it.key.a }
