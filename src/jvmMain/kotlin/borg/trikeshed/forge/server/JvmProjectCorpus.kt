@@ -8,10 +8,12 @@ import borg.trikeshed.lcnc.ProjectRef
 import borg.trikeshed.lcnc.ProjectText
 import borg.trikeshed.couch.CouchStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.narsese.DocumentAnchor
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -19,12 +21,16 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** An explicitly bound primary worktree, stored under a physical prefix in the daemon's main store. */
 data class PrimaryProjectBinding(val name: String, val prefix: String, val store: CouchStore,
-    val gateway: CouchAttachmentGateway, val path: String) {
+    val gateway: CouchAttachmentGateway, val path: String, val reader: BoundedCasReader? = null,
+    val maxBytes: Int = DEFAULT_MAX_BYTES) {
+    companion object { const val DEFAULT_MAX_BYTES = 16 * 1024 * 1024 }
     init {
         require(name.isNotBlank() && '/' !in name && '\u0000' !in name)
         require(prefix == "projects/$name/") { "Primary prefix must identify the bound project" }
         require(gateway.uses(store)) { "Primary gateway and store must share a backing store" }
+        require(reader == null || gateway.uses(reader)) { "Primary bounded reader must own the gateway's CAS" }
         require(path.isNotBlank()) { "Primary project path is required" }
+        require(maxBytes in 1 until Int.MAX_VALUE) { "Invalid primary read limit" }
     }
 }
 
@@ -44,9 +50,12 @@ class JvmProjectCorpus(
     },
     private val primary: PrimaryProjectBinding? = null,
 ) : ProjectCorpus {
+    /** Primary worktrees are read-only here; only mounted project databases support intake. */
+    internal fun intakeEligible(project: String): Boolean = project != primary?.name && registry.get(project) != null
+
     private val extracting = ConcurrentHashMap<Pair<String, String>, Mutex>()
     private data class Backing(val project: String, val store: CouchStore, val gateway: CouchAttachmentGateway,
-        val prefix: String, val primary: Boolean)
+        val prefix: String, val primary: Boolean, val reader: BoundedCasReader? = null, val maxBytes: Int = 0)
     private data class Stamp(val rev: String, val seq: Long)
 
     private fun backing(project: String): Backing? {
@@ -59,7 +68,7 @@ class JvmProjectCorpus(
                 scope.single().path == binding.path) {
                 "Primary project binding does not match its registered scope: $project"
             }
-            return Backing(project, binding.store, binding.gateway, binding.prefix, true)
+            return Backing(project, binding.store, binding.gateway, binding.prefix, true, binding.reader, binding.maxBytes)
         }
         val pdb = registry.get(project) ?: return null
         return Backing(project, pdb.store, pdb.gateway, "", false)
@@ -77,6 +86,23 @@ class JvmProjectCorpus(
     private fun stillCurrent(b: Backing, physical: String, expected: Stamp): Boolean =
         (!b.primary || backing(b.project) != null) && stamp(b, physical) == expected
 
+    /** The reader, not attachment metadata, enforces the allocation bound and verifies the CID. */
+    private fun primaryBytes(b: Backing, ref: borg.trikeshed.util.oroboros.OroborosAttachmentRef): ByteArray? {
+        if (ref.length < 0 || ref.length > b.maxBytes) return null
+        val reader = b.reader ?: return null
+        val bytes = try { reader.getBounded(ref.contentId, b.maxBytes) }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { return null }
+        return bytes?.takeIf { it.size <= b.maxBytes && it.size.toLong() == ref.length && ContentId.of(it) == ref.contentId }
+    }
+
+    /** Do not treat missing or malformed declared lengths as a verified empty attachment. */
+    private fun primaryRef(b: Backing, physical: String): borg.trikeshed.util.oroboros.OroborosAttachmentRef? {
+        val ref = b.gateway.getAttachmentRef(physical) ?: return null
+        val declared = (b.store.get(physical)?.fields?.find { it.name == "length" }?.value as? String)?.toLongOrNull()
+        return ref.takeIf { declared != null && declared >= 0 && declared == it.length }
+    }
+
     private fun document(backing: Backing, id: String, verifyBytes: Boolean = true): ProjectDoc? {
         val physical = backing.prefix + id
         if (!backing.primary) {
@@ -87,13 +113,11 @@ class JvmProjectCorpus(
                 head.sequenceOf(physical) ?: -1L, ref.length, ref.contentType)
         }
         val before = stamp(backing, physical) ?: return null
-        val ref = if (verifyBytes) {
-            val (ref, bytes) = backing.gateway.getAttachment(physical) ?: return null
-            if (ContentId.of(bytes) != ref.contentId) return null
-            ref
-        } else backing.gateway.getAttachmentRef(physical) ?: return null
+        val ref = (if (verifyBytes) primaryRef(backing, physical) else backing.gateway.getAttachmentRef(physical)) ?: return null
+        if (verifyBytes && primaryBytes(backing, ref) == null) return null
         if (!stillCurrent(backing, physical, before)) return null
-        return ProjectDoc(backing.project, id, ref.contentId.value, before.rev, before.seq, ref.length, ref.contentType)
+        return ProjectDoc(backing.project, id, ref.contentId.value, before.rev, before.seq, ref.length, ref.contentType,
+            contentStatus = if (verifyBytes) "verified-bytes" else "unchecked-metadata")
     }
 
     override suspend fun projects(): List<ProjectRef> = scopes.list().map {
@@ -129,8 +153,10 @@ class JvmProjectCorpus(
         val physical = b.prefix + id
         if (b.store.head.isDeleted(physical)) return@withContext null
         val before = if (b.primary) stamp(b, physical) ?: return@withContext null else null
-        val (ref, bytes) = b.gateway.getAttachment(physical) ?: return@withContext null
-        if (b.primary && ContentId.of(bytes) != ref.contentId) return@withContext null
+        val bytes = if (b.primary) {
+            val ref = primaryRef(b, physical) ?: return@withContext null
+            primaryBytes(b, ref) ?: return@withContext null
+        } else b.gateway.getAttachment(physical)?.second ?: return@withContext null
         if (before != null && !stillCurrent(b, physical, before)) return@withContext null
         bytes
     }
@@ -144,8 +170,10 @@ class JvmProjectCorpus(
             val metadata = b.gateway.getAttachmentRef(physical) ?: return@withContext null
             if (!ProjectGlob.isTextual(metadata.contentType, id) || !stillCurrent(b, physical, before)) return@withContext null
         }
-        val (ref, bytes) = b.gateway.getAttachment(physical) ?: return@withContext null
-        if (b.primary && ContentId.of(bytes) != ref.contentId) return@withContext null
+        val (ref, bytes) = if (b.primary) {
+            val ref = primaryRef(b, physical) ?: return@withContext null
+            Pair(ref, primaryBytes(b, ref) ?: return@withContext null)
+        } else b.gateway.getAttachment(physical) ?: return@withContext null
         if (!ProjectGlob.isTextual(ref.contentType, id)) return@withContext null
         // A text larger than asked for is read to its head, never refused: maxChars bounds the answer, not the document.
         val text = bytes.decodeToString(0, minOf(bytes.size.toLong(), 4L * maxChars).toInt())

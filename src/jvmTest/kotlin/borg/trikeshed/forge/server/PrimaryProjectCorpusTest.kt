@@ -6,6 +6,7 @@ import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.job.PackCasStore
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.lib.*
 import borg.trikeshed.memory.*
 import borg.trikeshed.modelmux.BrainClient
@@ -14,7 +15,7 @@ import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import borg.trikeshed.util.oroboros.*
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.io.TempDir
-import org.trikeshed.oroboros.primaryWorktreeRoot
+import borg.trikeshed.daemon.primaryWorktreeRoot
 import java.io.File
 import java.net.URLEncoder
 import java.nio.file.Path
@@ -24,7 +25,7 @@ import kotlin.test.*
 class PrimaryProjectCorpusTest {
     @TempDir lateinit var directory: Path
 
-    private class Rig(root: File, val cas: CasStore = CasStore.inMemory()) {
+    private class Rig(root: File, val cas: CasStore = FileCasStore(JvmFileOperations(), File(root, "fixture-cas").absolutePath)) {
         val store = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(store, cas)
         val files = JvmFileOperations()
@@ -42,7 +43,7 @@ class PrimaryProjectCorpusTest {
                 WorktreeCouchGateway.WORKTREE_PREFIX = prefix
                 scopes.registerPrimary(root, snapshot.paths.size)
             } finally { WorktreeCouchGateway.WORKTREE_PREFIX = prior }
-            return PrimaryProjectBinding(name, prefix, store, gateway, root.absolutePath)
+            return PrimaryProjectBinding(name, prefix, store, gateway, root.absolutePath, reader = cas as? BoundedCasReader)
         }
 
         fun corpus(binding: PrimaryProjectBinding) = JvmProjectCorpus(registry, scopes, primary = binding)
@@ -243,7 +244,7 @@ class PrimaryProjectCorpusTest {
                 assertNull(corpus.read(binding.name, "doc.txt"), "text bytes no longer match their claimed CID")
                 assertNull(corpus.bytes(binding.name, "doc.txt"), "original bytes no longer match their claimed CID")
                 val wire = rig.wire(corpus)
-                assertEquals(404, get(wire, "/api/projects/primary/docs/doc.txt").status)
+                assertEquals(503, get(wire, "/api/projects/primary/docs/doc.txt").status)
             } finally { rig.scopes.drain() }
         }
     }

@@ -69,8 +69,11 @@ import borg.trikeshed.agent.modelmux.Airgap
 private fun jfile(p: borg.trikeshed.common.Path): java.io.File = java.io.File(p.absolutePath)
 
 /** Preserve a named worktree alias; resolve dot-only spellings so the project has a real name. */
-internal fun primaryWorktreeRoot(path: java.io.File): java.io.File =
-    if (path.name.isBlank() || path.name == "." || path.name == "..") path.canonicalFile else path.absoluteFile
+internal fun primaryWorktreeRoot(path: java.io.File): java.io.File {
+    val root = if (path.name.isBlank() || path.name == "." || path.name == "..") path.canonicalFile else path.absoluteFile
+    require(root.name.isNotBlank()) { "Primary worktree must have a project name" }
+    return root
+}
 
 //java and sun deps are forbidden
 //syncronous calls, anything not SQE->CQE are absolutely banned here.  what is not written you must write as uring code hosted in commonMain nio code
@@ -687,7 +690,7 @@ object OroborosDaemon {
                 exitProcess(1)
             }
             fHome.mkdirs()
-            Pair(fHome, rDir)
+            Pair(fHome, File(primaryWorktreeRoot(jfile(rDir)).absolutePath))
         }
         if (!preflight(repoDir)) {
             HostSystem.err("[OROBOROS] preflight failed; aborting")
@@ -769,9 +772,7 @@ object OroborosDaemon {
         // lowercase() keeps TrikeShed's own default byte-identical to the prior hardcoded
         // literal ("TrikeShed".lowercase() == "trikeshed"), so existing stored content stays
         // addressable under the same prefix it was written with.
-        val primaryRoot = primaryWorktreeRoot(jfile(repoDir))
-        require(primaryRoot.name.isNotBlank()) { "Primary worktree must have a project name" }
-        WorktreeCouchGateway.WORKTREE_PREFIX = "projects/${primaryRoot.name.lowercase()}/"
+        WorktreeCouchGateway.WORKTREE_PREFIX = "projects/${repoDir.name.lowercase()}/"
 
         if ((HostSystem.getProperty("os.name") ?: "").lowercase().contains("linux")) {
             bpfProbeAttach(-1, Tracepoints.SYS_ENTER_SOCKET)
@@ -956,8 +957,8 @@ object OroborosDaemon {
         // now `projects/<repo>/…` was an id prefix nobody had declared, so the store could not say
         // what projects it held; the manifest is an ordinary document, so it replicates with them.
         borg.trikeshed.couch.Projects(couchDb).put(
-            primaryRoot.name.lowercase(),
-            mapOf("root" to primaryRoot.absolutePath, "prefix" to WorktreeCouchGateway.WORKTREE_PREFIX),
+            repoDir.name.lowercase(),
+            mapOf("root" to repoDir.absolutePath, "prefix" to WorktreeCouchGateway.WORKTREE_PREFIX),
         )
         // Peer exchange for _replicate rides the same HTX reactor as Jules/ModelMux — no JDK client.
         val peerHttp = borg.trikeshed.couch.replicate.HttpExchange { method, url, body, contentType ->
@@ -1480,10 +1481,10 @@ object OroborosDaemon {
         ) { HostSystem.currentTimeMillis() }
         // The mounted projects as one document set (Forge genesis, Cut F/D): the legos and the
         // document surface read the same seam.
-        val primaryProject = borg.trikeshed.forge.server.PrimaryProjectBinding(
-            primaryRoot.name.lowercase(), WorktreeCouchGateway.WORKTREE_PREFIX, couchStore, attachmentGateway, primaryRoot.absolutePath)
         val projectCorpus = borg.trikeshed.forge.server.JvmProjectCorpus(projectDbRegistry, projectScopes, projectMiner,
-            primary = primaryProject)
+            primary = borg.trikeshed.forge.server.PrimaryProjectBinding(repoDir.name.lowercase(),
+                WorktreeCouchGateway.WORKTREE_PREFIX, couchStore, attachmentGateway, repoDir.absolutePath,
+                reader = casStore as? borg.trikeshed.job.BoundedCasReader))
         // Workspace snapshots (Forge genesis, Cut C): the whole workspace named as one cid, a lineage
         // in <forgeHome>/snapshots/ledger.jsonl, the head as lcnc/snapshot/head.
         val snapshotService = borg.trikeshed.forge.server.WorkspaceSnapshotService(
@@ -2249,7 +2250,7 @@ object OroborosDaemon {
                 HostSystem.err("[OROBOROS] Git→Couch initial reconcile: ${snap.paths.size} paths @ ${headSha.take(12)}")
 
                 val worktreeSnap = worktreeReconcileElement.sync()
-                projectScopes.registerPrimary(primaryRoot, worktreeSnap.paths.size)
+                projectScopes.registerPrimary(jfile(repoDir), worktreeSnap.paths.size)
                 HostSystem.err(
                     "[OROBOROS] Worktree→Couch initial reconcile: ${worktreeSnap.paths.size} paths" +
                             (if (worktreeSnap.skippedDirs.isEmpty()) ""

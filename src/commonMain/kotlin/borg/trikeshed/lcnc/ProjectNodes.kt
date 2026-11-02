@@ -50,10 +50,12 @@ data class ProjectDoc(
     val seq: Long,
     val length: Long,
     val contentType: String,
+    /** Listing metadata is not evidence that bytes are available or match their claimed CID. */
+    val contentStatus: String? = null,
 ) {
-    fun toMap(): Map<String, Any?> = linkedMapOf(
+    fun toMap(): Map<String, Any?> = linkedMapOf<String, Any?>(
         "project" to project, "id" to id, "cid" to cid, "rev" to rev, "seq" to seq, "length" to length, "contentType" to contentType,
-    )
+    ).also { if (contentStatus != null) it["contentStatus"] = contentStatus }
 
     companion object {
         const val KIND = "ProjectDoc"
@@ -71,6 +73,7 @@ data class ProjectDoc(
                 seq = (m["seq"] as? Number)?.toLong() ?: 0L,
                 length = (m["length"] as? Number)?.toLong() ?: 0L,
                 contentType = m["contentType"]?.toString().orEmpty(),
+                contentStatus = m["contentStatus"] as? String,
             )
         }
     }
@@ -252,12 +255,18 @@ object ProjectNodes {
                 ?: throw IllegalArgumentException("project.read: no document wired and no id named")
             val maxChars = node.params["maxChars"]?.toIntOrNull()?.coerceIn(1, 1_048_576) ?: 65_536
             val text = service.value.read(project, id, maxChars)
-            if (text != null) currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id", text.cid, text.seq, text.rev)
+            // A listing row is a selection, not evidence: reread its actual head before returning it.
+            val current = if (text != null && doc != null) service.value.document(project, id) else null
+            val changed = text != null && doc != null && (doc.cid != text.cid ||
+                (doc.rev.isNotEmpty() && (doc.rev != text.rev || doc.seq != text.seq)) ||
+                current == null || current.cid != text.cid || current.rev != text.rev || current.seq != text.seq)
             if (text == null) mapOf("error" to "project.read: '$id' in '$project' is absent, binary, or over $maxChars chars")
-            else mapOf(
-                "text" to text.text, "cid" to text.cid, "id" to text.id,
-                "doc" to (doc ?: ProjectDoc(project, id, text.cid, text.rev, text.seq, text.text.length.toLong(), InMemoryProjectCorpus.contentTypeOf(id))).toMap(),
-            )
+            else if (changed) mapOf("error" to "project.read: '$id' in '$project' changed or is unavailable")
+            else {
+                currentCoroutineContext()[LcncConsumedLedger]?.consumed(LcncConsumedLedger.PROJECT, "$project/$id", text.cid, text.seq, text.rev)
+                mapOf("text" to text.text, "cid" to text.cid, "id" to text.id,
+                    "doc" to (current ?: ProjectDoc(project, id, text.cid, text.rev, text.seq, text.text.length.toLong(), InMemoryProjectCorpus.contentTypeOf(id))).toMap())
+            }
         },
         EXTRACT to boundLcnc(ProjectCorpusKey(corpus)) { service, node, inputs ->
             val doc = docOf(inputs)

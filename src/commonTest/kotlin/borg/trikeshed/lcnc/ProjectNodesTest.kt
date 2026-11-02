@@ -67,6 +67,21 @@ class ProjectNodesTest {
     }
 
     @Test
+    fun readDoesNotPromoteAStaleOrForgedListingRow(): Unit = runBlocking {
+        val source = corpus()
+        val runner = ProjectNodes.registry(source).getValue(ProjectNodes.READ)
+        val listed = source.docs("notes", prefix = "a.md").first { it.id == "a.md" }.toMap()
+        source.put("notes", "a.md", "changed".encodeToByteArray())
+        val stale = runner.run(LcncNode("r", ProjectNodes.READ), mapOf("doc?" to listed + ("contentStatus" to "verified-bytes")))
+        assertNull(stale["text"])
+        assertTrue(stale["error"].toString().contains("changed"))
+        val latest = source.document("notes", "a.md")!!.toMap()
+        val current = runner.run(LcncNode("r", ProjectNodes.READ), mapOf("doc?" to latest + ("contentStatus" to "verified-bytes")))
+        assertEquals("changed", current["text"])
+        assertNull((current["doc"] as Map<*, *>)["contentStatus"], "client-supplied verification status is not authoritative")
+    }
+
+    @Test
     fun extractReadsTheMinedTwinOrSaysNotFound(): Unit = runBlocking {
         val extract = ProjectNodes.registry(corpus()).getValue(ProjectNodes.EXTRACT)
         val found = extract.run(LcncNode("e", ProjectNodes.EXTRACT, params = mapOf("project" to "notes", "id" to "a.md")), emptyMap())
