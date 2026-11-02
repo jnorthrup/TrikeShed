@@ -1,6 +1,7 @@
 package borg.trikeshed.graal.subvm
 
 import borg.trikeshed.hermes.*
+import borg.trikeshed.lib.*
 import borg.trikeshed.vm.*
 import java.nio.file.Files
 import java.nio.file.Path
@@ -124,6 +125,21 @@ class PythonWheelsTest {
                 import sys
                 assert '_ruamel_yaml' not in sys.modules
             """.trimIndent())), dependencies = dependencies)
+            assertEquals(Teleported.Bool(true), port.importInVm(inventory, "entry"))
+        }
+    }
+
+    @Test fun installedSnowballLoadsEnglishStemmerInTheGuest() {
+        val dependencies = assertNotNull(PythonWheels.installed())
+        HermesPythonPort().use { port ->
+            val inventory = port.inventorySources(_m["entry" j ("entry.py" j """
+                import snowballstemmer
+                from importlib.metadata import version
+                assert version('snowballstemmer') == '3.1.1'
+                stemmer = snowballstemmer.stemmer('english')
+                assert stemmer.stemWord('issues') == stemmer.stemWord('issue')
+                assert stemmer.stemWord('creating') == stemmer.stemWord('create')
+            """.trimIndent()).pair], dependencies = dependencies)
             assertEquals(Teleported.Bool(true), port.importInVm(inventory, "entry"))
         }
     }
