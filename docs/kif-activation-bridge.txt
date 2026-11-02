@@ -51,11 +51,11 @@ No untrusted import API is introduced by this slice.
 Pinned upstream source alignment
 https://github.com/jnorthrup/mlir-nix/tree/7edfaba88ce1d6a615d211b0e9d757c7cb7e83bb
 Read-only GitHub inspection confirmed these actual sources:
-- include/NixDialect/NixOps.td lines1-110: real TableGen Nix dialect, lazy values,
+- include/NixDialect/NixOps.td lines 1-110: real TableGen Nix dialect, lazy values,
   graph regions and per-(operation,activation frame) thunks. Cyclic SSA encodes
   recursive bindings. Deferred lambda shells are not serializable/verifiable;
   eager lowering is required for interchange.
-- include/Nix/Eval.h lines1-180: a Frame is an activation of a graph region;
+- include/Nix/Eval.h lines 1-180: a Frame is an activation of a graph region;
   values obtain frame-local thunk slots on demand.
 - include/mlnix-c/MlnixC.h: mlnixOpen/Close, mlnixRoundTrip, mlnixError, mlnixFree.
   RoundTrip parses, verifies and prints text. No evaluation/force/proof API exists
@@ -78,10 +78,10 @@ was claimed. Targeted Kotlin tests validate receipt provenance/dependencies,
 stable IDs versus revision/frame IDs, bounded results and UTF-8 framing; they do
 not validate MLIR parsing, native execution or complete SUMO inference.
 
-Executed validation: cached Kotlin2.4.21 compiler, JVM target25; recompiled
+Executed validation: cached Kotlin 2.4.21 compiler, JVM target 25; recompiled
 KifSemantic, KifTaxonomySnapshot, KifActivationPlan and their three common test
 classes against frozen central JVM classes for unrelated dependencies. JUnit
-Platform1.14.4/Jupiter5.14.4 on GraalVM25 discovered and passed all12tests
+Platform 1.14.4/Jupiter 5.14.4 on GraalVM 25 discovered and passed all 12 tests
 (four new activation-plan tests plus eight existing semantic/snapshot tests).
 This was targeted JUnit validation, not a Gradle or multiplatform build. Logs:
 /workspace/library-files/kif-bridge-proof/compile.log
