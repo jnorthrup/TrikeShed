@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.lib.*
+import borg.trikeshed.job.ContentId
 import borg.trikeshed.wiki.WikiSurface
 
 /**
@@ -51,6 +52,7 @@ data class CurationRecordRow(val receiptCid: String, val name: String)
 data class CurationProposal(
     val subject: String?, val predicate: String?, val obj: String?,
     val quote: String?, val reasons: List<String>, val submitted: Boolean, val duplicate: Boolean,
+    val ordinal: Int = -1, val quotationBegin: Int? = null, val quotationEnd: Int? = null,
 )
 
 data class CurationAxiom(
@@ -73,7 +75,15 @@ data class CurationResult(
     val modelReceipt: CurationModelReceipt? = null,
     val project: String? = null,
     val documentId: String? = null,
+    val sourceRevision: DocRevision? = null,
+    val extractionRevision: DocRevision? = null,
+    val originalCid: String? = null,
+    val extractedTextCid: String? = null,
 )
+
+data class DocumentPassage(val receiptCid: String, val ordinal: Int, val source: DocRevision,
+    val textRevision: DocRevision, val begin: Int, val end: Int, val quote: String,
+    val contextBegin: Int, val contextEnd: Int, val context: String)
 
 /** The table's sortable columns, each with the header a reader sees. */
 enum class DocColumn(val key: String, val label: String) {
@@ -91,6 +101,26 @@ object DocumentSurface {
     const val CONTENT_ID = "ds-content"
     const val DIGEST_HREF = "/harness?load=preset-corpus"
     const val CURATION_HASH = "curation"
+    private val cidPattern = Regex("^sha256:[0-9a-f]{64}$")
+
+    private fun revision(value: Any?): DocRevision? {
+        val r = value as? Map<*, *> ?: return null
+        val seq = (r["seq"] as? Number)?.toDouble() ?: return null
+        if (!seq.isFinite() || seq < -1 || seq > 9_007_199_254_740_991.0 || seq % 1.0 != 0.0) return null
+        return DocRevision(r["project"] as? String ?: return null, r["id"] as? String ?: return null,
+            r["cid"] as? String ?: return null, r["rev"] as? String ?: return null,
+            seq.toLong())
+    }
+
+    private fun offset(value: Any?): Int? {
+        val n = (value as? Number)?.toDouble() ?: return null
+        return if (n.isFinite() && n >= 0 && n <= Int.MAX_VALUE.toDouble() && n % 1.0 == 0.0) n.toInt() else null
+    }
+
+    private fun exact(text: String, begin: Int, end: Int, quote: String): Boolean {
+        fun split(at: Int) = at > 0 && at < text.length && text[at - 1] in '\uD800'..'\uDBFF' && text[at] in '\uDC00'..'\uDFFF'
+        return begin >= 0 && end > begin && end <= text.length && !split(begin) && !split(end) && text.substring(begin, end) == quote
+    }
 
     /** Split before URL decoding so an encoded slash stays inside the project or document ID. */
     fun fragmentParts(fragment: String): Pair<String, String> {
@@ -131,12 +161,6 @@ object DocumentSurface {
     fun document(json: Any?): DocView? {
         val m = json as? Map<*, *> ?: return null
         val id = m["id"]?.toString() ?: return null
-        fun revision(value: Any?): DocRevision? {
-            val r = value as? Map<*, *> ?: return null
-            return DocRevision(r["project"] as? String ?: return null, r["id"] as? String ?: return null,
-                r["cid"] as? String ?: return null, r["rev"] as? String ?: return null,
-                (r["seq"] as? Number)?.toLong() ?: return null)
-        }
         return DocView(
             project = m["project"]?.toString().orEmpty(),
             id = id,
@@ -180,17 +204,18 @@ object DocumentSurface {
         val receiptCid = m["receiptCid"]?.toString() ?: return null
         val record = m["record"] as? Map<*, *> ?: return null
         val source = record["source"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-        val revision = source["project"] as? Map<*, *>
+        val projectRevision = source["project"] as? Map<*, *>
         val submittedCids = (record["submitted"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
         val duplicateCids = (record["duplicates"] as? List<*>)?.map { it.toString() }?.toSet().orEmpty()
-        val proposals = (record["proposals"] as? List<*> ?: emptyList<Any?>()).mapNotNull { row ->
-            val p = row as? Map<*, *> ?: return@mapNotNull null
+        val proposals = (record["proposals"] as? List<*> ?: emptyList<Any?>()).mapIndexedNotNull { ordinal, row ->
+            val p = row as? Map<*, *> ?: return@mapIndexedNotNull null
             CurationProposal(
-                subject = p["subject"]?.toString(), predicate = p["predicate"]?.toString(), obj = p["object"]?.toString(),
-                quote = p["quote"]?.toString(),
+                subject = p["subject"] as? String, predicate = p["predicate"] as? String, obj = p["object"] as? String,
+                quote = p["quote"] as? String,
                 reasons = (p["reasons"] as? List<*>)?.map { it.toString() }.orEmpty(),
                 submitted = p["receiptCid"]?.toString()?.let { it in submittedCids } ?: false,
                 duplicate = p["receiptCid"]?.toString()?.let { it in duplicateCids } ?: false,
+                ordinal = ordinal, quotationBegin = offset(p["quotationBegin"]), quotationEnd = offset(p["quotationEnd"]),
             )
         }
         val axioms = (m["nlpAxioms"] as? List<*> ?: emptyList<Any?>()).mapNotNull { row ->
@@ -201,7 +226,7 @@ object DocumentSurface {
             )
         }
         return CurationResult(
-            receiptCid = receiptCid, name = source["name"]?.toString().orEmpty(), text = source["text"]?.toString().orEmpty(),
+            receiptCid = receiptCid, name = source["name"]?.toString().orEmpty(), text = (source["text"] as? String).orEmpty(),
             proposals = proposals, reasons = (record["reasons"] as? List<*>)?.map { it.toString() }.orEmpty(),
             axioms = axioms,
             stages = ((record["toolReceipts"] as? List<*>) ?: emptyList<Any?>()).toSeries() α { row ->
@@ -214,9 +239,67 @@ object DocumentSurface {
                 (r["httpStatus"] as? Number)?.toInt(), (r["latencyMs"] as? Number)?.toLong(),
                 r["cachedHit"] as? Boolean, r["errorClass"] as? String,
             ) },
-            project = revision?.get("project") as? String,
-            documentId = revision?.get("id") as? String,
+            project = projectRevision?.get("project") as? String,
+            documentId = projectRevision?.get("id") as? String,
+            sourceRevision = revision(source["project"]), extractionRevision = revision(source["extraction"]),
+            originalCid = source["originalCid"] as? String, extractedTextCid = source["extractedTextCid"] as? String,
         )
+    }
+
+    /** Only an exact retained quotation tied to known source and text revisions can be offered. */
+    private fun textValid(result: CurationResult): Boolean {
+        if (result.sourceRevision == null) return false
+        val cid = result.extractedTextCid ?: return false
+        var i = 0
+        while (i < result.text.length) {
+            val ch = result.text[i]
+            if (ch in '\uD800'..'\uDBFF') {
+                if (i + 1 >= result.text.length || result.text[i + 1] !in '\uDC00'..'\uDFFF') return false
+                i++
+            } else if (ch in '\uDC00'..'\uDFFF') return false
+            i++
+        }
+        return cidPattern.matches(cid) && ContentId.of(result.text.encodeToByteArray()).value == cid
+    }
+
+    fun passage(result: CurationResult, ordinal: Int): DocumentPassage? =
+        result.proposals.firstOrNull { it.ordinal == ordinal }?.let { passage(result, it, textValid(result)) }
+
+    private fun passage(result: CurationResult, proposal: CurationProposal, validText: Boolean): DocumentPassage? {
+        if (!cidPattern.matches(result.receiptCid)) return null
+        val source = result.sourceRevision ?: return null
+        val textRevision = result.extractionRevision ?: source
+        fun valid(r: DocRevision) = r.project.isNotBlank() && r.id.isNotBlank() && r.rev.isNotBlank() && r.seq >= 0 && cidPattern.matches(r.cid)
+        if (!valid(source) || !valid(textRevision) || source.project != textRevision.project ||
+            source.project == CURATION_HASH || source.cid != result.originalCid || textRevision.cid != result.extractedTextCid || !validText) return null
+        val begin = proposal.quotationBegin ?: return null
+        val end = proposal.quotationEnd ?: return null
+        val quote = proposal.quote ?: return null
+        if (!exact(result.text, begin, end, quote)) return null
+        var before = maxOf(0, begin - 120)
+        var after = minOf(result.text.length.toLong(), end.toLong() + 120).toInt()
+        if (before > 0 && result.text[before] in '\uDC00'..'\uDFFF' && result.text[before - 1] in '\uD800'..'\uDBFF') before--
+        if (after < result.text.length && result.text[after] in '\uDC00'..'\uDFFF' && result.text[after - 1] in '\uD800'..'\uDBFF') after++
+        return DocumentPassage(result.receiptCid, proposal.ordinal, source, textRevision, begin, end, quote,
+            before, after, result.text.substring(before, after))
+    }
+
+    /** Match both recorded revisions and the returned preview; no text search or head substitution. */
+    fun passageHtml(view: DocView?, selected: DocumentPassage?): String {
+        fun unavailable() = "<section data-passage-result=\"1\"><p>Passage unavailable: the saved quotation or current document revision does not match.</p></section>"
+        if (view == null || selected == null || view.project != selected.source.project || view.id != selected.source.id ||
+            view.sourceRevision != selected.source) return unavailable()
+        val text = when (selected.textRevision) {
+            view.displayTextRevision -> view.text
+            view.extractionRevision -> view.extract
+            else -> null
+        } ?: return unavailable()
+        if (!exact(text, selected.begin, selected.end, selected.quote) || selected.contextBegin < 0 ||
+            selected.contextBegin > selected.begin || selected.contextEnd < selected.end || selected.contextEnd > text.length ||
+            text.substring(selected.contextBegin, selected.contextEnd) != selected.context) return unavailable()
+        return "<section data-passage-result=\"1\"><h2>Selected passage</h2><p>Matched to the saved text and document revisions. Original-page accuracy and review are not established.</p><pre>" +
+            esc(text.substring(selected.contextBegin, selected.begin)) + "<mark>" + esc(selected.quote) + "</mark>" +
+            esc(text.substring(selected.end, selected.contextEnd)) + "</pre></section>"
     }
 
     /** Both the list read (`error` at the top) and the curate write (`error` on a 503) land the same way. */
@@ -295,12 +378,18 @@ object DocumentSurface {
             .append(esc(result.text)).append("</pre></details>")
         val statements = result.proposals.filter { it.subject != null && it.predicate != null && it.obj != null }
         if (statements.isNotEmpty()) {
+            val validText = textValid(result)
             append("<h3 class=\"ds-curate-h3\">Proposed statements</h3><ul class=\"ds-curate-proposals\">")
             for (p in statements) {
                 append("<li class=\"ds-curate-proposal").append(if (p.submitted) " ds-curate-admitted" else " ds-curate-review").append("\">")
                 append("<div class=\"ds-curate-triple\">").append(esc(p.subject!!)).append(" <span class=\"ds-dim\">")
                     .append(esc(p.predicate!!)).append("</span> ").append(esc(p.obj!!)).append("</div>")
                 if (!p.quote.isNullOrBlank()) append("<blockquote class=\"ds-curate-quote\">“").append(esc(p.quote)).append("”</blockquote>")
+                val passage = passage(result, p, validText)
+                if (passage != null) append("<p><a data-passage-receipt=\"").append(esc(passage.receiptCid)).append("\" href=\"/documents?passageReceipt=")
+                    .append(WikiSurface.encode(passage.receiptCid)).append("&amp;passageProposal=").append(passage.ordinal)
+                    .append('#').append(WikiSurface.encode(passage.source.project)).append('/').append(WikiSurface.encode(passage.source.id))
+                    .append("\">Show passage in project document</a></p>")
                 append("<div class=\"ds-curate-status\">")
                     .append(when {
                         p.submitted -> "Submitted as source attribution"
