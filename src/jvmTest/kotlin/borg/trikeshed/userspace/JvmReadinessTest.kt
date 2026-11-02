@@ -1,0 +1,345 @@
+package borg.trikeshed.userspace
+
+import java.lang.foreign.Arena
+import java.lang.foreign.MemorySegment
+import java.lang.foreign.ValueLayout
+import java.net.ServerSocket
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * The emulated ring's deferred watches over loopback TCP, served by poll(2) only, by the kernel set only, and
+ * across the crossover in both directions. Each SQE ends in exactly one CQE whichever mechanism carried it.
+ */
+class JvmReadinessTest {
+    @Test fun pollOnly() = exchange(Int.MAX_VALUE)
+    @Test fun kernelSetOnly() = exchange(0)
+    @Test fun acrossTheCrossover() = exchange(4)
+
+    /** The same exchange through the FFM io_uring where Linux provides one; elsewhere native discovery must refuse. */
+    @Test fun kernelRingWhereLinuxHasOne() {
+        if (!System.getProperty("os.name").lowercase().contains("linux")) {
+            assertNull(discoverJvmUringBackend(8, UringBackendMode.AUTO).backend)
+            assertFailsWith<IllegalStateException> { discoverJvmUringBackend(8, UringBackendMode.NATIVE) }
+            return
+        }
+        val discovery = discoverJvmUringBackend(8, UringBackendMode.NATIVE)
+        val backend = assertNotNull(discovery.backend, discovery.report.description)
+        for (op in listOf(UringOp.POLL_ADD, UringOp.ACCEPT, UringOp.RECV, UringOp.SEND))
+            assertTrue(backend.nativeCapabilities and op.mask != 0L, "$op not executed by the kernel ring")
+        exchange(EmulatedRing(backend), null)
+    }
+
+    private fun exchange(crossover: Int) {
+        val readiness = JvmReadiness(crossover)
+        exchange(EmulatedRing(JvmUserspaceChannelBackend(readiness = readiness)), readiness)
+    }
+
+    private val linux = System.getProperty("os.name").lowercase().contains("linux")
+
+    /** A watch with no event bits ignores data and ends at the peer's reset, under poll(2) and the kernel set alike. */
+    @Test fun zeroMaskHangupParity() {
+        val polled = zeroMaskHangup(Int.MAX_VALUE)
+        val kernel = zeroMaskHangup(0)
+        assertEquals(polled, kernel, "poll(2) 0x${polled.toString(16)}, kernel set 0x${kernel.toString(16)}")
+        assertTrue(polled > 0 && polled and 0x10 != 0, "zero-mask watch ended with $polled, not POLLHUP")
+    }
+
+    private fun zeroMaskHangup(crossover: Int): Int {
+        val readiness = JvmReadiness(crossover)
+        val ring = EmulatedRing(JvmUserspaceChannelBackend(readiness = readiness))
+        ring.open(8, 0).getOrThrow()
+        try {
+            val f = Fixture(ring)
+            return peered(ring, f) { server, peer ->
+                val watch = f.next()
+                ring.prepPollAdd(server, 0, watch).getOrThrow()
+                ring.submit().getOrThrow()
+                assertEquals(crossover == 0, readiness.kernel)
+                peer.getOutputStream().write(7)
+                assertNull(ring.waitCqeTimeout(200_000_000L).getOrThrow(), "zero-mask watch fired on data")
+                peer.setSoLinger(true, 0)
+                peer.close()
+                val first = f.settle(watch).getValue(watch)
+                // The reset persists: a second zero-mask watch on the descriptor re-arms and fires the same way.
+                val again = f.next()
+                ring.prepPollAdd(server, 0, again).getOrThrow()
+                assertEquals(first, f.settle(again).getValue(again), "re-armed zero-mask watch")
+                first
+            }
+        } finally {
+            ring.close().getOrThrow()
+        }
+    }
+
+    /**
+     * A POLLPRI-only watch and urgent data. Linux reports it under both mechanisms. Darwin's poll(2) does not report
+     * TCP urgent data and its kernel mode serves PRI by that same poll(2), so the two agree there as well.
+     */
+    @Test fun urgentDataParity() {
+        val polled = urgentData(Int.MAX_VALUE)
+        val kernel = urgentData(0)
+        assertEquals(polled, kernel)
+        if (linux) assertEquals(0x2, polled and 0x2, "urgent data reported $polled")
+    }
+
+    /** The PRI watch's result, or the drain's -ECANCELED when it did not fire within a second. */
+    private fun urgentData(crossover: Int): Int {
+        val ring = EmulatedRing(JvmUserspaceChannelBackend(readiness = JvmReadiness(crossover)))
+        ring.open(8, 0).getOrThrow()
+        try {
+            val f = Fixture(ring)
+            return peered(ring, f) { server, peer ->
+                val watch = f.next()
+                ring.prepPollAdd(server, 0x2, watch).getOrThrow()
+                ring.submit().getOrThrow()
+                peer.sendUrgentData(0x41)
+                val fired = ring.waitCqeTimeout(1_000_000_000L).getOrThrow()
+                if (fired != null) {
+                    assertEquals(watch, fired.userData)
+                    fired.res
+                } else {
+                    ring.drain().getOrThrow()
+                    assertEquals(UringCompletion(watch, -125, 0), ring.peekCqe().getOrThrow())
+                    -125
+                }
+            }
+        } finally {
+            ring.close().getOrThrow()
+        }
+    }
+
+    /**
+     * Watches whose union changes on one descriptor: a POLLPRI watch (which Darwin's kernel mode serves by poll(2))
+     * stays pending while an OUT watch on the same socket fires, and is then removed. Same answers in both modes.
+     */
+    @Test fun unionChangesOnOneDescriptor() {
+        for (crossover in intArrayOf(Int.MAX_VALUE, 0)) {
+            val readiness = JvmReadiness(crossover)
+            val ring = EmulatedRing(JvmUserspaceChannelBackend(readiness = readiness))
+            ring.open(8, 0).getOrThrow()
+            try {
+                val f = Fixture(ring)
+                peered(ring, f) { server, _ ->
+                    val pri = f.next()
+                    ring.prepPollAdd(server, 0x2, pri).getOrThrow()
+                    ring.submit().getOrThrow()
+                    assertNull(ring.waitCqeTimeout(100_000_000L).getOrThrow(), "PRI fired without urgent data")
+                    assertEquals(crossover == 0, readiness.kernel)
+                    val out = f.next()
+                    ring.prepPollAdd(server, 0x4, out).getOrThrow()
+                    assertEquals(0x4, f.settle(out).getValue(out) and 0x4, "OUT beside a pending PRI watch, crossover $crossover")
+                    assertTrue(pri !in f.cqes)
+                    assertEquals(0, f.one { ring.prepPollRemove(pri, it) })
+                    assertEquals(-125, f.settle(pri).getValue(pri))
+                    assertEquals(0, readiness.watches)
+                }
+            } finally {
+                ring.close().getOrThrow()
+            }
+        }
+    }
+
+    /** Pending socket work in the FFM kernel ring ends by cancellation before the backend frees anything. */
+    @Test fun kernelRingDrainsPendingSocketIo() {
+        if (!linux) return
+        val backend = assertNotNull(discoverJvmUringBackend(8, UringBackendMode.NATIVE).backend)
+        Arena.ofConfined().use { arena ->
+            val ring = EmulatedRing(backend)
+            ring.open(8, 0).getOrThrow()
+            try {
+                val f = Fixture(ring)
+                peered(ring, f) { server, _ ->
+                    val recv = f.next()
+                    ring.prepRecv(server, arena.allocate(64).address(), 64, 0, recv).getOrThrow()
+                    ring.submit().getOrThrow()
+                    assertNull(ring.peekCqe().getOrThrow())
+                    assertEquals(1L, backend.counters()["native.inFlight"])
+                    ring.drain().getOrThrow()
+                    assertEquals(UringCompletion(recv, -125, 0), ring.peekCqe().getOrThrow())
+                    assertEquals(0L, backend.counters()["native.inFlight"])
+                }
+            } finally {
+                ring.close().getOrThrow()
+            }
+        }
+    }
+
+    /**
+     * A direct close with no cancellation wait: it either finds the RECV's terminal CQE and completes, or fails with
+     * the RECV still in flight and succeeds on a retry once that CQE arrives. It never frees ahead of the CQE.
+     */
+    @Test fun kernelRingCloseWaitsForTerminalCompletions() {
+        if (!linux) return
+        val backend = PanamauChannelBackend(openPanamaRing(8), cancelWaitNanos = 0L)
+        Arena.ofConfined().use { arena ->
+            val ring = EmulatedRing(backend)
+            ring.open(8, 0).getOrThrow()
+            val f = Fixture(ring)
+            peered(ring, f) { server, _ ->
+                ring.prepRecv(server, arena.allocate(64).address(), 64, 0, f.next()).getOrThrow()
+                ring.submit().getOrThrow()
+                assertEquals(1L, backend.counters()["native.inFlight"])
+                var attempts = 0
+                while (true) {
+                    val closed = runCatching { backend.close() }
+                    if (closed.isSuccess) break
+                    assertTrue(closed.exceptionOrNull() is IllegalStateException, "$closed")
+                    assertEquals(1L, backend.counters()["native.inFlight"])
+                    assertTrue(++attempts < 100, "no terminal CQE after $attempts closes")
+                    Thread.sleep(10)
+                }
+                assertEquals(0L, backend.counters()["native.inFlight"])
+            }
+        }
+    }
+
+    /** A listener of the ring's own, a JDK peer connected to it and the accepted descriptor; closes all three. */
+    private fun <R> peered(ring: EmulatedRing, f: Fixture, body: (server: Int, peer: java.net.Socket) -> R): R =
+        Arena.ofConfined().use { arena ->
+            val port = ServerSocket(0).use { it.localPort }
+            val address: MemorySegment = arena.allocate(16).also {
+                it.set(ValueLayout.JAVA_BYTE, 0, 2)
+                it.set(ValueLayout.JAVA_BYTE, 2, (port shr 8).toByte())
+                it.set(ValueLayout.JAVA_BYTE, 3, port.toByte())
+                it.set(ValueLayout.JAVA_BYTE, 4, 127)
+                it.set(ValueLayout.JAVA_BYTE, 7, 1)
+            }
+            val listener = f.one { ring.prepSocket(2, 1, 0, it) }.also { assertTrue(it >= 0) }
+            var server = -1
+            var peer: java.net.Socket? = null
+            try {
+                assertEquals(0, f.one { ring.prepBind(listener, address.address(), 16, it) })
+                assertEquals(0, f.one { ring.prepListen(listener, 4, it) })
+                peer = java.net.Socket("127.0.0.1", port)
+                server = f.one { ring.prepAccept(listener, it) }
+                assertTrue(server >= 0, "accept $server")
+                body(server, peer)
+            } finally {
+                peer?.close()
+                if (server >= 0) JvmFileTable.close(server)
+                JvmFileTable.close(listener)
+            }
+        }
+
+    private class Fixture(val ring: EmulatedRing) {
+        var token = 1L
+        val cqes = HashMap<Long, Int>()
+
+        fun next(): Long = token++
+
+        /** Submits and keeps whatever CQEs are already available, so the CQ never holds the next batch back. */
+        fun flush() {
+            ring.submit().getOrThrow()
+            while (true) {
+                val completion = ring.peekCqe().getOrThrow() ?: return
+                assertNull(cqes.put(completion.userData, completion.res), "second CQE for ${completion.userData}")
+            }
+        }
+
+        /** Submits what is staged and collects CQEs until [wanted] tokens have one each. */
+        fun settle(vararg wanted: Long): Map<Long, Int> {
+            ring.submit().getOrThrow()
+            while (wanted.any { it !in cqes }) {
+                val completion = assertNotNull(ring.waitCqeTimeout(5_000_000_000L).getOrThrow(), "no CQE within 5 s")
+                assertNull(cqes.put(completion.userData, completion.res), "second CQE for ${completion.userData}")
+            }
+            return cqes
+        }
+
+        fun one(stage: (Long) -> Result<Unit>): Int {
+            val token = next()
+            stage(token).getOrThrow()
+            return settle(token).getValue(token)
+        }
+    }
+
+    private fun exchange(ring: EmulatedRing, readiness: JvmReadiness?) {
+        val crossover = readiness?.crossover ?: 0
+        ring.open(8, 0).getOrThrow()
+        val count = 24
+        Arena.ofConfined().use { arena ->
+            val f = Fixture(ring)
+            val port = ServerSocket(0).use { it.localPort }
+            val address: MemorySegment = arena.allocate(16).also {
+                it.set(ValueLayout.JAVA_BYTE, 0, 2)
+                it.set(ValueLayout.JAVA_BYTE, 2, (port shr 8).toByte())
+                it.set(ValueLayout.JAVA_BYTE, 3, port.toByte())
+                it.set(ValueLayout.JAVA_BYTE, 4, 127)
+                it.set(ValueLayout.JAVA_BYTE, 7, 1)
+            }
+            val listener = f.one { ring.prepSocket(2, 1, 0, it) }.also { assertTrue(it >= 0) }
+            assertEquals(0, f.one { ring.prepBind(listener, address.address(), 16, it) })
+            assertEquals(0, f.one { ring.prepListen(listener, 64, it) })
+            val clients = IntArray(count) { f.one { token -> ring.prepSocket(2, 1, 0, token) }.also { assertTrue(it >= 0) } }
+            // CONNECTs beyond the SQ depth: each is a deferred watch until the handshake settles.
+            val connects = LongArray(count) { f.next() }
+            for (k in 0 until count step 8) {
+                for (j in k until minOf(count, k + 8)) ring.prepConnect(clients[j], address.address(), 16, connects[j]).getOrThrow()
+                f.flush()
+            }
+            for (token in connects) assertEquals(0, f.settle(token).getValue(token))
+            // The listener is non-blocking: an empty backlog answers -EAGAIN, and a POLLIN watch waits for more.
+            val servers = ArrayList<Int>()
+            while (servers.size < count) {
+                val accepted = f.one { ring.prepAccept(listener, it) }
+                if (accepted >= 0) servers.add(accepted)
+                else {
+                    assertEquals(-11, accepted)
+                    assertEquals(1, f.one { ring.prepPollAdd(listener, 1, it) } and 1)
+                }
+            }
+            val watches = LongArray(count) { f.next() }
+            for (k in 0 until count step 8) {
+                for (j in k until minOf(count, k + 8)) ring.prepPollAdd(servers[j], 1, watches[j]).getOrThrow()
+                f.flush()
+            }
+            assertNull(ring.peekCqe().getOrThrow())
+            if (readiness != null) {
+                assertEquals(count, readiness.watches)
+                if (crossover < count) assertTrue(readiness.kernel, "$count watched sockets exceed crossover $crossover")
+                else assertTrue(!readiness.kernel)
+            }
+            val byte = arena.allocate(16).also { it.set(ValueLayout.JAVA_BYTE, 0, 7) }
+            for (k in 0 until count) assertEquals(1, f.one { ring.prepSend(clients[k], byte.address(), 1, 0, it) })
+            for (token in watches) assertEquals(1, f.settle(token).getValue(token) and 1)
+            for (k in 0 until count) assertEquals(1, f.one { ring.prepRecv(servers[k], byte.address(), 16, 0, it) })
+            // Re-armed: half removed (-ECANCELED, remover 0), one closed under its watch (-EBADF), the rest fire.
+            val again = LongArray(count) { f.next() }
+            for (k in 0 until count step 8) {
+                for (j in k until minOf(count, k + 8)) ring.prepPollAdd(servers[j], 1, again[j]).getOrThrow()
+                f.flush()
+            }
+            for (k in 0 until count / 2) {
+                assertEquals(0, f.one { ring.prepPollRemove(again[k], it) })
+                assertEquals(-125, f.settle(again[k]).getValue(again[k]))
+            }
+            val closed = count / 2
+            assertEquals(0, f.one { ring.prepClose(servers[closed], it) })
+            assertEquals(-9, f.settle(again[closed]).getValue(again[closed]))
+            for (k in closed + 1 until count) assertEquals(1, f.one { ring.prepSend(clients[k], byte.address(), 1, 0, it) })
+            for (k in closed + 1 until count) assertEquals(1, f.settle(again[k]).getValue(again[k]) and 1)
+            if (readiness != null) {
+                assertEquals(0, readiness.watches)
+                if (crossover in 1 until count) assertTrue(readiness.switches >= 2, "switched ${readiness.switches} times")
+            }
+            // Drain ends unready watches (peers still open, nothing to read) with -ECANCELED; then nothing is admitted.
+            val idle = LongArray(4) { f.next() }
+            for (k in idle.indices) ring.prepPollAdd(clients[k], 1, idle[k]).getOrThrow()
+            ring.submit().getOrThrow()
+            ring.drain().getOrThrow()
+            for (token in idle) assertEquals(-125, assertNotNull(ring.peekCqe().getOrThrow()).res)
+            assertNull(ring.peekCqe().getOrThrow())
+            assertTrue(ring.prepPollAdd(clients[0], 1, f.next()).isFailure)
+            // Descriptors outlive the ring; the caller closes them.
+            for (k in servers.indices) if (k != closed) assertEquals(0, JvmFileTable.close(servers[k]))
+            assertEquals(0, JvmFileTable.close(listener))
+            for (fd in clients) assertEquals(0, JvmFileTable.close(fd))
+        }
+        ring.close().getOrThrow()
+    }
+}
