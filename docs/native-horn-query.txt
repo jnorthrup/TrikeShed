@@ -38,7 +38,8 @@ adapter16KiB, datalog1MiB, input4MiB). Pre/post hashes and canonical path equali
 are checked. Size-check/read is not atomic against a hostile filesystem writer;
 operator-owned immutable SDK/profile paths remain required.
 It directly invokes the fixed native instantiate CLI with --argstr path values;
-there is no POSIX shell, request expression interpolation, client-selected path,
+and a fixed --store dummy://, preventing ambient/remote store selection.
+There is no POSIX shell, request expression interpolation, client-selected path,
 command, profile, timeout or import. Actual pinned mlnix --argstr support was
 verified. Executable/adapter/datalog hashes and input bytes are checked before
 and after execution; profile filesystem immutability remains an operator duty.
@@ -83,3 +84,13 @@ hashes: /workspace/library-files/native-horn-query-proof/.
 - Incorrect executable pin refuses. Native integration tests explicitly require
   trikeshed.native.* operator system properties and otherwise visibly skip;
   ordinary route/default and finite process tests require no native SDK.
+
+Startup-equivalent integration uses NativeHornProfile.parse(JSON), with no
+constructor-supplied environment. Actual native execution also succeeded with
+the complete process environment cleared and --store dummy:// (exit0, empty
+stderr). No libraryDirectories/environment field was needed in operator JSON.
+This development binary embeds RUNPATH to the extracted SDK directories
+/workspace/library-files/mlnix-native-validation/sdk/usr/lib/x86_64-linux-gnu
+and /workspace/library-files/mlnix-native-validation/sdk/usr/lib/llvm-22/lib.
+Those operator-provisioned libraries must remain available; this is not a
+relocatable release packaging or dependency authentication claim.
