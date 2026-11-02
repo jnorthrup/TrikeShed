@@ -17,7 +17,7 @@ import kotlin.test.*
 class ConstellationAskUnlessTest {
     @TempDir lateinit var directory: Path
 
-    @Test fun missingAndLegacyFactsWaitWhileExplicitRefutationFires() = runBlocking {
+    @Test fun missingAndLegacyFactsWaitWhileExplicitRefutationFires(): Unit = runBlocking {
         val classId = requireNotNull(SumoCorpus.classifier.classId("Human")).value
         val bookDir = directory.resolve("constellations/books")
         Files.createDirectories(bookDir)
@@ -127,7 +127,8 @@ class ConstellationAskUnlessTest {
                 assertTrue(premise in (result["pending"] as Map<*, *>), text)
                 assertTrue((result["blocked"] as Map<*, *>).isEmpty(), text)
                 assertEquals("parsed-and-legacy-facts-are-unverified", result["withheldReason"])
-                if (text == "Rent is due.") assertTrue(premise in (result["parsedCandidates"] as List<*>))
+                assertEquals(text, result["candidateText"])
+                assertTrue((result["parsedCandidates"] as List<*>).all { it is String })
                 assertEquals(0, bank.size())
             }
         } finally { nodes.drain() }

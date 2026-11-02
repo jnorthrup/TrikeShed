@@ -10,8 +10,9 @@ it eligible. An `if` norm has the opposite eligibility. Unconditioned norms do
 not need a premise.
 
 This changes the legacy `facts` text input: its extracted `parsedCandidates`
-are shown for inspection and **do not activate conditions**. The parser can
-misread negation and qualification. Facts serialized in joined books and model
+are shown for inspection and **do not activate conditions**. The original is
+returned as `candidateText`; parsing may omit or change a candidate, or misread
+negation and qualification. Facts serialized in joined books and model
 suggestions are also withheld from applicability. To migrate an existing graph,
 review the intended premise and wire a JSON array of exact strings to the
 appropriate assumption port; no text is automatically converted to a negative.
