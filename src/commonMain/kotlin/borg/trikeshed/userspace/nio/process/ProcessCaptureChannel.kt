@@ -9,6 +9,8 @@ import kotlinx.coroutines.*
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.coroutines.CoroutineContext
 
+class ProcessOutputLimitExceeded(val limit: Int) : IllegalStateException("Process output exceeded $limit bytes")
+
 /** A finite process's merged output, retaining its head while counting every drained byte. */
 data class ProcessCapture(val exit: Int, val bytes: ByteArray, val total: Long, val timedOut: Boolean) {
     val kept: Long get() = bytes.size.toLong()
@@ -19,6 +21,7 @@ data class ProcessCapture(val exit: Int, val bytes: ByteArray, val total: Long, 
 /**
  * Raw process input, bounded output delivery and exit fan-in under one owning supervisor.
  * The platform opens these finite-process pipes with stderr merged into stdout.
+ * failOnOverflow opts into immediate revocation; the default retains the existing head-and-drain policy.
  */
 class ProcessCaptureChannel(
     context: CoroutineContext,
@@ -27,6 +30,7 @@ class ProcessCaptureChannel(
     private val maxBytes: Int = 4_194_304,
     private val timeoutMillis: Long = 120_000,
     capacity: Int = 8,
+    private val failOnOverflow: Boolean = false,
 ) : CoroutineContext.Element {
     companion object Key : CoroutineContext.Key<ProcessCaptureChannel>
     override val key: CoroutineContext.Key<*> get() = Key
@@ -52,6 +56,10 @@ class ProcessCaptureChannel(
                     for (chunk in chunks.kChannel) {
                         check(total <= Long.MAX_VALUE - chunk.size) { "Process byte count overflow" }
                         total += chunk.size
+                        if (failOnOverflow && total > maxBytes) {
+                            withContext(NonCancellable) { revoked.store(true); pipes.revoke(0) }
+                            throw ProcessOutputLimitExceeded(maxBytes)
+                        }
                         val take = minOf(chunk.size, maxBytes - size)
                         if (take > 0) {
                             if (size + take > bytes.size)
