@@ -22,7 +22,13 @@ import kotlin.test.*
 class ReviewedTaxonomyWireTest {
     @org.junit.jupiter.api.io.TempDir lateinit var directory: Path
 
-    @Test fun authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit(): Unit = runBlocking {
+    @Test fun authenticatedCurrentReadExcludesNormsWithoutSpendingItsPermit() = exercise(null)
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfSystemProperty(named = "trikeshed.native.mlnix", matches = ".+")
+    fun configuredNativeEndpointRunsActualReviewedQuery() = exercise(NativeHornQuery(NativeHornQueryTest().profile()))
+
+    private fun exercise(native: NativeHornQuery?): Unit = runBlocking {
         assertFailsWith<IllegalArgumentException> {
             DocumentReviewWire.taxonomyRequest("[".repeat(17) + "0" + "]".repeat(17))
         }
@@ -52,7 +58,7 @@ class ReviewedTaxonomyWireTest {
         val books = ConstellationNodes(directory.toFile(), ctx.blackboard, scope = scope, cas = cas)
         var wire: DocumentReviewWire? = null
         try {
-            wire = DocumentReviewWire.open(ctx, InMemoryProjectCorpus(), books)
+            wire = DocumentReviewWire.open(ctx, InMemoryProjectCorpus(), books, native)
             suspend fun request(suffix: String, body: Map<String, Any?>, auth: String? = token, status: Int = 200): Map<String, Any?> {
                 val path = "/api/documents/review/$suffix"
                 val message = "POST $path HTTP/1.1\r\n" + (auth?.let { "Authorization: Bearer $it\r\n" } ?: "") + "\r\n" + jsonOf(body)
@@ -100,6 +106,14 @@ class ReviewedTaxonomyWireTest {
             request("horn-input", hornRequest, auth = null, status = 401)
             request("horn-input", hornRequest + ("review" to "approved"), status = 409)
             request("horn-input", hornRequest + ("goal" to "applyObligation"), status = 409)
+            request("horn-query", hornRequest, auth = null, status = 401)
+            request("horn-query", hornRequest + ("binary" to "/client/path"), status = 409)
+            val unavailable = request("horn-query", hornRequest)
+            assertEquals(if (native == null) "UNAVAILABLE" else "SUPPORTED", unavailable["status"])
+            assertEquals("UNKNOWN", unavailable["worldObligationApplicability"])
+            val queryPath = "/api/documents/review/horn-query"
+            assertEquals(405, assertNotNull(ctx.routes.match(queryPath)?.route("GET", queryPath,
+                "GET $queryPath HTTP/1.1\r\nAuthorization: Bearer $token\r\n\r\n", null)).status)
             val horn = request("horn-input", hornRequest)
             assertEquals("NOT_EXECUTED", horn["status"])
             assertEquals("review-record-observations", horn["scope"])
