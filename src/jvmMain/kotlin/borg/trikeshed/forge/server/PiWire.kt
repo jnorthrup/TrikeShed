@@ -7,6 +7,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.litebike.JvmKanbanServer
 import borg.trikeshed.parse.*
 import borg.trikeshed.pi.PiModelPort
+import borg.trikeshed.pi.PiWorkspace
 import java.net.URI
 import java.security.MessageDigest
 import java.util.UUID
@@ -21,8 +22,9 @@ class PiWire(
     private val breadcrumbs: BreadcrumbElement,
     private val catalog: suspend () -> ModelMux?,
     private val tokenSha256: String?,
+    private val workspace: PiWorkspace? = null,
     private val openPort: (String, BreadcrumbGeneration) -> Port = { model, generation ->
-        val runtime = PiModelPort(model, generation, context + breadcrumbs, catalog)
+        val runtime = PiModelPort(model, generation, context + breadcrumbs, workspace, catalog)
         object : Port {
             override fun prompt(text: String): Map<String, Any?> = reifyStrict(runtime.prompt(text).canonical()) as Map<String, Any?>
             override fun close() = runtime.close()
@@ -211,6 +213,7 @@ class PiWire(
         "sessionId" j session.id, "contextId" j session.id, "contextRetained" j session.contextRetained,
         "latestTurnRetained" j session.latestTurnRetained, "persistenceConfigured" j (breadcrumbs.store != null),
         "retention" j "Bounded indexed prompt and new-message evidence; no agent resume or indefinite retention guarantee",
+        "workspaceFiles" j workspace?.paths?.toList().orEmpty(),
         "model" j session.model, "state" j session.state, "turnId" j session.turn,
         "result" j session.result, "error" j session.error]
     private fun json(status: Int, value: Map<String, Any?>) = JvmKanbanServer.HttpResponse(status, jsonOf(value))
