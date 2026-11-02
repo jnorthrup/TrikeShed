@@ -24,7 +24,7 @@ class PiWire(
     private val tokenSha256: String?,
     private val workspace: PiWorkspace? = null,
     private val openPort: (String, BreadcrumbGeneration) -> Port = { model, generation ->
-        val runtime = PiModelPort(model, generation, context + breadcrumbs, workspace, catalog)
+        val runtime = PiModelPort(model, generation, context + breadcrumbs, workspace?.fork(), catalog)
         object : Port {
             override fun prompt(text: String): Map<String, Any?> = reifyStrict(runtime.prompt(text).canonical()) as Map<String, Any?>
             override fun close() = runtime.close()
