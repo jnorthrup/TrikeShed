@@ -11,6 +11,7 @@ import borg.trikeshed.parse.kursive.sql.scalarText
 import borg.trikeshed.parse.reifyStrict
 import borg.trikeshed.rdf.CypherSurface
 import borg.trikeshed.rdf.SparqlQuery
+import borg.trikeshed.rdf.SparqlSource
 import borg.trikeshed.rdf.SparqlSurface
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,7 +41,16 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
         val reply = when {
             p == "/sql/visual" -> return VisualSqlWire.query(method, requestBody(text), surface.store, gate)
             p == "/sparql/visual" -> return visual(method, requestBody(text))
-            p == SparqlSurface.PATH -> { val rows = live?.invoke(); gate.withLock { surface.handle(method, path, requestHeaders(text), requestBody(text), rows) } }
+            p == SparqlSurface.PATH -> {
+                val selected = try { surface.requestedSource(path, requestHeaders(text), requestBody(text)) }
+                    catch (e: IllegalArgumentException) {
+                        return WireHttpResponse(400, e.message ?: "Invalid SPARQL source", "text/plain; charset=utf-8")
+                    }
+                if (selected == SparqlSource.RETE && live == null)
+                    return WireHttpResponse(400, "Rete projection is unavailable", "text/plain; charset=utf-8")
+                val rows = if ((selected ?: SparqlSource.UNION).projected) live?.invoke() else null
+                gate.withLock { surface.handle(method, path, requestHeaders(text), requestBody(text), rows) }
+            }
             cypher != null && CypherSurface.PATH.matches(p) -> { val rows = live?.invoke(); gate.withLock { cypher.handle(method, path, requestHeaders(text), requestBody(text), rows) } }
             else -> return null
         }
@@ -57,15 +67,15 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
         val request = try { reifyStrict(body) as? Map<*, *> ?: return error(400, "Expected a JSON object") }
             catch (e: Exception) { return error(400, "Invalid JSON: ${e.message}") }
         val dataset = request["dataset"] as? String ?: return error(400, "Select a dataset")
-        if (dataset != "quad-store" && dataset != "quad-store+rete") return error(400, "Unknown dataset")
-        if (dataset == "quad-store+rete" && live == null) return error(400, "Rete overlay is unavailable")
+        val selected = try { SparqlSource.of(dataset) } catch (_: IllegalArgumentException) { return error(400, "Unknown dataset") }
+        if (selected.projected && live == null) return error(400, "Rete overlay is unavailable")
         val candidateVariable = when (val value = request["candidateVariable"]) {
             null -> null
             is String -> value.removePrefix("?").takeIf { it.isNotBlank() }
                 ?: return error(400, "Candidate variable is empty")
             else -> return error(400, "Candidate variable must be a string")
         }
-        if (candidateVariable != null && dataset != "quad-store+rete")
+        if (candidateVariable != null && !selected.projected)
             return error(400, "Candidate details require the live Rete dataset")
         val document = request["program"] as? Map<*, *> ?: return error(400, "Expected a program object")
         fun count(value: Any?): Int = when (value) {
@@ -84,16 +94,16 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
             query.variables.any { it.length > VISUAL_VARIABLE_CHARS })
             return error(413, "Visual query variable name is too long")
         if (query.text.length > VISUAL_QUERY_CHARS) return error(413, "Visual query text is too large")
-        val rows = if (dataset == "quad-store+rete") live?.invoke() else null
+        val rows = if (selected.projected) live?.invoke() else null
         return gate.withLock {
             // Avoid constructing the combined cursor when the selected inputs already exceed the budget.
-            if (surface.store.size.toLong() + (rows?.size ?: 0).toLong() > VISUAL_SOURCE_ROWS)
+            if ((if (selected.stored) surface.store.size.toLong() else 0L) + (rows?.size ?: 0).toLong() > VISUAL_SOURCE_ROWS)
                 return@withLock error(413, "Selected dataset exceeds the visual query source limit")
-            val source = surface.quads(rows)
+            val source = surface.quads(rows, selected)
             val refusal = try { visualWorkRefusal(query, source, candidateVariable != null) }
                 catch (e: Exception) { return@withLock error(400, e.message ?: "Invalid quad source") }
             if (refusal != null) return@withLock error(413, refusal)
-            val result = surface.answer(query.text, emptyList(), emptyList(), "json", "", rows)
+            val result = surface.answer(query.text, emptyList(), emptyList(), "json", "", rows, selected)
             if (result.status != 200) error(result.status, result.body)
             else {
                 val results = reifyStrict(result.body)
@@ -101,7 +111,7 @@ class SparqlWire(val surface: SparqlSurface, val cypher: CypherSurface? = null, 
                     mapOf("candidateContext" to VisualCandidateContext.extract(candidateVariable, results, requireNotNull(rows)))
                 } catch (e: Exception) { return@withLock error(400, e.message ?: "Cannot inspect live proposal fields") }
                 val response = jsonOf(mapOf("dataset" to dataset, "query" to query.text,
-                    "results" to results) + candidateContext)
+                    "results" to results, "source" to selected.descriptor(rows != null)) + candidateContext)
                 if (response.encodeToByteArray().size > VISUAL_RESPONSE_BYTES)
                     error(413, "Visual query result exceeds the response size limit")
                 else WireHttpResponse(200, response, "application/json; charset=utf-8")

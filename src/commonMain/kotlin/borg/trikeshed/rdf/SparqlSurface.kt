@@ -8,6 +8,9 @@ import borg.trikeshed.lib.*
  * The SPARQL 1.1 Protocol as Virtuoso serves it at `/sparql`, over a [QuadStore]; commonMain, no
  * sockets — the daemon's wire hands `(method, path, headers, body)` in.
  *
+ * Optional physical `source`: quad-store, rete-projection, quad-store+rete (URL/form encode + as %2B).
+ * Omitted source preserves the union. Explicit non-store selectors refuse updates.
+ *
  *   GET  /sparql?query=…&default-graph-uri=…&named-graph-uri=…[&format=json|csv|tsv]
  *   POST /sparql   application/x-www-form-urlencoded (query= | update=), application/sparql-query,
  *                  application/sparql-update
@@ -19,7 +22,22 @@ import borg.trikeshed.lib.*
  * the store's own.
  */
 class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureExprCompiler) {
+    /** Independent of SPARQL FROM/protocol graph selection. Only form bodies carry protocol parameters. */
+    fun requestedSource(rawPath: String, headers: Map<String, String>, body: String): SparqlSource? {
+        val params = decodeQuery(rawPath.substringAfter('?', "")).toMutableList()
+        val contentType = headers.entries.firstOrNull { it.key.equals("content-type", true) }?.value.orEmpty().lowercase()
+        if (!contentType.startsWith("application/sparql-query") && !contentType.startsWith("application/sparql-update"))
+            params += decodeQuery(body)
+        val sources = params.filter { it.first == "source" }
+        require(sources.size <= 1) { "SPARQL source must be specified once" }
+        return sources.singleOrNull()?.second?.let { require(it.length <= 64); SparqlSource.of(it) }
+    }
+
     fun handle(method: String, rawPath: String, headers: Map<String, String>, body: String, live: Cursor? = null): PostgrestReply {
+        val selected = try { requestedSource(rawPath, headers, body) }
+            catch (e: IllegalArgumentException) { return refuse(400, e.message ?: "Invalid SPARQL source") }
+        val source = selected ?: SparqlSource.UNION
+        if (source == SparqlSource.RETE && live == null) return refuse(400, "Rete projection is unavailable")
         val h = headers.entries.associate { it.key.lowercase() to it.value.trim() }
         val params = decodeQuery(rawPath.substringAfter('?', "")).toMutableList()
         val contentType = h["content-type"].orEmpty().lowercase()
@@ -42,20 +60,23 @@ class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureEx
         val defaults = params.filter { it.first == "default-graph-uri" && it.second.isNotBlank() }.map { it.second }
         val named = params.filter { it.first == "named-graph-uri" && it.second.isNotBlank() }.map { it.second }
         val format = params.lastOrNull { it.first == "format" || it.first == "output" }?.second
-        return when {
-            update != null -> apply(update)
-            query != null -> answer(query, defaults, named, format, h["accept"].orEmpty(), live)
+        val result = when {
+            update != null -> if (selected != null && selected != SparqlSource.STORE)
+                refuse(400, "SPARQL updates target only quad-store") else apply(update)
+            query != null -> answer(query, defaults, named, format, h["accept"].orEmpty(), live, source)
             else -> refuse(400, "missing query parameter")
         }
+        val actual = if (update != null) SparqlSource.STORE else source
+        return result.copy(headers = result.headers + actual.headers(live != null))
     }
 
-    fun answer(text: String, defaults: List<String>, named: List<String>, format: String?, accept: String, live: Cursor? = null): PostgrestReply {
+    fun answer(text: String, defaults: List<String>, named: List<String>, format: String?, accept: String, live: Cursor? = null, selected: SparqlSource = SparqlSource.UNION): PostgrestReply {
         val query = try { SparqlQuery.parse(text, defaults, named) } catch (e: SparqlError) { return refuse(400, "Virtuoso 37000 Error SP030: SPARQL compiler, ${e.message}") }
         val media = (if (query.graphResult) graphMediaType(format, accept) else mediaType(format, accept))
             ?: return refuse(406, "none of these media types are available: ${format ?: accept}")
         // The plan and its rows are produced here, so a planner's or evaluator's refusal is this reply, never a dropped request.
         val body = try {
-            val source = quads(live)
+            val source = quads(live, selected)
             val rows = query.plan(source, compiler = compiler)
             when {
                 query.graphResult -> query.triples(rows, source).let { if (media == SparqlResults.NTRIPLES) SparqlResults.nTriples(it) else SparqlResults.turtle(it) }
@@ -81,7 +102,11 @@ class SparqlSurface(val store: QuadStore, val compiler: ExprCompiler = ClosureEx
     }
 
     /** The store's quads, with [live] rows beside them when a fact plane is read on the request. */
-    fun quads(live: Cursor?): Cursor = if (live == null || live.size == 0) store.scan() else combine(store.scan(), live)
+    fun quads(live: Cursor?, selected: SparqlSource = SparqlSource.UNION): Cursor = when (selected) {
+        SparqlSource.STORE -> store.scan()
+        SparqlSource.RETE -> requireNotNull(live) { "Rete projection is unavailable" }
+        SparqlSource.UNION -> if (live == null || live.size == 0) store.scan() else combine(store.scan(), live)
+    }
 
     /** The result media type for `format=`/`output=` (first) or `Accept`; null when neither names one served here. */
     fun mediaType(format: String?, accept: String): String? {
