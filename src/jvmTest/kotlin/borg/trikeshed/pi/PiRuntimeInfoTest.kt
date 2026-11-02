@@ -33,21 +33,24 @@ class PiRuntimeInfoTest {
                 return (Teleported.parseCanonical(json.v) as Teleported.Obj).v
             }
             val before = info()
+            assertEquals(Teleported.Num(1L), before["formatVersion"])
             assertEquals(Teleported.Str("GraalJS"), before["runtime"])
             assertEquals(Teleported.Str("ModelMux"), before["transport"])
             assertEquals(Teleported.Bool(false), before["initialized"])
             assertEquals(Teleported.parseCanonical("null"), before["model"])
             assertEquals(Teleported.parseCanonical("[]"), before["tools"])
             assertEquals(Teleported.Bool(true), before["buffered"])
-            val definitions = """[{"name":"read","description":"Inert diagnostic schema","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}}]"""
+            val definitions = """[{"name":"read","description":"Inert read schema","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}},{"name":"edit","description":"Inert edit schema","parameters":{"type":"object","properties":{},"additionalProperties":false}}]"""
             assertEquals(Teleported.Bool(true), guest.call("piInit", Teleported.Str("diagnostic"), Teleported.Str(definitions)))
             val after = info()
+            assertEquals(Teleported.Num(1L), after["formatVersion"])
             assertEquals(Teleported.Bool(true), after["initialized"])
             assertEquals(Teleported.Str("diagnostic"), after["model"])
-            assertEquals(Teleported.parseCanonical("[\"read\"]"), after["tools"])
+            assertEquals(Teleported.parseCanonical("[\"edit\",\"read\"]"), after["tools"])
             assertEquals(before["runtime"], after["runtime"])
             assertEquals(before["transport"], after["transport"])
             assertEquals(before["buffered"], after["buffered"])
+            assertEquals(after, info())
             assertEquals(0, clockCalls)
             assertEquals(Teleported.Bool(true), guest.eval("typeof process === 'undefined' && typeof require === 'undefined' && typeof fetch === 'undefined'"))
         }
