@@ -45,6 +45,73 @@ inline  class DelimitRange(val value: Int) : Twin<UShort>, ClosedRange<UShort> {
  */
 object CSVUtil {
 
+    /** Decoded cell plus half-open UTF-16 source coordinates, including source quoting. */
+    data class Cell(val value: String, val begin: Int, val end: Int)
+    data class Record(val cells: Series<Cell>, val begin: Int, val end: Int)
+
+    /**
+     * Strict delimited records. One leading BOM is accepted; LF and CRLF terminate
+     * records, bare CR is rejected outside quotes. Embedded newlines remain exact.
+     * Blank records are records, not discarded. A terminal newline adds no record.
+     * Limits count UTF-16 source units (field limit includes quoting).
+     */
+    fun records(
+        text: String, delimiter: Char = ',', maxRows: Int = 100_001,
+        maxFieldChars: Int = 1_048_576, maxColumns: Int = 1024,
+        maxInputChars: Int = 16_777_216,
+    ): Series<Record> {
+        require(delimiter == ',' || delimiter == '\t')
+        require(maxRows > 0 && maxFieldChars > 0 && maxColumns > 0 && maxInputChars > 0)
+        require(text.length <= maxInputChars) { "CSV input limit exceeded" }
+        val records = mutableListOf<Record>()
+        var pos = if (text.startsWith('\uFEFF')) 1 else 0
+        while (pos < text.length) {
+            require(records.size < maxRows) { "CSV record limit exceeded" }
+            val rowBegin = pos
+            val cells = mutableListOf<Cell>()
+            while (true) {
+                require(cells.size < maxColumns) { "CSV column limit exceeded" }
+                val begin = pos
+                val value = StringBuilder()
+                fun advance(): Char {
+                    require(pos - begin < maxFieldChars) { "CSV field limit exceeded at $begin" }
+                    return text[pos++]
+                }
+                if (pos < text.length && text[pos] == '"') {
+                    advance()
+                    var closed = false
+                    while (pos < text.length) {
+                        val c = advance()
+                        if (c != '"') value.append(c)
+                        else if (pos < text.length && text[pos] == '"') {
+                            advance()
+                            value.append('"')
+                        } else { closed = true; break }
+                    }
+                    require(closed) { "Unclosed CSV quote at $begin" }
+                    require(pos == text.length || text[pos] == delimiter || text[pos] == '\r' || text[pos] == '\n') {
+                        "Characters after closing CSV quote at $pos"
+                    }
+                } else {
+                    while (pos < text.length && text[pos] != delimiter && text[pos] != '\r' && text[pos] != '\n') {
+                        require(text[pos] != '"') { "Quote inside unquoted CSV field at $pos" }
+                        value.append(advance())
+                    }
+                }
+                cells.add(Cell(value.toString(), begin, pos))
+                if (pos < text.length && text[pos] == delimiter) { pos++; continue }
+                records.add(Record(cells.toSeries(), rowBegin, pos))
+                if (pos < text.length && text[pos] == '\r') {
+                    require(pos + 1 < text.length && text[pos + 1] == '\n') { "Bare CR at $pos" }
+                    pos++
+                }
+                if (pos < text.length) pos++
+                break
+            }
+        }
+        return records.toSeries()
+    }
+
     fun parseLine(line: String): List<String> {
         val result = mutableListOf<String>()
         var current = StringBuilder()
