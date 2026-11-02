@@ -1,0 +1,23 @@
+{
+  "upstream": "https://github.com/NousResearch/hermes-agent",
+  "revision": "2486f52ebd7ecebe432d6de1062125933e706788",
+  "scope": "Exact donor registry and constants; no claim of full agent-loop execution",
+  "files": [
+    {
+      "file": "LICENSE.txt",
+      "sha256": "821556e6336796450ab852d375117b48a4887e71d255794fd6318d99982a5ab6"
+    },
+    {
+      "file": "hermes_constants.py",
+      "sha256": "8d55a41452b625061f1f2e2f507a7e7ffb2a396e711afcc7aee28b03a6e8fa9d"
+    },
+    {
+      "file": "registry.py",
+      "sha256": "4a05aae5b4dd40bf9a104d23582d4363326ad7ce3fdac1ac249e0af04334d909"
+    },
+    {
+      "file": "tools-init.py",
+      "sha256": "7bca460f476ac9ace706c8cfd07e98f8aae34d839862f0f68abafc3a8397cf35"
+    }
+  ]
+}
