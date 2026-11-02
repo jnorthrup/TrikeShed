@@ -95,7 +95,7 @@ class HermesPen(
 
     fun install(guest: GuestIsolate, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
-        guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { muxConverse(args, cause) } } }
+        guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { admitted { muxConverse(args, cause) } } } }
         guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { admitted { muxCompletion(args, cause) } } } }
         guest.delegate("mux_breadcrumb") { args -> receipted("mux_breadcrumb", args) { runBlocking(muxContext) { admitted { muxBreadcrumb(args) } } } }
         guest.delegate("bag_recall") { args -> receipted("bag_recall", args) { bagRecall(args) } }
@@ -183,6 +183,10 @@ class HermesPen(
 
     private fun boundBreadcrumbSession(): String? = breadcrumbGeneration?.session ?: breadcrumbSession()
 
+    /** Inventory may advertise local memory tools without exposing the host session identity. */
+    val breadcrumbToolsEnabled: Boolean get() = boundBreadcrumbSession()?.let { it.isNotBlank() && it.length <= 128 } == true &&
+        muxContext[BreadcrumbElement] != null
+
     // ── verbs ─────────────────────────────────────────────────────────
 
     private suspend fun muxCatalog(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
@@ -200,7 +204,8 @@ class HermesPen(
         return withTimeout(timeout) {
             val mux = modelMuxProvider() ?: return@withTimeout refusal("no-mux", "model plane not leased to this pen")
             val remaining = (timeout - started.elapsedNow().inWholeMilliseconds).coerceAtLeast(1L)
-            val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, contextId = cause, timeoutMs = remaining)
+            val result = mux.chat(modelId, 1 j { _: Int -> "user" j prompt }, assessmentId = cause,
+                contextId = boundBreadcrumbSession(), timeoutMs = remaining)
             result.fold(
                 onSuccess = { true j mapOf("verdict" to "ok", "response" to it.a,
                     "usage" to mapOf("prompt_tokens" to it.b.a, "completion_tokens" to it.b.b)) },
@@ -219,8 +224,8 @@ class HermesPen(
         val session = if (args.size == 4) {
             val value = str(args, 3) ?: return refusal("bad-args", "mux_completion session must be a string")
             if (value.length > 128) return refusal("bad-args", "mux_completion session exceeds 128 characters")
-            value.takeIf { it.isNotBlank() }
-        } else null
+            value.takeIf { it.isNotBlank() } ?: boundBreadcrumbSession()
+        } else boundBreadcrumbSession()
         val request = try {
             require(reifyStrict(json) is Map<*, *>) { "completion must be a JSON object" }
             confixDoc(json).also { doc ->
@@ -256,27 +261,28 @@ class HermesPen(
         }
     }
 
-    /** Guest session names are checked against the pen's host-owned session binding. */
+    /** Two arguments use the immutable host session; legacy explicit sessions must match it. */
     private suspend fun muxBreadcrumb(args: List<Teleported>): Join<Boolean, Map<String, Any?>> {
-        if (args.size != 3) return refusal("bad-args", "mux_breadcrumb(session, tool, argumentsJson)")
-        val session = str(args, 0)?.takeIf { it.isNotBlank() && it.length <= 128 }
-            ?: return refusal("bad-args", "breadcrumb session required")
+        if (args.size !in 2..3) return refusal("bad-args", "mux_breadcrumb(tool, argumentsJson)")
         val bound = boundBreadcrumbSession()?.takeIf { it.isNotBlank() && it.length <= 128 }
             ?: return refusal("no-context", "no breadcrumb session bound to this pen")
+        val offset = args.size - 2
+        val session = if (offset == 0) bound else str(args, 0)?.takeIf { it.isNotBlank() && it.length <= 128 }
+            ?: return refusal("bad-args", "breadcrumb session required")
         if (session != bound) return refusal("forbidden", "breadcrumb session is not bound to this pen")
-        val tool = str(args, 1)?.takeIf { it in BREADCRUMB_TOOLS_NAMES }
+        val tool = str(args, offset)?.takeIf { it in BREADCRUMB_TOOLS_NAMES }
             ?: return refusal("bad-args", "unknown breadcrumb tool")
-        val json = str(args, 2) ?: return refusal("bad-args", "breadcrumb arguments required")
+        val json = str(args, offset + 1) ?: return refusal("bad-args", "breadcrumb arguments required")
         if (json.length > 4096) return refusal("bad-args", "breadcrumb arguments too large")
         val parsed = try { reifyStrict(json) as? Map<*, *> } catch (_: Exception) { null }
             ?: return refusal("bad-args", "breadcrumb arguments must be a JSON object")
         if (parsed.keys.any { it !is String } || parsed.values.any { it !is String && it !is Number })
             return refusal("bad-args", "breadcrumb arguments must be scalar")
         val contexts = muxContext[BreadcrumbElement] ?: return refusal("no-breadcrumbs")
-        val mux = modelMuxProvider() ?: return refusal("no-mux", "model plane not leased to this pen")
+        val mux = modelMuxProvider()
         return try {
             contexts.transact(session, create = false) { memory ->
-                val ceiling = memory.submission?.model?.let(mux::contextWindow)?.takeIf { it > 0 } ?: 2048
+                val ceiling = memory.submission?.model?.let { mux?.contextWindow(it) }?.takeIf { it > 0 } ?: 2048
                 val budget = BreadcrumbBudget(ceiling, currentTokens = memory.lastTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt())
                 val result = BreadcrumbToolDispatcher(memory, budget).dispatch(tool,
                     parsed.entries.associate { it.key.toString() to it.value.toString() })!!

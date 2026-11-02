@@ -10,6 +10,7 @@ object HermesModelProvider {
 
         PROVIDER = 'trikeshed'
         BASE_URL = 'https://modelmux.invalid/v1'
+        BREADCRUMB_ENABLED = False
 
         def _call(verb, *args):
             reply = json.loads(host.call(verb, *args))
@@ -220,6 +221,9 @@ object HermesModelProvider {
                                       base_url=BASE_URL, env_vars=(),
                                       supports_health_check=False, supports_model_listing=True)
             register_provider(profile)
+            if BREADCRUMB_ENABLED:
+                import trikeshed_breadcrumbs
+                trikeshed_breadcrumbs.register()
             return profile
     """.trimIndent()
 }
