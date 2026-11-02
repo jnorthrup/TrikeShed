@@ -35,6 +35,12 @@ private external fun pathRename(fd: Int, old: Int, oldLen: Int, newFd: Int, new:
 @WasmImport("wasi_snapshot_preview1", "environ_get") private external fun environGet(environ: Int, buf: Int): Int
 @WasmImport("wasi_snapshot_preview1", "args_sizes_get") private external fun argsSizesGet(count: Int, size: Int): Int
 @WasmImport("wasi_snapshot_preview1", "args_get") private external fun argsGet(argv: Int, buf: Int): Int
+@WasmImport("wasi_snapshot_preview1", "sock_accept") private external fun sockAccept(fd: Int, flags: Int, result: Int): Int
+@WasmImport("wasi_snapshot_preview1", "sock_recv")
+private external fun sockRecv(fd: Int, iovs: Int, count: Int, flags: Int, nread: Int, oflags: Int): Int
+@WasmImport("wasi_snapshot_preview1", "sock_send") private external fun sockSend(fd: Int, iovs: Int, count: Int, flags: Int, nsent: Int): Int
+@WasmImport("wasi_snapshot_preview1", "sock_shutdown") private external fun sockShutdown(fd: Int, how: Int): Int
+@WasmImport("wasi_snapshot_preview1", "poll_oneoff") private external fun pollOneoff(subs: Int, events: Int, n: Int, nevents: Int): Int
 
 /** A WASI filestat: filetype, size and modification time (ns). */
 class WasiStat(val filetype: Int, val size: Long, val mtimNanos: Long) {
@@ -49,27 +55,54 @@ class WasiStat(val filetype: Int, val size: Long, val mtimNanos: Long) {
 object Wasi {
     const val FILETYPE_DIRECTORY = 3
     const val FILETYPE_REGULAR = 4
+    const val FILETYPE_SOCKET_STREAM = 6
+    /** fdflags NONBLOCK: an accepted socket's recv and send answer -EAGAIN instead of waiting. */
+    private const val FDFLAGS_NONBLOCK = 4
     private const val CLOCK_REALTIME = 0
     private const val CLOCK_MONOTONIC = 1
     private const val EBADF_WASI = 8
+    /** poll_oneoff layout (preview 1): 48-byte subscriptions, 32-byte events, eventtype clock / fd_read / fd_write. */
+    private const val SUBSCRIPTION = 48
+    private const val EVENT = 32
+    private const val EVENTTYPE_CLOCK: Byte = 0
+    private const val EVENTTYPE_FD_READ: Byte = 1
+    private const val EVENTTYPE_FD_WRITE: Byte = 2
 
     private const val RIGHTS_READ = (1L shl 1) or (1L shl 2) or (1L shl 5) or (1L shl 7) or (1L shl 14) or (1L shl 21) or 1L or (1L shl 4)
     private const val RIGHTS_WRITE = RIGHTS_READ or (1L shl 6) or (1L shl 8) or (1L shl 22) or (1L shl 23)
     /** Directory rights a path_open may pass on: PATH_* and FD_READDIR, plus the file rights (bits 0..28, preview 1). */
     private const val RIGHTS_INHERITING = (1L shl 29) - 1
 
-    /** Preopened directories: (fd, name), in descriptor order. */
+    /**
+     * Preopened directories: (fd, name), in descriptor order. The scan walks the whole descriptor table (fd_fdstat_get
+     * until EBADF), since the host may put a listening socket (wasmtime -S tcplisten) before the directories.
+     */
     val preopens: List<Pair<Int, String>> by lazy {
         val found = ArrayList<Pair<Int, String>>()
         withScopedMemoryAllocator { a ->
             val stat = a.allocate(8)
+            val fdstat = a.allocate(24)
             var fd = 3
-            while (fdPrestatGet(fd, stat.i) == 0) {
-                if (stat.loadByte().toInt() == 0) {
+            while (fdFdstatGet(fd, fdstat.i) != EBADF_WASI) {
+                if (fdPrestatGet(fd, stat.i) == 0 && stat.loadByte().toInt() == 0) {
                     val len = (stat + 4).loadInt()
                     val name = a.allocate(len)
                     if (fdPrestatDirName(fd, name.i, len) == 0) found += fd to name.string(len).trimEnd('\u0000')
                 }
+                fd++
+            }
+        }
+        found
+    }
+
+    /** Listening stream sockets the host passed in (wasmtime -S tcplisten=ADDR), in descriptor order. */
+    val listeners: List<Int> by lazy {
+        val found = ArrayList<Int>()
+        withScopedMemoryAllocator { a ->
+            val fdstat = a.allocate(24)
+            var fd = 3
+            while (fdFdstatGet(fd, fdstat.i) != EBADF_WASI) {
+                if (fdstat.loadByte().toInt() == FILETYPE_SOCKET_STREAM) found += fd
                 fd++
             }
         }
@@ -215,6 +248,78 @@ object Wasi {
 
     fun realtimeNanos(): Long = clock(CLOCK_REALTIME)
     fun monotonicNanos(): Long = clock(CLOCK_MONOTONIC)
+
+    /** sock_accept on listener [fd]: the new socket, nonblocking, or -errno (-11 when none waits). */
+    fun accept(fd: Int): Int = withScopedMemoryAllocator { a ->
+        val out = a.allocate(4)
+        val errno = sockAccept(fd, FDFLAGS_NONBLOCK, out.i)
+        if (errno == 0) out.loadInt() else -linuxErrno(errno)
+    }
+
+    /** sock_recv into [dst][[at], [at] + [len]): bytes read, 0 at end of stream, or -errno (-11 when none are ready). */
+    fun recv(fd: Int, dst: ByteArray, at: Int, len: Int): Int = withScopedMemoryAllocator { a ->
+        val buf = a.allocate(maxOf(len, 1))
+        val iov = a.iov(buf, len)
+        val n = a.allocate(4)
+        val flags = a.allocate(4)
+        val errno = sockRecv(fd, iov.i, 1, 0, n.i, flags.i)
+        if (errno != 0) -linuxErrno(errno) else n.loadInt().also { buf.copyTo(dst, at, it) }
+    }
+
+    /** sock_send of [src][[at], [at] + [len]): bytes sent (fewer when the socket is full), or -errno. */
+    fun send(fd: Int, src: ByteArray, at: Int, len: Int): Int = withScopedMemoryAllocator { a ->
+        val buf = a.allocate(maxOf(len, 1))
+        buf.copyFrom(src, at, len)
+        val iov = a.iov(buf, len)
+        val n = a.allocate(4)
+        val errno = sockSend(fd, iov.i, 1, 0, n.i)
+        if (errno != 0) -linuxErrno(errno) else n.loadInt()
+    }
+
+    /** sock_shutdown of both directions. */
+    fun shutdown(fd: Int): Int = sockShutdown(fd, 3).let { if (it == 0) 0 else -linuxErrno(it) }
+
+    /**
+     * One poll_oneoff over the first [n] descriptors of [fds]: write readiness where [writes] is set, read readiness
+     * otherwise, and with [timeoutNanos] >= 0 a monotonic clock that ends the wait. The indices that are ready (an
+     * error or hang-up counts as ready) go to [ready]; returns their count, or -errno.
+     */
+    fun poll(fds: IntArray, writes: BooleanArray, n: Int, timeoutNanos: Long, ready: IntArray): Int =
+        withScopedMemoryAllocator { a ->
+            val subs = n + if (timeoutNanos >= 0) 1 else 0
+            if (subs == 0) return@withScopedMemoryAllocator 0
+            val s = a.allocate(SUBSCRIPTION * subs)
+            val events = a.allocate(EVENT * subs)
+            val count = a.allocate(4)
+            var i = 0
+            while (i < n) {
+                val p = s + SUBSCRIPTION * i
+                p.storeLong(i.toLong())
+                (p + 8).storeByte(if (writes[i]) EVENTTYPE_FD_WRITE else EVENTTYPE_FD_READ)
+                (p + 16).storeInt(fds[i])
+                i++
+            }
+            if (timeoutNanos >= 0) {
+                val p = s + SUBSCRIPTION * n
+                p.storeLong(-1L)
+                (p + 8).storeByte(EVENTTYPE_CLOCK)
+                (p + 16).storeInt(CLOCK_MONOTONIC)
+                (p + 24).storeLong(timeoutNanos)
+                (p + 32).storeLong(0L)
+                (p + 40).storeShort(0)
+            }
+            val errno = pollOneoff(s.i, events.i, subs, count.i)
+            if (errno != 0) return@withScopedMemoryAllocator -linuxErrno(errno)
+            var k = 0
+            var j = 0
+            val got = count.loadInt()
+            while (j < got) {
+                val index = (events + EVENT * j).loadLong()
+                if (index >= 0) ready[k++] = index.toInt()
+                j++
+            }
+            k
+        }
 
     fun random(bytes: ByteArray) {
         var at = 0
