@@ -55,6 +55,75 @@ class PrimaryProjectCorpusTest {
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, "UTF-8").replace("+", "%20")
+
+    @Test fun explicitPrimaryTextRetainsExactOwnedSnapshotAndRejectsStaleSelections(): Unit = runBlocking {
+        val root = directory.toFile()
+        PackCasStore(JvmFileOperations(), File(root, "pack-cas").absolutePath).use { cas ->
+            val rig = Rig(root, cas)
+            val primary = File(root, "primary").apply { mkdirs() }
+            val source = File(primary, "law + duty.md").apply { writeText("A 😀 duty.\r\n") }
+            val binding = rig.register(primary)
+            val corpus = rig.corpus(binding)
+            try {
+                val selected = assertNotNull(corpus.document(binding.name, source.name))
+                for (stale in s_[selected.copy(cid = ContentId.of("other".encodeToByteArray()).value),
+                    selected.copy(rev = "stale"), selected.copy(seq = selected.seq + 1), selected.copy(rev = "")].view)
+                    assertFailsWith<IllegalArgumentException> { corpus.retainPrimaryText(stale, cas) }
+                val retained = corpus.retainPrimaryText(selected, cas)
+                assertEquals(retained.project, retained.extraction)
+                assertEquals(selected.cid, retained.originalCid.value)
+                assertEquals(retained.originalCid, retained.extractedTextCid)
+                assertEquals("identity-utf8", retained.provenance["extractionKind"])
+                assertEquals("unreviewed", retained.provenance["reviewStatus"])
+                val wire = rig.wire(corpus)
+                val path = "/api/projects/${enc(binding.name)}/docs/${enc(source.name)}/retain-source"
+                suspend fun post(selection: Map<String, Any?>) = assertNotNull(wire.route("POST", path,
+                    "POST $path HTTP/1.1\r\n\r\n" + borg.trikeshed.parse.jsonOf(selection), null))
+                val response = post(selected.toMap())
+                assertEquals(200, response.status, response.body)
+                val receipt = json(response)
+                assertEquals("retained-source", receipt["action"])
+                assertEquals("unreviewed", receipt["reviewStatus"])
+                assertEquals(selected.cid, receipt["originalCid"])
+                assertEquals(receipt["project"], receipt["extraction"])
+                val receiptCid = ContentId(receipt["sourceCid"] as String)
+                assertNotNull(cas.getBounded(receiptCid, 65536))
+                assertEquals(409, post(selected.toMap() - "seq").status)
+                assertEquals(409, post(selected.toMap() + ("rev" to "stale")).status)
+                assertEquals("😀", retained.quotation(2, 4)["quote"])
+                assertFailsWith<IllegalArgumentException> { retained.quotation(2, 3) }
+                assertFailsWith<IllegalArgumentException> { retained.quotation(3, 4) }
+                source.writeText("replacement")
+                assertContentEquals(retained.text.encodeToByteArray(), cas.getBounded(retained.originalCid, 1024),
+                    "owned bytes survive changes to the original referenced path")
+                WorktreeCouchGateway(rig.files, rig.gateway, prefix = binding.prefix)
+                    .reconcile(primary.absolutePath, "fixture", "changed", 2)
+                assertFailsWith<IllegalArgumentException> { corpus.retainPrimaryText(selected, cas) }
+                assertEquals(409, post(selected.toMap()).status)
+                assertFalse(corpus.intakeEligible(binding.name))
+                assertNull(corpus.extract(binding.name, source.name, 100))
+            } finally { rig.scopes.drain() }
+        }
+    }
+
+    @Test fun explicitPrimaryTextRejectsInvalidUtf8AndOversize(): Unit = runBlocking {
+        val root = directory.toFile()
+        PackCasStore(JvmFileOperations(), File(root, "pack-cas").absolutePath).use { cas ->
+            val rig = Rig(root, cas)
+            val primary = File(root, "primary").apply { mkdirs() }
+            File(primary, "invalid.txt").writeBytes(_a[0xc3.toByte(), 0x28.toByte()])
+            File(primary, "large.md").writeBytes(ByteArray(4 * 1024 * 1024 + 1) { 65 })
+            File(primary, "binary.pdf").writeText("%PDF")
+            val binding = rig.register(primary)
+            val corpus = rig.corpus(binding)
+            try {
+                for (id in s_["invalid.txt", "large.md", "binary.pdf"].view) {
+                    val selected = assertNotNull(corpus.document(binding.name, id))
+                    assertFails { corpus.retainPrimaryText(selected, cas) }
+                }
+            } finally { rig.scopes.drain() }
+        }
+    }
     private suspend fun get(wire: PatchWire, path: String) = wire.route("GET", path, "GET $path HTTP/1.1\r\n\r\n", null)!!
     private fun json(response: borg.trikeshed.litebike.JvmKanbanServer.HttpResponse) = reify(response.body) as Map<*, *>
 

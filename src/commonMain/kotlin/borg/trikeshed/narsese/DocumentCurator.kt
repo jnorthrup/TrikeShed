@@ -35,6 +35,10 @@ data class DocumentSource(
     /** Exact UTF-16 quotation plus every retained layout span it intersects. */
     fun quotation(begin: Int, end: Int): Map<String, Any?> {
         require(begin >= 0 && end > begin && end <= text.length) { "Quotation outside extracted text" }
+        require(!(begin > 0 && text[begin].isLowSurrogate() && text[begin - 1].isHighSurrogate()) &&
+            !(end < text.length && text[end].isLowSurrogate() && text[end - 1].isHighSurrogate())) {
+            "Quotation cuts a UTF-16 surrogate pair"
+        }
         return mapOf("originalCid" to originalCid.value, "extractedTextCid" to extractedTextCid.value,
             "begin" to begin, "end" to end, "quote" to text.substring(begin, end),
             "anchors" to anchors.filter { it.begin < end && it.end > begin }.map(DocumentAnchor::toMap),
