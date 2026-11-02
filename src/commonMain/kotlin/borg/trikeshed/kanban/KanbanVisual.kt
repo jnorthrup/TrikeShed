@@ -22,8 +22,12 @@ fun KanbanBoard.toMermaidCausal(): String = buildString {
 
 private fun cardMermaidId(id: KanbanCardId): String = "card_${mermaidId(id.value)}"
 
-private fun mermaidId(raw: String): String = raw.map { ch ->
-    if (ch.isLetterOrDigit()) ch else '_'
-}.joinToString("").let { if (it.firstOrNull()?.isDigit() == true) "_$it" else it }
+private fun mermaidId(raw: String): String = buildString(raw.length + 1) {
+    if (raw.isNotEmpty() && raw[0].isDigit()) append('_')
+    for (i in 0 until raw.length) {
+        val ch = raw[i]
+        append(if (ch.isLetterOrDigit()) ch else '_')
+    }
+}
 
 private fun mermaidLabel(raw: String): String = raw.replace("\\", "\\\\").replace("\"", "\\\"")
