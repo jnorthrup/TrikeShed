@@ -51,7 +51,7 @@ requests and is not an unattended inference service. The default is
 From a matching source checkout, using JDK 25 and the project's Gradle wrapper:
 
 ```sh
-./gradlew graalPiZip graalPiTar
+./gradlew graalPiDist -PkotlinJsApps=pages -PgraalPiVersion=0.4.8-graal-pi-preview.1
 ```
 
 The archives are written under `build/distributions`. Unpack an archive into a
@@ -69,3 +69,24 @@ The archive includes the project AGPL license and notice and the Pi and TypeBox
 licenses. The corresponding full project source is available from the matching
 source revision of <https://github.com/jnorthrup/TrikeShed>; this archive's
 `source` directory provides the Pi-facing files, not the entire project source.
+
+## Self-editing demonstration
+
+The release evidence records the real packaged GraalJS Pi agent reading, editing
+and reading back its own `src/jvmMain/resources/pi-core/model-entry.ts`. Pi added
+`piRuntimeInfo()` and then versioned its JSON result and sorted the copied tool
+names. The host rebuilt the committed TypeScript with the pinned builder;
+restricted-GraalJS tests check the resulting production bundle before and after
+real Pi initialization. Editing source and executing that new source are
+separate steps.
+
+The demonstration used actual Sol 6.1 inference through a manually coordinated
+loopback collaboration relay. Its responses were not prerecorded fixtures. It
+was not an unattended remote API run, and provider token usage/billing was not
+reported. The relay is demonstration infrastructure and is not bundled as a
+model. Configure your own compatible API or local model endpoint to use Pi.
+
+The tested platform is Linux with GraalVM Java 25. The generated Windows launcher
+has not been tested; source tools require SecureDirectoryStream support and fail
+closed on unsupported filesystems. The standalone page serves Pi; the wider
+Forge installation supplies the other project applications.
