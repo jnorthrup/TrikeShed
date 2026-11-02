@@ -1,0 +1,88 @@
+KIF activation receipt / native bridge boundary
+2026-11-02
+
+Implemented slice
+KifTaxonomySnapshot.activationPlan(predicate, subject, object) consumes the existing
+bounded explain() result. It exports the same positive ground subclass/instance
+support, with alternative proof nodes pointing to ordered source premise nodes.
+No new entailment rule, index backend, Nix evaluation or host effect is introduced.
+Negative/quantified/unreviewed sources stay visible with their exclusions.
+SUPPORTED plus truncated=true is explicitly an incomplete support enumeration.
+UNKNOWN, UNSUPPORTED and BOUNDED survive unchanged; none imply refutation.
+
+Identity and immutable activation
+- assertionCid: existing canonical KIF syntax SHA-256, independent of source.
+- source nodeId: SHA-256 of source assertion ID, source CID/revision, review,
+  exact original text, assertionCid and exclusion. Equal formulas from two source
+  assertions keep independent support identities.
+- queryId: SHA-256 of policy, predicate and exact subject/object tokens.
+- proof nodeId: SHA-256 of queryId, ordered source node IDs and ordered rule IDs.
+- frameId: SHA-256 of revision, queryId, policy, all four search/admission limits,
+  all source node IDs, result status/truncation/steps and returned proof node IDs.
+  Source and proof records sort by stable IDs for export. Search traversal still
+  follows the existing snapshot algorithm; a bounded traversal can produce a
+  different receipt after source reordering, and therefore a different frame ID.
+  Changed source/review/bounds/revision requires a new immutable snapshot/frame.
+
+The frame is a receipt identity, not an upstream EvalState/Frame pointer or a
+proof of authentication. IDs are cryptographic content identities, not classifier
+preorder integers. Review metadata remains the trusted host curator's input.
+The plan does not maintain reverse dependencies or reactivate mutable thunks.
+
+Export v1
+KifActivationPlan.export() returns UTF-8 bytes. It is not MLIR assembly.
+Each field is ASCII decimal UTF-8 byte length, colon, then exactly that many
+bytes. There are no inter-field delimiters. Counts and booleans are themselves
+length-framed fields. All hashes use this same field encoding with domain tags.
+The exact field order is:
+  schema=kif-activation-plan/v1, queryId, frameId, revision, predicate, subject,
+  object, semantics, status, truncated, steps, maxAssertions, maxTotalChars,
+  maxSteps, maxProofs, sourceCount;
+  sourceCount records of: nodeId, assertionCid, source assertion ID, source CID,
+    source revision, review enum name, original text, hasExclusion, exclusion;
+  proofCount;
+  proofCount records of: nodeId, premiseCount, premise node IDs in order,
+    ruleCount, rule IDs in order.
+For absent exclusion, hasExclusion=false and exclusion is the empty string.
+Readers must retain exclusions/review, status and truncation, reject unknown
+schemas, and must not treat exported fields as host admission or native output.
+No untrusted import API is introduced by this slice.
+
+Pinned upstream source alignment
+https://github.com/jnorthrup/mlir-nix/tree/7edfaba88ce1d6a615d211b0e9d757c7cb7e83bb
+Read-only GitHub inspection confirmed these actual sources:
+- include/NixDialect/NixOps.td lines1-110: real TableGen Nix dialect, lazy values,
+  graph regions and per-(operation,activation frame) thunks. Cyclic SSA encodes
+  recursive bindings. Deferred lambda shells are not serializable/verifiable;
+  eager lowering is required for interchange.
+- include/Nix/Eval.h lines1-180: a Frame is an activation of a graph region;
+  values obtain frame-local thunk slots on demand.
+- include/mlnix-c/MlnixC.h: mlnixOpen/Close, mlnixRoundTrip, mlnixError, mlnixFree.
+  RoundTrip parses, verifies and prints text. No evaluation/force/proof API exists
+  in this header. RoundTrip cannot execute this receipt.
+
+Native next slice remains unimplemented
+A genuine generic KIF dialect needs registered TableGen/C++ types/operations,
+scope/category verification and parser/verifier roundtrip fixtures. A SUMO
+extension can then lower precisely the supported ground fragment into a typed
+proof/activation interface. KIF formulas must not be collapsed to Nix booleans;
+logical support, incomplete/unknown/conflicting results and host effects require
+separate contracts. An explicit C ABI evaluator/receipt interface would have to
+be added upstream before Kotlin can invoke it. Existing Nix thunk memoization
+does not implement KIF retraction or least-fixed-point inference.
+
+Validation boundary
+No mlir-opt, llvm-config, nix or local mlir-nix checkout was available. No native
+toolchain was installed and no registered KIF/SUMO dialect or native evaluation
+was claimed. Targeted Kotlin tests validate receipt provenance/dependencies,
+stable IDs versus revision/frame IDs, bounded results and UTF-8 framing; they do
+not validate MLIR parsing, native execution or complete SUMO inference.
+
+Executed validation: cached Kotlin2.4.21 compiler, JVM target25; recompiled
+KifSemantic, KifTaxonomySnapshot, KifActivationPlan and their three common test
+classes against frozen central JVM classes for unrelated dependencies. JUnit
+Platform1.14.4/Jupiter5.14.4 on GraalVM25 discovered and passed all12tests
+(four new activation-plan tests plus eight existing semantic/snapshot tests).
+This was targeted JUnit validation, not a Gradle or multiplatform build. Logs:
+/workspace/library-files/kif-bridge-proof/compile.log
+/workspace/library-files/kif-bridge-proof/tests.log
