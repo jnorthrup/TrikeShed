@@ -3,7 +3,7 @@ Forge / curation checkpoint — 2026-11-02
 Workspace: /workspace/TrikeShed, in the cloud environment.
 Origin: https://github.com/jnorthrup/TrikeShed.git.
 Branch: codex/forge-curation-pi-checkpoint-20261102. Pull request: #1065.
-Master 35886891f was integrated without conflicts. Subsequent fixes and evidence
+Master 488be32f1 was integrated without conflicts. Subsequent fixes and evidence
 were committed and pushed separately; continue that cadence for each slice.
 This checkpoint covers verified slices, not the full Forge acceptance goal.
 
@@ -22,6 +22,10 @@ Verification on the integrated branch:
   two fixture ModelMux replies, host-owned breadcrumb retrieval, final assistant
   and tool evidence retained after close and restored from file-backed storage.
   Browser/server exit zero. Hermes separate-tab navigation only; no Hermes turn.
+- v16: after the latest master sync, full main/test compilation and 76 focused
+  JVM checks passed across 10 suites with zero failures/errors/skips.
+- v17: Spacegraph, Documents and Pages Kotlin/JS compilation passed after that
+  sync. Logs: upstream-integration-tests-v16.log and upstream-js-check-v17.log.
 - v15: production Spacegraph browser proofs passed through real JVM routes for
   strict book review and visual SPARQL. Checked reviewer authentication, exact
   quotations, stale revisions, conditional release refusal, explicit datasets,
