@@ -191,6 +191,7 @@ dependencies {
     add(hermesPython.name, "python.wheels:pygments:2.21.0:py3-none-any@whl")
     add(hermesPython.name, "python.wheels:rich:14.3.3:py3-none-any@whl")
     add(hermesPython.name, "python.wheels:wcwidth:0.8.2:py3-none-any@whl")
+    add(hermesPython.name, "python.wheels:snowballstemmer:3.1.1:py3-none-any@whl")
 }
 val installHermesPython = tasks.register("installHermesPython") {
     group = "subvm"
@@ -200,6 +201,7 @@ val installHermesPython = tasks.register("installHermesPython") {
     outputs.dir(directory)
     doLast {
         val pins = mapOf(
+            "snowballstemmer-3.1.1-py3-none-any.whl" to "7e207fa178741da09cdee59d3ecec3827ad5f92b1fc5c9ff3755b639f71f5752",
             "ruamel.yaml-0.18.16-py3-none-any.whl" to "048f26d64245bae57a4f9ef6feb5b552a386830ef7a826f235ffb804c59efbba",
             "python_dotenv-1.2.2-py3-none-any.whl" to "1d8214789a24de455a8b8bd8ae6fe3c6b69a5e3d64aa8a8e5d68e694bbcb285a",
             "requests-2.33.0-py3-none-any.whl" to "3324635456fa185245e24865e810cecec7b4caf933d7eb133dcde67d48cee69b",
@@ -237,6 +239,7 @@ val installHermesPython = tasks.register("installHermesPython") {
                 "# declared\tpygments==2.21.0\n" +
                 "# declared\trich==14.3.3\n" +
                 "# declared\twcwidth==0.8.2\n" +
+                "# declared\tsnowballstemmer==3.1.1\n" +
                 "file\tsize\tsha256\n" + wheels.joinToString("") { "${it.name}\t${it.length()}\t${pins.getValue(it.name)}\n" },
         )
         logger.lifecycle("[subvm] hermes-python: ${wheels.sumOf { it.length() }} bytes -> ${lib.path}")

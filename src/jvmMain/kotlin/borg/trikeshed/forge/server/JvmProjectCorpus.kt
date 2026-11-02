@@ -50,6 +50,50 @@ class JvmProjectCorpus(
     },
     private val primary: PrimaryProjectBinding? = null,
 ) : ProjectCorpus {
+    /** Explicit TXT/MD admission names the reconciled store snapshot, never current disk bytes.
+     * Pack ownership is required: generic CasStore.put does not promise REF promotion. */
+    suspend fun retainPrimaryText(expected: ProjectDoc, snapshots: borg.trikeshed.job.PackCasStore): borg.trikeshed.narsese.DocumentSource =
+        withContext(Dispatchers.IO) {
+            val b = requireNotNull(backing(expected.project)) { "Primary project is unavailable" }
+            require(b.primary) { "Explicit primary text admission requires the bound primary" }
+            require(expected.cid.isNotBlank() && expected.rev.isNotBlank() && expected.seq >= 0) { "A complete source revision is required" }
+            require(expected.id.substringAfterLast('.', "").lowercase() in setOf("txt", "md")) { "Primary manual admission supports TXT and MD only" }
+            val original = requireNotNull(document(b, expected.id)) { "Primary source bytes are unavailable" }
+            fun matches(row: ProjectDoc?) = row != null && row.cid == expected.cid && row.rev == expected.rev && row.seq == expected.seq
+            require(matches(original)) { "Selected primary revision changed" }
+            val bytes = requireNotNull(bytes(expected.project, expected.id)) { "Primary source bytes are unavailable" }
+            require(bytes.size <= 4 * 1024 * 1024 && ContentId.of(bytes).value == expected.cid) { "Primary text identity or size mismatch" }
+            val text = bytes.decodeToString(throwOnInvalidSequence = true)
+            require(text.encodeToByteArray().contentEquals(bytes)) { "Primary text is not exact UTF-8" }
+            require(matches(document(b, expected.id))) { "Primary revision changed during admission" }
+            val cid = ContentId(expected.cid)
+            check(snapshots.put(bytes) == cid)
+            snapshots.sync()
+            check(snapshots.getBounded(cid, 4 * 1024 * 1024)?.contentEquals(bytes) == true) { "Owned primary snapshot readback failed" }
+            require(matches(document(b, expected.id))) { "Primary revision changed during retention" }
+            val revision = borg.trikeshed.narsese.DocumentRevision(expected.project, expected.id, expected.cid, expected.rev, expected.seq)
+            borg.trikeshed.narsese.DocumentSource(cid, cid, text, expected.id, original.contentType,
+                "${expected.project}/${expected.id}@${expected.rev}", category = "document",
+                provenance = mapOf("extractionKind" to "identity-utf8", "snapshotKind" to "reconciled-worktree", "reviewStatus" to "unreviewed"),
+                project = revision, extraction = revision)
+        }
+
+    suspend fun retainPrimaryTextReceipt(expected: ProjectDoc): Map<String, Any?> {
+        val b = requireNotNull(backing(expected.project)) { "Primary project is unavailable" }
+        val snapshots = b.reader as? borg.trikeshed.job.PackCasStore
+            ?: throw UnsupportedOperationException("Owned primary snapshot storage is unavailable")
+        val source = retainPrimaryText(expected, snapshots)
+        val receipt = borg.trikeshed.narsese.DocumentCuratorCodec.source(source) - "text"
+        val bytes = borg.trikeshed.job.CanonicalCbor.encodeMap(receipt)
+        val cid = snapshots.put(bytes)
+        snapshots.sync()
+        check(snapshots.getBounded(cid, bytes.size)?.contentEquals(bytes) == true)
+        require(document(expected.project, expected.id)?.let {
+            it.cid == expected.cid && it.rev == expected.rev && it.seq == expected.seq
+        } == true) { "Primary revision changed during receipt publication" }
+        return receipt + mapOf("sourceCid" to cid.value, "reviewStatus" to "unreviewed", "action" to "retained-source")
+    }
+
     /** Primary worktrees are read-only here; only mounted project databases support intake. */
     internal fun intakeEligible(project: String): Boolean = project != primary?.name && registry.get(project) != null
 
