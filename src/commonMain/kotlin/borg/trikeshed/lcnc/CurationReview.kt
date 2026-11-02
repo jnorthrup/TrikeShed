@@ -43,6 +43,21 @@ enum class CurationReviewAction(val wire: String) { DRAFT("draft"), APPROVE("app
 /** A host decision; graph inputs and review requests never select this policy. */
 enum class ConditionReviewPolicy { STRICT_BOOK, LEGACY }
 
+/** Host-issued read snapshot only: never a sink permit, release or admission. */
+class CurationReviewedRead internal constructor(
+    val candidate: CurationReviewCandidate,
+    val snapshotCid: ContentId,
+    val approvalCid: ContentId,
+    val decisionCid: ContentId,
+    val revision: Long,
+    val reviewer: String,
+    val synthetic: Boolean,
+    val assessmentCid: ContentId,
+    val assessment: ConditionAssessmentBatch,
+    val readCid: ContentId,
+    val asOf: Long,
+)
+
 private data class CurationReviewCall(val execute: suspend () -> Unit, val reject: (Throwable) -> Unit)
 
 /** The private WAL, not an editable board card or a supplied CID, establishes review authority. */
@@ -127,6 +142,42 @@ class CurationReview(
     }
 
     suspend fun inspect(snapshotCid: ContentId): Map<String, Any?> = submit { inspection(snapshotCid) }
+
+    /**
+     * Authenticated non-consuming STRICT_BOOK read. Re-resolves source/ontology and approval
+     * lineage under the actor; appends nothing and cannot authorize an executable sink.
+     */
+    suspend fun reviewedRead(snapshotCid: ContentId, expectedRevision: Long): CurationReviewedRead {
+        currentCoroutineContext()[ReviewPrincipal] ?: error("Authenticated reviewer required")
+        return submit {
+            val (candidate, head) = requireHead(snapshotCid, expectedRevision)
+            require(strict(candidate)) { "Reviewed taxonomy reads require STRICT_BOOK material" }
+            val decision = heads.getValue(candidate.family)
+            val action = string(head, "action")
+            require(action in setOf("approve", "release", "consume")) { "A current active approval lineage is required" }
+            val approval = if (action == "approve") decision else ContentId(string(head, "approvalCid"))
+            if (action == "release") require(head["previousCid"] == approval.value) { "Release approval lineage differs" }
+            if (action == "consume") {
+                val release = ContentId(string(head, "releaseCid"))
+                val event = events[release] ?: error("Release lineage is unavailable")
+                require(head["previousCid"] == release.value && event["action"] == "release" &&
+                    event["snapshotCid"] == snapshotCid.value && event["approvalCid"] == approval.value &&
+                    event["previousCid"] == approval.value) { "Consumed approval lineage differs" }
+            }
+            validate(candidate)
+            require(current(candidate)) { "Curation source or ontology is no longer current" }
+            val proof = strictAssessment(candidate, snapshotCid, approval, executable = true)
+            val issued = events.getValue(approval)
+            val readCid = ContentId.of(CanonicalCbor.encodeMap(mapOf(
+                "kind" to "curation-reviewed-read/1", "snapshotCid" to snapshotCid.value,
+                "approvalCid" to approval.value, "decisionCid" to decision.value,
+                "revision" to expectedRevision, "sourceRevision" to candidate.sourceRevision,
+                "curationReceiptCid" to candidate.curationReceiptCid.value,
+                "ontologyCid" to candidate.ontologyCid.value, "assessmentCid" to proof.cid.value)))
+            CurationReviewedRead(candidate, snapshotCid, approval, decision, expectedRevision,
+                string(issued, "reviewer"), issued["synthetic"] == true, proof.cid, proof.checked.batch, readCid, clock())
+        }
+    }
 
     /** A source correction withdraws old permission; it never supplies a replacement approval. */
     suspend fun invalidate(receiptCid: ContentId, reason: String = "Source correction"): Unit = submit {
