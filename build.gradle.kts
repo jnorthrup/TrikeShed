@@ -528,7 +528,16 @@ val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
     dependsOn(graalPiScripts)
     duplicatesStrategy = DuplicatesStrategy.FAIL
     into(layout.buildDirectory.dir("install/graal-pi"))
-    from(graalPiScripts) { into("bin") }
+    from(graalPiScripts) {
+        include("graal-pi")
+        into("bin")
+        filePermissions { unix("rwxr-xr-x") }
+    }
+    from(graalPiScripts) {
+        include("graal-pi.bat")
+        into("bin")
+        filePermissions { unix("rw-r--r--") }
+    }
     from(tasks.named("jvmJar"), graalPiPages, graalPiRuntime) { into("lib") }
     from("LICENSE", "NOTICE.md")
     from("release/graal-pi/README.md")
@@ -543,7 +552,12 @@ val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
 val graalPiZip = tasks.register<Zip>("graalPiZip") {
     group = "distribution"
     description = "Build a relocatable Graal Pi zip; validate it before publishing."
-    from(graalPiInstall) { into("graal-pi") }
+    from(graalPiInstall) { into("graal-pi"); exclude("bin/graal-pi") }
+    from(graalPiInstall) {
+        into("graal-pi")
+        include("bin/graal-pi")
+        filePermissions { unix("rwxr-xr-x") }
+    }
     archiveBaseName.set("graal-pi")
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     isPreserveFileTimestamps = false
@@ -553,7 +567,12 @@ val graalPiZip = tasks.register<Zip>("graalPiZip") {
 val graalPiTar = tasks.register<Tar>("graalPiTar") {
     group = "distribution"
     description = "Build a relocatable Graal Pi tar.gz; validate it before publishing."
-    from(graalPiInstall) { into("graal-pi") }
+    from(graalPiInstall) { into("graal-pi"); exclude("bin/graal-pi") }
+    from(graalPiInstall) {
+        into("graal-pi")
+        include("bin/graal-pi")
+        filePermissions { unix("rwxr-xr-x") }
+    }
     archiveBaseName.set("graal-pi")
     archiveExtension.set("tar.gz")
     compression = Compression.GZIP
