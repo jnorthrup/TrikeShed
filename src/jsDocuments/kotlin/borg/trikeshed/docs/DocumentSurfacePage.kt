@@ -60,6 +60,8 @@ object DocumentSurfacePage {
     /** Bumped on every navigation; a poll whose generation has moved on stops. */
     private var generation = 0
     private var passageView: String? = null
+    private var sourceRetention: SourceRetentionState? = null
+    private val retainingSources = mutableSetOf<DocRevision>()
 
     // ── curation state: reachable from the sidebar and #curation, independent of a project ──
     private var curationMode = false
@@ -125,9 +127,10 @@ object DocumentSurfacePage {
 
     private fun onClick(e: Event) {
         val target = (e.target as? Element)
-            ?.closest("[data-project],[data-doc],[data-source-project],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
+            ?.closest("[data-project],[data-doc],[data-source-project],[data-retain-source],[data-run-build],[data-run-rebuild],[data-view],[data-sort],[data-curate],[data-curate-open]")
             ?: return
         e.preventDefault()
+        if (target.hasAttribute("data-retain-source")) { MainScope().launch { retainSource() }; return }
         val p = target.getAttribute("data-project")
         val d = target.getAttribute("data-doc")
         val sourceProject = target.getAttribute("data-source-project")
@@ -208,6 +211,31 @@ object DocumentSurfacePage {
             curationResultError = err ?: if (curationResult == null) "That saved result could not be read." else null
         }
         render(keepLocation)
+    }
+
+    private suspend fun retainSource() {
+        val selected = doc?.let(DocumentSurface::retainableRevision) ?: return
+        if (!retainingSources.add(selected)) return
+        val ticket = generation
+        sourceRetention = SourceRetentionState(selected, true, "Retaining source…")
+        render(keepLocation = true)
+        val response = requestJson("/api/projects/" + encode(selected.project) + "/docs/" + encode(selected.id) + "/retain-source",
+            "POST", jsonOf(mapOf("cid" to selected.cid, "rev" to selected.rev, "seq" to selected.seq))) as? Map<*, *>
+        retainingSources.remove(selected)
+        if (ticket != generation || curationMode || doc?.let(DocumentSurface::retainableRevision) != selected) {
+            if (sourceRetention?.revision == selected && sourceRetention?.pending == true) sourceRetention = null
+            if (!curationMode && doc?.let(DocumentSurface::retainableRevision) == selected) render(keepLocation = true)
+            return
+        }
+        val cid = response?.get("sourceCid") as? String
+        val message = when {
+            response?.get("error") != null -> "Source could not be retained: ${response["error"]}"
+            response?.get("action") == "retained-source" && response["reviewStatus"] == "unreviewed" &&
+                cid != null && Regex("^sha256:[0-9a-f]{64}$").matches(cid) -> "Source retained for review; unreviewed. Receipt: $cid"
+            else -> "Source retention could not be verified."
+        }
+        sourceRetention = SourceRetentionState(selected, false, message)
+        render(keepLocation = true)
     }
 
     private suspend fun submitCuration() {
@@ -377,7 +405,11 @@ object DocumentSurfacePage {
         setHtml(
             DocumentSurface.CONTENT_ID,
             if (view == SurfaceView.TABLE) DocumentSurface.tableHtml(project, docs, column, ascending, doc?.id)
-            else (passageView ?: "") + (docError?.let(DocumentSurface::documentErrorHtml) ?: DocumentSurface.documentHtml(doc, runStates.toMap())),
+            else (passageView ?: "") + (docError?.let(DocumentSurface::documentErrorHtml) ?: DocumentSurface.documentHtml(doc, runStates.toMap(),
+                doc?.let(DocumentSurface::retainableRevision)?.let { selected ->
+                    if (selected in retainingSources) SourceRetentionState(selected, true, "Retaining source…")
+                    else sourceRetention?.takeIf { it.revision == selected }
+                })),
         )
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (doc?.let { "/" + encode(it.id) } ?: "")

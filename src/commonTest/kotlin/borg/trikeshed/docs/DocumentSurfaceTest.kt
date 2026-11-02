@@ -1,6 +1,7 @@
 package borg.trikeshed.docs
 
 import borg.trikeshed.parse.reify
+import borg.trikeshed.lib.*
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -10,6 +11,23 @@ import kotlin.test.assertTrue
 
 /** The page model: the routes' JSON in, escaped HTML with selection state out. */
 class DocumentSurfaceTest {
+    @Test fun sourceRetentionRequiresCapabilityAndExactRevisionAndEscapesFeedback() {
+        val cid = "sha256:" + "a".repeat(64)
+        val revision = DocRevision("primary", "law.md", cid, "1-source", 4)
+        val view = DocView("primary", "law.md", cid, "1-source", 4, "text/markdown", "# Duty",
+            sourceRevision = revision, canRetainSource = true)
+        assertEquals(revision, DocumentSurface.retainableRevision(view))
+        val pending = DocumentSurface.documentHtml(view, retention = SourceRetentionState(revision, true, "<pending>"))
+        assertTrue(pending.contains("Retain source for review"))
+        assertTrue(pending.contains("disabled aria-busy=\"true\""))
+        assertTrue(pending.contains("&lt;pending&gt;"))
+        val stale = DocumentSurface.documentHtml(view, retention = SourceRetentionState(revision.copy(seq = 3), true, "stale feedback"))
+        assertFalse(stale.contains("stale feedback"))
+        assertFalse(stale.contains("disabled"))
+        for (unavailable in s_[view.copy(canRetainSource = false), view.copy(sourceRevision = null),
+            view.copy(seq = 5), view.copy(id = "scan.pdf"), view.copy(sourceRevision = revision.copy(rev = ""))].view)
+            assertFalse(DocumentSurface.documentHtml(unavailable).contains("data-retain-source"))
+    }
 
     @Test
     fun fragmentSplitsEncodedProjectAndDocumentBeforeDecoding() {

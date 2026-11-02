@@ -1147,7 +1147,9 @@ class PatchWire(
                             linkedMapOf("project" to t.project, "id" to t.id, "cid" to t.cid, "rev" to t.rev, "seq" to t.seq)
                         json(linkedMapOf<String, Any?>("project" to name, "id" to id, "cid" to text.cid, "rev" to text.rev, "seq" to text.seq,
                             "contentType" to (listed?.contentType ?: "text/plain"), "length" to (listed?.length ?: text.text.length.toLong()), "text" to text.text,
-                            "sourceRevision" to listed?.toMap(), "displayTextRevision" to revision(text), "extractionRevision" to twin?.let(::revision))
+                            "sourceRevision" to listed?.toMap(), "displayTextRevision" to revision(text), "extractionRevision" to twin?.let(::revision),
+                            "canRetainSource" to (listed != null && listed.cid == text.cid && listed.rev == text.rev && listed.seq == text.seq &&
+                                (c as? JvmProjectCorpus)?.canRetainPrimaryText(listed) == true))
                             .also { m -> twin?.let { m["extract"] = it.text }; notes?.let { m["notes"] = it.text } })
                     }
                 }
