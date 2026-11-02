@@ -545,6 +545,7 @@ val graalPiZip = tasks.register<Zip>("graalPiZip") {
     description = "Build a relocatable Graal Pi zip; validate it before publishing."
     from(graalPiInstall) { into("graal-pi") }
     archiveBaseName.set("graal-pi")
+    archiveVersion.set(providers.gradleProperty("graalPiVersion").orElse(project.version.toString()))
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
     isPreserveFileTimestamps = false
     isReproducibleFileOrder = true
@@ -555,6 +556,7 @@ val graalPiTar = tasks.register<Tar>("graalPiTar") {
     description = "Build a relocatable Graal Pi tar.gz; validate it before publishing."
     from(graalPiInstall) { into("graal-pi") }
     archiveBaseName.set("graal-pi")
+    archiveVersion.set(providers.gradleProperty("graalPiVersion").orElse(project.version.toString()))
     archiveExtension.set("tar.gz")
     compression = Compression.GZIP
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
