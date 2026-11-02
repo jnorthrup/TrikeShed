@@ -74,7 +74,8 @@ object PiPage {
                 else -> ""
             }
             val error = strOrEmpty(message?.errorMessage)
-            if (text.isNotBlank() || error.isNotBlank()) append(role, text + if (error.isBlank()) "" else "\n" + error)
+            val label = if (role == "toolResult") "Tool · " + strOrEmpty(message?.toolName) + (if (message?.isError == true) " · refused" else " · result") else role
+            if (text.isNotBlank() || error.isNotBlank()) append(label, text + if (error.isBlank()) "" else "\n" + error)
         }
     }
     private fun poll(ticket: Int, id: String) {
@@ -83,6 +84,10 @@ object PiPage {
                 val value = request("/session/status?sessionId=" + js("encodeURIComponent")(id))
                 if (page.closing || ticket != revision || sessionId != id) return@submit
                 state = strOrEmpty(value.state).ifBlank { "unknown" }
+                if (js("Array").isArray(value.workspaceFiles) as Boolean && jsArray(value.workspaceFiles).isNotEmpty()) {
+                    byId("pi-project").hidden = false
+                    byId("pi-project").textContent = "Host source grant · " + jsArray(value.workspaceFiles).joinToString(", ") { str(it) }
+                }
                 showResult(value.result, strOrEmpty(value.turnId))
                 val detail = strOrEmpty(value.error?.detail)
                 status("Pi session · " + state + (if (detail.isBlank()) "" else " · " + detail))

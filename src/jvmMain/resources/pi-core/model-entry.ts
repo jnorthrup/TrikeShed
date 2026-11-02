@@ -114,7 +114,7 @@ globalThis.piInit = function(modelId, definitionsJson) {
   const tools = JSON.parse(definitionsJson).map(definition => ({
     ...definition, label: definition.name, executionMode: 'sequential',
     execute: async (_id, args) => {
-      const reply = crossing('pi_breadcrumb', definition.name, JSON.stringify(args));
+      const reply = crossing(['read', 'edit'].includes(definition.name) ? 'pi_workspace' : 'pi_breadcrumb', definition.name, JSON.stringify(args));
       const body = JSON.parse(reply.content);
       return { content: [{ type: 'text', text: reply.content }], details: {}, isError: !!body.error };
     },
