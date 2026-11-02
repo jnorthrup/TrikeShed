@@ -7,7 +7,12 @@ asserts world facts, grants a sink permit or spends a review release.
 /horn-input remains NOT_EXECUTED preparation. /horn-query defaults to
 UNAVAILABLE because DocumentReviewWire.open has no native capability unless
 trusted bootstrap code supplies NativeHornQuery(NativeHornProfile(...)).
-No daemon environment/UI configuration loader is added in this slice.
+NativeHornProfile.parse(text) is a pure strict16KiB operator-JSON factory.
+Its exact required fields are binary, binarySha256, adapter, datalogDirectory;
+optional timeoutMillis is integral1..45000. Relative paths, duplicate/unknown
+fields and environment/argv/code fields refuse. It reads no ambient environment.
+Trusted daemon bootstrap owns TRIKESHED_NATIVE_HORN_PROFILE selection and bounded
+FileOperations config read; that wiring is supplied separately from this slice.
 
 The trusted constructor supplies a canonical native executable and its SHA256,
 canonical run.nix and datalog directory, curated process environment and a
@@ -24,7 +29,14 @@ and immutable profile files. Their complete dependency authenticity, memory
 limits and network/OS isolation are not established by this runner.
 
 The host generates reviewed observation JSON, caps actual encoded input at4MiB,
-checks inputCID, and writes it in an exclusive host-created temporary directory.
+checks inputCID, and writes it in a host-created temporary directory. All
+filesystem I/O uses the explicitly installed FileOperations capability and
+fileIoContext; missing capability refuses. Profiles contain only normalized
+absolute path values until FileOperations canonical resolution during execution.
+Before reads, open/size/close rejects oversized trusted files (binary256MiB,
+adapter16KiB, datalog1MiB, input4MiB). Pre/post hashes and canonical path equality
+are checked. Size-check/read is not atomic against a hostile filesystem writer;
+operator-owned immutable SDK/profile paths remain required.
 It directly invokes the fixed native instantiate CLI with --argstr path values;
 there is no POSIX shell, request expression interpolation, client-selected path,
 command, profile, timeout or import. Actual pinned mlnix --argstr support was

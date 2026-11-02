@@ -6,6 +6,7 @@ import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.*
 import borg.trikeshed.ontology.CorpusOntology
 import kotlinx.coroutines.*
+import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import java.lang.System
 import java.nio.file.Path
 import kotlin.test.*
@@ -68,7 +69,7 @@ class NativeHornQueryTest {
         _m["LD_LIBRARY_PATH" j System.getProperty("trikeshed.native.libraryPath"),
             "NIX_REMOTE" j "dummy://"])
 
-    @Test fun realNativeReviewQueryAndNoProofKeepWorldUnknown(): Unit = runBlocking {
+    @Test fun realNativeReviewQueryAndNoProofKeepWorldUnknown(): Unit = runBlocking(JvmFileOperations()) {
         val f = Fixture(); f.review.open(this)
         try {
             val approved = f.approve()
@@ -94,9 +95,9 @@ class NativeHornQueryTest {
             }
         } finally { f.review.drain() }
     }
-    @Test fun incorrectExecutablePinRefusesExecution(): Unit = runBlocking {
+    @Test fun incorrectExecutablePinRefusesExecution(): Unit = runBlocking(JvmFileOperations()) {
         val good = profile()
         val bad = NativeHornProfile(good.binary, "0".repeat(64), good.adapter, good.datalogDirectory, good.environment)
-        assertFailsWith<IllegalArgumentException> { bad.check() }
+        assertFailsWith<IllegalArgumentException> { bad.check(checkNotNull(coroutineContext[borg.trikeshed.userspace.nio.file.spi.FileOperations])) }
     }
 }
