@@ -69,7 +69,10 @@ declared positive fragment, not refutation or a verdict on excluded formulas.
 Upstream retains ONLY THE FIRST derivation per fact, without substitutions or
 all alternative rule supports. Source alternatives for identical asserted facts
 are preserved by our sidecar; they do not turn upstream's proof into an exhaustive
-proof DAG. A fresh input frame recomputes after retraction; no mutable thunk
+proof DAG. Asserted leaves explicitly carry witnessMode=any-one-asserted-source:
+their source records are alternative witnesses, not joint premises or independent
+votes. Derived from nodes are joint rule premises; the returned derived proof
+still covers only the first derivation, not every rule/path. A fresh input frame recomputes after retraction; no mutable thunk
 invalidation or NAL evidence update is promised. ontology=null avoids implicit
 class ancestry whose support steps upstream omits from its proof. All logical
 class propagation must be explicit input rules/facts for this first bridge.
@@ -111,8 +114,22 @@ Artifacts/logs: /workspace/library-files/sumo-bridge-proof.
 Seven real Kotlin-exported fixtures, including authenticated retained-review
 exports with exact source spans and no WAL writes, are under:
 /workspace/library-files/sumo-nix-proof/source/bridge-fixtures.
-Native MLIR parse/verify/lowering has not been executed locally; source matching
-and string tests must not be reported as native dialect verification.
+Actual native validation subsequently built unmodified mlir-nix revision 1547e4a
+with the official LLVM/MLIR 22.1.8 SDK and GCC 14. All eight Kotlin-generated
+MLIR exports passed registered-dialect parsing, sumo-to-kif and kif-to-nix
+lowering and mlnix run-mlir evaluation, with facts/rules exactly matching the
+JSON sidecars. This includes non-BMP text, escaped quotes/backslashes and a quoted
+?notVariable scalar. Both upstream KIF positive/negative fixtures passed.
+The full upstream MLIR suite passed 21 cases with zero failures and four explicit
+LLVM-version feature skips. No upstream source patch was used.
+
+The native mlnix evaluator also executed the adapter on seven original JSON
+exports and on seven native run-mlir facts/rules results rejoined with unchanged
+sidecars/queries. All fourteen complete solver outputs exactly matched official
+Nix 2.35.4 execution. These are separate checks of registered MLIR interchange
+and actual Horn reasoning, not a Kotlin replacement solver.
+Native evidence: /workspace/library-files/mlnix-native-validation/native-fixture-results.json
+                 /workspace/library-files/mlnix-native-validation/native-solver-results.json
 
 Actual Nix 2.35.4 execution of all seven exported fixtures passed: the OpenSSL
 scenario derives its nginx policy violation and leaves hello UNKNOWN; duplicate
