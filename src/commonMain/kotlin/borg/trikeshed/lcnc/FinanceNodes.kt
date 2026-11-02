@@ -43,7 +43,7 @@ object FinanceNodes {
             "text/tab-separated-values" -> "TSV"
             else -> throw IllegalArgumentException("declared CSV/TSV source required")
         }
-        val bytes = requireNotNull(corpus.bytes(doc.project, doc.id)) { "original source bytes unavailable" }
+        val bytes = requireNotNull(corpus.bytes(doc.project, doc.id)) { "original source bytes unavailable" }.copyOf()
         require(bytes.size <= MAX_BYTES && bytes.size.toLong() == doc.length) { "source byte length mismatch or limit" }
         require(ContentId.of(bytes).value == doc.cid) { "source bytes do not match CID" }
         val text = bytes.decodeToString(throwOnInvalidSequence = true)
