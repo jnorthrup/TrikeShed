@@ -66,7 +66,7 @@ object ReviewedHornPlan {
             assertion("${selection.id}:reviewSelection", occurrenceCid, "(reviewSelection $record $selected)")
             fact("selectionKind", token("selection-kind", selection.kind))
             fact("selectionMappingStatus", unmapped)
-            for (field in s_["subject", "predicate", "object", "modality", "polarity", "condition"].view)
+            for (field in s_["subject", "predicate", "object", "modality", "polarity", "condition", "ontologyMapping"].view)
                 fact("selection" + field.replaceFirstChar { it.uppercase() }, token(field, selection.value[field]))
         }
         val rules = s_[
