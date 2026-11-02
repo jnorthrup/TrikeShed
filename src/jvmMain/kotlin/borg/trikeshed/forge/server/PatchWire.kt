@@ -1090,6 +1090,26 @@ class PatchWire(
                 json(mapOf("verdict" to "ok", "cid" to cid.value, "previousCid" to currentCid, "violations" to (entry?.get("violations") ?: emptyList<Any?>())))
             }
 
+            method == "POST" && p.startsWith("/api/projects/") &&
+                p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("docs/") && p.endsWith("/retain-source") -> {
+                val c = corpus as? JvmProjectCorpus ?: return json(mapOf("error" to "primary corpus not wired"), 503)
+                try {
+                    val rest = p.removePrefix("/api/projects/")
+                    fun segment(value: String) = java.net.URLDecoder.decode(value.replace("+", "%2B"), "UTF-8")
+                    val name = segment(rest.substringBefore('/'))
+                    val id = segment(rest.substringAfter('/').removePrefix("docs/").removeSuffix("/retain-source"))
+                    val body = borg.trikeshed.parse.reifyStrict(rawBody(text)) as? Map<*, *>
+                        ?: return json(mapOf("error" to "source revision required"), 400)
+                    require(body["cid"] is String && body["rev"] is String && body["seq"] is Number) { "Complete source revision required" }
+                    val revision = borg.trikeshed.narsese.DocumentRevision.fromMap(body + mapOf("project" to name, "id" to id))
+                        ?: return json(mapOf("error" to "source revision required"), 400)
+                    val selected = borg.trikeshed.lcnc.ProjectDoc(name, id, revision.cid, revision.rev, revision.seq, 0, "text/plain")
+                    json(c.retainPrimaryTextReceipt(selected))
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (failure: UnsupportedOperationException) { json(mapOf("error" to failure.message), 503) }
+                catch (failure: Exception) { json(mapOf("error" to (failure.message ?: "source retention failed")), 409) }
+            }
+
             // The document surface's reads: a project's document listing (prefix, glob, limit as query
             // params) and one document's text with its identity, plus the miner's .extract.md twin.
             method == "GET" && p.startsWith("/api/projects/") && (p.removePrefix("/api/projects/").substringAfter('/', "") == "docs" || p.removePrefix("/api/projects/").substringAfter('/', "").startsWith("docs/")) -> {
