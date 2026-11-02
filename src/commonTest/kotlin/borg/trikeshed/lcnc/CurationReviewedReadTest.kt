@@ -71,6 +71,16 @@ class CurationReviewedReadTest {
                 assertEquals(f.text, first.candidate.selections[0].quotation.quote)
                 assertEquals("unconditional", first.assessment.assessments.single().state.name.lowercase())
                 assertEquals(true, first.synthetic)
+                val horn = ReviewedHornPlan.report(f.review, f.cas, snapshot, f.revision(state), "needsMapping")
+                assertEquals("NOT_EXECUTED", horn["status"])
+                assertEquals("review-record-observations", horn["scope"])
+                assertEquals("UNKNOWN", horn["worldObligationApplicability"])
+                assertTrue((horn["mlir"] as String).contains("selectionMappingStatus"))
+                val input = borg.trikeshed.parse.reifyMap(horn["inputJson"] as String)
+                val facts = input["facts"] as List<*>
+                assertFalse(facts.any { (it as List<*>).first() == "subclass" }, "Norm content is never asserted as world taxonomy")
+                assertTrue(facts.any { (it as List<*>).first() == "selectionModality" })
+                assertEquals(before, f.log.frames.size, "Export must not consume or append review authority")
             }
             read(approved)
             val released = f.review.release(snapshot, approval, f.revision(approved))
