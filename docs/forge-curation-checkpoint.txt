@@ -40,9 +40,12 @@ and retained evidence verified. Artifacts: pi-loopback-proof/run-v13-GlWmNs.
 The v12 test run was stopped after two child-discovery assertions missed long
 Java command lines and a blocking Pi test starved its generation's event loop.
 Test-only exact-PID assertions, IO dispatch and explicit fixture-provider fixes
-were pushed in 1d50684ab. The integrated v13 suite is running, including upstream
-CRC32C and Couch recovery checks. Also pending: real document review route and
-visual SPARQL browser proofs.
+were pushed in 1d50684ab. The integrated v13 suite passed: 182 tests across 27
+suites, zero failures/errors/skips, including all 12 Pi runtime/route tests,
+upstream CRC32C and Couch recovery, JS/Python lifecycle, parser-profile safety,
+legal review, visual-query lowering and NARS experiment receipts. Cloud log:
+coordinated-slice-tests-v13.log; XML results archived before subsequent runs.
+Also pending: real document review route and visual SPARQL browser proofs.
 
 Limits: Pi integrates agent-core, not the Node coding CLI/extensions. It uses
 buffered completions and explicit breadcrumb tools, without automatic context
