@@ -87,6 +87,8 @@ class HermesPen(
     /** When supplied, the immutable generation owns and drains model and breadcrumb crossings. */
     private val breadcrumbGeneration: BreadcrumbGeneration? = null,
     val breadcrumbWallMillis: Long = BREADCRUMB_WALL_MILLIS,
+    breadcrumbSessionEnabled: Boolean = true,
+    private val receiptSequence: AtomicLong = AtomicLong(),
 ) {
     companion object {
         const val MODEL_WALL_MILLIS = 300_000L
@@ -95,9 +97,8 @@ class HermesPen(
 
     init { require(breadcrumbWallMillis in 1..BREADCRUMB_WALL_MILLIS) }
 
-    private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
-    private val breadcrumbBinding = breadcrumbGeneration?.session ?: breadcrumbSession()
+    private val breadcrumbBinding = if (breadcrumbSessionEnabled) breadcrumbGeneration?.session ?: breadcrumbSession() else null
 
     fun install(guest: GuestIsolate, sockets: PythonSocketProvider? = null) {
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
@@ -125,7 +126,7 @@ class HermesPen(
     // ── the double landing: blackboard fact + tool-use belief ─────────
 
     private fun receipted(verb: String, args: List<Teleported>, body: (String?) -> Join<Boolean, Map<String, Any?>>): Teleported {
-        val n = seq.incrementAndGet()
+        val n = receiptSequence.incrementAndGet()
         val cause = contextId()
         // Carry the verdict with the payload; a returned refusal is not a successful effect.
         val outcome = try {

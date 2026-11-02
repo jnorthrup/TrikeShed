@@ -394,8 +394,10 @@ class HermesVmConsoleTest {
 
     @Test
     fun providerRegistrationFailureClosesTheImportedVmAndCanRetry() {
+        val ports = mutableListOf<HermesPythonPort>()
         HermesVmConsole(Path.of("unused"), Path.of("unused")).use { console ->
             console.inventoryLoader = { port ->
+                ports.add(port)
                 port.inventorySources(mapOf(
                     "hermes_cli" to ("hermes_cli/__init__.py" to ""),
                     "hermes_cli.main" to ("hermes_cli/main.py" to ""),
@@ -405,15 +407,16 @@ class HermesVmConsoleTest {
             }
             assertEquals(HermesVmConsole.State.FAILED, console.open())
             assertTrue(console.detail.contains("registry unavailable"))
-            val field = HermesVmConsole::class.java.getDeclaredField("port").apply { isAccessible = true }
-            val port = field.get(console) as HermesPythonPort
+            val port = ports.single()
             assertFalse(port.vmStarted, "entry import success must not retain a VM after registration fails")
-            console.inventoryLoader = { p -> p.inventorySources(mapOf(
+            console.inventoryLoader = { p -> ports.add(p); p.inventorySources(mapOf(
                 "hermes_cli" to ("hermes_cli/__init__.py" to ""),
                 "hermes_cli.main" to ("hermes_cli/main.py" to ""),
             )) }
             assertEquals(HermesVmConsole.State.READY, console.open())
-            assertTrue(port.vmStarted)
+            assertFalse(port.vmStarted, "retry must not reopen the failed generation")
+            assertTrue(ports.last().vmStarted)
+            assertTrue(ports.last() !== port)
         }
     }
 
