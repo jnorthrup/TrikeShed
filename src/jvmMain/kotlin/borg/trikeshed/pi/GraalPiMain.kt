@@ -16,10 +16,25 @@ import kotlinx.coroutines.*
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.URI
+import java.net.URISyntaxException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+
+/** Validate the initial unauthenticated endpoint; a local relay can still forward requests elsewhere. */
+internal fun noAuthLoopbackBaseUrl(value: String?): String {
+    val url = requireNotNull(value?.takeIf { it.isNotBlank() }) { "PI_AUTH=none requires an explicit loopback PI_BASE_URL" }
+    val uri = try { URI(url) } catch (failure: URISyntaxException) {
+        throw IllegalArgumentException("PI_AUTH=none requires a numeric loopback HTTP(S) base URL", failure)
+    }
+    val authority = uri.rawAuthority.orEmpty()
+    val match = Regex("^(?:127\\.0\\.0\\.1|\\[::1\\])(?::([0-9]{1,5}))?$").matchEntire(authority)
+    require(uri.scheme?.lowercase() in _s["http", "https"] && match != null &&
+        uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
+        (uri.port == -1 || uri.port in 1..65535)) { "PI_AUTH=none requires a numeric loopback HTTP(S) base URL" }
+    return url
+}
 
 /** Standalone loopback host for the production Pi page, wire, ModelMux and restricted Graal child. */
 object GraalPiMain {
@@ -72,14 +87,7 @@ object GraalPiMain {
         require(tokenHash.matches(Regex("[0-9a-f]{64}"))) { "PI_ACCESS_TOKEN_SHA256 must be lowercase SHA-256 hex" }
         val configuredBase = System.getenv("PI_BASE_URL")?.takeIf { it.isNotBlank() }
         val baseUrl = if (auth == LlmAuth.NONE) {
-            val value = requireNotNull(configuredBase) { "PI_AUTH=none requires an explicit loopback PI_BASE_URL" }
-            val uri = URI(value)
-            val authority = uri.rawAuthority.orEmpty()
-            val match = Regex("^(?:127\\.0\\.0\\.1|\\[::1\\])(?::([0-9]{1,5}))?$").matchEntire(authority)
-            require(uri.scheme?.lowercase() in _s["http", "https"] && match != null &&
-                uri.rawUserInfo == null && uri.rawQuery == null && uri.rawFragment == null &&
-                (uri.port == -1 || uri.port in 1..65535)) { "PI_AUTH=none requires a numeric loopback HTTP(S) base URL" }
-            value
+            noAuthLoopbackBaseUrl(configuredBase)
         } else {
             require(!System.getenv("OPENAI_API_KEY").isNullOrBlank()) { "OPENAI_API_KEY is required" }
             configuredBase ?: "https://api.openai.com/v1"

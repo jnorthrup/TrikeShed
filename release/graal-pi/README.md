@@ -36,6 +36,8 @@ Changes to a source copy do not automatically rebuild or replace the bundle
 embedded in the running JVM. The page uses the configured token and requires a
 working model/provider to run a turn. Network access to a remote provider is
 not airgapped; a locally hosted provider must be configured separately.
+This standalone host keeps session transcripts and breadcrumbs in memory; it
+does not configure persistent breadcrumb storage. They are lost on restart.
 
 For a local development relay, set `PI_AUTH=none` and an explicit `PI_BASE_URL`
 whose host is the numeric loopback address `127.0.0.1` or `[::1]`. This opts
@@ -58,6 +60,8 @@ allowed edit before publishing it. The curated runtime classpath is separate
 from the full daemon classpath and must be tested as an installed package. The
 JVM and generated browser bundles are built from the checkout; the pinned Pi
 bundle, its SHA-256 and upstream/bundling details are in `source/pi-core`.
+The Pi bundle builder is included under `source/tools/pi-core` for inspection;
+it runs from a matching full project checkout, not from the unpacked archive.
 Rebuilding that pinned bundle also requires the upstream source and build inputs
 identified in its manifest and notice; they are not all included here.
 

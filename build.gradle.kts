@@ -533,6 +533,7 @@ val graalPiInstall = tasks.register<Sync>("graalPiInstall") {
     from("LICENSE", "NOTICE.md")
     from("release/graal-pi/README.md")
     from("src/jvmMain/resources/pi-core") { into("source/pi-core") }
+    from("tools/pi-core") { into("source/tools/pi-core") }
     from("src/jvmMain/kotlin/borg/trikeshed/pi") { into("source/host/pi") }
     from("src/jvmMain/kotlin/borg/trikeshed/forge/server/PiWire.kt") { into("source/host/forge/server") }
     from("src/commonMain/resources/web/pi.html") { into("source/web") }
