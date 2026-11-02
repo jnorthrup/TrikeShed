@@ -29,6 +29,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import borg.trikeshed.agent.modelmux.*
 import borg.trikeshed.agent.modelmux.acp.*
 import java.io.File
@@ -85,10 +86,14 @@ class HermesPen(
     breadcrumbSession: () -> String? = { null },
     /** When supplied, the immutable generation owns and drains model and breadcrumb crossings. */
     private val breadcrumbGeneration: BreadcrumbGeneration? = null,
+    val breadcrumbWallMillis: Long = BREADCRUMB_WALL_MILLIS,
 ) {
     companion object {
         const val MODEL_WALL_MILLIS = 300_000L
+        const val BREADCRUMB_WALL_MILLIS = 30_000L
     }
+
+    init { require(breadcrumbWallMillis in 1..BREADCRUMB_WALL_MILLIS) }
 
     private val seq = AtomicLong()
     private val evaluator = ContentId.of("hermes-pen".encodeToByteArray())
@@ -98,7 +103,18 @@ class HermesPen(
         guest.delegate("mux_catalog") { args -> receipted("mux_catalog", args) { runBlocking(muxContext) { muxCatalog(args) } } }
         guest.delegate("mux_converse", MODEL_WALL_MILLIS) { args -> receipted("mux_converse", args) { cause -> runBlocking(muxContext) { admitted { muxConverse(args, cause) } } } }
         guest.delegate("mux_completion", MODEL_WALL_MILLIS) { args -> receipted("mux_completion", args) { cause -> runBlocking(muxContext) { admitted { muxCompletion(args, cause) } } } }
-        guest.delegate("mux_breadcrumb") { args -> receipted("mux_breadcrumb", args) { runBlocking(muxContext) { admitted { muxBreadcrumb(args) } } } }
+        guest.delegate("mux_breadcrumb", breadcrumbWallMillis) { args ->
+            receipted("mux_breadcrumb", args) {
+                runBlocking(muxContext) {
+                    withTimeout(breadcrumbWallMillis) {
+                        admitted {
+                            withTimeoutOrNull(breadcrumbWallMillis) { muxBreadcrumb(args) }
+                                ?: refusal("deadline-exceeded", "breadcrumb host deadline elapsed")
+                        }
+                    }
+                }
+            }
+        }
         guest.delegate("bag_recall") { args -> receipted("bag_recall", args) { bagRecall(args) } }
         guest.delegate("bag_assert") { args -> receipted("bag_assert", args) { bagAssert(args) } }
         guest.delegate("crumb_walk") { args -> receipted("crumb_walk", args) { crumbWalk(args) } }
@@ -183,6 +199,9 @@ class HermesPen(
     } ?: operation()
 
     private fun boundBreadcrumbSession(): String? = breadcrumbBinding
+
+    /** Only generation-owned tools may advertise the inline, host-deadline transport. */
+    val breadcrumbToolsBounded: Boolean get() = breadcrumbGeneration != null && breadcrumbToolsEnabled
 
     /** Inventory may advertise local memory tools without exposing the host session identity. */
     val breadcrumbToolsEnabled: Boolean get() = boundBreadcrumbSession()?.let { it.isNotBlank() && it.length <= 128 } == true &&
