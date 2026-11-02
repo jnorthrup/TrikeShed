@@ -28,6 +28,7 @@ class PresetAssemblyTest {
                 LcncShakeDemo.NAME,
                 "preset-sql-quad",
                 "preset-sparql-quad",
+                "preset-finance-reconcile", "preset-kif-structure",
                 "preset-hermes", "preset-tribunal", "preset-curator",
                 "preset-tribunal-case", "preset-legal-tribunal-case",
                 "preset-tribunal-case-v2", "preset-legal-tribunal-case-v2",

@@ -36,5 +36,5 @@ private const val LOWER_HEX = "0123456789abcdef"
 private const val SHA256_PREFIX = "sha256:"
 private const val SHA256_TEXT_LENGTH = 71
 
-/** KMP-safe SHA-256. Uses java.security on JVM, falls back to a simple hash on other targets. */
+/** SHA-256: java.security on JVM, Sha256Pure on JS, Native and Wasm. */
 expect fun sha256(bytes: ByteArray): ByteArray
