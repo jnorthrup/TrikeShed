@@ -7,7 +7,9 @@ uses real browser gestures and the fixture's real /sparql/visual JVM route.
 """
 
 import json
+import os
 import sys
+import tempfile
 import time
 import traceback
 import urllib.parse
@@ -107,9 +109,19 @@ def run(url):
 
             dataset.select_option("quad-store+rete")
             sql.get_by_label("Projected proposal-fact variable").fill("?subject")
-            button.click()
+            with page.expect_response(lambda response: response.url.endswith("/sparql/visual") and response.request.method == "POST", timeout=30000) as candidate_response:
+                button.click()
+            candidate_status = candidate_response.value.status
+            candidate_body = candidate_response.value.text()
             links = result.locator('a[href^="/documents#curation/"]')
-            links.first.wait_for(timeout=30000)
+            try:
+                links.first.wait_for(timeout=30000)
+            except Exception as failure:
+                screenshot = os.path.join(tempfile.gettempdir(), "visual-sparql-browser-failure.png")
+                page.screenshot(path=screenshot, timeout=5000)
+                raise AssertionError("Reported reference links did not appear. Output:\n" + result.inner_text() +
+                                     "\nResponse status: " + str(candidate_status) + "\nResponse body:\n" + candidate_body +
+                                     "\nBrowser errors: " + repr(failures) + "\nScreenshot: " + screenshot) from failure
             assert links.count() == 2, "both conflicting reported CIDs must remain visible"
             assert {link.get_attribute("href") for link in links.all()} == {
                 "/documents#curation/sha256%3A" + "a" * 64,
