@@ -12,7 +12,8 @@ const web = path.resolve('src/commonMain/resources/web');
 const bundle = process.env.DOCUMENTS_BUNDLE;
 if (!bundle || !fs.existsSync(bundle)) throw Error('Set DOCUMENTS_BUNDLE to a freshly built documents.js');
 const sha = value => 'sha256:' + crypto.createHash('sha256').update(value).digest('hex');
-const project = 'dept/research & review';
+// A primary repository may keep spaces, + and & in its lowercased directory name.
+const project = 'docs and law+&';
 const documentId = "contracts/buyer's.pdf";
 const otherId = 'other.txt';
 const receiptCid = sha('synthetic retained curation receipt');
@@ -137,6 +138,49 @@ server.listen(0, '127.0.0.1', async () => {
     assert.equal(await selection.locator('b').count(), 0, 'quotation markup must remain text');
     assert((await selection.textContent()).includes('Between.'), 'the retained offsets select the second duplicate occurrence');
 
+    // Leaving a passage clears only its parameters; reload and browser history must not replay it.
+    await page.evaluate(() => {
+      const url = new URL(location.href); url.searchParams.set('keep', 'unrelated & value');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    });
+    await page.locator('[data-doc="other.txt"]').first().click();
+    await page.getByRole('heading',{name:otherId,exact:true}).waitFor();
+    let currentUrl = new URL(page.url());
+    assert.equal(currentUrl.searchParams.get('keep'), 'unrelated & value');
+    assert(!currentUrl.searchParams.has('passageReceipt') && !currentUrl.searchParams.has('passageProposal'));
+    await page.reload({waitUntil:'domcontentloaded'});
+    await page.getByRole('heading',{name:otherId,exact:true}).waitFor({timeout:30000});
+    assert.equal(await page.locator('[data-passage-result]').count(), 0, 'reload must not replay an old passage');
+    await page.goBack();
+    await page.getByRole('heading',{name:documentId,exact:true}).waitFor({timeout:30000});
+    currentUrl = new URL(page.url());
+    assert.equal(currentUrl.searchParams.get('keep'), 'unrelated & value');
+    assert(!currentUrl.searchParams.has('passageReceipt') && !currentUrl.searchParams.has('passageProposal'));
+    assert.equal(await page.locator('[data-passage-result]').count(), 0, 'Back opens the document, not the departed passage');
+    await page.goForward();
+    await page.getByRole('heading',{name:otherId,exact:true}).waitFor({timeout:30000});
+
+    for (const destination of ['project', 'curation']) {
+      await page.goto(attempt, {waitUntil:'domcontentloaded'});
+      await page.locator('a[data-passage-receipt]').first().click();
+      await selection.locator('mark').waitFor({timeout:30000});
+      await page.evaluate(() => {
+        const url = new URL(location.href); url.searchParams.set('keep', 'still here');
+        history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+      });
+      if (destination === 'project') {
+        await page.locator('[data-project]').first().click();
+        await page.waitForFunction(hash => location.hash === hash, '#' + encodeURIComponent(project));
+      } else {
+        await page.locator('[data-curate]').first().click();
+        await page.waitForFunction(() => location.hash === '#curation');
+      }
+      currentUrl = new URL(page.url());
+      assert.equal(currentUrl.searchParams.get('keep'), 'still here');
+      assert(!currentUrl.searchParams.has('passageReceipt') && !currentUrl.searchParams.has('passageProposal'),
+        `${destination} navigation retained the old passage`);
+    }
+
     await page.request.post(base + '/_test/changed?value=1');
     await page.goto(attempt, {waitUntil:'domcontentloaded'});
     await page.locator('a[data-passage-receipt]').first().click();
@@ -165,6 +209,9 @@ server.listen(0, '127.0.0.1', async () => {
       await page.request.post(base + '/_test/hold?kind=' + kind);
       await page.locator('a[data-passage-receipt]').first().click();
       await waitHeld(page, base, kind);
+      const loadingUrl = new URL(page.url());
+      assert.equal(loadingUrl.hash, parsed.hash, `loading ${kind} must preserve the target project/document hash`);
+      assert.equal(loadingUrl.searchParams.get('passageReceipt'), receiptCid);
       const other = page.locator('[data-doc="other.txt"]').first();
       await other.waitFor({timeout:10000});
       await other.click();
@@ -177,7 +224,7 @@ server.listen(0, '127.0.0.1', async () => {
     assert.equal(errors.length, 0, errors.join('\n'));
     assert(!requests.some(r => r.method === 'POST' && !r.path.startsWith('/_test/')), 'opening a passage must not dispatch any program or write');
     console.log(JSON.stringify({result:'PASS',scope:'production documents JS with simulated HTTP backend; not a CAS or legal verification',
-      checks:['retained proposal click','exact duplicate and UTF-16 passage','escaped text','changed extraction, source and receipt refusal','stale receipt and document navigation']}));
+      checks:['retained proposal click','exact duplicate and UTF-16 passage','escaped text','changed extraction, source and receipt refusal','passage parameter cleanup, reload and history','target hash and stale receipt/document navigation']}));
   } catch (error) {
     console.error(error.stack || error);
     if (page) {
