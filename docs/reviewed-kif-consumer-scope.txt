@@ -24,3 +24,5 @@ Real review ledger+verified source fixture (not an approval-map callback): creat
 
 Stop point
 No safe reusable reviewed-read capability or declared reviewed taxonomy relation mapping exists yet in the traced production path. Implementing the above requires a deliberate host authority/read-policy addition and authentic taxonomy review fixture, not merely connecting KifActivationPlan to arbitrary quad query rows. Await root decision before coding.
+
+Subsequent implementation boundary: authenticated non-consuming reviewedRead and the real taxonomy inspector now exist. No norm modality, including PRESUMED, is promoted to an asserted taxonomy fact; all such rows remain excluded and UNKNOWN. A distinct asserted-taxonomy source format is still missing. Review-record observation reification is a separate native bridge scope and does not assert the source proposition as a world fact.

@@ -1,0 +1,42 @@
+{
+  "tests": 16,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "source": "636a4c4bd72c7036b1381a4c76b07e9be0e422da",
+  "configurationCacheStored": true,
+  "suites": [
+    {
+      "name": "ReviewedTaxonomyWireTest[jvm]",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.669"
+    },
+    {
+      "name": "SourceSelectionTest[jvm]",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.023"
+    },
+    {
+      "name": "CurationReviewedReadTest[jvm]",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.066"
+    },
+    {
+      "name": "DocumentSurfaceTest[jvm]",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.133"
+    }
+  ]
+}

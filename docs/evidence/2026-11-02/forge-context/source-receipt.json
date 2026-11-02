@@ -1,0 +1,20 @@
+{
+  "source": "636a4c4bd72c7036b1381a4c76b07e9be0e422da",
+  "scope": "Synthetic retained unreviewed proposal, production document/project/wiki routes and three production bundles. No model, review approval or construction execution.",
+  "fixtureConstruction": "Production internal DocumentCuratorCodec accessed by Kotlin friend compilation against the exact frozen main JAR; HTTP responses were not mocked.",
+  "fixtureCorrection": "Driver expectation corrected from Authored to the actual fixture title Independent wiki page; runtime source unchanged.",
+  "serverStopped": true,
+  "artifacts": {
+    "main.jar": "dfdf093b348bae72f5b2a3a43a1a94c79adcc07e58720d9232fa84ec24628084",
+    "documents.js": "db2c50045be380603b836560c8136034f6b1ea9c8260686e451eb0ee7deac6ee",
+    "spacegraph.js": "1c41f5b576e89022bc2ea33cdbf560bf4dc3b9333de27a5cb7b62af5b05e18e3",
+    "pages.js": "6f90c0f046588e20a6a892e3fc746839d33bf4fb07d1cf4c838ce817c3feb8ee"
+  },
+  "files": {
+    "wiki-separate-source-context.png": "f361a50ebd6ed0bda3e031b52af4a4692630b99f0220da29dc63d16664621446",
+    "result.json": "34d8c863d5d2f029219f5cfd92b9c147cbf8ee5a491e184a2e3121f6106ef9f6",
+    "blackboard-stale-source.png": "320fd2e822977bb4b5a52d4ae8a84f68653a3bcf93fe0b8ee13ff4a4e98be679",
+    "blackboard-exact-passage.png": "a3338d2c0d2d769edf929b974ed1ee79cddcb4992e333d53d8d965d396ee833f",
+    "verification.json": "a543c706035b59264656a8eea9fc7ad7c1d602c717dc19700a8cb705ce6faf4b"
+  }
+}
