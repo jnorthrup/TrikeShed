@@ -68,7 +68,7 @@ class KifActivationPlan private constructor(
             fields(proof.rules.size.toString())
             for (rule in proof.rules.view) fields(rule)
         }
-    }.encodeToByteArray()
+    }.encodeToByteArray(throwOnInvalidSequence = true)
 
     companion object {
         internal fun create(snapshot: KifTaxonomySnapshot, predicate: String, subject: String, obj: String): KifActivationPlan {
@@ -90,7 +90,7 @@ class KifActivationPlan private constructor(
                     for (premise in premises.view) fields(premise.value)
                     fields(rules.size.toString())
                     for (rule in rules.view) fields(rule)
-                }.encodeToByteArray())
+                }.encodeToByteArray(throwOnInvalidSequence = true))
                 KifActivationProof(nodeId, premises, rules)
             }.sortedBy { it.nodeId.value }.toSeries()
             val limits = snapshot.limits
@@ -101,16 +101,16 @@ class KifActivationPlan private constructor(
                 for (source in sources.view) fields(source.nodeId.value)
                 fields(result.status.name, result.truncated.toString(), result.steps.toString(), proofs.size.toString())
                 for (proof in proofs.view) fields(proof.nodeId.value)
-            }.encodeToByteArray())
+            }.encodeToByteArray(throwOnInvalidSequence = true))
             return KifActivationPlan(queryId, frameId, snapshot.revision, predicate, subject, obj,
                 result.semantics, result.status, result.truncated, result.steps, limits, sources, proofs)
         }
 
         private fun identity(vararg fields: String): ContentId =
-            ContentId.of(buildString { fields(*fields) }.encodeToByteArray())
+            ContentId.of(buildString { fields(*fields) }.encodeToByteArray(throwOnInvalidSequence = true))
 
         private fun StringBuilder.fields(vararg values: String) {
-            for (value in values) append(value.encodeToByteArray().size).append(':').append(value)
+            for (value in values) append(value.encodeToByteArray(throwOnInvalidSequence = true).size).append(':').append(value)
         }
     }
 }

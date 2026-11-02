@@ -174,7 +174,8 @@ class KifTaxonomySnapshot private constructor(
                     p.arguments.size != 2 || p.arguments.any { it !is KifTerm.Constant } -> "Taxonomy requires two ground constants"
                     else -> null
                 }
-                KifActivationAssertion(source, ContentId.of(decoded.syntax.toKifString().encodeToByteArray()), decoded, exclusion)
+                KifActivationAssertion(source, ContentId.of(decoded.syntax.toKifString()
+                    .encodeToByteArray(throwOnInvalidSequence = true)), decoded, exclusion)
             }
             return KifTaxonomySnapshot(revision, entries.toList(), limits)
         }

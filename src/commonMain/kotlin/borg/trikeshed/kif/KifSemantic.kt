@@ -42,6 +42,8 @@ data class KifDecoded(
 object KifSemantic {
     fun decode(text: String, limits: KifDecodeLimits = KifDecodeLimits()): KifDecoded {
         require(text.length <= limits.maxChars) { "KIF input exceeds character bound" }
+        // Refuse lossy UTF-16 replacement before syntax/source identities can be hashed.
+        text.encodeToByteArray(throwOnInvalidSequence = true)
         // Check before invoking the recursive syntax parser, respecting comments and escaped strings.
         var depth = 0
         var quoted = false

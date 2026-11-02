@@ -34,6 +34,9 @@ KifActivationPlan.export() returns UTF-8 bytes. It is not MLIR assembly.
 Each field is ASCII decimal UTF-8 byte length, colon, then exactly that many
 bytes. There are no inter-field delimiters. Counts and booleans are themselves
 length-framed fields. All hashes use this same field encoding with domain tags.
+Malformed UTF-16 (unpaired surrogates) is rejected before decoding KIF and at
+every identity/export encoding boundary. Valid non-BMP surrogate pairs remain
+unchanged. No replacement encoding is permitted for field bytes or lengths.
 The exact field order is:
   schema=kif-activation-plan/v1, queryId, frameId, revision, predicate, subject,
   object, semantics, status, truncated, steps, maxAssertions, maxTotalChars,
@@ -86,3 +89,12 @@ Platform 1.14.4/Jupiter 5.14.4 on GraalVM 25 discovered and passed all 12 tests
 This was targeted JUnit validation, not a Gradle or multiplatform build. Logs:
 /workspace/library-files/kif-bridge-proof/compile.log
 /workspace/library-files/kif-bridge-proof/tests.log
+
+Follow-up UTF-8 audit reproduced a collision between distinct unpaired surrogate
+inputs in the previous replacement encoding. Two new refusal tests failed before
+the strict encoding change. The same targeted compile and JUnit suite then passed
+all 14 tests, including valid non-BMP syntax and byte-exact export framing. Logs:
+/workspace/library-files/kif-bridge-proof/utf8-before.log
+/workspace/library-files/kif-bridge-proof/utf8-red-tests.log
+/workspace/library-files/kif-bridge-proof/utf8-green-compile.log
+/workspace/library-files/kif-bridge-proof/utf8-green-tests.log
