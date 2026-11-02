@@ -676,10 +676,10 @@ object DocumentSurface {
         sb.append("<h1 class=\"ds-title\">").append(esc(view.id)).append("</h1>")
         retainableRevision(view)?.let { revision ->
             val state = retention?.takeIf { it.revision == revision }
-            sb.append("<button type=\"button\" data-retain-source=\"1\"")
+            sb.append("<button type=\"button\" class=\"ds-curate-submit\" data-retain-source=\"1\"")
             if (state?.pending == true) sb.append(" disabled aria-busy=\"true\"")
             sb.append(">Retain source for review</button>")
-            state?.message?.let { sb.append("<p role=\"status\">").append(esc(it)).append("</p>") }
+            state?.message?.let { sb.append("<p class=\"ds-retain-status\" role=\"status\">").append(esc(it)).append("</p>") }
         }
         fun showRevision(label: String, revision: DocRevision?) {
             sb.append("<p class=\"ds-sub\">").append(esc(label)).append(": ")
