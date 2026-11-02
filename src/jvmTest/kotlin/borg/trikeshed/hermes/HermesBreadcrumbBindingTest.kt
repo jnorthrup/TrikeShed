@@ -113,7 +113,7 @@ class HermesBreadcrumbBindingTest {
         } finally { generation.drain() }
     }
 
-    @Test fun converseKeepsCommandAttributionOutOfTheHostSessionIdentity() = runBlocking(Dispatchers.IO) {
+    @Test fun converseKeepsCommandAttributionOutOfTheHostSessionIdentity() = runBlocking<Unit>(Dispatchers.IO) {
         val htx = openHtxElement(routeService = object : HtxRouteService {
             override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult =
                 HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request,
