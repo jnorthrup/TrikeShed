@@ -42,6 +42,7 @@ class JvmProcessOperationsTest {
             "DYLD_INSERT_LIBRARIES", "PYTHONPATH", "PYTHONHOME", "NODE_OPTIONS",
             "JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "BASH_ENV", "BASH_FUNC_foo",
 <<<<<<< HEAD
+<<<<<<< HEAD
             "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
 <<<<<<< HEAD
             "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "TLS_CA_FILE"
@@ -51,6 +52,10 @@ class JvmProcessOperationsTest {
 =======
             "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND", "PROXY", "HTTP_PROXY", "HTTPS_PROXY"
 >>>>>>> origin/sentinel-block-proxy-vars-12654854428087132558
+=======
+            "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
+            "HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT_FILE", "TLS_CERT_FILE"
+>>>>>>> origin/sentinel/block-proxy-cert-env-16986303036899655400
         ).forEach { key ->
             assertEquals(GuestEnvironment.Disposition.BLOCKED, GuestEnvironment.deliberate(key))
         }

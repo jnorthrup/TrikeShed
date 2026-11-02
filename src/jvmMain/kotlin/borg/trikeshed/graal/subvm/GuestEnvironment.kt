@@ -46,6 +46,7 @@ object GuestEnvironment {
         "PERL5OPT", "PERL5LIB", "RUBYOPT", "RUBYLIB", "PROMPT_COMMAND",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         "PROXY", "TLS",
 =======
         "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "NO_PROXY", "PROXY",
@@ -53,6 +54,9 @@ object GuestEnvironment {
 =======
         "PROXY", "HTTP_PROXY", "HTTPS_PROXY",
 >>>>>>> origin/sentinel-block-proxy-vars-12654854428087132558
+=======
+        "PROXY", "HTTP_PROXY", "HTTPS_PROXY", "SSL_CERT", "TLS_CERT",
+>>>>>>> origin/sentinel/block-proxy-cert-env-16986303036899655400
     )
 
     enum class Disposition { READY, BLOCKED, DEFERRED }
