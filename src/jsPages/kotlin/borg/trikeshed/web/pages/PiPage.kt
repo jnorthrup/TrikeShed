@@ -81,10 +81,11 @@ object PiPage {
                 try {
                     val payload = JSON.parse<dynamic>(text)
                     val path = strOrEmpty(payload?.path)
+                    val diff: dynamic = payload?.diff
                     when {
                         path.isBlank() -> text
                         tool == "read" && jsTypeOf(payload?.content) == "string" -> path + "\n\n" + str(payload.content)
-                        tool == "edit" && payload?.changed == true && jsTypeOf(payload?.diff) == "string" -> str(payload.diff)
+                        tool == "edit" && payload?.changed == true && jsTypeOf(diff) == "string" -> str(diff)
                         else -> text
                     }
                 } catch (_: Throwable) { text }
