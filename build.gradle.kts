@@ -403,7 +403,7 @@ kotlin {
         if (targets.findByName("mingwX64") != null) {
             // mingwMain: the Windows actuals (Winsock, WSAPoll, Win32 files) over nativeMain; mingwX64Main is the
             // target's own default source set, so the target wires the compilation.
-            val mingwMain = maybeCreate("mingwMain").apply { dependsOn(nativeMain) }
+            val mingwMain = maybeCreate("mingwMain").apply { dependsOn(nativeMain); dependsOn(maybeCreate("nonPosixMain")) }
             maybeCreate("mingwX64Main").apply { dependsOn(mingwMain) }
             maybeCreate("mingwX64Test").apply { dependsOn(nativeTest) }
         }
