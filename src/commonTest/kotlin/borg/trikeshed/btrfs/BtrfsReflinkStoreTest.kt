@@ -1,6 +1,10 @@
 package borg.trikeshed.btrfs
 
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.cas.CasPaths
+import borg.trikeshed.userspace.nio.file.spi.BoundedFileReader
+import borg.trikeshed.userspace.nio.file.spi.BoundedReadLimitException
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.userspace.nio.file.spi.InMemoryFileOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessOperations
 import borg.trikeshed.userspace.nio.channels.spi.ProcessResult
@@ -12,6 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BtrfsReflinkStoreTest {
@@ -20,6 +25,60 @@ class BtrfsReflinkStoreTest {
     // filesystem at all; the btrfs guard is satisfied with an explicit stub so the
     // guard itself stays a REQUIRED constructor argument (no permissive default).
     private val BTRFS_PROBE = FilesystemTypeProbe { BtrfsReflinkStore.BTRFS }
+
+    @Test
+    fun boundedReadsVerifyContentAndKeepCanonicalPrecedence() {
+        val backing = InMemoryFileOperations()
+        var boundedReads = 0
+        val files = object : FileOperations by backing, BoundedFileReader {
+            override fun readAllBytes(filename: String): ByteArray = error("unbounded CAS read")
+            override fun readBounded(path: String, maxBytes: Int): ByteArray {
+                boundedReads++
+                val bytes = backing.readAllBytes(path)
+                if (bytes.size > maxBytes) throw BoundedReadLimitException(maxBytes)
+                return bytes.copyOf()
+            }
+        }
+        val store = BtrfsReflinkStore("/btrfs/cas", files, MockProcessOperations(), InMemoryReferenceCounter(), BTRFS_PROBE)
+        val bytes = "source".encodeToByteArray()
+        val cid = ContentId.of(bytes)
+        val canonical = backing.resolvePath("/btrfs/cas", CasPaths.blob(cid))
+        val legacy = backing.resolvePath("/btrfs/cas", CasPaths.legacyBlob(cid))
+        backing.write(legacy, bytes)
+        assertContentEquals(bytes, store.getBounded(cid, bytes.size))
+        assertFailsWith<BoundedReadLimitException> { store.getBounded(cid, bytes.size - 1) }
+        backing.write(canonical, "broken".encodeToByteArray())
+        assertFailsWith<IllegalStateException> { store.getBounded(cid, bytes.size) }
+        backing.write(canonical, bytes)
+        assertContentEquals(bytes, store.getBounded(cid, bytes.size))
+        assertNull(store.getBounded(ContentId.of("missing".encodeToByteArray()), 64))
+        assertFailsWith<IllegalArgumentException> { store.getBounded(cid, -1) }
+        assertFailsWith<IllegalArgumentException> { store.getBounded(cid, Int.MAX_VALUE) }
+        val empty = ContentId.of(ByteArray(0))
+        backing.write(backing.resolvePath("/btrfs/cas", CasPaths.blob(empty)), ByteArray(0))
+        assertContentEquals(ByteArray(0), store.getBounded(empty, 0))
+        assertEquals(5, boundedReads)
+    }
+
+    @Test
+    fun boundedReadsRefuseBackendsWithoutTheCapability() {
+        val store = BtrfsReflinkStore("/btrfs/cas", InMemoryFileOperations(), MockProcessOperations(),
+            InMemoryReferenceCounter(), BTRFS_PROBE)
+        assertFailsWith<UnsupportedOperationException> { store.getBounded(ContentId.of(ByteArray(0)), 0) }
+    }
+
+    @Test
+    fun boundedReadsRejectAnOversizedReturnFromABrokenBackend() {
+        val backing = InMemoryFileOperations()
+        val files = object : FileOperations by backing, BoundedFileReader {
+            override fun readBounded(path: String, maxBytes: Int): ByteArray = backing.readAllBytes(path)
+        }
+        val store = BtrfsReflinkStore("/btrfs/cas", files, MockProcessOperations(), InMemoryReferenceCounter(), BTRFS_PROBE)
+        val bytes = "source".encodeToByteArray()
+        val cid = ContentId.of(bytes)
+        backing.write(backing.resolvePath("/btrfs/cas", CasPaths.blob(cid)), bytes)
+        assertFailsWith<BoundedReadLimitException> { store.getBounded(cid, 1) }
+    }
 
     @Test
     fun testFourHexLayoutAndLegacyInterop() = runTest {

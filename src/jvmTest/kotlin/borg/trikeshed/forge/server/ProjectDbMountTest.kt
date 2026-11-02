@@ -3,17 +3,23 @@ package borg.trikeshed.forge.server
 import borg.trikeshed.couch.CouchStoreFactory
 import borg.trikeshed.couch.CouchReportReactorElement
 import borg.trikeshed.cursor.BlackboardContext
+import borg.trikeshed.context.Drain
 import borg.trikeshed.dag.*
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
 import borg.trikeshed.kif.KifKnowledgeBase
+import borg.trikeshed.lcnc.LcncNodeRunner
+import borg.trikeshed.narsese.ConstellationNodes
 import borg.trikeshed.lib.*
 import borg.trikeshed.memory.CouchIndexBridge
 import borg.trikeshed.memory.MemoryIndexLayer
 import borg.trikeshed.memory.MemoryStore
 import borg.trikeshed.narsese.DecisionProvider
+import borg.trikeshed.ontology.CorpusOntology
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
+import borg.trikeshed.userspace.nio.file.spi.FileOperations
 import borg.trikeshed.util.oroboros.CouchAttachmentGateway
+import borg.trikeshed.util.oroboros.FileCasStore
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -37,14 +43,14 @@ class ProjectDbMountTest {
         val indexLayer: MemoryIndexLayer,
     )
 
-    private fun harness(ledger: File, cas: CasStore = CasStore.inMemory()): Harness {
+    private fun harness(ledger: File, cas: CasStore = CasStore.inMemory(), files: FileOperations = JvmFileOperations()): Harness {
         val couchStore = CouchStoreFactory.casBacked(cas)
         val gateway = CouchAttachmentGateway(couchStore, cas)
         val indexLayer = MemoryIndexLayer(MemoryStore(cas, couchStore))
         val bridge = CouchIndexBridge(gateway, indexLayer)
         val registry = ProjectDbRegistry("trikeshed")
         val scopes = ProjectScopes(
-            JvmFileOperations(), gateway, bridge, cas, null,
+            files, gateway, bridge, cas, null,
             projectDbs = registry, ledgerFile = ledger,
             filesRoot = File(ledger.parentFile, "files"),
         )
@@ -193,6 +199,380 @@ class ProjectDbMountTest {
         assertTrue(h2.scopes.remountLedger() >= 1)
         // 2 direct puts + 1 wire put + 2 batched = 5
         assertEquals(5, h2.registry.get("my-drop")?.docCount, "manifest replay must rebuild every uploaded doc")
+    }
+
+    private fun durableCas(root: File): CasStore = FileCasStore(JvmFileOperations(), File(root, "cas").absolutePath)
+
+    private fun retainedOntology(cas: CasStore): ContentId =
+        CorpusOntology.retain(cas, "law", "test", "(subclass Obligation LegalConcept)", emptyMap()).cid
+
+    @Test
+    fun reviewPolicySurvivesRestartAndIsVisibleBeforeRemountAdmission(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = durableCas(tmp)
+        val ontology = retainedOntology(cas)
+        val review = CurationIntake.Mode.ReviewRequired(ontology)
+        val first = harness(ledger, cas)
+        val offered = mutableListOf<CurationIntake.Mode>()
+        first.scopes.onDocument = { project, _, _ -> offered.add(first.scopes.intakeMode(project)) }
+        first.scopes.beginUpload("legal")
+        first.scopes.setIntakePolicy("legal", review)
+        first.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+        assertEquals(listOf<CurationIntake.Mode>(review), offered)
+        first.scopes.drain()
+
+        val second = harness(ledger, durableCas(tmp))
+        val restored = mutableListOf<CurationIntake.Mode>()
+        second.scopes.onDocument = { project, _, _ -> restored.add(second.scopes.intakeMode(project)) }
+        try {
+            assertEquals(1, second.scopes.remountLedger())
+            assertEquals(review, second.scopes.intakeMode("legal"))
+            assertEquals(listOf<CurationIntake.Mode>(review), restored, "policy must be loaded before any resume callback")
+        } finally {
+            second.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun absentAndWrongKindOntologyCannotReplaceTheEffectivePolicy(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-invalid-${System.nanoTime()}").apply { mkdirs() }
+        val cas = durableCas(tmp)
+        val h = harness(File(tmp, "projects.tsv"), cas)
+        try {
+            h.scopes.beginUpload("legal")
+            val review = CurationIntake.Mode.ReviewRequired(retainedOntology(cas))
+            h.scopes.setIntakePolicy("legal", review)
+            val absent = ContentId.of("not retained".encodeToByteArray())
+            val wrongKind = cas.put("not an ontology".encodeToByteArray())
+            for (cid in listOf(absent, wrongKind)) {
+                assertFailsWith<Exception> { h.scopes.setIntakePolicy("legal", CurationIntake.Mode.ReviewRequired(cid)) }
+                assertEquals(review, h.scopes.intakeMode("legal"), "an invalid update must not downgrade the mode")
+            }
+        } finally {
+            h.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unreadableReviewPolicyBlocksResumedAdmissionsRatherThanFallingBackToLegacy(): Unit = runBlocking {
+        val root = File(System.getProperty("java.io.tmpdir"), "pdb-policy-cas-${System.nanoTime()}").apply { mkdirs() }
+        val cas = durableCas(root)
+        val wrongKind = cas.put("not an ontology".encodeToByteArray())
+        val absent = ContentId.of("not retained".encodeToByteArray())
+        val cases = listOf(
+            "future-mode" to "",
+            "review-required" to "",
+            "review-required" to "not-a-cid",
+            "review-required" to absent.value,
+            "review-required" to wrongKind.value,
+        )
+        for ((modeName, cid) in cases) {
+            val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-bad-${System.nanoTime()}").apply { mkdirs() }
+            val ledger = File(tmp, "projects.tsv")
+            val first = harness(ledger, cas)
+            first.scopes.beginUpload("legal")
+            first.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+            first.scopes.drain()
+            val columns = ledger.readLines().single().split('\t').take(3)
+            ledger.writeText(columns.joinToString("\t") + "\t\t$modeName\t$cid\n")
+            val second = harness(ledger, cas)
+            val restored = mutableListOf<CurationIntake.Mode>()
+            second.scopes.onDocument = { project, _, _ -> restored.add(second.scopes.intakeMode(project)) }
+            try {
+                assertEquals(1, second.scopes.remountLedger())
+                assertTrue(second.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked)
+                assertEquals(1, restored.size)
+                assertTrue(restored.single() is CurationIntake.Mode.Blocked,
+                    "the resume callback must never observe legacy for unreadable explicit policy")
+            } finally {
+                second.scopes.drain()
+                tmp.deleteRecursively()
+            }
+        }
+        root.deleteRecursively()
+    }
+
+    @Test
+    fun failedPolicyPersistenceBlocksAdmissionsUntilTheOutcomeIsResolved(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-write-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = durableCas(tmp)
+        val h = harness(ledger, cas)
+        try {
+            h.scopes.beginUpload("legal")
+            val review = CurationIntake.Mode.ReviewRequired(retainedOntology(cas))
+            h.scopes.setIntakePolicy("legal", review)
+            assertTrue(ledger.delete())
+            assertTrue(ledger.mkdir(), "replace the ledger file with a directory to force persistence failure")
+            assertFailsWith<Exception> { h.scopes.setIntakePolicy("legal", CurationIntake.Mode.Legacy) }
+            assertTrue(h.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked,
+                "a failed atomic write can have an uncertain durable outcome")
+        } finally {
+            h.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun prePolicyLedgerRowsRestoreLegacyMode(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-legacy-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = durableCas(tmp)
+        val first = harness(ledger, cas)
+        first.scopes.beginUpload("legal", decisionProvider = DecisionProvider.JEV)
+        first.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+        first.scopes.drain()
+        val columns = ledger.readLines().single().split('\t').take(4)
+        ledger.writeText(columns.joinToString("\t") + "\n")
+        val second = harness(ledger, cas)
+        val restored = mutableListOf<CurationIntake.Mode>()
+        second.scopes.onDocument = { project, _, _ -> restored.add(second.scopes.intakeMode(project)) }
+        try {
+            assertEquals(1, second.scopes.remountLedger())
+            assertEquals(CurationIntake.Mode.Legacy, second.scopes.intakeMode("legal"))
+            assertEquals(listOf<CurationIntake.Mode>(CurationIntake.Mode.Legacy), restored)
+            assertEquals(DecisionProvider.JEV, second.scopes.list().single().decisionProvider)
+        } finally {
+            second.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun volatileCasCannotClaimDurableReviewPolicy(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-volatile-${System.nanoTime()}").apply { mkdirs() }
+        val cas = CasStore.inMemory()
+        val h = harness(File(tmp, "projects.tsv"), cas)
+        try {
+            h.scopes.beginUpload("legal")
+            val review = CurationIntake.Mode.ReviewRequired(retainedOntology(cas))
+            assertFailsWith<Exception> { h.scopes.setIntakePolicy("legal", review) }
+            assertEquals(CurationIntake.Mode.Legacy, h.scopes.intakeMode("legal"))
+        } finally {
+            h.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun invalidGuardOrLedgerNeverRestoresLegacy(): Unit = runBlocking {
+        for (damage in listOf("truncated", "missing", "pending")) {
+            val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-tamper-${System.nanoTime()}").apply { mkdirs() }
+            val ledger = File(tmp, "projects.tsv")
+            val cas = durableCas(tmp)
+            val first = harness(ledger, cas)
+            first.scopes.beginUpload("legal")
+            first.scopes.setIntakePolicy("legal", CurationIntake.Mode.ReviewRequired(retainedOntology(cas)))
+            first.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+            first.scopes.drain()
+            val original = ledger.readLines().single()
+            when (damage) {
+                "missing" -> ledger.writeText("")
+                "truncated" -> ledger.writeText(original.split('\t').take(4).joinToString("\t") + "\n")
+                "pending" -> File(tmp, "project-intake-policy/legal.guard").writeText("pending\n")
+            }
+            val second = harness(ledger, durableCas(tmp))
+            val admittedModes = mutableListOf<CurationIntake.Mode>()
+            second.scopes.onDocument = { project, _, _ -> admittedModes.add(second.scopes.intakeMode(project)) }
+            try {
+                second.scopes.remountLedger()
+                assertTrue(second.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked,
+                    "the retained guard must detect $damage")
+                assertTrue(admittedModes.all { it is CurationIntake.Mode.Blocked },
+                    "no resume callback may see a legacy mode after policy tampering")
+                if (damage == "missing") assertTrue(admittedModes.isEmpty())
+            } finally {
+                second.scopes.drain()
+                tmp.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun explicitReviewLedgerWithoutGuardBlocksBeforeResumeHooks(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-no-guard-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = durableCas(tmp)
+        val first = harness(ledger, cas)
+        first.scopes.beginUpload("legal")
+        first.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+        val ontology = retainedOntology(cas)
+        first.scopes.drain()
+        // No setIntakePolicy call means no review guard was committed.
+        val columns = ledger.readLines().single().split('\t').take(3)
+        ledger.writeText(columns.joinToString("\t") + "\t\treview-required\t${ontology.value}\n")
+        val second = harness(ledger, durableCas(tmp))
+        val admittedModes = mutableListOf<CurationIntake.Mode>()
+        second.scopes.onDocument = { project, _, _ -> admittedModes.add(second.scopes.intakeMode(project)) }
+        try {
+            second.scopes.remountLedger()
+            assertTrue(second.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked)
+            assertTrue(admittedModes.all { it is CurationIntake.Mode.Blocked },
+                "an explicit review row without its guard cannot be trusted")
+        } finally {
+            second.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun unmountedReviewProjectNameStaysBlockedOnRecreationAndRestart(): Unit = runBlocking {
+        val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-recreate-${System.nanoTime()}").apply { mkdirs() }
+        val ledger = File(tmp, "projects.tsv")
+        val cas = durableCas(tmp)
+        val first = harness(ledger, cas)
+        val calls = mutableListOf<String>()
+        val runners = mapOf(
+            ConstellationNodes.CURATE to LcncNodeRunner { _, _ -> calls.add("curate"); emptyMap() },
+            ConstellationNodes.JOIN to LcncNodeRunner { _, _ -> calls.add("join"); emptyMap() },
+        )
+        fun attach(h: Harness): CurationIntake {
+            val intake = CurationIntake(JvmProjectCorpus(h.registry, h.scopes), { runners }, { null }, this,
+                mode = { project, _ -> h.scopes.intakeMode(project) })
+            h.scopes.onDocument = { project, id, provider -> intake.offer(project, id, provider) }
+            return intake
+        }
+        try {
+            first.scopes.beginUpload("legal")
+            first.scopes.setIntakePolicy("legal", CurationIntake.Mode.ReviewRequired(retainedOntology(cas)))
+            assertTrue(first.scopes.unmount("legal"))
+            first.scopes.beginUpload("legal")
+            assertTrue(first.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked)
+            val intake = attach(first)
+            first.scopes.uploadPut("legal", "new.html", "<p>new document</p>".encodeToByteArray())
+            intake.drain()
+            assertTrue(calls.isEmpty(), "recreation must not publish under a silently reset legacy policy")
+            assertEquals(1, (intake.status().getValue("legal") as Map<*, *>)["failed"])
+            first.scopes.drain()
+
+            val second = harness(ledger, durableCas(tmp))
+            val restoredIntake = attach(second)
+            try {
+                assertEquals(1, second.scopes.remountLedger())
+                assertTrue(second.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked)
+                restoredIntake.drain()
+                assertTrue(calls.isEmpty(), "restart must not join the recreated project either")
+                assertEquals(1, (restoredIntake.status().getValue("legal") as Map<*, *>)["failed"])
+            } finally {
+                restoredIntake.drain()
+                second.scopes.drain()
+            }
+        } finally {
+            first.scopes.drain()
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun failedUnmountLedgerWriteRetainsScopeAndBlocksGuardedPolicy(): Unit = runBlocking {
+        for (failAfterPublication in listOf(false, true)) {
+            val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-policy-unmount-failure-${System.nanoTime()}").apply { mkdirs() }
+            val ledger = File(tmp, "projects.tsv")
+            val backing = JvmFileOperations()
+            var failLedgerWrite = false
+            val failing = object : FileOperations by backing {
+                override fun writeAtomically(filename: String, bytes: ByteArray) {
+                    val fail = failLedgerWrite && File(filename).absoluteFile == ledger.absoluteFile
+                    if (fail && !failAfterPublication) error("injected ledger failure before publication")
+                    backing.writeAtomically(filename, bytes)
+                    if (fail) error("injected ledger failure after publication")
+                }
+            }
+            val cas = durableCas(tmp)
+            val h = harness(ledger, cas, failing)
+            try {
+                h.scopes.beginUpload("legal")
+                h.scopes.setIntakePolicy("legal", CurationIntake.Mode.ReviewRequired(retainedOntology(cas)))
+                h.scopes.uploadPut("legal", "contract.txt", "contract".encodeToByteArray())
+                failLedgerWrite = true
+                assertFailsWith<Exception> { h.scopes.unmount("legal") }
+                assertTrue(h.scopes.list().any { it.name == "legal" }, "the live scope must survive failed unmount")
+                assertNotNull(h.registry.get("legal"), "the project database must survive failed unmount")
+                assertTrue(h.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked,
+                    "the policy must block while ledger publication is uncertain")
+            } finally {
+                h.scopes.drain()
+                tmp.deleteRecursively()
+            }
+        }
+    }
+
+    @Test
+    fun failedRegistryOwnerDrainRetainsEvidenceAndRequiresRecovery(): Unit = runBlocking {
+        for (failure in listOf("none", "restore", "recoveryGuard", "cancellation")) {
+            val tmp = File(System.getProperty("java.io.tmpdir"), "pdb-owner-failure-${System.nanoTime()}").apply { mkdirs() }
+            val ledger = File(tmp, "projects.tsv")
+            val backing = JvmFileOperations()
+            var injectFailure = false
+            val files = object : FileOperations by backing {
+                override fun writeAtomically(filename: String, bytes: ByteArray) {
+                    if (injectFailure && failure == "restore" && File(filename).absoluteFile == ledger.absoluteFile && bytes.isNotEmpty())
+                        error("injected ledger restore failure")
+                    if (injectFailure && failure == "recoveryGuard" && filename.endsWith("/legal.guard") &&
+                        bytes.decodeToString().trim() == "recovery") error("injected recovery guard failure")
+                    backing.writeAtomically(filename, bytes)
+                }
+            }
+            val cas = durableCas(tmp)
+            val h = harness(ledger, cas, files)
+            try {
+                h.scopes.beginUpload("legal")
+                h.scopes.setIntakePolicy("legal", CurationIntake.Mode.ReviewRequired(retainedOntology(cas)))
+                val originalBytes = "contract".encodeToByteArray()
+                val sourceCid = h.scopes.uploadPut("legal", "contract.txt", originalBytes)
+                val ledgerBefore = ledger.readBytes()
+                val manifest = File(tmp, "project-manifests/legal.tsv")
+                val manifestBefore = manifest.readBytes()
+                val source = File(tmp, "files/legal/contract.txt")
+                val guard = File(tmp, "project-intake-policy/legal.guard")
+                assertTrue(guard.isFile)
+                assertTrue(source.isFile)
+                val ownerField = ProjectDbRegistry::class.java.getDeclaredField("owners").apply { isAccessible = true }
+                @Suppress("UNCHECKED_CAST")
+                val owners = ownerField.get(h.registry) as MutableMap<String, Join<Job, Drain>>
+                val finished = Job().apply { complete() }
+                owners["legal"] = finished j Drain {
+                    if (failure == "cancellation") throw kotlinx.coroutines.CancellationException("injected cancellation")
+                    error("injected owner drain failure")
+                }
+                injectFailure = true
+                if (failure == "cancellation") assertFailsWith<kotlinx.coroutines.CancellationException> { h.scopes.unmount("legal") }
+                else assertFailsWith<Exception> { h.scopes.unmount("legal") }
+                assertNull(h.registry.get("legal"), "registry removed the DB before the owner drain failed")
+                assertTrue(h.scopes.list().any { it.name == "legal" }, "recovery scope metadata must remain")
+                assertTrue(h.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked)
+                assertTrue(guard.isFile, "the guard must survive a partial unmount")
+                if (failure == "none" || failure == "cancellation")
+                    assertTrue(ledger.readBytes().contentEquals(ledgerBefore), "restore the exact ledger row")
+                if (failure == "recoveryGuard") assertTrue(!ledger.exists() || ledger.readText().isEmpty(),
+                    "do not restore a row without first durably recording recovery")
+                assertTrue(manifest.readBytes().contentEquals(manifestBefore))
+                assertTrue(source.readBytes().contentEquals(originalBytes))
+                assertTrue(cas.get(sourceCid)?.contentEquals(originalBytes) == true)
+                assertFailsWith<Exception> { h.scopes.setIntakePolicy("legal", CurationIntake.Mode.Legacy) }
+                assertFailsWith<Exception> { h.scopes.unmount("legal") }
+                assertTrue(manifest.isFile && source.isFile, "automatic retry must not clean up evidence")
+                h.scopes.drain()
+                val restarted = harness(ledger, durableCas(tmp))
+                val resumedModes = mutableListOf<CurationIntake.Mode>()
+                restarted.scopes.onDocument = { project, _, _ -> resumedModes.add(restarted.scopes.intakeMode(project)) }
+                try {
+                    restarted.scopes.remountLedger()
+                    assertTrue(restarted.scopes.intakeMode("legal") is CurationIntake.Mode.Blocked,
+                        "partial unmount recovery must remain blocked after restart")
+                    assertTrue(resumedModes.all { it is CurationIntake.Mode.Blocked },
+                        "no resume hook may observe a usable policy while recovery is unresolved")
+                } finally {
+                    restarted.scopes.drain()
+                }
+            } finally {
+                h.scopes.drain()
+                tmp.deleteRecursively()
+            }
+        }
     }
 
     @Test

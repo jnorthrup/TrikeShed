@@ -9,18 +9,22 @@ object AppDestinations {
 
     val all: List<AppDestination> = listOf(
         AppDestination("board", "Board", "/blackboard", listOf("/harness", "/harness.html")),
+        AppDestination("curator", "Curator", "/curator", listOf("/curator.html")),
+        AppDestination("documents", "Documents", "/documents", listOf("/documents.html")),
+        AppDestination("wiki", "Wiki", "/wiki", listOf("/wiki.html")),
         AppDestination("graal", "Graal", "/graal", emptyList()),
         AppDestination("panels", "Panels", "/panels", listOf("/panels.html")),
-        AppDestination("curator", "Curator", "/curator", listOf("/curator.html")),
-        AppDestination("wiki", "Wiki", "/wiki", listOf("/wiki.html")),
-        AppDestination("documents", "Documents", "/documents", listOf("/documents.html")),
         AppDestination("headhunter", "Job agent", "/headhunter", listOf("/headhunter.html")),
         AppDestination("kanban", "Kanban", "/kanban", listOf("/kanban.html")),
+        AppDestination("pi", "Pi", "/pi", emptyList()),
         AppDestination("hermes", "Hermes", "/hermes", emptyList()),
         AppDestination("keymux", "KeyMux", "/keymux", emptyList()),
         AppDestination("modelmux", "ModelMux", "/modelmux", listOf("/mux/sessions", "/mux/stats", "/mux.html")),
         AppDestination("futon", "Futon", "/futon", emptyList()),
     )
+
+    /** Core surfaces remain visible when the rest of the application menu collapses. */
+    val primary: List<AppDestination> = all.filter { it.id in setOf("board", "curator", "documents", "wiki", "pi", "hermes") }
 
     private fun trimSlash(path: String): String = if (path.endsWith("/")) path.dropLast(1) else path
 

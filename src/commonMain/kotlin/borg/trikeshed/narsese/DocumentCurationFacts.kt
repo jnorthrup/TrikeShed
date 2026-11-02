@@ -38,7 +38,8 @@ object DocumentCurationFacts {
                 "approvalCid" to admission["approvalCid"], "releaseCid" to admission["releaseCid"],
                 "admissionCid" to admission["admissionCid"], "reviewer" to admission["reviewer"],
                 "synthetic" to admission["synthetic"], "reviewStatus" to "approved",
-                "taxonomyClosureIsCausalProof" to false)
+                "taxonomyClosureIsCausalProof" to false) +
+                (selection["conditionReview"]?.let { mapOf("conditionReview" to it) } ?: emptyMap())
         }
     }
 

@@ -7,6 +7,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.RelationKind as SemanticRelationKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -42,14 +43,27 @@ class ContentEpistemicIngestTest {
             assertEquals(region.coordinate.size, region.lineCids.size)
         }
 
-        val causal = surface.links.view.filter { it.kind == RelationKind.CAUSALITY }
-        val attraction = surface.links.view.filter { it.kind == RelationKind.ATTRACTION }
-        assertEquals(3, causal.count())
-        assertTrue(attraction.count() >= 2)
-        assertEquals(surface.links.size, surface.signals.size)
-        assertTrue(surface.signals.view.any { it.relation == SemanticRelationKind.CAUSALITY })
-        assertTrue(surface.signals.view.any { it.relation == SemanticRelationKind.ATTRACTION })
+        val neighbors = surface.links.view.filter { it.kind == RelationKind.NEIGHBOR_NEXT }.toList()
+        val attraction = surface.links.view.filter { it.kind == RelationKind.ATTRACTION }.toList()
+        assertEquals(3, neighbors.size)
+        neighbors.forEachIndexed { i, link ->
+            assertEquals(i, link.from.index)
+            assertEquals(i + 1, link.to.index)
+        }
+        assertTrue(attraction.size >= 2)
+        assertEquals(attraction.size, surface.signals.size)
+        assertTrue(surface.signals.view.all { it.relation == SemanticRelationKind.ATTRACTION })
+        assertTrue(surface.signals.view.all { AngularCodec.Fields.relationOf(it.angular) == it.relation })
         assertTrue(surface.signals.view.all { it.subjectCid.isNotEmpty() && it.objectCid != null })
+    }
+
+    @Test
+    fun adjacentUnrelatedRegionsAreNotCausalBeliefs() {
+        val surface = ContentEpistemicIngest.ingest(CasStore.inMemory(), "Rain fell.\nA contract expired.",
+            LineAperture.L1, attractionThreshold = 1.1)
+        assertEquals(1, surface.links.size)
+        assertEquals(RelationKind.NEIGHBOR_NEXT, surface.links[0].kind)
+        assertEquals(0, surface.signals.size)
     }
 
     @Test

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pi · Forge</title>
+<link rel="stylesheet" href="/application-nav.css">
+<style>
+:root{color-scheme:dark;--bg:#0d1117;--panel:#151c24;--line:#34414e;--ink:#edf3f5;--dim:#b2c1c5;--accent:#71d6c6}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:30px 24px 60px}h1{margin:0;font-size:30px}h2{font-size:17px;margin:0 0 12px}p{color:var(--dim)}
+.intro{margin:6px 0 22px}.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;margin:16px 0}
+.controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px}label{display:grid;gap:5px;color:var(--dim)}select,input,textarea,button{font:inherit;border:1px solid var(--line);border-radius:6px;background:#0d141b;color:var(--ink);padding:9px}
+select{min-width:220px}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.5}.primary{background:#21635a;border-color:#39877b}.status{min-height:1.5em}.transcript{white-space:pre-wrap;overflow-wrap:anywhere;min-height:100px;max-height:45vh;overflow:auto}textarea{display:block;width:100%;resize:vertical;min-height:100px;margin:8px 0}a{color:var(--accent)}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body data-app-page="pi">
+<main>
+  <h1>Pi</h1>
+  <p class="intro">A separate Pi agent session, using the models and tools made available by this Forge host.</p>
+  <p id="pi-project" hidden></p>
+  <section class="card" aria-label="Pi session">
+    <h2>Session</h2>
+    <p id="pi-status" class="status" role="status" aria-live="polite">Enter the Pi access token, then refresh models.</p>
+    <div class="controls">
+      <label>Pi access token <input id="pi-token" type="password" autocomplete="off" aria-label="Pi access token"></label>
+      <label>Model <select id="pi-model" aria-label="Pi model" disabled><option value="">Choose a model</option></select></label>
+      <button id="pi-refresh" type="button">Refresh models</button>
+      <button id="pi-start" class="primary" type="button" disabled>Start Pi session</button>
+      <button id="pi-close" type="button" disabled>Close session</button>
+    </div>
+  </section>
+  <section class="card" aria-label="Pi conversation">
+    <h2>Conversation</h2>
+    <div id="pi-transcript" class="transcript" aria-live="polite">No messages yet.</div>
+    <form id="pi-form"><label for="pi-prompt">Message</label><textarea id="pi-prompt" placeholder="Write a message for this session"></textarea><button id="pi-send" class="primary" type="submit" disabled>Send to Pi</button></form>
+  </section>
+</main>
+<script src="/kotlin/pages/pages.js" defer></script>
+</body>
+</html>

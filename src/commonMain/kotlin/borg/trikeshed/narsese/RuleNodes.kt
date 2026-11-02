@@ -12,14 +12,26 @@ import borg.trikeshed.lib.*
  * zero rules, and a rete with an empty alpha network fires nothing forever;
  * these nodes are how eternal law reaches it after boot.
  *
- * `nal.rule.admit` admits explicit rules — a JSON list input of
- * `{antecedent, consequent, copula?, discount?}`, or ONE rule from the node's
- * own params. `nal.rules.fromKg` runs [KgNalBridge.bridgeToRules] over
- * interchange KR text (Turtle/KIF, sniffed) and admits the bridged rules —
- * temporal copulas are counted and refused at admission, never silently
- * reinterpreted.
+ * `nal.rule.admit` requires an authenticated document review release unless the
+ * host explicitly installs the legacy raw-rule policy. `nal.rules.fromKg` runs
+ * [KgNalBridge.bridgeToRules] over interchange KR text (Turtle/KIF, sniffed)
+ * and defaults to candidates only; its own legacy admission path is host opt-in.
+ * Temporal copulas are counted and refused at admission, never silently reinterpreted.
  */
 object RuleNodes {
+
+    /** Host installation policy; graph input and node parameters never select it. */
+    enum class AdmissionPolicy {
+        REVIEW_RELEASE_REQUIRED,
+        /** Explicit host opt-in for pre-existing experiments. Not document review. */
+        TRUSTED_HOST_LEGACY,
+    }
+
+    /** Controls whether the KG bridge may mutate the live rete; set by the host only. */
+    enum class KgAdmissionPolicy {
+        CANDIDATES_ONLY,
+        TRUSTED_HOST_LEGACY,
+    }
 
     private fun copulaOf(raw: String?): NalCopula {
         val text = raw?.trim() ?: "==>"
@@ -70,15 +82,19 @@ object RuleNodes {
     }
 
     /**
-     * `nal.rule.admit` — admit eternal rules into the live rete. The `rules`
-     * input is a JSON list of `{antecedent, consequent, copula?, discount?}`
-     * (reified maps from an upstream node, or JSON text); with no `rules`
-     * input the node's own params declare ONE rule. Outputs the count the
-     * swap actually added plus every offered rule's ruleCid.
+     * `nal.rule.admit` requires a host-consumed review release by default. A release
+     * supplies the exact selected rules; graph-provided rule rows are ignored.
+     * Hosts explicitly opting into [AdmissionPolicy.TRUSTED_HOST_LEGACY] may also
+     * admit raw manual rules; that option does not establish document provenance.
+     *
+     * The current review callback consumes before decoding/admission, and the optional
+     * durability tee runs afterward. These operations are not atomic: a failed decode
+     * may spend a release, and a failed tee may leave a live but non-durable rule.
      */
     fun ruleAdmitRunner(
         element: CausalityReteElement,
         review: (suspend (borg.trikeshed.job.ContentId) -> Map<String, Any?>)? = null,
+        policy: AdmissionPolicy = AdmissionPolicy.REVIEW_RELEASE_REQUIRED,
         /**
          * Durability tee for admitted rules. The rete is in-memory and the daemon boots it over
          * zero rules, so without this every rule admitted through this node is gone at the next
@@ -90,6 +106,9 @@ object RuleNodes {
     ): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         // Decode the whole offer before admission: a malformed later row cannot partially admit earlier rows.
         val release = inputs["releaseCid"] ?: inputs["releaseCid?"]
+        require(release != null || policy == AdmissionPolicy.TRUSTED_HOST_LEGACY) {
+            "A host-issued review release is required for rule admission"
+        }
         val admittedReview = release?.let {
             checkNotNull(review) { "Document review authority is unavailable" }(borg.trikeshed.job.ContentId(it as String))
         }
@@ -117,13 +136,15 @@ object RuleNodes {
     }
 
     /**
-     * `nal.rules.fromKg` — bridge interchange KR text to eternal rules and
-     * admit them. A `copula` param forces every bridged rule's copula
+     * `nal.rules.fromKg` — bridge interchange KR text to unreviewed candidates.
+     * Only a host explicitly selecting [KgAdmissionPolicy.TRUSTED_HOST_LEGACY]
+     * admits them to the live rete. A `copula` param forces every bridged rule's copula
      * (`==>` or `<=>`); without it [KgNalBridge.mapPredicate] decides, and
-     * mapped temporal copulas are reported as `rejectedTemporal` — refused
-     * at admission along with everything else non-eternal.
+     * mapped temporal copulas are reported as `rejectedTemporal`; all
+     * non-eternal copulas are also counted as `rejectedNonEternal`.
      */
-    fun rulesFromKgRunner(element: CausalityReteElement): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
+    fun rulesFromKgRunner(element: CausalityReteElement,
+        policy: KgAdmissionPolicy = KgAdmissionPolicy.CANDIDATES_ONLY): LcncNodeRunner = boundLcnc(element) { element, node, inputs ->
         val kgText = (inputs["kgText"] ?: inputs["kgText?"])?.toString() ?: node.params["kgText"] ?: ""
         val confidence = node.params["confidence"]?.toFloatOrNull() ?: 0.9f
         val forced = node.params["copula"]?.takeIf { it.isNotBlank() }?.let(::copulaOf)
@@ -133,18 +154,26 @@ object RuleNodes {
             if (forced != null) r.copy(copula = forced) else r
         }
         val rejectedTemporal = offered.count { it.copula.isTemporal }
-        val admitted = if (offered.isEmpty()) 0 else element.admit(offered.toSeries())
-        mapOf(
+        val admitted = if (policy == KgAdmissionPolicy.TRUSTED_HOST_LEGACY && offered.isNotEmpty())
+            element.admit(offered.toSeries()) else 0
+        mapOf<String, Any?>(
             "rules" to offered.map {
-                mapOf(
+                mapOf<String, Any?>(
                     "antecedent" to it.antecedent,
                     "consequent" to it.consequent,
                     "copula" to it.copula.name,
                     "ruleCid" to it.ruleCid.value,
-                )
+                ) + if (policy == KgAdmissionPolicy.CANDIDATES_ONLY) mapOf<String, Any?>(
+                    "reviewStatus" to "unreviewed",
+                    // Prevent direct handoff to the legacy raw-rule admission path;
+                    // metadata can be stripped and is not an authority token.
+                    "sourceEvidence" to mapOf("kind" to "unretained-kg-text"),
+                ) else emptyMap<String, Any?>()
             },
             "admitted" to admitted,
+            "admissionStatus" to if (policy == KgAdmissionPolicy.CANDIDATES_ONLY) "deferred-unreviewed" else "legacy-host-policy",
             "rejectedTemporal" to rejectedTemporal,
+            "rejectedNonEternal" to offered.count { !it.isEternal },
         )
     }
 }

@@ -35,6 +35,8 @@ class AgentSleeveTddRedTest {
     @Test
     fun piIsRedUntilItsDonorRootIsPinned() {
         val pi = AgentSleeveRegistry.PI
+        assertEquals(VmFacet.GRAAL_JS, pi.facet, "Pi is TypeScript, not a Python guest")
+        assertEquals("packages/coding-agent/src/index.ts", pi.entryModule)
         assertFalse(pi.pinned, "pi donor root must stay unpinned until Jim names the checkout")
         assertTrue(pi.isRed, pi.verdict)
         assertTrue(

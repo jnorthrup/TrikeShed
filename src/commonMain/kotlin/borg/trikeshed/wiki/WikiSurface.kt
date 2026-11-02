@@ -119,6 +119,9 @@ object WikiSurface {
     fun escape(value: String): String = DocumentMarkdown.escape(value)
     fun url(path: String): String = "/wiki?page=" + encode(path)
 
+    /** The retained curation section identity shared by the wiki and the curator. */
+    fun curationSectionPath(book: String, ordinal: Int): String = "library/${encode(book)}/$ordinal.md"
+
     fun encode(value: String): String = buildString {
         val hex = "0123456789ABCDEF"
         for (byte in value.encodeToByteArray()) {

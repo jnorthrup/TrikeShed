@@ -2,6 +2,7 @@ package borg.trikeshed.narsese
 
 import borg.trikeshed.collections.bits.RoaringSeries
 import borg.trikeshed.graal.subvm.CoreNlpRuntime
+import borg.trikeshed.nlp.NlpDocument
 import borg.trikeshed.lib.packInts
 import borg.trikeshed.ontology.SumoClassId
 import borg.trikeshed.ontology.SumoCorpus
@@ -13,18 +14,46 @@ import borg.trikeshed.ontology.SumoMask
  * Each line is parsed by CoreNLP; [NlpcoreAxiomatics] yields candidate implications. The
  * antecedent lemma resolves to a SUMO preorder class id through the WordNet noun mapping; the
  * consequent keeps its lemma. Candidates with the same (class id, lemma) revise one
- * [EvidenceLedger] slot, keyed by a source id that is unique across every [observe] call, so
- * evidence accumulates across batches and no line counts twice. [promote] admits the confident,
+ * [EvidenceLedger] slot. Exact repeated input lines share an in-memory source id across calls,
+ * preventing replay from inflating evidence. This conservative guard also merges identical text
+ * from independent sources and does not detect paraphrases or dependent sources with different
+ * text; it is not a substitute for stable source provenance. The bounded registry refuses new
+ * mappable lines when full; it never resets identities while this lane is alive. These limits
+ * bound the replay registry only, not the ledger, term index, parser, or caller input. [promote] admits the confident,
  * affirmative slots to [ClassRete]; [ask] matches a class by one Roaring AND of its self+ancestor
  * ids against the admitted antecedents, then weighs each match by NAL deduction revised with the
  * class's own direct observations.
  */
 class ClassRuleLane(private val nlp: () -> CoreNlpRuntime = { CoreNlpRuntime() }) : AutoCloseable {
+    private var maxSources: Int = 4_096
+    private var maxLineChars: Int = 16_384
+    private var maxSourceChars: Long = 4_194_304
+    private var readDocument: ((String) -> NlpDocument)? = null
+    private var classLookup: ((String) -> Int?)? = null
+
+    /** Internal deterministic reader and bounded-registry seam; the public constructor remains unchanged. */
+    internal constructor(
+        maxSources: Int,
+        maxLineChars: Int = 16_384,
+        maxSourceChars: Long = 4_194_304,
+        readDocument: ((String) -> NlpDocument)? = null,
+        classLookup: ((String) -> Int?)? = null,
+    ) : this() {
+        require(maxSources > 0 && maxLineChars > 0 && maxSourceChars > 0)
+        this.maxSources = maxSources
+        this.maxLineChars = maxLineChars
+        this.maxSourceChars = maxSourceChars
+        this.readDocument = readDocument
+        this.classLookup = classLookup
+    }
+
     val sumo by lazy { SumoCorpus.classifier }
     val ledger = EvidenceLedger()
     private val terms = ArrayList<String>()
     private val termIds = HashMap<String, Int>()
     private var nextSource = 0
+    private val sourceByExactLine = HashMap<String, Int>()
+    private var sourceChars = 0L
     private var runtime: CoreNlpRuntime? = null
     var rete = ClassRete(LongArray(0), LongArray(0))
         private set
@@ -41,22 +70,49 @@ class ClassRuleLane(private val nlp: () -> CoreNlpRuntime = { CoreNlpRuntime() }
     private fun termId(t: String): Int = termIds.getOrPut(t) { terms.size.also { terms.add(t) } }
 
     private fun classOf(lemma: String): Int? = lemma.lowercase().let { l ->
-        SumoCorpus.nounClassId(l).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(l.removeSuffix("s")).takeIf { it >= 0 }
+        val lookup = classLookup
+        if (lookup != null) lookup(l)
+        else SumoCorpus.nounClassId(l).takeIf { it >= 0 } ?: SumoCorpus.nounClassId(l.removeSuffix("s")).takeIf { it >= 0 }
+    }
+
+    /** Parse source-linked candidate readings without adding evidence or promoting rules. */
+    fun candidates(text: String): List<NlpcoreAxiom> {
+        require(text.length.toLong() <= maxSourceChars) { "candidate text exceeds source length limit" }
+        if (text.isBlank()) return emptyList()
+        val doc = readDocument?.invoke(text) ?: (runtime ?: nlp().also { runtime = it }).analyze(text)
+        require(doc.text == text) { "reader returned different text" }
+        return NlpcoreAxiomatics.recognize(doc).values()
     }
 
     fun observe(lines: List<String>): List<Observed> {
-        val nlp = runtime ?: nlp().also { runtime = it }
         val out = ArrayList<Observed>()
         for (line in lines) {
-            val source = nextSource++
-            val doc = nlp.analyze(line)
+            if (line.length > maxLineChars) {
+                out.add(Observed(-1, line, -1, "line exceeds source length limit"))
+                continue
+            }
+            val doc = readDocument?.invoke(line) ?: (runtime ?: nlp().also { runtime = it }).analyze(line)
+            if (doc.text != line) {
+                out.add(Observed(-1, line, -1, "reader returned different text"))
+                continue
+            }
             val lemmaOf = HashMap<String, String>()
             for (s in doc.sentences.values()) for (t in s.tokens.values()) lemmaOf[t.word] = t.lemma.ifBlank { t.word }
             val axioms = NlpcoreAxiomatics.recognize(doc).values()
-            if (axioms.isEmpty()) out.add(Observed(source, line, -1, "no candidate"))
+            if (axioms.isEmpty()) out.add(Observed(-1, line, -1, "no candidate"))
             for (a in axioms) {
                 val cls = classOf(lemmaOf[a.antecedent] ?: a.antecedent)
-                if (cls == null) { out.add(Observed(source, line, -1, "no class for ${a.antecedent}")); continue }
+                if (cls == null) { out.add(Observed(-1, line, -1, "no class for ${a.antecedent}")); continue }
+                val known = sourceByExactLine[line]
+                if (known == null && (sourceByExactLine.size >= maxSources || line.length.toLong() > maxSourceChars - sourceChars)) {
+                    out.add(Observed(-1, line, -1, "source capacity exhausted"))
+                    continue
+                }
+                val source = known ?: nextSource.also {
+                    nextSource++
+                    sourceByExactLine[line] = it
+                    sourceChars += line.length
+                }
                 val term = termId((lemmaOf[a.consequent] ?: a.consequent).lowercase())
                 out.add(Observed(source, line, ledger.observe(packInts(cls, term), source, a.rule.evidence), null))
             }

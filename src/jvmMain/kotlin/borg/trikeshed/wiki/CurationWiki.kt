@@ -159,7 +159,7 @@ class CurationWiki(val nodes: ConstellationNodes) {
         // Same identity used by constellation.brief(page=true); the saved summary belongs to this page.
         fun constellationPath(name: String): String = "patterns/constellation-$name.md"
         fun bookPath(book: String): String = "library/${WikiSurface.encode(book)}/index.md"
-        fun sectionPath(book: String, ordinal: Int): String = "library/${WikiSurface.encode(book)}/$ordinal.md"
+        fun sectionPath(book: String, ordinal: Int): String = WikiSurface.curationSectionPath(book, ordinal)
         private fun article(path: String, text: String, kind: WikiKind) = WikiArticle(path, text, ContentId.of(text.encodeToByteArray()).value, kind)
         private fun literal(value: String): String = buildString {
             for (char in value) when {

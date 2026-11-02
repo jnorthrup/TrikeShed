@@ -54,7 +54,9 @@ fun jsonOf(value: Any?, out: StringBuilder) {
         null -> out.append("null")
         is CharSequence -> {
             out.append('"')
-            for (char in value) when (char) {
+            // Index iteration avoids CharIterator allocation for string serialization
+            val len = value.length
+            for (i in 0 until len) when (val char = value[i]) {
                 '"' -> out.append("\\\"")
                 '\\' -> out.append("\\\\")
                 '\b' -> out.append("\\b")
@@ -70,10 +72,10 @@ fun jsonOf(value: Any?, out: StringBuilder) {
         is Map<*, *> -> {
             out.append('{')
             var first = true
-            for ((key, item) in value.entries) {
+            for (entry in value.entries) {
                 if (!first) out.append(", ")
                 first = false
-                jsonOf(key.toString(), out); out.append(':'); jsonOf(item, out)
+                jsonOf(entry.key.toString(), out); out.append(':'); jsonOf(entry.value, out)
             }
             out.append('}')
         }

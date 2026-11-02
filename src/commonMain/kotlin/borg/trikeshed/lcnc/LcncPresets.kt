@@ -47,6 +47,20 @@ object LcncPresets {
     /** The offered prefabs, described for the person adopting them. */
     fun catalog(): List<LcncPresetInfo> = listOf(
         LcncPresetInfo(
+            "preset-sparql-quad", "Explore quads with SPARQL",
+            does = "Draws a read-only graph pattern for subjects, predicates and objects.",
+            needs = "A selected local query dataset; an empty dataset returns no rows.",
+            see = "An editable SELECT diagram. Its default pattern searches the union of graphs.",
+            tweakFirst = "A graph-pattern term to narrow the results.",
+        ),
+        LcncPresetInfo(
+            "preset-sql-quad", "Explore the quad store",
+            does = "Draws a read-only view of subjects, predicates and objects from the local quad store.",
+            needs = "A local quad store; an empty store returns no rows.",
+            see = "A typed query diagram that can be edited and queried separately from program execution.",
+            tweakFirst = "A projected column, or add a simple comparison to narrow the results.",
+        ),
+        LcncPresetInfo(
             LcncShakeDemo.NAME, "Shake Demo",
             does = "Places every node type beside typed input and output counterparts, with no cables installed.",
             needs = "Nothing for wiring and inspection. Execution is disabled for this specimen.",
@@ -377,6 +391,19 @@ object LcncPresets {
 
     /** name → Confix JSON document, the exact shape LcncProgramConfix parses. */
     fun all(): Map<String, String> = linkedMapOf(
+        "preset-sparql-quad" to LcncProgramConfix.toJson(LcncProgram("sparql-quad", _l[
+            LcncNode("select", SparqlGraph.SELECT, x = 560.0, y = 160.0),
+            LcncNode("subject", SparqlGraph.VARIABLE, _m["name" j "?subject", "ord" j "0"], x = 40.0, y = 40.0),
+            LcncNode("predicate", SparqlGraph.VARIABLE, _m["name" j "?predicate", "ord" j "1"], x = 40.0, y = 180.0),
+            LcncNode("object", SparqlGraph.VARIABLE, _m["name" j "?object", "ord" j "2"], x = 40.0, y = 320.0),
+            LcncNode("pattern", SparqlGraph.PATTERN, _m["subject" j "?subject", "predicate" j "?predicate", "object" j "?object"], x = 280.0, y = 460.0),
+        ].toSeries(), _l[
+            LcncWire("subject", "variable", "select", "variables"),
+            LcncWire("predicate", "variable", "select", "variables"),
+            LcncWire("object", "variable", "select", "variables"),
+            LcncWire("pattern", "pattern", "select", "patterns"),
+        ].toSeries(), controls = LcncConfixControls(inspectionOnly = true), seq = 6)),
+        "preset-sql-quad" to LcncProgramConfix.toJson(SqlGraph.parse("SELECT S, P, O FROM DB.DBA.RDF_QUAD", "sql-quad")),
         LcncShakeDemo.NAME to LcncProgramConfix.toJson(LcncShakeDemo.build().program),
         "preset-describe" to describe(),
         "preset-norms" to norms(),
@@ -947,17 +974,17 @@ object LcncPresets {
                 LcncNode("n10", "display", x = 580.0, y = 540.0),
                 LcncNode("n8", "note", params = mapOf("text" to
                     "describe it — no model calls.\n" +
-                    "sentences → CoreNLP → NAL evidence → SUMO class rules;\n" +
-                    "each ask inherits through its SUMO path, revised by its own evidence.\n" +
+                    "sentences → CoreNLP → unreviewed candidate readings;\n" +
+                    "class answers are deferred until reviewed evidence is admitted.\n" +
                     "skill.curate models Hermes' .usage.json beside it; skill.overlap proposes consolidations.\n" +
-                    "query the bank: (ruleLearned ?a ?c) (ruleAnswer ?s ?c ?via ?f ?conf) (skillModelled ?s ?v) (skillOverlap ?a ?b ?f ?c)"),
+                    "query the bank: (skillModelled ?s ?v) (skillOverlap ?a ?b ?f ?c)"),
                     x = 820.0, y = 120.0),
             ).toSeries(),
             wires = listOf(
                 LcncWire("n1", "value", "n3", "text?"),
                 LcncWire("n2", "value", "n3", "ask?"),
-                LcncWire("n3", "rules", "n4", "x"),
-                LcncWire("n3", "answers", "n5", "x"),
+                LcncWire("n3", "candidates", "n4", "x"),
+                LcncWire("n3", "answerStatus", "n5", "x"),
                 LcncWire("n6", "skills", "n7", "x"),
                 LcncWire("n9", "pairs", "n10", "x"),
             ).toSeries(),
@@ -967,7 +994,7 @@ object LcncPresets {
         return LcncProgramConfix.toJson(program)
     }
 
-    // ── norms: text → normative beliefs by section ──
+    // ── norms: text → unreviewed clause readings by section ──
     private fun norms(): String {
         val program = LcncProgram(
             name = "preset-norms",
@@ -980,13 +1007,13 @@ object LcncPresets {
                 LcncNode("n2", "norm.clauses", params = mapOf("promote" to "0.6"), x = 330.0, y = 60.0),
                 LcncNode("n3", "display", x = 630.0, y = 60.0),
                 LcncNode("n4", "note", params = mapOf("text" to
-                    "norms: any text in; sections are paragraphs unless a heading regex is set.\n" +
-                    "clauses restated across sections gain confidence; contradicted ones lose frequency.\n" +
-                    "bank: (norm ?subject ?predicate ?f ?c)"), x = 330.0, y = 260.0),
+                    "norms: text is split into sections and parsed into clause readings.\n" +
+                    "Readings are unreviewed; conditions and modality remain visible.\n" +
+                    "The parser does not publish these readings to the bank."), x = 330.0, y = 260.0),
             ).toSeries(),
             wires = listOf(
                 LcncWire("n1", "value", "n2", "text"),
-                LcncWire("n2", "beliefs", "n3", "x"),
+                LcncWire("n2", "candidates", "n3", "x"),
             ).toSeries(),
             view = LcncView(x = 30.0, y = 20.0, zoom = 1.0),
             seq = 5,

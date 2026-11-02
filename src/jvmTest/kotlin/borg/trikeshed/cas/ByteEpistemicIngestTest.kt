@@ -5,6 +5,7 @@ import borg.trikeshed.lib.get
 import borg.trikeshed.lib.j
 import borg.trikeshed.lib.size
 import borg.trikeshed.lib.view
+import borg.trikeshed.narsese.AngularCodec
 import borg.trikeshed.narsese.RelationKind as SemanticRelationKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,16 +95,25 @@ class ByteEpistemicIngestTest {
     }
 
     @Test
-    fun signalsMapRelationsCorrectly() {
+    fun adjacencyStaysStructuralAndSimilaritySignalsUseMatchingCoordinates() {
         val cas = CasStore.inMemory()
         val payload = ByteArray(128) { (0x41 + (it % 26)).toByte() }
         val surface = ByteEpistemicIngest.ingest(cas, payload, chunkSize = 32)
-        // With adjacent chunks, expect CAUSALITY signals
-        var causal = 0
-        for (i in 0 until surface.signals.size) {
-            if (surface.signals[i].relation == SemanticRelationKind.CAUSALITY) causal++
-        }
-        assertTrue(causal > 0, "adjacent chunks produce CAUSALITY signals")
+        assertEquals(3, surface.links.view.count { it.kind == RelationKind.NEIGHBOR_NEXT })
+        assertEquals(6, surface.links.view.count { it.kind == RelationKind.ATTRACTION })
+        assertEquals(6, surface.signals.size)
+        assertTrue(surface.links.view.none { it.kind == RelationKind.CAUSALITY })
+        assertTrue(surface.signals.view.all { it.relation == SemanticRelationKind.ATTRACTION })
+        assertTrue(surface.signals.view.all { AngularCodec.Fields.relationOf(it.angular) == it.relation })
+    }
+
+    @Test
+    fun dissimilarNeighborsRemainLinksWithoutBeliefSignals() {
+        val payload = ByteArray(32) { 0x41 } + ByteArray(32)
+        val surface = ByteEpistemicIngest.ingest(CasStore.inMemory(), payload, chunkSize = 32)
+        assertEquals(1, surface.links.size)
+        assertEquals(RelationKind.NEIGHBOR_NEXT, surface.links[0].kind)
+        assertEquals(0, surface.signals.size)
     }
 
     @Test

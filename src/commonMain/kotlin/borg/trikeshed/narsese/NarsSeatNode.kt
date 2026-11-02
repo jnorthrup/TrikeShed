@@ -9,23 +9,13 @@ import borg.trikeshed.lcnc.boundLcnc
 import borg.trikeshed.lib.get
 import borg.trikeshed.lib.size
 /**
- * `nars.seat` — the council's NON-MODEL seat: NARS as the review of choices.
+ * `nars.seat` — an advisory, non-model council seat.
  *
- * A `council.seat` spends a model call on an opinion; this seat spends nothing
- * and answers only from curated belief: each wired choice is encoded to its
- * angular centroid ([AngularCodec], the same address `beliefs.resonate`
- * sweeps), the bag's hamming front around that centroid is revised into one
- * evidence base ([revise] — plain addition, the NAL merge), and the choice's
- * standing is [Nal.truthOf] of that base. The verdict ranks choices by
- * expectation; a choice with no resident evidence does not win by default —
- * the seat asks for clarification instead, the same escape a model judge has.
- *
- * Record shape is `council.seat`-compatible (`seat`, `panel`, `role`,
- * `round`, `charge`, `answeredBy`, `status`, `cid`, `text`, `contextId`) so
- * `text.fold` / `record.fold` / `council.record` compose unchanged, and the
- * trailing JSON verdict is exactly what `ruling.parse` extracts (strict
- * booleans included). `answeredBy` is `nars:belief-bag`: the provenance field
- * a fiduciary reader checks to see that no model spoke.
+ * A Hamming-near belief is a discovery suggestion, not evidence that a choice
+ * is the same proposition, reviewed, or independently supported. This seat
+ * reports nearby context but always requests clarification until a separate
+ * reviewed proposition-to-evidence binding is available. The council record
+ * shape is retained for `text.fold`, `record.fold` and `ruling.parse`.
  */
 object NarsSeatNode {
 
@@ -33,16 +23,6 @@ object NarsSeatNode {
 
     private fun port(inputs: Map<String, Any?>, name: String): Any? =
         inputs[name] ?: inputs["$name?"]
-
-    /** Fixed 3-decimal rendering, commonMain-legal (no String.format on JS). */
-    private fun f3(v: Float): String {
-        val scaled = (v * 1000).toInt()
-        val neg = scaled < 0
-        val abs = if (neg) -scaled else scaled
-        val whole = abs / 1000
-        val frac = (abs % 1000).toString().padStart(3, '0')
-        return (if (neg) "-" else "") + "$whole.$frac"
-    }
 
     /** Choices arrive as a MANY-collected list, one raw string, or a JSON array string. */
     private fun choicesOf(raw: Any?): List<String> = when (raw) {
@@ -55,7 +35,7 @@ object NarsSeatNode {
         else -> listOf(raw.toString())
     }.map { it.trim() }.filter { it.isNotEmpty() }
 
-    /** One choice's review: the revised evidence of its angular front, and the truth of it. */
+    /** One choice's discovery context; evidence remains empty without a verified binding. */
     data class ChoiceReview(
         val choice: String,
         val centroid: Long,
@@ -84,7 +64,6 @@ object NarsSeatNode {
         val k = node.params["k"]?.toIntOrNull() ?: 8
         val maxDistance = node.params["maxDistance"]?.toIntOrNull() ?: 16
         val taxonomy = node.params["taxonomy"]?.takeIf { it.isNotBlank() }
-        val minEvidence = (node.params["minEvidence"]?.toFloatOrNull() ?: 1f)
 
         val reviews = choices.map { choice ->
             val centroid = AngularCodec.encode(
@@ -93,43 +72,35 @@ object NarsSeatNode {
                 subjectTerm = choice,
             )
             val near = bag.recallNear(centroid, maxDistance)
-            var evidence = EvidenceCoord(0L, 0L)
+            val evidence = EvidenceCoord(0L, 0L)
             val front = ArrayList<Map<String, Any?>>()
             val bounded = if (near.size < k) near.size else k
             for (i in 0 until bounded) {
                 val signal = near[i]
-                evidence = revise(evidence, signal.evidence)
-                val truth = Nal.truthOf(signal.evidence)
                 front.add(mapOf(
                     "angular" to signal.angular.toString(),
                     "gloss" to (glossOf(signal.angular) ?: bag.glossOf(signal.angular)),
-                    "expectation" to truth.expectation(),
-                    "frequency" to truth.frequency,
+                    "relation" to signal.relation.name,
+                    "status" to "unverified-proximity",
                 ))
             }
             val truth = Nal.truthOf(evidence)
             ChoiceReview(choice, centroid, evidence, truth.expectation(), truth.frequency, truth.confidence, front)
         }
 
-        // Deterministic order: expectation, then confidence, then the text itself.
-        val ranked = reviews.sortedWith(
-            compareByDescending<ChoiceReview> { it.expectation }
-                .thenByDescending { it.confidence }
-                .thenBy { it.choice }
-        )
-        val top = ranked.first()
-        val thin = top.evidence.positive + top.evidence.negative < (minEvidence * Nal.UNIT).toLong()
+        // Preserve input order. There is no evidence-backed ranking or verdict.
+        val ranked = reviews
 
         val verdict = linkedMapOf<String, Any?>(
-            "disposition" to if (thin) "INSUFFICIENT CURATED EVIDENCE" else top.choice,
-            "needsClarification" to thin,
-            "clarificationQuestion" to
-                if (thin) "no curated belief addresses \"${top.choice}\" — admit evidence or re-phrase the choice" else "",
+            "disposition" to "INSUFFICIENT CURATED EVIDENCE",
+            "needsClarification" to true,
+            "clarificationQuestion" to "Which reviewed source and exact proposition support a choice?",
             "mistrial" to false,
-            "basis" to ANSWERED_BY,
+            "basis" to "unverified-proximity",
             "ranking" to ranked.map { r ->
                 mapOf(
                     "choice" to r.choice,
+                    "evidenceStatus" to "not-established",
                     "expectation" to r.expectation,
                     "frequency" to r.frequency,
                     "confidence" to r.confidence,
@@ -141,12 +112,8 @@ object NarsSeatNode {
 
         val body = buildString {
             appendLine("charge: $charge")
-            for (r in ranked) {
-                append("  ").append(f3(r.expectation))
-                    .append(" (f=").append(f3(r.frequency)).append(" c=").append(f3(r.confidence))
-                    .append(", w+=").append(r.evidence.positive).append(" w-=").append(r.evidence.negative)
-                    .append(") ").appendLine(r.choice)
-            }
+            appendLine("Nearby beliefs are unverified discovery context, not evidence for a choice.")
+            for (r in ranked) append("  - ").appendLine(r.choice)
             append(jsonOf(verdict))
         }
 
@@ -163,10 +130,11 @@ object NarsSeatNode {
             "text" to body,
             "chars" to body.length,
             "contextId" to contextId,
-            "basis" to ANSWERED_BY,
+            "basis" to "unverified-proximity",
             "choices" to ranked.map { r ->
                 mapOf(
                     "choice" to r.choice,
+                    "evidenceStatus" to "not-established",
                     "centroid" to r.centroid.toString(),
                     "expectation" to r.expectation,
                     "frequency" to r.frequency,

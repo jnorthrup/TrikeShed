@@ -51,6 +51,9 @@ sealed class BeliefIntake {
 
     /** Curation pulse: decay every budget via the element's decayFn, then evict below floor. */
     data object DecayTick : BeliefIntake()
+
+    /** FIFO processing fence. Completion does not imply a durable WAL flush. */
+    data class Fence(val completion: CompletableDeferred<Unit>) : BeliefIntake()
 }
 
 sealed class BeliefEvent {
@@ -157,7 +160,11 @@ class BeliefBagElement(
             var failure: Throwable? = null
             try {
                 for (cmd in intake) {
-                    val completion = (cmd as? BeliefIntake.Mint)?.completion
+                    val completion = when (cmd) {
+                        is BeliefIntake.Mint -> cmd.completion
+                        is BeliefIntake.Fence -> cmd.completion
+                        else -> null
+                    }
                     try {
                         handle(cmd)
                         completion?.complete(Unit)
@@ -178,7 +185,12 @@ class BeliefBagElement(
                 val stopped = failure ?: IllegalStateException("belief intake closed")
                 while (true) {
                     val pending = intake.tryReceive().getOrNull() ?: break
-                    (pending as? BeliefIntake.Mint)?.completion?.completeExceptionally(stopped)
+                    val completion = when (pending) {
+                        is BeliefIntake.Mint -> pending.completion
+                        is BeliefIntake.Fence -> pending.completion
+                        else -> null
+                    }
+                    completion?.completeExceptionally(stopped)
                 }
             }
         }
@@ -189,6 +201,18 @@ class BeliefBagElement(
         check(worker != null) { "Belief bag is not open" }
         val completion = CompletableDeferred<Unit>()
         intake.send(cmd.copy(completion = completion))
+        completion.await()
+    }
+
+    /**
+     * Await commands sent before this fence on the single intake channel. This
+     * is a processing boundary, not an atomic snapshot or durability guarantee;
+     * work sent later, or sent by downstream consumers, may still be pending.
+     */
+    suspend fun awaitProcessed() {
+        check(worker != null) { "Belief bag is not open" }
+        val completion = CompletableDeferred<Unit>()
+        intake.send(BeliefIntake.Fence(completion))
         completion.await()
     }
 
@@ -273,6 +297,7 @@ class BeliefBagElement(
             is BeliefIntake.Reinforce -> reinforce(cmd.angular, cmd.delta)
             is BeliefIntake.Attend -> attend(cmd.angular, cmd.budget)
             BeliefIntake.DecayTick -> decayAll()
+            is BeliefIntake.Fence -> return
         }
         momentsDirty = true
         maybeFlush()

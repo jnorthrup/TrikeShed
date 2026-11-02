@@ -66,14 +66,39 @@ sealed class Teleported {
             is Byte, is Short, is Int -> Num((o as Number).toLong())
             is String -> Str(o)
             is ByteArray -> Bytes(o)
-            is List<*> -> Arr(o.map { ofHost(it) })
-            is Array<*> -> Arr(o.map { ofHost(it) })
-            is Map<*, *> -> Obj(o.entries.map { it.key.toString() to ofHost(it.value) }.sortedBy { it.first }.toMap())
+            is List<*> -> {
+                val out = ArrayList<Teleported>(o.size)
+                for (item in o) out.add(ofHost(item))
+                Arr(out)
+            }
+            is Array<*> -> {
+                val out = ArrayList<Teleported>(o.size)
+                for (item in o) out.add(ofHost(item))
+                Arr(out)
+            }
+            is Map<*, *> -> {
+                val list = ArrayList<Pair<String, Teleported>>(o.size)
+                for ((k, v) in o) list.add(k.toString() to ofHost(v))
+                list.sortBy { it.first }
+                val map = LinkedHashMap<String, Teleported>(o.size)
+                for (i in list.indices) {
+                    val p = list[i]
+                    map[p.first] = p.second
+                }
+                Obj(map)
+            }
             else -> Opaque(o.toString())
         }
 
-        /** Build an envelope object from host values. */
-        fun obj(vararg fields: Pair<String, Any?>): Obj = Obj(fields.associate { (k, v) -> k to ofHost(v) })
+        /** Build an envelope object from host values with pre-sized map and direct iteration. */
+        fun obj(vararg fields: Pair<String, Any?>): Obj {
+            val map = LinkedHashMap<String, Teleported>(fields.size)
+            for (i in fields.indices) {
+                val pair = fields[i]
+                map[pair.first] = ofHost(pair.second)
+            }
+            return Obj(map)
+        }
 
         /**
          * Exact inverse of [canonical]. A generic JSON parser turns every number into a Double and

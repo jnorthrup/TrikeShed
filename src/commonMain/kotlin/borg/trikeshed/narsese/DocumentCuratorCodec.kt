@@ -158,8 +158,14 @@ internal object DocumentCuratorCodec {
         "axioms" to record.axioms?.values { axiom(it) },
     )
 
-    fun decode(bytes: ByteArray): DocumentCurationRecord {
-        val m = CanonicalCbor.decodeMap(bytes)
+    fun decode(bytes: ByteArray): DocumentCurationRecord = decodeMap(CanonicalCbor.decodeMap(bytes))
+
+    /** Bounded structural decode only; numeric field coercions are not strict range checks.
+     * Callers still need authorized, bounded retrieval and typed validation before trusting offsets. */
+    fun decodeBounded(bytes: ByteArray, maxBytes: Int, maxDepth: Int = 64, maxItems: Int = 1_000_000): DocumentCurationRecord =
+        decodeMap(CanonicalCbor.decodeMapBounded(bytes, maxBytes, maxDepth, maxItems))
+
+    private fun decodeMap(m: Map<String, Any?>): DocumentCurationRecord {
         require(m.int("version") == 1) { "unsupported document curation record" }
         val s = m.obj("source")
         val source = decodeSource(s)

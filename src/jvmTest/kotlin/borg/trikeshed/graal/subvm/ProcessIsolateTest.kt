@@ -6,6 +6,7 @@ import borg.trikeshed.vm.Teleported.Num
 import borg.trikeshed.vm.Teleported.Real
 import borg.trikeshed.vm.Teleported.Str
 import borg.trikeshed.pointcut.VmFacet
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -15,6 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
@@ -34,12 +36,6 @@ class ProcessIsolateTest {
             return "java.class.path: ${cp.length} chars, ${cp.split(java.io.File.pathSeparator).size} entries, " +
                 "polyglot=${cp.contains("polyglot")}, pathingJar=${cp.endsWith(".jar") && !cp.contains(java.io.File.pathSeparator)}"
         }
-
-    private fun subVmChildren(): List<ProcessHandle> = ProcessHandle.current().children().filter { h ->
-        val info = h.info()
-        val cmd = info.commandLine().orElse("") + " " + info.arguments().map { it.joinToString(" ") }.orElse("")
-        cmd.contains("SubVmMain") || cmd.isBlank()
-    }.toList()
 
     private fun spawnJs(budget: Budget = Budget(), replyTimeoutMillis: Long = 30_000) =
         ProcessIsolate("p-${System.nanoTime()}", VmFacet.GRAAL_JS, budget, replyTimeoutMillis = replyTimeoutMillis)
@@ -94,6 +90,323 @@ class ProcessIsolateTest {
         }
     }
 
+    @Test fun restrictedJsHostLeasePausesGuestWallBudget() {
+        // This lane deliberately uses wall-only guest budgeting: the existing JS
+        // statement-limited lane does not start its wall watchdog.
+        spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000).use { iso ->
+            assertTrue(iso.restrictedJsLeaseCapable)
+            assertEquals(Num(2), iso.eval("1+1")) // initialize before the timed host crossing
+            iso.delegate("slow", 4_000) { Thread.sleep(2_000); Num(7) }
+            assertEquals(Num(7), iso.eval("host.call('slow')"))
+            assertEquals(Num(3), iso.eval("1+2"))
+            assertEquals(Str("undefined"), iso.eval("typeof require"))
+            assertEquals(Str("undefined"), iso.eval("typeof process"))
+            assertFailsWith<GuestException> { iso.eval("Java.type('java.lang.System')") }
+        }
+    }
+
+    @Test fun restrictedJsExpiredHostLeaseDoesNotLeaveAStaleReply() {
+        spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000).use { iso ->
+            assertEquals(Num(1), iso.eval("1"))
+            val interrupted = CountDownLatch(1)
+            iso.delegate("timeout", 400) {
+                try { Thread.sleep(5_000); Num(0) }
+                catch (e: InterruptedException) { interrupted.countDown(); throw e }
+            }
+            assertFailsWith<GuestException> { iso.eval("host.call('timeout')") }
+            assertTrue(interrupted.await(5, TimeUnit.SECONDS), "cooperative host callback was not interrupted")
+            // A failed leased crossing revokes the child, so a late reply cannot
+            // be mistaken for another operation on the same isolate.
+            assertFalse(iso.isAlive)
+            assertFailsWith<GuestException> { iso.eval("19") }
+        }
+    }
+
+    @Test fun restrictedJsGuestWallAndRegistrationFailClosed() {
+        spawnJs(Budget(statements = 0, wallMillis = 1_000), replyTimeoutMillis = 6_000).use { iso ->
+            assertTrue(iso.restrictedJsLeaseCapable)
+            iso.delegate("value") { Num(11) }
+            // A rejected registration cannot replace the prior delegate.
+            assertFailsWith<IllegalArgumentException> { iso.delegate("value", 6_000) { Num(99) } }
+            assertEquals(Num(11), iso.eval("host.call('value')"))
+            iso.delegate("leased", 3_000) { Num(1) }
+            assertFailsWith<IllegalArgumentException> { iso.delegate("leased") { Num(2) } }
+            assertEquals(Num(1), iso.eval("host.call('leased')"))
+            assertFailsWith<GuestException> { iso.eval("while(true){}") }
+        }
+    }
+
+    @Test fun statementLimitedJsIsNotMisrepresentedAsWallLeased() {
+        spawnJs().use { iso ->
+            assertFalse(iso.restrictedJsLeaseCapable)
+            assertFailsWith<IllegalArgumentException> { iso.delegate("leased", 1_000) { Num(1) } }
+            assertEquals(Num(2), iso.eval("1+1"))
+        }
+    }
+
+    @Test fun nodeLauncherCannotRegisterRestrictedJsLeases() {
+        val node = System.getenv("PATH").orEmpty().split(java.io.File.pathSeparator)
+            .map { java.io.File(it, "node") }.firstOrNull { it.isFile && it.canExecute() }
+        assumeTrue(node != null, "Node launcher is unavailable")
+        ProcessIsolate("node-lease-${System.nanoTime()}", VmFacet.GRAAL_JS,
+            budget = Budget(statements = 0, wallMillis = 1_000), nodeLauncher = node,
+            replyTimeoutMillis = 6_000).use { iso ->
+            assertFalse(iso.restrictedJsLeaseCapable)
+            assertFailsWith<IllegalArgumentException> { iso.delegate("leased", 1_000) { Num(1) } }
+            assertEquals(Num(2), iso.eval("1+1"))
+        }
+    }
+
+    @Test fun restrictedJsChildDeathWaitsForAdmittedHostCleanup() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        val entered = CountDownLatch(1)
+        val cleaning = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val outcome = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        try {
+            iso.eval("1")
+            iso.delegate("work", 1_000) {
+                entered.countDown()
+                try { Thread.sleep(30_000); Num(1) }
+                catch (e: InterruptedException) {
+                    cleaning.countDown()
+                    while (true) try { release.await(); break } catch (_: InterruptedException) { }
+                    throw e
+                }
+            }
+            caller = Thread({ try { iso.eval("host.call('work')") } catch (e: Throwable) { outcome.set(e) } }).apply {
+                isDaemon = true; start()
+            }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            assertTrue(ProcessHandle.of(iso.processId).orElseThrow().destroyForcibly())
+            assertTrue(cleaning.await(8, TimeUnit.SECONDS), "host cleanup did not begin")
+            assertTrue(caller.isAlive, "crossing returned before admitted host cleanup")
+            release.countDown()
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertIs<GuestException>(outcome.get())
+            assertFalse(iso.isAlive)
+            assertFailsWith<GuestException> { iso.eval("1") }
+        } finally {
+            release.countDown()
+            caller?.join(10_000)
+            iso.close()
+        }
+    }
+
+    @Test fun restrictedJsInterruptedCallerRevokesAndWaitsForHostCleanup() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        val entered = CountDownLatch(1)
+        val cleaning = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val outcome = AtomicReference<Throwable?>()
+        val interruptRestored = java.util.concurrent.atomic.AtomicBoolean(false)
+        var caller: Thread? = null
+        try {
+            iso.eval("1")
+            iso.delegate("work", 1_000) {
+                entered.countDown()
+                try { Thread.sleep(30_000); Num(1) }
+                catch (e: InterruptedException) {
+                    cleaning.countDown()
+                    while (true) try { release.await(); break } catch (_: InterruptedException) { }
+                    throw e
+                }
+            }
+            caller = Thread({
+                try { iso.eval("host.call('work')") }
+                catch (e: Throwable) { outcome.set(e); interruptRestored.set(Thread.currentThread().isInterrupted) }
+            }).apply { isDaemon = true; start() }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            caller.interrupt()
+            assertTrue(cleaning.await(8, TimeUnit.SECONDS), "host cleanup did not begin")
+            assertTrue(caller.isAlive, "interrupted caller returned before admitted host cleanup")
+            release.countDown()
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertIs<InterruptedException>(outcome.get())
+            assertTrue(interruptRestored.get(), "caller interrupt status was not restored")
+            assertFalse(iso.isAlive)
+            assertFailsWith<GuestException> { iso.eval("1") }
+        } finally {
+            release.countDown()
+            caller?.join(10_000)
+            iso.close()
+        }
+    }
+
+    @Test fun restrictedJsBoundsPreviouslyRegisteredOrdinaryDelegate() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_000), replyTimeoutMillis = 6_000)
+        val interrupted = CountDownLatch(1)
+        try {
+            iso.eval("1")
+            // Pi installs its catalogue before the first leased delegate.
+            iso.delegate("ordinary") {
+                try { Thread.sleep(30_000); Num(0) }
+                catch (e: InterruptedException) { interrupted.countDown(); throw e }
+            }
+            iso.delegate("leased", 3_000) { Num(1) }
+            assertFailsWith<GuestException> { iso.eval("host.call('ordinary')") }
+            assertTrue(interrupted.await(5, TimeUnit.SECONDS), "ordinary callback was not interrupted")
+            assertFalse(iso.isAlive)
+        } finally { iso.close() }
+    }
+
+    @Test fun restrictedJsRejectsSynchronousHostReentryBeforeTakingIsolateLock() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        try {
+            iso.eval("1")
+            iso.delegate("reenter", 4_000) { iso.eval("1+1") }
+            val start = System.nanoTime()
+            assertFailsWith<GuestException> { iso.eval("host.call('reenter')") }
+            assertTrue(System.nanoTime() - start < TimeUnit.SECONDS.toNanos(7), "host callback deadlocked on the isolate")
+            assertFalse(iso.isAlive)
+        } finally { iso.close() }
+    }
+
+    @Test fun restrictedJsRejectsCrossThreadReentryWithoutBlockingHostCleanup() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        try {
+            iso.eval("1")
+            iso.delegate("reenter", 4_000) {
+                val result = AtomicReference<Throwable?>()
+                val thread = Thread({
+                    try { iso.eval("2") } catch (e: Throwable) { result.set(e) }
+                }).apply { isDaemon = true; start() }
+                thread.join(2_000)
+                check(!thread.isAlive) { "cross-thread reentry blocked on the isolate" }
+                check(result.get() is IllegalStateException) { "cross-thread reentry was not refused" }
+                Num(42)
+            }
+            assertEquals(Num(42), iso.eval("host.call('reenter')"))
+            assertEquals(Num(2), iso.eval("1+1"))
+        } finally { iso.close() }
+    }
+
+    @Test fun restrictedJsRejectsCrossThreadInterruptWhileCrossingIsActive() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        try {
+            iso.eval("1")
+            iso.delegate("reenter", 4_000) {
+                val result = AtomicReference<Throwable?>()
+                val thread = Thread({ try { iso.interrupt() } catch (e: Throwable) { result.set(e) } })
+                    .apply { isDaemon = true; start() }
+                thread.join(2_000)
+                check(!thread.isAlive) { "cross-thread interrupt blocked on the isolate" }
+                check(result.get() is IllegalStateException) { "cross-thread interrupt was not refused" }
+                Num(42)
+            }
+            assertEquals(Num(42), iso.eval("host.call('reenter')"))
+            assertEquals(Num(2), iso.eval("1+1"))
+        } finally { iso.close() }
+    }
+
+    @Test fun restrictedJsBusyLifecycleCallsFailWithoutClosingTheChild() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val outcome = AtomicReference<Teleported?>()
+        val failure = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        try {
+            iso.eval("1")
+            iso.delegate("hold", 4_000) { entered.countDown(); release.await(); Num(7) }
+            caller = Thread({
+                try { outcome.set(iso.eval("host.call('hold')")) } catch (e: Throwable) { failure.set(e) }
+            }).apply { isDaemon = true; start() }
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
+            assertFailsWith<IllegalStateException> { iso.close() }
+            assertFailsWith<IllegalStateException> { iso.interrupt() }
+            assertFailsWith<IllegalStateException> { iso.pushInput("input") }
+            assertTrue(iso.isAlive, "busy close must not silently close the child")
+            release.countDown()
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertNull(failure.get())
+            assertEquals(Num(7), outcome.get())
+        } finally {
+            release.countDown()
+            caller?.join(10_000)
+            iso.close()
+        }
+    }
+
+    @Test fun restrictedJsFirstLeaseCannotRaceWithOrdinaryDelegateReplacement() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 8_000)
+        val lock = ProcessIsolate::class.java.getDeclaredField("lock").let {
+            it.isAccessible = true
+            it.get(iso) as java.util.concurrent.locks.ReentrantLock
+        }
+        val outcome = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        try {
+            iso.eval("1")
+            lock.lock()
+            try {
+                caller = Thread({
+                    try { iso.delegate("race") { Num(99) } } catch (e: Throwable) { outcome.set(e) }
+                }).apply { isDaemon = true; start() }
+                val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+                while (!lock.hasQueuedThread(caller) && System.nanoTime() < deadline) Thread.sleep(10)
+                assertTrue(lock.hasQueuedThread(caller), "ordinary registration did not queue")
+                // Reentrant acquisition lets this registration activate the leased lane
+                // before the queued ordinary registration gets the crossing lock.
+                iso.delegate("race", 4_000) { Num(1) }
+            } finally { lock.unlock() }
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertIs<IllegalArgumentException>(outcome.get())
+            assertEquals(Num(1), iso.eval("host.call('race')"))
+        } finally {
+            caller?.join(10_000)
+            iso.close()
+        }
+    }
+
+    @Test fun restrictedJsOuterDeadlineRevokesAndWaitsForAdmittedHostCleanup() {
+        val iso = spawnJs(Budget(statements = 0, wallMillis = 1_500), replyTimeoutMillis = 7_000)
+        val entered = CountDownLatch(1)
+        val cleaning = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val calls = java.util.concurrent.atomic.AtomicInteger()
+        val outcome = AtomicReference<Throwable?>()
+        var caller: Thread? = null
+        try {
+            iso.eval("1")
+            iso.delegate("work", 4_000) {
+                if (calls.incrementAndGet() <= 4) { Thread.sleep(900); Num(1) }
+                else {
+                    entered.countDown()
+                    try { Thread.sleep(30_000); Num(1) }
+                    catch (e: InterruptedException) {
+                        cleaning.countDown()
+                        while (true) try { release.await(); break } catch (_: InterruptedException) { }
+                        throw e
+                    }
+                }
+            }
+            caller = Thread({
+                try { iso.eval("for (let i=0;i<5;i++) host.call('work'); 19") } catch (e: Throwable) { outcome.set(e) }
+            }).apply { isDaemon = true; start() }
+            assertTrue(entered.await(8, TimeUnit.SECONDS), "final host call was not admitted")
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(8)
+            while (iso.isAlive && System.nanoTime() < deadline) Thread.sleep(20)
+            assertFalse(iso.isAlive, "outer deadline did not revoke the child")
+            assertTrue(cleaning.await(8, TimeUnit.SECONDS), "host cleanup did not begin")
+            assertTrue(caller.isAlive, "crossing returned before admitted host cleanup")
+            release.countDown()
+            caller.join(10_000)
+            assertFalse(caller.isAlive)
+            assertIs<GuestException>(outcome.get())
+            assertFailsWith<GuestException> { iso.eval("19") }
+        } finally {
+            release.countDown()
+            caller?.join(10_000)
+            iso.close()
+        }
+    }
+
     /**
      * The envelope is `reify`: `stringify` escapes a source's `"` and newlines, but the reader
      * hands the escapes through verbatim, so the guest receives `\"` and `\n` as two characters. Every
@@ -123,17 +436,20 @@ class ProcessIsolateTest {
     }
 
     @Test fun interruptDestroysAHungChild() {
-        val before = subVmChildren().size
         val iso = spawnJs(Budget(statements = 0, wallMillis = 0), replyTimeoutMillis = 8_000)
+        var caller: Thread? = null
         try {
             assertEquals(Num(1), iso.eval("1"))
-            assertTrue(subVmChildren().size >= before + 1, "child JVM visible as a direct child process")
+            val child = ProcessHandle.of(iso.processId).orElseThrow()
+            assertTrue(child.isAlive, "the isolate's exact child process is alive")
+            assertEquals(ProcessHandle.current().pid(), child.parent().orElseThrow().pid(), "isolate child belongs to this JVM")
             val outcome = AtomicReference<Throwable?>()
             val entered = CountDownLatch(1)
             val t = Thread({
                 entered.countDown()
                 try { iso.eval("while(true){}") } catch (e: Throwable) { outcome.set(e) }
             }, "hung-guest").apply { isDaemon = true }
+            caller = t
             t.start(); entered.await()
             Thread.sleep(500)
             val t0 = System.nanoTime()
@@ -142,28 +458,37 @@ class ProcessIsolateTest {
             assertTrue(ms < 6_500, "interrupt() returned after ${ms}ms")
             assertFalse(iso.isAlive, "hung child must be destroyed")
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            while (subVmChildren().size > before && System.nanoTime() < deadline) Thread.sleep(50)
-            assertEquals(before, subVmChildren().size, "child process gone after destroyForcibly")
+            while (child.isAlive && System.nanoTime() < deadline) Thread.sleep(50)
+            assertFalse(child.isAlive, "the isolate's exact child process is gone after interrupt")
             t.join(20_000)
             assertFalse(t.isAlive, "eval thread released after the child died")
             val e = outcome.get()
             assertIs<GuestException>(e, "hung eval ended with $e")
             assertTrue(e.kind == GuestFailure.DEAD || e.kind == GuestFailure.INTERRUPTED, e.message)
-        } finally { iso.close() }
+        } finally {
+            if (caller?.isAlive == true) runCatching { iso.interrupt() }
+            caller?.join(20_000)
+            iso.close()
+        }
     }
 
     @Test fun closeTerminatesTheChildProcess() {
-        val before = subVmChildren().size
         val iso = spawnJs()
-        assertEquals(Num(4), iso.eval("2+2"))
-        assertTrue(subVmChildren().size >= before + 1)
-        iso.close()
-        assertFalse(iso.isAlive)
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-        while (subVmChildren().size > before && System.nanoTime() < deadline) Thread.sleep(50)
-        assertEquals(before, subVmChildren().size, "child process gone after close()")
-        val e = assertFailsWith<GuestException> { iso.eval("1") }
-        assertEquals(GuestFailure.DEAD, e.kind)
+        var closed = false
+        try {
+            assertEquals(Num(4), iso.eval("2+2"))
+            val child = ProcessHandle.of(iso.processId).orElseThrow()
+            assertTrue(child.isAlive, "the isolate's exact child process is alive")
+            assertEquals(ProcessHandle.current().pid(), child.parent().orElseThrow().pid(), "isolate child belongs to this JVM")
+            iso.close()
+            closed = true
+            assertFalse(iso.isAlive)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (child.isAlive && System.nanoTime() < deadline) Thread.sleep(50)
+            assertFalse(child.isAlive, "the isolate's exact child process is gone after close()")
+            val e = assertFailsWith<GuestException> { iso.eval("1") }
+            assertEquals(GuestFailure.DEAD, e.kind)
+        } finally { if (!closed) iso.close() }
     }
 
     @Test fun closePreservesAnAdmittedHostCallBeyondTheFormerKillGrace() {

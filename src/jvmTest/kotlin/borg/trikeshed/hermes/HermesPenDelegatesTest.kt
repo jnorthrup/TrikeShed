@@ -131,6 +131,98 @@ class HermesPenDelegatesTest {
     }
 
     @Test
+    fun providerExplicitBreadcrumbProjectionKeepsSessionsSeparate() = runBlocking {
+        val sent = mutableListOf<String>()
+        val htx = openHtxElement(routeService = object : HtxRouteService {
+            override suspend fun exchange(state: HtxExchangeState, request: HtxRequest): HtxExchangeResult {
+                sent.add(request.body.toArray().decodeToString())
+                val reply = HtxResponse(200, body = ByteSeries(
+                    """{"choices":[{"message":{"role":"assistant","content":"answer"}}]}""".encodeToByteArray()))
+                return HtxExchangeResult(state.copy(lifecycle = HtxExchangeLifecycle.RESPONDED, request = request, response = reply))
+            }
+        })
+        val mux = ModelMux(KeyMux { bind("llm.fixture.key", TestKeySource()) }) {
+            model("fixture", caps = setOf("chat", "tools"), baseUrl = "https://fixture.invalid/v1")
+        }
+        val board = ConfixBlackboard.empty()
+        val breadcrumbs = BreadcrumbElement({ BreadcrumbContext({ 0L }) })
+        val generation = BreadcrumbGeneration(this, "case-a")
+        try {
+            breadcrumbs.transact("case-b") { it.put(BreadcrumbId("same-call"), "tool:same-call", "second evidence") }
+            HermesPythonPort(blackboard = board, pen = HermesPen(board, modelMux = mux, muxContext = htx + breadcrumbs,
+                breadcrumbGeneration = generation)).use { port ->
+                port.importInVm(port.inventorySources(emptyMap()), HermesModelProvider.MODULE)
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    import trikeshed_modelmux as mux
+                    client = mux.ModelMuxClient()
+                    client.create(model='fixture', messages=[
+                            {'role':'assistant','content':None,'tool_calls':[{'id':'same-call','type':'function','function':{'name':'lookup','arguments':'{}'}}]},
+                            {'role':'tool','tool_call_id':'same-call','content':'first evidence'}],
+                            extra_body={'breadcrumb_context':'case-a'})
+                    def tool(session, name, arguments):
+                        return json.loads(host.call('mux_breadcrumb', session, name, json.dumps(arguments)))
+                    first = json.loads(tool('case-a', 'search', {'query':'first'})['content'])
+                    assert len(first['matches']) == 1
+                    match = first['matches'][0]
+                    found = json.loads(tool('case-a', 'recall', {'ref':match['ref'], 'cid':match['cid'], 'presence':1})['content'])
+                    assert found['ranges'][0]['content'] == 'first evidence'
+                    metadata = json.loads(tool('case-a', 'recall', {'ref':match['ref'], 'cid':match['cid'], 'presence':0})['content'])
+                    assert not metadata['ranges'] and metadata['omittedChars'] == len('first evidence')
+                    assert tool('case-b', 'search', {'query':'second'})['verdict'] == 'forbidden'
+                    assert tool('case-b', 'recall', {'ref':match['ref'], 'cid':match['cid'], 'presence':1})['verdict'] == 'forbidden'
+                    request = {'messages':[{'role':'user','content':'hello'}], 'breadcrumb_context':'case-b'}
+                    assert json.loads(host.call('mux_completion', 'fixture', json.dumps(request)))['verdict'] == 'forbidden'
+                    request.pop('breadcrumb_context')
+                    assert json.loads(host.call('mux_completion', 'fixture', json.dumps(request), 1500, 'case-b'))['verdict'] == 'forbidden'
+                    for raw in (
+                        '{"breadcrumb_context":"case-a","breadcrumb_context":"case-b","messages":[]}',
+                        '{"breadcrumb_context":"case-b","breadcrumb_context":"case-a","messages":[]}',
+                        '{"breadcrumb_context":"case-a","messages":[]'):
+                        assert json.loads(host.call('mux_completion', 'fixture', raw))['verdict'] == 'bad-args'
+                    True
+                """.trimIndent()))
+                generation.drain()
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    r = json.loads(host.call('mux_breadcrumb', 'case-a', 'search', '{"query":"first"}'))
+                    assert r['verdict'] != 'ok'
+                    True
+                """.trimIndent()))
+            }
+            HermesPythonPort(blackboard = board, pen = HermesPen(board, modelMux = mux, muxContext = htx + breadcrumbs,
+                breadcrumbSession = { "case-b" })).use { port ->
+                port.importInVm(port.inventorySources(emptyMap()), HermesModelProvider.MODULE)
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    own = json.loads(host.call('mux_breadcrumb', 'case-b', 'search', '{"query":"second"}'))
+                    assert len(json.loads(own['content'])['matches']) == 1
+                    foreign = json.loads(host.call('mux_breadcrumb', 'case-a', 'search', '{"query":"first"}'))
+                    assert foreign['verdict'] == 'forbidden'
+                    True
+                """.trimIndent()))
+            }
+            HermesPythonPort(blackboard = board, pen = HermesPen(board, modelMux = mux, muxContext = htx + breadcrumbs)).use { port ->
+                port.importInVm(port.inventorySources(emptyMap()), HermesModelProvider.MODULE)
+                assertEquals(Teleported.Bool(true), port.evalInVm("""
+                    import json
+                    assert json.loads(host.call('mux_breadcrumb', 'case-a', 'search', '{"query":"first"}'))['verdict'] == 'no-context'
+                    request = {'messages':[{'role':'user','content':'hello'}], 'breadcrumb_context':'case-a'}
+                    assert json.loads(host.call('mux_completion', 'fixture', json.dumps(request)))['verdict'] == 'no-context'
+                    True
+                """.trimIndent()))
+            }
+            assertEquals(1, sent.size)
+            val first = confixDoc(sent[0])
+            assertEquals(null, first.getAt("breadcrumb_context"), "The local routing key must not reach the provider")
+            assertEquals("first evidence", confixDoc(first.value("messages", 1, "content") as String).value("content"))
+            assertEquals("breadcrumb", first.value("tools", 0, "function", "name"))
+            assertEquals("first evidence", breadcrumbs.transact("case-a", create = false) { it.lookup(BreadcrumbId("same-call"))!!.content })
+            assertEquals("second evidence", breadcrumbs.transact("case-b", create = false) { it.lookup(BreadcrumbId("same-call"))!!.content })
+        } finally { generation.drain(); htx.close() }
+    }
+
+    @Test
     fun guestConversationPreservesToolCallsAndTextUsage() = runBlocking {
         val sent = mutableListOf<String>()
         val response = """{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"answer","tool_calls":[{"id":"call-2","type":"function","function":{"name":"lookup","arguments":"{\"q\":\"µ 🦉\"}"}}]}}],"usage":{"prompt_tokens":4,"completion_tokens":2}}"""
@@ -148,7 +240,8 @@ class HermesPenDelegatesTest {
         val breadcrumbs = BreadcrumbElement()
         try {
             guest().use { g ->
-                HermesPen(blackboard, modelMux = mux, muxContext = htx + breadcrumbs).install(g)
+                HermesPen(blackboard, modelMux = mux, muxContext = htx + breadcrumbs,
+                    breadcrumbSession = { "hermes-session" }).install(g)
                 val out = g.eval("""
                     import json
                     request = {

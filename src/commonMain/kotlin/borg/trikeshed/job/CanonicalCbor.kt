@@ -118,6 +118,14 @@ object CanonicalCbor {
         return m.entries.associate { it.key.toString() to it.value }
     }
 
+    /** Bounded JSON-shaped decode for untrusted bytes; rejects unsupported CBOR structures. */
+    fun decodeMapBounded(bytes: ByteArray, maxBytes: Int, maxDepth: Int = 64, maxItems: Int = 1_000_000): Map<String, Any?> {
+        val item = Cbor.decodeBounded(bytes, maxBytes, maxDepth, maxItems)
+        require(item is Item.Map) { "CBOR root must be a map" }
+        @Suppress("UNCHECKED_CAST")
+        return item.toAny() as Map<String, Any?>
+    }
+
     private fun encodeSortedMap(fields: Map<String, Any?>): ByteArray {
         val pairs = fields.entries.map { it.key to toCanonical(it.value.toItem()) }.toTypedArray()
         val sortedPairs = pairs.sortedBy { it.first }.toTypedArray()

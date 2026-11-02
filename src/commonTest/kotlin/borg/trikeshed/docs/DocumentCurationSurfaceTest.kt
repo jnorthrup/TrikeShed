@@ -4,6 +4,18 @@ import borg.trikeshed.parse.reify
 import kotlin.test.*
 
 class DocumentCurationSurfaceTest {
+    @Test fun sourceLinkKeepsProjectAndDocumentIdentityAndDistinguishesCurrentRevision() {
+        val html = render("""{
+            "source":{"name":"agreement","project":{"project":"dept/research & review","id":"contracts/buyer's.pdf","rev":"1-old"}}
+        }""")
+        assertContains(html, "/documents#dept%2Fresearch%20%26%20review/contracts%2Fbuyer%27s.pdf")
+        assertContains(html, "data-source-project=\"dept/research &amp; review\"")
+        assertContains(html, "data-source-document=\"contracts/buyer's.pdf\"")
+        assertContains(html, "it may have changed since this attempt")
+        assertFalse(render("""{"source":{"name":"only text"}}""").contains("Open current project document"))
+        assertFalse(render("""{"source":{"project":{"project":"curation","id":"doc"}}}""").contains("Open current project document"))
+    }
+
     @Test fun retainedAttemptAndStageLinksPinCborWithoutLoadingOrExecutingAProgram() {
         val cid = "sha256:" + "a".repeat(64)
         val stage = "sha256:" + "b".repeat(64)

@@ -88,11 +88,10 @@ class FragmentCodeIngestTest {
             "binary chunks must not all collapse into the printable code",
         )
 
-        // CAUSALITY links between same-schema chunks: subject/object terms equal →
-        // their angulars must be hamming-tiny (the FNV-era avalanche would scatter them)
+        // Similarity suggestions for same-schema chunks share close coordinates.
         val angulars = (0 until surface.signals.size).map { surface.signals[it].angular }
-        val causalSameSchema = angulars.take(4) // chunk0→1, 1→2, 2→3, 3→4 ... includes schema boundary at 1→2
-        val within = hamming(causalSameSchema[0], causalSameSchema[1])
+        assertTrue(angulars.size >= 2)
+        val within = hamming(angulars[0], angulars[1])
         assertTrue(within <= 24, "same-position link angulars hamming $within must be moderate (≤24), FNV gave ~32 mean")
     }
 
@@ -108,11 +107,11 @@ class FragmentCodeIngestTest {
         """.trimIndent()
         val surface = ContentEpistemicIngest.ingest(cas, text)
         assertTrue(surface.signals.size > 0, "region links exist")
-        // CAUSALITY chain angulars across similar regions must cluster — revision
-        // (same angular ⇒ evidence union) can only dedupe if coordinates collide meaningfully
+        // Coordinates must encode the same relation carried by their signals.
         for (i in 0 until surface.signals.size) {
             val s = surface.signals[i]
             assertTrue(s.angular != 0L, "angular minted")
+            assertEquals(s.relation, AngularCodec.Fields.relationOf(s.angular))
         }
     }
 }
