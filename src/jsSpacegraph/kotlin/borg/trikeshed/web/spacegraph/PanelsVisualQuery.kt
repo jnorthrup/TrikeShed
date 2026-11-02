@@ -9,7 +9,7 @@ private fun appendReportedCurationLinks(target: dynamic, context: dynamic) {
     if (context == null || !isArray(context.candidates)) return
     for (raw in arr(context.candidates)) {
         if (raw == null) continue
-        val candidate = raw.asDynamic()
+        val candidate: dynamic = raw
         if (jsTypeOf(candidate.fact) != "string") continue
         val values = candidate.fields?.curationCid
         if (!isArray(values)) continue
