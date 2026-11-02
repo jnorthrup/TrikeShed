@@ -117,6 +117,7 @@ jobs:
           def release():
               value = api('releases/' + str(RELEASE))
               require(value.get('id') == RELEASE and value.get('tag_name') == TAG and
+                      value.get('target_commitish') == SOURCE and
                       type(value.get('draft')) is bool, 'Remote release identity mismatch')
               return value
 
