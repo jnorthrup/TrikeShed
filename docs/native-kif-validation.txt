@@ -1,0 +1,54 @@
+Native KIF/SUMO validation — 2026-11-02
+
+Actual upstream source: jnorthrup/mlir-nix
+1547e4a37ea1393a7cd3e3cfe7a89aff38a36dba, with no tracked source edits.
+Pinned sumo-nix solver: 1e2fb138d562769d21e7f3e6cfdade9129705ec4.
+
+The workspace now has an actual native mlnix-opt and mlnix, built with
+LLVM/MLIR22.1.8, GCC14.2/C++20 and two compiler jobs (94.43 seconds).
+32 official Debian/LLVM packages (216643120 download bytes) were checked against
+signed repository metadata and package SHA256, then extracted locally. Nothing
+was installed into or replaced on the host. One SDK CMake libz3 import path was
+relocated to its matching extracted library; no SDK binary or upstream source
+was altered. Full package/relocation manifests and the first failed attempt remain.
+
+Native binary SHA256:
+mlnix     97d00dc8d4da0faedd000e434e47c380a5a80335a93376ff5d14337fc6b40fd5
+mlnix-opt 317af11429f66562789f3bcc8a138b02df89b4756918d9a83b00c7bbb25c6e54
+
+Validation passed:
+* Upstream registered KIF/SUMO positive/negative tests: 2 passed, 0 failed.
+* Full upstream MLIR tests: 21 passed, 0 failed; 4 RUN lines explicitly skipped
+  because LLVM22 lacks dynamic-IRDL CSE. Static KIF CSE and lowering ran.
+* Eight actual Kotlin-generated fixtures parsed, lowered through --sumo-to-kif
+  --kif-to-nix, then executed by mlnix run-mlir --json. Every facts/rules value
+  exactly matched the exporter JSON, including escaped quotes/backslashes,
+  Greek text, a non-BMP scalar and a quoted ?-prefixed literal.
+* The fixed utils/sumo-nix/run.nix adapter ran on native mlnix for seven original
+  exports and seven native MLIR roundtrips rejoined with their unchanged query
+  and provenance sidecars. All 14 entire result JSON objects exactly matched
+  official Nix2.35.4: supported/unknown, first proof, support removal and review
+  observation cases. Original oracle input CIDs were checked; derived inputs
+  were also independently evaluated by official Nix.
+
+The adapter and datalog hashes were asserted; ontology=null throughout.
+This proves the registered native dialect/export/lowering/evaluator chain and
+positive-scalar-Horn first-proof reasoning on these inputs. UNKNOWN means no
+proof in this fragment, never refutation. It does not establish full SUMO or
+general KIF semantics, all-proof maintenance, authenticated human review,
+production host-query integration or OS isolation. Native query processes used
+45-second/8GiB limits; the official Nix oracle used its existing offline wrapper.
+
+An initial full-suite failure was only the upstream test's source/build/lib
+path assumption against the external build directory. A temporary alias to the
+same actual build corrected the harness; it was removed afterward. Both logs
+are preserved. SDK provisioning and native compilation are finished, with no
+build process left running; the SDK remains available for repeatable validation.
+
+Artifacts: /workspace/library-files/mlnix-native-validation/
+verified-summary-sanitized.json contains pins, counts, statuses, hashes and
+limits, without raw provenance text, credentials or headers. native-results/
+retains parsed/lowered MLIR and actual JSON; solver-results/ retains native and
+official oracle outputs. provision.py, build.py, validate.py and solve.py retain
+the concrete method; build settings, signed metadata, packages and SDK relocation
+manifests retain provenance. The actual compiled tools are under build/bin/.
