@@ -47,6 +47,22 @@ legal review, visual-query lowering and NARS experiment receipts. Cloud log:
 coordinated-slice-tests-v13.log; XML results archived before subsequent runs.
 Also pending: real document review route and visual SPARQL browser proofs.
 
+Individual 1917 document pilot: real book.curate with NO_KBP completed in about
+100 seconds over hash-verified retained extraction from the supplied PDF.
+The saved receipt was inspected read-only: 598 unreviewed candidates, all 598
+quotations exact against extracted text, and 14 raw parser receipts checked for
+digest/profile/configuration. Receipt f3d5361d8bef45e0cc81f10f861ed04fc71c21c0817c400587c5e1d5ceee7d44.
+No approval, constellation membership, rule admission or live graph mutation.
+This reused the original extraction, with anchors on 72 of 80 pages and known
+layout defects; it does not establish fresh OCR quality, statutory authority,
+semantic accuracy or footnote parsing. Original inspector limit failure is
+preserved separately from the successful read-only inspection.
+Cloud artifacts: parser-probes/trading-enemy-NO_KBP-retained-baseline-run-et9ej5.
+
+Production browser v14: StrictBookReviewLoopbackTest passed against the real
+review wire and bounded file CAS. Visual SPARQL proof failed on missing reported
+curation links; investigation is open, so that proof is not counted as passed.
+
 Limits: Pi integrates agent-core, not the Node coding CLI/extensions. It uses
 buffered completions and explicit breadcrumb tools, without automatic context
 projection or session resume. Retained contexts have finite capacity. Shared
