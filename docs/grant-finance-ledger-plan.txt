@@ -1,0 +1,37 @@
+Grant / finance / legal / reconciliation engineering scope
+Read-only audit, 2026-11-02. No production edits, builds, deployments, or new test executions.
+
+Observed foundation
+- src/commonMain/resources/lcnc/nonprofit/{workflow,source-store,semantic-map}.json composes project document inventory, extraction, native Camel/JDBC PostgreSQL retention/readback, literal vocabulary candidates and review displays. It is not a grant-management or accounting implementation.
+- docs/lcnc/nonprofit-camel-postgres.md explicitly calls the flow an executed local demonstration. Its recorded execution evidence belongs to an isolated macOS port-8890 deployment, not a fresh verification in this workspace. Native Camel is OWN host code with JDBC reach, not a sandbox. Deployment paths/endpoints are local examples.
+- The source-store checks exact source identity and extraction-origin pairs, UTF-8 SHA-256 text identity and parameterized SQL; these can support future evidence references. The semantic map marks candidates proposed, uses exact UTF-16 source offsets and emits no accepted relationships. Its bounded preview and lexical matching cannot establish grant eligibility, impact, compliance or accounting classification.
+- LegalNodes.kt and LegalCurationCouncilTest.kt provide canonical document curation/evidence and council seams. The test supplies a synthetic deterministic model/council, rejects an invented quotation, and preserves original/extracted CIDs. This is useful evidence machinery, not independent legal correctness or jurisdiction-specific advice.
+
+Concrete blocking gaps
+1. CSV import: lcnc/reactor/CsvIngestCodec.kt splits physical lines and delimiters, trims cells, zips headers to values without arity checks, and only retains id/title/parent in empty-content pages. Ordinary fields such as amount/value are discarded. Quoted commas, escaped quotes and embedded newlines are not handled by this codec. Its sole CsvIngestCodecTest checks two simple rows and IDs/titles, not retained monetary cells or malformed records. Existing parse/csv utilities should be assessed for reuse rather than adding a competing parser.
+2. Exact money: lcnc/rollup/RollupReducer.kt converts Number to Double, sums Double, and rounds with powers of ten. That is not an exact-decimal accounting path. Existing JVM ConfixBean BigDecimal roundtrip tests show reusable decimal-preserving storage machinery; no dedicated accounting schema was found in the bounded source search. Graal Teleport may demote representable BigDecimal to Real or leave others opaque: do not send money through untyped numeric guest values. Use canonical decimal strings with explicit scale/currency or checked integer minor units; reject unsupported currency/scale rather than silently round.
+3. Reconciliation: no bank-statement-to-journal match engine, immutable journal posting API, chart of accounts, balanced debit/credit admission, accounting period controls, reversal semantics, or restricted-fund rules were established by this audit. Runtime consumed/provenance ledgers and Git/worktree reconciliation are unrelated and must not be described as financial ledgers.
+4. Grants: document retrieval exists, but grant identity/funder/program, award version, restricted purpose, allowable cost rules, budget line allocations, evidence requirements, deadlines, disbursement schedules, expenditure links and reviewer authority need explicit domain records. Lexical outcome/indicator candidates do not supply them.
+5. Legal/approval: durable decisions must bind exact source and extraction CIDs plus rule/policy version, actor and timestamp, and fail stale revisions. The nonprofit documentation itself identifies versioned analyst approval and authentication as open boundaries. Jurisdiction, effective dates, obligations/exceptions and human sign-off cannot be inferred from council text. Do not enable automated filing/payment or treat a model disposition as legal authority.
+
+Smallest coherent first slice (proposed, not implemented)
+An offline review-only bank CSV versus approved-expenditure CSV reconciliation, one declared currency and scale, with no model requirement and no posting/payment authority. Keep raw source bytes/CIDs, parser configuration/version, row number and exact source cell strings. Parse with quoted-field semantics and explicit required unique headers; reject malformed rows, duplicate external IDs, unsupported locale/currency and excess precision. Store amounts losslessly. Accept only exact, unambiguous matches under a declared rule (e.g. account + external transaction reference + signed amount + currency); keep every ambiguous, duplicate, unmatched and invalid row visible for review. Do not guess matches by model similarity. Produce exact opening + movement = closing and matched/unmatched totals, with sign convention stated. Reviewer acceptance creates an immutable decision referencing the two source versions and rule version; any changed input invalidates reuse. This is a reconciliation report, not a general ledger.
+
+Focused acceptance evidence for that slice
+- CSV: comma/quote/newline in description, CRLF/BOM policy, trailing empty field, duplicate/missing headers, short/long rows, empty versus zero, line/row size limits; ordinary amount fields demonstrably survive import.
+- Money: 0.10 + 0.20 = 0.30 exactly; very large sums, negative/refund amounts, disallowed extra precision, overflow and mixed currencies rejected; JSON/storage roundtrip preserves value and declared scale.
+- Matching: exact match, no match, duplicate IDs, duplicate imports, many-to-one ambiguity, equal amounts with distinct references, zero and reversal; report conservation holds without counting a row twice.
+- Evidence/review: source CID changes, parser/rule changes and stale approvals rejected; unauthorized review denied; raw row/cell references recover the displayed value; no external service calls or posting side effects.
+- Follow-on only after this proof: independently reviewed balanced journal/fund schema, grant-budget linkage, jurisdiction/policy obligations and controlled approval/posting workflow. Do not scope a full ERP into the first parser fix.
+
+Source inspection targets
+src/commonMain/kotlin/borg/trikeshed/lcnc/reactor/CsvIngestCodec.kt
+src/commonTest/kotlin/borg/trikeshed/lcnc/reactor/CsvIngestCodecTest.kt
+src/commonMain/kotlin/borg/trikeshed/lcnc/rollup/RollupReducer.kt
+src/commonMain/kotlin/borg/trikeshed/parse/csv/
+src/jvmMain/kotlin/borg/trikeshed/relaxfactory/ConfixBean.kt
+src/jvmTest/kotlin/borg/trikeshed/relaxfactory/GwtCouchRequestFactoryTest.kt
+src/jvmMain/kotlin/borg/trikeshed/narsese/LegalNodes.kt
+src/jvmTest/kotlin/borg/trikeshed/lcnc/LegalCurationCouncilTest.kt
+src/commonMain/resources/lcnc/nonprofit/
+docs/lcnc/nonprofit-camel-postgres.md
