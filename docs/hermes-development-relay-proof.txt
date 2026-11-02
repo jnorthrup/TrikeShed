@@ -1,0 +1,54 @@
+Hermes actual inferred development-relay turn — 2026-11-02
+
+PASS: actual pinned AIAgent.run_conversation completed in 13.975038785 seconds
+within the unchanged 45-second full-turn bound. It used two newly inferred
+Sol6.1 development collaboration envelopes: first a recall tool decision, then
+an answer from the genuine host result. No provider outputs were prerecorded.
+This was a manual development collaboration relay through file-backed Htx,
+not an unattended provider API, billing measurement, native CLI/console run,
+or network-isolation proof. No API credentials were extracted or used.
+
+The first actual ModelMux request supplied only the host-generated reference
+f92a and CID sha256:6b56da513dc107d0742ccc23404d5b600722975b46b016fc906bf5be0dc0fa90.
+It did not contain the retained source text. The model inferred recall(ref,cid,
+presence=1). The real generation-owned host tool returned “HOST violet turbine”
+with exact UTF-16 range 0–19, selectedChars19 and omittedChars0. The second
+actual request carried that tool result; the model inferred the final quote
+and range. Neither request included the foreign session's private evidence;
+a separate actual foreign-context crossing returned forbidden.
+
+UTC host crossings:
+request1  21:34:14.802084630    response1 21:34:22.867907081
+request2  21:34:23.476432989    response2 21:34:27.352996713
+Donor completed=true, failed=false, api_calls=2. Provider token usage was not
+reported; no usage or cost was invented. The eight pen receipts include two
+successful model completions, one successful host recall and foreign refusal.
+
+Frozen donor pin: bec8f70c124be62703d37095621535c0a46ed6bf; all 8488 Python
+blobs in the external donor snapshot were verified against that Git tree.
+Compilation used immutable v17 host sources and frozen v18 classpath snapshots,
+with only the separately verified metadata green overlay for provider+catalog.
+No root live build classes or runtime source were copied or changed.
+The model card alias “fixture” declared a development bound131072; the metadata
+hook and actual donor compressor both read131072. That bound is test
+configuration, not a measurement or claim about Sol6.1's actual model capacity.
+
+Exact compiled host-source SHA256:
+HermesModelProvider.kt cb666e79e29d0af3268a1ddb7410f358bc5eb2fe96aa08ec581f290686ba695f
+HermesPythonPort.kt 236579d8d043dfc0741e742cfa19c39bb06d9e70df0c69cbac082a7bbf7542bc
+HermesPenDelegates.kt 93cc6f19ea4b8c6d2ffe2660ee2064b06c7ed4996c3cad54e262ff9aeea8632c
+HermesBreadcrumbTools.kt 964c955207307d2708931432569adf9bb66f9c39f021eca66f3e0d350decc4c4
+
+Artifacts: /workspace/library-files/hermes-development-relay-proof/run-v1/
+verified-summary.json independently checks source/response hashes, actual tool
+result CID, inferred responses, foreign refusal and cleanup. manifest.json and
+execution.json retain the source overlays and frozen classpath. requests/001.json,
+requests/002.json and responses/001.json, responses/002.json retain the complete
+actual exchanges; inference-001.json and inference-002.json retain matching
+request/response SHA256 and UTC inference/write times. result.log preserves the
+45-second clock, successful donor.close and host service shutdown.
+
+The authorized relay agent saw only actual request files, wrote each response
+after reading its request, and completed after its second inferred reply.
+The probe process exited0, its polling agent completed, stop.json prevents
+additional requests, and no owned probe or broker process remained running.
