@@ -142,8 +142,11 @@ class RlncDecoder(private val symbolSize: Int, private val validator: SymbolVali
     private fun solveSingles() {
         while (true) {
             val e = pivots.entries.firstOrNull { it.value.coeffs.size == 1 } ?: return
-            pivots.remove(e.key)
-            solved(e.value)
+            // Read the entry before the remove: a Kotlin/Native entry is a view that refuses reads once its map changes.
+            val seq = e.key
+            val row = e.value
+            pivots.remove(seq)
+            solved(row)
         }
     }
 
