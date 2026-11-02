@@ -1,0 +1,21 @@
+Exact retained-passage slice — verification 2026-11-02
+
+Feature source: 0868d8a9e (plus its parent 8b9dcc5e0).
+Checked in combined validation with current master and the independent Hermes
+and query-pilot slices; 81 selected JVM tests passed, no failures/errors/skips.
+The passage cases and actual project-route cases all passed. Kotlin/JS and the
+fresh Documents development bundle compiled successfully.
+
+Two Chromium proofs passed on frozen v18 main classes and the fresh UI bundle.
+The first used simulated HTTP to exercise UTF-16, revision mismatch, history,
+reload and stale-navigation cases. The second mounted a real synthetic secondary
+project and used ProjectScopes, JvmProjectCorpus, PatchWire, projectSource, a
+CAS-encoded DocumentCurationRecord and the production retained read route.
+A real proposal click highlighted the exact quotation; changing the source
+prevented the old passage from being highlighted. Application routes were read-only.
+
+This does not verify OCR, legal correctness, independent browser verification of
+CBOR bytes, or primary-project access. The primary scope has a separate missing
+corpus/admission adapter; this proof does not fabricate a primary database.
+Cloud commands, source/asset hashes, logs and exit codes:
+/workspace/library-files/passage-proof-v18/method.md.
