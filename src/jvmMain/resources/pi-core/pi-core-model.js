@@ -630,40 +630,40 @@ class Agent {
 
 __webpack_require__.r(__webpack_exports__);
 /* harmony export */ __webpack_require__.d(__webpack_exports__, {
-/* harmony export */   AssistantMessageEventStream: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.AssistantMessageEventStream),
-/* harmony export */   EventStream: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.EventStream),
-/* harmony export */   PI_ATTRIBUTION: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.PI_ATTRIBUTION),
-/* harmony export */   collapseSystemMessages: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.collapseSystemMessages),
-/* harmony export */   createAssistantMessageEventStream: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.createAssistantMessageEventStream),
-/* harmony export */   createInitialSystemMessage: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.createInitialSystemMessage),
-/* harmony export */   declarationsEqual: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.declarationsEqual),
-/* harmony export */   formatUserAgent: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.formatUserAgent),
-/* harmony export */   getAttributionHeaders: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getAttributionHeaders),
-/* harmony export */   getClientVersion: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getClientVersion),
-/* harmony export */   getCurrentSystemMessage: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentSystemMessage),
-/* harmony export */   getCurrentSystemPrompt: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentSystemPrompt),
-/* harmony export */   getCurrentTools: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentTools),
-/* harmony export */   getDeclaredTools: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getDeclaredTools),
-/* harmony export */   getIdentityHeaders: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getIdentityHeaders),
-/* harmony export */   getInitialSystemMessage: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getInitialSystemMessage),
-/* harmony export */   getOpenCodeSessionHeaders: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getOpenCodeSessionHeaders),
-/* harmony export */   getToolStateChanges: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getToolStateChanges),
-/* harmony export */   hasNonAdditiveToolChanges: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.hasNonAdditiveToolChanges),
-/* harmony export */   hasToolRedefinitions: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.hasToolRedefinitions),
-/* harmony export */   mergeClientIdentity: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.mergeClientIdentity),
-/* harmony export */   normalizeContext: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.normalizeContext),
-/* harmony export */   resolveTranscript: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.resolveTranscript),
-/* harmony export */   resolveTranscriptTools: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.resolveTranscriptTools),
-/* harmony export */   toToolDeclaration: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.toToolDeclaration),
-/* harmony export */   validateToolArguments: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__.validateToolArguments),
-/* harmony export */   validateToolCall: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__.validateToolCall),
-/* harmony export */   withClientIdentity: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.withClientIdentity),
-/* harmony export */   withoutInitialSystemMessage: () => (/* reexport safe */ _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.withoutInitialSystemMessage)
+/* harmony export */   AssistantMessageEventStream: () => (/* reexport safe */ _upstream_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.AssistantMessageEventStream),
+/* harmony export */   EventStream: () => (/* reexport safe */ _upstream_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.EventStream),
+/* harmony export */   PI_ATTRIBUTION: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.PI_ATTRIBUTION),
+/* harmony export */   collapseSystemMessages: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.collapseSystemMessages),
+/* harmony export */   createAssistantMessageEventStream: () => (/* reexport safe */ _upstream_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__.createAssistantMessageEventStream),
+/* harmony export */   createInitialSystemMessage: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.createInitialSystemMessage),
+/* harmony export */   declarationsEqual: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.declarationsEqual),
+/* harmony export */   formatUserAgent: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.formatUserAgent),
+/* harmony export */   getAttributionHeaders: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getAttributionHeaders),
+/* harmony export */   getClientVersion: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getClientVersion),
+/* harmony export */   getCurrentSystemMessage: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentSystemMessage),
+/* harmony export */   getCurrentSystemPrompt: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentSystemPrompt),
+/* harmony export */   getCurrentTools: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getCurrentTools),
+/* harmony export */   getDeclaredTools: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getDeclaredTools),
+/* harmony export */   getIdentityHeaders: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getIdentityHeaders),
+/* harmony export */   getInitialSystemMessage: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getInitialSystemMessage),
+/* harmony export */   getOpenCodeSessionHeaders: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.getOpenCodeSessionHeaders),
+/* harmony export */   getToolStateChanges: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.getToolStateChanges),
+/* harmony export */   hasNonAdditiveToolChanges: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.hasNonAdditiveToolChanges),
+/* harmony export */   hasToolRedefinitions: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.hasToolRedefinitions),
+/* harmony export */   mergeClientIdentity: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.mergeClientIdentity),
+/* harmony export */   normalizeContext: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.normalizeContext),
+/* harmony export */   resolveTranscript: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.resolveTranscript),
+/* harmony export */   resolveTranscriptTools: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.resolveTranscriptTools),
+/* harmony export */   toToolDeclaration: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.toToolDeclaration),
+/* harmony export */   validateToolArguments: () => (/* reexport safe */ _upstream_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__.validateToolArguments),
+/* harmony export */   validateToolCall: () => (/* reexport safe */ _upstream_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__.validateToolCall),
+/* harmony export */   withClientIdentity: () => (/* reexport safe */ _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__.withClientIdentity),
+/* harmony export */   withoutInitialSystemMessage: () => (/* reexport safe */ _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__.withoutInitialSystemMessage)
 /* harmony export */ });
-/* harmony import */ var _references_pi_mono_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
-/* harmony import */ var _references_pi_mono_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(5);
-/* harmony import */ var _references_pi_mono_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(6);
-/* harmony import */ var _references_pi_mono_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(8);
+/* harmony import */ var _upstream_packages_ai_src_utils_transcript_ts__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(3);
+/* harmony import */ var _upstream_packages_ai_src_utils_event_stream_ts__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(5);
+/* harmony import */ var _upstream_packages_ai_src_utils_identity_ts__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(6);
+/* harmony import */ var _upstream_packages_ai_src_utils_validation_ts__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(8);
 
 
 
