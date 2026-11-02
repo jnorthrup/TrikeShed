@@ -178,7 +178,11 @@ object GraalPiMain {
         if (result == null) respond(exchange, 404, "text/plain; charset=utf-8", ByteArray(0))
         else {
             result.headers.forEach { (name, value) -> exchange.responseHeaders.set(name, value) }
-            respond(exchange, result.status, result.contentType, result.payloadBytes)
+            val payload = if (exchange.requestMethod == "GET" && exchange.requestURI.path in _s["/pi", "/pi/"] && result.status == 200)
+                result.payloadBytes.decodeToString().replace("<body data-app-page=\"pi\">",
+                    "<body data-app-page=\"pi\" data-standalone=\"pi\">").encodeToByteArray()
+                else result.payloadBytes
+            respond(exchange, result.status, result.contentType, payload)
         }
     }
 

@@ -101,6 +101,7 @@ object PiPage {
                 val value = request("/session/status?sessionId=" + js("encodeURIComponent")(id))
                 if (page.closing || ticket != revision || sessionId != id) return@submit
                 state = strOrEmpty(value.state).ifBlank { "unknown" }
+                if (jsTypeOf(value.model) == "string") model().value = str(value.model)
                 if (js("Array").isArray(value.workspaceFiles) as Boolean && jsArray(value.workspaceFiles).isNotEmpty()) {
                     byId("pi-project").hidden = false
                     byId("pi-project").textContent = "Host source grant · " + jsArray(value.workspaceFiles).joinToString(", ") { str(it) }
