@@ -6,6 +6,7 @@ import borg.trikeshed.userspace.nio.file.spi.*
 import borg.trikeshed.userspace.nio.file.spi.fileIoContext
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.lang.System
 import kotlin.test.*
 
 class NativeHornBootstrapTest {
