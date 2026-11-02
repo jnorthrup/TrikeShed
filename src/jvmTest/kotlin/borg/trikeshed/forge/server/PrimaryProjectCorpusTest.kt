@@ -103,7 +103,7 @@ class PrimaryProjectCorpusTest {
             assertContentEquals("%PDF-fixture-v1".encodeToByteArray(), corpus.bytes(binding.name, "scan.pdf"),
                 "binary original bytes remain available through the read-only corpus")
             val admission = assertFailsWith<IllegalArgumentException> { rig.scopes.admitDocument(binding.name, id) }
-            assertContains(admission.message.orEmpty(), "no project db", "curation admission is a separate, still-unavailable capability")
+            assertContains(admission.message.orEmpty(), "no project db", message = "curation admission is a separate, still-unavailable capability")
 
             val wire = rig.wire(corpus)
             val base = "/api/projects/" + enc(binding.name) + "/docs"
