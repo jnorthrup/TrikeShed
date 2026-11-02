@@ -11,8 +11,10 @@ NativeHornProfile.parse(text) is a pure strict16KiB operator-JSON factory.
 Its exact required fields are binary, binarySha256, adapter, datalogDirectory;
 optional timeoutMillis is integral1..45000. Relative paths, duplicate/unknown
 fields and environment/argv/code fields refuse. It reads no ambient environment.
-Trusted daemon bootstrap owns TRIKESHED_NATIVE_HORN_PROFILE selection and bounded
-FileOperations config read; that wiring is supplied separately from this slice.
+OroborosLcncWiring.documentReview uses host FileOperations to load the optional
+TRIKESHED_NATIVE_HORN_PROFILE absolute operator JSON path, bounded to16KiB.
+Unset leaves /horn-query UNAVAILABLE. An invalid explicit profile fails startup.
+HTTP cannot select this profile. JSON accepts no environment/code/argv fields.
 
 The trusted constructor supplies a canonical native executable and its SHA256,
 canonical run.nix and datalog directory, curated process environment and a
