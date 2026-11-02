@@ -280,13 +280,13 @@ class CurationIntakeTest {
             },
         )
         val intake = CurationIntake(corpus, { runners }, { null }, this, { _, _ -> selected },
-            settled = { releases++; events.add("release") }) { provider, book ->
+            settled = { releases++; events.add("release") }, score = { provider, book ->
             scoring.complete(Unit)
             release.await()
             scored.add(provider to book)
             events.add("score")
             if (provider == DecisionProvider.OPENAI) error("provider unavailable")
-        }
+        })
         intake.offer("project", "book.pdf")
         intake.offer("project", "book.pdf")
         selected = DecisionProvider.OPENAI

@@ -25,6 +25,20 @@ class DocumentSurfaceTest {
     private val docsJson = """{"project":"genesis-notes","docs":[{"project":"genesis-notes","id":"a.md","cid":"sha256:59204cb01ed1947253923d","rev":"1-sha256:8fc0","seq":0,"length":73,"contentType":"text/markdown"},{"id":"c.txt","cid":"sha256:abc","rev":"1-x","seq":2,"length":13,"contentType":"text/plain"}],"count":2}"""
 
     @Test
+    fun uncheckedMetadataAndUnavailableSourceAreVisible() {
+        val rows = DocumentSurface.docs(reify("""{"docs":[{"id":"legal.txt","cid":"sha256:abc","contentStatus":"unchecked-metadata"}]}"""))
+        assertEquals("unchecked-metadata", rows.single().contentStatus)
+        val html = DocumentSurface.tableHtml("primary", rows)
+        assertTrue(html.contains("unchecked metadata"), html)
+        assertTrue(html.contains("opening a document verifies its bytes"), html)
+        assertTrue(DocumentSurface.pagesHtml("primary", rows, null).contains("title=\"Unchecked metadata: sha256:abc\""))
+        val unavailable = reify("""{"error":"source_unavailable_or_changed","id":"legal.txt"}""")
+        assertNull(DocumentSurface.document(unavailable))
+        assertTrue(DocumentSurface.documentError(unavailable)!!.contains("has not been verified"))
+        assertTrue(DocumentSurface.documentErrorHtml("<bad>").contains("&lt;bad&gt;"))
+    }
+
+    @Test
     fun theSidebarNestsAWorkspacesPagesUnderTheOpenOne() {
         val projects = DocumentSurface.projects(reify(projectsJson))
         assertEquals(listOf("genesis-notes", "trikeshed"), projects.map { it.name })

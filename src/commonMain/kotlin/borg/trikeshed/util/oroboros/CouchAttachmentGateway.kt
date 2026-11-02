@@ -5,6 +5,7 @@ import borg.trikeshed.couch.Document
 import borg.trikeshed.couch.Field
 import borg.trikeshed.job.CasStore
 import borg.trikeshed.job.ContentId
+import borg.trikeshed.job.BoundedCasReader
 import borg.trikeshed.lib.Series
 import borg.trikeshed.lib.Series2
 import borg.trikeshed.lib.j
@@ -24,6 +25,8 @@ class CouchAttachmentGateway(
     private val couchStore: CouchStore,
     private val casStore: CasStore
 ) {
+    internal fun uses(store: CouchStore): Boolean = couchStore === store
+    internal fun uses(reader: BoundedCasReader): Boolean = (casStore as Any) === reader
 
     /** [source]: the file [bytes] were read from; the CAS then names it in place rather than copying it. */
     fun putAttachment(ref: OroborosAttachmentRef, bytes: ByteArray, source: String? = null) {

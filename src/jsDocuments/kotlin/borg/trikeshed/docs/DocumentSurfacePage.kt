@@ -50,6 +50,7 @@ object DocumentSurfacePage {
     private var project: String? = null
     private var docs: List<DocRow> = emptyList()
     private var doc: DocView? = null
+    private var docError: String? = null
     private var blocks: List<RunBlock.Block> = emptyList()
     private var view: SurfaceView = SurfaceView.PAGE
     private var column: DocColumn = DocColumn.NAME
@@ -106,7 +107,7 @@ object DocumentSurfacePage {
                 }
             }
         } else {
-            generation++; clearPassage(); curationMode = false; project = null; doc = null
+            generation++; clearPassage(); curationMode = false; project = null; doc = null; docError = null
             docs = emptyList(); blocks = emptyList(); runStates.clear(); view = SurfaceView.PAGE
             render(keepLocation = true)
         }
@@ -241,7 +242,7 @@ object DocumentSurfacePage {
         val ticket = ++generation
         clearPassage()
         curationMode = false
-        project = name; doc = null; docs = emptyList()
+        project = name; doc = null; docError = null; docs = emptyList()
         view = SurfaceView.TABLE
         blocks = emptyList(); runStates.clear()
         render(keepLocation = true)
@@ -257,11 +258,13 @@ object DocumentSurfacePage {
         curationMode = false
         clearPassage()
         val generationHere = ++generation
-        doc = null; blocks = emptyList(); runStates.clear()
+        doc = null; docError = null; blocks = emptyList(); runStates.clear()
         render(keepLocation = true)
-        val loaded = DocumentSurface.document(getJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
+        val response = requestJson("/api/projects/" + encode(p) + "/docs/" + encode(id))
         if (generationHere != generation || project != p || curationMode) return
-        doc = loaded
+        docError = DocumentSurface.documentError(response)
+        doc = if (docError == null) DocumentSurface.document(response) else null
+        if (doc == null && docError == null) docError = "Document could not be read."
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
         render(keepLocation)
@@ -279,7 +282,7 @@ object DocumentSurfacePage {
     /** The receipt, project listing and current document belong to the same navigation ticket. */
     private suspend fun openPassage(p: String, id: String, receipt: String, ordinal: Int) {
         val ticket = ++generation
-        project = p; doc = null; curationMode = false; view = SurfaceView.PAGE
+        project = p; doc = null; docError = null; curationMode = false; view = SurfaceView.PAGE
         docs = emptyList(); blocks = emptyList(); runStates.clear()
         passageView = "<section data-passage-result=\"1\"><p>Reading selected passage…</p></section>"
         render(keepLocation = true)
@@ -290,8 +293,11 @@ object DocumentSurfacePage {
             DocumentSurface.curationResult(requestJson("/api/documents?cid=" + encode(receipt))) else null
         if (ticket != generation) return
         val selected = retained?.takeIf { it.receiptCid == receipt }?.let { DocumentSurface.passage(it, ordinal) }
-        val current = DocumentSurface.document(requestJson("/api/projects/" + encode(p) + "/docs/" + encode(id)))
+        val response = requestJson("/api/projects/" + encode(p) + "/docs/" + encode(id))
         if (ticket != generation || project != p || curationMode) return
+        docError = DocumentSurface.documentError(response)
+        val current = if (docError == null) DocumentSurface.document(response) else null
+        if (current == null && docError == null) docError = "Document could not be read."
         doc = current
         blocks = doc?.takeIf { DocumentSurface.isMarkdown(it) }?.let { RunBlock.scan(it.text) } ?: emptyList()
         runStates.clear()
@@ -371,7 +377,7 @@ object DocumentSurfacePage {
         setHtml(
             DocumentSurface.CONTENT_ID,
             if (view == SurfaceView.TABLE) DocumentSurface.tableHtml(project, docs, column, ascending, doc?.id)
-            else (passageView ?: "") + DocumentSurface.documentHtml(doc, runStates.toMap()),
+            else (passageView ?: "") + (docError?.let(DocumentSurface::documentErrorHtml) ?: DocumentSurface.documentHtml(doc, runStates.toMap())),
         )
         val p = project
         val wanted = if (p == null) "" else "#" + encode(p) + (doc?.let { "/" + encode(it.id) } ?: "")

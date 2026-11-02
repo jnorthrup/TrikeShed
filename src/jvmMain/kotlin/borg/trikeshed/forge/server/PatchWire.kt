@@ -1112,7 +1112,13 @@ class PatchWire(
                     val text = c.read(name, id, 262_144) ?: twin
                     if (text == null) {
                         val listed = c.document(name, id)
-                        if (listed == null) json(mapOf("error" to "absent", "project" to name, "id" to id), 404)
+                        if (listed == null) {
+                            val metadata = c.docs(name, id, "", 8).firstOrNull { it.id == id }
+                            if (metadata?.contentStatus == "unchecked-metadata")
+                                json(mapOf("error" to "source_unavailable_or_changed", "project" to name, "id" to id,
+                                    "contentStatus" to metadata.contentStatus), 503)
+                            else json(mapOf("error" to "absent", "project" to name, "id" to id), 404)
+                        }
                         else json(mapOf("error" to "not_text", "project" to name, "id" to id, "contentType" to listed.contentType, "length" to listed.length, "cid" to listed.cid), 415)
                     } else {
                         val notes = c.read(name, id + borg.trikeshed.lcnc.ProjectNodes.NOTES_SUFFIX, 262_144)
