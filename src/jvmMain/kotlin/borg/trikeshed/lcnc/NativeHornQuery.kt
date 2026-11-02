@@ -111,7 +111,7 @@ class NativeHornQuery(private val profile: NativeHornProfile) {
             }
             val pipes = JvmProcessProtocolPipes.open(
                 command = { _, _ -> _l[resolved.binary, "instantiate", "--eval", "--strict", "--json",
-                    "--readonly-mode", resolved.adapter, "--argstr", "sumoNix", resolved.datalog,
+                    "--readonly-mode", "--store", "dummy://", resolved.adapter, "--argstr", "sumoNix", resolved.datalog,
                     "--argstr", "input", path] },
                 environment = profile.environment, mergeError = true)
             // stderr shares this same finite cap. Diagnostics that make stdout non-JSON cause refusal.

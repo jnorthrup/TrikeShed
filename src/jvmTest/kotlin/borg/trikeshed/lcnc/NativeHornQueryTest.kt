@@ -5,6 +5,7 @@ import borg.trikeshed.job.*
 import borg.trikeshed.lib.*
 import borg.trikeshed.narsese.*
 import borg.trikeshed.ontology.CorpusOntology
+import borg.trikeshed.parse.jsonOf
 import kotlinx.coroutines.*
 import borg.trikeshed.userspace.nio.file.spi.JvmFileOperations
 import java.lang.System
@@ -61,13 +62,13 @@ class NativeHornQueryTest {
     }
 
 
-    internal fun profile(): NativeHornProfile = NativeHornProfile(
-        Path.of(System.getProperty("trikeshed.native.mlnix")),
-        System.getProperty("trikeshed.native.mlnix.sha256"),
-        Path.of(System.getProperty("trikeshed.native.adapter")),
-        Path.of(System.getProperty("trikeshed.native.datalog")),
-        _m["LD_LIBRARY_PATH" j System.getProperty("trikeshed.native.libraryPath"),
-            "NIX_REMOTE" j "dummy://"])
+    internal fun profile(): NativeHornProfile = NativeHornProfile.parse(jsonOf(_m[
+        "binary" j System.getProperty("trikeshed.native.mlnix"),
+        "binarySha256" j System.getProperty("trikeshed.native.mlnix.sha256"),
+        "adapter" j System.getProperty("trikeshed.native.adapter"),
+        "datalogDirectory" j System.getProperty("trikeshed.native.datalog")])).also {
+            assertTrue(it.environment.isEmpty(), "Parsed operator profile must work without constructor-only environment")
+        }
 
     @Test fun realNativeReviewQueryAndNoProofKeepWorldUnknown(): Unit = runBlocking(JvmFileOperations()) {
         val f = Fixture(); f.review.open(this)
