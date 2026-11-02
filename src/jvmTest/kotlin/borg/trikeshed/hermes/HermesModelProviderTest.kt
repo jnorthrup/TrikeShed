@@ -4,11 +4,67 @@ import borg.trikeshed.graal.ConfixBlackboard
 import borg.trikeshed.vm.Teleported
 import borg.trikeshed.agent.keymux.KeyMux
 import borg.trikeshed.agent.modelmux.ModelMux
+import borg.trikeshed.lib.*
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class HermesModelProviderTest {
+    @Test
+    fun providerContextLengthTracksKnownHostCatalogMetadata() {
+        val board = ConfixBlackboard.empty()
+        val lease = AtomicReference<ModelMux?>(ModelMux(KeyMux {}) {
+            model("known", contextWindow = 131072, caps = _s["chat"])
+            model("unknown", caps = _s["chat"])
+            model("invalid", contextWindow = -1, caps = _s["chat"])
+            defaultModel("known")
+        })
+        // Registry/base contracts are fixtures; GraalPy, provider source, host catalog and
+        // lease are production code. These capacities are synthetic catalog metadata.
+        val profiles = _m[
+            "providers" j ("providers/__init__.py" j """
+                profiles = {}
+                def register_provider(profile): profiles[profile.name] = profile
+            """.trimIndent()),
+            "providers.base" j ("providers/base.py" j """
+                class ProviderProfile:
+                    def __init__(self, **kwargs): self.__dict__.update(kwargs)
+                    def get_model_context_length(self, model): return None
+            """.trimIndent()),
+        ].mapValues { (_, entry) -> entry.pair }
+        HermesPythonPort(blackboard = board, pen = HermesPen(board, modelMuxProvider = lease::get)).use { port ->
+            port.importInVm(port.inventorySources(profiles), HermesModelProvider.MODULE)
+            assertEquals(Teleported.Bool(true), port.evalInVm("""
+                import trikeshed_modelmux as mux
+                profile = mux.register()
+                assert profile.get_model_context_length('known') == 131072
+                assert profile.get_model_context_length('unknown') is None
+                assert profile.get_model_context_length('invalid') is None
+                assert profile.get_model_context_length('missing') is None
+                assert profile.get_model_context_length(None) is None
+                True
+            """.trimIndent()))
+            lease.set(ModelMux(KeyMux {}) {
+                model("known", contextWindow = 65536, caps = _s["chat"])
+            })
+            assertEquals(Teleported.Bool(true), port.evalInVm("""
+                assert profile.get_model_context_length('known') == 65536
+                assert profile.get_model_context_length('unknown') is None
+                True
+            """.trimIndent()))
+            lease.set(null)
+            assertEquals(Teleported.Bool(true), port.evalInVm("""
+                try:
+                    profile.get_model_context_length('known')
+                except RuntimeError as error:
+                    assert 'no-mux' in str(error)
+                else:
+                    raise AssertionError('revoked metadata lease admitted')
+                True
+            """.trimIndent()))
+        }
+    }
+
     @Test
     fun leasedProviderResolvesWithoutGuestCredentialsAndRetainsForeignResolvers() {
         val board = ConfixBlackboard.empty()
