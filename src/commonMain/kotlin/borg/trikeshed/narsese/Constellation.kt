@@ -60,7 +60,7 @@ data class NormStatement(
     /** What must hold for the norm to apply: the condition without its mark ("rent be due"). */
     val premise: String? get() = condition?.substringAfter(' ')
 
-    /** An `unless` condition: the norm applies while its premise is absent. */
+    /** An `unless` condition: the norm applies when its premise is explicitly false. */
     val unless: Boolean get() = condition?.startsWith("unless ") == true
 
     /** The rule's antecedent: the bearer, conjoined with the condition when one opens the clause. */
@@ -216,7 +216,7 @@ class Constellation(val name: String) {
     var unconditioned = RoaringSeries.EMPTY
         private set
 
-    /** Statements whose condition is `unless`: they fire on the premise's absence. */
+    /** Statements whose condition is `unless`: they require explicit negative evidence. */
     var unless = RoaringSeries.EMPTY
         private set
 
@@ -262,29 +262,40 @@ class Constellation(val name: String) {
         return out
     }
 
-    /** The join's result: statements that fire, and per missing premise the statements waiting on it. */
-    class Fired(val fires: RoaringSeries, val pending: Map<String, RoaringSeries>)
+    /** Pending means neither sign is known; blocked and conflicted are distinct from absence. */
+    class Fired(val fires: RoaringSeries, val pending: Map<String, RoaringSeries>,
+                val blocked: Map<String, RoaringSeries>, val conflicted: Map<String, RoaringSeries>)
 
     /**
      * Rete join: the alpha match for the class whose self+ancestor ids are [mask], AND the beta
-     * memory of the [facts] that hold. Unconditioned statements fire; a conditioned one fires when its
-     * premise is a fact (an `unless` one when it is not), else it waits on its premise.
+     * memory of the [facts] that hold and explicitly supplied [negativeFacts]. Absence from [facts]
+     * does not establish a negative fact. Conflicting signs never fire a conditioned statement.
      */
-    fun fire(mask: RoaringSeries, facts: Set<String>): Fired {
+    fun fire(mask: RoaringSeries, facts: Set<String>, negativeFacts: Set<String> = emptySet()): Fired {
         val alpha = applicable(mask)
         var fires = alpha and unconditioned
         val pending = LinkedHashMap<String, RoaringSeries>()
+        val blocked = LinkedHashMap<String, RoaringSeries>()
+        val conflicted = LinkedHashMap<String, RoaringSeries>()
         for ((p, ids) in premised) {
             val hit = alpha and ids
             if (hit.isEmpty()) continue
-            if (p in facts) fires = fires or hit.andNot(unless)
-            else {
-                fires = fires or (hit and unless)
-                val waiting = hit.andNot(unless)
-                if (!waiting.isEmpty()) pending[p] = waiting
+            when {
+                p in facts && p in negativeFacts -> conflicted[p] = hit
+                p in facts -> {
+                    fires = fires or hit.andNot(unless)
+                    val stopped = hit and unless
+                    if (!stopped.isEmpty()) blocked[p] = stopped
+                }
+                p in negativeFacts -> {
+                    fires = fires or (hit and unless)
+                    val stopped = hit.andNot(unless)
+                    if (!stopped.isEmpty()) blocked[p] = stopped
+                }
+                else -> pending[p] = hit
             }
         }
-        return Fired(fires, pending)
+        return Fired(fires, pending, blocked, conflicted)
     }
 
     fun join(book: Book): Int {

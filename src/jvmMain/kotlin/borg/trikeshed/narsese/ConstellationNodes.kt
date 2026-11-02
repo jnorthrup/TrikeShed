@@ -330,8 +330,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
 
     /**
      * `constellation.ask`: the norms a SUMO class holds in a constellation: stated of it, or stated of
-     * an ancestor and deduced down is-a, revised with its own evidence. Tells `(normHeld Class
-     * "predication" Via "f" "c")` per held norm.
+     * an ancestor and deduced down is-a, revised with its own evidence. Publishes only unconditional
+     * `normHeld` assertions because the global KIF store has no place for this query's premises.
+     * Negative premises are caller-supplied, not verified.
      */
     private val ask = LcncNodeRunner { node, inputs ->
         val name = node.params["constellation"]?.takeIf { it.isNotBlank() } ?: error("constellation.ask: name the constellation")
@@ -345,14 +346,23 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
         // The join: facts read by the same parser as the norms, in premise form.
         val factText = ((inputs["facts"] ?: inputs["facts?"])?.toString() ?: node.params["facts"]).orEmpty()
         val facts = if (factText.isBlank()) emptySet() else NormClauses.facts(CoreNlpRuntime().use { it.analyze(factText) })
-        val fired = c.fire(SumoCorpus.closure(id), c.facts + facts)
+        val negativeInput = inputs["negativeFacts"] ?: inputs["negativeFacts?"]
+        val negativeFacts = if (negativeInput == null) emptySet() else {
+            val values = negativeInput as? List<*> ?: error("constellation.ask: negativeFacts must be an array of exact premise strings")
+            require(values.size <= 256 && values.all { it is String && it.isNotBlank() && it.length <= 8192 }) {
+                "constellation.ask: negativeFacts must contain at most 256 nonblank premise strings"
+            }
+            values.map { it as String }.toSet()
+        }
+        val fired = c.fire(SumoCorpus.closure(id), c.facts + facts, negativeFacts)
         fun addresses(ids: RoaringSeries) = ids.toIntArray().map { "constellation/$name/norm/${c.statements[it].id}" }
         fun q(s: String) = "\"" + s.replace("\"", "\\\"") + "\""
         val className = sumo.className(SumoClassId(id))
-        val rows = held.map { h ->
+        val rows = held.filter { h -> h.statements.isNotEmpty() && h.statements.all { fired.fires.contains(it) } }.map { h ->
             val t = Nal.truthOf(h.belief)
             val via = sumo.className(SumoClassId(h.via))
-            bank?.assertKif("(normHeld $className ${q(c.predicationNames[h.predication])} $via ${q("%.2f".format(t.frequency))} ${q("%.2f".format(t.confidence))})")
+            if (h.statements.all { c.statements[it].premise == null })
+                bank?.assertKif("(normHeld $className ${q(c.predicationNames[h.predication])} $via ${q("%.2f".format(t.frequency))} ${q("%.2f".format(t.confidence))})")
             mapOf("predication" to c.predicationNames[h.predication], "via" to via,
                 "frequency" to t.frequency, "confidence" to t.confidence,
                 "inherited" to h.inherited?.let { Nal.truthOf(it).let { d -> "%.2f/%.2f".format(d.frequency, d.confidence) } },
@@ -360,7 +370,9 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
                 "norms" to h.statements.map { "constellation/$name/norm/${c.statements[it].id}" })
         }
         mapOf("class" to className, "held" to rows, "count" to rows.size, "facts" to facts.toList(),
-            "fires" to addresses(fired.fires), "pending" to fired.pending.mapValues { addresses(it.value) })
+            "negativeFacts" to negativeFacts.toList(), "negativeFactsSource" to "caller-provided-unverified",
+            "fires" to addresses(fired.fires), "pending" to fired.pending.mapValues { addresses(it.value) },
+            "blocked" to fired.blocked.mapValues { addresses(it.value) }, "conflicted" to fired.conflicted.mapValues { addresses(it.value) })
     }
 
     /**
@@ -1614,6 +1626,8 @@ class ConstellationNodes(private val stateDir: File, private val blackboard: Con
             "premises" to premises.mapIndexed { i, pr -> mapOf("premise" to pr, "question" to question(pr), "holds" to Jev.noulOf(answers, "premise_$i")) },
             "fires" to fired.fires.toIntArray().take(RANKED).map { c.statements[it].sentence },
             "pending" to fired.pending.entries.take(RANKED).associate { (pr, ids) -> question(pr) to ids.toIntArray().map { c.statements[it].sentence } },
+            "blocked" to fired.blocked.entries.take(RANKED).associate { (pr, ids) -> question(pr) to ids.toIntArray().map { c.statements[it].sentence } },
+            "conflicted" to fired.conflicted.entries.take(RANKED).associate { (pr, ids) -> question(pr) to ids.toIntArray().map { c.statements[it].sentence } },
         )
     }
 
