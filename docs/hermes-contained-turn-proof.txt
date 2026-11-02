@@ -13,6 +13,14 @@ Final phase-v17 elapsed 1,924,762,843 ns within the existing 45,000 ms turn boun
 Fixture card context window 131072 and token usage are declared synthetic data;
 no live provider inference or billing was exercised.
 
+Metadata boundary verified separately in phase-v18: 131072 was the HOST ModelMux
+card/breadcrumb budget only. The donor provider hook returned None; the donor's
+normal unknown-model fallback and compressor used 256000, with no config override.
+The hook was providers.base.ProviderProfile.get_model_context_length; donor Python
+blobs matched the pinned fork. There was no external provider/sleeve metadata hook.
+This fixture proves the turn, not alignment of donor context budgeting with the
+host card. Real provider context bounds require the separate metadata bridge.
+
 Three demonstrated blockers were fixed separately:
 * Official pinned pure Snowball wheel was missing from the guest module mount.
 * Non-delegating rounds imported the optional delegation backend and native SQLite.
