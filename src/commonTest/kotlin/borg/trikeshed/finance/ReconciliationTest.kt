@@ -58,16 +58,16 @@ class ReconciliationTest {
     }
 
     @Test fun invalidCurrencyAmountEvidenceAndOverflowMarkIncomplete(): Unit {
-        val invalid = reconcile(bank, expenditure, s_[row(bank, code = "EUR"), row(bank, "2", 2, "0.001"), row(bank, "3", 3).copy(sourceCid = expenditure.sourceCid)], s_[], usd, policy)
+        val invalid = reconcile(bank, expenditure, s_[row(bank, code = "EUR"), row(bank, "2", 2, "0.001"), row(bank, "3", 3).copy(sourceCid = expenditure.sourceCid)], emptySeriesOf<FinanceRow>(), usd, policy)
         assertFalse(invalid.complete)
         assertTrue(invalid.entries.view.all { it.disposition == ReconcileDisposition.INVALID })
         assertNull(invalid.bankTotals.input)
-        val overflow = reconcile(bank, expenditure, s_[row(bank, amount = "92233720368547758.07"), row(bank, "2", 2, "0.01", "other")], s_[], usd, policy)
+        val overflow = reconcile(bank, expenditure, s_[row(bank, amount = "92233720368547758.07"), row(bank, "2", 2, "0.01", "other")], emptySeriesOf<FinanceRow>(), usd, policy)
         assertFalse(overflow.complete)
         assertNull(overflow.bankTotals.input)
         assertFalse(overflow.bankTotals.conserved)
         assertEquals(2, overflow.entries.size)
-        val underflow = reconcile(bank, expenditure, s_[row(bank, amount = "-92233720368547758.08"), row(bank, "2", 2, "-0.01", "other")], s_[], usd, policy)
+        val underflow = reconcile(bank, expenditure, s_[row(bank, amount = "-92233720368547758.08"), row(bank, "2", 2, "-0.01", "other")], emptySeriesOf<FinanceRow>(), usd, policy)
         assertFalse(underflow.complete)
         assertNull(underflow.bankTotals.input)
         assertFalse(underflow.bankTotals.conserved)
@@ -80,7 +80,7 @@ class ReconciliationTest {
         assertTrue(differentDate.entries.view.all { it.disposition == ReconcileDisposition.UNMATCHED })
         val withoutDate = reconcile(bank, expenditure, s_[row(bank)], s_[row(expenditure, date = "2026-11-03")], usd, ReconcilePolicy("no-date-v1", false, "cash"))
         assertTrue(withoutDate.entries.view.all { it.disposition == ReconcileDisposition.EXACT })
-        val badDate = reconcile(bank, expenditure, s_[row(bank, date = "2026-02-30")], s_[], usd, policy)
+        val badDate = reconcile(bank, expenditure, s_[row(bank, date = "2026-02-30")], emptySeriesOf<FinanceRow>(), usd, policy)
         assertFalse(badDate.complete)
         val replaySource = expenditure.copy(sourceCid = bank.sourceCid)
         val replay = reconcile(bank, replaySource, s_[row(bank)], s_[row(replaySource)], usd, policy)
@@ -91,11 +91,11 @@ class ReconciliationTest {
         assertFails { bank.copy(revision = "") }
         assertFails { bank.copy(parserIdentity = "") }
         assertFails { policy.copy(accountScope = "") }
-        val account = reconcile(bank, expenditure, s_[row(bank).copy(account = "other")], s_[], usd, policy)
+        val account = reconcile(bank, expenditure, s_[row(bank).copy(account = "other")], emptySeriesOf<FinanceRow>(), usd, policy)
         assertEquals(ReconcileDisposition.INVALID, account.entries[0].disposition)
-        val oversized = reconcile(bank, expenditure, s_[row(bank).copy(rawRow = "x".repeat(RECONCILE_RAW_CHARS + 1))], s_[], usd, policy)
+        val oversized = reconcile(bank, expenditure, s_[row(bank).copy(rawRow = "x".repeat(RECONCILE_RAW_CHARS + 1))], emptySeriesOf<FinanceRow>(), usd, policy)
         assertFalse(oversized.complete)
         val tooMany = (RECONCILE_ROWS + 1) j { _: Int -> row(bank) }
-        assertFails { reconcile(bank, expenditure, tooMany, s_[], usd, policy) }
+        assertFails { reconcile(bank, expenditure, tooMany, emptySeriesOf<FinanceRow>(), usd, policy) }
     }
 }
