@@ -111,9 +111,10 @@ let agent;
 let result;
 globalThis.piRuntimeInfo = function() {
   return JSON.stringify({
+    formatVersion: 1,
     runtime: 'GraalJS', transport: 'ModelMux', initialized: !!agent,
     model: agent?.state.model?.id ?? null,
-    tools: agent ? agent.state.tools.map(tool => tool.name) : [],
+    tools: agent ? agent.state.tools.map(tool => tool.name).sort() : [],
     buffered: true,
   });
 };
