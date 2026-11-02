@@ -1,0 +1,185 @@
+name: Upload verified Graal Pi release
+on:
+  workflow_dispatch:
+    inputs:
+      manifest_blob:
+        description: Git blob SHA of the verified asset manifest
+        required: true
+        type: string
+      manifest_sha256:
+        description: SHA256 of the raw manifest bytes
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: graal-pi-release-431920067
+  cancel-in-progress: false
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MANIFEST_BLOB: ${{ inputs.manifest_blob }}
+      MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+    steps:
+      - name: Verify, upload and publish exact assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, re, subprocess, tempfile, urllib.request
+
+          REPO = 'jnorthrup/TrikeShed'
+          RELEASE = 431920067
+          TAG = 'v0.4.8-graal-pi-preview.1'
+          SOURCE = '6c6d1e05aecdf854bf601a4f9aa03d01df915e37'
+          NAMES = {'SHA256SUMS', 'graal-pi-0.4.8-graal-pi-preview.1.tar.gz',
+                   'graal-pi-0.4.8-graal-pi-preview.1.zip', 'graal-pi-evidence.zip',
+                   'graal-pi-release-ready.png', 'graal-pi-self-edit.png', 'release-evidence.json'}
+          MiB = 1024 * 1024
+
+          def require(ok, message):
+              if not ok:
+                  raise RuntimeError(message)
+
+          def hexvalue(value, length):
+              return isinstance(value, str) and re.fullmatch('[0-9a-f]{' + str(length) + '}', value) is not None
+
+          def integer(value, low, high):
+              return type(value) is int and low <= value <= high
+
+          def keys(value, expected):
+              return isinstance(value, dict) and set(value) == set(expected)
+
+          def unique(pairs):
+              result = {}
+              for key, value in pairs:
+                  require(key not in result, 'Duplicate JSON key')
+                  result[key] = value
+              return result
+
+          def api(path, method='GET', body=None, limit=2 * MiB):
+              payload = None if body is None else json.dumps(body).encode()
+              request = urllib.request.Request('https://api.github.com/repos/' + REPO + '/' + path,
+                  data=payload, method=method, headers={
+                      'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                      'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json',
+                      'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'graal-pi-verified-release'})
+              with urllib.request.urlopen(request, timeout=120) as response:
+                  raw = response.read(limit + 1)
+              require(len(raw) <= limit, 'API response exceeds bound')
+              return json.loads(raw, object_pairs_hook=unique)
+
+          def blob(sha, size):
+              require(hexvalue(sha, 40), 'Invalid blob SHA')
+              result = api('git/blobs/' + sha, limit=12 * MiB)
+              require(result.get('sha') == sha and result.get('size') == size and
+                      result.get('encoding') == 'base64', 'Blob metadata mismatch')
+              encoded = result.get('content')
+              require(isinstance(encoded, str), 'Missing blob content')
+              raw = base64.b64decode(''.join(encoded.split()), validate=True)
+              require(len(raw) == size, 'Blob size mismatch')
+              gitsha = hashlib.sha1(b'blob ' + str(size).encode() + b'\0' + raw).hexdigest()
+              require(gitsha == sha, 'Git object hash mismatch')
+              return raw
+
+          manifest_sha = os.environ['MANIFEST_BLOB']
+          require(hexvalue(manifest_sha, 40) and hexvalue(os.environ['MANIFEST_SHA256'], 64),
+                  'Invalid manifest inputs')
+          metadata = api('git/blobs/' + manifest_sha)
+          require(integer(metadata.get('size'), 1, 65536), 'Manifest size outside bound')
+          raw = blob(manifest_sha, metadata['size'])
+          require(hashlib.sha256(raw).hexdigest() == os.environ['MANIFEST_SHA256'], 'Manifest digest mismatch')
+          manifest = json.loads(raw, object_pairs_hook=unique)
+          require(keys(manifest, ['repository', 'releaseId', 'tag', 'draft', 'sourceCommit', 'files']), 'Manifest fields mismatch')
+          require(manifest['repository'] == REPO and type(manifest['releaseId']) is int and
+                  manifest['releaseId'] == RELEASE and manifest['tag'] == TAG and
+                  manifest['sourceCommit'] == SOURCE and manifest['draft'] is True, 'Manifest release identity mismatch')
+          files = manifest['files']
+          require(isinstance(files, list) and len(files) == 7, 'Expected exactly seven files')
+          names = []
+          total = 0
+          for item in files:
+              require(keys(item, ['name', 'size', 'sha256', 'parts']), 'Invalid file fields')
+              require(isinstance(item['name'], str) and item['name'] in NAMES and integer(item['size'], 1, 100 * MiB) and
+                      hexvalue(item['sha256'], 64), 'Invalid file identity or bounds')
+              names.append(item['name'])
+              total += item['size']
+              chunks = item['parts']
+              require(isinstance(chunks, list) and 1 <= len(chunks) <= 13, 'Invalid chunk count')
+              for chunk in chunks:
+                  require(keys(chunk, ['sha', 'size']) and hexvalue(chunk['sha'], 40) and
+                          integer(chunk['size'], 1, 8 * MiB), 'Invalid chunk fields or bounds')
+              require(sum(chunk['size'] for chunk in chunks) == item['size'], 'Chunk sizes do not sum to file size')
+          require(set(names) == NAMES and len(set(names)) == 7 and total <= 200 * MiB, 'Asset set or total bound mismatch')
+
+          def release():
+              value = api('releases/' + str(RELEASE))
+              require(value.get('id') == RELEASE and value.get('tag_name') == TAG and
+                      type(value.get('draft')) is bool, 'Remote release identity mismatch')
+              return value
+
+          def assets():
+              result = api('releases/' + str(RELEASE) + '/assets?per_page=100')
+              require(isinstance(result, list) and len(result) <= 7, 'Unexpected remote assets')
+              names = [item.get('name') for item in result]
+              require(len(set(names)) == len(names) and set(names) <= NAMES, 'Unexpected or duplicate remote asset names')
+              return {item['name']: item for item in result}
+
+          def verify_remote(asset, expected, directory):
+              require(asset.get('size') == expected['size'] and asset.get('state') == 'uploaded', 'Existing asset size/state mismatch')
+              digest = asset.get('digest')
+              if digest is not None:
+                  require(digest == 'sha256:' + expected['sha256'], 'Existing asset digest mismatch')
+              else:
+                  target = directory / ('download-' + expected['name'])
+                  with target.open('wb') as output:
+                      subprocess.run(['gh', 'api', 'repos/' + REPO + '/releases/assets/' + str(asset['id']),
+                          '-H', 'Accept: application/octet-stream'], stdout=output, check=True, timeout=180)
+                  require(target.stat().st_size == expected['size'], 'Downloaded asset size mismatch')
+                  require(hashlib.file_digest(target.open('rb'), 'sha256').hexdigest() == expected['sha256'],
+                          'Downloaded asset hash mismatch')
+                  target.unlink()
+
+          initial = release()
+          with tempfile.TemporaryDirectory(prefix='graal-pi-upload-') as temporary:
+              directory = pathlib.Path(temporary)
+              current = assets()
+              if not initial['draft']:
+                  require(set(current) == NAMES, 'Published release has missing assets; refusing mutation')
+                  for item in files:
+                      verify_remote(current[item['name']], item, directory)
+              else:
+                  # Reconstruct and verify every file before any upload.
+                  for item in files:
+                      target = directory / item['name']
+                      with target.open('wb') as output:
+                          for chunk in item['parts']:
+                              output.write(blob(chunk['sha'], chunk['size']))
+                      require(target.stat().st_size == item['size'], 'Reconstructed file size mismatch')
+                      with target.open('rb') as source:
+                          require(hashlib.file_digest(source, 'sha256').hexdigest() == item['sha256'], 'Reconstructed file digest mismatch')
+                  evidence = json.loads((directory / 'release-evidence.json').read_bytes(), object_pairs_hook=unique)
+                  require(evidence.get('sourceCommit') == SOURCE, 'Release evidence source mismatch')
+                  for item in files:
+                      if item['name'] in current:
+                          verify_remote(current[item['name']], item, directory)
+                  for item in files:
+                      if item['name'] not in current:
+                          require(release()['draft'], 'Release published during upload; refusing mutation')
+                          subprocess.run(['gh', 'release', 'upload', TAG, str(directory / item['name']),
+                              '--repo', REPO], check=True, timeout=300)
+                  final = assets()
+                  require(set(final) == NAMES, 'Incomplete remote asset set')
+                  for item in files:
+                      verify_remote(final[item['name']], item, directory)
+                  require(release()['draft'], 'Release changed during verification')
+                  published = api('releases/' + str(RELEASE), method='PATCH', body={'draft': False})
+                  require(published.get('draft') is False and published.get('tag_name') == TAG, 'Publication verification failed')
+          final_release = release()
+          require(final_release['draft'] is False, 'Release is still draft')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('Verified all seven Graal Pi assets by size and SHA256; release is published.\n\n')
+              summary.write('https://github.com/' + REPO + '/releases/tag/' + TAG + '\n')
+          PY
