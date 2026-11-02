@@ -12,7 +12,10 @@ class ProcessCaptureBoundedTest {
     private suspend fun capture(mode: String, strict: Boolean = true, wall: Long = 5000): ProcessCaptureChannel {
         val pipes = JvmProcessProtocolPipes.open({ _, _ -> _l[
             Path.of(System.getProperty("java.home"), "bin", "java").toString(), "-cp",
-            System.getProperty("java.class.path"), CaptureFixture::class.java.name, mode] }, emptyMap(), mergeError = true)
+            _l[CaptureFixture::class.java.protectionDomain.codeSource.location,
+                Unit::class.java.protectionDomain.codeSource.location]
+                .joinToString(java.io.File.pathSeparator) { Path.of(it.toURI()).toString() },
+            CaptureFixture::class.java.name, mode] }, emptyMap(), mergeError = true)
         return ProcessCaptureChannel(currentCoroutineContext(), pipes, maxBytes = 1024,
             timeoutMillis = wall, failOnOverflow = strict)
     }
