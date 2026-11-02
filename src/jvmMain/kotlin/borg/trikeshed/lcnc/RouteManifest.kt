@@ -103,6 +103,9 @@ object RouteManifest {
             RouteEntry("GET", "/rest/v1/rpc/{fn}", "a stable function called with its arguments in the query string"),
             RouteEntry("POST", "/pg/query", "pg-meta raw SQL: SELECT, CREATE TABLE, DROP TABLE, and SPARQL … (SPASQL) over DB.DBA.RDF_QUAD"),
         ),
+        "DocumentReviewWire" to listOf(
+            RouteEntry("POST", "/api/documents/review/taxonomy-plan", "Authenticated non-consuming current STRICT_BOOK inspection with explicit taxonomy exclusions; no sink permit or norm promotion"),
+        ),
         // -- SparqlWire: Virtuoso's SPARQL endpoint over the quad store --
         "SparqlWire" to listOf(
             RouteEntry("GET", "/sparql", "SPARQL 1.1 protocol: query, default-graph-uri, named-graph-uri; format or Accept picks results JSON, CSV or TSV"),

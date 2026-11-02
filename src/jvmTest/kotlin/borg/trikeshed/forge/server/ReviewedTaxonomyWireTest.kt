@@ -75,6 +75,11 @@ class ReviewedTaxonomyWireTest {
             request("taxonomy-plan", goal(approved["revision"]) + ("review" to "approved"), status = 409)
             val wal = documents.resolve("review.wal")
             val walSize = Files.size(wal)
+            val getPath = "/api/documents/review/taxonomy-plan"
+            val get = assertNotNull(ctx.routes.match(getPath)?.route("GET", getPath,
+                "GET $getPath HTTP/1.1\r\nAuthorization: Bearer $token\r\n\r\n", null))
+            assertEquals(405, get.status)
+            assertEquals(walSize, Files.size(wal), "Refused GET must not append a review event")
             val first = request("taxonomy-plan", goal(approved["revision"]))
             val second = request("taxonomy-plan", goal(approved["revision"]))
             assertEquals(walSize, Files.size(wal), "Read must not append a review event")

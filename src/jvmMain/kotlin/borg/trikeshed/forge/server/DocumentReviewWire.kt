@@ -210,6 +210,8 @@ class DocumentReviewWire private constructor(
         if ((endpoint.endsWith("/decision") || endpoint.endsWith("/session") || endpoint.endsWith("/release") ||
                 endpoint.endsWith("/assess") || endpoint.endsWith("/assessment") || endpoint.endsWith("/taxonomy-plan")) && actor == null)
             return json(mapOf("error" to "authenticated_reviewer_required"), 401)
+        if (endpoint.endsWith("/taxonomy-plan") && method != "POST")
+            return json(mapOf("error" to "method_not_allowed"), 405)
         return try {
             requests.call {
                 when {
